@@ -2,67 +2,117 @@
 
 本台账是发布前许可检查的输入。未完整登记、未完成许可核验的依赖、数据集或模型不得进入正式发布包。
 
-## Kotlin
-- 名称: Kotlin
-- 版本: 2.1.21
+## androidx-core-ktx
+- 名称: AndroidX Core KTX
+- 版本: 1.17.0
 - 许可证: Apache-2.0
-- 用途: Android 应用与构建逻辑编程语言
-- 数据流: 不处理用户或网络数据；仅在构建时编译本地源代码
+- 用途: Android Kotlin 基础兼容 API
+- 数据流: 仅在设备内处理应用状态，不传输用户数据
 - NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
-- 替代方案: Java
+- 替代方案: Android 平台 API
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
 
-## androidx-compose
-- 名称: Jetpack Compose BOM 与 UI
+## androidx-activity-compose
+- 名称: AndroidX Activity Compose
+- 版本: 1.12.1
+- 许可证: Apache-2.0
+- 用途: Compose Activity 集成
+- 数据流: 仅在设备内托管 UI 状态，不传输用户数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: Android Views Activity
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-compose-bom
+- 名称: Jetpack Compose BOM
 - 版本: 2025.12.00
 - 许可证: Apache-2.0
+- 用途: 对齐 Compose 依赖版本
+- 数据流: 仅在构建时解析版本，不处理用户数据
+- NOTICE 位置: 构建元数据与本文件
+- 替代方案: 分别固定 Compose 模块版本
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-compose-ui
+- 名称: Jetpack Compose UI
+- 版本: 由 androidx-compose-bom 2025.12.00 管理
+- 许可证: Apache-2.0
 - 用途: 声明式本地 Android UI
-- 数据流: 仅在设备内渲染应用状态；本阶段不发起网络请求、不收集用户数据
+- 数据流: 仅在设备内渲染应用状态，不发起网络请求
 - NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
 - 替代方案: Android Views
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
 
-## androidx-room
-- 名称: Room
+## androidx-compose-material3
+- 名称: Jetpack Compose Material 3
+- 版本: 由 androidx-compose-bom 2025.12.00 管理
+- 许可证: Apache-2.0
+- 用途: 本地 Material 3 UI 组件
+- 数据流: 仅在设备内渲染 UI，不收集或传输用户数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: 自定义 Compose 组件
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-room-runtime
+- 名称: Room Runtime
 - 版本: 2.8.4
 - 许可证: Apache-2.0
-- 用途: 后续本地关系数据访问与 schema 生成
-- 数据流: 本阶段不创建业务数据；后续仅处理应用私有存储中的本地数据，不传输网络数据
+- 用途: 后续本地关系数据访问
+- 数据流: 后续仅处理应用私有存储中的本地数据，不传输网络数据
 - NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
 - 替代方案: SQLiteDatabase
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
 
-## hilt
-- 名称: Dagger Hilt
+## androidx-room-ktx
+- 名称: Room KTX
+- 版本: 2.8.4
+- 许可证: Apache-2.0
+- 用途: Room Kotlin 协程扩展
+- 数据流: 后续仅处理应用私有存储中的本地数据，不传输网络数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: Room Java API
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-room-compiler
+- 名称: Room Compiler
+- 版本: 2.8.4
+- 许可证: Apache-2.0
+- 用途: Room schema 与 DAO 代码生成
+- 数据流: 仅在构建时读取本地源代码，不处理用户数据
+- NOTICE 位置: 构建插件依赖与本文件
+- 替代方案: 手写 SQLite 访问层
+- 商业分发结论: 构建依赖不随 APK 分发，可商业使用并保留 Apache-2.0 说明
+
+## androidx-security-crypto
+- 名称: AndroidX Security Crypto
+- 版本: 1.1.0
+- 许可证: Apache-2.0
+- 用途: 后续 Android Keystore 支撑的本地安全存储
+- 数据流: 后续仅处理设备内凭据密文，不上传网络
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: Android Keystore 平台 API
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## hilt-android
+- 名称: Dagger Hilt Android
 - 版本: 2.57.2
 - 许可证: Apache-2.0
-- 用途: 后续依赖注入编译与运行时组装
+- 用途: 后续依赖注入运行时组装
 - 数据流: 不处理、收集或传输用户数据
 - NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
 - 替代方案: 手写构造函数注入
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
 
-## androidx-security
-- 名称: AndroidX Security Crypto
-- 版本: 1.1.0
+## hilt-compiler
+- 名称: Dagger Hilt Compiler
+- 版本: 2.57.2
 - 许可证: Apache-2.0
-- 用途: 后续 Android Keystore 支撑的本地安全存储
-- 数据流: 本阶段不保存密钥；后续仅处理设备内凭据密文，不上传网络
-- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
-- 替代方案: Android Keystore 平台 API
-- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+- 用途: Hilt 注入代码生成
+- 数据流: 仅在构建时读取本地源代码，不处理用户数据
+- NOTICE 位置: 构建插件依赖与本文件
+- 替代方案: 手写依赖注入
+- 商业分发结论: 构建依赖不随 APK 分发，可商业使用并保留 Apache-2.0 说明
 
-## kotlin-test-junit5
-- 名称: Kotlin Test JUnit 5
-- 版本: 2.1.21
-- 许可证: Apache-2.0
-- 用途: Kotlin 单元测试断言与 JUnit 5 集成
-- 数据流: 仅在本地测试进程执行，不处理用户数据
-- NOTICE 位置: 不需要；Apache-2.0 许可证文本在依赖分发中提供
-- 替代方案: 直接使用 JUnit Jupiter Assertions
-- 商业分发结论: 仅测试依赖，不打包至正式应用
-
-## junit
+## junit-jupiter
 - 名称: JUnit Jupiter
 - 版本: 5.12.2
 - 许可证: EPL-2.0
@@ -70,13 +120,13 @@
 - 数据流: 仅读取本地测试输入，不处理生产用户数据或网络数据
 - NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
 - 替代方案: kotlin.test
-- 商业分发结论: 测试依赖不随 APK 分发；源码/测试分发时保留 EPL-2.0 说明
+- 商业分发结论: 测试依赖不随 APK 分发；源码测试分发时保留 EPL-2.0 说明
 
-## androidx-test
+## androidx-test-core
 - 名称: AndroidX Test Core
 - 版本: 1.7.0
 - 许可证: Apache-2.0
-- 用途: Android 测试运行与上下文支持
+- 用途: Android 测试上下文支持
 - 数据流: 仅在测试设备内读取测试状态，不上传数据
 - NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
 - 替代方案: Android instrumentation API
@@ -87,7 +137,7 @@
 - 版本: 4.16
 - 许可证: MIT
 - 用途: 本地 JVM Android 行为测试
-- 数据流: 仅运行本地测试；不处理生产用户数据或网络数据
+- 数据流: 仅运行本地测试，不处理生产用户数据或网络数据
 - NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
 - 替代方案: Android instrumented tests
 - 商业分发结论: 测试依赖不随 APK 分发；保留 MIT 许可证文本
@@ -96,7 +146,7 @@
 - 名称: MockK
 - 版本: 1.14.5
 - 许可证: Apache-2.0
-- 用途: 后续 JVM 测试替身
+- 用途: JVM 测试替身
 - 数据流: 仅处理本地测试数据，不传输网络数据
 - NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
 - 替代方案: 手写 fake 或 Mockito
@@ -106,28 +156,98 @@
 - 名称: Turbine
 - 版本: 1.2.1
 - 许可证: Apache-2.0
-- 用途: 后续 Kotlin Flow 测试
+- 用途: Kotlin Flow 测试
 - 数据流: 仅处理本地测试流数据，不传输网络数据
 - NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
 - 替代方案: kotlinx-coroutines-test
 - 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 说明
 
-## detekt
+## kotlinx-coroutines-test
+- 名称: kotlinx-coroutines-test
+- 版本: 1.10.2
+- 许可证: Apache-2.0
+- 用途: Kotlin 协程测试调度与断言
+- 数据流: 仅在本地测试进程执行，不处理用户数据
+- NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
+- 替代方案: 手写协程测试调度器
+- 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 说明
+
+## kotlin-test-junit5
+- 名称: Kotlin Test JUnit 5
+- 版本: 2.1.21
+- 许可证: Apache-2.0
+- 用途: Kotlin 单元测试断言与 JUnit 5 集成
+- 数据流: 仅在本地测试进程执行，不处理用户数据
+- NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
+- 替代方案: 直接使用 JUnit Jupiter Assertions
+- 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 说明
+
+## plugin-android-application
+- 名称: Android Gradle Plugin
+- 版本: 8.12.2
+- 许可证: Apache-2.0
+- 用途: Android 应用构建、打包与测试任务
+- 数据流: 仅在构建环境读取本地工程和依赖，不处理用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
+- 替代方案: Android 命令行构建工具链
+- 商业分发结论: 构建插件不随 APK 分发，可商业使用并保留 Apache-2.0 说明
+
+## plugin-kotlin-android
+- 名称: Kotlin Android Gradle Plugin
+- 版本: 2.1.21
+- 许可证: Apache-2.0
+- 用途: Kotlin Android 源代码编译
+- 数据流: 仅在构建环境编译本地源代码，不处理用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
+- 替代方案: Java Android 编译
+- 商业分发结论: 构建插件不随 APK 分发，可商业使用并保留 Apache-2.0 说明
+
+## plugin-ksp
+- 名称: Kotlin Symbol Processing Gradle Plugin
+- 版本: 2.1.21-2.0.1
+- 许可证: Apache-2.0
+- 用途: 运行 Room 与 Hilt 注解处理器
+- 数据流: 仅在构建环境读取本地源代码，不处理用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
+- 替代方案: Kotlin kapt
+- 商业分发结论: 构建插件不随 APK 分发，可商业使用并保留 Apache-2.0 说明
+
+## plugin-compose-compiler
+- 名称: Kotlin Compose Compiler Gradle Plugin
+- 版本: 2.1.21
+- 许可证: Apache-2.0
+- 用途: 编译 Compose UI 源代码
+- 数据流: 仅在构建环境编译本地源代码，不处理用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
+- 替代方案: Android Views 编译路径
+- 商业分发结论: 构建插件不随 APK 分发，可商业使用并保留 Apache-2.0 说明
+
+## plugin-hilt
+- 名称: Dagger Hilt Gradle Plugin
+- 版本: 2.57.2
+- 许可证: Apache-2.0
+- 用途: 配置 Hilt Android 构建集成
+- 数据流: 仅在构建环境读取本地工程配置，不处理用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
+- 替代方案: 手写依赖注入构建配置
+- 商业分发结论: 构建插件不随 APK 分发，可商业使用并保留 Apache-2.0 说明
+
+## plugin-detekt
 - 名称: detekt Gradle Plugin
 - 版本: 1.23.8
 - 许可证: Apache-2.0
 - 用途: 静态代码分析质量门
-- 数据流: 仅在构建环境分析本地 Kotlin 源代码；不收集或传输用户数据
+- 数据流: 仅在构建环境分析本地 Kotlin 源代码，不收集或传输用户数据
 - NOTICE 位置: 构建插件不打包进 release APK；本文件
 - 替代方案: Android Lint
 - 商业分发结论: 构建插件不随 APK 分发；可商业使用并保留 Apache-2.0 说明
 
-## ktlint
+## plugin-ktlint
 - 名称: ktlint Gradle Plugin
 - 版本: 12.1.2
 - 许可证: MIT
 - 用途: Kotlin 格式检查质量门
-- 数据流: 仅在构建环境读取和检查本地 Kotlin 源代码；不收集或传输用户数据
+- 数据流: 仅在构建环境读取和检查本地 Kotlin 源代码，不收集或传输用户数据
 - NOTICE 位置: 构建插件不打包进 release APK；本文件
 - 替代方案: Kotlin formatter
 - 商业分发结论: 构建插件不随 APK 分发；可商业使用并保留 MIT 许可证文本
