@@ -21,8 +21,10 @@ fun verifyThirdPartyNotices(markdown: String): List<NoticeValidationError> = mar
         when {
             line.startsWith("## ") -> entries += NoticeEntry(line.removePrefix("## ").trim())
             line.startsWith("- ") && entries.isNotEmpty() -> {
-                val key = line.removePrefix("- ").substringBefore(":").trim()
-                entries.last().fields += key
+                val field = line.removePrefix("- ")
+                val key = field.substringBefore(":").trim()
+                val value = field.substringAfter(":", missingDelimiterValue = "").trim()
+                if (value.isNotEmpty()) entries.last().fields += key
             }
         }
         entries

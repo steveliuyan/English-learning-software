@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.ktlint) apply false
 }
 
 val requiredNoticeFields = listOf(
@@ -21,8 +23,12 @@ tasks.register("verifyThirdPartyNotices") {
         noticesFile.asFile.forEachLine { line ->
             when {
                 line.startsWith("## ") -> entries += Entry(line.removePrefix("## ").trim())
-                line.startsWith("- ") && entries.isNotEmpty() -> entries.last().fields +=
-                    line.removePrefix("- ").substringBefore(":").trim()
+                line.startsWith("- ") && entries.isNotEmpty() -> {
+                    val field = line.removePrefix("- ")
+                    val key = field.substringBefore(":").trim()
+                    val value = field.substringAfter(":", missingDelimiterValue = "").trim()
+                    if (value.isNotEmpty()) entries.last().fields += key
+                }
             }
         }
         check(entries.isNotEmpty()) { "No third-party notice entries found." }

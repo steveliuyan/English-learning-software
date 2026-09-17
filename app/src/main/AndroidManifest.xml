@@ -4,5 +4,5 @@
         android:allowBackup="false"
         android:label="English Learning"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        android:theme="@style/Theme.EnglishLearning" />
 </manifest>

@@ -52,6 +52,16 @@
 - 替代方案: Android Keystore 平台 API
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
 
+## kotlin-test-junit5
+- 名称: Kotlin Test JUnit 5
+- 版本: 2.1.21
+- 许可证: Apache-2.0
+- 用途: Kotlin 单元测试断言与 JUnit 5 集成
+- 数据流: 仅在本地测试进程执行，不处理用户数据
+- NOTICE 位置: 不需要；Apache-2.0 许可证文本在依赖分发中提供
+- 替代方案: 直接使用 JUnit Jupiter Assertions
+- 商业分发结论: 仅测试依赖，不打包至正式应用
+
 ## junit
 - 名称: JUnit Jupiter
 - 版本: 5.12.2
@@ -103,24 +113,24 @@
 - 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 说明
 
 ## detekt
-- 名称: detekt
-- 版本: 未引入（计划质量工具）
+- 名称: detekt Gradle Plugin
+- 版本: 1.23.8
 - 许可证: Apache-2.0
-- 用途: 静态代码分析；本任务仅登记，尚未启用插件
-- 数据流: 未引入/不运行；启用后只分析本地源代码，不上传数据
-- NOTICE 位置: 未打包；本文件
+- 用途: 静态代码分析质量门
+- 数据流: 仅在构建环境分析本地 Kotlin 源代码；不收集或传输用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
 - 替代方案: Android Lint
-- 商业分发结论: 未引入/不打包；启用时可商业分发并保留 Apache-2.0 说明
+- 商业分发结论: 构建插件不随 APK 分发；可商业使用并保留 Apache-2.0 说明
 
 ## ktlint
-- 名称: ktlint
-- 版本: 未引入（计划质量工具）
+- 名称: ktlint Gradle Plugin
+- 版本: 12.1.2
 - 许可证: MIT
-- 用途: Kotlin 格式检查；本任务仅登记，尚未启用插件
-- 数据流: 未引入/不运行；启用后只分析本地源代码，不上传数据
-- NOTICE 位置: 未打包；本文件
+- 用途: Kotlin 格式检查质量门
+- 数据流: 仅在构建环境读取和检查本地 Kotlin 源代码；不收集或传输用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
 - 替代方案: Kotlin formatter
-- 商业分发结论: 未引入/不打包；启用时可商业分发并保留 MIT 许可证文本
+- 商业分发结论: 构建插件不随 APK 分发；可商业使用并保留 MIT 许可证文本
 
 ## datasets
 - 名称: 词书、词典与其他数据集

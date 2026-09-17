@@ -21,8 +21,12 @@ val entries = mutableListOf<Entry>()
 noticesFile.forEachLine { line ->
     when {
         line.startsWith("## ") -> entries += Entry(line.removePrefix("## ").trim())
-        line.startsWith("- ") && entries.isNotEmpty() -> entries.last().fields +=
-            line.removePrefix("- ").substringBefore(":").trim()
+        line.startsWith("- ") && entries.isNotEmpty() -> {
+            val field = line.removePrefix("- ")
+            val key = field.substringBefore(":").trim()
+            val value = field.substringAfter(":", missingDelimiterValue = "").trim()
+            if (value.isNotEmpty()) entries.last().fields += key
+        }
     }
 }
 require(entries.isNotEmpty()) { "No third-party notice entries found." }
