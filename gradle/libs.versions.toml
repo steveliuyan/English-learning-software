@@ -18,6 +18,7 @@ robolectric = "4.16"
 mockk = "1.14.5"
 turbine = "1.2.1"
 coroutines = "1.10.2"
+serialization = "1.8.1"
 detekt = "1.23.8"
 ktlint = "12.1.2"
 
@@ -43,6 +44,7 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

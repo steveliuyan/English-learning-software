@@ -72,6 +72,16 @@
 - 替代方案: Room Java API
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
 
+## kotlinx-serialization-json
+- 名称: Kotlinx Serialization JSON
+- 版本: 1.8.1
+- 许可证: Apache-2.0
+- 用途: 对齐 Room migration test 运行时所需的 Kotlin serialization API
+- 数据流: 仅在设备内序列化 Room schema 测试元数据，不传输用户数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: 保持与 Room 传递依赖兼容的 Kotlinx Serialization 版本
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
 ## androidx-room-compiler
 - 名称: Room Compiler
 - 版本: 2.8.4
