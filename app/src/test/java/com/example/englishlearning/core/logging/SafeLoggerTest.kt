@@ -18,9 +18,9 @@ class SafeLoggerTest {
                     "apiKey" to "sk-secret",
                     "password" to "p@ss",
                     "private key" to "private-material",
-                "imageBytes" to byteArrayOf(1, 2, 3),
-                "profileId" to "profile-1",
-                "unapprovedStatus" to "not-for-log",
+                    "imageBytes" to byteArrayOf(1, 2, 3),
+                    "profileId" to "profile-1",
+                    "unapprovedStatus" to "not-for-log",
                 ),
         )
 
@@ -33,6 +33,33 @@ class SafeLoggerTest {
         assertFalse(line.contains("private-material"))
         assertFalse(line.contains("1, 2, 3"))
         assertFalse(line.contains("not-for-log"))
+    }
+
+    @Test
+    fun `logger rejects mixed case sensitive key fragments`() {
+        val sink = RecordingLogSink()
+        val logger = SanitizingSafeLogger(sink)
+
+        logger.info(
+            event = "sensitive_attributes_received",
+            attributes =
+                mapOf(
+                    "TOKEN" to "token-sentinel",
+                    "SeCrEt" to "secret-sentinel",
+                    "KEY_ALIAS" to "alias-sentinel",
+                    "filePATH" to "path-sentinel",
+                    "contentHASH" to "hash-sentinel",
+                    "profileId" to "profile-1",
+                ),
+        )
+
+        val line = sink.requireLine()
+        assertContains(line, "profileId=profile-1")
+        assertFalse(line.contains("token-sentinel"))
+        assertFalse(line.contains("secret-sentinel"))
+        assertFalse(line.contains("alias-sentinel"))
+        assertFalse(line.contains("path-sentinel"))
+        assertFalse(line.contains("hash-sentinel"))
     }
 
     @Test

@@ -70,3 +70,23 @@ No dependencies were added, so no third-party ledger update was needed.
 - The plan asks for stable UI resource IDs. This foundation contains no Android string-resource layer yet, so `AppErrorUiText` is a stable non-sensitive identifier enum for later UI mapping; no error payload contains raw cause content.
 - The sink abstraction intentionally has no production Android logging backend in Task 2. A later composition-root task must bind it to an Android-safe backend.
 - The checked-in working tree still has pre-existing untracked `task-1-final-review.md` and `task-1-rereview.md`; neither was staged or committed.
+
+## Fix round 1: review repairs
+
+### Review findings addressed
+
+- Corrected the `SafeLoggerTest.kt` map-entry indentation reported by `ktlintTestSourceSetCheck`.
+- Added `AppErrorTest` to instantiate all six variants, assert their exact and unique `AppErrorUiText` mappings, and reject declared payload fields that could expose exception, secret, alias, path, hash, `Throwable`, `CharArray`, or `String` content.
+- Added direct mixed-case sensitive-key regression coverage for `TOKEN`, `SeCrEt`, `KEY_ALIAS`, `filePATH`, and `contentHASH`, each carrying a unique sentinel. The sink line retains only `profileId` and contains none of the sentinels.
+
+### TDD evidence
+
+The added tests were written before any implementation changes. The initial no-daemon/no-build-cache invocation returned exit code 1 with no emitted Gradle diagnostic after the shell I/O interruption; a repeat after restoring the test-only assertion shape returned exit code 0. No production implementation change was needed: the existing strict allowlist and case-insensitive fragment filter already satisfied the new behavior.
+
+### Fresh validation
+
+```text
+GRADLE_USER_HOME=D:/Android/GradleCache gradlew.bat -p D:/EnglishLearningWorktrees/stage-0-foundation-verify :app:testDebugUnitTest --tests '*SafeLoggerTest' --tests '*ClockProviderTest' :app:check :app:assembleDebug --no-daemon --no-build-cache
+```
+
+Result: process exit code `0`. This run covered the requested targeted tests, detekt, ktlint including `:app:ktlintTestSourceSetCheck`, unit tests, lint, and debug APK assembly. The pre-existing `android.overridePathCheck=true` experimental warning may still be emitted by Gradle configuration and did not cause a failure.
