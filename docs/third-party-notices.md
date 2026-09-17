@@ -132,6 +132,16 @@
 - 替代方案: Android instrumentation API
 - 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 说明
 
+## androidx-test-ext-junit
+- 名称: AndroidX Test Ext JUnit
+- 版本: 1.3.0
+- 许可证: Apache-2.0
+- 用途: Android instrumentation JUnit 测试运行支持
+- 数据流: 仅在测试设备内读取测试状态，不上传数据
+- NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
+- 替代方案: Android instrumentation API
+- 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 说明
+
 ## robolectric
 - 名称: Robolectric
 - 版本: 4.16

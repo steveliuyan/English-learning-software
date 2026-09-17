@@ -48,20 +48,36 @@ class PrivateMediaStoreTest {
     }
 
     @Test
-    fun `insufficient storage is mapped and temporary file is removed`() =
+    fun `insufficient storage removes existing final and temporary file`() =
         runTest {
+            val assetId = UUID.randomUUID()
             val files = FakeFileOps(writeFailure = IOException("no space"))
+            files.seed(assetId.toString(), "previous".encodeToByteArray())
             val store = PrivateMediaStore(files, StandardTestDispatcher(testScheduler))
 
-            val result = store.writeVerified(UUID.randomUUID(), ByteArrayInputStream(byteArrayOf(1)), "00")
+            val result = store.writeVerified(assetId, ByteArrayInputStream(byteArrayOf(1)), "00")
 
             assertEquals(AppError.StorageInsufficient(0), (result.exceptionOrNull() as AppErrorException).appError)
+            assertEquals(emptySet(), files.finalFiles())
             assertEquals(emptySet(), files.temporaryFiles())
         }
+
+    @Test
+    fun `hash lookup failure after existence check is rebuildable`() {
+        val files = FakeFileOps(hashFailure = IOException("removed"))
+        files.seed("present", "content".encodeToByteArray())
+        val store = PrivateMediaStore(files, StandardTestDispatcher())
+
+        assertEquals(
+            MediaAvailability.UnavailableRebuildable,
+            store.availability(AssetRecord("present", sha256("content"))),
+        )
+    }
 }
 
 private class FakeFileOps(
     private val writeFailure: IOException? = null,
+    private val hashFailure: IOException? = null,
 ) : FileOps {
     private val files = mutableMapOf<String, ByteArray>()
 
@@ -74,7 +90,10 @@ private class FakeFileOps(
         return files.getValue(path).size.toLong()
     }
 
-    override fun sha256(path: String): String = sha256(files.getValue(path))
+    override fun sha256(path: String): String {
+        hashFailure?.let { throw it }
+        return sha256(files.getValue(path))
+    }
 
     override fun atomicMove(
         source: String,

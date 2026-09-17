@@ -19,6 +19,7 @@ class PrivateMediaStore(
         withContext(ioDispatcher) {
             val finalName = assetId.toString()
             val temporaryName = "$finalName.tmp"
+            var published = false
             try {
                 files.delete(temporaryName)
                 files.write(temporaryName, source)
@@ -26,6 +27,7 @@ class PrivateMediaStore(
                     return@withContext Result.failure(AppErrorException(AppError.IntegrityMismatch))
                 }
                 files.atomicMove(temporaryName, finalName)
+                published = true
                 Result.success(Unit)
             } catch (error: java.io.IOException) {
                 Result.failure(error.toAppErrorException())
@@ -35,13 +37,20 @@ class PrivateMediaStore(
                 Result.failure(error.toAppErrorException())
             } finally {
                 files.delete(temporaryName)
+                if (!published) files.delete(finalName)
             }
         }
 
     fun availability(asset: AssetRecord): MediaAvailability =
-        if (files.exists(asset.id) && files.sha256(asset.id).equals(asset.sha256, ignoreCase = true)) {
-            MediaAvailability.Available
-        } else {
+        try {
+            if (files.exists(asset.id) && files.sha256(asset.id).equals(asset.sha256, ignoreCase = true)) {
+                MediaAvailability.Available
+            } else {
+                MediaAvailability.UnavailableRebuildable
+            }
+        } catch (_: IOException) {
+            MediaAvailability.UnavailableRebuildable
+        } catch (_: SecurityException) {
             MediaAvailability.UnavailableRebuildable
         }
 }

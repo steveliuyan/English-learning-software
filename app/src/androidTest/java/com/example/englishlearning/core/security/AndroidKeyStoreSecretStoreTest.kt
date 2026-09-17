@@ -4,24 +4,26 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.storage.AppErrorException
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import java.io.File
 import javax.crypto.SecretKey
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class AndroidKeyStoreSecretStoreTest {
     @Test
-    fun providerFailure_returnsKeyStoreUnavailable_and_leaves_no_ciphertext() {
+    fun providerFailure_returnsKeyStoreUnavailable_clearsCallerBuffer_and_leaves_no_ciphertext() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val alias = "provider-failure-test"
         File(context.filesDir, "secrets").deleteRecursively()
         val store = AndroidKeyStoreSecretStore(context, FailingProvider)
+        val secret = "not-recorded".toCharArray()
 
-        val result = store.save(SecretReference(alias), "not-recorded".toCharArray())
+        val result = store.save(SecretReference(alias), secret)
 
         assertEquals(AppError.KeyStoreUnavailable, (result.exceptionOrNull() as AppErrorException).appError)
+        assertTrue(secret.all { it == '\u0000' })
         assertFalse(File(context.filesDir, "secrets").listFiles().orEmpty().any { it.isFile })
     }
 

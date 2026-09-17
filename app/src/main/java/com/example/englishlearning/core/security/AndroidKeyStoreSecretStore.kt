@@ -20,30 +20,29 @@ class AndroidKeyStoreSecretStore(
     override fun save(
         reference: SecretReference,
         secret: CharArray,
-    ): Result<Unit> =
-        runCatching {
-            val destination = ciphertextFile(reference)
+    ): Result<Unit> {
+        var destination: File? = null
+        return try {
+            destination = ciphertextFile(reference)
             destination.delete()
-            val key =
-                try {
-                    keyStoreProvider.keyFor(reference.alias)
-                } catch (_: Throwable) {
-                    throw AppErrorException(AppError.KeyStoreUnavailable)
-                }
+            val key = keyStoreProvider.keyFor(reference.alias)
+            val plaintext = secret.concatToString().encodeToByteArray()
             try {
-                val plaintext = secret.concatToString().encodeToByteArray()
                 val encrypted =
                     Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, key) }
                         .let { cipher -> cipher.iv + cipher.doFinal(plaintext) }
-                plaintext.fill(0)
                 destination.outputStream().use { it.write(encrypted) }
-            } catch (_: Throwable) {
-                destination.delete()
-                throw AppErrorException(AppError.KeyStoreUnavailable)
+                Result.success(Unit)
             } finally {
-                secret.fill('\u0000')
+                plaintext.fill(0)
             }
+        } catch (_: Exception) {
+            destination?.delete()
+            Result.failure(AppErrorException(AppError.KeyStoreUnavailable))
+        } finally {
+            secret.fill('\u0000')
         }
+    }
 
     override fun delete(reference: SecretReference): Result<Unit> =
         runCatching {
