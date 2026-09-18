@@ -6,13 +6,14 @@ package com.example.englishlearning.core.export
  */
 data class LogicalSnapshot(
     val formatVersion: Int,
-    val records: List<LogicalRecord>,
+    val records: List<ExportProfileRecord>,
 )
 
-data class LogicalRecord(
-    val type: String,
-    val id: String,
-    val attributes: Map<String, String>,
+/** Explicit, non-sensitive profile metadata eligible for a future logical export. */
+data class ExportProfileRecord(
+    val profileId: String,
+    val displayName: String,
+    val createdAtEpochMillis: Long,
 )
 
 data class MediaManifestItem(
