@@ -19,12 +19,14 @@ sealed interface MetadataValidationResult {
 }
 
 object WordBookMetadataPolicy {
+    const val APPLICATION_GROUPING_POLICY = "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+
     private val approvedSourceIds = setOf("ngsl-nawl-1.2", "cefr-j-1.5")
 
     fun validate(metadata: WordBookMetadata): MetadataValidationResult =
         when {
             metadata.sourceId !in approvedSourceIds -> MetadataValidationResult.UnknownSource
-            metadata.sourcePolicy.contains("官方") && !metadata.sourcePolicy.contains("不是官方") ->
+            metadata.sourcePolicy != APPLICATION_GROUPING_POLICY ->
                 MetadataValidationResult.OfficialDescriptionNotAllowed
             else -> MetadataValidationResult.Valid
         }
