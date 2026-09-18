@@ -1,0 +1,56 @@
+[
+  {
+    "id": "primary-school",
+    "displayName": "小学",
+    "level": "基础",
+    "totalWords": 0,
+    "dataVersion": "v1",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+  },
+  {
+    "id": "junior-high-school",
+    "displayName": "初中",
+    "level": "初中",
+    "totalWords": 0,
+    "dataVersion": "v1",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+  },
+  {
+    "id": "senior-high-school",
+    "displayName": "高中",
+    "level": "高中",
+    "totalWords": 0,
+    "dataVersion": "v1",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+  },
+  {
+    "id": "cet4",
+    "displayName": "大学英语四级",
+    "level": "CET-4",
+    "totalWords": 0,
+    "dataVersion": "v1",
+    "sourceId": "cefr-j-1.5",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+  },
+  {
+    "id": "cet6",
+    "displayName": "大学英语六级",
+    "level": "CET-6",
+    "totalWords": 0,
+    "dataVersion": "v1",
+    "sourceId": "cefr-j-1.5",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+  },
+  {
+    "id": "postgraduate-entrance-exam",
+    "displayName": "考研",
+    "level": "研究生入学考试",
+    "totalWords": 0,
+    "dataVersion": "v1",
+    "sourceId": "cefr-j-1.5",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+  }
+]
