@@ -6,6 +6,20 @@ import kotlin.test.assertEquals
 
 class SeedWordBooksUseCaseTest {
     @Test
+    fun `asset read exception is rejected without write`() = runTest {
+        val repository = FakeRepository()
+        val source = WordBookMetadataAssetSource { throw Exception("untrusted asset failure") }
+
+        val result = SeedWordBooksUseCase(source, repository)()
+
+        assertEquals(0, result.importedCount)
+        assertEquals(1, result.rejectedCount)
+        assertEquals(setOf(SeedRejectionReason.InvalidAsset), result.rejectionReasons)
+        assertEquals(0, repository.upsertCalls)
+        assertEquals(false, result.toString().contains("untrusted asset failure"))
+    }
+
+    @Test
     fun `malformed asset is rejected without write`() = runTest {
         val repository = FakeRepository()
 
@@ -14,6 +28,36 @@ class SeedWordBooksUseCaseTest {
         assertEquals(0, result.importedCount)
         assertEquals(1, result.rejectedCount)
         assertEquals(setOf(SeedRejectionReason.InvalidAsset), result.rejectionReasons)
+        assertEquals(0, repository.upsertCalls)
+    }
+
+    @Test
+    fun `metadata missing required field is rejected without write`() = runTest {
+        val repository = FakeRepository()
+        val source = WordBookMetadataAssetSource {
+            """[{"id":"primary-school","displayName":"小学","level":"基础","totalWords":0,"dataVersion":"v1","sourceId":"ngsl-nawl-1.2"}]"""
+        }
+
+        val result = SeedWordBooksUseCase(source, repository)()
+
+        assertEquals(0, result.importedCount)
+        assertEquals(1, result.rejectedCount)
+        assertEquals(setOf(SeedRejectionReason.InvalidMetadata), result.rejectionReasons)
+        assertEquals(0, repository.upsertCalls)
+    }
+
+    @Test
+    fun `metadata with noninteger total words is rejected without write`() = runTest {
+        val repository = FakeRepository()
+        val source = WordBookMetadataAssetSource {
+            """[{"id":"primary-school","displayName":"小学","level":"基础","totalWords":"not-a-number","dataVersion":"v1","sourceId":"ngsl-nawl-1.2","sourcePolicy":"${WordBookMetadataPolicy.APPLICATION_GROUPING_POLICY}"}]"""
+        }
+
+        val result = SeedWordBooksUseCase(source, repository)()
+
+        assertEquals(0, result.importedCount)
+        assertEquals(1, result.rejectedCount)
+        assertEquals(setOf(SeedRejectionReason.InvalidMetadata), result.rejectionReasons)
         assertEquals(0, repository.upsertCalls)
     }
 
