@@ -14,17 +14,23 @@ class SelectWordBookAndSetDailyTargetUseCase(
         profileId: String,
         wordBookId: String,
         dailyNewTarget: Int,
-    ): SetupResult = when {
-        dailyNewTarget < 1 -> SetupResult.InvalidDailyTarget
-        repository.findWordBook(wordBookId).toDomainOrNull() == null -> SetupResult.UnknownWordBook
-        else -> repository.save(LearningProfile(profileId, wordBookId, dailyNewTarget)).toSetupResult()
+    ): SetupResult {
+        if (dailyNewTarget < 1) return SetupResult.InvalidDailyTarget
+
+        return when (val lookup = repository.findWordBook(wordBookId)) {
+            is RepositoryResult.Failure -> SetupResult.StorageUnavailable
+            is RepositoryResult.Success -> {
+                if (lookup.value == null) SetupResult.UnknownWordBook else save(profileId, wordBookId, dailyNewTarget)
+            }
+        }
     }
 
-    private fun RepositoryResult<WordBook?>.toDomainOrNull(): WordBook? =
-        (this as? RepositoryResult.Success)?.value
-
-    private fun RepositoryResult<Unit>.toSetupResult(): SetupResult =
-        when (this) {
+    private suspend fun save(
+        profileId: String,
+        wordBookId: String,
+        dailyNewTarget: Int,
+    ): SetupResult =
+        when (repository.save(LearningProfile(profileId, wordBookId, dailyNewTarget))) {
             is RepositoryResult.Success -> SetupResult.Saved
             is RepositoryResult.Failure -> SetupResult.StorageUnavailable
         }

@@ -3,65 +3,88 @@ package com.example.englishlearning.learning
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class SelectWordBookAndSetDailyTargetUseCaseTest {
-    private val repository = FakeLearningProfileRepository()
-    private val useCase = SelectWordBookAndSetDailyTargetUseCase(repository)
-
     @Test
-    fun `zero target is rejected without persisting`() = runTest {
-        val result = useCase("default", "primary-school", 0)
+    fun `invalid target and unavailable storage do not save`() = runTest {
+        val repository = FakeLearningProfileRepository()
+        val useCase = SelectWordBookAndSetDailyTargetUseCase(repository)
 
-        assertEquals(SetupResult.InvalidDailyTarget, result)
-        assertEquals(null, repository.current("default").getOrNull())
+        assertEquals(SetupResult.InvalidDailyTarget, useCase("default", "primary-school", 0))
+        repository.findFailure = true
+        assertEquals(SetupResult.StorageUnavailable, useCase("default", "primary-school", 1))
+        assertEquals(0, repository.saveCalls)
     }
 
     @Test
-    fun `negative target is rejected without persisting`() = runTest {
-        val result = useCase("default", "primary-school", -1)
+    fun `unknown wordbook does not save`() = runTest {
+        val repository = FakeLearningProfileRepository()
+        val useCase = SelectWordBookAndSetDailyTargetUseCase(repository)
 
-        assertEquals(SetupResult.InvalidDailyTarget, result)
-        assertEquals(null, repository.current("default").getOrNull())
+        assertEquals(SetupResult.UnknownWordBook, useCase("default", "missing", 1))
+        assertEquals(0, repository.saveCalls)
     }
 
     @Test
-    fun `unknown wordbook is rejected without persisting`() = runTest {
-        val result = useCase("default", "missing", 10)
+    fun `save failure is reported without persistence`() = runTest {
+        val repository = FakeLearningProfileRepository().apply {
+            wordBooks["primary-school"] = wordBook()
+            saveFailure = true
+        }
+        val useCase = SelectWordBookAndSetDailyTargetUseCase(repository)
 
-        assertEquals(SetupResult.UnknownWordBook, result)
-        assertEquals(null, repository.current("default").getOrNull())
+        assertEquals(SetupResult.StorageUnavailable, useCase("default", "primary-school", 1))
+        assertEquals(1, repository.saveCalls)
+        assertEquals(null, repository.profiles["default"])
     }
 
     @Test
     fun `valid selection saves matching profile wordbook and target`() = runTest {
-        repository.upsertWordBook(WordBook("primary-school", "小学", "基础", 0, "v1", "ngsl-nawl-1.2"))
+        val repository = FakeLearningProfileRepository().apply {
+            wordBooks["primary-school"] = wordBook()
+        }
+        val useCase = SelectWordBookAndSetDailyTargetUseCase(repository)
 
-        val result = useCase("default", "primary-school", 10)
-
-        assertEquals(SetupResult.Saved, result)
+        assertEquals(SetupResult.Saved, useCase("default", "primary-school", 10))
         assertEquals(
             LearningProfile("default", "primary-school", 10),
-            repository.current("default"),
+            (repository.current("default") as RepositoryResult.Success).value,
         )
     }
 
+    private fun wordBook() =
+        WordBook("primary-school", "小学", "基础", 0, "v1", "ngsl-nawl-1.2")
+
     private class FakeLearningProfileRepository : LearningProfileRepository {
-        private val profiles = mutableMapOf<String, LearningProfile>()
-        private val wordBooks = mutableMapOf<String, WordBook>()
+        val profiles = mutableMapOf<String, LearningProfile>()
+        val wordBooks = mutableMapOf<String, WordBook>()
+        var findFailure = false
+        var saveFailure = false
+        var saveCalls = 0
 
-        override suspend fun current(profileId: String): Result<LearningProfile?> = Result.success(profiles[profileId])
+        override suspend fun current(profileId: String): RepositoryResult<LearningProfile?> =
+            RepositoryResult.Success(profiles[profileId])
 
-        override suspend fun save(profile: LearningProfile) {
+        override suspend fun save(profile: LearningProfile): RepositoryResult<Unit> {
+            saveCalls += 1
+            if (saveFailure) return RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
             profiles[profile.profileId] = profile
+            return RepositoryResult.Success(Unit)
         }
 
-        override suspend fun listWordBooks(): List<WordBook> = wordBooks.values.toList()
+        override suspend fun listWordBooks(): RepositoryResult<List<WordBook>> =
+            RepositoryResult.Success(wordBooks.values.toList())
 
-        override suspend fun findWordBook(id: String): WordBook? = wordBooks[id]
+        override suspend fun findWordBook(id: String): RepositoryResult<WordBook?> =
+            if (findFailure) {
+                RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
+            } else {
+                RepositoryResult.Success(wordBooks[id])
+            }
 
-        override suspend fun upsertWordBook(wordBook: WordBook) {
+        override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> {
             wordBooks[wordBook.id] = wordBook
+            return RepositoryResult.Success(Unit)
         }
     }
 }

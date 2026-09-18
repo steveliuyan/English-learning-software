@@ -16,8 +16,13 @@ class RoomLearningProfileRepositoryTest {
         val databaseName = "learning-profile-${System.nanoTime()}.db"
         val database = openDatabase(context, databaseName)
         val repository = RoomLearningProfileRepository(database, Dispatchers.Unconfined)
-        assertEquals(RepositoryResult.Success(Unit), repository.upsertWordBook(WordBook("primary-school", "小学", "基础", 0, "v1", "ngsl-nawl-1.2")))
-        assertEquals(RepositoryResult.Success(Unit), repository.save(LearningProfile("default", "primary-school", 10)))
+        val wordBook = WordBook("primary-school", "小学", "基础", 0, "v1", "ngsl-nawl-1.2")
+
+        assertEquals(RepositoryResult.Success(Unit), repository.upsertWordBook(wordBook))
+        assertEquals(
+            RepositoryResult.Success(Unit),
+            repository.save(LearningProfile("default", "primary-school", 10)),
+        )
         database.close()
 
         val reopened = openDatabase(context, databaseName)
@@ -28,6 +33,21 @@ class RoomLearningProfileRepositoryTest {
             persisted,
         )
         reopened.close()
+        context.deleteDatabase(databaseName)
+    }
+
+    @Test
+    fun `closed database returns stable storage error`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val databaseName = "closed-learning-profile-${System.nanoTime()}.db"
+        val database = openDatabase(context, databaseName)
+        val repository = RoomLearningProfileRepository(database, Dispatchers.Unconfined)
+        database.close()
+
+        assertEquals(
+            RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable),
+            repository.current("default"),
+        )
         context.deleteDatabase(databaseName)
     }
 

@@ -3,6 +3,7 @@ package com.example.englishlearning.learning
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.WordBookEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
@@ -28,7 +29,9 @@ class RoomLearningProfileRepository(
     private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> =
         try {
             RepositoryResult.Success(withContext(ioDispatcher) { block() })
-        } catch (_: Throwable) {
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
             RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
         }
 

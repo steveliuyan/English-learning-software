@@ -1,5 +1,6 @@
 package com.example.englishlearning.learning
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
@@ -26,7 +27,9 @@ class SeedWordBooksUseCase(
     suspend operator fun invoke(): SeedWordBooksResult {
         val elements = try {
             json.parseToJsonElement(assetSource.read()).jsonArray
-        } catch (_: Throwable) {
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
             return SeedWordBooksResult(0, 1, setOf(SeedRejectionReason.InvalidAsset))
         }
         var imported = 0
@@ -61,7 +64,9 @@ class SeedWordBooksUseCase(
             sourceId = fields.string("sourceId"),
             sourcePolicy = fields.string("sourcePolicy"),
         )
-    } catch (_: Throwable) {
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Exception) {
         null
     }
 
