@@ -65,7 +65,7 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE TABLE IF NOT EXISTS `learning_profiles` " +
                             "(`profileId` TEXT NOT NULL, `activeWordBookId` TEXT NOT NULL, " +
-                            "`dailyNewTarget` INTEGER NOT NULL CHECK(`dailyNewTarget` >= 1), " +
+                            "`dailyNewTarget` INTEGER NOT NULL DEFAULT 1 CHECK(`dailyNewTarget` >= 1), " +
                             "PRIMARY KEY(`profileId`), FOREIGN KEY(`activeWordBookId`) " +
                             "REFERENCES `word_books`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
                     )

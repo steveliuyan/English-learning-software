@@ -40,6 +40,22 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun createV3Database_rejectsNonPositiveDailyNewTarget() {
+        Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            AppDatabase::class.java,
+        ).build().apply {
+            openHelper.writableDatabase.apply {
+                execSQL("PRAGMA foreign_keys = ON")
+                insertWordBook()
+                assertConstraintRejected { insertLearningProfile("zero-target", "primary-school", 0) }
+                assertConstraintRejected { insertLearningProfile("negative-target", "primary-school", -1) }
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateV2ToV3_preservesLocalProfileAndCreatesConstrainedLearningTables() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 2).apply {

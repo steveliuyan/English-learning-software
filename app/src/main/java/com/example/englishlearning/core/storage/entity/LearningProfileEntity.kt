@@ -1,5 +1,6 @@
 package com.example.englishlearning.core.storage.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -21,5 +22,6 @@ import androidx.room.PrimaryKey
 data class LearningProfileEntity(
     @PrimaryKey val profileId: String,
     val activeWordBookId: String,
+    @ColumnInfo(defaultValue = "1 CHECK(dailyNewTarget >= 1)")
     val dailyNewTarget: Int,
 )
