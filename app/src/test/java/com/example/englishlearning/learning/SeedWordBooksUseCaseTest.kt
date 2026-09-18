@@ -18,20 +18,22 @@ class SeedWordBooksUseCaseTest {
 
         val result = SeedWordBooksUseCase(source, repository)()
 
-        assertEquals(listOf("primary-school"), result.importedIds)
-        assertEquals(listOf("unknown"), result.rejectedIds)
-        assertEquals("小学", repository.findWordBook("primary-school")?.displayName)
+        assertEquals(1, result.importedCount)
+        assertEquals(1, result.rejectedCount)
+        assertEquals(setOf(SeedRejectionReason.InvalidMetadata), result.rejectionReasons)
+        assertEquals("小学", repository.findWordBook("primary-school").getOrNull()?.displayName)
     }
 
     private class FakeRepository : LearningProfileRepository {
         private val wordBooks = mutableMapOf<String, WordBook>()
 
-        override suspend fun current(profileId: String): LearningProfile? = null
-        override suspend fun save(profile: LearningProfile) = Unit
-        override suspend fun listWordBooks(): List<WordBook> = wordBooks.values.toList()
-        override suspend fun findWordBook(id: String): WordBook? = wordBooks[id]
-        override suspend fun upsertWordBook(wordBook: WordBook) {
+        override suspend fun current(profileId: String): RepositoryResult<LearningProfile?> = RepositoryResult.Success(null)
+        override suspend fun save(profile: LearningProfile): RepositoryResult<Unit> = RepositoryResult.Success(Unit)
+        override suspend fun listWordBooks(): RepositoryResult<List<WordBook>> = RepositoryResult.Success(wordBooks.values.toList())
+        override suspend fun findWordBook(id: String): RepositoryResult<WordBook?> = RepositoryResult.Success(wordBooks[id])
+        override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> {
             wordBooks[wordBook.id] = wordBook
+            return RepositoryResult.Success(Unit)
         }
     }
 }

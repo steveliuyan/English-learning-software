@@ -7,7 +7,6 @@ import com.example.englishlearning.core.storage.AppDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import java.io.File
 import kotlin.test.assertEquals
 
 class RoomLearningProfileRepositoryTest {
@@ -17,14 +16,17 @@ class RoomLearningProfileRepositoryTest {
         val databaseName = "learning-profile-${System.nanoTime()}.db"
         val database = openDatabase(context, databaseName)
         val repository = RoomLearningProfileRepository(database, Dispatchers.Unconfined)
-        repository.upsertWordBook(WordBook("primary-school", "小学", "基础", 0, "v1", "ngsl-nawl-1.2"))
-        repository.save(LearningProfile("default", "primary-school", 10))
+        assertEquals(RepositoryResult.Success(Unit), repository.upsertWordBook(WordBook("primary-school", "小学", "基础", 0, "v1", "ngsl-nawl-1.2")))
+        assertEquals(RepositoryResult.Success(Unit), repository.save(LearningProfile("default", "primary-school", 10)))
         database.close()
 
         val reopened = openDatabase(context, databaseName)
         val persisted = RoomLearningProfileRepository(reopened, Dispatchers.Unconfined).current("default")
 
-        assertEquals(LearningProfile("default", "primary-school", 10), persisted)
+        assertEquals(
+            RepositoryResult.Success(LearningProfile("default", "primary-school", 10)),
+            persisted,
+        )
         reopened.close()
         context.deleteDatabase(databaseName)
     }

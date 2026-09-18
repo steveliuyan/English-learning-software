@@ -14,7 +14,7 @@ class SelectWordBookAndSetDailyTargetUseCaseTest {
         val result = useCase("default", "primary-school", 0)
 
         assertEquals(SetupResult.InvalidDailyTarget, result)
-        assertNull(repository.current("default"))
+        assertEquals(null, repository.current("default").getOrNull())
     }
 
     @Test
@@ -22,7 +22,7 @@ class SelectWordBookAndSetDailyTargetUseCaseTest {
         val result = useCase("default", "primary-school", -1)
 
         assertEquals(SetupResult.InvalidDailyTarget, result)
-        assertNull(repository.current("default"))
+        assertEquals(null, repository.current("default").getOrNull())
     }
 
     @Test
@@ -30,7 +30,7 @@ class SelectWordBookAndSetDailyTargetUseCaseTest {
         val result = useCase("default", "missing", 10)
 
         assertEquals(SetupResult.UnknownWordBook, result)
-        assertNull(repository.current("default"))
+        assertEquals(null, repository.current("default").getOrNull())
     }
 
     @Test
@@ -50,7 +50,7 @@ class SelectWordBookAndSetDailyTargetUseCaseTest {
         private val profiles = mutableMapOf<String, LearningProfile>()
         private val wordBooks = mutableMapOf<String, WordBook>()
 
-        override suspend fun current(profileId: String): LearningProfile? = profiles[profileId]
+        override suspend fun current(profileId: String): Result<LearningProfile?> = Result.success(profiles[profileId])
 
         override suspend fun save(profile: LearningProfile) {
             profiles[profile.profileId] = profile
