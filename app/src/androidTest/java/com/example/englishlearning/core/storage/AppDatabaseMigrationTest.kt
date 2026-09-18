@@ -1,5 +1,6 @@
 package com.example.englishlearning.core.storage
 
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -8,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,6 +29,7 @@ class AppDatabaseMigrationTest {
             AppDatabase::class.java,
             TEST_DB,
         ).addMigrations(*AppDatabase.MIGRATIONS)
+            .addCallback(AppDatabase.CONSTRAINT_CALLBACK)
             .build()
             .openHelper
             .writableDatabase
@@ -44,26 +47,36 @@ class AppDatabaseMigrationTest {
         Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             AppDatabase::class.java,
-        ).build().apply {
-            openHelper.writableDatabase.apply {
-                execSQL("PRAGMA foreign_keys = ON")
-                insertWordBook()
-                assertConstraintRejected { insertLearningProfile("zero-target", "primary-school", 0) }
-                assertConstraintRejected { insertLearningProfile("negative-target", "primary-school", -1) }
+        ).addCallback(AppDatabase.CONSTRAINT_CALLBACK)
+            .build()
+            .apply {
+                openHelper.writableDatabase.apply {
+                    execSQL("PRAGMA foreign_keys = ON")
+                    insertWordBook()
+                    insertLearningProfile("valid-target", "primary-school", 1)
+                    assertTargetConstraintRejected { insertLearningProfile("zero-target", "primary-school", 0) }
+                    assertTargetConstraintRejected { insertLearningProfile("negative-target", "primary-school", -1) }
+                    assertTargetConstraintRejected { updateLearningProfile("valid-target", 0) }
+                    assertTargetConstraintRejected { updateLearningProfile("valid-target", -1) }
+                }
+                close()
             }
-            close()
-        }
     }
 
     @Test
-    fun migrateV2ToV3_preservesLocalProfileAndCreatesConstrainedLearningTables() {
+    fun migrateV2ToV3_preservesLocalProfileAndRejectsNonPositiveDailyTarget() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 2).apply {
             execSQL("INSERT INTO local_profiles (id, displayName, createdAt) VALUES ('default', 'Ada', 1)")
             close()
         }
 
-        helper.runMigrationsAndValidate(TEST_DB, 3, true, AppDatabase.MIGRATION_2_3).apply {
+        helper.runMigrationsAndValidate(
+            TEST_DB,
+            3,
+            true,
+            AppDatabase.MIGRATION_2_3,
+        ).apply {
             execSQL("PRAGMA foreign_keys = ON")
             query("SELECT displayName FROM local_profiles WHERE id = 'default'").use { cursor ->
                 assertTrue(cursor.moveToFirst())
@@ -71,8 +84,10 @@ class AppDatabaseMigrationTest {
             }
             insertWordBook()
             insertLearningProfile("default", "primary-school", 1)
-            assertConstraintRejected { insertLearningProfile("invalid-target", "primary-school", 0) }
-            assertConstraintRejected { insertLearningProfile("unknown-book", "missing", 1) }
+            assertTargetConstraintRejected { insertLearningProfile("zero-target", "primary-school", 0) }
+            assertTargetConstraintRejected { insertLearningProfile("negative-target", "primary-school", -1) }
+            assertTargetConstraintRejected { updateLearningProfile("default", 0) }
+            assertTargetConstraintRejected { updateLearningProfile("default", -1) }
             close()
         }
     }
@@ -120,8 +135,12 @@ class AppDatabaseMigrationTest {
         )
     }
 
-    private fun assertConstraintRejected(action: () -> Unit) {
-        runCatching(action).onSuccess { error("Expected SQLite constraint violation") }
+    private fun SupportSQLiteDatabase.updateLearningProfile(profileId: String, dailyNewTarget: Int) {
+        execSQL("UPDATE learning_profiles SET dailyNewTarget = $dailyNewTarget WHERE profileId = '$profileId'")
+    }
+
+    private fun assertTargetConstraintRejected(action: () -> Unit) {
+        assertThrows(SQLiteConstraintException::class.java, action)
     }
 
     private companion object {

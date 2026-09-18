@@ -65,7 +65,7 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE TABLE IF NOT EXISTS `learning_profiles` " +
                             "(`profileId` TEXT NOT NULL, `activeWordBookId` TEXT NOT NULL, " +
-                            "`dailyNewTarget` INTEGER NOT NULL DEFAULT 1 CHECK(`dailyNewTarget` >= 1), " +
+                            "`dailyNewTarget` INTEGER NOT NULL, " +
                             "PRIMARY KEY(`profileId`), FOREIGN KEY(`activeWordBookId`) " +
                             "REFERENCES `word_books`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
                     )
@@ -73,9 +73,34 @@ abstract class AppDatabase : RoomDatabase() {
                         "CREATE INDEX IF NOT EXISTS `index_learning_profiles_activeWordBookId` " +
                             "ON `learning_profiles` (`activeWordBookId`)",
                     )
+                    createDailyTargetConstraintTriggers(db)
+                }
+            }
+
+        internal val CONSTRAINT_CALLBACK: RoomDatabase.Callback =
+            object : RoomDatabase.Callback() {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    createDailyTargetConstraintTriggers(db)
                 }
             }
 
         val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+
+        private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
+            db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)
+            db.execSQL(DAILY_TARGET_UPDATE_TRIGGER_SQL)
+        }
+
+        private const val DAILY_TARGET_INSERT_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `learning_profiles_daily_target_insert_check` " +
+                "BEFORE INSERT ON `learning_profiles` FOR EACH ROW " +
+                "WHEN NEW.`dailyNewTarget` < 1 BEGIN " +
+                "SELECT RAISE(ABORT, 'dailyNewTarget must be at least 1'); END"
+
+        private const val DAILY_TARGET_UPDATE_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `learning_profiles_daily_target_update_check` " +
+                "BEFORE UPDATE OF `dailyNewTarget` ON `learning_profiles` FOR EACH ROW " +
+                "WHEN NEW.`dailyNewTarget` < 1 BEGIN " +
+                "SELECT RAISE(ABORT, 'dailyNewTarget must be at least 1'); END"
     }
 }

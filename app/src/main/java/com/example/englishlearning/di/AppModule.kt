@@ -22,7 +22,11 @@ import kotlinx.coroutines.Dispatchers
 @InstallIn(SingletonComponent::class)
 object AppModule {
     @Provides @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase = Room.databaseBuilder(context, AppDatabase::class.java, "english-learning.db").addMigrations(*AppDatabase.MIGRATIONS).build()
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, "english-learning.db")
+            .addMigrations(*AppDatabase.MIGRATIONS)
+            .addCallback(AppDatabase.CONSTRAINT_CALLBACK)
+            .build()
     @Provides @Singleton fun provideClock(): ClockProvider = SystemClockProvider()
     @Provides @Named("io") fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
     @Provides @Singleton fun provideProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LocalProfileRepository = RoomLocalProfileRepository(database, dispatcher)
