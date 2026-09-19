@@ -1,0 +1,45 @@
+package com.example.englishlearning.learning
+
+import com.example.englishlearning.core.time.ClockProvider
+import java.util.UUID
+
+class GetOrCreateTodayPlanUseCase(
+    private val learningProfileRepository: LearningProfileRepository,
+    private val todayPlanRepository: TodayPlanRepository,
+    private val cardSource: PlanCardSource,
+    private val clock: ClockProvider,
+) {
+    suspend operator fun invoke(profileId: String): TodayPlanResult {
+        val generationInstant = clock.instant()
+        val zoneId = clock.zoneId()
+        val localDate = generationInstant.atZone(zoneId).toLocalDate()
+
+        when (val existing = todayPlanRepository.find(profileId, localDate)) {
+            is TodayPlanResult.Ready -> return existing
+            TodayPlanResult.StorageUnavailable -> return TodayPlanResult.StorageUnavailable
+            TodayPlanResult.NotFound -> Unit
+            TodayPlanResult.MissingLearningSetup -> return TodayPlanResult.StorageUnavailable
+        }
+
+        val profile = when (val result = learningProfileRepository.current(profileId)) {
+            is RepositoryResult.Failure -> return TodayPlanResult.StorageUnavailable
+            is RepositoryResult.Success -> result.value ?: return TodayPlanResult.MissingLearningSetup
+        }
+        val dueCardIds = cardSource.dueCardIds(profile.activeWordBookId, generationInstant).distinct()
+        val newCardIds = cardSource.newCardIds(profile.activeWordBookId, profile.dailyNewTarget).distinct()
+        val plan = TodayPlan(
+            planId = UUID.randomUUID().toString(),
+            profileId = profileId,
+            localDate = localDate,
+            zoneId = zoneId.id,
+            activeWordBookId = profile.activeWordBookId,
+            newTarget = newCardIds.size,
+            dueTarget = dueCardIds.size,
+            newCardIds = newCardIds,
+            dueCardIds = dueCardIds,
+            ruleVersion = "f1-v1",
+            generatedAt = generationInstant,
+        )
+        return todayPlanRepository.saveIfAbsent(plan)
+    }
+}
