@@ -6,6 +6,8 @@ import com.example.englishlearning.core.storage.entity.TodayPlanEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
@@ -22,7 +24,7 @@ class RoomTodayPlanRepository(
                 } ?: TodayPlanResult.NotFound
             }
         } catch (cancellation: CancellationException) {
-            throw cancellation
+            if (currentCoroutineContext().isActive) TodayPlanResult.StorageUnavailable else throw cancellation
         } catch (_: Exception) {
             TodayPlanResult.StorageUnavailable
         }
@@ -77,7 +79,8 @@ class RoomTodayPlanRepository(
         val uniquePrefix = "UNIQUE constraint failed: "
         val normalizedMessage = message?.trim() ?: return false
         if (!normalizedMessage.startsWith(uniquePrefix)) return false
-        return normalizedMessage.removePrefix(uniquePrefix) ==
+        val constraintDescription = normalizedMessage.removePrefix(uniquePrefix)
+        return constraintDescription.substringBefore(" (code ") ==
             "today_plans.profileId, today_plans.localDate"
     }
 

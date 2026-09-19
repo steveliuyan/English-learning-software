@@ -50,7 +50,6 @@ class RoomTodayPlanRepositoryTest {
                 todayPlanEntity(first),
                 todayPlanTasks(first),
             )
-
             val repository = RoomTodayPlanRepository(database, Dispatchers.Unconfined)
 
             assertEquals(TodayPlanResult.Ready(first), repository.saveIfAbsent(replacement))
