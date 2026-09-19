@@ -33,6 +33,10 @@ sealed interface AppError {
     data object PairingFailed : AppError {
         override val uiText: AppErrorUiText = AppErrorUiText.PairingFailed
     }
+
+    data object InvalidProfileName : AppError {
+        override val uiText: AppErrorUiText = AppErrorUiText.InvalidProfileName
+    }
 }
 
 enum class AppErrorUiText {
@@ -42,4 +46,5 @@ enum class AppErrorUiText {
     KeyStoreUnavailable,
     IntegrityMismatch,
     PairingFailed,
+    InvalidProfileName,
 }

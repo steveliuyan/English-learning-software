@@ -15,6 +15,7 @@ class AppErrorTest {
                 AppError.KeyStoreUnavailable,
                 AppError.IntegrityMismatch,
                 AppError.PairingFailed,
+                AppError.InvalidProfileName,
             )
 
         assertEquals(
@@ -25,6 +26,7 @@ class AppErrorTest {
                 AppErrorUiText.KeyStoreUnavailable,
                 AppErrorUiText.IntegrityMismatch,
                 AppErrorUiText.PairingFailed,
+                AppErrorUiText.InvalidProfileName,
             ),
             errors.map(AppError::uiText),
         )
