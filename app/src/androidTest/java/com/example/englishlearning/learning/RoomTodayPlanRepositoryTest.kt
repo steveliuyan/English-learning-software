@@ -6,23 +6,26 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import org.junit.runner.RunWith
 import java.time.Instant
 import java.time.LocalDate
-import kotlin.test.assertEquals
 
+@RunWith(AndroidJUnit4::class)
 class RoomTodayPlanRepositoryTest {
     @Test
-    fun `missing plan returns not found`() = runTest {
+    fun `missing plan returns not found`() = runBlocking {
         withRepository { repository ->
             assertEquals(TodayPlanResult.NotFound, repository.find("profile-1", LocalDate.parse("2026-09-19")))
         }
     }
 
     @Test
-    fun `saved plan round trips exact fields and task ordering`() = runTest {
+    fun `saved plan round trips exact fields and task ordering`() = runBlocking {
         withRepository { repository ->
             val plan = plan(newCards = listOf("new-2", "new-1"), dueCards = listOf("due-2", "due-1"))
 
@@ -32,7 +35,7 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
-    fun `unique conflict returns persisted snapshot without replacing tasks`() = runTest {
+    fun `unique conflict returns persisted snapshot without replacing tasks`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "today-plan-conflict-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
@@ -59,7 +62,7 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
-    fun `non unique SQLite failure with existing snapshot returns storage unavailable`() = runTest {
+    fun `non unique SQLite failure with existing snapshot returns storage unavailable`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "today-plan-storage-failure-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
@@ -87,7 +90,7 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
-    fun `closed database returns stable storage unavailable without SQL leakage`() = runTest {
+    fun `closed database returns stable storage unavailable without SQL leakage`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-today-plan-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
