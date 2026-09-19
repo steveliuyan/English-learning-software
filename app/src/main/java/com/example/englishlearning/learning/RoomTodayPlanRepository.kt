@@ -16,8 +16,9 @@ class RoomTodayPlanRepository(
     override suspend fun find(profileId: String, localDate: LocalDate): TodayPlanResult =
         try {
             withContext(ioDispatcher) {
-                database.internalTodayPlanDao().findPlan(profileId, localDate.toString())?.let(::readResult)
-                    ?: TodayPlanResult.NotFound
+                database.internalTodayPlanDao().findPlan(profileId, localDate.toString())?.let { entity ->
+                    readResult(entity)
+                } ?: TodayPlanResult.NotFound
             }
         } catch (cancellation: CancellationException) {
             throw cancellation
@@ -29,19 +30,15 @@ class RoomTodayPlanRepository(
         try {
             withContext(ioDispatcher) {
                 val dao = database.internalTodayPlanDao()
-                val stored = dao.findPlan(plan.profileId, plan.localDate.toString())
-                if (stored != null) {
-                    readResult(stored)
-                } else {
-                    try {
-                        dao.insertIfAbsent(plan.toEntity(), plan.toTaskEntities())
-                        TodayPlanResult.Ready(plan)
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (_: Exception) {
-                        dao.findPlan(plan.profileId, plan.localDate.toString())?.let(::readResult)
-                            ?: TodayPlanResult.StorageUnavailable
-                    }
+                try {
+                    dao.insertIfAbsent(plan.toEntity(), plan.toTaskEntities())
+                    TodayPlanResult.Ready(plan)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    dao.findPlan(plan.profileId, plan.localDate.toString())?.let { entity ->
+                        readResult(entity)
+                    } ?: TodayPlanResult.StorageUnavailable
                 }
             }
         } catch (cancellation: CancellationException) {

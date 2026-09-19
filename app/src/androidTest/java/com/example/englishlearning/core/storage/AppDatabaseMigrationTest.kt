@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -63,6 +64,7 @@ class AppDatabaseMigrationTest {
             query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'today_plan_tasks'").use { cursor ->
                 assertTrue(cursor.moveToFirst())
             }
+            assertTodayPlanConstraints()
             close()
         }
     }
@@ -140,6 +142,50 @@ class AppDatabaseMigrationTest {
         query("SELECT alias FROM key_aliases WHERE purpose = 'ai'").use { cursor ->
             check(cursor.moveToFirst() && cursor.getString(0) == "alias-1")
         }
+    }
+
+    private fun SupportSQLiteDatabase.assertTodayPlanConstraints() {
+        execSQL("PRAGMA foreign_keys = ON")
+        insertTodayPlan("plan-1", "default", "2026-09-19")
+        assertThrows(SQLiteConstraintException::class.java) {
+            insertTodayPlan("plan-2", "default", "2026-09-19")
+        }
+        insertTodayPlanTask("plan-1", "card-new", "NEW", 0)
+        assertThrows(SQLiteConstraintException::class.java) {
+            insertTodayPlanTask("plan-1", "card-invalid", "INVALID", 1)
+        }
+        assertThrows(SQLiteConstraintException::class.java) {
+            execSQL("DELETE FROM today_plans WHERE planId = 'plan-1'")
+        }
+        query("PRAGMA index_list('today_plan_tasks')").use { cursor ->
+            var hasPlanIdIndex = false
+            var hasPlanIdOrdinalIndex = false
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                hasPlanIdIndex = hasPlanIdIndex || name == "index_today_plan_tasks_planId"
+                hasPlanIdOrdinalIndex = hasPlanIdOrdinalIndex || name == "index_today_plan_tasks_planId_ordinal"
+            }
+            assertTrue(hasPlanIdIndex)
+            assertTrue(hasPlanIdOrdinalIndex)
+        }
+        query("PRAGMA foreign_key_list('today_plan_tasks')").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("NO ACTION", cursor.getString(cursor.getColumnIndexOrThrow("on_delete")))
+        }
+    }
+
+    private fun SupportSQLiteDatabase.insertTodayPlan(planId: String, profileId: String, localDate: String) {
+        execSQL(
+            "INSERT INTO today_plans (planId, profileId, localDate, zoneId, activeWordBookId, newTarget, dueTarget, ruleVersion, generatedAtEpochMillis) " +
+                "VALUES ('$planId', '$profileId', '$localDate', 'Asia/Shanghai', 'primary-school', 1, 0, 'v1', 1)",
+        )
+    }
+
+    private fun SupportSQLiteDatabase.insertTodayPlanTask(planId: String, cardId: String, taskKind: String, ordinal: Int) {
+        execSQL(
+            "INSERT INTO today_plan_tasks (planId, cardId, taskKind, ordinal) " +
+                "VALUES ('$planId', '$cardId', '$taskKind', $ordinal)",
+        )
     }
 
     private fun SupportSQLiteDatabase.insertWordBook() {

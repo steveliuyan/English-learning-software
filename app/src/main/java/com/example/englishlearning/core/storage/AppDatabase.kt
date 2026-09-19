@@ -100,7 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     db.execSQL(
                         "CREATE TABLE IF NOT EXISTS `today_plan_tasks` " +
-                            "(`planId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `taskKind` TEXT NOT NULL, " +
+                            "(`planId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `taskKind` TEXT NOT NULL CHECK(`taskKind` IN ('NEW', 'DUE')), " +
                             "`ordinal` INTEGER NOT NULL, PRIMARY KEY(`planId`, `cardId`), " +
                             "FOREIGN KEY(`planId`) REFERENCES `today_plans`(`planId`) " +
                             "ON UPDATE NO ACTION ON DELETE NO ACTION )",
@@ -120,6 +120,7 @@ abstract class AppDatabase : RoomDatabase() {
             object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     createDailyTargetConstraintTriggers(db)
+                    createTodayPlanTaskKindTrigger(db)
                 }
             }
 
@@ -129,6 +130,23 @@ abstract class AppDatabase : RoomDatabase() {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)
             db.execSQL(DAILY_TARGET_UPDATE_TRIGGER_SQL)
         }
+
+        private fun createTodayPlanTaskKindTrigger(db: SupportSQLiteDatabase) {
+            db.execSQL(TODAY_PLAN_TASK_KIND_INSERT_TRIGGER_SQL)
+            db.execSQL(TODAY_PLAN_TASK_KIND_UPDATE_TRIGGER_SQL)
+        }
+
+        private const val TODAY_PLAN_TASK_KIND_INSERT_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `today_plan_tasks_kind_insert_check` " +
+                "BEFORE INSERT ON `today_plan_tasks` FOR EACH ROW " +
+                "WHEN NEW.`taskKind` NOT IN ('NEW', 'DUE') BEGIN " +
+                "SELECT RAISE(ABORT, 'taskKind must be NEW or DUE'); END"
+
+        private const val TODAY_PLAN_TASK_KIND_UPDATE_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `today_plan_tasks_kind_update_check` " +
+                "BEFORE UPDATE OF `taskKind` ON `today_plan_tasks` FOR EACH ROW " +
+                "WHEN NEW.`taskKind` NOT IN ('NEW', 'DUE') BEGIN " +
+                "SELECT RAISE(ABORT, 'taskKind must be NEW or DUE'); END"
 
         private const val DAILY_TARGET_INSERT_TRIGGER_SQL =
             "CREATE TRIGGER IF NOT EXISTS `learning_profiles_daily_target_insert_check` " +

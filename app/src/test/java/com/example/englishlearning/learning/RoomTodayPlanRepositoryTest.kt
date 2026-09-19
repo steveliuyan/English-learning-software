@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.englishlearning.core.storage.AppDatabase
+import com.example.englishlearning.core.storage.entity.TodayPlanEntity
+import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -30,18 +32,29 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
-    fun `second save returns first persisted plan without adding replacement tasks`() = runTest {
-        withRepository { repository ->
+    fun `unique conflict returns persisted snapshot without replacing tasks`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "today-plan-conflict-${System.nanoTime()}.db"
+        val database = openDatabase(context, name)
+        try {
             val first = plan(newCards = listOf("new-1"), dueCards = listOf("due-1"))
             val replacement = first.copy(
                 planId = "plan-replacement",
                 newCardIds = listOf("new-replacement"),
                 dueCardIds = listOf("due-replacement"),
             )
+            database.internalTodayPlanDao().insertIfAbsent(
+                todayPlanEntity(first),
+                todayPlanTasks(first),
+            )
 
-            assertEquals(TodayPlanResult.Ready(first), repository.saveIfAbsent(first))
+            val repository = RoomTodayPlanRepository(database, Dispatchers.Unconfined)
+
             assertEquals(TodayPlanResult.Ready(first), repository.saveIfAbsent(replacement))
             assertEquals(TodayPlanResult.Ready(first), repository.find(first.profileId, first.localDate))
+        } finally {
+            database.close()
+            context.deleteDatabase(name)
         }
     }
 
@@ -74,6 +87,26 @@ class RoomTodayPlanRepositoryTest {
             .addMigrations(*AppDatabase.MIGRATIONS)
             .addCallback(AppDatabase.CONSTRAINT_CALLBACK)
             .build()
+
+    private fun todayPlanEntity(plan: TodayPlan) =
+        TodayPlanEntity(
+            planId = plan.planId,
+            profileId = plan.profileId,
+            localDate = plan.localDate.toString(),
+            zoneId = plan.zoneId,
+            activeWordBookId = plan.activeWordBookId,
+            newTarget = plan.newTarget,
+            dueTarget = plan.dueTarget,
+            ruleVersion = plan.ruleVersion,
+            generatedAtEpochMillis = plan.generatedAt.toEpochMilli(),
+        )
+
+    private fun todayPlanTasks(plan: TodayPlan): List<TodayPlanTaskEntity> =
+        plan.newCardIds.mapIndexed { ordinal, cardId ->
+            TodayPlanTaskEntity(plan.planId, cardId, "NEW", ordinal)
+        } + plan.dueCardIds.mapIndexed { ordinal, cardId ->
+            TodayPlanTaskEntity(plan.planId, cardId, "DUE", ordinal)
+        }
 
     private fun plan(newCards: List<String>, dueCards: List<String>) =
         TodayPlan(
