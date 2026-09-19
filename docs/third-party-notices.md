@@ -212,6 +212,16 @@
 - 替代方案: 直接使用 JUnit Jupiter Assertions
 - 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 说明
 
+## kotlin-reflect
+- 名称: Kotlin Reflect
+- 版本: 2.1.21
+- 许可证: Apache-2.0
+- 用途: JVM 单元测试反射契约断言
+- 数据流: 仅在本地测试进程检查编译类型与成员，不处理生产用户数据或网络数据
+- NOTICE 位置: 开发与测试依赖，不打包进 release APK；本文件
+- 替代方案: 不使用反射的手写契约断言
+- 商业分发结论: 测试依赖不随 APK 分发；保留 Apache-2.0 许可证与 NOTICE
+
 ## plugin-android-application
 - 名称: Android Gradle Plugin
 - 版本: 8.12.2
