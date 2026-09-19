@@ -10,9 +10,15 @@ import com.example.englishlearning.learning.SetupResult
 import com.example.englishlearning.learning.WordBook
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+sealed interface LearningSetupEffect {
+    data object Saved : LearningSetupEffect
+}
 
 data class LearningSetupUiState(
     val wordBooks: List<WordBook> = emptyList(),
@@ -36,6 +42,8 @@ class LearningSetupViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LearningSetupUiState())
     val uiState: StateFlow<LearningSetupUiState> = _uiState
+    private val _effects = MutableSharedFlow<LearningSetupEffect>()
+    val effects: SharedFlow<LearningSetupEffect> = _effects
 
     fun load(profileId: String) {
         viewModelScope.launch {
@@ -77,10 +85,13 @@ class LearningSetupViewModel @Inject constructor(
         val wordBookId = state.selectedWordBookId ?: return
         viewModelScope.launch {
             when (selectWordBook(profileId, wordBookId, state.dailyNewTarget)) {
-                SetupResult.Saved -> _uiState.value = state.copy(
-                    savedWordBookName = state.wordBooks.find { it.id == wordBookId }?.displayName,
-                    message = null,
-                )
+                SetupResult.Saved -> {
+                    _uiState.value = state.copy(
+                        savedWordBookName = state.wordBooks.find { it.id == wordBookId }?.displayName,
+                        message = null,
+                    )
+                    _effects.emit(LearningSetupEffect.Saved)
+                }
                 SetupResult.InvalidDailyTarget -> _uiState.value = state.copy(message = "每日新词目标至少为 1")
                 SetupResult.UnknownWordBook -> _uiState.value = state.copy(message = "词书不可用")
                 SetupResult.StorageUnavailable -> _uiState.value = state.copy(message = "暂时无法保存学习设置")

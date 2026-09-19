@@ -3,10 +3,18 @@
     <application
         android:name=".EnglishLearningApplication"
         android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
         android:label="English Learning"
         android:supportsRtl="true"
         android:theme="@style/Theme.EnglishLearning">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".launch.BrandLaunchActivity"
+            android:exported="true"
+            android:theme="@style/Theme.EnglishLearning.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -1,10 +1,9 @@
 package com.example.englishlearning.ui
 
-import androidx.compose.ui.test.assertContentDescriptionContains
-import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -15,9 +14,12 @@ import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
+import com.example.englishlearning.learning.TodayPlan
+import com.example.englishlearning.learning.TodayPlanResult
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
 import com.example.englishlearning.profile.InMemoryLocalProfileRepository
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,27 +33,140 @@ class AppScreenTest {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
         val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
-        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel()) }
+        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlanViewModel()) }
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("设置学习词书").assertExists()
-        composeRule.onNodeWithText("保存学习设置").assertExists()
+        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+        composeRule.onNodeWithContentDescription("保存学习设置").assertExists()
     }
 
     @Test
     fun errorScreenRendersSafeStableTextOnly() {
-        val repository = InMemoryLocalProfileRepository()
-        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
-        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel()) }
-        composeRule.onNodeWithContentDescription("姓名输入").performTextInput("   ")
-        composeRule.onNodeWithContentDescription("创建资料").performClick()
-        composeRule.waitForIdle()
+        composeRule.setContent { ErrorScreen(onRetry = {}) }
         composeRule.onNodeWithText("无法创建资料，请检查姓名").assertExists()
         composeRule.onNodeWithText("Exception").assertDoesNotExist()
         composeRule.onNodeWithText("/secret").assertDoesNotExist()
     }
+
+    @Test
+    fun errorScreenOffersReturnActionSoUserIsNotStuck() {
+        var returned = false
+        composeRule.setContent { ErrorScreen(onRetry = { returned = true }) }
+        composeRule.onNodeWithContentDescription("返回重新填写").assertExists().performClick()
+        composeRule.waitForIdle()
+        assertEquals(true, returned)
+    }
+
+    @Test
+    fun blankNameDisablesCreateAndDoesNotReloadTodayPlan() {
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        var invocations = 0
+        val todayPlan = TodayPlanViewModel(
+            { invocations++; TodayPlanResult.MissingLearningSetup },
+            FakeLearningProfileRepository(),
+        )
+        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlan) }
+        composeRule.onNodeWithContentDescription("创建资料").assertExists().assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("请输入名字提示").assertExists()
+        assertEquals(0, invocations)
+    }
+
+    @Test
+    fun savingSetupReloadsTodayPlan() {
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        var invocations = 0
+        val todayPlan = TodayPlanViewModel(
+            { invocations++; TodayPlanResult.MissingLearningSetup },
+            FakeLearningProfileRepository(),
+        )
+        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlan) }
+        composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
+        composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
+        composeRule.waitForIdle()
+        assertEquals(2, invocations)
+    }
+
+    private fun todayPlanViewModel(): TodayPlanViewModel = TodayPlanViewModel({ TodayPlanResult.MissingLearningSetup }, FakeLearningProfileRepository())
+
+    @Test
+    fun readyPlanEntryReopensSetupAndSavingReturnsToTodayPlan() {
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        var invocations = 0
+        val todayPlan = TodayPlanViewModel({ invocations++; readyPlanResult() }, FakeLearningProfileRepository())
+        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlan) }
+        composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
+        composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+
+        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+
+        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        assertEquals(2, invocations)
+    }
+
+    @Test
+    fun optionalSetupCanBeCancelledBackToTodayPlanWithoutReloading() {
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        var invocations = 0
+        val todayPlan = TodayPlanViewModel({ invocations++; readyPlanResult() }, FakeLearningProfileRepository())
+        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlan) }
+        composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
+        composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+
+        composeRule.onNodeWithContentDescription("返回今日计划").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        assertEquals(1, invocations)
+    }
+
+    @Test
+    fun mandatorySetupOffersNoCancelEntry() {
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlanViewModel()) }
+        composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
+        composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+        composeRule.onNodeWithContentDescription("返回今日计划").assertDoesNotExist()
+    }
+
+    private fun readyPlanResult(): TodayPlanResult = TodayPlanResult.Ready(
+        TodayPlan(
+            planId = "plan-1",
+            profileId = "profile-1",
+            localDate = java.time.LocalDate.of(2026, 9, 19),
+            zoneId = "Asia/Shanghai",
+            activeWordBookId = "test-book",
+            newTarget = 10,
+            dueTarget = 0,
+            newCardIds = emptyList(),
+            dueCardIds = emptyList(),
+            ruleVersion = "v1",
+            generatedAt = java.time.Instant.EPOCH,
+        ),
+    )
 
     private fun setupViewModel(): LearningSetupViewModel {
         val repository = FakeLearningProfileRepository()

@@ -8,3 +8,9 @@ local.properties
 .cxx/
 .superpowers/
 .worktrees/
+.gradle-review/
+.gradle-user-home/
+verification-logs/
+today-plan-device.png
+verification-head.txt
+*.hprof

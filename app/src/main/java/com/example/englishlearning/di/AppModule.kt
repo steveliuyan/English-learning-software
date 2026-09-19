@@ -5,6 +5,12 @@ import androidx.room.Room
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.time.ClockProvider
 import com.example.englishlearning.core.time.SystemClockProvider
+import com.example.englishlearning.learning.GetOrCreateTodayPlanUseCase
+import com.example.englishlearning.learning.FixturePlanCardSource
+import com.example.englishlearning.learning.PlanCardSource
+import com.example.englishlearning.learning.RoomTodayPlanRepository
+import com.example.englishlearning.learning.TodayPlanRepository
+import com.example.englishlearning.ui.TodayPlanUseCaseContract
 import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.RoomLearningProfileRepository
 import com.example.englishlearning.learning.SeedWordBooksUseCase
@@ -40,4 +46,8 @@ object AppModule {
     @Provides fun provideSelectLearningSetupUseCase(repository: LearningProfileRepository): SelectWordBookAndSetDailyTargetUseCase = SelectWordBookAndSetDailyTargetUseCase(repository)
     @Provides fun provideWordBookMetadataAssetSource(@ApplicationContext context: Context): WordBookMetadataAssetSource = WordBookMetadataAssetSource { context.assets.open("wordbooks/metadata.json").bufferedReader().use { it.readText() } }
     @Provides fun provideSeedWordBooksUseCase(source: WordBookMetadataAssetSource, repository: LearningProfileRepository): SeedWordBooksUseCase = SeedWordBooksUseCase(source, repository)
+    @Provides @Singleton fun provideTodayPlanRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): TodayPlanRepository = RoomTodayPlanRepository(database, dispatcher)
+    @Provides @Singleton fun providePlanCardSource(): PlanCardSource = FixturePlanCardSource()
+    @Provides fun provideTodayPlanUseCase(learning: LearningProfileRepository, plans: TodayPlanRepository, cards: PlanCardSource, clock: ClockProvider): GetOrCreateTodayPlanUseCase = GetOrCreateTodayPlanUseCase(learning, plans, cards, clock)
+    @Provides fun provideTodayPlanUseCaseContract(useCase: GetOrCreateTodayPlanUseCase): TodayPlanUseCaseContract = TodayPlanUseCaseContract { profileId -> useCase(profileId) }
 }

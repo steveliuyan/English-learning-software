@@ -52,6 +52,7 @@ ksp {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.hilt.navigation.compose)

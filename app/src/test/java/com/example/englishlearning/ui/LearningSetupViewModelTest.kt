@@ -7,6 +7,9 @@ import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.WordBook
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -66,6 +69,23 @@ class LearningSetupViewModelTest {
         assertEquals(LearningProfile("default", "cet4", 20), repository.profile)
         assertEquals("大学英语四级", viewModel.uiState.value.savedWordBookName)
         assertEquals(20, viewModel.uiState.value.dailyNewTarget)
+    }
+
+    @Test
+    fun `save emits one Saved effect only when setup succeeds`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 0, "v1", "cefr-j-1.5")
+        }
+        val viewModel = LearningSetupViewModel(repository, seed(repository), select(repository))
+        viewModel.load("default")
+        advanceUntilIdle()
+        val effect = async(start = CoroutineStart.UNDISPATCHED) { viewModel.effects.first() }
+
+        viewModel.save("default")
+        advanceUntilIdle()
+
+        assertEquals(LearningSetupEffect.Saved, effect.await())
+        assertEquals("大学英语四级", viewModel.uiState.value.savedWordBookName)
     }
 
     private fun seed(repository: LearningProfileRepository) =
