@@ -43,6 +43,31 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV3ToV4_preservesLearningDataAndCreatesTodayPlanTables() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 3).apply {
+            insertWordBook()
+            insertLearningProfile("default", "primary-school", 10)
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, AppDatabase.MIGRATION_3_4).apply {
+            query("SELECT activeWordBookId, dailyNewTarget FROM learning_profiles WHERE profileId = 'default'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("primary-school", cursor.getString(0))
+                assertEquals(10, cursor.getInt(1))
+            }
+            query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'today_plans'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+            }
+            query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'today_plan_tasks'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+            }
+            close()
+        }
+    }
+
+    @Test
     fun createV3Database_rejectsNonPositiveDailyNewTarget() {
         Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),

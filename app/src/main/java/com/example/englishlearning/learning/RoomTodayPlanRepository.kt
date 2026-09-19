@@ -1,0 +1,93 @@
+package com.example.englishlearning.learning
+
+import com.example.englishlearning.core.storage.AppDatabase
+import com.example.englishlearning.core.storage.entity.TodayPlanEntity
+import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
+
+class RoomTodayPlanRepository(
+    private val database: AppDatabase,
+    private val ioDispatcher: CoroutineDispatcher,
+) : TodayPlanRepository {
+    override suspend fun find(profileId: String, localDate: LocalDate): TodayPlanResult =
+        try {
+            withContext(ioDispatcher) {
+                database.internalTodayPlanDao().findPlan(profileId, localDate.toString())?.let(::readResult)
+                    ?: TodayPlanResult.NotFound
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            TodayPlanResult.StorageUnavailable
+        }
+
+    override suspend fun saveIfAbsent(plan: TodayPlan): TodayPlanResult =
+        try {
+            withContext(ioDispatcher) {
+                val dao = database.internalTodayPlanDao()
+                val stored = dao.findPlan(plan.profileId, plan.localDate.toString())
+                if (stored != null) {
+                    readResult(stored)
+                } else {
+                    try {
+                        dao.insertIfAbsent(plan.toEntity(), plan.toTaskEntities())
+                        TodayPlanResult.Ready(plan)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        dao.findPlan(plan.profileId, plan.localDate.toString())?.let(::readResult)
+                            ?: TodayPlanResult.StorageUnavailable
+                    }
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            TodayPlanResult.StorageUnavailable
+        }
+
+    private suspend fun readResult(entity: TodayPlanEntity): TodayPlanResult.Ready {
+        val tasks = database.internalTodayPlanDao().findTasks(entity.planId)
+        return TodayPlanResult.Ready(
+            TodayPlan(
+                planId = entity.planId,
+                profileId = entity.profileId,
+                localDate = LocalDate.parse(entity.localDate),
+                zoneId = entity.zoneId,
+                activeWordBookId = entity.activeWordBookId,
+                newTarget = entity.newTarget,
+                dueTarget = entity.dueTarget,
+                newCardIds = tasks.filter { it.taskKind == NEW }.map { it.cardId },
+                dueCardIds = tasks.filter { it.taskKind == DUE }.map { it.cardId },
+                ruleVersion = entity.ruleVersion,
+                generatedAt = Instant.ofEpochMilli(entity.generatedAtEpochMillis),
+            ),
+        )
+    }
+
+    private fun TodayPlan.toEntity() =
+        TodayPlanEntity(
+            planId = planId,
+            profileId = profileId,
+            localDate = localDate.toString(),
+            zoneId = zoneId,
+            activeWordBookId = activeWordBookId,
+            newTarget = newTarget,
+            dueTarget = dueTarget,
+            ruleVersion = ruleVersion,
+            generatedAtEpochMillis = generatedAt.toEpochMilli(),
+        )
+
+    private fun TodayPlan.toTaskEntities(): List<TodayPlanTaskEntity> =
+        newCardIds.mapIndexed { ordinal, cardId -> TodayPlanTaskEntity(planId, cardId, NEW, ordinal) } +
+            dueCardIds.mapIndexed { ordinal, cardId -> TodayPlanTaskEntity(planId, cardId, DUE, ordinal) }
+
+    private companion object {
+        const val NEW = "NEW"
+        const val DUE = "DUE"
+    }
+}
