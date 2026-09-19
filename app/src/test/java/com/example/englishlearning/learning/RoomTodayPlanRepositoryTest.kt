@@ -72,7 +72,8 @@ class RoomTodayPlanRepositoryTest {
             )
             database.openHelper.writableDatabase.execSQL(
                 "CREATE TRIGGER reject_today_plan_insert BEFORE INSERT ON today_plans " +
-                    "WHEN NEW.planId = 'plan-rejected' BEGIN SELECT RAISE(ABORT, 'storage unavailable'); END",
+                    "WHEN NEW.planId = 'plan-rejected' BEGIN " +
+                    "SELECT RAISE(ABORT, 'today_plans.profileId, today_plans.localDate'); END",
             )
 
             assertEquals(

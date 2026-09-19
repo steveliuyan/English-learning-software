@@ -73,8 +73,13 @@ class RoomTodayPlanRepository(
         )
     }
 
-    private fun SQLiteConstraintException.isTodayPlanUniqueConflict(): Boolean =
-        message?.contains("today_plans.profileId, today_plans.localDate") == true
+    private fun SQLiteConstraintException.isTodayPlanUniqueConflict(): Boolean {
+        val uniquePrefix = "UNIQUE constraint failed: "
+        val normalizedMessage = message?.trim() ?: return false
+        if (!normalizedMessage.startsWith(uniquePrefix)) return false
+        return normalizedMessage.removePrefix(uniquePrefix) ==
+            "today_plans.profileId, today_plans.localDate"
+    }
 
     private fun TodayPlan.toEntity() =
         TodayPlanEntity(
