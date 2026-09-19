@@ -42,6 +42,16 @@
 - 替代方案: Android Views
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
 
+## androidx-compose-ui-test-junit4
+- 名称: Jetpack Compose UI Test JUnit4
+- 版本: 由 androidx-compose-bom 2025.12.00 管理
+- 许可证: Apache-2.0
+- 用途: Android instrumentation UI 测试断言与规则
+- 数据流: 仅在测试设备内执行 UI 验证，不处理用户数据或网络数据
+- NOTICE 位置: Android test/debug-only 依赖，不打包进 release APK；本文件
+- 替代方案: Espresso 或手写 Android UI 测试
+- 商业分发结论: 测试依赖不随 release APK 分发；保留 Apache-2.0 许可证与 NOTICE
+
 ## androidx-compose-material3
 - 名称: Jetpack Compose Material 3
 - 版本: 由 androidx-compose-bom 2025.12.00 管理
