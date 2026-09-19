@@ -18,14 +18,14 @@ import java.time.LocalDate
 @RunWith(AndroidJUnit4::class)
 class RoomTodayPlanRepositoryTest {
     @Test
-    fun `missing plan returns not found`() = runBlocking {
+    fun missingPlanReturnsNotFound() = runBlocking {
         withRepository { repository ->
             assertEquals(TodayPlanResult.NotFound, repository.find("profile-1", LocalDate.parse("2026-09-19")))
         }
     }
 
     @Test
-    fun `saved plan round trips exact fields and task ordering`() = runBlocking {
+    fun savedPlanRoundTripsExactFieldsAndTaskOrdering() = runBlocking {
         withRepository { repository ->
             val plan = plan(newCards = listOf("new-2", "new-1"), dueCards = listOf("due-2", "due-1"))
 
@@ -35,7 +35,7 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
-    fun `unique conflict returns persisted snapshot without replacing tasks`() = runBlocking {
+    fun uniqueConflictReturnsPersistedSnapshotWithoutReplacingTasks() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "today-plan-conflict-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
@@ -62,7 +62,7 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
-    fun `non unique SQLite failure with existing snapshot returns storage unavailable`() = runBlocking {
+    fun nonUniqueSqliteFailureWithExistingSnapshotReturnsStorageUnavailable() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "today-plan-storage-failure-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
@@ -90,7 +90,7 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
-    fun `closed database returns stable storage unavailable without SQL leakage`() = runBlocking {
+    fun closedDatabaseReturnsStableStorageUnavailableWithoutSqlLeakage() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-today-plan-${System.nanoTime()}.db"
         val database = openDatabase(context, name)

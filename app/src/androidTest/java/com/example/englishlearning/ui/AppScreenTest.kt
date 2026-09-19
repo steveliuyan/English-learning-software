@@ -27,7 +27,7 @@ class AppScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun `profile creation controls have semantic labels and show ready`() {
+    fun profileCreationControlsHaveSemanticLabelsAndShowReady() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
         val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
@@ -40,7 +40,7 @@ class AppScreenTest {
     }
 
     @Test
-    fun `error screen renders safe stable text only`() {
+    fun errorScreenRendersSafeStableTextOnly() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
         val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))

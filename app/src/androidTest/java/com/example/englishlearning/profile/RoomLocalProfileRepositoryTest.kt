@@ -13,7 +13,7 @@ import java.time.Instant
 
 @RunWith(AndroidJUnit4::class)
 class RoomLocalProfileRepositoryTest {
-    @Test fun `room repository persists profile across reopen`() = runBlocking {
+    @Test fun roomRepositoryPersistsProfileAcrossReopen() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "profile-repository-test.db"
         context.deleteDatabase(name)
