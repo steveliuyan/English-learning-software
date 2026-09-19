@@ -1,5 +1,6 @@
 package com.example.englishlearning.learning
 
+import android.database.sqlite.SQLiteConstraintException
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
@@ -35,10 +36,16 @@ class RoomTodayPlanRepository(
                     TodayPlanResult.Ready(plan)
                 } catch (cancellation: CancellationException) {
                     throw cancellation
+                } catch (failure: SQLiteConstraintException) {
+                    if (failure.isTodayPlanUniqueConflict()) {
+                        dao.findPlan(plan.profileId, plan.localDate.toString())?.let { entity ->
+                            readResult(entity)
+                        } ?: TodayPlanResult.StorageUnavailable
+                    } else {
+                        TodayPlanResult.StorageUnavailable
+                    }
                 } catch (_: Exception) {
-                    dao.findPlan(plan.profileId, plan.localDate.toString())?.let { entity ->
-                        readResult(entity)
-                    } ?: TodayPlanResult.StorageUnavailable
+                    TodayPlanResult.StorageUnavailable
                 }
             }
         } catch (cancellation: CancellationException) {
@@ -65,6 +72,9 @@ class RoomTodayPlanRepository(
             ),
         )
     }
+
+    private fun SQLiteConstraintException.isTodayPlanUniqueConflict(): Boolean =
+        message?.contains("today_plans.profileId, today_plans.localDate") == true
 
     private fun TodayPlan.toEntity() =
         TodayPlanEntity(

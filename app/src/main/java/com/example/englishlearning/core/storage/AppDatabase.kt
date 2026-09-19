@@ -100,7 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     db.execSQL(
                         "CREATE TABLE IF NOT EXISTS `today_plan_tasks` " +
-                            "(`planId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `taskKind` TEXT NOT NULL CHECK(`taskKind` IN ('NEW', 'DUE')), " +
+                            "(`planId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `taskKind` TEXT NOT NULL, " +
                             "`ordinal` INTEGER NOT NULL, PRIMARY KEY(`planId`, `cardId`), " +
                             "FOREIGN KEY(`planId`) REFERENCES `today_plans`(`planId`) " +
                             "ON UPDATE NO ACTION ON DELETE NO ACTION )",
@@ -120,6 +120,10 @@ abstract class AppDatabase : RoomDatabase() {
             object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     createDailyTargetConstraintTriggers(db)
+                    createTodayPlanTaskKindTrigger(db)
+                }
+
+                override fun onOpen(db: SupportSQLiteDatabase) {
                     createTodayPlanTaskKindTrigger(db)
                 }
             }

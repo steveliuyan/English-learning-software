@@ -52,21 +52,54 @@ class AppDatabaseMigrationTest {
             close()
         }
 
-        helper.runMigrationsAndValidate(TEST_DB, 4, true, AppDatabase.MIGRATION_3_4).apply {
-            query("SELECT activeWordBookId, dailyNewTarget FROM learning_profiles WHERE profileId = 'default'").use { cursor ->
-                assertTrue(cursor.moveToFirst())
-                assertEquals("primary-school", cursor.getString(0))
-                assertEquals(10, cursor.getInt(1))
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, AppDatabase.MIGRATION_3_4).close()
+
+        Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            AppDatabase::class.java,
+            TEST_DB,
+        ).addMigrations(*AppDatabase.MIGRATIONS)
+            .addCallback(AppDatabase.CONSTRAINT_CALLBACK)
+            .build()
+            .apply {
+                openHelper.writableDatabase.apply {
+                    query("SELECT activeWordBookId, dailyNewTarget FROM learning_profiles WHERE profileId = 'default'").use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                        assertEquals("primary-school", cursor.getString(0))
+                        assertEquals(10, cursor.getInt(1))
+                    }
+                    query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'today_plans'").use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                    }
+                    query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'today_plan_tasks'").use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                    }
+                    assertTodayPlanConstraints()
+                }
+                close()
             }
-            query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'today_plans'").use { cursor ->
-                assertTrue(cursor.moveToFirst())
+    }
+
+    @Test
+    fun freshV4Database_rejectsInvalidTodayPlanTaskKindOnInsertAndUpdate() {
+        Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            AppDatabase::class.java,
+        ).addCallback(AppDatabase.CONSTRAINT_CALLBACK)
+            .build()
+            .apply {
+                openHelper.writableDatabase.apply {
+                    insertTodayPlan("plan-1", "default", "2026-09-19")
+                    assertThrows(SQLiteConstraintException::class.java) {
+                        insertTodayPlanTask("plan-1", "card-invalid", "INVALID", 0)
+                    }
+                    insertTodayPlanTask("plan-1", "card-new", "NEW", 0)
+                    assertThrows(SQLiteConstraintException::class.java) {
+                        execSQL("UPDATE today_plan_tasks SET taskKind = 'INVALID' WHERE planId = 'plan-1'")
+                    }
+                }
+                close()
             }
-            query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'today_plan_tasks'").use { cursor ->
-                assertTrue(cursor.moveToFirst())
-            }
-            assertTodayPlanConstraints()
-            close()
-        }
     }
 
     @Test
@@ -153,6 +186,9 @@ class AppDatabaseMigrationTest {
         insertTodayPlanTask("plan-1", "card-new", "NEW", 0)
         assertThrows(SQLiteConstraintException::class.java) {
             insertTodayPlanTask("plan-1", "card-invalid", "INVALID", 1)
+        }
+        assertThrows(SQLiteConstraintException::class.java) {
+            execSQL("UPDATE today_plan_tasks SET taskKind = 'INVALID' WHERE planId = 'plan-1'")
         }
         assertThrows(SQLiteConstraintException::class.java) {
             execSQL("DELETE FROM today_plans WHERE planId = 'plan-1'")

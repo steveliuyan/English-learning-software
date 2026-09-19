@@ -59,6 +59,33 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
+    fun `non unique SQLite failure with existing snapshot returns storage unavailable`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "today-plan-storage-failure-${System.nanoTime()}.db"
+        val database = openDatabase(context, name)
+        try {
+            val persisted = plan(newCards = listOf("new-1"), dueCards = listOf("due-1"))
+            val rejected = persisted.copy(planId = "plan-rejected")
+            database.internalTodayPlanDao().insertIfAbsent(
+                todayPlanEntity(persisted),
+                todayPlanTasks(persisted),
+            )
+            database.openHelper.writableDatabase.execSQL(
+                "CREATE TRIGGER reject_today_plan_insert BEFORE INSERT ON today_plans " +
+                    "WHEN NEW.planId = 'plan-rejected' BEGIN SELECT RAISE(ABORT, 'storage unavailable'); END",
+            )
+
+            assertEquals(
+                TodayPlanResult.StorageUnavailable,
+                RoomTodayPlanRepository(database, Dispatchers.Unconfined).saveIfAbsent(rejected),
+            )
+        } finally {
+            database.close()
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test
     fun `closed database returns stable storage unavailable without SQL leakage`() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-today-plan-${System.nanoTime()}.db"
