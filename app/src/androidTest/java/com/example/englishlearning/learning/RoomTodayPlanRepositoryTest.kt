@@ -99,6 +99,7 @@ class RoomTodayPlanRepositoryTest {
 
         assertEquals(TodayPlanResult.StorageUnavailable, repository.find("profile-1", LocalDate.parse("2026-09-19")))
         context.deleteDatabase(name)
+        Unit
     }
 
     private suspend fun withRepository(block: suspend (RoomTodayPlanRepository) -> Unit) {
