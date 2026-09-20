@@ -108,6 +108,40 @@ class RoomLearningEventRepositoryTest {
         }
     }
 
+    @Test
+    fun closedDatabaseReturnsStableStorageUnavailableForAppend(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "closed-learning-event-append-${System.nanoTime()}.db"
+        val database = openDatabase(context, name)
+        val repository = RoomLearningEventRepository(database, Dispatchers.Unconfined)
+        database.close()
+
+        assertEquals(
+            AppendEventResult.StorageUnavailable,
+            repository.append(event("event-1", "card-1", later), state("card-1", later)),
+        )
+        context.deleteDatabase(name)
+    }
+
+    @Test
+    fun closedDatabaseReturnsStableStorageUnavailableForReads(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "closed-learning-event-reads-${System.nanoTime()}.db"
+        val database = openDatabase(context, name)
+        val repository = RoomLearningEventRepository(database, Dispatchers.Unconfined)
+        database.close()
+
+        assertEquals(
+            RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable),
+            repository.findEvent("event-1"),
+        )
+        assertEquals(
+            RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable),
+            repository.completedCardIds("plan-1"),
+        )
+        context.deleteDatabase(name)
+    }
+
     private suspend fun withRepository(block: suspend (RoomLearningEventRepository) -> Unit) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "learning-event-${System.nanoTime()}.db"

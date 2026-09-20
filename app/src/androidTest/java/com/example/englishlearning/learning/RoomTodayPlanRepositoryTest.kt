@@ -101,6 +101,21 @@ class RoomTodayPlanRepositoryTest {
         Unit
     }
 
+    @Test
+    fun closedDatabaseReturnsStableStorageUnavailableForSaveIfAbsent(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "closed-today-plan-save-${System.nanoTime()}.db"
+        val database = openDatabase(context, name)
+        val repository = RoomTodayPlanRepository(database, Dispatchers.Unconfined)
+        database.close()
+
+        assertEquals(
+            TodayPlanResult.StorageUnavailable,
+            repository.saveIfAbsent(plan(newCards = listOf("new-1"), dueCards = listOf("due-1"))),
+        )
+        context.deleteDatabase(name)
+    }
+
     private suspend fun withRepository(block: suspend (RoomTodayPlanRepository) -> Unit) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "today-plan-${System.nanoTime()}.db"
