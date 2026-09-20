@@ -25,7 +25,7 @@ import java.time.ZoneOffset
 internal fun wordCardFixtureViewModel(
     planResult: () -> TodayPlanResult = { placeholderCardPlan() },
 ): WordCardViewModel {
-    val events = NoLearningEventRepository()
+    val events = NoopLearningEventRepository()
     return WordCardViewModel(
         todayPlan = { planResult() },
         content = PlaceholderWordCardSource(),
@@ -54,7 +54,7 @@ internal fun placeholderCardPlan(): TodayPlanResult =
     )
 
 /** An event log with nothing recorded and no behaviour, for tests that never submit feedback. */
-internal class NoLearningEventRepository : LearningEventRepository {
+internal class NoopLearningEventRepository : LearningEventRepository {
     override suspend fun append(event: LearningEvent, nextState: CardReviewState) =
         AppendEventResult.Appended(duplicate = false)
 
