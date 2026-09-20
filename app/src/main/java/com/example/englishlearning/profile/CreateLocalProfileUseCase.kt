@@ -1,6 +1,7 @@
 package com.example.englishlearning.profile
 
 import com.example.englishlearning.core.error.AppError
+import com.example.englishlearning.core.storage.AppErrorException
 import com.example.englishlearning.core.time.ClockProvider
 
 class CreateLocalProfileUseCase(
@@ -18,5 +19,6 @@ class ProfileException(val error: AppError) : Exception()
 
 fun Throwable.toSafeAppError(): AppError = when (this) {
     is ProfileException -> error
+    is AppErrorException -> appError
     else -> (cause as? ProfileException)?.error ?: AppError.DatabaseMigrationFailed
 }
