@@ -25,6 +25,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.Test
  * card, a retry reuses the same event id, and completion is read back from the event log so
  * leaving and re-entering the flow neither loses nor invents progress.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class WordCardViewModelTest {
     @Test
     fun `load shows the first card of the plan and the session total`() = cardTest { harness ->

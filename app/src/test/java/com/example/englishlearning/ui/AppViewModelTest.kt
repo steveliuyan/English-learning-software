@@ -7,6 +7,7 @@ import com.example.englishlearning.profile.InMemoryLocalProfileRepository
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
     @Test
     fun `create profile persists and reloads without network`() = runTest {

@@ -5,6 +5,7 @@ import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
 import com.example.englishlearning.profile.LocalProfile
 import com.example.englishlearning.profile.LocalProfileRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.ZoneOffset
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelFailureTest {
     private val clock = FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)
     @Test fun `repository read failure becomes safe error`() = runTest {

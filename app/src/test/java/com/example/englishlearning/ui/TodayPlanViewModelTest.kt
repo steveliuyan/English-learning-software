@@ -7,6 +7,7 @@ import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
 import com.example.englishlearning.learning.WordBook
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TodayPlanViewModelTest {
     @Test
     fun `load exposes ready snapshot counts and date`() = runTest {
