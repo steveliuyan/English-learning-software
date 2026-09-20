@@ -181,6 +181,39 @@ class AppScreenTest {
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
+    @Test
+    fun returningFromLearningReloadsTodayPlan() {
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        var invocations = 0
+        val todayPlan = TodayPlanViewModel({ invocations++; placeholderCardPlan() }, FakeLearningProfileRepository())
+        composeRule.setContent {
+            AppScreen(
+                viewModel = vm,
+                learningSetupViewModel = setupViewModel(),
+                todayPlanViewModel = todayPlan,
+                wordCardViewModel = wordCardFixtureViewModel(),
+            )
+        }
+        composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
+        composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
+        composeRule.waitForIdle()
+        // Initial load once the profile becomes Ready.
+        assertEquals(1, invocations)
+
+        composeRule.onNodeWithContentDescription("开始学习").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("word_card_screen").assertExists()
+
+        // Leaving the learning flow must recompute today's progress (F1-04: re-entering the
+        // today page recomputes state), otherwise the plan stays stale after reviewing cards.
+        composeRule.onNodeWithContentDescription("返回今日计划").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        assertEquals(2, invocations)
+    }
+
     private fun readyPlanResult(): TodayPlanResult = TodayPlanResult.Ready(
         TodayPlan(
             planId = "plan-1",

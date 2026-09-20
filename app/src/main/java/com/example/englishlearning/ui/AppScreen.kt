@@ -103,8 +103,15 @@ fun AppScreen(
                 null
             }
             BackHandler(enabled = cancelSetup != null) { cancelSetup?.invoke() }
+            // Single exit for the learning flow. It always returns to the today page *and*
+            // recomputes its state (F1-04: entering the today page recalculates progress), so
+            // work reviewed in the cards shows immediately instead of only after a restart.
+            val exitLearning: () -> Unit = {
+                showLearning = false
+                todayPlanViewModel.load(state.profile.id)
+            }
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
-            BackHandler(enabled = showLearning) { showLearning = false }
+            BackHandler(enabled = showLearning) { exitLearning() }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
                     profileId = state.profile.id,
@@ -121,7 +128,7 @@ fun AppScreen(
                     state = cardState,
                     onSubmit = wordCardViewModel::submit,
                     onRetry = { wordCardViewModel.load(state.profile.id) },
-                    onBackToPlan = { showLearning = false },
+                    onBackToPlan = exitLearning,
                 )
             } else {
                 TodayPlanScreen(
