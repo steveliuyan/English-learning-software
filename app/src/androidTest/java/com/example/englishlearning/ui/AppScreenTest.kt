@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import android.view.KeyEvent
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.learning.LearningProfile
 import com.example.englishlearning.learning.LearningProfileRepository
@@ -176,8 +178,9 @@ class AppScreenTest {
         composeRule.onNodeWithText("ability").assertExists()
         composeRule.onNodeWithContentDescription("不认识").assertExists()
 
-        composeRule.onNodeWithContentDescription("返回今日计划").assertExists().performClick()
-        composeRule.waitForIdle()
+        // The card is on its first (Ready) card, which offers no "back to plan" button; leaving
+        // the flow is a system-back action handled by AppScreen's BackHandler.
+        pressSystemBack()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
@@ -206,12 +209,23 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("word_card_screen").assertExists()
 
-        // Leaving the learning flow must recompute today's progress (F1-04: re-entering the
-        // today page recomputes state), otherwise the plan stays stale after reviewing cards.
-        composeRule.onNodeWithContentDescription("返回今日计划").assertExists().performClick()
-        composeRule.waitForIdle()
+        // Leaving via system back must recompute today's progress (F1-04: re-entering the today
+        // page recomputes state), otherwise the plan stays stale after reviewing cards.
+        pressSystemBack()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
         assertEquals(2, invocations)
+    }
+
+    /**
+     * Drives a real system back on the host Activity, exercising the same
+     * OnBackPressedDispatcher path that AppScreen's `BackHandler` listens on. `Espresso.pressBack()`
+     * is not usable here (espresso-core is only on the androidTest runtime classpath, not the
+     * compile classpath), so the key event is injected directly through the instrumentation.
+     */
+    private fun pressSystemBack() {
+        composeRule.waitForIdle()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        composeRule.waitForIdle()
     }
 
     private fun readyPlanResult(): TodayPlanResult = TodayPlanResult.Ready(
