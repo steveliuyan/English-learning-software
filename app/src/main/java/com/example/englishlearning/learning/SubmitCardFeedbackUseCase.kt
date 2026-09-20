@@ -82,8 +82,8 @@ class SubmitCardFeedbackUseCase(
                 wordBookId = command.wordBookId,
                 feedback = rating,
                 occurredAt = occurredAt,
-                algorithmVersion = V1ReviewScheduler.ALGORITHM_VERSION,
-                paramsVersion = V1ReviewScheduler.PARAMS_VERSION,
+                algorithmVersion = scheduler.algorithmVersion,
+                paramsVersion = scheduler.paramsVersion,
                 dueBefore = before?.nextReviewAt,
                 nextReviewAt = decision.nextReviewAt,
             )

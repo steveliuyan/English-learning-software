@@ -5,6 +5,9 @@ import java.time.Instant
 
 /** Deterministic, dependency-free FSRS V1-compatible scheduling boundary. */
 class FsrsReviewScheduler : ReviewScheduler {
+    override val algorithmVersion: String = ALGORITHM_VERSION
+    override val paramsVersion: String = PARAMS_VERSION
+
     override fun schedule(
         state: ReviewState,
         feedback: ReviewFeedback,
@@ -26,6 +29,7 @@ class FsrsReviewScheduler : ReviewScheduler {
 
     companion object {
         const val ALGORITHM_VERSION: String = "fsrs-v1"
+        const val PARAMS_VERSION: String = "fsrs-v1-default"
         private val AGAIN_INTERVAL = Duration.ofMinutes(10)
         private val HARD_INTERVAL = Duration.ofHours(12)
         private val GOOD_INTERVAL = Duration.ofDays(1)

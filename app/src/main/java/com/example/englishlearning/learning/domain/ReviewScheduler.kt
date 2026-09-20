@@ -4,6 +4,12 @@ import java.time.Instant
 
 /** Boundary for the future FSRS-compatible scheduling implementation. */
 interface ReviewScheduler {
+    val algorithmVersion: String
+        get() = "v1"
+
+    val paramsVersion: String
+        get() = "v1"
+
     fun schedule(
         state: ReviewState,
         feedback: ReviewFeedback,

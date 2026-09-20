@@ -39,6 +39,19 @@ class SubmitCardFeedbackUseCaseTest {
     }
 
     @Test
+    fun `injected fsrs scheduler persists its algorithm and params versions`() = runSubmit { repository, clock ->
+        val useCase = useCase(repository, clock, firstSubmitAt, com.example.englishlearning.learning.domain.FsrsReviewScheduler())
+
+        val result = assertIs<SubmitFeedbackResult.Recorded>(useCase(command(eventId = "fsrs-1")))
+
+        assertEquals(firstSubmitAt.plus(Duration.ofDays(1)), result.nextReviewAt)
+        val event = repository.events.getValue("fsrs-1")
+        assertEquals("fsrs-v1", event.algorithmVersion)
+        assertEquals("fsrs-v1-default", event.paramsVersion)
+        assertEquals(1, repository.events.size)
+    }
+
+    @Test
     fun `three tiers are recorded as their fixed ratings`() = runSubmit { repository, clock ->
         val useCase = useCase(repository, clock, firstSubmitAt)
 
@@ -142,9 +155,10 @@ class SubmitCardFeedbackUseCaseTest {
         repository: LearningEventRepository,
         clock: MutableClock,
         start: Instant,
+        scheduler: com.example.englishlearning.learning.domain.ReviewScheduler = com.example.englishlearning.learning.domain.V1ReviewScheduler(),
     ): SubmitCardFeedbackUseCase {
         clock.advanceTo(start)
-        return SubmitCardFeedbackUseCase(repository = repository, clock = clock)
+        return SubmitCardFeedbackUseCase(repository = repository, clock = clock, scheduler = scheduler)
     }
 
     private fun command(
