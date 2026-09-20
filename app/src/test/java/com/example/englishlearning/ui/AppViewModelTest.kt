@@ -7,18 +7,36 @@ import com.example.englishlearning.profile.InMemoryLocalProfileRepository
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
+    private val dispatcher = StandardTestDispatcher()
+
+    @BeforeEach
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
     @Test
-    fun `create profile persists and reloads without network`() = runTest {
+    fun `create profile persists and reloads without network`() = runTest(dispatcher) {
         val repo = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)
         val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock))
@@ -30,7 +48,7 @@ class AppViewModelTest {
     }
 
     @Test
-    fun `blank profile name maps to stable safe error without echo`() = runTest {
+    fun `blank profile name maps to stable safe error without echo`() = runTest(dispatcher) {
         val input = "   "
         val repo = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)
