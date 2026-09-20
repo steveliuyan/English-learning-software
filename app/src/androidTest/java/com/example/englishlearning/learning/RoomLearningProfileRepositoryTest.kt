@@ -48,6 +48,7 @@ class RoomLearningProfileRepositoryTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val databaseName = "closed-learning-profile-${System.nanoTime()}.db"
         val database = openDatabase(context, databaseName)
+        database.openHelper.writableDatabase // force Room to actually open the connection
         val repository = RoomLearningProfileRepository(database, Dispatchers.Unconfined)
         database.close()
 

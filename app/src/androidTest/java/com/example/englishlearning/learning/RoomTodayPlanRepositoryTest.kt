@@ -106,6 +106,7 @@ class RoomTodayPlanRepositoryTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-today-plan-save-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
+        database.openHelper.writableDatabase // force Room to actually open the connection
         val repository = RoomTodayPlanRepository(database, Dispatchers.Unconfined)
         database.close()
 

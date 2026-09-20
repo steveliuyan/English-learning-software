@@ -113,6 +113,7 @@ class RoomLearningEventRepositoryTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-learning-event-append-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
+        database.openHelper.writableDatabase // force Room to actually open the connection
         val repository = RoomLearningEventRepository(database, Dispatchers.Unconfined)
         database.close()
 
@@ -128,6 +129,7 @@ class RoomLearningEventRepositoryTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-learning-event-reads-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
+        database.openHelper.writableDatabase // force Room to actually open the connection
         val repository = RoomLearningEventRepository(database, Dispatchers.Unconfined)
         database.close()
 
