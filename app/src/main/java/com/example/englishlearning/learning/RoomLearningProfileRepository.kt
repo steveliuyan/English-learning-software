@@ -5,6 +5,8 @@ import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.WordBookEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 class RoomLearningProfileRepository(
@@ -30,7 +32,11 @@ class RoomLearningProfileRepository(
         try {
             RepositoryResult.Success(withContext(ioDispatcher) { block() })
         } catch (cancellation: CancellationException) {
-            throw cancellation
+            if (currentCoroutineContext().isActive) {
+                RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
+            } else {
+                throw cancellation
+            }
         } catch (_: Exception) {
             RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
         }

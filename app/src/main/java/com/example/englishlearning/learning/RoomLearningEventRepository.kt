@@ -9,6 +9,8 @@ import com.example.englishlearning.learning.domain.ReviewFeedback
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 class RoomLearningEventRepository(
@@ -50,7 +52,11 @@ class RoomLearningEventRepository(
         try {
             RepositoryResult.Success(withContext(ioDispatcher) { block() })
         } catch (cancellation: CancellationException) {
-            throw cancellation
+            if (currentCoroutineContext().isActive) {
+                RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
+            } else {
+                throw cancellation
+            }
         } catch (_: Exception) {
             RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
         }
