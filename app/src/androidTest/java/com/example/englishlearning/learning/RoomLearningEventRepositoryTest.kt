@@ -80,7 +80,7 @@ class RoomLearningEventRepositoryTest {
             repository.append(event("event-1", "card-1", later), state("card-1", later))
 
             assertEquals(emptyList<String>(), dueCardIds(repository))
-            assertEquals(emptyList<String>(), completedCardIds(repository, planId = "another-plan"))
+            assertEquals(emptySet<String>(), completedCardIds(repository, planId = "another-plan"))
         }
     }
 

@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class RoomLearningProfileRepositoryTest {
     @Test
-    fun savedActiveWordbookAndTargetSurviveDatabaseReopen() = runBlocking {
+    fun savedActiveWordbookAndTargetSurviveDatabaseReopen(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val databaseName = "learning-profile-${System.nanoTime()}.db"
         val database = openDatabase(context, databaseName)
@@ -44,7 +44,7 @@ class RoomLearningProfileRepositoryTest {
     }
 
     @Test
-    fun closedDatabaseReturnsStableStorageError() = runBlocking {
+    fun closedDatabaseReturnsStableStorageError(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val databaseName = "closed-learning-profile-${System.nanoTime()}.db"
         val database = openDatabase(context, databaseName)
