@@ -56,6 +56,20 @@ class TodayPlanScreenTest {
         composeRule.onNodeWithTag("today_plan_empty").assertExists()
     }
 
+    @Test fun ready_renders_total_progress_and_unlock_reason() {
+        composeRule.setContent {
+            TodayPlanScreen(
+                TodayPlanUiState.Ready(
+                    "小学", "2026-09-19", 2, 3, 5,
+                    newDone = 1, dueDone = 2, isUnlocked = false,
+                    unlockReason = "完成新词与复习后解锁文章",
+                ),
+            )
+        }
+        composeRule.onNodeWithTag("today_plan_total_progress").assertExists()
+        composeRule.onNodeWithTag("today_plan_unlock_status").assertExists()
+    }
+
     @Test fun ready_offers_setup_entry_to_reopen_word_book_settings() {
         var opened = 0
         composeRule.setContent {

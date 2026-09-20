@@ -94,6 +94,12 @@ fun TodayPlanScreen(
                 }
                 if (state.totalTasks == 0) Text("今天暂无学习任务", color = MintTextMuted, modifier = Modifier.testTag("today_plan_empty"))
                 else Text("今日计划共 ${state.totalTasks} 项", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_task_total"))
+                Text("新增 ${state.newDone}/${state.newTarget} · 复习 ${state.dueDone}/${state.dueTarget}", color = MintPrimaryDark, modifier = Modifier.testTag("today_plan_progress"))
+                val totalDone = state.newDone + state.dueDone
+                val totalTarget = state.newTarget + state.dueTarget
+                Text("总进度 $totalDone/$totalTarget", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_total_progress"))
+                val unlockText = if (state.isUnlocked) "已解锁：文章已解锁" else "未解锁：${state.unlockReason}"
+                Text(unlockText, color = if (state.isUnlocked) MintPrimary else MintTextMuted, modifier = Modifier.testTag("today_plan_unlock_status"))
                 Button(
                     onClick = onStartLearning,
                     modifier = Modifier
