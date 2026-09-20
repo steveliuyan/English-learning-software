@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.example.englishlearning.ui.AppScreenTest" tests="10" failures="0" errors="0" skipped="0" time="13.174" timestamp="2026-09-20T15:51:40" hostname="localhost">
+  <properties>
+    <property name="device" value="M2102J2SC - 13" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan" classname="com.example.englishlearning.ui.AppScreenTest" time="1.721" />
+  <testcase name="blankNameDisablesCreateAndDoesNotReloadTodayPlan" classname="com.example.englishlearning.ui.AppScreenTest" time="0.728" />
+  <testcase name="optionalSetupCanBeCancelledBackToTodayPlanWithoutReloading" classname="com.example.englishlearning.ui.AppScreenTest" time="1.495" />
+  <testcase name="errorScreenOffersReturnActionSoUserIsNotStuck" classname="com.example.englishlearning.ui.AppScreenTest" time="0.926" />
+  <testcase name="savingSetupReloadsTodayPlan" classname="com.example.englishlearning.ui.AppScreenTest" time="1.34" />
+  <testcase name="mandatorySetupOffersNoCancelEntry" classname="com.example.englishlearning.ui.AppScreenTest" time="1.245" />
+  <testcase name="errorScreenRendersSafeStableTextOnly" classname="com.example.englishlearning.ui.AppScreenTest" time="0.954" />
+  <testcase name="profileCreationControlsHaveSemanticLabelsAndShowReady" classname="com.example.englishlearning.ui.AppScreenTest" time="1.01" />
+  <testcase name="returningFromLearningReloadsTodayPlan" classname="com.example.englishlearning.ui.AppScreenTest" time="1.325" />
+  <testcase name="readyPlanEntryReopensSetupAndSavingReturnsToTodayPlan" classname="com.example.englishlearning.ui.AppScreenTest" time="1.341" />
+</testsuite>
