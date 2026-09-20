@@ -14,6 +14,7 @@ import com.example.englishlearning.learning.RoomLearningEventRepository
 import com.example.englishlearning.learning.StoredPlanCardSource
 import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
 import com.example.englishlearning.learning.WordCardSource
+import com.example.englishlearning.learning.domain.FsrsReviewScheduler
 import com.example.englishlearning.learning.RoomTodayPlanRepository
 import com.example.englishlearning.learning.TodayPlanRepository
 import com.example.englishlearning.ui.TodayPlanUseCaseContract
@@ -54,7 +55,8 @@ object AppModule {
     @Provides fun provideSeedWordBooksUseCase(source: WordBookMetadataAssetSource, repository: LearningProfileRepository): SeedWordBooksUseCase = SeedWordBooksUseCase(source, repository)
     @Provides @Singleton fun provideTodayPlanRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): TodayPlanRepository = RoomTodayPlanRepository(database, dispatcher)
     @Provides @Singleton fun provideLearningEventRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningEventRepository = RoomLearningEventRepository(database, dispatcher)
-    @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock)
+    @Provides @Singleton fun provideFsrsReviewScheduler(): FsrsReviewScheduler = FsrsReviewScheduler()
+    @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider, scheduler: FsrsReviewScheduler): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock, scheduler = scheduler)
     @Provides @Singleton fun provideEventIdFactory(): EventIdFactory = EventIdFactory.Random
     @Provides @Singleton fun provideWordCardSource(): WordCardSource = PlaceholderWordCardSource()
     @Provides @Singleton fun providePlanCardSource(content: WordCardSource, events: LearningEventRepository): PlanCardSource = StoredPlanCardSource(content, events)
