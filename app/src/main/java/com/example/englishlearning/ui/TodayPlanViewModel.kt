@@ -2,16 +2,44 @@ package com.example.englishlearning.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.englishlearning.learning.AppendEventResult
 import com.example.englishlearning.learning.LearningEventRepository
 import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.TodayPlanResult
 import com.example.englishlearning.learning.UnlockPolicy
+import com.example.englishlearning.learning.domain.CardReviewState
+import com.example.englishlearning.learning.domain.LearningEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+/**
+ * Compatibility [LearningEventRepository] backing the two-argument secondary constructor.
+ *
+ * It models a plan that has recorded no learning events yet: every completion read returns an
+ * empty success, so [load] still emits the classic [TodayPlanUiState.Ready] (locked, zero
+ * progress) the older two-argument callers rely on. This is an *inert* implementation, not an
+ * "unavailable" one — returning a storage failure would route a Ready plan to
+ * [TodayPlanUiState.Unavailable] and break the legacy UI semantics.
+ *
+ * The event repository is only consulted inside the `Ready` branch of [load]; any non-Ready
+ * result (Loading, MissingSetup, NotFound, StorageUnavailable) never reaches it.
+ */
+private object NoLearningEventRepository : LearningEventRepository {
+    override suspend fun append(event: LearningEvent, nextState: CardReviewState) =
+        AppendEventResult.Appended(duplicate = false)
+
+    override suspend fun findEvent(eventId: String) = RepositoryResult.Success<LearningEvent?>(null)
+    override suspend fun findCardState(cardId: String) = RepositoryResult.Success<CardReviewState?>(null)
+    override suspend fun countEventsForCard(planId: String, cardId: String) = RepositoryResult.Success(0)
+    override suspend fun completedCardIds(planId: String) = RepositoryResult.Success(emptyList<String>())
+    override suspend fun reviewedCardIds(wordBookId: String) = RepositoryResult.Success(emptyList<String>())
+    override suspend fun dueCardIds(wordBookId: String, now: Instant) = RepositoryResult.Success(emptyList<String>())
+}
 
 sealed interface TodayPlanUiState {
     data object Loading : TodayPlanUiState
@@ -38,6 +66,7 @@ class TodayPlanViewModel @Inject constructor(
     private val profiles: LearningProfileRepository,
     private val events: LearningEventRepository,
 ) : ViewModel() {
+    constructor(useCase: TodayPlanUseCaseContract, profiles: LearningProfileRepository) : this(useCase, profiles, NoLearningEventRepository)
     private val _uiState = MutableStateFlow<TodayPlanUiState>(TodayPlanUiState.Loading)
     val uiState: StateFlow<TodayPlanUiState> = _uiState
 

@@ -41,6 +41,41 @@ class TodayPlanViewModelTest {
     }
 
     @Test
+    fun `two argument constructor keeps legacy ready semantics`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val repository = FakeLearningProfileRepository()
+        var invocations = 0
+        val viewModel = TodayPlanViewModel({ invocations++; TodayPlanResult.Ready(plan()) }, repository)
+        viewModel.load("profile-1")
+        viewModel.load("profile-1")
+        advanceUntilIdle()
+        assertEquals(2, invocations)
+        assertEquals(
+            TodayPlanUiState.Ready(
+                "小学", "2026-09-19", 0, 5, 5,
+                newDone = 0, dueDone = 0, isUnlocked = false,
+                unlockReason = "完成新词与复习后解锁文章",
+            ),
+            viewModel.uiState.value,
+        )
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `non ready result never triggers the event repository`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val events = SpyLearningEventRepository()
+        val viewModel = TodayPlanViewModel({ TodayPlanResult.MissingLearningSetup }, FakeLearningProfileRepository(), events)
+        viewModel.load("profile-1")
+        advanceUntilIdle()
+        assertEquals(TodayPlanUiState.MissingSetup, viewModel.uiState.value)
+        assertEquals(0, events.completedCardIdsCalls)
+        Dispatchers.resetMain()
+    }
+
+    @Test
     fun `strict default stays locked until both new and due groups complete`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
@@ -138,5 +173,19 @@ class TodayPlanViewModelTest {
         override suspend fun listWordBooks() = RepositoryResult.Success(emptyList<WordBook>())
         override suspend fun findWordBook(id: String) = RepositoryResult.Success(WordBook(id, "小学", "Primary", 0, "v1", "fixture"))
         override suspend fun upsertWordBook(wordBook: WordBook) = RepositoryResult.Success(Unit)
+    }
+
+    private class SpyLearningEventRepository : com.example.englishlearning.learning.LearningEventRepository {
+        var completedCardIdsCalls = 0
+        override suspend fun append(event: com.example.englishlearning.learning.domain.LearningEvent, nextState: com.example.englishlearning.learning.domain.CardReviewState) = com.example.englishlearning.learning.AppendEventResult.Appended(false)
+        override suspend fun findEvent(eventId: String) = RepositoryResult.Success<com.example.englishlearning.learning.domain.LearningEvent?>(null)
+        override suspend fun findCardState(cardId: String) = RepositoryResult.Success<com.example.englishlearning.learning.domain.CardReviewState?>(null)
+        override suspend fun countEventsForCard(planId: String, cardId: String) = RepositoryResult.Success(0)
+        override suspend fun completedCardIds(planId: String): RepositoryResult<List<String>> {
+            completedCardIdsCalls++
+            return RepositoryResult.Success(emptyList())
+        }
+        override suspend fun reviewedCardIds(wordBookId: String) = RepositoryResult.Success(emptyList<String>())
+        override suspend fun dueCardIds(wordBookId: String, now: Instant) = RepositoryResult.Success(emptyList<String>())
     }
 }
