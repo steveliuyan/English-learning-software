@@ -27,9 +27,13 @@ class AppViewModel @Inject constructor(private val repository: LocalProfileRepos
     }
     fun createProfile(name: String) = viewModelScope.launch {
         runCatching { create(name) }
-            .getOrNull()
-            ?.onSuccess { _uiState.value = AppUiState.Ready(it) }
-            ?.onFailure { error -> _uiState.value = AppUiState.Error(error.toSafeAppError()) }
-            ?: run { _uiState.value = AppUiState.Error(AppError.DatabaseMigrationFailed) }
+            .fold(
+                onSuccess = { result ->
+                    result
+                        .onSuccess { _uiState.value = AppUiState.Ready(it) }
+                        .onFailure { error -> _uiState.value = AppUiState.Error(error.toSafeAppError()) }
+                },
+                onFailure = { error -> _uiState.value = AppUiState.Error(error.toSafeAppError()) },
+            )
     }
 }
