@@ -8,6 +8,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishlearning.ui.AppScreen
 import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.TodayPlanViewModel
+import com.example.englishlearning.ui.WordCardViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -20,6 +21,7 @@ class MainActivity : ComponentActivity() {
                 viewModel = hiltViewModel(),
                 learningSetupViewModel = hiltViewModel<LearningSetupViewModel>(),
                 todayPlanViewModel = hiltViewModel<TodayPlanViewModel>(),
+                wordCardViewModel = hiltViewModel<WordCardViewModel>(),
             )
         }
     }

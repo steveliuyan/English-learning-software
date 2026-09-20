@@ -92,6 +92,20 @@ class GetOrCreateTodayPlanUseCaseTest {
     }
 
     @Test
+    fun `unavailable plan cards do not persist an empty plan`() = runTest {
+        val planRepository = FakeTodayPlanRepository(findResult = null)
+        val cardSource = FakePlanCardSource(throwWhenReadingDueCards = true)
+
+        val result = useCase(planRepository, cardSource)("profile")
+
+        assertEquals(TodayPlanResult.StorageUnavailable, result)
+        assertEquals(1, cardSource.dueCalls)
+        assertEquals(0, cardSource.newCalls)
+        assertEquals(0, planRepository.saveCalls)
+        assertEquals(null, planRepository.savedPlan)
+    }
+
+    @Test
     fun `new plan captures local date zone generation instant and persisted conflict result`() = runTest {
         val conflictPlan = plan(localDate = LocalDate.of(2026, 9, 20), zone = "Pacific/Auckland")
         val planRepository = FakeTodayPlanRepository(
@@ -158,6 +172,7 @@ class GetOrCreateTodayPlanUseCaseTest {
     private class FakePlanCardSource(
         private val dueIds: List<String> = emptyList(),
         private val newIds: List<String> = emptyList(),
+        private val throwWhenReadingDueCards: Boolean = false,
     ) : PlanCardSource {
         var dueCalls = 0
         var newCalls = 0
@@ -169,6 +184,9 @@ class GetOrCreateTodayPlanUseCaseTest {
             dueCalls++
             dueWordBookId = wordBookId
             dueNow = now
+            if (throwWhenReadingDueCards) {
+                throw PlanCardSourceUnavailable()
+            }
             return dueIds
         }
 

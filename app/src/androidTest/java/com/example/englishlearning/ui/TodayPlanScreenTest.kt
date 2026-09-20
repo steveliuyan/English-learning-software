@@ -1,7 +1,6 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -36,16 +35,20 @@ class TodayPlanScreenTest {
         composeRule.onNodeWithContentDescription("重试").assertExists()
     }
 
-    @Test fun ready_renders_task_counts_and_disabled_start() {
-        composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
+    @Test fun ready_renders_task_counts_and_start_learning_entry() {
+        var started = 0
+        composeRule.setContent {
+            TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5), onStartLearning = { started++ })
+        }
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
         composeRule.onNodeWithTag("today_plan_new_count").assertExists()
         composeRule.onNodeWithContentDescription("今日新增 2 词").assertExists()
         composeRule.onNodeWithTag("today_plan_due_count").assertExists()
         composeRule.onNodeWithContentDescription("今日复习 3 词").assertExists()
         composeRule.onNodeWithTag("today_plan_task_total").assertExists()
-        composeRule.onNodeWithTag("today_plan_start_learning").assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription("开始学习").assertExists()
+        composeRule.onNodeWithTag("today_plan_start_learning").assertExists().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, started)
     }
 
     @Test fun ready_with_no_tasks_renders_empty_state() {

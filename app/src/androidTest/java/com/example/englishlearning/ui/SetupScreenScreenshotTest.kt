@@ -52,6 +52,7 @@ class SetupScreenScreenshotTest {
                 viewModel = vm,
                 learningSetupViewModel = setupViewModel(),
                 todayPlanViewModel = TodayPlanViewModel({ TodayPlanResult.MissingLearningSetup }, FakeLearningProfileRepository()),
+                wordCardViewModel = wordCardFixtureViewModel(),
             )
         }
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")

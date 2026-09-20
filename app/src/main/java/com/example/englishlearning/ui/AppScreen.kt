@@ -59,19 +59,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
+import com.example.englishlearning.ui.theme.AppleMintEnd
+import com.example.englishlearning.ui.theme.AppleMintLight
+import com.example.englishlearning.ui.theme.AppleMintMiddle
+import com.example.englishlearning.ui.theme.AppleMintStart
+import com.example.englishlearning.ui.theme.MintBackground
+import com.example.englishlearning.ui.theme.MintOutline
+import com.example.englishlearning.ui.theme.MintPrimary
+import com.example.englishlearning.ui.theme.MintPrimaryDark
+import com.example.englishlearning.ui.theme.MintSurface
+import com.example.englishlearning.ui.theme.MintTextMuted
+import com.example.englishlearning.ui.theme.MintTint
 import kotlin.math.roundToInt
 
-private val MintBackground = Color(0xFFF1FBF5)
-private val MintSurface = Color(0xEFFFFFFF)
-private val MintTint = Color(0xFFDDF7E8)
-private val MintPrimary = Color(0xFF2EC99C)
-private val MintPrimaryDark = Color(0xFF188F76)
-private val MintOutline = Color(0xFFADE7D2)
-private val MintTextMuted = Color(0xFF4E756A)
-private val AppleMintStart = Color(0xFFA8F3C8)
-private val AppleMintMiddle = Color(0xFF5DDFB4)
-private val AppleMintEnd = Color(0xFF35B9B5)
-private val AppleMintLight = Color(0xFFD9FFF0)
 private val AppleMintGradient = Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))
 
 @Composable
@@ -79,6 +79,7 @@ fun AppScreen(
     viewModel: AppViewModel,
     learningSetupViewModel: LearningSetupViewModel,
     todayPlanViewModel: TodayPlanViewModel,
+    wordCardViewModel: WordCardViewModel,
 ) {
     var name by remember { mutableStateOf("") }
     when (val state = viewModel.uiState.collectAsState().value) {
@@ -90,6 +91,7 @@ fun AppScreen(
         )
         is AppUiState.Ready -> {
             var showSetup by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showLearning by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
@@ -101,6 +103,8 @@ fun AppScreen(
                 null
             }
             BackHandler(enabled = cancelSetup != null) { cancelSetup?.invoke() }
+            // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
+            BackHandler(enabled = showLearning) { showLearning = false }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
                     profileId = state.profile.id,
@@ -111,11 +115,23 @@ fun AppScreen(
                     },
                     onCancel = cancelSetup,
                 )
+            } else if (showLearning) {
+                val cardState by wordCardViewModel.uiState.collectAsState()
+                WordCardScreen(
+                    state = cardState,
+                    onSubmit = wordCardViewModel::submit,
+                    onRetry = { wordCardViewModel.load(state.profile.id) },
+                    onBackToPlan = { showLearning = false },
+                )
             } else {
                 TodayPlanScreen(
                     state = todayState,
                     onRetry = { todayPlanViewModel.load(state.profile.id) },
                     onOpenSetup = { showSetup = true },
+                    onStartLearning = {
+                        wordCardViewModel.load(state.profile.id)
+                        showLearning = true
+                    },
                 )
             }
         }

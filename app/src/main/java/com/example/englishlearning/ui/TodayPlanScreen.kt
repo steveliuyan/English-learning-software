@@ -28,20 +28,20 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
-private val MintBackground = Color(0xFFF1FBF5)
-private val MintSurface = Color(0xEFFFFFFF)
-private val MintTint = Color(0xFFDDF7E8)
-private val MintPrimary = Color(0xFF2EC99C)
-private val MintPrimaryDark = Color(0xFF188F76)
-private val MintOutline = Color(0xFFADE7D2)
-private val MintTextMuted = Color(0xFF4E756A)
+import com.example.englishlearning.ui.theme.MintBackground
+import com.example.englishlearning.ui.theme.MintOutline
+import com.example.englishlearning.ui.theme.MintPrimary
+import com.example.englishlearning.ui.theme.MintPrimaryDark
+import com.example.englishlearning.ui.theme.MintSurface
+import com.example.englishlearning.ui.theme.MintTextMuted
+import com.example.englishlearning.ui.theme.MintTint
 
 @Composable
 fun TodayPlanScreen(
     state: TodayPlanUiState,
     onRetry: () -> Unit = {},
     onOpenSetup: () -> Unit = {},
+    onStartLearning: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(MintBackground).padding(horizontal = 20.dp, vertical = 24.dp).testTag("today_plan_screen"),
@@ -95,17 +95,19 @@ fun TodayPlanScreen(
                 if (state.totalTasks == 0) Text("今天暂无学习任务", color = MintTextMuted, modifier = Modifier.testTag("today_plan_empty"))
                 else Text("今日计划共 ${state.totalTasks} 项", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_task_total"))
                 Button(
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier.fillMaxWidth().testTag("today_plan_start_learning").semantics { contentDescription = "开始学习" },
+                    onClick = onStartLearning,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("today_plan_start_learning")
+                        .semantics { contentDescription = "开始学习" },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MintPrimary,
                         contentColor = Color.White,
                         disabledContainerColor = MintTint,
                         disabledContentColor = MintPrimaryDark,
                     ),
-                ) { Text("开始学习（即将推出）") }
-                Text("词卡学习将在后续版本开放", style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
+                ) { Text("开始学习", fontWeight = FontWeight.Bold) }
             }
         }
     }

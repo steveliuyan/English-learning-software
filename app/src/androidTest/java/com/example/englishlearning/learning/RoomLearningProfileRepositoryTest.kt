@@ -3,15 +3,24 @@ package com.example.englishlearning.learning
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.core.storage.AppDatabase
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import org.junit.runner.RunWith
 
+/**
+ * Room/SQLite behaviour must be proven on a device. The local unit test source set runs on
+ * the JUnit 5 platform only — no JUnit 4 runner and no Robolectric registration exist there,
+ * so `ApplicationProvider` cannot resolve and the test fails with "No instrumentation
+ * registered". This file therefore lives in `androidTest`, like the other Room tests.
+ */
+@RunWith(AndroidJUnit4::class)
 class RoomLearningProfileRepositoryTest {
     @Test
-    fun `saved active wordbook and target survive database reopen`() = runTest {
+    fun savedActiveWordbookAndTargetSurviveDatabaseReopen() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val databaseName = "learning-profile-${System.nanoTime()}.db"
         val database = openDatabase(context, databaseName)
@@ -26,18 +35,16 @@ class RoomLearningProfileRepositoryTest {
         database.close()
 
         val reopened = openDatabase(context, databaseName)
-        val persisted = RoomLearningProfileRepository(reopened, Dispatchers.Unconfined).current("default")
-
         assertEquals(
             RepositoryResult.Success(LearningProfile("default", "primary-school", 10)),
-            persisted,
+            RoomLearningProfileRepository(reopened, Dispatchers.Unconfined).current("default"),
         )
         reopened.close()
         context.deleteDatabase(databaseName)
     }
 
     @Test
-    fun `closed database returns stable storage error`() = runTest {
+    fun closedDatabaseReturnsStableStorageError() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val databaseName = "closed-learning-profile-${System.nanoTime()}.db"
         val database = openDatabase(context, databaseName)

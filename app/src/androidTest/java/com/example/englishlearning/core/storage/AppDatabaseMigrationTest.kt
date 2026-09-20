@@ -81,6 +81,31 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV4ToV5_preservesPlansAndCreatesLearningEventStorage() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 4).apply {
+            insertWordBook()
+            insertLearningProfile("default", "primary-school", 10)
+            insertTodayPlan("plan-1", "default", "2026-09-19")
+            insertTodayPlanTask("plan-1", "card-1", "NEW", 0)
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 5, true, AppDatabase.MIGRATION_4_5).apply {
+            query("SELECT cardId FROM today_plan_tasks WHERE planId = 'plan-1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("card-1", cursor.getString(0))
+            }
+            assertTableExists("learning_events")
+            assertTableExists("card_review_states")
+            assertIndexExists("learning_events", "index_learning_events_profileId_cardId")
+            assertIndexExists("learning_events", "index_learning_events_planId")
+            assertIndexExists("card_review_states", "index_card_review_states_wordBookId_nextReviewAtEpochMillis")
+            close()
+        }
+    }
+
+    @Test
     fun freshV4Database_rejectsInvalidTodayPlanTaskKindOnInsertAndUpdate() {
         Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
@@ -174,6 +199,22 @@ class AppDatabaseMigrationTest {
         }
         query("SELECT alias FROM key_aliases WHERE purpose = 'ai'").use { cursor ->
             check(cursor.moveToFirst() && cursor.getString(0) == "alias-1")
+        }
+    }
+
+    private fun SupportSQLiteDatabase.assertTableExists(table: String) {
+        query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = '$table'").use { cursor ->
+            assertTrue("expected table $table", cursor.moveToFirst())
+        }
+    }
+
+    private fun SupportSQLiteDatabase.assertIndexExists(table: String, index: String) {
+        query("PRAGMA index_list('$table')").use { cursor ->
+            var found = false
+            while (cursor.moveToNext()) {
+                found = found || cursor.getString(cursor.getColumnIndexOrThrow("name")) == index
+            }
+            assertTrue("expected index $index on $table", found)
         }
     }
 

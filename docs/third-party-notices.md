@@ -302,6 +302,16 @@
 - 替代方案: Kotlin formatter
 - 商业分发结论: 构建插件不随 APK 分发；可商业使用并保留 MIT 许可证文本
 
+## app-authored-placeholder-word-cards
+- 名称: 应用自撰占位词卡内容（F1-03 词卡与反馈）
+- 版本: v1 占位（实现位于 `app/src/main/java/com/example/englishlearning/learning/PlaceholderWordCardSource.kt`）
+- 许可证: 无第三方许可依赖。内容由本项目自行撰写（一小组基础词条，含单词、IPA、词性、中文释义与例句），不复制、不派生于 NGSL/NAWL、CEFR-J 或任何其他第三方词书、词典或数据集，因此不触发 CC BY-SA 4.0 或其他第三方许可义务
+- 用途: 在经许可核验的词条数据到位之前，为词卡展示、三档反馈与排程记录提供可运行、可真机验证的占位内容
+- 数据流: 仅随 APK 打包并在设备内读取；不下载、不上传、不联网、不参与任何 AI 或网络请求
+- NOTICE 位置: 本文件、`docs/decisions/2026-09-19-placeholder-word-card-content.md`
+- 替代方案: 经许可核验且允许离线再分发的词条数据集，或「仅在线查词、不打包词条正文」的实现
+- 商业分发结论: **发布前必须替换**。占位内容不属于正式词书，不得作为词书内容对外宣称；替换为真实数据集时须同步更新本条目与 `app/src/main/assets/wordbooks/metadata.json` 的 `totalWords`
+
 ## ngsl-nawl-1.2
 - 名称: New General Service List / New Academic Word List（NGSL/NAWL）
 - 版本: 1.2（候选来源标识；本任务不打包词条正文）
@@ -324,13 +334,13 @@
 
 ## datasets
 - 名称: 词书、词典与其他数据集
-- 版本: 仅登记 NGSL/NAWL 1.2 与 CEFR-J 1.5 来源标识；未引入词条正文
+- 版本: 仅登记 NGSL/NAWL 1.2 与 CEFR-J 1.5 来源标识；未引入第三方词条正文
 - 许可证: 见本文件 `ngsl-nawl-1.2` 与 `cefr-j-1.5` 条目；其他数据集未引入/待许可核验
-- 用途: 当前仅保存六本应用内学习分组元数据，不使用、不下载、不打包任何词条正文或中文释义
-- 数据流: 未引入/不处理/不传输词条、释义或其他数据集内容
-- NOTICE 位置: 本文件、`docs/decisions/2026-09-18-initial-wordbook-data-policy.md`；未来实际打包时须在发行 NOTICE 完整登记
+- 用途: 保存六本应用内学习分组元数据；F1-03 起另有应用自撰的占位词卡内容（见 `app-authored-placeholder-word-cards`），仍不使用、不下载、不打包任何第三方词条正文或第三方中文释义
+- 数据流: 未引入/不处理/不传输第三方词条、释义或其他数据集内容
+- NOTICE 位置: 本文件、`docs/decisions/2026-09-18-initial-wordbook-data-policy.md`、`docs/decisions/2026-09-19-placeholder-word-card-content.md`；未来实际打包时须在发行 NOTICE 完整登记
 - 替代方案: 用户导入且经许可核验的数据，或不提供该资源
-- 商业分发结论: 元数据可随应用分发；词条正文在完成逐项许可核验前禁止商业分发
+- 商业分发结论: 元数据与应用自撰占位内容可随应用分发；第三方词条正文在完成逐项许可核验前禁止商业分发
 
 ## models
 - 名称: OCR、TTS、AI 与其他模型

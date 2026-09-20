@@ -5,9 +5,15 @@ import androidx.room.Room
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.time.ClockProvider
 import com.example.englishlearning.core.time.SystemClockProvider
+import com.example.englishlearning.learning.EventIdFactory
 import com.example.englishlearning.learning.GetOrCreateTodayPlanUseCase
-import com.example.englishlearning.learning.FixturePlanCardSource
+import com.example.englishlearning.learning.LearningEventRepository
+import com.example.englishlearning.learning.PlaceholderWordCardSource
 import com.example.englishlearning.learning.PlanCardSource
+import com.example.englishlearning.learning.RoomLearningEventRepository
+import com.example.englishlearning.learning.StoredPlanCardSource
+import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
+import com.example.englishlearning.learning.WordCardSource
 import com.example.englishlearning.learning.RoomTodayPlanRepository
 import com.example.englishlearning.learning.TodayPlanRepository
 import com.example.englishlearning.ui.TodayPlanUseCaseContract
@@ -47,7 +53,11 @@ object AppModule {
     @Provides fun provideWordBookMetadataAssetSource(@ApplicationContext context: Context): WordBookMetadataAssetSource = WordBookMetadataAssetSource { context.assets.open("wordbooks/metadata.json").bufferedReader().use { it.readText() } }
     @Provides fun provideSeedWordBooksUseCase(source: WordBookMetadataAssetSource, repository: LearningProfileRepository): SeedWordBooksUseCase = SeedWordBooksUseCase(source, repository)
     @Provides @Singleton fun provideTodayPlanRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): TodayPlanRepository = RoomTodayPlanRepository(database, dispatcher)
-    @Provides @Singleton fun providePlanCardSource(): PlanCardSource = FixturePlanCardSource()
+    @Provides @Singleton fun provideLearningEventRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningEventRepository = RoomLearningEventRepository(database, dispatcher)
+    @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock)
+    @Provides @Singleton fun provideEventIdFactory(): EventIdFactory = EventIdFactory.Random
+    @Provides @Singleton fun provideWordCardSource(): WordCardSource = PlaceholderWordCardSource()
+    @Provides @Singleton fun providePlanCardSource(content: WordCardSource, events: LearningEventRepository): PlanCardSource = StoredPlanCardSource(content, events)
     @Provides fun provideTodayPlanUseCase(learning: LearningProfileRepository, plans: TodayPlanRepository, cards: PlanCardSource, clock: ClockProvider): GetOrCreateTodayPlanUseCase = GetOrCreateTodayPlanUseCase(learning, plans, cards, clock)
     @Provides fun provideTodayPlanUseCaseContract(useCase: GetOrCreateTodayPlanUseCase): TodayPlanUseCaseContract = TodayPlanUseCaseContract { profileId -> useCase(profileId) }
 }

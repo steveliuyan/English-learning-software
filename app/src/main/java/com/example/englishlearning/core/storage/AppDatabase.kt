@@ -5,12 +5,15 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.englishlearning.core.storage.dao.InternalAssetDao
+import com.example.englishlearning.core.storage.dao.InternalLearningEventDao
 import com.example.englishlearning.core.storage.dao.InternalLearningProfileDao
 import com.example.englishlearning.core.storage.dao.InternalProfileDao
 import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
 import com.example.englishlearning.core.storage.dao.InternalWordBookDao
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
+import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
 import com.example.englishlearning.core.storage.entity.KeyAliasEntity
+import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LocalProfileEntity
 import com.example.englishlearning.core.storage.entity.SchemaMetaEntity
@@ -32,8 +35,10 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         LearningProfileEntity::class,
         TodayPlanEntity::class,
         TodayPlanTaskEntity::class,
+        LearningEventEntity::class,
+        CardReviewStateEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,6 +51,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalLearningProfileDao(): InternalLearningProfileDao
 
     internal abstract fun internalTodayPlanDao(): InternalTodayPlanDao
+
+    internal abstract fun internalLearningEventDao(): InternalLearningEventDao
 
     companion object {
         val MIGRATION_1_2: Migration =
@@ -116,6 +123,39 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_4_5: Migration =
+            object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `learning_events` " +
+                            "(`eventId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `planId` TEXT NOT NULL, " +
+                            "`cardId` TEXT NOT NULL, `wordBookId` TEXT NOT NULL, `feedback` TEXT NOT NULL, " +
+                            "`occurredAtEpochMillis` INTEGER NOT NULL, `algorithmVersion` TEXT NOT NULL, " +
+                            "`paramsVersion` TEXT NOT NULL, `dueBeforeEpochMillis` INTEGER, " +
+                            "`nextReviewAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`eventId`))",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_learning_events_profileId_cardId` " +
+                            "ON `learning_events` (`profileId`, `cardId`)",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_learning_events_planId` " +
+                            "ON `learning_events` (`planId`)",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `card_review_states` " +
+                            "(`cardId` TEXT NOT NULL, `wordBookId` TEXT NOT NULL, `lastFeedback` TEXT NOT NULL, " +
+                            "`lastReviewedAtEpochMillis` INTEGER NOT NULL, " +
+                            "`nextReviewAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`cardId`))",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS " +
+                            "`index_card_review_states_wordBookId_nextReviewAtEpochMillis` " +
+                            "ON `card_review_states` (`wordBookId`, `nextReviewAtEpochMillis`)",
+                    )
+                }
+            }
+
         internal val CONSTRAINT_CALLBACK: RoomDatabase.Callback =
             object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
@@ -128,7 +168,8 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val MIGRATIONS: Array<Migration> =
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

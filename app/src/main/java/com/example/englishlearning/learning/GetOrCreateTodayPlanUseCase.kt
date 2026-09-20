@@ -25,8 +25,16 @@ class GetOrCreateTodayPlanUseCase(
             is RepositoryResult.Failure -> return TodayPlanResult.StorageUnavailable
             is RepositoryResult.Success -> result.value ?: return TodayPlanResult.MissingLearningSetup
         }
-        val dueCardIds = cardSource.dueCardIds(profile.activeWordBookId, generationInstant).distinct()
-        val newCardIds = cardSource.newCardIds(profile.activeWordBookId, profile.dailyNewTarget).distinct()
+        val dueCardIds: List<String>
+        val newCardIds: List<String>
+        try {
+            dueCardIds = cardSource.dueCardIds(profile.activeWordBookId, generationInstant).distinct()
+            newCardIds = cardSource.newCardIds(profile.activeWordBookId, profile.dailyNewTarget).distinct()
+        } catch (_: PlanCardSourceUnavailable) {
+            // The plan is an immutable snapshot: never persist an empty one because the
+            // event store happened to fail, or the whole day is lost.
+            return TodayPlanResult.StorageUnavailable
+        }
         val plan = TodayPlan(
             planId = UUID.randomUUID().toString(),
             profileId = profileId,
