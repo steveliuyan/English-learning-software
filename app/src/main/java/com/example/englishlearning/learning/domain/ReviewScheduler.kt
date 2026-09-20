@@ -25,4 +25,5 @@ enum class ReviewFeedback {
 data class ScheduledReview(
     val state: ReviewState,
     val nextReviewAt: Instant,
+    val algorithmVersion: String = "v1",
 )
