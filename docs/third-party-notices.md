@@ -312,6 +312,16 @@
 - 替代方案: 经许可核验且允许离线再分发的词条数据集，或「仅在线查词、不打包词条正文」的实现
 - 商业分发结论: **发布前必须替换**。占位内容不属于正式词书，不得作为词书内容对外宣称；替换为真实数据集时须同步更新本条目与 `app/src/main/assets/wordbooks/metadata.json` 的 `totalWords`
 
+## app-authored-card-illustrations
+- 名称: 应用自研词卡说明图（F1-06 彩色卡通插画，12 张）
+- 版本: v1（资源位于 `app/src/main/res/drawable-nodpi/illus_<lemma>.webp`；生成与处理台账见 `docs/design/card-illustration-prompts.md`）
+- 许可证: 无第三方素材许可依赖。图片由本项目通过 AI 图像生成能力按自有提示词产出，不含、不派生自任何第三方素材库、图库或数据集作品，不复制任何第三方图标、插画或摄影作品，因此不触发 CC BY-SA 4.0 或其他第三方素材许可义务
+- 用途: 为占位词条的词卡详情页提供彩色卡通说明图，以图示辅助理解词义（解释的补充而非替代）
+- 数据流: 仅随 APK 打包并在设备内渲染；不下载、不上传、不联网、不参与任何 AI 或网络请求
+- NOTICE 位置: 本文件、`docs/decisions/2026-09-22-card-illustration-assets.md`、`docs/design/card-illustration-prompts.md`
+- 替代方案: 经许可核验的第三方插画素材（须逐张核验归属与署名），或继续使用应用自绘矢量说明图
+- 商业分发结论: 可随应用分发。**发布前须复核**所用 AI 图像生成服务自身的使用条款（尤其商用与再分发条款）；这 12 张仅服务占位词条，真实词书配图的许可须单独闭合后另行登记
+
 ## ngsl-nawl-1.2
 - 名称: New General Service List / New Academic Word List（NGSL/NAWL）
 - 版本: 1.2（候选来源标识；本任务不打包词条正文）

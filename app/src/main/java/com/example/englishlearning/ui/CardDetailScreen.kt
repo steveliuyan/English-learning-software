@@ -42,7 +42,7 @@ import com.example.englishlearning.ui.theme.MintTextMuted
  * Every content module renders only when its data is present. A blank field hides
  * the whole module: no empty heading, no "暂无" placeholder (AC1-12). The
  * illustration module is likewise absent when [lemmaToDrawableRes] finds no bundled
- * vector for the lemma.
+ * picture for the lemma.
  *
  * This screen is deliberately wired to nothing: it takes the [WordCard] to show and
  * an [onBack] callback only. The ViewModel detail state, the per-tier settings

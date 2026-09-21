@@ -33,7 +33,7 @@
 
 ### 3. 说明图资源
 
-1. **`res/drawable` 矢量资源 + `painterResource`，lemma → drawable 封闭映射放在 UI 层纯函数（采用）**
+1. **`res/drawable` 矢量资源 + `painterResource`，lemma → drawable 封闭映射放在 UI 层纯函数（采用；资源形态于 2026-09-22 修订为彩色卡通位图）**
 2. `assets/` 内置位图 + `BitmapFactory` 运行时解码
 3. 引入 Coil 等图片库
 
@@ -66,6 +66,8 @@
 - 零解码代码、零新依赖，离线天然可用，与项目既有矢量资源用法一致。
 - **否决 `assets` + `BitmapFactory`**：需要自建解码、采样与内存管理，V1 属过度设计。
 - **否决引入图片库**：新依赖 + 锁文件 + 台账成本，收益为零。
+
+> **2026-09-22 修订（资源形态）**：以上「机制」判断保持不变——映射仍是 UI 层纯函数、无匹配返回 null 即隐藏、零新依赖、零自写解码代码、不引图片库。被修订的只有**资源形态**：单色薄荷绿矢量图真机查看后读起来像图标、看不出词义，已替换为 **AI 生成的彩色卡通插画**，落 `res/drawable-nodpi/illus_<lemma>.webp`（512×512 无损 WebP，共 12 张，约 1.14 MB）。位图同样经 `painterResource` 渲染（`minSdk` 26 原生支持 WebP），因此「无位图解码能力」这一调研事实并不构成阻碍，「否决 `assets` + `BitmapFactory`」与「否决图片库」的结论也不受影响。原因、流水线与质量评估见 `2026-09-22-card-illustration-assets.md`。
 
 ### 内容模块缺失：整体隐藏
 
