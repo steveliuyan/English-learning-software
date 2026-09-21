@@ -2,8 +2,12 @@ package com.example.englishlearning.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.englishlearning.learning.GetLearningSettingsUseCase
 import com.example.englishlearning.learning.LearningProfileRepository
+import com.example.englishlearning.learning.LearningSettings
+import com.example.englishlearning.learning.LearningSettingsRepositoryResult
 import com.example.englishlearning.learning.RepositoryResult
+import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.SetupResult
@@ -26,6 +30,9 @@ data class LearningSetupUiState(
     val dailyNewTarget: Int = DEFAULT_DAILY_TARGET,
     val savedWordBookName: String? = null,
     val message: String? = null,
+    val openDetailOnKnown: Boolean = false,
+    val openDetailOnFuzzy: Boolean = true,
+    val openDetailOnForgotten: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_DAILY_TARGET = 10
@@ -39,13 +46,17 @@ class LearningSetupViewModel @Inject constructor(
     private val repository: LearningProfileRepository,
     private val seedWordBooks: SeedWordBooksUseCase,
     private val selectWordBook: SelectWordBookAndSetDailyTargetUseCase,
+    private val getSettings: GetLearningSettingsUseCase,
+    private val saveSettings: SaveLearningSettingsUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LearningSetupUiState())
     val uiState: StateFlow<LearningSetupUiState> = _uiState
     private val _effects = MutableSharedFlow<LearningSetupEffect>()
     val effects: SharedFlow<LearningSetupEffect> = _effects
+    private var settingsProfileId: String? = null
 
     fun load(profileId: String) {
+        settingsProfileId = profileId
         viewModelScope.launch {
             seedWordBooks()
             val wordBooksResult = repository.listWordBooks()
@@ -56,12 +67,20 @@ class LearningSetupViewModel @Inject constructor(
             }
             val wordBooks = (wordBooksResult as RepositoryResult.Success).value
             val profile = (profileResult as RepositoryResult.Success).value
+            val settings =
+                when (val result = getSettings(profileId)) {
+                    is LearningSettingsRepositoryResult.Success -> result.value
+                    LearningSettingsRepositoryResult.StorageUnavailable -> LearningSettings.defaults(profileId)
+                }
             _uiState.value =
                 LearningSetupUiState(
                     wordBooks = wordBooks,
                     selectedWordBookId = profile?.activeWordBookId ?: wordBooks.firstOrNull()?.id,
                     dailyNewTarget = profile?.dailyNewTarget ?: LearningSetupUiState.DEFAULT_DAILY_TARGET,
                     savedWordBookName = wordBooks.find { it.id == profile?.activeWordBookId }?.displayName,
+                    openDetailOnKnown = settings.openDetailOnKnown,
+                    openDetailOnFuzzy = settings.openDetailOnFuzzy,
+                    openDetailOnForgotten = settings.openDetailOnForgotten,
                 )
         }
     }
@@ -78,6 +97,36 @@ class LearningSetupViewModel @Inject constructor(
             ),
             savedWordBookName = null,
         )
+    }
+
+    fun setOpenDetailOnKnown(value: Boolean) {
+        _uiState.value = _uiState.value.copy(openDetailOnKnown = value)
+        persistSettings()
+    }
+
+    fun setOpenDetailOnFuzzy(value: Boolean) {
+        _uiState.value = _uiState.value.copy(openDetailOnFuzzy = value)
+        persistSettings()
+    }
+
+    fun setOpenDetailOnForgotten(value: Boolean) {
+        _uiState.value = _uiState.value.copy(openDetailOnForgotten = value)
+        persistSettings()
+    }
+
+    private fun persistSettings() {
+        val profileId = settingsProfileId ?: return
+        val state = _uiState.value
+        viewModelScope.launch {
+            saveSettings(
+                LearningSettings(
+                    profileId = profileId,
+                    openDetailOnKnown = state.openDetailOnKnown,
+                    openDetailOnFuzzy = state.openDetailOnFuzzy,
+                    openDetailOnForgotten = state.openDetailOnForgotten,
+                ),
+            )
+        }
     }
 
     fun save(profileId: String) {

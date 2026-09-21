@@ -18,6 +18,11 @@ import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
+import com.example.englishlearning.learning.GetLearningSettingsUseCase
+import com.example.englishlearning.learning.LearningSettings
+import com.example.englishlearning.learning.LearningSettingsRepository
+import com.example.englishlearning.learning.LearningSettingsRepositoryResult
+import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
 import com.example.englishlearning.profile.InMemoryLocalProfileRepository
@@ -250,10 +255,13 @@ class AppScreenTest {
             { "[{\"id\":\"test-book\",\"displayName\":\"测试词书\",\"level\":\"Test\",\"totalWords\":1,\"dataVersion\":\"v1\",\"sourceId\":\"ngsl-nawl-1.2\",\"sourcePolicy\":\"应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。\"}]" },
             repository,
         )
+        val settingsRepo = FakeLearningSettingsRepository()
         return LearningSetupViewModel(
             repository,
             seedWordBooks,
             SelectWordBookAndSetDailyTargetUseCase(repository),
+            GetLearningSettingsUseCase(settingsRepo),
+            SaveLearningSettingsUseCase(settingsRepo),
         )
     }
 
@@ -276,6 +284,18 @@ class AppScreenTest {
             wordBooks.removeAll { it.id == wordBook.id }
             wordBooks += wordBook
             return RepositoryResult.Success(Unit)
+        }
+    }
+
+    private class FakeLearningSettingsRepository : LearningSettingsRepository {
+        private val stored = mutableMapOf<String, LearningSettings>()
+
+        override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
+            LearningSettingsRepositoryResult.Success(stored[profileId])
+
+        override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> {
+            stored[settings.profileId] = settings
+            return LearningSettingsRepositoryResult.Success(Unit)
         }
     }
 }

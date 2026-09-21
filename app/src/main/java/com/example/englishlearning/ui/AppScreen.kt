@@ -33,6 +33,8 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -124,12 +126,24 @@ fun AppScreen(
                 )
             } else if (showLearning) {
                 val cardState by wordCardViewModel.uiState.collectAsState()
-                WordCardScreen(
-                    state = cardState,
-                    onSubmit = wordCardViewModel::submit,
-                    onRetry = { wordCardViewModel.load(state.profile.id) },
-                    onBackToPlan = exitLearning,
-                )
+                val detailCard by wordCardViewModel.detailCard.collectAsState()
+                // The detail page is an overlay inside the learning branch: it leaves the
+                // showLearning state machine untouched, and returning from it (clearDetail) drops
+                // the user back onto the same card / normal learning state.
+                Box(modifier = Modifier.fillMaxSize()) {
+                    WordCardScreen(
+                        state = cardState,
+                        onSubmit = wordCardViewModel::submit,
+                        onRetry = { wordCardViewModel.load(state.profile.id) },
+                        onBackToPlan = exitLearning,
+                    )
+                    if (detailCard != null) {
+                        CardDetailScreen(
+                            card = detailCard!!,
+                            onBack = wordCardViewModel::clearDetail,
+                        )
+                    }
+                }
             } else {
                 TodayPlanScreen(
                     state = todayState,
@@ -311,6 +325,24 @@ private fun LearningSetupScreen(
             target = state.dailyNewTarget,
             onTargetChange = viewModel::updateDailyNewTarget,
         )
+        DetailToggleRow(
+            label = "提交「认识」后查看词义详情",
+            description = "默认关闭",
+            checked = state.openDetailOnKnown,
+            onToggle = viewModel::setOpenDetailOnKnown,
+        )
+        DetailToggleRow(
+            label = "提交「模糊」后查看词义详情",
+            description = "默认开启",
+            checked = state.openDetailOnFuzzy,
+            onToggle = viewModel::setOpenDetailOnFuzzy,
+        )
+        DetailToggleRow(
+            label = "提交「忘记了」后查看词义详情",
+            description = "默认开启",
+            checked = state.openDetailOnForgotten,
+            onToggle = viewModel::setOpenDetailOnForgotten,
+        )
         Button(
             onClick = { viewModel.save(profileId) },
             modifier = Modifier
@@ -413,6 +445,38 @@ private fun WordBookCard(book: WordBook, selected: Boolean, onSelect: () -> Unit
                         .padding(horizontal = 9.dp, vertical = 5.dp),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DetailToggleRow(
+    label: String,
+    description: String,
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MintSurface),
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(24.dp)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = Color(0xFFCDEFE1)),
+                modifier = Modifier.semantics { contentDescription = label },
+            )
         }
     }
 }

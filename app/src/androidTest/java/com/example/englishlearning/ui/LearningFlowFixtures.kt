@@ -4,6 +4,9 @@ import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.learning.AppendEventResult
 import com.example.englishlearning.learning.EventIdFactory
 import com.example.englishlearning.learning.LearningEventRepository
+import com.example.englishlearning.learning.LearningSettings
+import com.example.englishlearning.learning.LearningSettingsRepository
+import com.example.englishlearning.learning.LearningSettingsRepositoryResult
 import com.example.englishlearning.learning.PlaceholderWordCardSource
 import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
@@ -32,6 +35,7 @@ internal fun wordCardFixtureViewModel(
         events = events,
         submitFeedback = SubmitCardFeedbackUseCase(events, FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)),
         eventIds = EventIdFactory { "event-1" },
+        settings = NoopLearningSettingsRepository(),
     )
 }
 
@@ -69,4 +73,13 @@ internal class NoopLearningEventRepository : LearningEventRepository {
     override suspend fun reviewedCardIds(wordBookId: String) = RepositoryResult.Success(emptyList<String>())
 
     override suspend fun dueCardIds(wordBookId: String, now: Instant) = RepositoryResult.Success(emptyList<String>())
+}
+
+/** A settings repository that reports defaults and never fails, for fixture wiring. */
+internal class NoopLearningSettingsRepository : LearningSettingsRepository {
+    override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
+        LearningSettingsRepositoryResult.Success(LearningSettings.defaults(profileId))
+
+    override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> =
+        LearningSettingsRepositoryResult.Success(Unit)
 }

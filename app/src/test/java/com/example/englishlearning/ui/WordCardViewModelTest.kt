@@ -10,6 +10,9 @@ import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
 import com.example.englishlearning.learning.WordCardSource
+import com.example.englishlearning.learning.LearningSettings
+import com.example.englishlearning.learning.LearningSettingsRepository
+import com.example.englishlearning.learning.LearningSettingsRepositoryResult
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.learning.domain.CardReviewState
 import com.example.englishlearning.learning.domain.LearningEvent
@@ -143,6 +146,99 @@ class WordCardViewModelTest {
     }
 
     @Test
+    fun `submitting known opens the detail page only when openDetailOnKnown is enabled`() = cardTest { harness ->
+        harness.settings.stored = LearningSettings(PROFILE_ID, openDetailOnKnown = true, openDetailOnFuzzy = true, openDetailOnForgotten = true)
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+
+        val detail = harness.viewModel.detailCard.value
+        assertNotNull(detail, "detail must open for the submitted card when the Known tier is enabled")
+        assertEquals("ability", detail?.lemma)
+    }
+
+    @Test
+    fun `submitting known does not open the detail page when openDetailOnKnown is disabled`() = cardTest { harness ->
+        harness.settings.stored = LearningSettings(PROFILE_ID, openDetailOnKnown = false, openDetailOnFuzzy = true, openDetailOnForgotten = true)
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.detailCard.value, "detail must stay closed when the Known tier is disabled")
+    }
+
+    @Test
+    fun `submitting fuzzy opens the detail page by default`() = cardTest { harness ->
+        // No stored settings (null) => repository returns defaults: fuzzy enabled.
+        harness.settings.stored = null
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Fuzzy)
+        advanceUntilIdle()
+
+        assertNotNull(harness.viewModel.detailCard.value, "fuzzy must open detail by default")
+    }
+
+    @Test
+    fun `submitting unknown opens the detail page by default`() = cardTest { harness ->
+        harness.settings.stored = null
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Unknown)
+        advanceUntilIdle()
+
+        assertNotNull(harness.viewModel.detailCard.value, "forgotten must open detail by default")
+    }
+
+    @Test
+    fun `a feedback write failure never opens the detail page`() = cardTest { harness ->
+        harness.settings.stored = LearningSettings(PROFILE_ID, openDetailOnKnown = true, openDetailOnFuzzy = true, openDetailOnForgotten = true)
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+        harness.events.failWrites = true
+
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.detailCard.value, "a failed write must never open the detail page")
+    }
+
+    @Test
+    fun `a settings read failure never opens the detail page`() = cardTest { harness ->
+        harness.settings.failReads = true
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Unknown)
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.detailCard.value, "when settings cannot be read, assume no tier is enabled")
+    }
+
+    @Test
+    fun `clearing the detail page does not append a learning event`() = cardTest { harness ->
+        harness.settings.stored = LearningSettings(PROFILE_ID, openDetailOnKnown = true, openDetailOnFuzzy = true, openDetailOnForgotten = true)
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+        assertNotNull(harness.viewModel.detailCard.value)
+
+        val eventsBefore = harness.events.events.size
+        harness.viewModel.clearDetail()
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.detailCard.value, "returning from detail clears the detail state")
+        assertEquals(eventsBefore, harness.events.events.size, "leaving the detail page must not write a learning event")
+    }
+
+    @Test
     fun `re-entering the flow keeps recorded cards complete and unanswered ones open`() = cardTest { harness ->
         harness.viewModel.load(PROFILE_ID)
         advanceUntilIdle()
@@ -216,6 +312,7 @@ class WordCardViewModelTest {
     private class Harness {
         val content = FakeContent(defaultCards())
         val events = InMemoryEvents()
+        val settings = FakeSettingsRepository()
         var planResult: TodayPlanResult = TodayPlanResult.Ready(plan(content.cards.map(WordCard::cardId)))
         private var nextEventId = 0
 
@@ -226,7 +323,30 @@ class WordCardViewModelTest {
                 events = events,
                 submitFeedback = SubmitCardFeedbackUseCase(events, FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)),
                 eventIds = EventIdFactory { "event-${++nextEventId}" },
+                settings = settings,
             )
+    }
+
+    /**
+     * In-memory [LearningSettingsRepository]. [stored] holds the last written settings so a test
+     * can assert per-profile persistence; [failReads] simulates a settings read that cannot reach
+     * storage (which must never open the detail page).
+     */
+    private class FakeSettingsRepository(
+        var stored: LearningSettings? = null,
+        var failReads: Boolean = false,
+    ) : LearningSettingsRepository {
+        override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
+            if (failReads) {
+                LearningSettingsRepositoryResult.StorageUnavailable
+            } else {
+                LearningSettingsRepositoryResult.Success(stored)
+            }
+
+        override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> {
+            stored = settings
+            return LearningSettingsRepositoryResult.Success(Unit)
+        }
     }
 
     private class FakeContent(var cards: List<WordCard>) : WordCardSource {

@@ -11,6 +11,9 @@ import com.example.englishlearning.learning.SubmitFeedbackResult
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
 import com.example.englishlearning.learning.WordCardSource
+import com.example.englishlearning.learning.LearningSettings
+import com.example.englishlearning.learning.LearningSettingsRepository
+import com.example.englishlearning.learning.LearningSettingsRepositoryResult
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.learning.domain.WordCard
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -58,9 +61,14 @@ class WordCardViewModel @Inject constructor(
     private val events: LearningEventRepository,
     private val submitFeedback: SubmitCardFeedbackUseCase,
     private val eventIds: EventIdFactory,
+    private val settings: LearningSettingsRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<WordCardUiState>(WordCardUiState.Loading)
     val uiState: StateFlow<WordCardUiState> = _uiState
+
+    /** Nullable detail state: non-null means the CardDetailScreen overlay is showing the held card. */
+    private val _detailCard = MutableStateFlow<WordCard?>(null)
+    val detailCard: StateFlow<WordCard?> = _detailCard
 
     private var session: Session? = null
     private var pendingEventId: String? = null
@@ -68,6 +76,7 @@ class WordCardViewModel @Inject constructor(
     fun load(profileId: String) {
         session = null
         pendingEventId = null
+        _detailCard.value = null
         _uiState.value = WordCardUiState.Loading
         viewModelScope.launch {
             when (val result = todayPlan(profileId)) {
@@ -110,11 +119,42 @@ class WordCardViewModel @Inject constructor(
                     pendingEventId = null
                     current.completed += card.cardId
                     emit(current)
+                    // Only after the local event is written and the completion set is updated do we
+                    // read the current profile's tier settings and decide whether to surface the
+                    // just-submitted card's detail page. A settings read failure must never open it.
+                    openDetailIfEnabled(feedback, card, current.profileId)
                 }
                 SubmitFeedbackResult.StorageUnavailable ->
                     emit(current, message = FEEDBACK_NOT_SAVED)
             }
         }
+    }
+
+    /**
+     * Opens the detail page for [card] when the submitted [feedback] tier is enabled for the
+     * profile. Reading happens after the write so the detail overlay can never show for an
+     * unsaved submission; the detail state is a pure view, written nowhere into the event log.
+     * A settings read failure (or an unknown profile with no stored row, which falls back to
+     * [LearningSettings.defaults]) leaves the detail state closed.
+     */
+    private suspend fun openDetailIfEnabled(feedback: CardFeedback, card: WordCard, profileId: String) {
+        val settings =
+            when (val result = settings.find(profileId)) {
+                is LearningSettingsRepositoryResult.Success -> result.value ?: LearningSettings.defaults(profileId)
+                LearningSettingsRepositoryResult.StorageUnavailable -> return
+            }
+        val open =
+            when (feedback) {
+                CardFeedback.Known -> settings.openDetailOnKnown
+                CardFeedback.Fuzzy -> settings.openDetailOnFuzzy
+                CardFeedback.Unknown -> settings.openDetailOnForgotten
+            }
+        if (open) _detailCard.value = card
+    }
+
+    /** Returns from the detail overlay; leaves the learning session (and its completion) untouched. */
+    fun clearDetail() {
+        _detailCard.value = null
     }
 
     private suspend fun startSession(profileId: String, plan: TodayPlan) {

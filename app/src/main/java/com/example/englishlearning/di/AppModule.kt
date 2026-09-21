@@ -22,6 +22,8 @@ import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.LearningSettingsRepository
 import com.example.englishlearning.learning.RoomLearningProfileRepository
 import com.example.englishlearning.learning.RoomLearningSettingsRepository
+import com.example.englishlearning.learning.GetLearningSettingsUseCase
+import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.WordBookMetadataAssetSource
@@ -53,6 +55,8 @@ object AppModule {
     @Provides fun provideCreateUseCase(repository: LocalProfileRepository, clock: ClockProvider): CreateLocalProfileUseCase = CreateLocalProfileUseCase(repository, clock)
     @Provides @Singleton fun provideLearningProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningProfileRepository = RoomLearningProfileRepository(database, dispatcher)
     @Provides @Singleton fun provideLearningSettingsRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningSettingsRepository = RoomLearningSettingsRepository(database, dispatcher)
+    @Provides fun provideGetLearningSettingsUseCase(repository: LearningSettingsRepository): GetLearningSettingsUseCase = GetLearningSettingsUseCase(repository)
+    @Provides fun provideSaveLearningSettingsUseCase(repository: LearningSettingsRepository): SaveLearningSettingsUseCase = SaveLearningSettingsUseCase(repository)
     @Provides fun provideSelectLearningSetupUseCase(repository: LearningProfileRepository): SelectWordBookAndSetDailyTargetUseCase = SelectWordBookAndSetDailyTargetUseCase(repository)
     @Provides fun provideWordBookMetadataAssetSource(@ApplicationContext context: Context): WordBookMetadataAssetSource = WordBookMetadataAssetSource { context.assets.open("wordbooks/metadata.json").bufferedReader().use { it.readText() } }
     @Provides fun provideSeedWordBooksUseCase(source: WordBookMetadataAssetSource, repository: LearningProfileRepository): SeedWordBooksUseCase = SeedWordBooksUseCase(source, repository)
