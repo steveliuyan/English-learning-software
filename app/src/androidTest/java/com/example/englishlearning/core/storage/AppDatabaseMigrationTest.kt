@@ -135,6 +135,23 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV6ToV7_createsArticleAndReadingPreferenceTables() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 6).apply {
+            insertWordBook()
+            insertLearningProfile("default", "primary-school", 10)
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, AppDatabase.MIGRATION_6_7).apply {
+            assertTableExists("articles")
+            assertTableExists("reading_preferences")
+            assertIndexExists("articles", "index_articles_reuse_key")
+            close()
+        }
+    }
+
+    @Test
     fun freshV4Database_rejectsInvalidTodayPlanTaskKindOnInsertAndUpdate() {
         Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),

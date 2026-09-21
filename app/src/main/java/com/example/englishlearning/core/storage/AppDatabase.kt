@@ -4,13 +4,16 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.englishlearning.core.storage.dao.InternalArticleDao
 import com.example.englishlearning.core.storage.dao.InternalAssetDao
+import com.example.englishlearning.core.storage.dao.InternalReadingPreferenceDao
 import com.example.englishlearning.core.storage.dao.InternalLearningEventDao
 import com.example.englishlearning.core.storage.dao.InternalLearningProfileDao
 import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
 import com.example.englishlearning.core.storage.dao.InternalProfileDao
 import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
 import com.example.englishlearning.core.storage.dao.InternalWordBookDao
+import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
 import com.example.englishlearning.core.storage.entity.KeyAliasEntity
@@ -18,6 +21,7 @@ import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
 import com.example.englishlearning.core.storage.entity.LocalProfileEntity
+import com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity
 import com.example.englishlearning.core.storage.entity.SchemaMetaEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
@@ -30,6 +34,8 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
 @Database(
     entities = [
         SchemaMetaEntity::class,
+        ArticleEntity::class,
+        ReadingPreferenceEntity::class,
         AssetRecordEntity::class,
         KeyAliasEntity::class,
         LocalProfileEntity::class,
@@ -41,10 +47,14 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
+    internal abstract fun internalArticleDao(): InternalArticleDao
+
+    internal abstract fun internalReadingPreferenceDao(): InternalReadingPreferenceDao
+
     internal abstract fun internalAssetDao(): InternalAssetDao
 
     internal abstract fun internalProfileDao(): InternalProfileDao
@@ -128,6 +138,33 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_6_7: Migration =
+            object : Migration(6, 7) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `articles` " +
+                            "(`articleId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `localDate` TEXT NOT NULL, " +
+                            "`activeWordBookId` TEXT NOT NULL, `articleType` TEXT NOT NULL, `lengthTier` TEXT NOT NULL, " +
+                            "`version` INTEGER NOT NULL, `title` TEXT NOT NULL, `englishText` TEXT NOT NULL, " +
+                            "`chineseText` TEXT NOT NULL, `generatedAtEpochMillis` INTEGER NOT NULL, `modelName` TEXT, " +
+                            "PRIMARY KEY(`articleId`))",
+                    )
+                    db.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_reuse_key` " +
+                            "ON `articles` (`profileId`, `localDate`, `activeWordBookId`, `articleType`, `lengthTier`, `version`)",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_articles_profileId_generatedAtEpochMillis` " +
+                            "ON `articles` (`profileId`, `generatedAtEpochMillis`)",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `reading_preferences` " +
+                            "(`profileId` TEXT NOT NULL, `defaultArticleType` TEXT NOT NULL DEFAULT 'STORY', " +
+                            "`explicitLengthTier` TEXT, PRIMARY KEY(`profileId`))",
+                    )
+                }
+            }
+
         val MIGRATION_5_6: Migration =
             object : Migration(5, 6) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -193,7 +230,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)
