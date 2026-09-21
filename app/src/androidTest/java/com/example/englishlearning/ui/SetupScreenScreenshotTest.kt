@@ -17,6 +17,11 @@ import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
+import com.example.englishlearning.learning.GetLearningSettingsUseCase
+import com.example.englishlearning.learning.LearningSettings
+import com.example.englishlearning.learning.LearningSettingsRepository
+import com.example.englishlearning.learning.LearningSettingsRepositoryResult
+import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.TodayPlanResult
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
@@ -79,10 +84,13 @@ class SetupScreenScreenshotTest {
             { "[{\"id\":\"cet4\",\"displayName\":\"大学英语四级\",\"level\":\"CET-4\",\"totalWords\":1,\"dataVersion\":\"v1\",\"sourceId\":\"ngsl-nawl-1.2\",\"sourcePolicy\":\"应用内学习分组，不是官方考试大纲词表。\"},{\"id\":\"cet6\",\"displayName\":\"大学英语六级\",\"level\":\"CET-6\",\"totalWords\":1,\"dataVersion\":\"v1\",\"sourceId\":\"ngsl-nawl-1.2\",\"sourcePolicy\":\"应用内学习分组，不是官方考试大纲词表。\"},{\"id\":\"kaoyan\",\"displayName\":\"考研英语\",\"level\":\"Postgraduate\",\"totalWords\":1,\"dataVersion\":\"v1\",\"sourceId\":\"ngsl-nawl-1.2\",\"sourcePolicy\":\"应用内学习分组，不是官方考试大纲词表。\"}]" },
             repository,
         )
+        val settingsRepo = FakeLearningSettingsRepository()
         return LearningSetupViewModel(
-            repository,
-            seedWordBooks,
-            SelectWordBookAndSetDailyTargetUseCase(repository),
+            repository = repository,
+            seedWordBooks = seedWordBooks,
+            selectWordBook = SelectWordBookAndSetDailyTargetUseCase(repository),
+            getSettings = GetLearningSettingsUseCase(settingsRepo),
+            saveSettings = SaveLearningSettingsUseCase(settingsRepo),
         )
     }
 
@@ -105,6 +113,18 @@ class SetupScreenScreenshotTest {
             wordBooks.removeAll { it.id == wordBook.id }
             wordBooks += wordBook
             return RepositoryResult.Success(Unit)
+        }
+    }
+
+    private class FakeLearningSettingsRepository : LearningSettingsRepository {
+        private val stored = mutableMapOf<String, LearningSettings>()
+
+        override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
+            LearningSettingsRepositoryResult.Success(stored[profileId])
+
+        override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> {
+            stored[settings.profileId] = settings
+            return LearningSettingsRepositoryResult.Success(Unit)
         }
     }
 }
