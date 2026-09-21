@@ -1,6 +1,7 @@
 package com.example.englishlearning.ui
 
 import com.example.englishlearning.R
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import org.junit.jupiter.api.Test
