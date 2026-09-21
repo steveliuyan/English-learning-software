@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -95,8 +96,11 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("测试词书").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) { invocations == 2 }
         assertEquals(2, invocations)
     }
 
@@ -120,7 +124,9 @@ class AppScreenTest {
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
 
         composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
         assertEquals(2, invocations)
     }
@@ -186,6 +192,9 @@ class AppScreenTest {
         // The card is on its first (Ready) card, which offers no "back to plan" button; leaving
         // the flow is a system-back action handled by AppScreen's BackHandler.
         pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
@@ -217,6 +226,9 @@ class AppScreenTest {
         // Leaving via system back must recompute today's progress (F1-04: re-entering the today
         // page recomputes state), otherwise the plan stays stale after reviewing cards.
         pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
         assertEquals(2, invocations)
     }
