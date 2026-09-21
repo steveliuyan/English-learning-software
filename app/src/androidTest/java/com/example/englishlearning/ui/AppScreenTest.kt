@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -100,7 +101,7 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("测试词书").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) { invocations == 2 }
         assertEquals(2, invocations)
     }
@@ -124,7 +125,7 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
 
-        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
         }
