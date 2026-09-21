@@ -5,6 +5,7 @@ import com.example.englishlearning.core.storage.dao.InternalAssetDao
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -49,7 +50,31 @@ class AssetRepositoryTest {
             try {
                 val result = AssetRepository(database, executor.asCoroutineDispatcher()).get(UUID.randomUUID())
 
-                assertEquals(AppError.DatabaseMigrationFailed, assertIs<AppErrorException>(result.exceptionOrNull()).appError)
+                assertEquals(AppError.StorageUnavailable, assertIs<AppErrorException>(result.exceptionOrNull()).appError)
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+
+    @Test
+    fun `get maps internal-scope cancellation to a storage failure while the caller stays active`() =
+        runTest {
+            val id = UUID.fromString("00000000-0000-0000-0000-000000000002")
+            val database = mockk<AppDatabase>()
+            val dao = mockk<InternalAssetDao>()
+            // Closed-database reads surface as a CancellationException raised on Room's own
+            // scope while the caller's coroutine is still active; that must be mapped, not
+            // swallowed as a plain storage failure nor leaked as a caller cancellation.
+            coEvery { database.internalAssetDao() } returns dao
+            coEvery { dao.findById(id.toString()) } throws CancellationException("closed database access")
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                val result = AssetRepository(database, executor.asCoroutineDispatcher()).get(id)
+
+                assertEquals(
+                    AppError.StorageUnavailable,
+                    assertIs<AppErrorException>(result.exceptionOrNull()).appError,
+                )
             } finally {
                 executor.shutdownNow()
             }

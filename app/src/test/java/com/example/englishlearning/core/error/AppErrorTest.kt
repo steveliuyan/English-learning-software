@@ -10,6 +10,7 @@ class AppErrorTest {
         val errors =
             listOf(
                 AppError.NetworkUnavailable,
+                AppError.StorageUnavailable,
                 AppError.StorageInsufficient(requiredBytes = 4096),
                 AppError.DatabaseMigrationFailed,
                 AppError.KeyStoreUnavailable,
@@ -21,6 +22,7 @@ class AppErrorTest {
         assertEquals(
             listOf(
                 AppErrorUiText.NetworkUnavailable,
+                AppErrorUiText.StorageUnavailable,
                 AppErrorUiText.StorageInsufficient,
                 AppErrorUiText.DatabaseMigrationFailed,
                 AppErrorUiText.KeyStoreUnavailable,

@@ -12,6 +12,10 @@ sealed interface AppError {
         override val uiText: AppErrorUiText = AppErrorUiText.NetworkUnavailable
     }
 
+    data object StorageUnavailable : AppError {
+        override val uiText: AppErrorUiText = AppErrorUiText.StorageUnavailable
+    }
+
     data class StorageInsufficient(
         val requiredBytes: Long,
     ) : AppError {
@@ -41,6 +45,7 @@ sealed interface AppError {
 
 enum class AppErrorUiText {
     NetworkUnavailable,
+    StorageUnavailable,
     StorageInsufficient,
     DatabaseMigrationFailed,
     KeyStoreUnavailable,

@@ -1,7 +1,10 @@
 package com.example.englishlearning.core.storage
 
 import com.example.englishlearning.core.error.AppError
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -14,8 +17,14 @@ class AssetRepository(
             try {
                 database.internalAssetDao().findById(id.toString())?.toRecord()?.let(Result.Companion::success)
                     ?: Result.success(null)
+            } catch (cancellation: CancellationException) {
+                if (currentCoroutineContext().isActive) {
+                    Result.failure(AppErrorException(AppError.StorageUnavailable))
+                } else {
+                    throw cancellation
+                }
             } catch (_: Exception) {
-                Result.failure(AppErrorException(AppError.DatabaseMigrationFailed))
+                Result.failure(AppErrorException(AppError.StorageUnavailable))
             }
         }
 
