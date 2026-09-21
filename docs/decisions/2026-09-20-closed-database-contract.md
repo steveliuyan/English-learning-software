@@ -23,7 +23,7 @@ Stage 1 收尾时，`RoomLearningEventRepository`、`RoomTodayPlanRepository`、
 | `P3_CLOSED_DIRECT_INSERT` | `throw:kotlinx.coroutines.JobCancellationException`，`stillActive=true` |
 | `P4_CLOSED_SAVE_IF_ABSENT` | `Ready(plan=...)` |
 | `P5_FRESH_APPEND` | `Appended(duplicate=false)` |
-| `P6_CLOSED_APPEND_X3` | `Appended`、`Appended`、`Appended`（稳定） |
+| `P6_CLOSED_APPEND_X3` | `first=Appended(duplicate=false)`、`second=Appended(duplicate=false)`（日志只记到两次） |
 
 辅助证据：`verification-logs/30b-closed-db-probe.log` 证明 `database.openHelper.writableDatabase` 对"已关闭"与"从未打开"两种状态**都返回 OK**，不构成判别器；`verification-logs/30d-closed-db-readback-probe.log` 证明同一关闭实例上的读会返回 `StorageUnavailable`，因此落盘校验必须经**重新打开**的实例。
 

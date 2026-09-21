@@ -16,7 +16,8 @@
 
 ## 证据
 
-- RED（生产改动前）：`verification-logs/35a-red-asset-error-mapping.log` — `AssetRepositoryTest.kt:46` 与 `:61` 均以 `AssertionFailedError: expected: <StorageUnavailable> but was: <DatabaseMigrationFailed>` 失败，即误标本身。
+- RED（生产**映射**改动前——枚举成员已先加入以便测试编译，`AssetRepository` 仍是旧实现）：`verification-logs/35a-red-asset-error-mapping.log:50,53` — `AssetRepositoryTest > get maps database failures without leaking storage details()` 与 `get maps internal-scope cancellation to a storage failure while the caller stays active()` 均以 `org.opentest4j.AssertionFailedError` 失败（同批次 `4 tests completed, 2 failed`）。失败语义即误标本身：旧实现返回 `DatabaseMigrationFailed`，新断言期望 `StorageUnavailable`。
+  说明：该日志只记录异常类型与断言行号，**未内联断言消息原文**；此处不引用日志中不存在的文本（初次成文时曾误引，已按原始日志更正）。
 - GREEN：`verification-logs/35-unit-asset-error-mapping.log` — `114 tests completed, 4 failed`，4 项为既有 Stage-0 遗留（`LogicalSnapshotSecurityTest` ×2、`ProviderContractTest` ×1、`ThirdPartyNoticesTest` ×1），与本次无关；新增用例通过。
 - 提交 `29d4b1e`，改动 4 文件（+43/−2）。
 
