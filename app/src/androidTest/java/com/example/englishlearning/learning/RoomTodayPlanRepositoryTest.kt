@@ -25,6 +25,34 @@ class RoomTodayPlanRepositoryTest {
     }
 
     @Test
+    fun findLatestWithoutAnyPlanReturnsNotFound() = runBlocking {
+        withRepository { repository ->
+            assertEquals(TodayPlanResult.NotFound, repository.findLatest("profile-1"))
+        }
+    }
+
+    @Test
+    fun findLatestReturnsTheGreatestLocalDateRegardlessOfInsertionOrder() = runBlocking {
+        withRepository { repository ->
+            val later = plan(newCards = listOf("new-later"), dueCards = emptyList()).copy(
+                planId = "plan-later",
+                localDate = LocalDate.parse("2026-09-20"),
+            )
+            val earlier = plan(newCards = listOf("new-earlier"), dueCards = emptyList()).copy(
+                planId = "plan-earlier",
+                localDate = LocalDate.parse("2026-09-19"),
+            )
+
+            // Insert the greatest date first: the query must order by localDate, not by insert order.
+            assertEquals(TodayPlanResult.Ready(later), repository.saveIfAbsent(later))
+            assertEquals(TodayPlanResult.Ready(earlier), repository.saveIfAbsent(earlier))
+
+            // Ready equality carries the task snapshot, so this also proves tasks are loaded.
+            assertEquals(TodayPlanResult.Ready(later), repository.findLatest(later.profileId))
+        }
+    }
+
+    @Test
     fun savedPlanRoundTripsExactFieldsAndTaskOrdering() = runBlocking {
         withRepository { repository ->
             val plan = plan(newCards = listOf("new-2", "new-1"), dueCards = listOf("due-2", "due-1"))
@@ -97,6 +125,19 @@ class RoomTodayPlanRepositoryTest {
         database.close()
 
         assertEquals(TodayPlanResult.StorageUnavailable, repository.find("profile-1", LocalDate.parse("2026-09-19")))
+        context.deleteDatabase(name)
+        Unit
+    }
+
+    @Test
+    fun findLatestOnClosedDatabaseReturnsStableStorageUnavailable() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "closed-today-plan-latest-${System.nanoTime()}.db"
+        val database = openDatabase(context, name)
+        val repository = RoomTodayPlanRepository(database, Dispatchers.Unconfined)
+        database.close()
+
+        assertEquals(TodayPlanResult.StorageUnavailable, repository.findLatest("profile-1"))
         context.deleteDatabase(name)
         Unit
     }

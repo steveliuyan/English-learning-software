@@ -15,7 +15,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -25,11 +24,11 @@ import org.junit.runner.RunWith
  * and once generated that plan is an immutable snapshot — this asserts the second day does
  * not rewrite the first day's row or its tasks.
  *
- * Known gap (timezone): [GetOrCreateTodayPlanUseCase] recomputes
- * `clock.instant().atZone(clock.zoneId()).toLocalDate()` on every `invoke` (lines 13-15) and
- * the unique index only covers `(profileId, localDate)`, so a timezone change inside one
- * physical learning day invents a second local date and a second plan. The timezone test is
- * written against the intended behaviour and `@Ignore`-d until that product decision lands.
+ * Learning-day identity: [GetOrCreateTodayPlanUseCase] anchors the day to the profile's plan
+ * with the greatest `localDate`. When the device's current local date is not strictly later
+ * than that anchor (equal or rolled back, e.g. a timezone/clock change inside one physical
+ * learning day) the existing snapshot is reused verbatim — including its `zoneId` and
+ * generation instant — and no second plan is created.
  */
 @RunWith(AndroidJUnit4::class)
 class TodayPlanAcrossDaysTest {
@@ -116,12 +115,6 @@ class TodayPlanAcrossDaysTest {
         }
     }
 
-    @Ignore(
-        "AC1-07 timezone gap: GetOrCreateTodayPlanUseCase recomputes localDate from the current " +
-            "zone on every call (lines 13-15) and the unique index only covers " +
-            "(profileId, localDate), so one physical learning day forks into two plans across zones. " +
-            "Asserted against the intended behaviour; enable once the product decision lands.",
-    )
     @Test
     fun timezoneChangeWithinOneLearningDayDoesNotCreateASecondPlan() = runBlocking {
         withDatabase { database ->
@@ -132,11 +125,24 @@ class TodayPlanAcrossDaysTest {
             val useCase = useCase(database, clock)
 
             val planA = useCase.ready()
+            val rowBefore = findPlan(database, planA.localDate.toString())
+            val tasksBefore = findTasks(database, planA.planId)
+
             clock.zone = ZoneId.of("America/Los_Angeles")
             val planB = useCase.ready()
 
             assertEquals("one physical day must not fork into two plans", planA.planId, planB.planId)
             assertEquals(1, planRowCount(database))
+            assertEquals("the rolled-back local date stays on the anchored day", planA.localDate, planB.localDate)
+
+            val rowAfter = findPlan(database, planA.localDate.toString())
+            assertEquals("the snapshot's zone must not be rewritten", "Asia/Shanghai", rowAfter?.zoneId)
+            assertEquals(
+                "the snapshot's generation instant must not be rewritten",
+                rowBefore?.generatedAtEpochMillis,
+                rowAfter?.generatedAtEpochMillis,
+            )
+            assertEquals("the first day's tasks must stay frozen", tasksBefore, findTasks(database, planA.planId))
         }
     }
 

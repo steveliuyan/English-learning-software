@@ -13,6 +13,9 @@ internal interface InternalTodayPlanDao {
     @Query("SELECT * FROM today_plans WHERE profileId = :profileId AND localDate = :localDate LIMIT 1")
     suspend fun findPlan(profileId: String, localDate: String): TodayPlanEntity?
 
+    @Query("SELECT * FROM today_plans WHERE profileId = :profileId ORDER BY localDate DESC LIMIT 1")
+    suspend fun findLatestPlan(profileId: String): TodayPlanEntity?
+
     @Query("SELECT * FROM today_plan_tasks WHERE planId = :planId ORDER BY ordinal ASC")
     suspend fun findTasks(planId: String): List<TodayPlanTaskEntity>
 

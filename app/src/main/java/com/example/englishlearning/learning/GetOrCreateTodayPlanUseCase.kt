@@ -14,10 +14,15 @@ class GetOrCreateTodayPlanUseCase(
         val zoneId = clock.zoneId()
         val localDate = generationInstant.atZone(zoneId).toLocalDate()
 
-        when (val existing = todayPlanRepository.find(profileId, localDate)) {
-            is TodayPlanResult.Ready -> return existing
-            TodayPlanResult.StorageUnavailable -> return TodayPlanResult.StorageUnavailable
+        // The learning day is anchored to the profile's latest generated plan (the greatest
+        // localDate), not to the current clock value: a clock value is not monotonic, and a
+        // timezone/clock rollback must reuse the existing snapshot instead of issuing a second
+        // batch of new words. Only a strictly later local date starts a new plan.
+        when (val latest = todayPlanRepository.findLatest(profileId)) {
+            is TodayPlanResult.Ready ->
+                if (!localDate.isAfter(latest.plan.localDate)) return latest
             TodayPlanResult.NotFound -> Unit
+            TodayPlanResult.StorageUnavailable -> return TodayPlanResult.StorageUnavailable
             TodayPlanResult.MissingLearningSetup -> return TodayPlanResult.StorageUnavailable
         }
 

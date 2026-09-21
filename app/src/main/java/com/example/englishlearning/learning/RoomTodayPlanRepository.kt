@@ -30,6 +30,20 @@ class RoomTodayPlanRepository(
         }
     }
 
+    override suspend fun findLatest(profileId: String): TodayPlanResult {
+        return try {
+            withContext(ioDispatcher) {
+                database.internalTodayPlanDao().findLatestPlan(profileId)?.let { entity ->
+                    readResult(entity)
+                } ?: TodayPlanResult.NotFound
+            }
+        } catch (cancellation: CancellationException) {
+            if (currentCoroutineContext().isActive) TodayPlanResult.StorageUnavailable else throw cancellation
+        } catch (_: Exception) {
+            TodayPlanResult.StorageUnavailable
+        }
+    }
+
     override suspend fun saveIfAbsent(plan: TodayPlan): TodayPlanResult {
         return try {
             withContext(ioDispatcher) {
