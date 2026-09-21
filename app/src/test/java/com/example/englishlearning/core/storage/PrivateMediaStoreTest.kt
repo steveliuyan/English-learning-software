@@ -13,6 +13,37 @@ import kotlin.test.assertTrue
 
 class PrivateMediaStoreTest {
     @Test
+    fun `matching hash publishes final asset and removes temporary file`() =
+        runTest {
+            val files = FakeFileOps()
+            val content = "verified".encodeToByteArray()
+            val assetId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+            val store = PrivateMediaStore(files, StandardTestDispatcher(testScheduler))
+
+            val result = store.writeVerified(assetId, ByteArrayInputStream(content), sha256(content))
+
+            assertTrue(result.isSuccess)
+            assertEquals(setOf(assetId.toString()), files.finalFiles())
+            assertEquals(emptySet(), files.temporaryFiles())
+            assertEquals(MediaAvailability.Available, store.availability(AssetRecord(assetId.toString(), sha256(content))))
+        }
+
+    @Test
+    fun `unexpected write failure is mapped and cleaned`() =
+        runTest {
+            val assetId = UUID.randomUUID()
+            val files = FakeFileOps(writeFailure = IllegalStateException("internal path leaked"))
+            files.seed(assetId.toString(), "previous".encodeToByteArray())
+            val store = PrivateMediaStore(files, StandardTestDispatcher(testScheduler))
+
+            val result = store.writeVerified(assetId, ByteArrayInputStream(byteArrayOf(1)), "00")
+
+            assertEquals(AppError.StorageUnavailable, (result.exceptionOrNull() as AppErrorException).appError)
+            assertEquals(emptySet(), files.finalFiles())
+            assertEquals(emptySet(), files.temporaryFiles())
+        }
+
+    @Test
     fun `hash mismatch leaves no final asset or temporary file`() =
         runTest {
             val files = FakeFileOps()
@@ -63,6 +94,18 @@ class PrivateMediaStoreTest {
         }
 
     @Test
+    fun `unexpected availability failure is rebuildable`() {
+        val files = FakeFileOps(hashFailure = IllegalStateException("internal path leaked"))
+        files.seed("present", "content".encodeToByteArray())
+        val store = PrivateMediaStore(files, StandardTestDispatcher())
+
+        assertEquals(
+            MediaAvailability.UnavailableRebuildable,
+            store.availability(AssetRecord("present", sha256("content"))),
+        )
+    }
+
+    @Test
     fun `hash lookup failure after existence check is rebuildable`() {
         val files = FakeFileOps(hashFailure = IOException("removed"))
         files.seed("present", "content".encodeToByteArray())
@@ -76,8 +119,8 @@ class PrivateMediaStoreTest {
 }
 
 private class FakeFileOps(
-    private val writeFailure: IOException? = null,
-    private val hashFailure: IOException? = null,
+    private val writeFailure: Exception? = null,
+    private val hashFailure: Exception? = null,
 ) : FileOps {
     private val files = mutableMapOf<String, ByteArray>()
 

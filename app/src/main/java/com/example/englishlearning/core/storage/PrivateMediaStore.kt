@@ -1,7 +1,10 @@
 package com.example.englishlearning.core.storage
 
 import com.example.englishlearning.core.error.AppError
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InputStream
@@ -33,7 +36,13 @@ class PrivateMediaStore(
                 Result.failure(error.toAppErrorException())
             } catch (error: SecurityException) {
                 Result.failure(error.toAppErrorException())
-            } catch (error: UnsupportedOperationException) {
+            } catch (cancellation: CancellationException) {
+                if (currentCoroutineContext().isActive) {
+                    Result.failure(AppErrorException(AppError.StorageUnavailable))
+                } else {
+                    throw cancellation
+                }
+            } catch (error: RuntimeException) {
                 Result.failure(error.toAppErrorException())
             } finally {
                 files.delete(temporaryName)
@@ -51,6 +60,8 @@ class PrivateMediaStore(
         } catch (_: IOException) {
             MediaAvailability.UnavailableRebuildable
         } catch (_: SecurityException) {
+            MediaAvailability.UnavailableRebuildable
+        } catch (_: RuntimeException) {
             MediaAvailability.UnavailableRebuildable
         }
 }
