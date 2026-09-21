@@ -18,7 +18,6 @@ class RoomLearningEventRepository(
     private val ioDispatcher: CoroutineDispatcher,
 ) : LearningEventRepository {
     override suspend fun append(event: LearningEvent, nextState: CardReviewState): AppendEventResult {
-        if (!database.isOpen) return AppendEventResult.StorageUnavailable
         return try {
             val rowId =
                 withContext(ioDispatcher) {
@@ -26,7 +25,7 @@ class RoomLearningEventRepository(
                 }
             AppendEventResult.Appended(duplicate = rowId == DUPLICATE_ROW_ID)
         } catch (cancellation: CancellationException) {
-            throw cancellation
+            if (currentCoroutineContext().isActive) AppendEventResult.StorageUnavailable else throw cancellation
         } catch (_: Exception) {
             AppendEventResult.StorageUnavailable
         }
@@ -51,7 +50,6 @@ class RoomLearningEventRepository(
         runStorage { database.internalLearningEventDao().dueCardIds(wordBookId, now.toEpochMilli()) }
 
     private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> {
-        if (!database.isOpen) return RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
         return try {
             RepositoryResult.Success(withContext(ioDispatcher) { block() })
         } catch (cancellation: CancellationException) {

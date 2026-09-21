@@ -101,8 +101,18 @@ class RoomTodayPlanRepositoryTest {
         Unit
     }
 
+    /**
+     * Contract (AGENTS.md: "学习反馈必须先成功写入本地"): a reported success must be readable back.
+     *
+     * On Room 2.8.4 a suspended `@Transaction` write on a closed instance reopens the database
+     * file and persists, so [TodayPlanResult.Ready] here is truthful and there is no write-path
+     * failure signal to map to [TodayPlanResult.StorageUnavailable]. Reads on the same closed
+     * instance still fail with a `JobCancellationException` while the caller's coroutine is
+     * active (raw evidence: verification-logs/30c-closed-db-probe-isolated.log), so the plan is
+     * read back through a reopened instance. Both branches assert, so neither passes vacuously.
+     */
     @Test
-    fun closedDatabaseReturnsStableStorageUnavailableForSaveIfAbsent(): Unit = runBlocking {
+    fun closedDatabaseNeverReportsAPlanThatWasNotPersisted(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-today-plan-save-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
@@ -110,11 +120,23 @@ class RoomTodayPlanRepositoryTest {
         val repository = RoomTodayPlanRepository(database, Dispatchers.Unconfined)
         database.close()
 
-        assertEquals(
-            TodayPlanResult.StorageUnavailable,
-            repository.saveIfAbsent(plan(newCards = listOf("new-1"), dueCards = listOf("due-1"))),
-        )
-        context.deleteDatabase(name)
+        val todayPlan = plan(newCards = listOf("new-1"), dueCards = listOf("due-1"))
+        val result = repository.saveIfAbsent(todayPlan)
+
+        val reopened = openDatabase(context, name)
+        try {
+            val readBack = RoomTodayPlanRepository(reopened, Dispatchers.Unconfined)
+            val found = readBack.find(todayPlan.profileId, todayPlan.localDate)
+            if (result is TodayPlanResult.Ready) {
+                assertEquals("a reported save must be readable back", TodayPlanResult.Ready(todayPlan), found)
+            } else {
+                assertEquals(TodayPlanResult.StorageUnavailable, result)
+                assertEquals("a reported failure must not have persisted anything", TodayPlanResult.NotFound, found)
+            }
+        } finally {
+            reopened.close()
+            context.deleteDatabase(name)
+        }
     }
 
     private suspend fun withRepository(block: suspend (RoomTodayPlanRepository) -> Unit) {

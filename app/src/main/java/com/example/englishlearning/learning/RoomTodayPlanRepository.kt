@@ -17,7 +17,6 @@ class RoomTodayPlanRepository(
     private val ioDispatcher: CoroutineDispatcher,
 ) : TodayPlanRepository {
     override suspend fun find(profileId: String, localDate: LocalDate): TodayPlanResult {
-        if (!database.isOpen) return TodayPlanResult.StorageUnavailable
         return try {
             withContext(ioDispatcher) {
                 database.internalTodayPlanDao().findPlan(profileId, localDate.toString())?.let { entity ->
@@ -32,7 +31,6 @@ class RoomTodayPlanRepository(
     }
 
     override suspend fun saveIfAbsent(plan: TodayPlan): TodayPlanResult {
-        if (!database.isOpen) return TodayPlanResult.StorageUnavailable
         return try {
             withContext(ioDispatcher) {
                 val dao = database.internalTodayPlanDao()
@@ -40,7 +38,7 @@ class RoomTodayPlanRepository(
                     dao.insertIfAbsent(plan.toEntity(), plan.toTaskEntities())
                     TodayPlanResult.Ready(plan)
                 } catch (cancellation: CancellationException) {
-                    throw cancellation
+                    if (currentCoroutineContext().isActive) TodayPlanResult.StorageUnavailable else throw cancellation
                 } catch (failure: SQLiteConstraintException) {
                     if (failure.isTodayPlanUniqueConflict()) {
                         dao.findPlan(plan.profileId, plan.localDate.toString())?.let { entity ->
@@ -54,7 +52,7 @@ class RoomTodayPlanRepository(
                 }
             }
         } catch (cancellation: CancellationException) {
-            throw cancellation
+            if (currentCoroutineContext().isActive) TodayPlanResult.StorageUnavailable else throw cancellation
         } catch (_: Exception) {
             TodayPlanResult.StorageUnavailable
         }

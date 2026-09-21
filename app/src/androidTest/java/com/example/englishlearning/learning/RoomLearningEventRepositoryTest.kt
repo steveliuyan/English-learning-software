@@ -108,8 +108,19 @@ class RoomLearningEventRepositoryTest {
         }
     }
 
+    /**
+     * Contract (AGENTS.md: "学习反馈必须先成功写入本地"): a reported success must be readable back.
+     *
+     * On Room 2.8.4 a suspended `@Transaction` write on a closed instance reopens the database
+     * file and persists, so [AppendEventResult.Appended] here is truthful and there is no
+     * write-path failure signal to map to [AppendEventResult.StorageUnavailable]. Reads on the
+     * same closed instance still fail with a `JobCancellationException` while the caller's
+     * coroutine is active (raw evidence: verification-logs/30c-closed-db-probe-isolated.log), so
+     * the row is read back through a reopened instance. Both branches assert, so neither passes
+     * vacuously.
+     */
     @Test
-    fun closedDatabaseReturnsStableStorageUnavailableForAppend(): Unit = runBlocking {
+    fun closedDatabaseNeverReportsAWriteThatDidNotPersist(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "closed-learning-event-append-${System.nanoTime()}.db"
         val database = openDatabase(context, name)
@@ -117,11 +128,28 @@ class RoomLearningEventRepositoryTest {
         val repository = RoomLearningEventRepository(database, Dispatchers.Unconfined)
         database.close()
 
-        assertEquals(
-            AppendEventResult.StorageUnavailable,
-            repository.append(event("event-1", "card-1", later), state("card-1", later)),
-        )
-        context.deleteDatabase(name)
+        val learningEvent = event("event-1", "card-1", later)
+        val result = repository.append(learningEvent, state("card-1", later))
+
+        val reopened = openDatabase(context, name)
+        try {
+            val readBack = RoomLearningEventRepository(reopened, Dispatchers.Unconfined)
+            val persisted = (readBack.countEventsForCard("plan-1", "card-1") as RepositoryResult.Success).value
+            if (result is AppendEventResult.Appended) {
+                assertEquals("a reported append must be readable back", 1, persisted)
+                assertEquals(
+                    "a reported append must return the stored event",
+                    learningEvent,
+                    (readBack.findEvent(learningEvent.eventId) as RepositoryResult.Success).value,
+                )
+            } else {
+                assertEquals(AppendEventResult.StorageUnavailable, result)
+                assertEquals("a reported failure must not have persisted anything", 0, persisted)
+            }
+        } finally {
+            reopened.close()
+            context.deleteDatabase(name)
+        }
     }
 
     @Test

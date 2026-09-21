@@ -29,7 +29,6 @@ class RoomLearningProfileRepository(
         runStorage { database.internalWordBookDao().upsert(wordBook.toEntity()) }
 
     private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> {
-        if (!database.isOpen) return RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
         return try {
             RepositoryResult.Success(withContext(ioDispatcher) { block() })
         } catch (cancellation: CancellationException) {
