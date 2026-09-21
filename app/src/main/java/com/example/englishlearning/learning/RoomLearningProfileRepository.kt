@@ -28,8 +28,9 @@ class RoomLearningProfileRepository(
     override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> =
         runStorage { database.internalWordBookDao().upsert(wordBook.toEntity()) }
 
-    private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> =
-        try {
+    private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> {
+        if (!database.isOpen) return RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
+        return try {
             RepositoryResult.Success(withContext(ioDispatcher) { block() })
         } catch (cancellation: CancellationException) {
             if (currentCoroutineContext().isActive) {
@@ -40,6 +41,7 @@ class RoomLearningProfileRepository(
         } catch (_: Exception) {
             RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
         }
+    }
 
     private fun LearningProfileEntity.toDomain() =
         LearningProfile(profileId, activeWordBookId, dailyNewTarget)

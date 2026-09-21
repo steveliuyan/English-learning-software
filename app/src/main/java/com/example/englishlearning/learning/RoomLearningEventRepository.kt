@@ -17,8 +17,9 @@ class RoomLearningEventRepository(
     private val database: AppDatabase,
     private val ioDispatcher: CoroutineDispatcher,
 ) : LearningEventRepository {
-    override suspend fun append(event: LearningEvent, nextState: CardReviewState): AppendEventResult =
-        try {
+    override suspend fun append(event: LearningEvent, nextState: CardReviewState): AppendEventResult {
+        if (!database.isOpen) return AppendEventResult.StorageUnavailable
+        return try {
             val rowId =
                 withContext(ioDispatcher) {
                     database.internalLearningEventDao().appendEvent(event.toEntity(), nextState.toEntity())
@@ -29,6 +30,7 @@ class RoomLearningEventRepository(
         } catch (_: Exception) {
             AppendEventResult.StorageUnavailable
         }
+    }
 
     override suspend fun findEvent(eventId: String): RepositoryResult<LearningEvent?> =
         runStorage { database.internalLearningEventDao().findEvent(eventId)?.toDomain() }
@@ -48,8 +50,9 @@ class RoomLearningEventRepository(
     override suspend fun dueCardIds(wordBookId: String, now: Instant): RepositoryResult<List<String>> =
         runStorage { database.internalLearningEventDao().dueCardIds(wordBookId, now.toEpochMilli()) }
 
-    private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> =
-        try {
+    private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> {
+        if (!database.isOpen) return RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
+        return try {
             RepositoryResult.Success(withContext(ioDispatcher) { block() })
         } catch (cancellation: CancellationException) {
             if (currentCoroutineContext().isActive) {
@@ -60,6 +63,7 @@ class RoomLearningEventRepository(
         } catch (_: Exception) {
             RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
         }
+    }
 
     private companion object {
         const val DUPLICATE_ROW_ID = -1L
