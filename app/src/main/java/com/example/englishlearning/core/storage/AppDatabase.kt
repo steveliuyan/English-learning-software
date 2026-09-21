@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.englishlearning.core.storage.dao.InternalAssetDao
 import com.example.englishlearning.core.storage.dao.InternalLearningEventDao
 import com.example.englishlearning.core.storage.dao.InternalLearningProfileDao
+import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
 import com.example.englishlearning.core.storage.dao.InternalProfileDao
 import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
 import com.example.englishlearning.core.storage.dao.InternalWordBookDao
@@ -15,6 +16,7 @@ import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
 import com.example.englishlearning.core.storage.entity.KeyAliasEntity
 import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
+import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
 import com.example.englishlearning.core.storage.entity.LocalProfileEntity
 import com.example.englishlearning.core.storage.entity.SchemaMetaEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
@@ -37,8 +39,9 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         TodayPlanTaskEntity::class,
         LearningEventEntity::class,
         CardReviewStateEntity::class,
+        LearningSettingsEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -49,6 +52,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalWordBookDao(): InternalWordBookDao
 
     internal abstract fun internalLearningProfileDao(): InternalLearningProfileDao
+
+    internal abstract fun internalLearningSettingsDao(): InternalLearningSettingsDao
 
     internal abstract fun internalTodayPlanDao(): InternalTodayPlanDao
 
@@ -123,6 +128,25 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_5_6: Migration =
+            object : Migration(5, 6) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `learning_settings` " +
+                            "(`profileId` TEXT NOT NULL, `openDetailOnKnown` INTEGER NOT NULL DEFAULT 0, " +
+                            "`openDetailOnFuzzy` INTEGER NOT NULL DEFAULT 1, " +
+                            "`openDetailOnForgotten` INTEGER NOT NULL DEFAULT 1, " +
+                            "PRIMARY KEY(`profileId`))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO `learning_settings` " +
+                            "(`profileId`, `openDetailOnKnown`, `openDetailOnFuzzy`, `openDetailOnForgotten`) " +
+                            "SELECT `profileId`, 0, 1, 1 FROM `learning_profiles` " +
+                            "WHERE `profileId` NOT IN (SELECT `profileId` FROM `learning_settings`)",
+                    )
+                }
+            }
+
         val MIGRATION_4_5: Migration =
             object : Migration(4, 5) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -169,7 +193,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

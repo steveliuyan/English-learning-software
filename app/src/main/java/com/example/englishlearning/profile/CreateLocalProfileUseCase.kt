@@ -20,5 +20,5 @@ class ProfileException(val error: AppError) : Exception()
 fun Throwable.toSafeAppError(): AppError = when (this) {
     is ProfileException -> error
     is AppErrorException -> appError
-    else -> (cause as? ProfileException)?.error ?: AppError.DatabaseMigrationFailed
+    else -> (cause as? ProfileException)?.error ?: AppError.StorageUnavailable
 }

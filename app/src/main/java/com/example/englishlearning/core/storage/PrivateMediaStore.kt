@@ -60,6 +60,6 @@ class AppErrorException(val appError: AppError) : RuntimeException(null, null, f
 private fun Exception.toAppErrorException(): AppErrorException =
     when (this) {
         is AppErrorException -> this
-        is IOException -> AppErrorException(AppError.StorageInsufficient(0))
-        else -> AppErrorException(AppError.StorageInsufficient(0))
+        is IOException -> AppErrorException(AppError.StorageUnavailable)
+        else -> AppErrorException(AppError.StorageUnavailable)
     }

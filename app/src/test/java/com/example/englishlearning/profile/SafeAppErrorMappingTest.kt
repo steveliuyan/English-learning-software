@@ -40,8 +40,8 @@ class SafeAppErrorMappingTest {
     }
 
     @Test
-    fun `unknown failure degrades to database migration failed`() {
-        assertEquals(AppError.DatabaseMigrationFailed, IllegalStateException("boom").toSafeAppError())
+    fun `unknown failure degrades to storage unavailable`() {
+        assertEquals(AppError.StorageUnavailable, IllegalStateException("boom").toSafeAppError())
     }
 
     @Test

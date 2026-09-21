@@ -7,11 +7,15 @@ import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.util.UUID
 import java.util.concurrent.Executors
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class AssetRepositoryTest {
@@ -51,6 +55,37 @@ class AssetRepositoryTest {
                 val result = AssetRepository(database, executor.asCoroutineDispatcher()).get(UUID.randomUUID())
 
                 assertEquals(AppError.StorageUnavailable, assertIs<AppErrorException>(result.exceptionOrNull()).appError)
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+
+    @Test
+    fun `get rethrows cancellation when the caller coroutine is already cancelled`() =
+        runTest {
+            val id = UUID.fromString("00000000-0000-0000-0000-000000000003")
+            val database = mockk<AppDatabase>()
+            val dao = mockk<InternalAssetDao>()
+            val cancellation = CancellationException("caller cancelled")
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            coEvery { database.internalAssetDao() } returns dao
+            coEvery { dao.findById(id.toString()) } answers {
+                entered.countDown()
+                release.await(5, TimeUnit.SECONDS)
+                throw cancellation
+            }
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                    assertFailsWith<CancellationException> {
+                        AssetRepository(database, executor.asCoroutineDispatcher()).get(id)
+                    }
+                }
+                check(entered.await(5, TimeUnit.SECONDS))
+                job.cancel(cancellation)
+                release.countDown()
+                job.join()
             } finally {
                 executor.shutdownNow()
             }

@@ -57,7 +57,7 @@ class PrivateMediaStoreTest {
 
             val result = store.writeVerified(assetId, ByteArrayInputStream(byteArrayOf(1)), "00")
 
-            assertEquals(AppError.StorageInsufficient(0), (result.exceptionOrNull() as AppErrorException).appError)
+            assertEquals(AppError.StorageUnavailable, (result.exceptionOrNull() as AppErrorException).appError)
             assertEquals(emptySet(), files.finalFiles())
             assertEquals(emptySet(), files.temporaryFiles())
         }

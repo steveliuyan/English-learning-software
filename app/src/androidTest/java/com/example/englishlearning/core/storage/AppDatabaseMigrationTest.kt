@@ -106,6 +106,35 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV5ToV6_createsLearningSettingsWithDefaultsAndPreservesExistingData() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 5).apply {
+            insertWordBook()
+            insertLearningProfile("default", "primary-school", 10)
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, *AppDatabase.MIGRATIONS).apply {
+            assertTableExists("learning_settings")
+            query(
+                "SELECT profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten " +
+                    "FROM learning_settings WHERE profileId = 'default'",
+            ).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("default", cursor.getString(0))
+                assertEquals(0, cursor.getInt(1))
+                assertEquals(1, cursor.getInt(2))
+                assertEquals(1, cursor.getInt(3))
+            }
+            query("SELECT displayName FROM word_books WHERE id = 'primary-school'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("小学", cursor.getString(0))
+            }
+            close()
+        }
+    }
+
+    @Test
     fun freshV4Database_rejectsInvalidTodayPlanTaskKindOnInsertAndUpdate() {
         Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
