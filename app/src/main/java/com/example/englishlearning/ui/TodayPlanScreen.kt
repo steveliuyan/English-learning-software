@@ -42,6 +42,7 @@ fun TodayPlanScreen(
     onRetry: () -> Unit = {},
     onOpenSetup: () -> Unit = {},
     onStartLearning: () -> Unit = {},
+    onOpenReading: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(MintBackground).padding(horizontal = 20.dp, vertical = 24.dp).testTag("today_plan_screen"),
@@ -100,6 +101,21 @@ fun TodayPlanScreen(
                 Text("总进度 $totalDone/$totalTarget", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_total_progress"))
                 val unlockText = if (state.isUnlocked) "已解锁：文章已解锁" else "未解锁：${state.unlockReason}"
                 Text(unlockText, color = if (state.isUnlocked) MintPrimary else MintTextMuted, modifier = Modifier.testTag("today_plan_unlock_status"))
+                Button(
+                    onClick = onOpenReading,
+                    enabled = state.isUnlocked,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("today_plan_open_reading")
+                        .semantics { contentDescription = "阅读文章" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MintPrimary,
+                        contentColor = Color.White,
+                        disabledContainerColor = MintTint,
+                        disabledContentColor = MintPrimaryDark,
+                    ),
+                ) { Text("阅读文章", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onStartLearning,
                     modifier = Modifier

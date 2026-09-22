@@ -82,6 +82,7 @@ fun AppScreen(
     learningSetupViewModel: LearningSetupViewModel,
     todayPlanViewModel: TodayPlanViewModel,
     wordCardViewModel: WordCardViewModel,
+    readingAccessViewModel: ReadingAccessViewModel? = null,
 ) {
     var name by remember { mutableStateOf("") }
     when (val state = viewModel.uiState.collectAsState().value) {
@@ -94,6 +95,7 @@ fun AppScreen(
         is AppUiState.Ready -> {
             var showSetup by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearning by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showReading by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
@@ -114,6 +116,7 @@ fun AppScreen(
             }
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
+            BackHandler(enabled = showReading) { showReading = false }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
                     profileId = state.profile.id,
@@ -144,6 +147,14 @@ fun AppScreen(
                         )
                     }
                 }
+            } else if (showReading && readingAccessViewModel != null) {
+                val readingState by readingAccessViewModel.uiState.collectAsState()
+                ReadingAccessScreen(
+                    state = readingState,
+                    onBack = { showReading = false },
+                    onSelectType = readingAccessViewModel::selectType,
+                    onOpenHistory = {},
+                )
             } else {
                 TodayPlanScreen(
                     state = todayState,
@@ -152,6 +163,11 @@ fun AppScreen(
                     onStartLearning = {
                         wordCardViewModel.load(state.profile.id)
                         showLearning = true
+                    },
+                    onOpenReading = {
+                        val ready = todayState as? TodayPlanUiState.Ready ?: return@TodayPlanScreen
+                        readingAccessViewModel?.load(state.profile.id, ready.isUnlocked, ready.unlockReason)
+                        showReading = readingAccessViewModel != null
                     },
                 )
             }
