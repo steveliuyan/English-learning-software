@@ -96,6 +96,7 @@ fun AppScreen(
             var showSetup by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearning by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showReading by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showReadingHistory by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
@@ -117,6 +118,7 @@ fun AppScreen(
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
             BackHandler(enabled = showReading) { showReading = false }
+            BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
                     profileId = state.profile.id,
@@ -149,12 +151,17 @@ fun AppScreen(
                 }
             } else if (showReading && readingAccessViewModel != null) {
                 val readingState by readingAccessViewModel.uiState.collectAsState()
-                ReadingAccessScreen(
-                    state = readingState,
-                    onBack = { showReading = false },
-                    onSelectType = readingAccessViewModel::selectType,
-                    onOpenHistory = {},
-                )
+                if (showReadingHistory) {
+                    val history = (readingState as? ReadingAccessUiState.Ready)?.history.orEmpty()
+                    ReadingHistoryScreen(history = history, onBack = { showReadingHistory = false })
+                } else {
+                    ReadingAccessScreen(
+                        state = readingState,
+                        onBack = { showReading = false },
+                        onSelectType = readingAccessViewModel::selectType,
+                        onOpenHistory = { showReadingHistory = true },
+                    )
+                }
             } else {
                 TodayPlanScreen(
                     state = todayState,

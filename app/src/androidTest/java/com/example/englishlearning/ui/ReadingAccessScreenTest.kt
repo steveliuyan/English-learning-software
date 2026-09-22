@@ -42,7 +42,7 @@ class ReadingAccessScreenTest {
             ReadingAccessScreen(
                 state = ReadingAccessUiState.Ready(
                     preference = ReadingPreference("p1", ArticleType.SCIENCE, ArticleLengthTier.LONG),
-                    historyCount = 2,
+                    history = emptyList(),
                 ),
                 onBack = {},
                 onSelectType = { selected = it },

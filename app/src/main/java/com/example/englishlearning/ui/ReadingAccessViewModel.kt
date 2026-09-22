@@ -27,7 +27,7 @@ class ReadingAccessViewModel @Inject constructor(
             _uiState.value = when {
                 preference.isFailure || history.isFailure -> ReadingAccessUiState.Unavailable
                 !isUnlocked -> ReadingAccessUiState.Locked(unlockReason)
-                else -> ReadingAccessUiState.Ready(preference.getOrThrow(), history.getOrThrow().size)
+                else -> ReadingAccessUiState.Ready(preference.getOrThrow(), history.getOrThrow())
             }
         }
     }

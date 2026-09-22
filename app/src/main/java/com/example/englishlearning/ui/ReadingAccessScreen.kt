@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
 import com.example.englishlearning.ui.theme.MintBackground
@@ -38,8 +39,10 @@ sealed interface ReadingAccessUiState {
     data class Locked(val reason: String) : ReadingAccessUiState
     data class Ready(
         val preference: ReadingPreference,
-        val historyCount: Int,
-    ) : ReadingAccessUiState
+        val history: List<Article>,
+    ) : ReadingAccessUiState {
+        val historyCount: Int get() = history.size
+    }
     data object Unavailable : ReadingAccessUiState
 }
 

@@ -64,7 +64,7 @@ class ReadingAccessViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            ReadingAccessUiState.Ready(ReadingPreference("p1", ArticleType.SCIENCE, ArticleLengthTier.LONG), 2),
+            ReadingAccessUiState.Ready(ReadingPreference("p1", ArticleType.SCIENCE, ArticleLengthTier.LONG), listOf(article("a1"), article("a2"))),
             viewModel.uiState.value,
         )
     }
