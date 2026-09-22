@@ -3,6 +3,8 @@ package com.example.englishlearning.di
 import android.content.Context
 import androidx.room.Room
 import com.example.englishlearning.core.storage.AppDatabase
+import com.example.englishlearning.core.security.AndroidKeyStoreSecretStore
+import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.core.time.ClockProvider
 import com.example.englishlearning.core.time.SystemClockProvider
 import com.example.englishlearning.learning.EventIdFactory
@@ -53,6 +55,7 @@ object AppModule {
             .addMigrations(*AppDatabase.MIGRATIONS)
             .addCallback(AppDatabase.CONSTRAINT_CALLBACK)
             .build()
+    @Provides @Singleton fun provideSecretStore(@ApplicationContext context: Context): SecretStore = AndroidKeyStoreSecretStore(context)
     @Provides @Singleton fun provideClock(): ClockProvider = SystemClockProvider()
     @Provides @Named("io") fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
     @Provides @Singleton fun provideProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LocalProfileRepository = RoomLocalProfileRepository(database, dispatcher)
