@@ -41,6 +41,10 @@ sealed interface AppError {
     data object InvalidProfileName : AppError {
         override val uiText: AppErrorUiText = AppErrorUiText.InvalidProfileName
     }
+
+    data object InvalidAiConfiguration : AppError {
+        override val uiText: AppErrorUiText = AppErrorUiText.InvalidAiConfiguration
+    }
 }
 
 enum class AppErrorUiText {
@@ -52,4 +56,5 @@ enum class AppErrorUiText {
     IntegrityMismatch,
     PairingFailed,
     InvalidProfileName,
+    InvalidAiConfiguration,
 }
