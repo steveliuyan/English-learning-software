@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.englishlearning.core.storage.dao.InternalAiProfileDao
 import com.example.englishlearning.core.storage.dao.InternalArticleDao
 import com.example.englishlearning.core.storage.dao.InternalAssetDao
 import com.example.englishlearning.core.storage.dao.InternalReadingPreferenceDao
@@ -13,6 +14,7 @@ import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
 import com.example.englishlearning.core.storage.dao.InternalProfileDao
 import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
 import com.example.englishlearning.core.storage.dao.InternalWordBookDao
+import com.example.englishlearning.core.storage.entity.AiProfileEntity
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
@@ -34,6 +36,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
 @Database(
     entities = [
         SchemaMetaEntity::class,
+        AiProfileEntity::class,
         ArticleEntity::class,
         ReadingPreferenceEntity::class,
         AssetRecordEntity::class,
@@ -47,10 +50,12 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
+    internal abstract fun internalAiProfileDao(): InternalAiProfileDao
+
     internal abstract fun internalArticleDao(): InternalArticleDao
 
     internal abstract fun internalReadingPreferenceDao(): InternalReadingPreferenceDao
@@ -134,6 +139,20 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE INDEX IF NOT EXISTS `index_today_plan_tasks_planId_ordinal` " +
                             "ON `today_plan_tasks` (`planId`, `ordinal`)",
+                    )
+                }
+            }
+
+        val MIGRATION_7_8: Migration =
+            object : Migration(7, 8) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `ai_profiles` " +
+                            "(`profileId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `websiteUrl` TEXT NOT NULL, " +
+                            "`endpoint` TEXT NOT NULL, `model` TEXT NOT NULL, `capabilities` TEXT NOT NULL, " +
+                            "`secretAlias` TEXT NOT NULL, `temperature` REAL NOT NULL, `topP` REAL NOT NULL, " +
+                            "`maxTokens` INTEGER NOT NULL, `timeoutSeconds` INTEGER NOT NULL, " +
+                            "`systemPromptTemplateId` TEXT NOT NULL, PRIMARY KEY(`profileId`))",
                     )
                 }
             }
@@ -230,7 +249,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

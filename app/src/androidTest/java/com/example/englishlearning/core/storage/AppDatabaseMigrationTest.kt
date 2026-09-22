@@ -18,6 +18,23 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationTest {
     @Test
+    fun migrateV7ToV8_createsAiProfileTableWithoutCredentialValueColumn() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 7).close()
+
+        helper.runMigrationsAndValidate(TEST_DB, 8, true, AppDatabase.MIGRATION_7_8).apply {
+            query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_profiles'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+            }
+            query("PRAGMA table_info(ai_profiles)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertFalse(names.any { it.contains("key", ignoreCase = true) || it.contains("secretValue", ignoreCase = true) })
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateAllHistoricalSchemasWithoutDestructiveFallback() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 1).apply {
