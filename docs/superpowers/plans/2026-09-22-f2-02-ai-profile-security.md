@@ -36,13 +36,20 @@
 - `data class AiAdvancedParameters(temperature: Double = 0.7, topP: Double = 1.0, maxTokens: Int = 1024, timeoutSeconds: Int = 30, systemPromptTemplateId: String = "default-reading-v1")`
 - `fun validateEndpoint(endpoint: String): Result<URI>`; invalid values return `AppErrorException` using a stable endpoint/configuration error, never the raw URL in user-facing text.
 
-- [ ] Write tests for HTTPS-only, rejected HTTP/file/content schemes, localhost/loopback, private IPv4 ranges, IPv6 loopback/private ranges, missing host, credentials in URL, and valid public host.
-- [ ] Write tests for advanced parameter boundaries and unknown parameter rejection through a typed model.
-- [ ] Run the focused tests and confirm RED because the model and policy do not exist.
-- [ ] Implement pure validation with `java.net.URI`/`InetAddress` parsing; do not perform DNS or network calls in the pure policy.
-- [ ] Add stable error mapping without including endpoint or secret values in messages.
-- [ ] Document the public-host limitation: DNS resolution and redirect validation are transport-layer responsibilities and remain outside this pure task.
-- [ ] Run focused JVM tests and commit `feat(ai): define profile and endpoint security policy`.
+- [x] Write tests for HTTPS-only, rejected HTTP/file/content schemes, localhost/loopback, private IPv4 ranges, IPv6 loopback/private ranges, missing host, credentials in URL, and valid public host.
+       → `ai/domain/AiEndpointPolicyTest.kt` 4 例 + `ai/domain/AiProfileTest.kt` 2 例。
+- [x] Write tests for advanced parameter boundaries and unknown parameter rejection through a typed model.
+       → 边界与拒绝逻辑在 Task 4 落到 `ai/AiRequestPolicyTest.kt`（18 例）统一覆盖。
+- [x] Run the focused tests and confirm RED because the model and policy do not exist.
+       → 已按 TDD 先 RED 后实现（本轮补记：RED/GREEN 过程见 `verification-logs/59-f2-02-task1-{red,green}.log`）。
+- [x] Implement pure validation with `java.net.URI`/`InetAddress` parsing; do not perform DNS or network calls in the pure policy.
+       → `ai/domain/AiEndpointPolicy.kt` 纯函数，无 socket、无 DNS。
+- [x] Add stable error mapping without including endpoint or secret values in messages.
+       → 统一 `AppErrorException(AppError.InvalidAiConfiguration)`，失败信息不含原始 URL。
+- [x] Document the public-host limitation: DNS resolution and redirect validation are transport-layer responsibilities and remain outside this pure task.
+       → 已记入 `docs/decisions/2026-09-22-f2-02-ai-profile-security.md`。
+- [x] Run focused JVM tests and commit `feat(ai): define profile and endpoint security policy`.
+       → 提交 `15ceb68`（**本轮补勾**：该项早已完成，此前只是漏标，勾选时按实际提交核对过）。
 
 ### Task 2: Persist non-sensitive AI Profile metadata
 
@@ -59,12 +66,20 @@
 - `interface AiProfileRepository { suspend fun list(): Result<List<AiProfile>>; suspend fun find(profileId: String): Result<AiProfile?>; suspend fun save(profile: AiProfile): Result<Unit>; suspend fun delete(profileId: String): Result<Unit> }`
 - Entity stores display name, website, endpoint, model, capability names, secret alias, typed advanced parameter values; never stores plaintext Key.
 
-- [ ] Write a migration test from Room version 7 asserting existing tables/rows survive and the new profile table is usable.
-- [ ] Write repository tests asserting CRUD round-trip, profile isolation, capability/parameter mapping, and stored field inspection has no key value field.
-- [ ] Run tests before entities/repository implementation and verify RED.
-- [ ] Upgrade Room `7 → 8`, add migration and exported schema; avoid destructive fallback.
-- [ ] Implement repository using the established `CancellationException` discriminator and `AppErrorException(AppError.StorageUnavailable)` mapping.
-- [ ] Run migration and repository instrumentation tests and commit `feat(ai): persist safe AI profile metadata`.
+- [x] Write a migration test from Room version 7 asserting existing tables/rows survive and the new profile table is usable.
+       → `AppDatabaseMigrationTest` 内的 7→8 用例（该套件现共 9 例）。
+- [x] Write repository tests asserting CRUD round-trip, profile isolation, capability/parameter mapping, and stored field inspection has no key value field.
+       → `ai/RoomAiProfileRepositoryTest.kt`（2 例，内存库）。
+- [x] Run tests before entities/repository implementation and verify RED.
+       → RED 修正后为 `verification-logs/60-f2-02-task2-red2.log`（缺仓储/MIGRATION_7_8）。
+- [x] Upgrade Room `7 → 8`, add migration and exported schema; avoid destructive fallback.
+       → schema `app/schemas/com.example.englishlearning.core.storage.AppDatabase/8.json` 已提交，无破坏性回退。
+- [x] Implement repository using the established `CancellationException` discriminator and `AppErrorException(AppError.StorageUnavailable)` mapping.
+       → `RoomAiProfileRepository.kt` 沿用既有 Room 关库判别式。
+- [x] Run migration and repository instrumentation tests and commit `feat(ai): persist safe AI profile metadata`.
+       → 提交 `b7ac91d`；真机迁移与仓储套件 11/11（`verification-logs/60-f2-02-task2-device.log`）。
+       **但当时漏了 Hilt provider**，该仓储直到 2026-09-24 才真正在应用里被实例化（见偏差 2）。
+       （**本轮补勾**：该项早已完成，此前只是漏标。）
 
 ### Task 3: Bind Profile key references to SecretStore
 
@@ -77,10 +92,14 @@
 - `interface AiProfileSecretUseCase { fun saveKey(profile: AiProfile, key: CharArray): Result<Unit>; fun deleteKey(profile: AiProfile): Result<Unit>; fun hasKey(profile: AiProfile): Result<Boolean> }`
 - Alias must be deterministically derived from profile ID with a fixed prefix, not endpoint/model/name; changing endpoint never looks up another profile’s alias.
 
-- [ ] Write tests proving save delegates only to the profile’s alias, deletes clear that alias, hasKey reports missing/present, and the input `CharArray` is cleared by SecretStore.
-- [ ] Write a test proving two profiles with different IDs cannot share a SecretReference even when endpoint/model are equal.
-- [ ] Run RED, then implement the use case with no plaintext retention or logging.
-- [ ] Add the Android SecretStore binding in Hilt and run focused tests; commit `feat(ai): isolate profile secrets by reference`.
+- [x] Write tests proving save delegates only to the profile’s alias, deletes clear that alias, hasKey reports missing/present, and the input `CharArray` is cleared by SecretStore.
+       → `ai/AiProfileSecretUseCaseTest.kt` 3 例。
+- [x] Write a test proving two profiles with different IDs cannot share a SecretReference even when endpoint/model are equal.
+       → 同上；别名由 `referenceFor(profileId)` = `ai-profile-{profileId}` 派生，与 endpoint/model 无关。
+- [x] Run RED, then implement the use case with no plaintext retention or logging.
+       → `ai/AiProfileSecretUseCase.kt`，无明文留存、无日志。
+- [x] Add the Android SecretStore binding in Hilt and run focused tests; commit `feat(ai): isolate profile secrets by reference`.
+       → 提交 `9fcb586`。（**本轮补勾**：该项早已完成，此前只是漏标。）
 
 ### Task 4: Define confirmation and safe request policy
 
@@ -182,7 +201,7 @@ AI Profile：名称、官网、Endpoint、模型、能力、高级参数及 Secr
 - [x] F2-02 endpoint, profile, secret binding, confirmation, parameter allow-list, error mapping, and migration requirements each have a task.
 - [x] No task introduces real AI transport or article generation.
 - [x] No API Key is stored in Room, logs, test snapshots, or UI state.
-- [ ] All interfaces use exact names and types defined above. —— **不满足，见偏差 3、4、5**（三处刻意收紧/改动，已记理由）。
+- [ ] All interfaces use exact names and types defined above. —— **刻意保留未勾**：偏差 3、4、5 三处是有意的收紧/改动且已记理由，这不是遗留待办，而是「原签名确实没被照抄」的事实，勾上才是假话。
 - [x] Existing F2-01 and Stage-0 data semantics remain unchanged.
 
 ---
