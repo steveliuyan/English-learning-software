@@ -2,6 +2,7 @@ package com.example.englishlearning.export
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.learning.worksheet.WorksheetDirection
@@ -18,6 +19,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 /**
  * 把三份导出模板真实渲染成 PNG，用于人工核对版式与真机取证。
@@ -55,7 +57,8 @@ class WorksheetTemplateVisualTest {
                 WorksheetTemplate.EBBINGHAUS_REVIEW -> 2
             }
             assertEquals(template.name, expectedPageCount, rendered.pageCount)
-            preview.render(rendered.file, maxWidth = 1000).forEachIndexed { index, bitmap ->
+            preview.render(rendered.file, maxWidth = PREVIEW_MAX_WIDTH).forEachIndexed { index, bitmap ->
+                assertTableFrameClosesAtTopLeft(bitmap, "${template.name} 第 ${index + 1} 页")
                 val target = File(outputDirectory, "$template-page-${index + 1}.png")
                 FileOutputStream(target).use { stream ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
@@ -73,7 +76,51 @@ class WorksheetTemplateVisualTest {
         assertTrue(File(outputDirectory, "${WorksheetTemplate.EBBINGHAUS_REVIEW}-page-2.png").exists())
     }
 
+    /**
+     * 表格外框必须闭合到左上角，不能与直角单元格「打架」。
+     *
+     * 这条断言来自用户实测：外框一度画成圆角矩形，而表头底色与单元格网格线都是直角，
+     * 于是四角同时存在直角的填充边缘和圆角的轮廓弧线，看起来像两个角叠在一起、绿角还溢出弧线。
+     *
+     * 取样的可判别性：圆角矩形在离角点 1 pt 处，弧线已经向内退了约 3 pt（半径 6 pt 时），
+     * 因此 (左, 上+1pt) 与 (左+1pt, 上) 这两点若落在**表头底色**上，就说明外框在角上没有线。
+     * 断言用「与表头底色的明暗差」而不是具体色值，改配色不会误报。
+     */
+    private fun assertTableFrameClosesAtTopLeft(bitmap: Bitmap, label: String) {
+        val scale = PREVIEW_MAX_WIDTH.toFloat() / WorksheetPaper.A4_WIDTH
+        val leftPx = (WorksheetPaper.TABLE_LEFT * scale).roundToInt()
+        val topPx = (WorksheetPaper.TABLE_TOP * scale).roundToInt()
+        // 沿边线离开角点 1 pt；只在「沿边」方向偏移，不垂直于边线，因此仍应落在边线上。
+        val alongEdge = (1f * scale).roundToInt().coerceAtLeast(2)
+        val inset = (6f * scale).roundToInt()
+
+        val headerInk = bitmap.getPixel(leftPx + inset, topPx + inset)
+        val verticalEdge = bitmap.getPixel(leftPx, topPx + alongEdge)
+        val horizontalEdge = bitmap.getPixel(leftPx + alongEdge, topPx)
+
+        assertTrue(
+            "$label 左上角内侧应当是深色表头底色，实际取到 ${hex(headerInk)}；取样坐标与版式不符，断言失去意义",
+            channelSum(headerInk) < HEADER_INK_MAX,
+        )
+        listOf("竖边" to verticalEdge, "横边" to horizontalEdge).forEach { (edge, pixel) ->
+            assertTrue(
+                "$label 的外框没有闭合到左上角（$edge）：取到 ${hex(pixel)}，与表头底色 ${hex(headerInk)} 近乎同色。" +
+                    "这通常意味着外框被画成圆角、而表头与网格线是直角，四角出现「两个角叠在一起」。",
+                channelSum(pixel) > channelSum(headerInk) + EDGE_MIN_GAIN,
+            )
+        }
+    }
+
+    private fun channelSum(color: Int): Int = Color.red(color) + Color.green(color) + Color.blue(color)
+
+    private fun hex(color: Int): String = "#%06X".format(color and 0xFFFFFF)
+
     private companion object {
+        const val PREVIEW_MAX_WIDTH = 1000
+        /** 表头底色（深青）三通道之和约 292，白底为 765；用 600 把白底与表头底色分开。 */
+        const val HEADER_INK_MAX = 600
+        /** 边线（浅青）比表头底色亮约 219，取 60 留足抗锯齿余量。 */
+        const val EDGE_MIN_GAIN = 60
         val words = listOf(
             WorksheetItem("1", "abandon", "/əˈbændən/", "v.", "放弃；抛弃", null),
             WorksheetItem("2", "ability", "/əˈbɪləti/", "n.", "能力；才能", null),

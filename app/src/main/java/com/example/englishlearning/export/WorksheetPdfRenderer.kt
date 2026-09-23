@@ -190,19 +190,13 @@ class WorksheetPdfRenderer(
             canvas.drawLine(x, TABLE_TOP + rowHeight, x, bottom, cellStroke)
         }
         strokeColumns(canvas, TABLE_LEFT, TABLE_TOP, bottom, REVIEW_TEXT_COLUMNS)
-        canvas.drawRoundRect(
-            RectF(TABLE_LEFT, TABLE_TOP, TABLE_LEFT + TABLE_WIDTH, bottom),
-            HEADER_CORNER, HEADER_CORNER, tableFrame,
-        )
+        canvas.drawRect(TABLE_LEFT, TABLE_TOP, TABLE_LEFT + TABLE_WIDTH, bottom, tableFrame)
     }
 
+    /** 表头底色用直角，与表格的直角网格线和直角外框保持一致。 */
     private fun drawReviewHeader(canvas: Canvas, rowHeight: Float) {
         val left = TABLE_LEFT
         val headerBottom = TABLE_TOP + rowHeight * EBBINGHAUS_HEADER_ROWS
-        canvas.drawRoundRect(
-            RectF(left, TABLE_TOP, left + TABLE_WIDTH, headerBottom),
-            HEADER_CORNER, HEADER_CORNER, headerFillBorder,
-        )
         canvas.drawRect(left, TABLE_TOP, left + TABLE_WIDTH, headerBottom, headerFill)
         // 合并表头的列宽必须与数据行同一套（REVIEW_TEXT_COLUMNS），否则表头与列内容错位。
         val headerHeight = rowHeight * EBBINGHAUS_HEADER_ROWS
@@ -220,6 +214,12 @@ class WorksheetPdfRenderer(
         drawCenteredHeader(canvas, left + REVIEW_TEXT_WIDTH, TABLE_TOP, REVIEW_WIDTH, rowHeight, "Review")
     }
 
+    /**
+     * 表头底色。
+     *
+     * 必须用 `drawRect`（直角）而不是圆角：表格的网格线是直角的，外框也必须直角，
+     * 否则直角填充会溢出圆角弧线、弧线又斜切进填充，四角看起来是「两个角叠在一起」。
+     */
     private fun drawHeaderRow(
         canvas: Canvas,
         left: Float,
@@ -229,10 +229,6 @@ class WorksheetPdfRenderer(
         headers: List<String>,
         columns: FloatArray,
     ) {
-        canvas.drawRoundRect(
-            RectF(left, top, left + width, top + rowHeight),
-            HEADER_CORNER, HEADER_CORNER, headerFillBorder,
-        )
         canvas.drawRect(left, top, left + width, top + rowHeight, headerFill)
         var x = left
         headers.forEachIndexed { index, header ->
@@ -356,10 +352,8 @@ class WorksheetPdfRenderer(
         val bottom = TABLE_TOP + rowHeight * (rows + headerRows)
         strokeRows(canvas, rows, rowHeight, left, width, headerRows)
         strokeColumns(canvas, left, TABLE_TOP, bottom, columns)
-        canvas.drawRoundRect(
-            RectF(left, TABLE_TOP, left + width, bottom),
-            HEADER_CORNER, HEADER_CORNER, tableFrame,
-        )
+        // 外框必须与网格线同为直角，否则外框画成圆角时，四角会出现「直角的网格线 + 圆角的轮廓」两个角叠在一起。
+        canvas.drawRect(left, TABLE_TOP, left + width, bottom, tableFrame)
     }
 
     private fun fillRow(canvas: Canvas, y: Float, rowHeight: Float, index: Int, left: Float = TABLE_LEFT, width: Float = TABLE_WIDTH) {
@@ -454,7 +448,6 @@ class WorksheetPdfRenderer(
         strokeWidth = 1.6f
     }
     private val headerFill = Paint().apply { color = Color.rgb(20, 150, 122) }
-    private val headerFillBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(20, 150, 122) }
     private val alternateFill = Paint().apply { color = Color.rgb(234, 248, 243) }
     private val cellStroke = Paint().apply {
         color = Color.rgb(150, 220, 197)
@@ -474,19 +467,19 @@ class WorksheetPdfRenderer(
 
     private companion object {
         const val EXPORT_DIRECTORY = "worksheets"
-        const val A4_WIDTH = 595
-        const val A4_HEIGHT = 842
+        // 纸张与表格几何来自 WorksheetPaper，渲染与版式测试共用同一份坐标。
+        const val A4_WIDTH = WorksheetPaper.A4_WIDTH
+        const val A4_HEIGHT = WorksheetPaper.A4_HEIGHT
         const val MARGIN = 42f
         const val FRAME_LEFT = 30f
         const val FRAME_TOP = 30f
         const val CORNER = 10f
-        const val HEADER_CORNER = 6f
         const val TITLE_BASELINE = 48f
-        const val TABLE_TOP = 66f
-        const val TABLE_BOTTOM = 800f
+        const val TABLE_TOP = WorksheetPaper.TABLE_TOP
+        const val TABLE_BOTTOM = WorksheetPaper.TABLE_BOTTOM
         const val FOOTER_BASELINE = 820f
-        const val TABLE_LEFT = 42f
-        const val TABLE_WIDTH = 511f
+        const val TABLE_LEFT = WorksheetPaper.TABLE_LEFT
+        const val TABLE_WIDTH = WorksheetPaper.TABLE_WIDTH
         const val GROUP_GAP = 15f
         const val GROUP_WIDTH = (TABLE_WIDTH - GROUP_GAP) / 2f
         const val REVIEW_WIDTH = 200f

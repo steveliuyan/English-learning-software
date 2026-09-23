@@ -2,7 +2,7 @@
 
 设备：`M2102J2SC`（MIUI V816 / Android 13，adb serial `bf353dda`）
 分支：`stage-1-f1-05-fsrs-scheduling`
-调试 APK：`app/build/outputs/apk/debug/app-debug.apk`，MD5 `089d873dbc815d144f6428103c059988`
+调试 APK：`app/build/outputs/apk/debug/app-debug.apk`，MD5 `437fffdb59f529075f4e492d1244b950`
 
 ## 一、三份导出模板
 
@@ -88,14 +88,36 @@ MSYS_NO_PATHCONV=1 adb shell am instrument -w com.example.englishlearning.test/a
 
 真机（M2102J2SC / MIUI V816 / Android 13）复核：`WorksheetInkTest` 2/2 通过（JVM 179 项全绿），真机全量 92 项全绿；三份模板的 A4 位图在 `docs/verification/printable-worksheet/*.png`（本轮重新导出），应用内预览实拍 `ui/08-in-app-preview-ink.png`。跑测试前后 `english-learning.db`（176128 B / 00:33）与 `-wal`、`-shm` 时间戳、大小一致，用户数据未被触碰。
 
-## 六、一并修复的既有质量门账目
+## 六、直角与圆角混用导致的「框框打架」，以及角点断言
+
+用户实测第二轮：「pdf 的框框排版打架，长方形跟圆角矩形打架」「框框内的颜色是长方形的，跟外面的圆角矩形不匹配」。
+
+放大取证（`corner/*.png`，9–10 倍最近邻放大）后确认了两处同源缺陷：
+
+1. **表头底色是直角矩形，表格外框却画成圆角矩形**（半径 6 pt）。四角上圆角弧线斜切进深绿的直角填充，绿角还溢出到弧线外侧。
+2. **表格四角同时存在两套角**：网格线的竖边／横边是直的、一直画到直角顶点，而外框的圆角弧线又从中间切过去，看起来像两个角叠在一起。
+
+根因是同一个：表格里混用了直角与圆角。修复是把**表格本体一律改为直角**——表头底色用 `drawRect`、表格外框用 `drawRect`，删掉冗余的 `headerFillBorder`（它先画一个同色圆角矩形，随即被同色直角矩形整块盖住）。最外层的页面装饰边框保留圆角：它与表格之间有空隙、互不接触，不构成冲突。
+
+为防止回退，`WorksheetTemplateVisualTest` 增加角点断言：在渲染出的位图上取「表头底色」「离左上角沿边 1 pt 的竖边」「离左上角沿边 1 pt 的横边」三点，要求两条边的通道和比表头底色高 60 以上（同时断言表头底色确实是深色，保证取样坐标有效）。断言用**明暗差**而非具体色值，改配色不会误报。
+
+用同一套取样逻辑回放旧版与新版位图，可证明该断言确实抓得住这个 bug：
+
+| 位图 | 表头底色 | 竖边 | 横边 | 结果 |
+| --- | --- | --- | --- | --- |
+| 旧版（圆角外框） | `#14967A`（和 292） | `#35A88D`（和 362） | `#14967A`（和 292，与表头同色） | FAIL |
+| 新版（直角外框） | `#14967A`（和 292） | `#5ABBA1`（和 438） | `#6CC4AA`（和 474） | PASS |
+
+坐标基准（`A4_WIDTH`、`TABLE_LEFT`、`TABLE_TOP` 等）抽到 `WorksheetPaper`，渲染器与测试读同一份，避免测试里出现第二套坐标。
+
+## 七、一并修复的既有质量门账目
 
 本轮开始前全量单元测试有 4 项失败，与本功能无关，已定位并修复：
 
 1. `LogicalSnapshotSecurityTest`（2 项）与 `ProviderContractTest`（1 项）：禁用词表按**子串**匹配，`ExportProfileRecord` 里的 `Profile` 命中 `file`，把普通导出 DTO 误判成存储材料。改为按词边界（含 camelCase 拆分与相邻词拼接）匹配，`java.io.File`、`filePath`、`files`、`apiKey`、`httpUrl` 仍会被命中，检测能力未削弱。
 2. `ThirdPartyNoticesTest`：版本目录中 `androidx-core-splashscreen`、`androidx-lifecycle-viewmodel`、`androidx-hilt-navigation-compose`、`androidx-compose-ui-test-manifest`、`androidx-room-testing` 五个别名缺台账条目，已在 `docs/third-party-notices.md` 补齐。
 
-## 七、边界与未完成项
+## 八、边界与未完成项
 
 - PDF 只生成在 `cacheDir/worksheets/`，经 FileProvider 以 `content://` 只读共享；未新增存储或网络权限。
 - 词条只来自当前不可变今日计划中已提交反馈的卡片，复习词排在新词前。
