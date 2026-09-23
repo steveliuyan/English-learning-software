@@ -120,16 +120,30 @@ MSYS_NO_PATHCONV=1 adb exec-out run-as com.example.englishlearning \
 
 > AC2-04：未配置 Key、HTTP Endpoint、私网 Endpoint、401、429、超时和畸形响应均返回对应可操作错误，学习完成状态保持。
 
-| 触发条件 | 错误类型 | 用户看到的文案 | 提供的操作 | 取证 |
+| 触发条件 | 错误类型 | 用户看到的文案（代码原文） | 提供的操作 | 取证 |
 | --- | --- | --- | --- | --- |
 | 未配置 Key | `AiFailure.NotConfigured` | 「还没有配置 AI 服务，先去「设置 · AI」添加一套。」 | 去配置 | `AiFailureTest`；截图 `11-ai-tab-badge.png` |
-| HTTP / 私网 / 环回 Endpoint | `AppError.InvalidAiConfiguration`（`validateEndpoint`） | 不泄露原始 URL 的稳定错误 | 去配置 | `AiEndpointPolicyTest`（4 例）；真机截图 `05-editor-validation-error.png` |
+| HTTP / 私网 / 环回 Endpoint | `AppError.InvalidAiConfiguration`（`validateEndpoint`）→ 界面转成 `AiProfileFieldError.EndpointInvalid` | 「Endpoint 必须是 https 公网地址，且不能带账号密码。」 | 改 Endpoint | `AiEndpointPolicyTest`（4 例）；真机截图 `05-editor-validation-error.png` |
 | 401 | `AiFailure.Unauthorized` | 「密钥被拒绝，去「设置 · AI」换一份有效的密钥。」 | **去配置**（不是「重试」） | `AiFailureTest` |
-| 429 | `AiFailure.RateLimited` | 限流文案 | 稍后重试 | `AiFailureTest` |
-| 超时 | `AiFailure.Timeout` | 超时文案 | 稍后重试 | `AiFailureTest` |
-| 畸形响应 | `AiFailure.InvalidResponse` | 响应异常文案 | 重新生成 | `AiFailureTest` |
-| 网络不可达 | `AiFailure.NetworkUnavailable` | 「网络不可用，请检查网络或 Endpoint」 | 检查网络 | 上一轮 F2-03 真机已验 |
-| 能力不支持 | `AiFailure.CapabilityUnsupported` | 能力不支持文案 | 更换模型 | `AiFailureTest` |
+| 429 | `AiFailure.RateLimited` | 「请求太频繁或额度用尽，稍后再试。」 | 稍后重试 | `AiFailureTest` |
+| 服务端 5xx | `AiFailure.ServerUnavailable` | 「对方服务暂时不可用，稍后再试。」 | 稍后重试 | `AiFailureTest` |
+| 超时 | `AiFailure.Timeout` | 「等待超时，稍后再试。」 | 稍后重试 | `AiFailureTest` |
+| 畸形响应 | `AiFailure.InvalidResponse` | 「返回内容不合格，可以重新生成。」 | 重新生成 | `AiFailureTest` |
+| 网络不可达 | `AiFailure.NetworkUnavailable` | 「网络不可用，检查网络后重试。」 | 检查网络 | `AiFailureTest` |
+| 能力不支持 | `AiFailure.CapabilityUnsupported` | 「这套配置没开启所需能力，换一个模型或补上能力声明。」 | 更换模型 | `AiFailureTest` |
+| 用户取消 | `AiFailure.Cancelled` | 「已取消。」 | 知道了 | `AiFailureTest` |
+
+> 引文逐字来自代码，不是转述：`AiFailure.*` 的十行取自 `AiFailureUiText`（`ai/AiFailure.kt`），
+> Endpoint 一行取自 `AiProfileFieldError.EndpointInvalid`（`ui/AiProfileSettingsViewModel.kt`）——
+> Endpoint 的校验失败在界面层被转成**字段级错误**贴着输入框显示，而不是走 `AiFailure` 的九类传输失败。
+>
+> 另注：`AppErrorUiText` 目前只是标识枚举，**没有**到中文文案的渲染映射，所以 `AppError` 的失败
+> 暂时不会自己出现在界面上；界面显示的是 `AiProfileFieldError` 与 `AiProfileListUiState` 里的消息。
+> 这条落在 §7 的未闭合项里。
+>
+> 注意 `NetworkUnavailable` **没有真机取证**：本应用当前**没有任何网络客户端、也没有 `INTERNET` 权限**，
+> 这条路径在真机上跑不到，只能由 JVM 契约测试覆盖。此前项目记忆里「已有 HTTPS 客户端与文章生成」
+> 的记录已于 2026-09-23 逐文件核对后订正为不实，此处按订正后的事实写。
 
 **「学习完成状态保持」**：本轮 F2-02 不发起任何真实网络调用（spec 明确排除），所以不存在
 「AI 失败影响今日计划」的路径。真机走查中反复进出 AI 配置页与功能页后，今日计划三文件 MD5
@@ -270,6 +284,18 @@ UI 改版 `e9410b8`，含 `AiProfileScreen`/`AiProfileViewModel`）。那版实�
 **本轮处置：未删除、未修改任何一行。** 这属于真机上的用户数据，即使是垃圾行也不由我单方面清。
 建议由用户确认后清除，或直接忽略（它们不影响当前功能：`hasKey=false`，徽章如实显示「AI 尚未接通」）。
 
+### 7.6 `AppErrorUiText` 只是标识枚举，没有到中文文案的渲染映射（既有缺口，本轮未扩大）
+
+写 §5 时为了引用「用户看到的文案」去核对，发现 `core/error/AppError.kt` 里的 `AppErrorUiText`
+是一个**只有标识符没有 message 的枚举**（`NetworkUnavailable`、`StorageUnavailable`、
+`InvalidAiConfiguration`…），全仓库**没有**任何 `when`/映射把它转成用户可见文字，`ui/` 下也没有
+引用点。也就是说 `AppError` 这一侧的失败目前**不会自己出现在界面上**。
+
+这不是本轮引入的（`AppError` 属 Stage-0 受保护文件，本轮未改动），也没有在本轮扩大：
+AI 配置界面的错误走的是自己的 `AiProfileFieldError`（字段级）与 `AiProfileListUiState.message`，
+两条都有中文文案且已由真机走查覆盖。**记录在这里是为了不让「已有稳定错误文案」这个印象
+被继续默认下去**——将来接 F2-03 网络层时，`AppError` 与 `AiFailure` 到界面的呈现路径需要一并定下来。
+
 ---
 
 ## 8. Task 6 四项专门取证
@@ -279,7 +305,7 @@ UI 改版 `e9410b8`，含 `AiProfileScreen`/`AiProfileViewModel`）。那版实�
 | 跑全部 F2-02 JVM 测试 + 存储/错误回归 + Room 迁移 instrumentation | JVM 全量 + 真机全量 | 231/0、153/0；迁移由 `AppDatabaseMigrationTest`（9 例）覆盖 |
 | 真机证明「进程重启后 Profile 元数据可读、Room 行与日志中无 Key」 | 重新拉起应用 → 学习 → 设置 → AI 服务与密钥，让列表完整渲染；随后 `adb logcat -d` 全量落盘并做模式扫描；另对 db 副本做 `PRAGMA table_info` + `SELECT *` | 元数据 4 行正常渲染；`secretAlias` 列只有别名文本；logcat 5107 行 / 本应用 140 行，**密钥与鉴权模式零匹配**（`verification-logs/f2-02-logcat-probe.txt`） |
 | 用环回/私网/HTTP 夹具跑 Endpoint 策略，**不允许真实网络请求** | `AiEndpointPolicyTest` 纯函数夹具；本轮无任何 socket | 通过；主源码无 HTTP 客户端接入 |
-| 记录精确计数、设备、APK 校验和、已知的无关失败与排除项 | 本文 §2 §3 §9 | 已记录；**本轮无失败用例** |
+| 记录精确计数、设备、APK 校验和、已知的无关失败与排除项 | 本文 §2（环境/APK）§3（计数）§10（排除项） | 已记录；**本轮无失败用例** |
 
 ---
 
