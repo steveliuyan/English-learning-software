@@ -2,7 +2,7 @@
 
 设备：`M2102J2SC`（MIUI V816 / Android 13，adb serial `bf353dda`）
 分支：`stage-1-f1-05-fsrs-scheduling`
-调试 APK：`app/build/outputs/apk/debug/app-debug.apk`，MD5 `c06fdaeca02fe7643212597fccc2b795`
+调试 APK：`app/build/outputs/apk/debug/app-debug.apk`，MD5 `089d873dbc815d144f6428103c059988`
 
 ## 一、三份导出模板
 
@@ -16,6 +16,8 @@
 | 答案页 | 单栏 `No./Word/Meaning`，题号与题目页一致 | 20 |
 
 共同版式：A4 竖版 595×842 pt、圆角青绿外框、深青底白字表头、浅青交替行底色；**每张表都带闭合外框 + 全格网格**，竖线包含左右外边线，读起来是一张连续的表而不是散落的线。标题左上、`Date：` 右上、`Page-N` 右下。四线三格只作用于拼写测试模板的留空单元格。
+
+**墨色契约（`WorksheetInk`）**：单词近黑加粗（`#111111` / 8 pt）、音标淡灰小字（`#A3ABA8` / 6.6 pt）、释义中灰（`#333333` / 7.5 pt）。单词与音标**分行**绘制（单词在上、音标在下），单元格文本块在行内垂直居中，因此同一行的单词、音标、释义在同一视觉基线上。相对关系由 `WorksheetInkTest` 锁定：单词亮度必须 < 0.05、音标亮度必须 > 0.30，且两者亮度差 > 0.25——以后微调配色不会误报，但把音标调成和单词一样重一定会失败。
 
 只有拼写测试模板消费「中译英 / 英译中」方向；完整词表与艾宾浩斯模板都直接印出单词与释义，选择两个方向也不会把词表重复两遍（`WorksheetSettings.requiresDirection()` + 文档构建器只生成一组）。
 
@@ -32,7 +34,7 @@
 ## 三、测试结果
 
 ```
-:app:testDebugUnitTest        177 tests / 0 failed / 0 skipped
+:app:testDebugUnitTest        179 tests / 0 failed / 0 skipped
 真机 am instrument 全量        92 tests / 0 failed / 0 errors / 0 skipped
 ```
 
@@ -74,14 +76,26 @@ MSYS_NO_PATHCONV=1 adb shell am instrument -w com.example.englishlearning.test/a
 | `06-export-chooser.png` | 系统面板里文件名为 `worksheet-*.pdf`，并出现「Android 系统 打开」入口 |
 | `07-opened-in-viewer.png` | PDF 在小米浏览器阅读器中真实渲染出题目页与答案页 |
 
-## 五、一并修复的既有质量门账目
+## 五、单词与音标的视觉区分，以及第二轮排版整理
+
+用户要求「单词和音标要有明显的区分，比如单词是黑色的音标是淡灰色等等，还有要排好版」。改动：
+
+- 单词与音标**分行**绘制，不再拼成一行同色文字：单词近黑加粗在上、音标淡灰小字在下。
+- 墨色抽成 `WorksheetInk`（`#111111` / `#A3ABA8` / `#333333`），由 `WorksheetInkTest` 锁定「单词必须明显重于音标」的度量关系。
+- 单元格文本块改为在行内**垂直居中**，多行单元格不再贴顶，同一行的单词、音标、释义落在同一视觉基线上。
+- 列宽重排：`FULL_LIST` `[22, 100, 剩余]`、答案页 `[26, 170, 剩余]`、艾宾浩斯正文 `[26, 140, 剩余]`——Word 列要同时容下两行，比 No. 列宽裕；释义列吃剩下的宽度。
+- 修掉两处会错位的旧问题：艾宾浩斯合并表头的列宽原先取 `ANSWER_COLUMNS`，与数据行的 `REVIEW_TEXT_COLUMNS` 不是同一套，`Meaning` 表头与列内容会错开；`ellipsize` 用正文笔测宽却用表头笔画字，算出的可用宽度偏窄导致表头溢出。
+
+真机（M2102J2SC / MIUI V816 / Android 13）复核：`WorksheetInkTest` 2/2 通过（JVM 179 项全绿），真机全量 92 项全绿；三份模板的 A4 位图在 `docs/verification/printable-worksheet/*.png`（本轮重新导出），应用内预览实拍 `ui/08-in-app-preview-ink.png`。跑测试前后 `english-learning.db`（176128 B / 00:33）与 `-wal`、`-shm` 时间戳、大小一致，用户数据未被触碰。
+
+## 六、一并修复的既有质量门账目
 
 本轮开始前全量单元测试有 4 项失败，与本功能无关，已定位并修复：
 
 1. `LogicalSnapshotSecurityTest`（2 项）与 `ProviderContractTest`（1 项）：禁用词表按**子串**匹配，`ExportProfileRecord` 里的 `Profile` 命中 `file`，把普通导出 DTO 误判成存储材料。改为按词边界（含 camelCase 拆分与相邻词拼接）匹配，`java.io.File`、`filePath`、`files`、`apiKey`、`httpUrl` 仍会被命中，检测能力未削弱。
 2. `ThirdPartyNoticesTest`：版本目录中 `androidx-core-splashscreen`、`androidx-lifecycle-viewmodel`、`androidx-hilt-navigation-compose`、`androidx-compose-ui-test-manifest`、`androidx-room-testing` 五个别名缺台账条目，已在 `docs/third-party-notices.md` 补齐。
 
-## 六、边界与未完成项
+## 七、边界与未完成项
 
 - PDF 只生成在 `cacheDir/worksheets/`，经 FileProvider 以 `content://` 只读共享；未新增存储或网络权限。
 - 词条只来自当前不可变今日计划中已提交反馈的卡片，复习词排在新词前。

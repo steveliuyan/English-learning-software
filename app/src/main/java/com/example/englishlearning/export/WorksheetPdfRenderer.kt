@@ -84,9 +84,9 @@ class WorksheetPdfRenderer(
             drawRowCells(
                 canvas, TABLE_LEFT, y, rowHeight,
                 listOf(
-                    answer.number.toString(),
-                    "${answer.lemma}  ${answer.ipa}",
-                    "${answer.partOfSpeech} ${answer.meaningZh}",
+                    Cell.Plain(answer.number.toString()),
+                    Cell.Word(answer.lemma, answer.ipa),
+                    Cell.Plain("${answer.partOfSpeech} ${answer.meaningZh}"),
                 ),
                 ANSWER_COLUMNS,
             )
@@ -107,7 +107,11 @@ class WorksheetPdfRenderer(
                 fillRow(canvas, y, rowHeight, index, left, GROUP_WIDTH)
                 drawRowCells(
                     canvas, left, y, rowHeight,
-                    listOf(row.number.toString(), "${row.lemma} ${row.ipa}", "${row.partOfSpeech} ${row.meaningZh}"),
+                    listOf(
+                        Cell.Plain(row.number.toString()),
+                        Cell.Word(row.lemma, row.ipa),
+                        Cell.Plain("${row.partOfSpeech} ${row.meaningZh}"),
+                    ),
                     FULL_LIST_COLUMNS,
                 )
             }
@@ -131,8 +135,16 @@ class WorksheetPdfRenderer(
             val y = TABLE_TOP + rowHeight * (index + 1)
             fillRow(canvas, y, rowHeight, index, left, GROUP_WIDTH)
             fillRow(canvas, y, rowHeight, index, right, GROUP_WIDTH)
-            drawRowCells(canvas, left, y, rowHeight, listOf(row.number.toString(), "${row.lemma} ${row.ipa}", ""), leftColumns)
-            drawRowCells(canvas, right, y, rowHeight, listOf(row.number.toString(), "", "${row.partOfSpeech} ${row.meaningZh}"), rightColumns)
+            drawRowCells(
+                canvas, left, y, rowHeight,
+                listOf(Cell.Plain(row.number.toString()), Cell.Word(row.lemma, row.ipa), Cell.Plain("")),
+                leftColumns,
+            )
+            drawRowCells(
+                canvas, right, y, rowHeight,
+                listOf(Cell.Plain(row.number.toString()), Cell.Plain(""), Cell.Plain("${row.partOfSpeech} ${row.meaningZh}")),
+                rightColumns,
+            )
             if (useFourLineGrid) {
                 val leftBlankStart = left + SPELLING_NUMBER_WIDTH + promptWidth
                 drawFourLineGrid(canvas, leftBlankStart + 6f, y + rowHeight - 10f, left + GROUP_WIDTH - 6f)
@@ -156,7 +168,11 @@ class WorksheetPdfRenderer(
             fillRow(canvas, y, rowHeight, index)
             drawRowCells(
                 canvas, TABLE_LEFT, y, rowHeight,
-                listOf(row.number.toString(), "${row.lemma} ${row.ipa}", "${row.partOfSpeech} ${row.meaningZh}"),
+                listOf(
+                    Cell.Plain(row.number.toString()),
+                    Cell.Word(row.lemma, row.ipa),
+                    Cell.Plain("${row.partOfSpeech} ${row.meaningZh}"),
+                ),
                 REVIEW_TEXT_COLUMNS,
             )
         }
@@ -188,11 +204,13 @@ class WorksheetPdfRenderer(
             HEADER_CORNER, HEADER_CORNER, headerFillBorder,
         )
         canvas.drawRect(left, TABLE_TOP, left + TABLE_WIDTH, headerBottom, headerFill)
-        drawHeaderCell(canvas, left, TABLE_TOP, rowHeight * EBBINGHAUS_HEADER_ROWS, "No.", ANSWER_COLUMNS[0])
-        drawHeaderCell(canvas, left + ANSWER_COLUMNS[0], TABLE_TOP, rowHeight * EBBINGHAUS_HEADER_ROWS, "Word", ANSWER_COLUMNS[1])
+        // 合并表头的列宽必须与数据行同一套（REVIEW_TEXT_COLUMNS），否则表头与列内容错位。
+        val headerHeight = rowHeight * EBBINGHAUS_HEADER_ROWS
+        drawHeaderCell(canvas, left, TABLE_TOP, headerHeight, "No.", REVIEW_TEXT_COLUMNS[0])
+        drawHeaderCell(canvas, left + REVIEW_TEXT_COLUMNS[0], TABLE_TOP, headerHeight, "Word", REVIEW_TEXT_COLUMNS[1])
         drawHeaderCell(
-            canvas, left + ANSWER_COLUMNS[0] + ANSWER_COLUMNS[1], TABLE_TOP, rowHeight * EBBINGHAUS_HEADER_ROWS,
-            "Meaning", REVIEW_TEXT_WIDTH - ANSWER_COLUMNS[0] - ANSWER_COLUMNS[1],
+            canvas, left + REVIEW_TEXT_COLUMNS[0] + REVIEW_TEXT_COLUMNS[1], TABLE_TOP, headerHeight,
+            "Meaning", REVIEW_TEXT_COLUMNS[2],
         )
         REVIEW_DAYS.forEachIndexed { index, day ->
             val x = left + REVIEW_TEXT_WIDTH + REVIEW_WIDTH * index / REVIEW_DAYS.size
@@ -231,15 +249,73 @@ class WorksheetPdfRenderer(
         canvas.drawText(text, x + width / 2f - header.measureText(text) / 2f, y + height / 2f + 3f, header)
     }
 
-    private fun drawRowCells(canvas: Canvas, left: Float, y: Float, rowHeight: Float, cells: List<String>, columns: FloatArray) {
+    /**
+     * 一行里的一个单元格。`Word` 把单词与音标拆成两种墨：单词近黑加粗、音标淡灰小字，
+     * 两者在纸面上必须一眼可分，而不是连成一串同色文字。
+     */
+    private sealed interface Cell {
+        data class Plain(val text: String) : Cell
+
+        data class Word(val lemma: String, val ipa: String) : Cell
+    }
+
+    private fun drawRowCells(
+        canvas: Canvas,
+        left: Float,
+        y: Float,
+        rowHeight: Float,
+        cells: List<Cell>,
+        columns: FloatArray,
+    ) {
         var x = left
-        cells.forEachIndexed { index, text ->
-            if (text.isNotEmpty()) {
-                drawWrapped(canvas, text, x + 4f, y + 11f, columns[index] - 8f, rowHeight - 6f)
+        cells.forEachIndexed { index, cell ->
+            val width = columns[index] - CELL_INSET_X * 2f
+            when (cell) {
+                is Cell.Plain -> if (cell.text.isNotEmpty()) {
+                    drawCell(
+                        canvas,
+                        x + CELL_INSET_X,
+                        y,
+                        rowHeight,
+                        wrap(cell.text, width, maxLinesFor(rowHeight), body).map { it to body },
+                    )
+                }
+
+                is Cell.Word -> drawCell(
+                    canvas,
+                    x + CELL_INSET_X,
+                    y,
+                    rowHeight,
+                    wordCellLines(cell.lemma, cell.ipa, width, rowHeight),
+                )
             }
             x += columns[index]
         }
     }
+
+    /** 单词在上、音标在下；行高不够时先保证单词完整，音标让位而不是互相挤成一行。 */
+    private fun wordCellLines(lemma: String, ipa: String, width: Float, rowHeight: Float): List<Pair<String, Paint>> {
+        val maxLines = maxLinesFor(rowHeight)
+        val lemmaLines = wrap(lemma, width, maxLines, lemmaInk).map { it to lemmaInk }
+        val remaining = maxLines - lemmaLines.size
+        if (remaining <= 0 || ipa.isBlank()) return lemmaLines
+        return lemmaLines + wrap(ipa, width, remaining, ipaInk).map { it to ipaInk }
+    }
+
+    /** 文本块在行内垂直居中，避免多行单元格贴顶、与相邻列看起来没对齐。 */
+    private fun drawCell(canvas: Canvas, x: Float, y: Float, rowHeight: Float, lines: List<Pair<String, Paint>>) {
+        if (lines.isEmpty()) return
+        val metrics = lines.first().second.fontMetrics
+        val ascent = -metrics.ascent
+        val blockHeight = LINE_HEIGHT * (lines.size - 1) + ascent + metrics.descent
+        var baseline = y + (rowHeight - blockHeight) / 2f + ascent
+        lines.forEach { (text, paint) ->
+            canvas.drawText(text, x, baseline, paint)
+            baseline += LINE_HEIGHT
+        }
+    }
+
+    private fun maxLinesFor(rowHeight: Float): Int = ((rowHeight - 4f) / LINE_HEIGHT).toInt().coerceAtLeast(1)
 
     /** 横向网格：表头行以下逐行画线，最后一行即表格下边框。 */
     private fun strokeRows(
@@ -297,17 +373,13 @@ class WorksheetPdfRenderer(
         canvas.drawLine(left, baseline, right, baseline, cellStroke)
     }
 
-    private fun drawWrapped(canvas: Canvas, text: String, x: Float, y: Float, maxWidth: Float, maxHeight: Float) {
-        val lines = wrap(text, maxWidth, (maxHeight / LINE_HEIGHT).toInt().coerceAtLeast(1))
-        lines.forEachIndexed { index, line -> canvas.drawText(line, x, y + LINE_HEIGHT * index, body) }
-    }
-
-    private fun wrap(text: String, maxWidth: Float, maxLines: Int): List<String> {
+    private fun wrap(text: String, maxWidth: Float, maxLines: Int, paint: Paint): List<String> {
+        if (maxLines <= 0) return emptyList()
         val byWord = mutableListOf<String>()
         var current = StringBuilder()
         text.split(' ').forEach { word ->
             val candidate = if (current.isEmpty()) word else "$current $word"
-            if (body.measureText(candidate) <= maxWidth || current.isEmpty()) {
+            if (paint.measureText(candidate) <= maxWidth || current.isEmpty()) {
                 current = StringBuilder(candidate)
             } else {
                 byWord += current.toString()
@@ -316,19 +388,19 @@ class WorksheetPdfRenderer(
         }
         if (current.isNotEmpty()) byWord += current.toString()
         // 中文释义没有空格，按词切分后仍可能超出列宽，再按字符兜底断行。
-        val lines = byWord.flatMap { line -> breakByCharacter(line, maxWidth) }
+        val lines = byWord.flatMap { line -> breakByCharacter(line, maxWidth, paint) }
         if (lines.isEmpty()) return listOf("")
         val visible = lines.take(maxLines).toMutableList()
         if (lines.size > maxLines) visible[visible.lastIndex] = visible.last().dropLast(1) + "…"
         return visible
     }
 
-    private fun breakByCharacter(line: String, maxWidth: Float): List<String> {
-        if (body.measureText(line) <= maxWidth) return listOf(line)
+    private fun breakByCharacter(line: String, maxWidth: Float, paint: Paint): List<String> {
+        if (paint.measureText(line) <= maxWidth) return listOf(line)
         val chunks = mutableListOf<String>()
         val current = StringBuilder()
         line.forEach { character ->
-            if (current.isNotEmpty() && body.measureText("$current$character") > maxWidth) {
+            if (current.isNotEmpty() && paint.measureText("$current$character") > maxWidth) {
                 chunks += current.toString()
                 current.clear()
             }
@@ -338,10 +410,11 @@ class WorksheetPdfRenderer(
         return chunks
     }
 
+    /** 表头用 `header` 笔绘制，就必须用同一支笔测宽，否则会算出偏窄的可用宽度而溢出单元格。 */
     private fun ellipsize(text: String, maxWidth: Float): String {
-        if (body.measureText(text) <= maxWidth) return text
+        if (header.measureText(text) <= maxWidth) return text
         var result = text
-        while (result.isNotEmpty() && body.measureText("$result…") > maxWidth) result = result.dropLast(1)
+        while (result.isNotEmpty() && header.measureText("$result…") > maxWidth) result = result.dropLast(1)
         return "$result…"
     }
 
@@ -370,7 +443,11 @@ class WorksheetPdfRenderer(
     private val title = textPaint(Color.rgb(14, 80, 65), 13f, bold = true)
     private val meta = textPaint(Color.rgb(78, 117, 106), 8f)
     private val header = textPaint(Color.WHITE, 8f, bold = true)
-    private val body = textPaint(Color.rgb(51, 51, 51), 7.5f)
+    private val body = textPaint(WorksheetInk.BODY, WorksheetInk.BODY_SIZE)
+    /** 单词：近黑加粗，是每一行最重的墨。 */
+    private val lemmaInk = textPaint(WorksheetInk.LEMMA, WorksheetInk.LEMMA_SIZE, bold = true)
+    /** 音标：淡灰小字，明显轻于单词。 */
+    private val ipaInk = textPaint(WorksheetInk.IPA, WorksheetInk.IPA_SIZE)
     private val frame = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.rgb(16, 150, 123)
         style = Paint.Style.STROKE
@@ -416,12 +493,14 @@ class WorksheetPdfRenderer(
         const val REVIEW_TEXT_WIDTH = TABLE_WIDTH - REVIEW_WIDTH
         const val LINE_HEIGHT = 8.4f
         const val MAX_ROW_HEIGHT = 60f
+        const val CELL_INSET_X = 4f
         const val ROWS_PER_COLUMN = 20
         const val SPELLING_NUMBER_WIDTH = 22f
         const val EBBINGHAUS_HEADER_ROWS = 2
         val REVIEW_DAYS = listOf("D1", "D2", "D4", "D7", "D15", "D30", "D60", "D90")
-        val FULL_LIST_COLUMNS = floatArrayOf(24f, 92f, GROUP_WIDTH - 116f)
-        val ANSWER_COLUMNS = floatArrayOf(28f, 190f, TABLE_WIDTH - 218f)
-        val REVIEW_TEXT_COLUMNS = floatArrayOf(28f, 190f, REVIEW_TEXT_WIDTH - 218f)
+        // Word 列要同时容下单词与音标两行，因此比 No. 列宽裕；释义列吃剩下的宽度。
+        val FULL_LIST_COLUMNS = floatArrayOf(22f, 100f, GROUP_WIDTH - 122f)
+        val ANSWER_COLUMNS = floatArrayOf(26f, 170f, TABLE_WIDTH - 196f)
+        val REVIEW_TEXT_COLUMNS = floatArrayOf(26f, 140f, REVIEW_TEXT_WIDTH - 166f)
     }
 }
