@@ -302,6 +302,56 @@
 - 替代方案: Kotlin formatter
 - 商业分发结论: 构建插件不随 APK 分发；可商业使用并保留 MIT 许可证文本
 
+## androidx-core-splashscreen
+- 名称: AndroidX Core SplashScreen
+- 版本: 1.0.1
+- 许可证: Apache-2.0
+- 用途: 启动阶段显示系统 SplashScreen，避免冷启动白屏
+- 数据流: 仅在设备内绘制启动画面，不采集或传输用户数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: 自定义启动主题与窗口背景
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-lifecycle-viewmodel
+- 名称: AndroidX Lifecycle ViewModel KTX
+- 版本: 2.9.0
+- 许可证: Apache-2.0
+- 用途: Compose 界面的 ViewModel 与生命周期作用域
+- 数据流: 仅在设备内保存界面状态，不传输用户数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: Android 平台 ViewModelStore 手写封装
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-hilt-navigation-compose
+- 名称: AndroidX Hilt Navigation Compose
+- 版本: 1.3.0
+- 许可证: Apache-2.0
+- 用途: 在 Compose 界面中注入 Hilt ViewModel
+- 数据流: 仅在设备内完成依赖注入，不传输用户数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: 手动构造 ViewModel 工厂
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-compose-ui-test-manifest
+- 名称: Jetpack Compose UI Test Manifest
+- 版本: 由 androidx-compose-bom 2025.12.00 管理
+- 许可证: Apache-2.0
+- 用途: 为 Compose 测试提供空的测试 Activity 清单
+- 数据流: 仅在测试设备内提供测试宿主 Activity，不处理用户数据或网络数据
+- NOTICE 位置: Android test/debug-only 依赖，不打包进 release APK；本文件
+- 替代方案: 手写测试 Activity 与清单条目
+- 商业分发结论: 测试依赖不随 release APK 分发；保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-room-testing
+- 名称: Room Testing
+- 版本: 2.8.4
+- 许可证: Apache-2.0
+- 用途: 在 JVM 与真机测试中构建内存 Room 数据库
+- 数据流: 仅在测试进程内创建内存数据库，不读取真实用户数据、不联网
+- NOTICE 位置: Android test/debug-only 依赖，不打包进 release APK；本文件
+- 替代方案: 直接使用 SQLite 内存数据库做夹具
+- 商业分发结论: 测试依赖不随 release APK 分发；保留 Apache-2.0 许可证与 NOTICE
+
 ## app-authored-placeholder-word-cards
 - 名称: 应用自撰占位词卡内容（F1-03 词卡与反馈）
 - 版本: v1 占位（实现位于 `app/src/main/java/com/example/englishlearning/learning/PlaceholderWordCardSource.kt`）

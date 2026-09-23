@@ -75,13 +75,13 @@ class ProviderContractTest {
             type.arguments.mapNotNull { it.type }.forEach(::inspect)
             val classifier = type.classifier as? KClass<*> ?: return
             assertTrue(
-                forbiddenTokens.none { token -> classifier.qualifiedName.orEmpty().contains(token, ignoreCase = true) },
+                !refersToForbidden(classifier.qualifiedName.orEmpty(), forbiddenTokens),
                 "Public contract type ${classifier.qualifiedName} must not expose forbidden material",
             )
             if (!inspectedClasses.add(classifier)) return
             classifier.memberProperties.forEach { property ->
                 assertTrue(
-                    forbiddenTokens.none { token -> property.name.contains(token, ignoreCase = true) },
+                    !refersToForbidden(property.name, forbiddenTokens),
                     "Public contract property ${classifier.qualifiedName}.${property.name} must not expose forbidden material",
                 )
                 inspect(property.returnType)
@@ -89,6 +89,22 @@ class ProviderContractTest {
         }
 
         inspect(root)
+    }
+
+    /**
+     * 按词边界而不是子串判定禁用材料，避免 `ExportProfileRecord` 里的 `Profile`
+     * 命中 `file` 这类误报；`java.io.File`、`filePath`、`files`、`apiKey`、`httpUrl` 仍会被命中。
+     */
+    private fun refersToForbidden(name: String, forbidden: List<String>): Boolean {
+        val words = name
+            .split('.', '_', '-', ' ')
+            .flatMap { part -> part.split(Regex("(?<=[a-z0-9])(?=[A-Z])")) }
+            .map { it.lowercase() }
+            .filter { it.isNotEmpty() }
+        val candidates = words + words.zipWithNext { first, second -> first + second }
+        return forbidden.any { token ->
+            candidates.any { candidate -> candidate.startsWith(token.lowercase()) }
+        }
     }
 
     private companion object {
