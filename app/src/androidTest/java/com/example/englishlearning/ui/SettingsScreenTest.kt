@@ -24,6 +24,8 @@ class SettingsScreenTest {
         todayDueTarget: Int? = 3,
         onOpenSetup: () -> Unit = {},
         onOpenWorksheet: () -> Unit = {},
+        onOpenAiProfiles: () -> Unit = {},
+        aiProfileSubtitle: String? = null,
     ) {
         composeRule.setContent {
             SettingsScreen(
@@ -33,6 +35,8 @@ class SettingsScreenTest {
                 todayDueTarget = todayDueTarget,
                 onOpenSetup = onOpenSetup,
                 onOpenWorksheet = onOpenWorksheet,
+                onOpenAiProfiles = onOpenAiProfiles,
+                aiProfileSubtitle = aiProfileSubtitle,
             )
         }
     }
@@ -99,13 +103,33 @@ class SettingsScreenTest {
         setScreen()
         listOf(
             "settings_pending_reading",
-            "settings_pending_ai",
             "settings_pending_profile",
             "settings_pending_backup",
         ).forEach { tag ->
             composeRule.onNodeWithTag(tag).performScrollTo().assertExists().assertHasNoClickAction()
         }
-        composeRule.onNodeWithText("后续版本：需要先接通 AI 网关，再支持多套配置与测试连接").assertExists()
+    }
+
+    /** AI 服务配置已经是真能力（F2-02），这里锁住它不再是「后续版本」占位。 */
+    @Test fun ai_profiles_entry_is_clickable_and_reports_its_callback() {
+        var opened = 0
+        setScreen(onOpenAiProfiles = { opened++ })
+
+        composeRule.onNodeWithTag("settings_open_ai_profiles").performScrollTo().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(1, opened)
+        composeRule.onNodeWithTag("settings_pending_ai").assertDoesNotExist()
+    }
+
+    @Test fun ai_profiles_entry_reports_the_real_summary_when_it_has_one() {
+        setScreen(aiProfileSubtitle = "已配置 2 套 · 1 套已设置密钥")
+        composeRule.onNodeWithText("已配置 2 套 · 1 套已设置密钥").assertExists()
+    }
+
+    @Test fun ai_profiles_entry_admits_when_there_is_nothing_configured() {
+        setScreen(aiProfileSubtitle = "尚未添加，点这里添加第一套 OpenAI 兼容服务")
+        composeRule.onNodeWithText("尚未添加，点这里添加第一套 OpenAI 兼容服务").assertExists()
     }
 }
 

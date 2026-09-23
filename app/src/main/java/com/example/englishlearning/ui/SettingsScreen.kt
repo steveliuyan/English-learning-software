@@ -53,6 +53,9 @@ fun SettingsScreen(
     todayDueTarget: Int?,
     onOpenSetup: () -> Unit,
     onOpenWorksheet: () -> Unit,
+    onOpenAiProfiles: () -> Unit,
+    /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
+    aiProfileSubtitle: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -117,10 +120,11 @@ fun SettingsScreen(
         }
 
         SettingsGroup(title = "AI", tag = "settings_group_ai") {
-            SettingsPendingRow(
+            SettingsActionRow(
                 title = "AI 服务与密钥",
-                subtitle = "后续版本：需要先接通 AI 网关，再支持多套配置与测试连接",
-                tag = "settings_pending_ai",
+                subtitle = aiProfileSubtitle ?: "添加多套 OpenAI 兼容服务，管理 Endpoint、模型与密钥",
+                tag = "settings_open_ai_profiles",
+                onClick = onOpenAiProfiles,
             )
         }
 

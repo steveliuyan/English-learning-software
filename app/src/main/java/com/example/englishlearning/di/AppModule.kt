@@ -4,6 +4,10 @@ import android.content.Context
 import com.example.englishlearning.export.WorksheetPdfRenderer
 import com.example.englishlearning.export.WorksheetPdfWriter
 import androidx.room.Room
+import com.example.englishlearning.ai.AiProfileIdFactory
+import com.example.englishlearning.ai.AiProfileRepository
+import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.RoomAiProfileRepository
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.security.AndroidKeyStoreSecretStore
 import com.example.englishlearning.core.security.SecretStore
@@ -87,4 +91,7 @@ object AppModule {
     @Provides fun provideTodayPlanUseCase(learning: LearningProfileRepository, plans: TodayPlanRepository, cards: PlanCardSource, clock: ClockProvider): GetOrCreateTodayPlanUseCase = GetOrCreateTodayPlanUseCase(learning, plans, cards, clock)
     @Provides fun provideTodayPlanUseCaseContract(useCase: GetOrCreateTodayPlanUseCase): TodayPlanUseCaseContract = TodayPlanUseCaseContract { profileId -> useCase(profileId) }
     @Provides @Singleton fun provideReadingPreferenceRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): ReadingPreferenceRepository = RoomReadingPreferenceRepository(database, dispatcher)
+    @Provides @Singleton fun provideAiProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): AiProfileRepository = RoomAiProfileRepository(database, dispatcher)
+    @Provides fun provideAiProfileSecretUseCase(secretStore: SecretStore): AiProfileSecretUseCase = AiProfileSecretUseCase(secretStore)
+    @Provides @Singleton fun provideAiProfileIdFactory(): AiProfileIdFactory = AiProfileIdFactory.Random
 }

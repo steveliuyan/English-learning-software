@@ -152,10 +152,10 @@ fun AiFeatureScreen(
                         .fillMaxWidth()
                         .height(48.dp)
                         .testTag("ai_feature_open_settings")
-                        .semantics { contentDescription = "去设置里配置 AI" },
+                        .semantics { contentDescription = "去配置 AI 服务" },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
-                ) { Text("去设置里配置 AI", fontWeight = FontWeight.Bold) }
+                ) { Text("去配置 AI 服务", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenLearning,
                     modifier = Modifier

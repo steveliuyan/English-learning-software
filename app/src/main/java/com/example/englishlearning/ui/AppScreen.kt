@@ -86,6 +86,7 @@ fun AppScreen(
     wordCardViewModel: WordCardViewModel,
     worksheetViewModel: WorksheetViewModel? = null,
     readingAccessViewModel: ReadingAccessViewModel? = null,
+    aiProfileViewModel: AiProfileSettingsViewModel? = null,
 ) {
     var name by remember { mutableStateOf("") }
     when (val state = viewModel.uiState.collectAsState().value) {
@@ -104,8 +105,14 @@ fun AppScreen(
             var showWorksheetPreview by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 选中的 AI 功能存 key 而不是枚举实例：String 进 Bundle 最省心，将来加功能也不用改存法。
             var selectedFeatureKey by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
+            var showAiProfiles by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             val selectedFeature = AiFeature.entries.firstOrNull { it.key == selectedFeatureKey }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
+            // AI 配置是设备级的（与学习者无关），启动时读一次，好让「设置」栏的摘要和「AI 学」页
+            // 的徽章说的是本机真实状态，而不是写死的假设。
+            LaunchedEffect(state.profile.id) { aiProfileViewModel?.load() }
+            val aiProfiles = aiProfileViewModel?.listState?.collectAsState()?.value as? AiProfileListUiState.Ready
+            val aiConfigured = aiProfiles?.items?.any { it.hasKey } == true
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val todayReady = todayState as? TodayPlanUiState.Ready
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
@@ -136,7 +143,7 @@ fun AppScreen(
                 todayPlanViewModel.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -152,6 +159,9 @@ fun AppScreen(
                 worksheetViewModel?.dismissPreview()
                 showWorksheetPreview = false
             }
+            // 这一层内部还有「列表 / 编辑」两态，编辑态会自己再声明一条更靠后的 BackHandler，
+            // 因此从编辑页按返回键先关编辑页，而不是直接退掉整层。
+            BackHandler(enabled = showAiProfiles) { showAiProfiles = false }
             BackHandler(enabled = selectedFeature != null) { selectedFeatureKey = null }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
@@ -235,6 +245,20 @@ fun AppScreen(
                     },
                     onBack = { showWorksheetSettings = false },
                 )
+            } else if (showAiProfiles) {
+                val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
+                AiProfileSettingsScreen(
+                    listState = aiProfiles ?: AiProfileListUiState.Loading,
+                    editor = editor,
+                    onAdd = { aiProfileViewModel?.startCreate() },
+                    onEdit = { aiProfileViewModel?.startEdit(it) },
+                    onDraftChange = { aiProfileViewModel?.updateDraft(it) },
+                    onSave = { aiProfileViewModel?.save() },
+                    onCloseEditor = { aiProfileViewModel?.closeEditor() },
+                    onDeleteProfile = { aiProfileViewModel?.deleteProfile(it) },
+                    onDeleteKey = { aiProfileViewModel?.deleteKey(it) },
+                    onBack = { showAiProfiles = false },
+                )
             } else if (selectedFeature != null) {
                 AiFeatureScreen(
                     feature = selectedFeature,
@@ -243,7 +267,14 @@ fun AppScreen(
                     onBack = { selectedFeatureKey = null },
                     onOpenSettings = {
                         selectedFeatureKey = null
-                        selectedTab = AppTab.SETTINGS
+                        // 配置页真的存在了，就直接送过去；少了这个 ViewModel 时（预览/测试夹具）
+                        // 退回「设置」栏，不假装能直达。
+                        aiProfileViewModel?.load()
+                        if (aiProfileViewModel != null) {
+                            showAiProfiles = true
+                        } else {
+                            selectedTab = AppTab.SETTINGS
+                        }
                     },
                     onOpenLearning = {
                         selectedFeatureKey = null
@@ -283,10 +314,8 @@ fun AppScreen(
                             AppTab.AI -> AiLearningScreen(
                                 todayWordCount = todayReady?.newTarget,
                                 dueWordCount = todayReady?.dueTarget,
-                                // AI 网关（F2-03）尚未实现，应用里也没有任何创建 AI 配置的界面，
-                                // 所以这里恒为 false。F2-02 的配置界面落地后，这里必须改成读
-                                // AiProfileRepository 的真实结果，否则徽章会撒谎。
-                                aiConfigured = false,
+                                // 读的是本机真实配置：至少有一套配置设了密钥才算「已配置」。
+                                aiConfigured = aiConfigured,
                                 onOpenFeature = { selectedFeatureKey = it.key },
                                 onOpenWordList = { selectedTab = AppTab.LEARNING },
                             )
@@ -299,6 +328,17 @@ fun AppScreen(
                                 onOpenWorksheet = {
                                     worksheetViewModel?.load(state.profile.id)
                                     showWorksheetSettings = worksheetViewModel != null
+                                },
+                                onOpenAiProfiles = {
+                                    aiProfileViewModel?.load()
+                                    showAiProfiles = aiProfileViewModel != null
+                                },
+                                aiProfileSubtitle = aiProfiles?.let { ready ->
+                                    if (ready.items.isEmpty()) {
+                                        "尚未添加，点这里添加第一套 OpenAI 兼容服务"
+                                    } else {
+                                        "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                                    }
                                 },
                             )
                         }

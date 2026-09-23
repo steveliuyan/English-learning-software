@@ -117,7 +117,7 @@ class AiFeatureScreenTest {
     @Test fun every_action_is_reachable_by_its_content_description() {
         setScreen()
         composeRule.onNodeWithContentDescription("返回 AI 学").assertExists()
-        composeRule.onNodeWithContentDescription("去设置里配置 AI").performScrollTo().assertExists()
+        composeRule.onNodeWithContentDescription("去配置 AI 服务").performScrollTo().assertExists()
         composeRule.onNodeWithContentDescription("回到今日学习").performScrollTo().assertExists()
     }
 

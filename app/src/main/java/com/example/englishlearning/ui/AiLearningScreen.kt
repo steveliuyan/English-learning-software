@@ -59,7 +59,8 @@ private val AiHeaderGradient = Brush.linearGradient(listOf(AppleMintStart, Apple
  *
  * @param todayWordCount 今日计划的新词数，`null` 表示今日计划还不可读。
  * @param dueWordCount 今日计划的待复习词数，`null` 同上。
- * @param aiConfigured 是否已有可用的 AI 配置。当前恒为 `false`，因为 AI 网关尚未接通。
+ * @param aiConfigured 是否已有可用的 AI 配置。取自本机真实的 AI Profile：至少有一套配了密钥才为真。
+ *   AI 调用本身（F2-03 网络客户端）仍未接通，所以这一个徽章只描述「配置」状态，不承诺「能生成」。
  * @param onOpenFeature 点开某个功能页。
  * @param onOpenWordList 点「查看词表」的详情，跳去看得到真实词表的地方。
  */
