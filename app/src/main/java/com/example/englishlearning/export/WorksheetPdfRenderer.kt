@@ -9,24 +9,26 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import com.example.englishlearning.learning.worksheet.WorksheetPage
-import com.example.englishlearning.learning.worksheet.WorksheetQuestionRow
 import com.example.englishlearning.learning.worksheet.WorksheetTemplate
 import java.io.File
 import java.io.FileOutputStream
-
-data class RenderedWorksheet(
-    val file: File,
-    val pageCount: Int,
-)
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
- * 按参考模板绘制 A4 默写纸：圆角青绿外框、深青表头、浅青交替行底、右下 Page-N。
+ * 按参考模板绘制 A4 默写纸：圆角青绿外框、深青底白字表头、浅青交替行底、完整单元格网格。
  *
- * 行高由可用高度动态推导，保证最后一行不会与页脚重叠。
+ * 版式约定：
+ * - 每一张表都带完整外框与全格网格，表头、数据行、艾宾浩斯的 Review 列读起来是一张连续的表。
+ * - 行高由模板容量推导（满页恰好铺满），词条不足时保持同一行高并在最后一行收尾。
  */
 class WorksheetPdfRenderer(
     private val context: Context,
-) {
+) : WorksheetPdfWriter {
+    /** 端口实现：把阻塞的 PDF 写入放到 IO 线程，调用方（ViewModel）只负责在自己的作用域等待。 */
+    override suspend fun write(pages: List<WorksheetPage>, useFourLineGrid: Boolean): Result<RenderedWorksheet> =
+        withContext(Dispatchers.IO) { render(pages, useFourLineGrid) }
+
     fun render(pages: List<WorksheetPage>, useFourLineGrid: Boolean): Result<RenderedWorksheet> = runCatching {
         require(pages.isNotEmpty())
         val exportDirectory = File(context.cacheDir, EXPORT_DIRECTORY).apply { mkdirs() }
@@ -79,12 +81,15 @@ class WorksheetPdfRenderer(
         page.answers.take(visibleRows).forEachIndexed { index, answer ->
             val y = TABLE_TOP + rowHeight * (index + 1)
             fillRow(canvas, y, rowHeight, index)
-            val cells = listOf(
-                answer.number.toString(),
-                "${answer.lemma}  ${answer.ipa}",
-                "${answer.partOfSpeech} ${answer.meaningZh}",
+            drawRowCells(
+                canvas, TABLE_LEFT, y, rowHeight,
+                listOf(
+                    answer.number.toString(),
+                    "${answer.lemma}  ${answer.ipa}",
+                    "${answer.partOfSpeech} ${answer.meaningZh}",
+                ),
+                ANSWER_COLUMNS,
             )
-            drawRowCells(canvas, TABLE_LEFT, y, rowHeight, cells, ANSWER_COLUMNS)
         }
         drawTableGrid(canvas, visibleRows, rowHeight, TABLE_LEFT, TABLE_WIDTH, ANSWER_COLUMNS)
     }
@@ -142,32 +147,47 @@ class WorksheetPdfRenderer(
     private fun drawEbbinghaus(canvas: Canvas, page: WorksheetPage) {
         val visibleRows = minOf(page.questionRows.size, ROWS_PER_COLUMN)
         val rowHeight = rowHeightForTemplateRows(headerRows = EBBINGHAUS_HEADER_ROWS)
+        val dataTop = TABLE_TOP + rowHeight * EBBINGHAUS_HEADER_ROWS
+        val bottom = dataTop + rowHeight * visibleRows
+
         drawReviewHeader(canvas, rowHeight)
         page.questionRows.take(visibleRows).forEachIndexed { index, row ->
-            val y = TABLE_TOP + rowHeight * (index + EBBINGHAUS_HEADER_ROWS)
+            val y = dataTop + rowHeight * index
             fillRow(canvas, y, rowHeight, index)
             drawRowCells(
                 canvas, TABLE_LEFT, y, rowHeight,
                 listOf(row.number.toString(), "${row.lemma} ${row.ipa}", "${row.partOfSpeech} ${row.meaningZh}"),
                 REVIEW_TEXT_COLUMNS,
             )
-            drawReviewBoxes(canvas, y, rowHeight)
         }
-        strokeRows(canvas, visibleRows, rowHeight, TABLE_LEFT, REVIEW_TEXT_WIDTH, headerRows = EBBINGHAUS_HEADER_ROWS)
-        val dataTop = TABLE_TOP + rowHeight * EBBINGHAUS_HEADER_ROWS
-        val dataBottom = dataTop + rowHeight * visibleRows
-        strokeColumns(canvas, TABLE_LEFT, dataTop, dataBottom, REVIEW_TEXT_COLUMNS)
-        strokeReviewBoxes(canvas, visibleRows, rowHeight)
+
+        // 整表横向网格：数据行逐行画线，最后一行成为表格下边框。
+        strokeRows(canvas, visibleRows, rowHeight, TABLE_LEFT, TABLE_WIDTH, headerRows = EBBINGHAUS_HEADER_ROWS)
+        // 表头第二行只在 Review 列分格（左侧三列是跨两行的合并表头）。
+        canvas.drawLine(
+            TABLE_LEFT + REVIEW_TEXT_WIDTH, TABLE_TOP + rowHeight,
+            TABLE_LEFT + TABLE_WIDTH, TABLE_TOP + rowHeight, cellStroke,
+        )
+        // Review 列：表头第二行起到底边的竖向分隔，与数据行对齐成一张打卡表。
+        for (index in 0..REVIEW_DAYS.size) {
+            val x = TABLE_LEFT + REVIEW_TEXT_WIDTH + REVIEW_WIDTH * index / REVIEW_DAYS.size
+            canvas.drawLine(x, TABLE_TOP + rowHeight, x, bottom, cellStroke)
+        }
+        strokeColumns(canvas, TABLE_LEFT, TABLE_TOP, bottom, REVIEW_TEXT_COLUMNS)
+        canvas.drawRoundRect(
+            RectF(TABLE_LEFT, TABLE_TOP, TABLE_LEFT + TABLE_WIDTH, bottom),
+            HEADER_CORNER, HEADER_CORNER, tableFrame,
+        )
     }
 
     private fun drawReviewHeader(canvas: Canvas, rowHeight: Float) {
         val left = TABLE_LEFT
         val headerBottom = TABLE_TOP + rowHeight * EBBINGHAUS_HEADER_ROWS
-        canvas.drawRect(left, TABLE_TOP, left + TABLE_WIDTH, headerBottom, headerFill)
         canvas.drawRoundRect(
             RectF(left, TABLE_TOP, left + TABLE_WIDTH, headerBottom),
             HEADER_CORNER, HEADER_CORNER, headerFillBorder,
         )
+        canvas.drawRect(left, TABLE_TOP, left + TABLE_WIDTH, headerBottom, headerFill)
         drawHeaderCell(canvas, left, TABLE_TOP, rowHeight * EBBINGHAUS_HEADER_ROWS, "No.", ANSWER_COLUMNS[0])
         drawHeaderCell(canvas, left + ANSWER_COLUMNS[0], TABLE_TOP, rowHeight * EBBINGHAUS_HEADER_ROWS, "Word", ANSWER_COLUMNS[1])
         drawHeaderCell(
@@ -180,28 +200,6 @@ class WorksheetPdfRenderer(
             drawCenteredHeader(canvas, x, TABLE_TOP + rowHeight, w, rowHeight, day)
         }
         drawCenteredHeader(canvas, left + REVIEW_TEXT_WIDTH, TABLE_TOP, REVIEW_WIDTH, rowHeight, "Review")
-        strokeColumns(canvas, left, TABLE_TOP, headerBottom, REVIEW_TEXT_COLUMNS)
-    }
-
-    private fun drawReviewBoxes(canvas: Canvas, y: Float, rowHeight: Float) {
-        val left = TABLE_LEFT + REVIEW_TEXT_WIDTH
-        val cellWidth = REVIEW_WIDTH / REVIEW_DAYS.size
-        REVIEW_DAYS.indices.forEach { index ->
-            canvas.drawRect(left + cellWidth * index, y, left + cellWidth * (index + 1), y + rowHeight, cellStroke)
-        }
-    }
-
-    private fun strokeReviewBoxes(canvas: Canvas, rows: Int, rowHeight: Float) {
-        val left = TABLE_LEFT + REVIEW_TEXT_WIDTH
-        val top = TABLE_TOP + rowHeight * EBBINGHAUS_HEADER_ROWS
-        REVIEW_DAYS.indices.forEach { index ->
-            val x = left + REVIEW_WIDTH * index / REVIEW_DAYS.size
-            canvas.drawLine(x, top, x, top + rowHeight * rows, cellStroke)
-        }
-        for (index in 0..rows) {
-            val y = top + rowHeight * index
-            canvas.drawLine(left, y, left + REVIEW_WIDTH, y, cellStroke)
-        }
     }
 
     private fun drawHeaderRow(
@@ -243,6 +241,7 @@ class WorksheetPdfRenderer(
         }
     }
 
+    /** 横向网格：表头行以下逐行画线，最后一行即表格下边框。 */
     private fun strokeRows(
         canvas: Canvas,
         rows: Int,
@@ -258,12 +257,33 @@ class WorksheetPdfRenderer(
         }
     }
 
+    /** 竖向网格：包含表格左右外边线，保证与上下边框闭合。 */
     private fun strokeColumns(canvas: Canvas, left: Float, top: Float, bottom: Float, columns: FloatArray) {
         var x = left
-        columns.dropLast(1).forEach { width ->
+        canvas.drawLine(x, top, x, bottom, cellStroke)
+        columns.forEach { width ->
             x += width
             canvas.drawLine(x, top, x, bottom, cellStroke)
         }
+    }
+
+    /** 一张表的完整网格：横竖线 + 闭合外框，让它读起来像一张真表。 */
+    private fun drawTableGrid(
+        canvas: Canvas,
+        rows: Int,
+        rowHeight: Float,
+        left: Float,
+        width: Float,
+        columns: FloatArray,
+        headerRows: Int = 1,
+    ) {
+        val bottom = TABLE_TOP + rowHeight * (rows + headerRows)
+        strokeRows(canvas, rows, rowHeight, left, width, headerRows)
+        strokeColumns(canvas, left, TABLE_TOP, bottom, columns)
+        canvas.drawRoundRect(
+            RectF(left, TABLE_TOP, left + width, bottom),
+            HEADER_CORNER, HEADER_CORNER, tableFrame,
+        )
     }
 
     private fun fillRow(canvas: Canvas, y: Float, rowHeight: Float, index: Int, left: Float = TABLE_LEFT, width: Float = TABLE_WIDTH) {
@@ -334,22 +354,6 @@ class WorksheetPdfRenderer(
         return (available / (ROWS_PER_COLUMN + headerRows)).coerceAtMost(MAX_ROW_HEIGHT)
     }
 
-    /**
-     * 画一张表的横竖网格：表头与数据行都覆盖，末行成为表格下边框。
-     */
-    private fun drawTableGrid(
-        canvas: Canvas,
-        rows: Int,
-        rowHeight: Float,
-        left: Float,
-        width: Float,
-        columns: FloatArray,
-        headerRows: Int = 1,
-    ) {
-        strokeRows(canvas, rows, rowHeight, left, width, headerRows)
-        strokeColumns(canvas, left, TABLE_TOP, TABLE_TOP + rowHeight * (rows + headerRows), columns)
-    }
-
     private fun titleFor(page: WorksheetPage): String = when {
         page.answers.isNotEmpty() -> "我的词表 · 答案"
         page.template == WorksheetTemplate.FULL_LIST -> "我的词表"
@@ -376,8 +380,13 @@ class WorksheetPdfRenderer(
     private val headerFillBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(20, 150, 122) }
     private val alternateFill = Paint().apply { color = Color.rgb(234, 248, 243) }
     private val cellStroke = Paint().apply {
-        color = Color.rgb(173, 231, 210)
+        color = Color.rgb(150, 220, 197)
         strokeWidth = 0.8f
+    }
+    private val tableFrame = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(126, 205, 180)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.1f
     }
     private val guideStroke = Paint().apply {
         color = Color.rgb(190, 65, 65)
@@ -407,9 +416,9 @@ class WorksheetPdfRenderer(
         const val REVIEW_TEXT_WIDTH = TABLE_WIDTH - REVIEW_WIDTH
         const val LINE_HEIGHT = 8.4f
         const val MAX_ROW_HEIGHT = 60f
+        const val ROWS_PER_COLUMN = 20
         const val SPELLING_NUMBER_WIDTH = 22f
         const val EBBINGHAUS_HEADER_ROWS = 2
-        const val ROWS_PER_COLUMN = 20
         val REVIEW_DAYS = listOf("D1", "D2", "D4", "D7", "D15", "D30", "D60", "D90")
         val FULL_LIST_COLUMNS = floatArrayOf(24f, 92f, GROUP_WIDTH - 116f)
         val ANSWER_COLUMNS = floatArrayOf(28f, 190f, TABLE_WIDTH - 218f)

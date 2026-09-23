@@ -2,6 +2,7 @@ package com.example.englishlearning.di
 
 import android.content.Context
 import com.example.englishlearning.export.WorksheetPdfRenderer
+import com.example.englishlearning.export.WorksheetPdfWriter
 import androidx.room.Room
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.security.AndroidKeyStoreSecretStore
@@ -82,7 +83,7 @@ object AppModule {
     @Provides fun provideBuildWorksheetContentUseCase(plans: TodayPlanRepository, events: LearningEventRepository, content: WordCardSource): BuildWorksheetContentUseCase = BuildWorksheetContentUseCase(plans, events, content)
     @Provides fun provideWorksheetDocumentBuilder(): WorksheetDocumentBuilder = WorksheetDocumentBuilder()
     @Provides fun provideWorksheetPaginator(): WorksheetPaginator = WorksheetPaginator()
-    @Provides fun provideWorksheetPdfRenderer(@ApplicationContext context: Context): WorksheetPdfRenderer = WorksheetPdfRenderer(context)
+    @Provides fun provideWorksheetPdfWriter(@ApplicationContext context: Context): WorksheetPdfWriter = WorksheetPdfRenderer(context)
     @Provides fun provideTodayPlanUseCase(learning: LearningProfileRepository, plans: TodayPlanRepository, cards: PlanCardSource, clock: ClockProvider): GetOrCreateTodayPlanUseCase = GetOrCreateTodayPlanUseCase(learning, plans, cards, clock)
     @Provides fun provideTodayPlanUseCaseContract(useCase: GetOrCreateTodayPlanUseCase): TodayPlanUseCaseContract = TodayPlanUseCaseContract { profileId -> useCase(profileId) }
     @Provides @Singleton fun provideReadingPreferenceRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): ReadingPreferenceRepository = RoomReadingPreferenceRepository(database, dispatcher)

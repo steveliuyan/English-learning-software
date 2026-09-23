@@ -467,12 +467,40 @@ Run:
 ```
 Expected: PASS — 14 worksheet domain tests, plus per-template rendering and the template picker on a real Android 13 device.
 
-- [ ] **Step 7: Device-check all three templates and commit**
+- [x] **Step 7: Device-check all three templates and commit**
 
-Export each template on device `bf353dda`, screenshot the settings page, the per-template preview and the generated PDF page, then commit the template change separately from the Task 5 documentation commit.
+Export each template on device `bf353dda`, screenshot the settings page, the per-template preview and the generated PDF page, then commit the template change separately from the Task 5 documentation commit. The device round-trip that followed exposed four further defects — see Task 7.
+
+### Task 7: Fix the preview/export round-trip the user hit on device (change request)
+
+User report: previews of the three templates all looked identical and were not PDFs, export produced a file that would not open, and after tapping "返回修改" the template picker was stuck on 拼写测试. All three symptoms shared one root cause: `WorksheetViewModel.updateSettings()` and `preview()` both required the state to be `Ready`, but `preview()` moved the state to `Preview` and never moved it back, so every later settings change was silently dropped.
+
+- [x] **Step 1: Write failing tests for the state machine**
+
+`WorksheetViewModelTest` (JVM) covers: template and switches stay editable after returning from preview; each preview rebuilds pages from the currently selected template; the full list needs no dictation direction; the spelling test without a direction stays on settings with a readable reason; export shares the rendered file and clears the request once consumed. Ports (`BuildWorksheetContentUseCase`, `TodayPlanRepository`, `LearningEventRepository`, `WordCardSource`, `WorksheetPdfWriter`) are faked and driven with `StandardTestDispatcher` + `Dispatchers.setMain`.
+
+- [x] **Step 2: Replace the state hierarchy with a single phase plus shared settings**
+
+`WorksheetUiState(phase, source, settings, pages, renderedFile, rendering, message)` with `WorksheetPhase { IDLE, LOADING, SETTINGS, PREVIEW, ERROR }`. `settings` is mutable in every phase, `dismissPreview()` only rolls the phase back, and `preview()` may be called repeatedly and repaginates each time. Render jobs carry a monotonically increasing `renderGeneration`; a stale result is deleted instead of published.
+
+- [x] **Step 3: Make the preview show the real PDF**
+
+`WorksheetPdfWriter` becomes a suspend port so the JVM state machine is deterministically testable; `WorksheetPdfRenderer` implements it (still exposing the non-suspend `render(...)` the Android tests use). `WorksheetPreviewScreen` replaces the hand-drawn text approximation with `produceState { WorksheetPreviewRenderer(context).render(renderedFile, 1000) }` mapped to `ImageBitmap`s, so preview and export are literally the same file.
+
+- [x] **Step 4: Fix the export that would not open**
+
+`WorksheetShareLauncher` derives the authority from `context.packageName` (equivalent to `${applicationId}.worksheetfiles`), offers `ACTION_VIEW` alongside `ACTION_SEND` through `EXTRA_INITIAL_INTENTS`, and repeats `clipData` + `FLAG_GRANT_READ_URI_PERMISSION` on the chooser itself. A failed launch now reports a readable reason instead of failing silently.
+
+- [x] **Step 5: Make all three templates read as one connected table**
+
+Every table now gets a closed outer frame plus a full cell grid (`strokeColumns` also strokes the left and right outer edges); `EBBINGHAUS_REVIEW` uses one full-width grid with a merged `No./Word/Meaning` header spanning two rows and `D1…D90` on the second header row only. Row height is derived from the template capacity (`ROWS_PER_COLUMN = 20` plus header rows), never from the rows present on the page — deriving it from actual rows stretched the header into a 60pt block. Chinese meanings wrap by character when a single word exceeds the column width.
+
+- [ ] **Step 6: Re-run the JVM and device suites and commit**
+
+Run the JVM suite and the targeted device suite, pull the three per-template bitmap pages back with `MSYS_NO_PATHCONV=1 adb pull`, and confirm each one reads as a connected table before committing.
 
 ## Plan Self-Review
 
-- Spec coverage: Tasks 1–2 implement safe source selection, both directions, answers and shared pagination; Task 3 implements local PDF, preview, FileProvider and system sharing; Task 4 implements tool/settings/preview UX and bridge navigation; Task 5 enforces preview-first end-to-end validation and documentation; Task 6 aligns the export with the user-supplied reference templates and makes pagination template-driven.
+- Spec coverage: Tasks 1–2 implement safe source selection, both directions, answers and shared pagination; Task 3 implements local PDF, preview, FileProvider and system sharing; Task 4 implements tool/settings/preview UX and bridge navigation; Task 5 enforces preview-first end-to-end validation and documentation; Task 6 aligns the export with the user-supplied reference templates and makes pagination template-driven; Task 7 fixes the preview/export/edit round-trip reported on device.
 - Placeholder scan: no TBD/TODO or implicit error-handling steps remain; typed failures, cleanup and exact security behavior are specified.
 - Type consistency: `WorksheetSource`, `WorksheetItem`, `WorksheetTemplate`, `WorksheetSettings`, `WorksheetDirection`, paginated `WorksheetPage`, `WorksheetQuestionRow`, `RenderedWorksheet`, and ViewModel effects are introduced in dependency order and used consistently.

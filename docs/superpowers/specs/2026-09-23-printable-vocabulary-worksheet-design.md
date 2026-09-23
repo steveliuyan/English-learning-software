@@ -27,8 +27,8 @@
 2. 用户选择“导出单词表”或“生成默写纸”。
 3. 系统读取当前学习日不可变计划、已保存的学习事件和本地词卡内容；只有成功提交反馈的词才属于“今天已学习”。
 4. 用户选择导出模板、词条范围、（拼写测试模板下的）默写方向、是否使用四线三格和是否添加答案页。
-5. 点击“预览默写纸”。系统生成内存中的文档模型和应用私有 PDF，显示页数及逐页预览。
-6. 用户可返回设置重新生成，或在预览页点击“导出/分享 PDF”。系统使用 Android Sharesheet；打印机、文件管理器或聊天应用由系统决定。
+5. 点击“预览默写纸”。系统先在本地写出 PDF，再把该 PDF 的每一页渲染成位图，逐页显示真实纸张画面；预览的图片来源与导出交给系统的是同一个文件，因此不存在“预览与导出不一致”。
+6. 用户可返回设置重新选择模板或调整开关（已选内容不丢失），或在预览页点击“导出 PDF”。系统使用 Android Sharesheet；分享面板同时提供“分享/打印”目标与“用 PDF 阅读器打开”目标。
 
 ## 数据与领域边界
 
@@ -58,6 +58,20 @@
 
 `WorksheetSettings` 必须是可序列化的 UI 值：模板、范围、方向集合、四线三格开关、答案页开关。默认值为“拼写测试模板 + 当前学习日已完成词 + 中译英 + 四线三格 + 答案页”。首版在界面重建期间保存在 `SavedStateHandle`，不写 Room；后续设置中心可以增加长期默认值。
 
+### 设置与预览的状态机
+
+`WorksheetUiState` 只保留一份 `settings`，设置页与预览页读写的是同一份：
+
+- `settings` 在任何阶段都可以修改，因此“返回修改”不会把模板重置成默认值，也不会让开关失效。
+- `preview()` 从设置页或预览页都可以调用，每次都按当前 `settings` 重新构建文档并重新分页；不存在“第二次预览沿用第一份结果”的情况。
+- `dismissPreview()` 只把阶段退回设置页，保留 `source` 与 `settings`。
+- 需要方向却未选任何方向时不进入预览页，只在设置页给出可读原因。
+- PDF 渲染带代次号（generation）：过期渲染完成时丢弃并删除其产物，避免旧结果覆盖新结果。
+- 分享只在用户显式点击“导出”时触发一次，界面消费后立即清空请求，重进预览页不会重复弹出分享面板。
+
+分页与 PDF 写入被抽在端口后（`WorksheetPdfWriter`），PDF 写入在实现内部切到 IO 线程，因此
+`WorksheetViewModel` 的状态机可以在 JVM 上用假实现确定性地测试。
+
 ### 分页与渲染
 
 新增 `WorksheetPaginator` 作为纯 Kotlin 布局器：以 A4 宽高、统一边距和行高计算 `WorksheetPage`。测量和分页规则只在此处定义，预览与 PDF 渲染均消费该输出，禁止分别写两套分页逻辑。
@@ -68,15 +82,16 @@
 - 四线三格只作用于拼写测试模板的留空单元格，三条实线与一条红色虚线均为自主绘制的通用书写辅助线，不复制任何第三方模板。
 - 行不能跨页；当一个方向没有题目时不创建空白题目页；需要方向而未选择任何方向时，预览按钮禁用并显示“至少选择一种默写方向”。
 
-版式元素对齐参考样例：圆角青绿外框、深青底白字表头、浅青交替行底色、浅青单元格网格线；英文与音标用青绿色、释义用深灰色。
+版式元素对齐参考样例：圆角青绿外框、深青底白字表头、浅青交替行底色、浅青单元格网格线；英文与音标用青绿色、释义用深灰色。每一张表都画完整外框与全格网格（含左右外边线），表头、数据行与艾宾浩斯的 `Review` 列读起来是一张连续的表；艾宾浩斯模板的 `No./Word/Meaning` 是跨两行的合并表头，`D1…D90` 只占表头第二行。
 
-Android 实现使用框架 `android.graphics.pdf.PdfDocument` 和 `Canvas` 自主绘制，不新增第三方 PDF SDK。预览使用 `PdfRenderer` 将已生成的私有 PDF 渲染为页位图，Compose `LazyColumn` 显示缩略页，点击进入全页查看。
+Android 实现使用框架 `android.graphics.pdf.PdfDocument` 和 `Canvas` 自主绘制，不新增第三方 PDF SDK。预览使用 `PdfRenderer` 将已生成的私有 PDF 渲染为页位图，Compose `LazyColumn` 显示真实纸张页面图像。
 
 ## Android 文件、安全与分享
 
-- PDF 生成到 `cacheDir/worksheets/`；以安全的 `worksheet-<localDate>-<timestamp>.pdf` 命名。
-- 通过 `androidx.core.content.FileProvider` 输出临时 `content://` URI。Manifest provider 必须 `exported=false`、`grantUriPermissions=true`，并仅暴露 `cache-path` 的 `worksheets/` 子目录。
-- 外发只使用 `Intent.ACTION_SEND`、`type = "application/pdf"`、`Intent.EXTRA_STREAM` 与 `FLAG_GRANT_READ_URI_PERMISSION`。不使用文件路径 URI，不申请存储权限，不把 PDF 写入公共目录。
+- PDF 生成到 `cacheDir/worksheets/`；以安全的 `worksheet-<timestamp>.pdf` 命名。
+- 通过 `androidx.core.content.FileProvider` 输出临时 `content://` URI。Manifest provider 必须 `exported=false`、`grantUriPermissions=true`，并仅暴露 `cache-path` 的 `worksheets/` 子目录。authority 在代码中由 `context.packageName + ".worksheetfiles"` 推导，与 Manifest 的 `${applicationId}.worksheetfiles` 始终一致，换构建变体也不会失配。
+- 外发使用 `Intent.ACTION_SEND`、`type = "application/pdf"`、`Intent.EXTRA_STREAM` 与 `FLAG_GRANT_READ_URI_PERMISSION`；同时通过 `EXTRA_INITIAL_INTENTS` 附带一个 `ACTION_VIEW` 目标，让用户能直接用 PDF 阅读器打开导出结果。只读权限标志与 `clipData` 在 chooser 上再声明一次，避免部分 ROM 的 chooser 不透传内层 Intent 的权限。不使用文件路径 URI，不申请存储权限，不把 PDF 写入公共目录。
+- 分享面板无法拉起时（设备上没有可处理 PDF 的应用）给出可读中文提示，不静默失败也不崩溃。
 - 预览或导出失败时删除不完整文件，页面显示不泄露路径、词表内容或底层异常的中文错误提示。
 - 不增加网络权限；所有筛选、分页、PDF、预览和分享均在设备本地完成。
 
@@ -86,7 +101,7 @@ Android 实现使用框架 `android.graphics.pdf.PdfDocument` 和 `Canvas` 自�
 
 1. `LearningToolsScreen`：浅薄荷背景、白色卡片、工具宫格；首版两个可点击工具，后续“错词再练”显示为未开放，不伪装成已实现功能。
 2. `WorksheetSettingsScreen`：模板单选、范围选择、双向复选（仅拼写测试模板可见）、四线三格开关、答案页开关、词数摘要和“预览默写纸”。
-3. `WorksheetPreviewScreen`：逐页缩略预览、页数、重新设置和“导出/分享 PDF”。
+3. `WorksheetPreviewScreen`：逐页显示由真实 PDF 渲染出的纸张图像、页数与模板标签、重新设置和“导出 PDF”。
 
 所有交互提供稳定 `testTag` 和 `contentDescription`。颜色沿用现有 Mint token；强调色只用于主操作和选择态。预览页不得使用 WebView。
 

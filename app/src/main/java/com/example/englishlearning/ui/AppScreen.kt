@@ -124,7 +124,10 @@ fun AppScreen(
             BackHandler(enabled = showLearning) { exitLearning() }
             BackHandler(enabled = showReading) { showReading = false }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
-            BackHandler(enabled = showWorksheetPreview) { showWorksheetPreview = false }
+            BackHandler(enabled = showWorksheetPreview) {
+                worksheetViewModel?.dismissPreview()
+                showWorksheetPreview = false
+            }
             BackHandler(enabled = showWorksheetSettings) { showWorksheetSettings = false }
             BackHandler(enabled = showLearningTools) { showLearningTools = false }
             if (setupRequired || showSetup) {
@@ -158,23 +161,44 @@ fun AppScreen(
                     }
                 }
             } else if (showWorksheetPreview) {
-                val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value as? WorksheetUiState.Preview
+                val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
                 val context = androidx.compose.ui.platform.LocalContext.current
-                val renderedFile = worksheetState?.rendered?.file
-                LaunchedEffect(renderedFile) {
-                    renderedFile?.let { context.startActivity(WorksheetShareLauncher(context).createChooser(it)) }
+                // 只有用户显式点「导出」才会拉起系统面板；重进预览页不会重复弹出。
+                val shareFile = worksheetViewModel?.shareRequest?.collectAsState()?.value
+                LaunchedEffect(shareFile) {
+                    shareFile?.let { file ->
+                        val launched = runCatching {
+                            val intent = WorksheetShareLauncher(context).createChooser(file)
+                            if (context !is android.app.Activity) {
+                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }.isSuccess
+                        if (launched) {
+                            worksheetViewModel?.consumeShareRequest()
+                        } else {
+                            worksheetViewModel?.reportShareUnavailable()
+                            worksheetViewModel?.consumeShareRequest()
+                        }
+                    }
                 }
                 WorksheetPreviewScreen(
                     pages = worksheetState?.pages.orEmpty(),
-                    onBack = { showWorksheetPreview = false },
-                    onExport = { worksheetViewModel?.exportPreview() },
+                    renderedFile = worksheetState?.renderedFile,
+                    rendering = worksheetState?.rendering ?: false,
+                    message = worksheetState?.message,
+                    onBack = {
+                        worksheetViewModel?.dismissPreview()
+                        showWorksheetPreview = false
+                    },
+                    onExport = { worksheetViewModel?.export() },
                 )
             } else if (showWorksheetSettings) {
                 val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
-                val ready = worksheetState as? WorksheetUiState.Ready
                 WorksheetSettingsScreen(
-                    settings = ready?.settings ?: com.example.englishlearning.learning.worksheet.WorksheetSettings(),
-                    selectedCount = ready?.source?.items?.size ?: 0,
+                    settings = worksheetState?.settings
+                        ?: com.example.englishlearning.learning.worksheet.WorksheetSettings(),
+                    selectedCount = worksheetState?.selectedCount ?: 0,
                     onToggleDirection = { worksheetViewModel?.toggleDirection(it) },
                     onSelectRange = { worksheetViewModel?.selectRange(it) },
                     onSelectTemplate = { worksheetViewModel?.selectTemplate(it) },
@@ -182,7 +206,9 @@ fun AppScreen(
                     onToggleAnswers = { worksheetViewModel?.toggleAnswers(it) },
                     onPreview = {
                         worksheetViewModel?.preview()
-                        if (worksheetViewModel?.uiState?.value is WorksheetUiState.Preview) showWorksheetPreview = true
+                        if (worksheetViewModel?.uiState?.value?.phase == WorksheetPhase.PREVIEW) {
+                            showWorksheetPreview = true
+                        }
                     },
                     onBack = { showWorksheetSettings = false },
                 )
