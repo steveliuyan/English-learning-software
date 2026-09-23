@@ -144,11 +144,17 @@
 - Modify: `.workbuddy/memory/MEMORY.md`、`.workbuddy/memory/2026-09-23.md`
 - Modify: `C:/Users/20212/.workbuddy/MEMORY.md`（若产生新的本机/工具坑）
 
-- [ ] 若过程中发现新工具坑，按既有格式补进用户级 `MEMORY.md`；没有则不写。
-- [ ] 项目 `MEMORY.md` 的「当前产品待办」中，把「三栏底部导航」更新为已完成的四栏，并记入「AI 学」页的状态。
-- [ ] 追加当日 memory：交付了什么、四个功能的真实状态、下一步依赖。
-- [ ] 若「自绘 tab 图标以避免 dependency locking 冲突」「全屏层覆盖 Scaffold 以保证底导隐藏」形成可复用套路，考虑沉淀为 skill。
-- [ ] 提交 `docs: update the roadmap notes for the AI learning tab`。
+- [x] 若过程中发现新工具坑，按既有格式补进用户级 `MEMORY.md`；没有则不写。
+      → 写入了 1 条：`adb exec-out run-as ... > file` 必须加 `MSYS_NO_PATHCONV=1`，否则 MSYS 改写 Android 路径，命令失败却被 `2>/dev/null` 吞掉，产出 **162 字节的假文件且退出码为 0**。
+- [x] 项目 `MEMORY.md` 的「当前产品待办」中，把「三栏底部导航」更新为已完成的四栏，并记入「AI 学」页的状态。
+      → 顺带订正了一条不实描述：原文称 F2 已有「HTTPS 安全客户端 + OpenAI-compatible 文章生成」，逐文件核对后确认**没有网络客户端、没有 `INTERNET` 权限、没有文章生成、没有 AI 配置界面**，只有数据与安全地基。已改写并加注「以后描述 AI 能力前先 grep 一遍再写」。
+      → 注意：memory 文件位于**主目录** `D:/workbjddy-project/手机学习英语软件/.workbuddy/memory/`，不在本工作树内，因此不进入本次提交。
+- [x] 追加当日 memory：交付了什么、四个功能的真实状态、下一步依赖。
+      → 同日日志追加 8 条；另抓出并记录两处「文案说谎」（设置页拿当日计划数冒充「每日新增 N 词」；默写纸设置页返回按钮仍指向已删除的「学习工具」页）。
+- [x] 若「自绘 tab 图标以避免 dependency locking 冲突」「全屏层覆盖 Scaffold 以保证底导隐藏」形成可复用套路，考虑沉淀为 skill。
+      → **结论：不为这两个技巧新建 skill。** 它们各自只有数行，且强绑定本项目（前者源于 `dependencyLocking { lockAllConfigurations() }` 这个项目级开关），已落在项目 `MEMORY.md`「架构与测试规律」里（`BackHandler` 后声明者优先、一级 tab 不设返回入口、`testTag` 与 `contentDescription` 双标注）。
+      → 改做了一件收益更高的事：**修订既有 skill `android-device-pdf-evidence`**——① 修掉一条**过期断言**（原文写「本机 `uiautomator dump` 失败」，实际可用且能取到全部 Compose 文本节点）；② 新增 §2.1 **三文件 MD5 数据完整性取证**（含 `MSYS_NO_PATHCONV=1` 与 162 字节假文件两个坑），把「跑测试没弄坏真机数据」变成可复现的硬证据。
+- [x] 提交 `docs: update the roadmap notes for the AI learning tab`。
 
 ---
 
