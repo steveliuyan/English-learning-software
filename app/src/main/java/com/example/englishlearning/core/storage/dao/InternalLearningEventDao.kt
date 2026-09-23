@@ -9,6 +9,11 @@ import androidx.room.Upsert
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
 import com.example.englishlearning.core.storage.entity.LearningEventEntity
 
+internal data class PlanCardFeedbackRow(
+    val cardId: String,
+    val feedback: String,
+)
+
 /**
  * Append-only access to the learning event log (spec F1-03).
  *
@@ -33,6 +38,15 @@ internal interface InternalLearningEventDao {
     /** Cards of this plan that already carry an event, i.e. plan items already complete. */
     @Query("SELECT DISTINCT cardId FROM learning_events WHERE planId = :planId")
     suspend fun completedCardIds(planId: String): List<String>
+
+    @Query(
+        "SELECT event.cardId AS cardId, event.feedback AS feedback FROM learning_events AS event " +
+            "INNER JOIN (SELECT cardId, MAX(occurredAtEpochMillis) AS latestAt FROM learning_events " +
+            "WHERE planId = :planId GROUP BY cardId) AS latest " +
+            "ON event.cardId = latest.cardId AND event.occurredAtEpochMillis = latest.latestAt " +
+            "WHERE event.planId = :planId ORDER BY event.cardId ASC",
+    )
+    suspend fun completedCardFeedback(planId: String): List<PlanCardFeedbackRow>
 
     /** Cards of [wordBookId] that have been reviewed at least once, so they are no longer new. */
     @Query("SELECT cardId FROM card_review_states WHERE wordBookId = :wordBookId")

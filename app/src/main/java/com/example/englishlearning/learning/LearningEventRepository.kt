@@ -2,7 +2,13 @@ package com.example.englishlearning.learning
 
 import com.example.englishlearning.learning.domain.CardReviewState
 import com.example.englishlearning.learning.domain.LearningEvent
+import com.example.englishlearning.learning.domain.ReviewFeedback
 import java.time.Instant
+
+data class PlanCardFeedback(
+    val cardId: String,
+    val feedback: ReviewFeedback,
+)
 
 sealed interface AppendEventResult {
     /** [duplicate] is true when the same event id was already stored and nothing changed. */
@@ -31,6 +37,10 @@ interface LearningEventRepository {
      * the event log, never from a separate counter, so completion cannot drift from history.
      */
     suspend fun completedCardIds(planId: String): RepositoryResult<List<String>>
+
+    /** Latest stored feedback for every completed card in this plan, read in one query. */
+    suspend fun completedCardFeedback(planId: String): RepositoryResult<List<PlanCardFeedback>> =
+        RepositoryResult.Success(emptyList())
 
     /** Cards of [wordBookId] reviewed at least once, so they are no longer "new". */
     suspend fun reviewedCardIds(wordBookId: String): RepositoryResult<List<String>>

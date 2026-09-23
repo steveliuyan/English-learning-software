@@ -58,6 +58,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.example.englishlearning.export.WorksheetShareLauncher
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
@@ -82,6 +83,7 @@ fun AppScreen(
     learningSetupViewModel: LearningSetupViewModel,
     todayPlanViewModel: TodayPlanViewModel,
     wordCardViewModel: WordCardViewModel,
+    worksheetViewModel: WorksheetViewModel? = null,
     readingAccessViewModel: ReadingAccessViewModel? = null,
 ) {
     var name by remember { mutableStateOf("") }
@@ -97,6 +99,9 @@ fun AppScreen(
             var showLearning by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showReading by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showReadingHistory by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showLearningTools by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showWorksheetSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showWorksheetPreview by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
@@ -119,6 +124,9 @@ fun AppScreen(
             BackHandler(enabled = showLearning) { exitLearning() }
             BackHandler(enabled = showReading) { showReading = false }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
+            BackHandler(enabled = showWorksheetPreview) { showWorksheetPreview = false }
+            BackHandler(enabled = showWorksheetSettings) { showWorksheetSettings = false }
+            BackHandler(enabled = showLearningTools) { showLearningTools = false }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
                     profileId = state.profile.id,
@@ -149,6 +157,43 @@ fun AppScreen(
                         )
                     }
                 }
+            } else if (showWorksheetPreview) {
+                val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value as? WorksheetUiState.Preview
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val renderedFile = worksheetState?.rendered?.file
+                LaunchedEffect(renderedFile) {
+                    renderedFile?.let { context.startActivity(WorksheetShareLauncher(context).createChooser(it)) }
+                }
+                WorksheetPreviewScreen(
+                    pages = worksheetState?.pages.orEmpty(),
+                    onBack = { showWorksheetPreview = false },
+                    onExport = { worksheetViewModel?.exportPreview() },
+                )
+            } else if (showWorksheetSettings) {
+                val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
+                val ready = worksheetState as? WorksheetUiState.Ready
+                WorksheetSettingsScreen(
+                    settings = ready?.settings ?: com.example.englishlearning.learning.worksheet.WorksheetSettings(),
+                    selectedCount = ready?.source?.items?.size ?: 0,
+                    onToggleDirection = { worksheetViewModel?.toggleDirection(it) },
+                    onSelectRange = { worksheetViewModel?.selectRange(it) },
+                    onSelectTemplate = { worksheetViewModel?.selectTemplate(it) },
+                    onToggleGrid = { worksheetViewModel?.toggleGrid(it) },
+                    onToggleAnswers = { worksheetViewModel?.toggleAnswers(it) },
+                    onPreview = {
+                        worksheetViewModel?.preview()
+                        if (worksheetViewModel?.uiState?.value is WorksheetUiState.Preview) showWorksheetPreview = true
+                    },
+                    onBack = { showWorksheetSettings = false },
+                )
+            } else if (showLearningTools) {
+                LearningToolsScreen(
+                    onBack = { showLearningTools = false },
+                    onOpenWorksheet = {
+                        worksheetViewModel?.load(state.profile.id)
+                        showWorksheetSettings = worksheetViewModel != null
+                    },
+                )
             } else if (showReading && readingAccessViewModel != null) {
                 val readingState by readingAccessViewModel.uiState.collectAsState()
                 if (showReadingHistory) {
@@ -176,6 +221,7 @@ fun AppScreen(
                         readingAccessViewModel?.load(state.profile.id, ready.isUnlocked, ready.unlockReason)
                         showReading = readingAccessViewModel != null
                     },
+                    onOpenLearningTools = { showLearningTools = true },
                 )
             }
         }

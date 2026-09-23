@@ -1,6 +1,7 @@
 package com.example.englishlearning.di
 
 import android.content.Context
+import com.example.englishlearning.export.WorksheetPdfRenderer
 import androidx.room.Room
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.security.AndroidKeyStoreSecretStore
@@ -16,6 +17,9 @@ import com.example.englishlearning.learning.RoomLearningEventRepository
 import com.example.englishlearning.learning.StoredPlanCardSource
 import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
 import com.example.englishlearning.learning.WordCardSource
+import com.example.englishlearning.learning.worksheet.BuildWorksheetContentUseCase
+import com.example.englishlearning.learning.worksheet.WorksheetDocumentBuilder
+import com.example.englishlearning.learning.worksheet.WorksheetPaginator
 import com.example.englishlearning.learning.domain.FsrsReviewScheduler
 import com.example.englishlearning.learning.RoomTodayPlanRepository
 import com.example.englishlearning.learning.TodayPlanRepository
@@ -75,6 +79,10 @@ object AppModule {
     @Provides @Singleton fun provideEventIdFactory(): EventIdFactory = EventIdFactory.Random
     @Provides @Singleton fun provideWordCardSource(): WordCardSource = PlaceholderWordCardSource()
     @Provides @Singleton fun providePlanCardSource(content: WordCardSource, events: LearningEventRepository): PlanCardSource = StoredPlanCardSource(content, events)
+    @Provides fun provideBuildWorksheetContentUseCase(plans: TodayPlanRepository, events: LearningEventRepository, content: WordCardSource): BuildWorksheetContentUseCase = BuildWorksheetContentUseCase(plans, events, content)
+    @Provides fun provideWorksheetDocumentBuilder(): WorksheetDocumentBuilder = WorksheetDocumentBuilder()
+    @Provides fun provideWorksheetPaginator(): WorksheetPaginator = WorksheetPaginator()
+    @Provides fun provideWorksheetPdfRenderer(@ApplicationContext context: Context): WorksheetPdfRenderer = WorksheetPdfRenderer(context)
     @Provides fun provideTodayPlanUseCase(learning: LearningProfileRepository, plans: TodayPlanRepository, cards: PlanCardSource, clock: ClockProvider): GetOrCreateTodayPlanUseCase = GetOrCreateTodayPlanUseCase(learning, plans, cards, clock)
     @Provides fun provideTodayPlanUseCaseContract(useCase: GetOrCreateTodayPlanUseCase): TodayPlanUseCaseContract = TodayPlanUseCaseContract { profileId -> useCase(profileId) }
     @Provides @Singleton fun provideReadingPreferenceRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): ReadingPreferenceRepository = RoomReadingPreferenceRepository(database, dispatcher)

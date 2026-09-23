@@ -10,6 +10,7 @@ import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.ReadingAccessViewModel
 import com.example.englishlearning.ui.TodayPlanViewModel
 import com.example.englishlearning.ui.WordCardViewModel
+import com.example.englishlearning.ui.WorksheetViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
                 learningSetupViewModel = hiltViewModel<LearningSetupViewModel>(),
                 todayPlanViewModel = hiltViewModel<TodayPlanViewModel>(),
                 wordCardViewModel = hiltViewModel<WordCardViewModel>(),
+                worksheetViewModel = hiltViewModel<WorksheetViewModel>(),
                 readingAccessViewModel = hiltViewModel<ReadingAccessViewModel>(),
             )
         }

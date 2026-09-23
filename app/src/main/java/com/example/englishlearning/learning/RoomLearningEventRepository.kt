@@ -43,6 +43,13 @@ class RoomLearningEventRepository(
     override suspend fun completedCardIds(planId: String): RepositoryResult<List<String>> =
         runStorage { database.internalLearningEventDao().completedCardIds(planId) }
 
+    override suspend fun completedCardFeedback(planId: String): RepositoryResult<List<PlanCardFeedback>> =
+        runStorage {
+            database.internalLearningEventDao().completedCardFeedback(planId).map { row ->
+                PlanCardFeedback(row.cardId, row.feedback.toReviewFeedback())
+            }
+        }
+
     override suspend fun reviewedCardIds(wordBookId: String): RepositoryResult<List<String>> =
         runStorage { database.internalLearningEventDao().reviewedCardIds(wordBookId) }
 

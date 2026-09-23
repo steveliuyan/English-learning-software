@@ -43,6 +43,7 @@ fun TodayPlanScreen(
     onOpenSetup: () -> Unit = {},
     onStartLearning: () -> Unit = {},
     onOpenReading: () -> Unit = {},
+    onOpenLearningTools: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(MintBackground).padding(horizontal = 20.dp, vertical = 24.dp).testTag("today_plan_screen"),
@@ -130,6 +131,11 @@ fun TodayPlanScreen(
                         disabledContentColor = MintPrimaryDark,
                     ),
                 ) { Text("开始学习", fontWeight = FontWeight.Bold) }
+                Button(
+                    onClick = onOpenLearningTools,
+                    modifier = Modifier.fillMaxWidth().height(50.dp).testTag("today_plan_learning_tools"),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
+                ) { Text("学习工具", fontWeight = FontWeight.Bold) }
             }
         }
     }
