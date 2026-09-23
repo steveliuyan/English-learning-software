@@ -60,7 +60,7 @@
   - 阅读：三条横线（首条稍短）
   - AI 学：四角星（sparkle）
   - 设置：三条带圆点的滑杆
-- [ ] 提交 `feat(ui): add a self-drawn four-slot bottom navigation bar`。
+- [x] 提交 `feat(ui): add a self-drawn four-slot bottom navigation bar`。
 
 ### Task 3: 「AI 学」页
 
@@ -76,7 +76,7 @@
 - [x] 实现四个功能行（`AiFeature.entries` 驱动，不硬编码顺序）。
 - [x] 实现「AI 学习导航」卡与渐变边框「查看词表」卡，卡内显示 `todayWordCount`/`dueWordCount` 真实数字。
 - [x] 实现「AI 学如何起作用」说明区（可折叠，默认收起）。
-- [ ] 提交 `feat(ui): build the AI learning tab with four feature entries`。
+- [x] 提交 `feat(ui): build the AI learning tab with four feature entries`。
 
 ### Task 4: 四个功能的页面骨架
 
@@ -89,7 +89,7 @@
 
 - [x] 写 `AiFeatureScreenTest`：四个功能各自渲染时标题正确、「当前进度」块存在、依赖清单条数与 `feature.dependencies.size` 一致、「先去配置 AI」可点并触发 `onOpenSettings`、`onBack` 可点。
 - [x] 实现单页骨架，五个区块按 Spec 第 5 章排列。
-- [ ] 提交 `feat(ui): add honest skeletons for the four AI features`。
+- [x] 提交 `feat(ui): add honest skeletons for the four AI features`。
 
 ### Task 5: 「设置」页并收纳学习工具
 
@@ -103,7 +103,7 @@
 
 - [x] 写 `SettingsScreenTest`：`settings_screen` 存在；四个分组标题（学习 / 阅读 / AI / 账户）存在；「生成默写纸」仍在且可点；「调整词书与目标」可点并触发 `onOpenSetup`。
 - [x] 实现设置页：顶部资料卡（昵称 + 词书 + 每日目标）+ 四个分组；已实现项可点，未实现项显示为禁用态并标注「后续版本」，不得做成可点无反应。
-- [ ] 提交 `feat(ui): add a settings tab that absorbs the learning tools entry`。
+- [x] 提交 `feat(ui): add a settings tab that absorbs the learning tools entry`。
 
 ### Task 6: 把底导接进 AppScreen
 
@@ -119,7 +119,7 @@
 - [x] 二级全屏层保持覆盖在 `Scaffold` 之上（不进 `content`），确保底导隐藏。
 - [x] 切换「阅读」tab 时触发 `readingAccessViewModel.load(...)`，入参取 `todayState` 的 `isUnlocked` / `unlockReason`。
 - [x] 补 `AppScreenTest`：断言底导四栏存在；从今日计划切到 AI 学后 `ai_learning_screen` 存在；切到设置后 `settings_screen` 存在。
-- [ ] 提交 `feat(ui): wire the four-slot bottom navigation into the app shell`。
+- [x] 提交 `feat(ui): wire the four-slot bottom navigation into the app shell`。
 
 ### Task 7: 真机验收与证据归档
 
@@ -127,15 +127,15 @@
 - Create: `docs/verification/ai-learning-tab/README.md`
 - Create: `docs/verification/ai-learning-tab/*.png`
 
-- [ ] 构建：`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`（工作树外跑需禁用沙箱）。
-- [ ] 跑全量 JVM 测试，记录通过数与失败数。
-- [ ] `adb install -r -t` 安装主 APK 与测试 APK。
-- [ ] 跑全量 instrumented 测试：`adb shell am instrument -w com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`。
-- [ ] `adb shell run-as <pkg> ls -la .../databases` 比对跑测前后的 `english-learning.db` / `-wal` / `-shm` 时间戳与大小，证明数据未被清空。
-- [ ] 跑测前锁竖屏；跑测期间不触碰手机。
-- [ ] adb 走查并截图归档：四栏底导、AI 学页头卡与四个功能行、四个功能页（逐个）、设置页、全屏层出现时底导隐藏、返回后回到原 tab。
-- [ ] 写 `docs/verification/ai-learning-tab/README.md`：逐条对应 Spec 第 6 章 AC-1~AC-9，附命令与截图文件名。
-- [ ] 提交 `docs(verification): record the AI learning tab on-device walkthrough`。
+- [x] 构建：`./gradlew :app:assembleDebug :app:assembleDebugAndroidTest`（工作树外跑需禁用沙箱）。
+- [x] 跑全量 JVM 测试，记录通过数与失败数。
+- [x] `adb install -r -t` 安装主 APK 与测试 APK。
+- [x] 跑全量 instrumented 测试：`adb shell am instrument -w com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`。
+- [x] `adb shell run-as <pkg> ls -la .../databases` 比对跑测前后的 `english-learning.db` / `-wal` / `-shm` 时间戳与大小，证明数据未被清空。
+- [x] 跑测前锁竖屏；跑测期间不触碰手机。
+- [x] adb 走查并截图归档：四栏底导、AI 学页头卡与四个功能行、四个功能页（逐个）、设置页、全屏层出现时底导隐藏、返回后回到原 tab。
+- [x] 写 `docs/verification/ai-learning-tab/README.md`：逐条对应 Spec 第 6 章 AC-1~AC-9，附命令与截图文件名。
+- [x] 提交 `docs(verification): record the AI learning tab on-device walkthrough`。
 
 ### Task 8: 文档与记忆回写
 
