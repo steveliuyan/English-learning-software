@@ -155,7 +155,8 @@
       → **结论：不为这两个技巧新建 skill。** 它们各自只有数行，且强绑定本项目（前者源于 `dependencyLocking { lockAllConfigurations() }` 这个项目级开关），已落在项目 `MEMORY.md`「架构与测试规律」里（`BackHandler` 后声明者优先、一级 tab 不设返回入口、`testTag` 与 `contentDescription` 双标注）。
       → 改做了一件收益更高的事：**修订既有 skill `android-device-pdf-evidence`**——① 修掉一条**过期断言**（原文写「本机 `uiautomator dump` 失败」，实际可用且能取到全部 Compose 文本节点）；② 新增 §2.1 **三文件 MD5 数据完整性取证**（含 `MSYS_NO_PATHCONV=1` 与 162 字节假文件两个坑），把「跑测试没弄坏真机数据」变成可复现的硬证据。
 - [x] 提交本次收尾。
-      → 实际提交 `1032524 docs(plan): close out the AI learning tab step list`（计划里原定消息 `docs: update the roadmap notes for the AI learning tab` 与实际改动不符，按事实改成「闭合步骤清单」）。远端 `stage-1-f1-05-fsrs-scheduling` 与本地 HEAD 均为 `103252457e7c23db79f09c08e7232658dc25b576`。
+      → 实际提交 `1032524 docs(plan): close out the AI learning tab step list`（计划里原定消息 `docs: update the roadmap notes for the AI learning tab` 与实际改动不符，按事实改成「闭合步骤清单」）。
+      → 推送后已用 `git rev-parse HEAD` 与 `git -c http.proxy=... ls-remote origin <branch>` 逐字核对远端分支 SHA。**此处刻意不抄具体 SHA**：任何写在文档里的「当前 HEAD」都会随下一次提交过期，要看 tip 请直接查 git。
 
 ---
 
