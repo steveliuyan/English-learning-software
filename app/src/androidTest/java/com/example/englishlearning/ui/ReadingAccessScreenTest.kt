@@ -23,7 +23,6 @@ class ReadingAccessScreenTest {
         composeRule.setContent {
             ReadingAccessScreen(
                 state = ReadingAccessUiState.Locked("还差 2 个新词、1 个复习词"),
-                onBack = {},
                 onSelectType = {},
                 onOpenHistory = {},
             )
@@ -44,7 +43,6 @@ class ReadingAccessScreenTest {
                     preference = ReadingPreference("p1", ArticleType.SCIENCE, ArticleLengthTier.LONG),
                     history = emptyList(),
                 ),
-                onBack = {},
                 onSelectType = { selected = it },
                 onOpenHistory = { historyOpened++ },
             )

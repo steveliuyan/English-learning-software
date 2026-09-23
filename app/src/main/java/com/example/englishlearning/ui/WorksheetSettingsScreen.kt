@@ -70,9 +70,10 @@ fun WorksheetSettingsScreen(
     ) {
         TextButton(
             onClick = onBack,
-            modifier = Modifier.semantics { contentDescription = "返回学习工具" },
+            // 入口在「设置」栏，旧的「学习工具」页已并入设置并被删除，文案必须跟着走。
+            modifier = Modifier.semantics { contentDescription = "返回设置" },
             colors = ButtonDefaults.textButtonColors(contentColor = MintPrimaryDark),
-        ) { Text("← 返回学习工具", fontWeight = FontWeight.Bold) }
+        ) { Text("← 返回设置", fontWeight = FontWeight.Bold) }
         Text(
             text = "生成默写纸",
             style = MaterialTheme.typography.headlineSmall,

@@ -70,6 +70,13 @@ class TodayPlanScreenTest {
         composeRule.onNodeWithTag("today_plan_unlock_status").assertExists()
     }
 
+    /** 同级按钮都有 contentDescription；这一个是本轮改名后新加的，不能漏掉无障碍标注。 */
+    @Test fun ready_offers_a_labelled_learning_tools_entry() {
+        composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
+        composeRule.onNodeWithTag("today_plan_learning_tools").assertExists().assertHasClickAction()
+        composeRule.onNodeWithContentDescription("学习工具与设置").assertExists()
+    }
+
     @Test fun ready_offers_setup_entry_to_reopen_word_book_settings() {
         var opened = 0
         composeRule.setContent {

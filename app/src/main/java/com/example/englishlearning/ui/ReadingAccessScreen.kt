@@ -46,10 +46,15 @@ sealed interface ReadingAccessUiState {
     data object Unavailable : ReadingAccessUiState
 }
 
+/**
+ * 「阅读」栏的根页面。
+ *
+ * 它现在只作为一级 tab 使用，出口交给底部导航，所以**没有**自带的返回按钮——一级页面出现
+ * 「返回上一层」本身就是层级错误，留着只会误导人。
+ */
 @Composable
 fun ReadingAccessScreen(
     state: ReadingAccessUiState,
-    onBack: () -> Unit,
     onSelectType: (ArticleType) -> Unit,
     onOpenHistory: () -> Unit,
 ) {
@@ -57,11 +62,6 @@ fun ReadingAccessScreen(
         modifier = Modifier.fillMaxSize().background(MintBackground).padding(horizontal = 20.dp, vertical = 24.dp).testTag("reading_access_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Button(
-            onClick = onBack,
-            modifier = Modifier.testTag("reading_access_back").semantics { contentDescription = "返回今日计划" },
-            colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-        ) { Text("返回") }
         Text("每日阅读", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
         when (state) {
             ReadingAccessUiState.Loading -> Text("正在读取本地阅读状态…", color = MintTextMuted)

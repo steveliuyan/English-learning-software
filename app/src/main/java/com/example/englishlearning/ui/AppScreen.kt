@@ -31,6 +31,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -95,16 +96,31 @@ fun AppScreen(
             onCreate = { viewModel.createProfile(name) },
         )
         is AppUiState.Ready -> {
+            var selectedTab by rememberSaveable(state.profile.id) { mutableStateOf(AppTab.LEARNING) }
             var showSetup by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearning by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            var showReading by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showReadingHistory by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            var showLearningTools by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWorksheetSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWorksheetPreview by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 选中的 AI 功能存 key 而不是枚举实例：String 进 Bundle 最省心，将来加功能也不用改存法。
+            var selectedFeatureKey by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
+            val selectedFeature = AiFeature.entries.firstOrNull { it.key == selectedFeatureKey }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
             val todayState by todayPlanViewModel.uiState.collectAsState()
+            val todayReady = todayState as? TodayPlanUiState.Ready
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
+            // 进入阅读 tab 才算准入；今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
+            LaunchedEffect(selectedTab, state.profile.id, todayReady?.isUnlocked) {
+                if (selectedTab == AppTab.READING) {
+                    readingAccessViewModel?.load(
+                        profileId = state.profile.id,
+                        isUnlocked = todayReady?.isUnlocked == true,
+                        unlockReason = todayReady?.unlockReason ?: "今日计划尚未就绪",
+                    )
+                }
+            }
+            val readingState: ReadingAccessUiState =
+                readingAccessViewModel?.uiState?.collectAsState()?.value ?: ReadingAccessUiState.Loading
             // Only an user-opened setup screen may be dismissed; a mandatory setup (no active
             // word book yet) must stay until a word book is saved, so it gets no escape hatch.
             val cancelSetup: (() -> Unit)? = if (showSetup && !setupRequired) {
@@ -112,7 +128,6 @@ fun AppScreen(
             } else {
                 null
             }
-            BackHandler(enabled = cancelSetup != null) { cancelSetup?.invoke() }
             // Single exit for the learning flow. It always returns to the today page *and*
             // recomputes its state (F1-04: entering the today page recalculates progress), so
             // work reviewed in the cards shows immediately instead of only after a restart.
@@ -120,16 +135,24 @@ fun AppScreen(
                 showLearning = false
                 todayPlanViewModel.load(state.profile.id)
             }
+            val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null
+            // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
+            // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
+            BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
+                selectedTab = AppTab.LEARNING
+            }
+            BackHandler(enabled = cancelSetup != null) { cancelSetup?.invoke() }
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
-            BackHandler(enabled = showReading) { showReading = false }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
+            // 设置页先声明、预览页后声明：两者同时为真时（从设置页点进预览）返回键要先关预览。
+            BackHandler(enabled = showWorksheetSettings) { showWorksheetSettings = false }
             BackHandler(enabled = showWorksheetPreview) {
                 worksheetViewModel?.dismissPreview()
                 showWorksheetPreview = false
             }
-            BackHandler(enabled = showWorksheetSettings) { showWorksheetSettings = false }
-            BackHandler(enabled = showLearningTools) { showLearningTools = false }
+            BackHandler(enabled = selectedFeature != null) { selectedFeatureKey = null }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
                     profileId = state.profile.id,
@@ -212,43 +235,75 @@ fun AppScreen(
                     },
                     onBack = { showWorksheetSettings = false },
                 )
-            } else if (showLearningTools) {
-                LearningToolsScreen(
-                    onBack = { showLearningTools = false },
-                    onOpenWorksheet = {
-                        worksheetViewModel?.load(state.profile.id)
-                        showWorksheetSettings = worksheetViewModel != null
+            } else if (selectedFeature != null) {
+                AiFeatureScreen(
+                    feature = selectedFeature,
+                    todayWordCount = todayReady?.newTarget,
+                    dueWordCount = todayReady?.dueTarget,
+                    onBack = { selectedFeatureKey = null },
+                    onOpenSettings = {
+                        selectedFeatureKey = null
+                        selectedTab = AppTab.SETTINGS
+                    },
+                    onOpenLearning = {
+                        selectedFeatureKey = null
+                        selectedTab = AppTab.LEARNING
                     },
                 )
-            } else if (showReading && readingAccessViewModel != null) {
-                val readingState by readingAccessViewModel.uiState.collectAsState()
-                if (showReadingHistory) {
-                    val history = (readingState as? ReadingAccessUiState.Ready)?.history.orEmpty()
-                    ReadingHistoryScreen(history = history, onBack = { showReadingHistory = false })
-                } else {
-                    ReadingAccessScreen(
-                        state = readingState,
-                        onBack = { showReading = false },
-                        onSelectType = readingAccessViewModel::selectType,
-                        onOpenHistory = { showReadingHistory = true },
-                    )
-                }
+            } else if (showReadingHistory) {
+                val history = (readingState as? ReadingAccessUiState.Ready)?.history.orEmpty()
+                ReadingHistoryScreen(history = history, onBack = { showReadingHistory = false })
             } else {
-                TodayPlanScreen(
-                    state = todayState,
-                    onRetry = { todayPlanViewModel.load(state.profile.id) },
-                    onOpenSetup = { showSetup = true },
-                    onStartLearning = {
-                        wordCardViewModel.load(state.profile.id)
-                        showLearning = true
-                    },
-                    onOpenReading = {
-                        val ready = todayState as? TodayPlanUiState.Ready ?: return@TodayPlanScreen
-                        readingAccessViewModel?.load(state.profile.id, ready.isUnlocked, ready.unlockReason)
-                        showReading = readingAccessViewModel != null
-                    },
-                    onOpenLearningTools = { showLearningTools = true },
-                )
+                // 四个一级 tab 的根页面装在这里，底部导航只在这一层出现；上面所有分支都是
+                // 覆盖全屏的二级层，因此天然不会显示底导。
+                Scaffold(
+                    containerColor = MintBackground,
+                    bottomBar = { AppBottomBar(selected = selectedTab, onSelect = { selectedTab = it }) },
+                ) { contentPadding ->
+                    Box(Modifier.fillMaxSize().padding(contentPadding)) {
+                        when (selectedTab) {
+                            AppTab.LEARNING -> TodayPlanScreen(
+                                state = todayState,
+                                onRetry = { todayPlanViewModel.load(state.profile.id) },
+                                onOpenSetup = { showSetup = true },
+                                onStartLearning = {
+                                    wordCardViewModel.load(state.profile.id)
+                                    showLearning = true
+                                },
+                                // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
+                                // 全屏页，避免出现「底导之上再压一层」的混乱层级。
+                                onOpenReading = { selectedTab = AppTab.READING },
+                                onOpenLearningTools = { selectedTab = AppTab.SETTINGS },
+                            )
+                            AppTab.READING -> ReadingAccessScreen(
+                                state = readingState,
+                                onSelectType = { readingAccessViewModel?.selectType(it) },
+                                onOpenHistory = { showReadingHistory = true },
+                            )
+                            AppTab.AI -> AiLearningScreen(
+                                todayWordCount = todayReady?.newTarget,
+                                dueWordCount = todayReady?.dueTarget,
+                                // AI 网关（F2-03）尚未实现，应用里也没有任何创建 AI 配置的界面，
+                                // 所以这里恒为 false。F2-02 的配置界面落地后，这里必须改成读
+                                // AiProfileRepository 的真实结果，否则徽章会撒谎。
+                                aiConfigured = false,
+                                onOpenFeature = { selectedFeatureKey = it.key },
+                                onOpenWordList = { selectedTab = AppTab.LEARNING },
+                            )
+                            AppTab.SETTINGS -> SettingsScreen(
+                                profileName = state.profile.displayName,
+                                wordBookName = todayReady?.wordBookName,
+                                todayNewTarget = todayReady?.newTarget,
+                                todayDueTarget = todayReady?.dueTarget,
+                                onOpenSetup = { showSetup = true },
+                                onOpenWorksheet = {
+                                    worksheetViewModel?.load(state.profile.id)
+                                    showWorksheetSettings = worksheetViewModel != null
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
         is AppUiState.Error -> ErrorScreen(onRetry = { viewModel.reload() })
@@ -381,8 +436,10 @@ private fun LearningSetupScreen(
             TextButton(
                 onClick = onCancel,
                 colors = ButtonDefaults.textButtonColors(contentColor = MintPrimaryDark),
-                modifier = Modifier.semantics { contentDescription = "返回今日计划" },
-            ) { Text("← 返回今日计划", fontWeight = FontWeight.Bold) }
+                // 这个设置页现在既能从「学习」栏也能从「设置」栏打开，所以文案不能再写死
+                // 「返回今日计划」——从设置栏进来时会指错地方。
+                modifier = Modifier.semantics { contentDescription = "返回上一层" },
+            ) { Text("← 返回上一层", fontWeight = FontWeight.Bold) }
         }
         Text(
             text = "选好词书，开始今天的积累",

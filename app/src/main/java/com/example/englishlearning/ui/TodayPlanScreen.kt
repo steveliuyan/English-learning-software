@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,7 +48,13 @@ fun TodayPlanScreen(
     onOpenLearningTools: () -> Unit = {},
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().background(MintBackground).padding(horizontal = 20.dp, vertical = 24.dp).testTag("today_plan_screen"),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MintBackground)
+            // 底部导航会吃掉 64dp，这里必须可滚动，否则小屏上最后一排按钮会被裁掉。
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .testTag("today_plan_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("今日学习计划", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.semantics { contentDescription = "今日学习计划" })
@@ -133,9 +141,13 @@ fun TodayPlanScreen(
                 ) { Text("开始学习", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenLearningTools,
-                    modifier = Modifier.fillMaxWidth().height(50.dp).testTag("today_plan_learning_tools"),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("today_plan_learning_tools")
+                        .semantics { contentDescription = "学习工具与设置" },
                     colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                ) { Text("学习工具", fontWeight = FontWeight.Bold) }
+                ) { Text("学习工具与设置", fontWeight = FontWeight.Bold) }
             }
         }
     }

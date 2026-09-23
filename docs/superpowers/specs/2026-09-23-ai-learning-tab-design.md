@@ -1,0 +1,174 @@
+# 四栏底部导航与「AI 学」页设计
+
+**日期：** 2026-09-23
+**范围：** 应用级导航改造 + 「AI 学」入口页及其四个功能的页面骨架
+**参考：** 用户提供的扇贝 App 截图（底部导航含「AI 学」标签页）
+**关联：** PRD `FR-04 AI 复习短文`、`FR-05 AI 配置与自定义供应商`
+
+---
+
+## 1. 背景与现状
+
+用户要求「在应用底下也加个 ai 学，跟着上面一样，有这些功能」。动手前已核对代码，实情如下：
+
+| 能力 | 现状 |
+|---|---|
+| 底部导航 | **不存在**。所有二级页面都是「今日计划」页上的 `rememberSaveable` 布尔开关弹出的全屏层 |
+| AI 界面 | **不存在**。没有 Profile 管理页、没有测试连接、没有模型列表 |
+| 网络调用 | **不存在**。无 `HttpsURLConnection`/`OkHttpClient`，`AndroidManifest.xml` 里**没有 `INTERNET` 权限** |
+| AI Profile 数据层 | 已有：`AiProfile`、`AiEndpointPolicy`（纯函数校验）、`RoomAiProfileRepository`、`AiProfileSecretUseCase` |
+| API Key 存储 | 已有：`AndroidKeyStoreSecretStore`，Key 进 Keystore，`AiProfile` 只存 `SecretReference` alias |
+| 文章 | 只有**离线仓储**（`ArticleRepository`）与阅读准入判定（`ReadingAccessUseCase`），**不会生成** |
+| 发音 | 只有 `PronunciationProvider` 枚举（含 `SystemTextToSpeech`），**没有播放实现** |
+
+截图中的四个功能与项目既有规划的对应关系：
+
+| 截图功能 | 项目内对应 | 状态 |
+|---|---|---|
+| 词文串学（根据所学单词，AI 匹配外刊短文） | PRD FR-04 AI 复习短文 | 已设计，未实现 |
+| AI 短文填词（AI 生成短文，选词填空） | **无对应条目**，新增需求 | 未设计 |
+| 单词随身听（听写听讲磨耳朵） | 部分对应 FR-06 发音（TTS） | 未设计 |
+| 单词串讲（今日单词 & 常错词逐个讲解、AI 问答） | 部分对应 FR-06/FR-04，AI 问答为新增 | 未设计 |
+
+**因此本轮不承诺「四个功能可用」。** 本轮交付：真实的四栏底部导航 + 一个结构完整、视觉成型的「AI 学」页，四个功能各自有可点开、**如实说明依赖与进度**的页面。不制造「点了没反应」或「假装能用」的入口。
+
+## 2. 已确认的产品决定
+
+| 决定项 | 结论 |
+|---|---|
+| 本轮范围 | 底部导航 + AI 学页骨架；AI 内容生成放后续 |
+| 底导布局 | **四栏：学习 / 阅读 / AI 学 / 设置** |
+| 配色 | **沿用薄荷绿主题**，不引入第二套视觉语言 |
+
+## 3. 导航架构
+
+### 3.1 层级
+
+引入两级结构：
+
+- **一级 = tab 根页面**，显示底部导航，四选一。
+- **二级 = 全屏层**，覆盖整个屏幕（含底导），不显示底部导航。
+
+二级层用全屏覆盖而非嵌套在 tab 内，理由：学习流程、默写纸预览这类页面需要完整高度和专注度；且现有 `BackHandler` 链已按「全屏层」语义写好，不改动其语义可以避免返回键行为回退。
+
+### 3.2 Tab 定义
+
+```kotlin
+enum class AppTab(val label: String, val contentDescription: String) {
+    LEARNING("学习", "学习"),
+    READING("阅读", "阅读"),
+    AI("AI 学", "AI 学"),
+    SETTINGS("设置", "设置"),
+}
+```
+
+`readonly` 的纯 Kotlin 枚举，无 Android 依赖，可在 JVM 测试中锁定「恰好四栏、顺序固定、标签不重复」。
+
+### 3.3 各 tab 内容
+
+| Tab | 根页面 | 说明 |
+|---|---|---|
+| 学习 | `TodayPlanScreen` | 现有页面，原样复用。原「学习工具」按钮改为进入设置 tab 的入口 |
+| 阅读 | `ReadingAccessScreen` | 现有页面，去掉自身「返回」按钮（底导即出口）；进入 tab 时触发 `load` |
+| AI 学 | `AiLearningScreen` | 新建 |
+| 设置 | `SettingsScreen` | 新建，收纳原「学习工具」内容 + 后续设置分组入口 |
+
+### 3.4 全屏层清单（不显示底导）
+
+| 层 | 触发 |
+|---|---|
+| `LearningSetupScreen` | 首次必填（无活动词书）或用户主动打开 |
+| `WordCardScreen` + `CardDetailScreen` | 学习 tab「开始学习」 |
+| `WorksheetSettingsScreen` | 设置 tab「生成默写纸」 |
+| `WorksheetPreviewScreen` | 默写纸设置页「预览」 |
+| `ReadingHistoryScreen` | 阅读 tab「查看本地阅读历史」 |
+| `AiFeatureScreen`（新） | AI 学页任一功能入口 |
+
+### 3.5 返回键语义
+
+现有 `BackHandler` 链按「最内层优先生效」排列，加入底导后保持原语义并新增一条最低优先级规则：
+
+1. `showSetup`（可取消时）→ 关设置
+2. `showLearning` → 退出学习流程并刷新今日计划
+3. `showReadingHistory` → 回阅读 tab
+4. `showWorksheetPreview` → `dismissPreview()` 并回设置
+5. `showWorksheetSettings` → 回设置 tab
+6. `showAiFeature`（新）→ 回 AI 学 tab
+7. **底导不在根 tab 时** → 回「学习」tab
+8. 在「学习」tab 且无全屏层 → 交给系统（退出应用）
+
+第 7 条让「按返回键回首页」这一 Android 惯例成立，且不会把关不掉的应用卡给用户。
+
+### 3.6 Tab 与全屏层的状态保存
+
+- 当前 tab 用 `rememberSaveable(state.profile.id) { mutableStateOf(AppTab.LEARNING) }`，随资料 id 重置——换资料不继承上一个资料的 tab。
+- 旋转屏幕后 tab 保持，因为 `rememberSaveable` 走 `Bundle`。`AppTab` 是枚举，`Parcelable` 兼容（`Serializable`），无需自定义 `Saver`。
+- 各全屏层的 `show*` 布尔开关沿用现有 `rememberSaveable(state.profile.id)` 写法不变。
+
+## 4. 「AI 学」页结构
+
+自上而下四段，全部沿用薄荷绿主题：
+
+### 4.1 头部渐变卡
+
+- 背景：既有 `AppleMintGradient`（`#A8F3C8 → #5DDFB4 → #35B9B5`），圆角 24dp。
+- 主标题：「AI 学」
+- 副标题：「用你学过的词，生成专属的阅读与练习」
+- 状态徽章：显示 AI 是否已配置。因为当前 AI 网关未接通，恒显示「AI 尚未接通」的浅色徽章——**这是实情，不隐藏**。
+
+### 4.2 四个功能行
+
+每行：图标 + 标题 + 一行说明 + 右侧箭头。整行可点，`contentDescription` 为功能名。
+
+| key | 标题 | 说明 |
+|---|---|---|
+| `word-passage` | 词文串学 | 根据今日所学单词，匹配一篇外刊短文 |
+| `cloze` | AI 短文填词 | AI 生成短文，选词填空做练习 |
+| `listening` | 单词随身听 | 听写听讲，把词听进耳朵里 |
+| `coach` | 单词串讲 | 今日词与常错词逐个讲解，可以追问 |
+
+### 4.3 「AI 学习导航」引导卡
+
+- 标题「AI 学习导航」+ 副标题「学习预热加速！」
+- 一张渐变边框的「查看词表」卡，含「查看详情」按钮 → 跳转阅读 tab（当前唯一有真实内容的 AI 相邻能力）。
+- 卡内如实标注当前词表来源（本地词书）与今日词数。
+
+### 4.4 说明区
+
+「AI 学如何起作用」折叠说明：讲清 AI 会用哪些数据（今日词、词书等级、历史错词）、数据发往哪里（用户自己配置的第三方服务）、未配置时如何降级（离线学习不受影响）。文案必须与 PRD「安全、隐私与合规」章节一致，不得承诺尚未实现的能力。
+
+## 5. 四个功能的页面骨架
+
+`AiFeatureScreen` 由 `AiFeature` 枚举驱动，每个功能页包含：
+
+1. 标题与一句话定位
+2. **「当前进度」状态块** — 明确写出已完成 / 未完成，不使用含糊措辞
+3. **「依赖」清单** — 例如「需要 AI 网关（F2-03）：网络客户端 + `INTERNET` 权限」「需要 AI Profile 配置界面（F2-02 收尾）」
+4. **「会用到的数据」清单** — 例如今日新词 N 个、待复习 M 个（读真实数据）
+5. 一个**真实可点的动作**，指向当前确实存在的能力（如「先去配置 AI」→ 设置 tab 的 AI 分组、「查看今日词表」→ 学习 tab）
+
+约束：状态块文案由 `AiFeature` 枚举携带的静态文本提供，可被 JVM 测试断言，防止「未实现」被悄悄改成「已完成」而不改代码。
+
+## 6. 验收标准
+
+| 编号 | 标准 | 验证方式 |
+|---|---|---|
+| AC-1 | 应用底部出现四栏导航，标签依次为 学习 / 阅读 / AI 学 / 设置 | 真机 `uiautomator dump` 读取四栏 `content-desc` |
+| AC-2 | 点击任一栏切换内容，选中态可见 | adb `input tap` 逐栏切换 + 截图 |
+| AC-3 | 「AI 学」页显示渐变头卡、四个功能行、学习导航卡、说明区 | 真机截图 |
+| AC-4 | 四个功能行都可点开，页面不得空白或崩溃 | adb 逐个点开 + 截图 |
+| AC-5 | 全屏层出现时底导隐藏；返回后回到原 tab | adb 走查 + 截图 |
+| AC-6 | 旋转屏幕后停留 tab 不丢失 | 真机旋转 + 截图（或 instrumentation 断言） |
+| AC-7 | JVM：`AppTab` 恰好四栏、顺序固定、标签不重复；`AiFeature` 的状态文案与「未实现」事实一致 | JVM 测试 |
+| AC-8 | instrumentation：四栏节点存在、点击回调收到正确 tab | `createComposeRule` |
+| AC-9 | 真机全量测试 0 失败，且应用数据未被清空 | `install -r` + `am instrument` + `run-as` 比对 databases |
+
+## 7. 明确不做（本轮）
+
+- AI 网络客户端、`INTERNET` 权限、Endpoint 真实连通
+- AI Profile 管理界面（新增 / 编辑 / 测试连接 / `GET /models` 模型列表）
+- 四个功能的真实生成逻辑（文章、填词、串讲、AI 问答）
+- 音频播放与缓存（`单词随身听`）
+- 「课程」「发现」「我的」等截图里有、但项目无对应能力的 tab
+
+这些进入 F2-03 及后续计划。本轮结束时，用户应当能在真机上看到并点通整个入口结构，且页面上的每一句状态描述都与代码事实相符。

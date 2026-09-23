@@ -1,6 +1,8 @@
 package com.example.englishlearning.ui
 
 import android.view.KeyEvent
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -106,6 +108,117 @@ class AppScreenTest {
         assertEquals(2, invocations)
     }
 
+    /**
+     * 用户要求「在应用底下加个 AI 学」。这里断言四栏都真的出现在应用外壳里，而不只是
+     * 组件级测试通过——底导没被接进 AppScreen 是很容易发生的回归。
+     */
+    @Test
+    fun readyPlanShowsTheFourSlotBottomNavigation() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        AppTab.entries.forEach { tab ->
+            composeRule.onNodeWithTag("app_tab_${tab.name.lowercase()}").assertExists()
+        }
+        composeRule.onNodeWithContentDescription("AI 学").assertExists()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+    }
+
+    @Test
+    fun aiTabOpensTheAiLearningScreen() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_ai").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_learning_screen").assertExists()
+        composeRule.onNodeWithTag("ai_learning_header").assertExists()
+        AiFeature.entries.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").assertExists()
+        }
+        // 换 tab 之后学习页应当已经让位，不能被压在下面继续占位。
+        composeRule.onNodeWithTag("today_plan_summary").assertDoesNotExist()
+    }
+
+    @Test
+    fun settingsTabOpensTheSettingsScreenAndKeepsTheWorksheetEntry() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("settings_open_worksheet").assertExists().assertHasClickAction()
+    }
+
+    @Test
+    fun readingTabOpensTheReadingScreenWithoutItsOwnBackButton() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_reading").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reading_access_screen").assertExists()
+        // 一级 tab 没有「上一层」可回，页面上不该出现任何返回入口。
+        composeRule.onNodeWithTag("reading_access_back").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("返回上一层").assertDoesNotExist()
+    }
+
+    @Test
+    fun openingAnAiFeatureHidesTheBottomBarAndBackReturnsToTheAiTab() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_ai").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_feature_cloze").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_feature_screen").assertExists()
+        composeRule.onNodeWithTag("ai_feature_title").assertExists()
+        composeRule.onNodeWithTag("app_tab_ai").assertDoesNotExist()
+
+        pressSystemBack()
+        composeRule.onNodeWithTag("ai_learning_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_ai").assertExists()
+    }
+
+    @Test
+    fun systemBackFromANonLearningTabReturnsToTheLearningTab() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+
+        pressSystemBack()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+    }
+
+    @Test
+    fun startLearningStillHidesTheBottomBarSoTheCardGetsTheWholeScreen() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithContentDescription("开始学习").assertExists().performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("word_card_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
+    }
+
+    @Composable
+    private fun readyAppScreen() {
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        AppScreen(
+            viewModel = vm,
+            learningSetupViewModel = setupViewModel(),
+            todayPlanViewModel = TodayPlanViewModel({ placeholderCardPlan() }, FakeLearningProfileRepository()),
+            wordCardViewModel = wordCardFixtureViewModel(),
+        )
+    }
+
+    private fun createProfile() {
+        composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
+        composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+    }
+
     private fun todayPlanViewModel(): TodayPlanViewModel = TodayPlanViewModel({ TodayPlanResult.MissingLearningSetup }, FakeLearningProfileRepository())
 
     @Test
@@ -121,7 +234,7 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
 
-        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
 
@@ -144,11 +257,11 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
 
-        composeRule.onNodeWithContentDescription("返回今日计划").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("返回上一层").assertExists().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
         assertEquals(1, invocations)
@@ -164,7 +277,7 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
-        composeRule.onNodeWithContentDescription("返回今日计划").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("返回上一层").assertDoesNotExist()
     }
 
     @Test
@@ -185,7 +298,7 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithContentDescription("开始学习").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("开始学习").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("word_card_screen").assertExists()
         composeRule.onNodeWithText("ability").assertExists()
@@ -221,7 +334,7 @@ class AppScreenTest {
         // Initial load once the profile becomes Ready.
         assertEquals(1, invocations)
 
-        composeRule.onNodeWithContentDescription("开始学习").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("开始学习").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("word_card_screen").assertExists()
 
