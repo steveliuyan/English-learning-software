@@ -591,7 +591,7 @@ git commit -m "feat(reading): show the article source, attribution and translati
 **Interfaces:**
 - Produces: `ReadingAccessScreen` 三个来源入口「AI 生成」「从外刊选取」「粘贴文章」；`ArticleImportScreen(state, onBodyChange, onTitleChange, onImport, onBack, modifier)`；`testTag`：`reading_source_ai`、`reading_source_feed`、`reading_source_import`、`import_title`、`import_body`、`import_submit`、`import_disclaimer`、`import_rejection_reason`。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 要点：
 
@@ -601,11 +601,11 @@ git commit -m "feat(reading): show the article source, attribution and translati
 - 外刊入口进入后先列出 feed 标题列表，**列表为空时显示明确空态**而不是空白页；
 - 外刊来源在未通过许可核验时（台账条目缺失）入口**不可用并说明原因**。
 
-- [ ] **Step 2: 实现** → **Step 3: 跑测试确认 GREEN**
+- [x] **Step 2: 实现** → **Step 3: 跑测试确认 GREEN**
 
 Run: `./gradlew.bat :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.englishlearning.ui.ReadingAccessScreenTest -P...class=com.example.englishlearning.ui.ArticleImportScreenTest --no-daemon --no-build-cache --console=plain`
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git commit -m "feat(reading): offer generation, feed and import as three sources"

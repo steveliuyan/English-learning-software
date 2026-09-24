@@ -8,6 +8,8 @@ import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.RoomAiProfileRepository
+import com.example.englishlearning.ai.net.AiHttpTransport
+import com.example.englishlearning.ai.net.UrlConnectionAiHttpTransport
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.security.AndroidKeyStoreSecretStore
 import com.example.englishlearning.core.security.SecretStore
@@ -39,10 +41,14 @@ import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.WordBookMetadataAssetSource
 import com.example.englishlearning.profile.LocalProfileRepository
+import com.example.englishlearning.reading.ArticleIdFactory
 import com.example.englishlearning.reading.ArticleRepository
 import com.example.englishlearning.reading.RoomArticleRepository
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
 import com.example.englishlearning.profile.RoomLocalProfileRepository
+import com.example.englishlearning.reading.FetchArticleUseCase
+import com.example.englishlearning.reading.GenerateArticleUseCase
+import com.example.englishlearning.reading.ImportArticleUseCase
 import com.example.englishlearning.reading.ReadingPreferenceRepository
 import com.example.englishlearning.reading.RoomReadingPreferenceRepository
 import dagger.Module
@@ -94,4 +100,28 @@ object AppModule {
     @Provides @Singleton fun provideAiProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): AiProfileRepository = RoomAiProfileRepository(database, dispatcher)
     @Provides fun provideAiProfileSecretUseCase(secretStore: SecretStore): AiProfileSecretUseCase = AiProfileSecretUseCase(secretStore)
     @Provides @Singleton fun provideAiProfileIdFactory(): AiProfileIdFactory = AiProfileIdFactory.Random
+    @Provides @Singleton fun provideAiHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AiHttpTransport = UrlConnectionAiHttpTransport(dispatcher)
+    @Provides @Singleton fun provideArticleIdFactory(): ArticleIdFactory = ArticleIdFactory.Random
+    @Provides @Singleton fun provideGenerateArticleUseCase(
+        profiles: AiProfileRepository,
+        secrets: AiProfileSecretUseCase,
+        transport: AiHttpTransport,
+        articles: ArticleRepository,
+        ids: ArticleIdFactory,
+        clock: ClockProvider,
+    ): GenerateArticleUseCase = GenerateArticleUseCase(profiles, secrets, transport, articles, ids, { clock.instant() })
+    @Provides @Singleton fun provideFetchArticleUseCase(
+        transport: AiHttpTransport,
+        articles: ArticleRepository,
+        ids: ArticleIdFactory,
+        clock: ClockProvider,
+    ): FetchArticleUseCase = FetchArticleUseCase(transport, articles, ids, { clock.instant() })
+    @Provides @Singleton fun provideImportArticleUseCase(
+        articles: ArticleRepository,
+        plans: TodayPlanRepository,
+        events: LearningEventRepository,
+        cards: WordCardSource,
+        ids: ArticleIdFactory,
+        clock: ClockProvider,
+    ): ImportArticleUseCase = ImportArticleUseCase(articles, plans, events, cards, ids, { clock.instant() })
 }

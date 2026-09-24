@@ -7,6 +7,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishlearning.ui.AiProfileSettingsViewModel
 import com.example.englishlearning.ui.AppScreen
+import com.example.englishlearning.ui.ArticleReadingViewModel
 import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.ReadingAccessViewModel
 import com.example.englishlearning.ui.TodayPlanViewModel
@@ -27,6 +28,7 @@ class MainActivity : ComponentActivity() {
                 wordCardViewModel = hiltViewModel<WordCardViewModel>(),
                 worksheetViewModel = hiltViewModel<WorksheetViewModel>(),
                 readingAccessViewModel = hiltViewModel<ReadingAccessViewModel>(),
+                articleReadingViewModel = hiltViewModel<ArticleReadingViewModel>(),
                 aiProfileViewModel = hiltViewModel<AiProfileSettingsViewModel>(),
             )
         }

@@ -1130,11 +1130,11 @@ git commit -m "feat(reading): add the article reading screen"
 - Consumes: `GenerateArticleResult`、`AiFailure` + `AiFailureUiText` + `UserAction`、`AiPayloadKind`
 - Produces: `ReadingAccessScreen` 新增参数 `state`（扩展为含生成态的 `ReadingAccessUiState`）、`onGenerate: (ArticleType, ArticleLengthTier) -> Unit`、`onOpenArticle: () -> Unit`、`onConfirmOutbound: (Boolean) -> Unit`、`onOpenAiProfiles: () -> Unit`
 
-- [ ] **Step 1: 更新受影响的既有测试（先 RED）**
+- [x] **Step 1: 更新受影响的既有测试（先 RED）**
 
 `ReadingAccessScreenTest` 里原先断言「本阶段不会发起网络生成」的用例必须改为断言新文案。`AppScreenTest` 增加「阅读栏点生成 → 进阅读页」的路径。
 
-- [ ] **Step 2: 实现界面**
+- [x] **Step 2: 实现界面**
 
 要点：
 
@@ -1146,19 +1146,19 @@ git commit -m "feat(reading): add the article reading screen"
 - `Cancelled` 不显示错误横幅（用户自己取消的，不该弹红字）。
 - 生成中禁用按钮并显示进度；**失败后今日学习完成状态与今日计划不受影响**（用例本身不写今日计划，界面也不得因失败清任何状态）。
 
-- [ ] **Step 3: AppScreen 接线**
+- [x] **Step 3: AppScreen 接线**
 
 - 新增 `var showArticle by rememberSaveable(state.profile.id) { mutableStateOf(false) }`，加进 `overlayOpen`。
 - `BackHandler` **按优先级从低到高声明**：`showArticle` 的 handler 声明在阅读栏 handler 之后（后声明者优先），否则返回键会关错层。已有注释的排序规则照旧扩写。
 - 点词卡：复用既有 `CardDetailScreen` 分支，把选中的 `WordCard` 存进状态。
 - `MainActivity` 挂 `articleReadingViewModel`。
 
-- [ ] **Step 4: 跑测试确认 GREEN**
+- [x] **Step 4: 跑测试确认 GREEN**
 
 Run: `./gradlew.bat :app:connectedDebugAndroidTest -P...class=com.example.englishlearning.ui.ReadingAccessScreenTest -P...class=com.example.englishlearning.ui.AppScreenTest --no-daemon --no-build-cache --console=plain`
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/ui app/src/main/java/com/example/englishlearning/MainActivity.kt app/src/androidTest

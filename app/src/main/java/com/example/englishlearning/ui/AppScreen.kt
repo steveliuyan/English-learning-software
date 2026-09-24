@@ -86,6 +86,7 @@ fun AppScreen(
     wordCardViewModel: WordCardViewModel,
     worksheetViewModel: WorksheetViewModel? = null,
     readingAccessViewModel: ReadingAccessViewModel? = null,
+    articleReadingViewModel: ArticleReadingViewModel? = null,
     aiProfileViewModel: AiProfileSettingsViewModel? = null,
 ) {
     var name by remember { mutableStateOf("") }
@@ -106,6 +107,10 @@ fun AppScreen(
             // 选中的 AI 功能存 key 而不是枚举实例：String 进 Bundle 最省心，将来加功能也不用改存法。
             var selectedFeatureKey by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
             var showAiProfiles by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 阅读来源的二级层：导入页是显式导航；文章页由 readingTarget 驱动；词卡详情是
+            // 阅读页之上的本地覆盖层（WordCardViewModel 的详情只服务学习流，不复用）。
+            var showArticleImport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var selectedArticleCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             val selectedFeature = AiFeature.entries.firstOrNull { it.key == selectedFeatureKey }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
             // AI 配置是设备级的（与学习者无关），启动时读一次，好让「设置」栏的摘要和「AI 学」页
@@ -128,6 +133,14 @@ fun AppScreen(
             }
             val readingState: ReadingAccessUiState =
                 readingAccessViewModel?.uiState?.collectAsState()?.value ?: ReadingAccessUiState.Loading
+            val readingTarget = readingAccessViewModel?.readingTarget?.collectAsState()?.value
+            // 任一来源产出文章都会设置 readingTarget：此时导入页让位给文章页，
+            // 并把文章与词卡交给阅读页 ViewModel 渲染。
+            LaunchedEffect(readingTarget) {
+                val target = readingTarget ?: return@LaunchedEffect
+                showArticleImport = false
+                articleReadingViewModel?.load(target.article, target.cards)
+            }
             // Only an user-opened setup screen may be dismissed; a mandatory setup (no active
             // word book yet) must stay until a word book is saved, so it gets no escape hatch.
             val cancelSetup: (() -> Unit)? = if (showSetup && !setupRequired) {
@@ -143,7 +156,8 @@ fun AppScreen(
                 todayPlanViewModel.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles ||
+                showArticleImport || readingTarget != null || selectedArticleCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -153,6 +167,11 @@ fun AppScreen(
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
+            // 阅读来源的层级从浅到深：导入页 → 文章页 → 点词的词卡详情。
+            // 声明顺序即优先级（后声明者先拿返回键），别随手重排。
+            BackHandler(enabled = showArticleImport) { showArticleImport = false }
+            BackHandler(enabled = readingTarget != null) { readingAccessViewModel?.closeArticle() }
+            BackHandler(enabled = selectedArticleCard != null) { selectedArticleCard = null }
             // 设置页先声明、预览页后声明：两者同时为真时（从设置页点进预览）返回键要先关预览。
             BackHandler(enabled = showWorksheetSettings) { showWorksheetSettings = false }
             BackHandler(enabled = showWorksheetPreview) {
@@ -284,6 +303,32 @@ fun AppScreen(
             } else if (showReadingHistory) {
                 val history = (readingState as? ReadingAccessUiState.Ready)?.history.orEmpty()
                 ReadingHistoryScreen(history = history, onBack = { showReadingHistory = false })
+            } else if (showArticleImport) {
+                val importState = (readingState as? ReadingAccessUiState.Ready)?.import ?: ImportUiState()
+                ArticleImportScreen(
+                    state = importState,
+                    onTitleChange = { readingAccessViewModel?.importTitleChange(it) },
+                    onBodyChange = { readingAccessViewModel?.importBodyChange(it) },
+                    onImport = { readingAccessViewModel?.submitImport() },
+                    onBack = { showArticleImport = false },
+                )
+            } else if (readingTarget != null) {
+                val articleState = articleReadingViewModel?.uiState?.collectAsState()?.value
+                Box(Modifier.fillMaxSize()) {
+                    ArticleReadingScreen(
+                        state = articleState,
+                        onBack = { readingAccessViewModel?.closeArticle() },
+                        onOpenCard = { selectedArticleCard = it },
+                        onModeChange = { articleReadingViewModel?.setMode(it) },
+                        onToggleTranslation = { articleReadingViewModel?.toggleTranslation() },
+                        onOpenDictionaryPlaceholder = {},
+                        onOpenPronunciationPlaceholder = {},
+                    )
+                    // 点词的详情是阅读页之上的覆盖层，不动 readingTarget 的状态机。
+                    selectedArticleCard?.let { card ->
+                        CardDetailScreen(card = card, onBack = { selectedArticleCard = null })
+                    }
+                }
             } else {
                 // 四个一级 tab 的根页面装在这里，底部导航只在这一层出现；上面所有分支都是
                 // 覆盖全屏的二级层，因此天然不会显示底导。
@@ -310,6 +355,22 @@ fun AppScreen(
                                 state = readingState,
                                 onSelectType = { readingAccessViewModel?.selectType(it) },
                                 onOpenHistory = { showReadingHistory = true },
+                                onGenerate = { readingAccessViewModel?.generate() },
+                                onRegenerate = { readingAccessViewModel?.generate(regenerate = true) },
+                                onOpenTodayArticle = { readingAccessViewModel?.openTodayArticle() },
+                                onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
+                                onOpenAiSettings = {
+                                    // 与 AI 学的跳转同一规则：配置页可用就直达，否则退回设置栏。
+                                    aiProfileViewModel?.load()
+                                    if (aiProfileViewModel != null) {
+                                        showAiProfiles = true
+                                    } else {
+                                        selectedTab = AppTab.SETTINGS
+                                    }
+                                },
+                                onOpenImport = { showArticleImport = true },
+                                onOpenFeed = { readingAccessViewModel?.openFeed() },
+                                onFetchFeedItem = { readingAccessViewModel?.fetchFeedItem(it) },
                             )
                             AppTab.AI -> AiLearningScreen(
                                 todayWordCount = todayReady?.newTarget,
