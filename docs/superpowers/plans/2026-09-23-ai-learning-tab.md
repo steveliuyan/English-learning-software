@@ -183,7 +183,7 @@
 - [x] 登记 `app-authored-ai-mascot` 到 `docs/third-party-notices.md`；`verifyThirdPartyNotices` → `Validated 43 third-party notice entries`；`ThirdPartyNoticesTest` 4/4 绿。
 - [x] 真机跑 `AiMascotTest`：`OK (7 tests)`，0 失败。
 - [x] 真机证明「确实在动」：见下方「Task 9 的执行记录与偏差」第 3 条。
-- [ ] 提交。
+- [x] 提交：实现 `33906e6`，眨眼闪烁修复 `1fcc4a6`（两者均已推送，本地 = 远端）。
 
 ### Task 9 的执行记录与偏差
 
