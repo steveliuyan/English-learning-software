@@ -57,7 +57,9 @@
   - `SecretStore.read(reference: SecretReference): Result<CharArray>`（返回的数组由调用方负责清零）
   - `AiProfileSecretUseCase.loadKey(profile: AiProfile): Result<CharArray>`
 
-- [ ] **Step 1: 写失败的 JVM 测试（Robolectric + 假 `KeyStoreProvider`）**
+- [x] **Step 1: 写失败的 JVM 测试（假 `KeyStoreProvider`，用 `@TempDir` 取代 Robolectric）**
+
+> **偏差（已执行时改定）**：计划原文写的是 Robolectric + `ApplicationProvider`。实际改用 **`@TempDir` 注入目录**，因此把 `AndroidKeyStoreSecretStore` 的主构造从「接收 `Context`」改为「接收 `File` 目录」，保留 `Context` 次级构造。理由两条：① 本机 `D:/Android/GradleCache` 下**没有 Robolectric 的 `android-all` 运行期 jar**，首次使用要联网下载上百 MB，与「零新依赖」的约束相冲；② 该类对 `Context` 的真实需求只是 `filesDir/secrets` 这一个目录，直接要目录比为了拿目录而引入整个 Android 运行期更干净。`Context` 构造点只有 Hilt 一处（`di/AppModule.kt`），零改动。
 
 `AndroidKeyStoreSecretStore` 构造需要 `Context`（用 `filesDir`），所以 JVM 侧用 Robolectric 提供 Context，并用**真实 JCE AES 密钥**冒充 Keystore 密钥——这样加解密是真跑，只是密钥来源换掉。
 
@@ -99,12 +101,13 @@ class AndroidKeyStoreSecretStoreTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认 RED**
+- [x] **Step 2: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.core.security.AndroidKeyStoreSecretStoreTest" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败 `Unresolved reference 'read'`。
+实测：按预期失败——`Unresolved reference 'read'`（调用点 3 处）+ `Argument type mismatch: actual type is 'File!', but 'Context' was expected.`（构造点改签名后的连带失败）。
 
-- [ ] **Step 3: 实现 `read` 与 `loadKey`**
+- [x] **Step 3: 实现 `read` 与 `loadKey`**
 
 `AndroidKeyStoreSecretStore.read`：
 
@@ -136,7 +139,7 @@ override fun read(reference: SecretReference): Result<CharArray> =
 
 `AiProfileSecretUseCase.loadKey`：`secretStore.read(referenceFor(profile.profileId))`，原样透传结果，**不做日志**。
 
-- [ ] **Step 4: 跑 JVM 测试确认 GREEN，再在真机上验证真实 Keystore 往返**
+- [x] **Step 4: 跑 JVM 测试确认 GREEN，再在真机上验证真实 Keystore 往返**
 
 Run (JVM): 同 Step 2。Expected: PASS。
 Run (真机): 新增 `SecretStoreDeviceTest`，在真机上走 `save → read → delete → read 失败` 全链路，用 `am instrument` 执行。
@@ -147,12 +150,22 @@ adb shell am instrument -w -e class com.example.englishlearning.core.security.Se
 
 > 这一步不是可选的：它是 `IV_LENGTH = 12` 唯一的外部证据。
 
-- [ ] **Step 5: 提交**
+实测：JVM 侧 `AndroidKeyStoreSecretStoreTest` **7/7**、`AiProfileSecretUseCaseTest` **5/5**、`AiProfileSettingsViewModelTest` **16/16**；完整 JVM 套件 **46 个测试类 / 252 用例 / 0 失败 / 0 跳过**。真机 `com.example.englishlearning.core.security` 包 **OK (6 tests)**（`SecretStoreDeviceTest` 4 例走真实 AndroidKeyStore 往返，含多字节中文字符密钥；`AndroidKeyStoreSecretStoreTest` 2 例无关用例一并回归）——`IV_LENGTH = 12` 与 `iv || ciphertext` 布局在真实 Keystore 上成立。
+
+- [x] **Step 5: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/core/security app/src/main/java/com/example/englishlearning/ai app/src/test/java/com/example/englishlearning/core/security app/src/androidTest/java/com/example/englishlearning/core/security
 git commit -m "feat(security): read stored secrets back for outbound authorization"
 ```
+
+### Task A 执行记录与偏差
+
+1. **偏离计划：Robolectric → `@TempDir`**（见 Step 1 的理由）。连带改动：`AndroidKeyStoreSecretStore` 主构造改为接收 `File` 目录，`Context` 版本降为次级构造。生产构造点只有 Hilt 一处，未受影响。
+2. **接口加方法会击穿所有假实现**：`SecretStore` 加 `read` 后，`AiProfileSecretUseCaseTest` 与 `AiProfileSettingsViewModelTest` 里两个文件级 `FakeSecretStore` 必须同步补 `read`，否则测试源集编译不过。这是接口扩展的必然代价，不是可选项。
+3. **`IV_LENGTH = 12` 只能由真机证明**：`save` 写的是 `iv || ciphertext` 且**不记录 IV 长度**，读回端只能假定 12。JVM 侧用的是真实 JCE AES 密钥，能验证布局逻辑，但「AndroidKeyStore 在 `init(ENCRYPT_MODE, key)` 下 IV 恒为 12 字节」这条前提只有真机往返能证实——`SecretStoreDeviceTest` 就是这条证据。
+4. **错误映射故意合并**：GCM 有认证标签，错误密钥/篡改密文抛 `AEADBadTagException`，与「密文缺失」「密钥丢失」统一映射为 `AppError.KeyStoreUnavailable`。**不区分「旧格式」与「被篡改」**，因为三种情况对用户的处置完全相同（界面：密钥不可读，请重新录入）。
+5. **`androidTest` 不会被 `:app:testDebugUnitTest` 编译**：新增 `SecretStoreDeviceTest` 后，JVM 套件全绿并不代表真机测试类没问题，必须单独 `assembleDebugAndroidTest` 才会暴露编译错误。这次已单独编译并真机执行。
 
 ---
 

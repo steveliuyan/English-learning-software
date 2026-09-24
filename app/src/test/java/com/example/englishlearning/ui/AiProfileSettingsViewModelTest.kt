@@ -407,6 +407,14 @@ private class FakeSecretStore(private val ops: MutableList<String>) : SecretStor
         return Result.success(Unit)
     }
 
+    override fun read(reference: SecretReference): Result<CharArray> {
+        ops += "secret-read:${reference.alias}"
+        val value = entries[reference.alias]
+            ?: return Result.failure(AppErrorException(AppError.KeyStoreUnavailable))
+        // 返回新数组：真实实现保证调用方清零上一次结果不影响下一次读取。
+        return Result.success(value.toCharArray())
+    }
+
     override fun delete(reference: SecretReference): Result<Unit> {
         ops += "secret-delete:${reference.alias}"
         entries.remove(reference.alias)

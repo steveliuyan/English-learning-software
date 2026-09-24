@@ -2,8 +2,10 @@ package com.example.englishlearning.ai
 
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
+import com.example.englishlearning.core.storage.AppErrorException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -40,6 +42,29 @@ class AiProfileSecretUseCaseTest {
         assertEquals("ai-profile-p2", store.deletedReference?.alias)
     }
 
+    @Test
+    fun loadingKeyUsesTheSameProfileReferenceAndReturnsTheValueUnchanged() {
+        val store = FakeSecretStore().apply { storedValue = "sk-live".toCharArray() }
+        val useCase = AiProfileSecretUseCase(store)
+
+        val loaded = useCase.loadKey(profile("p3")).getOrThrow()
+
+        assertEquals("ai-profile-p3", store.readReference?.alias)
+        assertContentEquals("sk-live".toCharArray(), loaded)
+    }
+
+    @Test
+    fun loadingKeyPassesTheStorageFailureThroughUnchanged() {
+        // 用例层不得把失败改写成别的类型、也不得吞掉它——界面要按 KeyStoreUnavailable 决定提示什么。
+        val store = FakeSecretStore()
+        val useCase = AiProfileSecretUseCase(store)
+
+        val result = useCase.loadKey(profile("p4"))
+
+        assertTrue(result.isFailure)
+        assertEquals(AppError.KeyStoreUnavailable, (result.exceptionOrNull() as AppErrorException).appError)
+    }
+
     private fun profile(id: String) = AiProfile(
         profileId = id,
         displayName = "Profile",
@@ -54,11 +79,21 @@ class AiProfileSecretUseCaseTest {
         var savedReference: SecretReference? = null
         var checkedReference: SecretReference? = null
         var deletedReference: SecretReference? = null
+        var readReference: SecretReference? = null
+        var storedValue: CharArray? = null
 
         override fun save(reference: SecretReference, secret: CharArray): Result<Unit> {
             savedReference = reference
             secret.fill('\u0000')
             return Result.success(Unit)
+        }
+
+        override fun read(reference: SecretReference): Result<CharArray> {
+            readReference = reference
+            val value = storedValue
+                ?: return Result.failure(AppErrorException(AppError.KeyStoreUnavailable))
+            // 每次都返回新数组：真实实现就是这个契约，假实现不能把它放宽。
+            return Result.success(value.copyOf())
         }
 
         override fun delete(reference: SecretReference): Result<Unit> {
