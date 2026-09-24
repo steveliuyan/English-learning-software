@@ -160,6 +160,43 @@
 
 ---
 
+### Task 9: AI 表情（头部卡顶部）
+
+> **计划外追加（2026-09-24，用户提出）**。用户要求「在 AI 学那加个 grokbot 这种类似的动态表情，有点像 AI，位置要放好要大」。三项决定：形象用**白色玻璃质感**；动效**绑定真实配置状态**（只映射「AI 是否已配置」这一事实，不做任何虚构状态）；位置与大小由实现者按人机审美定。设计详见 `docs/superpowers/specs/2026-09-23-ai-learning-tab-design.md` §4.5 与 AC-10~AC-14。
+>
+> **查证结论（先做了再定方案）**：GitHub 上确有同类实现，但没有一个能用。`CX-ArtLab/agent-robot-avatar`（MIT）最接近，但它是 **Web Component**，Compose 里跑不了；`iprashantpanwar/Composio`（MIT）是纯 Compose 且含 `MorphingBlob`，但引入即为新依赖 + 锁文件重写；`bloub` 与 GrokBot 系是对 **xAI Grok 吉祥物的复刻**，形象属他人品牌资产，不采用。**结论：自撰零依赖 Compose Canvas 动画，架构思路借鉴（几何纯函数 + 逐帧绘制 + 一次性动画控制器），代码自己写。**
+
+**Files:**
+- Create: `app/src/main/java/com/example/englishlearning/ui/mascot/AiMascotExpression.kt`
+- Create: `app/src/main/java/com/example/englishlearning/ui/mascot/AiMascotGeometry.kt`
+- Create: `app/src/main/java/com/example/englishlearning/ui/mascot/AiMascot.kt`
+- Modify: `app/src/main/java/com/example/englishlearning/ui/AiLearningScreen.kt`
+- Modify: `docs/third-party-notices.md`
+- Test: `app/src/test/java/com/example/englishlearning/ui/mascot/AiMascotGeometryPolicyTest.kt`
+- Test: `app/src/androidTest/java/com/example/englishlearning/ui/mascot/AiMascotTest.kt`
+
+- [x] 写 `AiMascotGeometryPolicyTest`（9 例，锁几何不变量）与 `AiMascotTest`（锁定尺寸 / 描述属实 / 能力禁令 / 不可点击）。
+- [x] 跑构建确认 RED（`Unresolved reference 'AiMascot'` 等，`BUILD FAILED`，EXIT=1）。
+- [x] 实现 `AiMascotExpression`、`AiMascotGeometry` + `AiMascotGeometryPolicy`（纯函数）、`AiMascot`（`Canvas` + `rememberInfiniteTransition` 呼吸 + 眨眼 `Animatable`）。
+- [x] 把 `AiHeaderCard` 改为「居中表情 → 标题 / 副标题 → 徽章」，表情 `AI_MASCOT_SIZE = 140.dp`。
+- [x] 跑 JVM 测试确认 GREEN：`tests="9" failures="0" errors="0"`。
+- [x] 登记 `app-authored-ai-mascot` 到 `docs/third-party-notices.md`；`verifyThirdPartyNotices` → `Validated 43 third-party notice entries`；`ThirdPartyNoticesTest` 4/4 绿。
+- [x] 真机跑 `AiMascotTest`：`OK (7 tests)`，0 失败。
+- [x] 真机证明「确实在动」：见下方「Task 9 的执行记录与偏差」第 3 条。
+- [ ] 提交。
+
+### Task 9 的执行记录与偏差
+
+1. **`androidTest` 的编译错误只有构建它才会暴露。** `:app:testDebugUnitTest` 编译的是 JVM 源集，**不会**编译 `androidTest`。第一版 `AiMascotTest` 用了 `SemanticsConfiguration.getOrNull`，漏了 `import androidx.compose.ui.semantics.getOrNull`（它是扩展函数），JVM 测试全绿、`assembleDebugAndroidTest` 才报 `Unresolved reference 'getOrNull'`（`joinToString` 是它的级联错误）。**教训：改过 `androidTest` 就必须跑一次 `assembleDebugAndroidTest`，不能只看单测通过。**
+2. **`createComposeRule()` 的 `setContent` 每个测试方法只能调用一次。** 第一版把「能力禁令」写成在 `listOf(true, false)` 上循环、每次循环调 `showMascot()`，真机报 `IllegalStateException: ComponentActivity has already set content`。改为拆成两个测试方法（`theUnconfiguredMascotNeverClaimsAnUnimplementedCapability` / `theConfiguredMascotNeverClaimsAnUnimplementedCapability`）共用一个私有断言函数，**禁令词表仍只维护一份**。这是测试自身的缺陷，会掩盖真正想抓的文案问题。
+3. **「表情是否在动」用截图/录屏定量证明，不靠肉眼。** 语义树断言不了逐帧画面，所以做了一次实测：
+   - 设备 `animator_duration_scale = 0.0`（本机长期如此，避免 UI 测试被动画拖住）时，表情区连拍 20 帧**逐像素完全相同**（平均绝对差 `0.000`），身体上边缘摆动 `0px`；同批**静态对照区**也是 `0.000`，排除截图噪声。
+   - 临时把该值设为 `1.0`（验证后已改回 `0.0`）：同法连拍，动画区相邻帧平均绝对差升到 `max 2.115`、静态区仍 `0.000`；录屏 14s / 1255 帧，身体上边缘摆动 **14px**（与几何公式 `0.07 × 192.5 ≈ 13.5px` 吻合），检出 **4 次眨眼**（每次约 11 帧 ≈ 120ms），闭眼帧肉眼为两条圆头短横线。
+   - **结论：代码没问题，先前观察到的「静止」是系统减弱动效设置所致，属正确行为，不得绕开。** 已写进设计文档 §4.5，避免后人当缺陷修。
+   - 分析脚本留在本地（`verification-logs/` 被 gitignore）：`mascot-frames/analyse.py` 用 PIL 比对静态截图，`analyse_video.py` 用 OpenCV 逐帧量化呼吸与眨眼。
+4. **真机独立复核了 140dp。** `uiautomator dump` 取到表情节点 `bounds="[348,211][733,596]"` = `385×385px`；本机 `wm density = 440`（=2.75 倍），`385 / 2.75 = 140dp`，与头卡里写死的常量一致。这比只断言「我传进去的 modifier 生效」更有意义。
+5. **`AiMascotTest` 补了 `@RunWith(AndroidJUnit4::class)`**，与该目录既有 Compose 测试一致（`androidTest` 里 25/29 个类都带）。
+
 ## 执行记录与计划偏差
 
 以下是与计划不一致的地方，按事实记录，供后续复用：

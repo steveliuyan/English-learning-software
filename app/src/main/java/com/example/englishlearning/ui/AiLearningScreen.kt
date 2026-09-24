@@ -37,7 +37,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.mascot.AiMascot
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
@@ -50,6 +52,16 @@ import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
 
 private val AiHeaderGradient = Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))
+
+/**
+ * 头卡表情边长。
+ *
+ * 140dp 是取舍后的结果，不是随手取的数：手机竖屏内容宽约 320dp（360dp 屏宽减去左右 20dp 内边距），
+ * 140dp 约占其四成半，在整页最上方形成明确的视觉入口，同时把标题/副标题留在同一屏内。
+ * 再大（≥160dp）会把副标题和状态徽章挤出首屏，用户看不到「AI 尚未接通」这句实话；
+ * 再小（≤110dp）则退化成装饰小图标，与「要大」的诉求不符。逐项理由见设计文档 §4.5。
+ */
+private val AI_MASCOT_SIZE = 140.dp
 
 /**
  * 「AI 学」一级页。
@@ -106,14 +118,25 @@ private fun AiHeaderCard(aiConfigured: Boolean) {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(AiHeaderGradient)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("AI 学", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+            // 表情居中独占一行：手机屏宽约 360dp，与文字并排会把它压到 110dp 左右，
+            // 既与「要大」冲突，也会把副标题挤成四五行的窄条。取舍理由见设计文档 §4.5。
+            AiMascot(aiConfigured = aiConfigured, modifier = Modifier.size(AI_MASCOT_SIZE))
+            Text(
+                "AI 学",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+            )
             Text(
                 text = "用你学过的词，生成专属的阅读与练习",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White,
+                textAlign = TextAlign.Center,
             )
             Box(
                 modifier = Modifier
