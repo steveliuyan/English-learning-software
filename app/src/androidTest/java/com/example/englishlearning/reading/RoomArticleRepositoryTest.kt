@@ -94,6 +94,25 @@ class RoomArticleRepositoryTest {
     }
 
     @Test
+    fun findsAStoredArticleByItsSourceUrl() = runTest {
+        val url = "https://learningenglish.voanews.com/a/7998765.html"
+        repository.saveNewVersion(
+            article(
+                source = ArticleSource.WebFetched(
+                    sourceId = "voa-learning-english",
+                    displayName = "VOA Learning English",
+                    articleUrl = url,
+                    licenseNote = "Public domain",
+                    attributionText = "learningenglish.voanews.com",
+                ),
+            ),
+        ).getOrThrow()
+
+        assertEquals("a1", repository.findBySourceUrl(url).getOrThrow()?.articleId)
+        assertEquals(null, repository.findBySourceUrl("https://learningenglish.voanews.com/a/other.html").getOrThrow())
+    }
+
+    @Test
     fun unknownSourceTypeFailsTheReadInsteadOfBecomingUserImported() = runTest {
         // 'MYSTERY' 不是三个已知分支中的任何一个。把它读成 UserImported 会凭空抹掉抓取来源
         // 必须展示的署名与许可说明，因此整体失败才是唯一诚实的处置。

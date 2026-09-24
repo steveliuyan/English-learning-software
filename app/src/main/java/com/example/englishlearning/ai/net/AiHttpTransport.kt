@@ -2,13 +2,15 @@ package com.example.englishlearning.ai.net
 
 /**
  * 一次 AI/抓取出站请求。[headers] 的值必须已经过上游策略审查（`AiRequestPolicy`），
- * 本类型不负责任何校验——它只是运输。
+ * 本类型不负责任何校验——它只是运输。[method] 只支持 `POST`（AI 对话）与 `GET`（外刊
+ * 抓取，无 body 无凭据）；transport 对其他值的行为未定义。
  */
 data class AiHttpRequest(
     val url: String,
     val headers: Map<String, String>,
     val body: String,
     val timeoutSeconds: Int,
+    val method: String = "POST",
 )
 
 data class AiHttpResponse(

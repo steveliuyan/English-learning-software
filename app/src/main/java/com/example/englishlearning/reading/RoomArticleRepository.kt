@@ -58,6 +58,10 @@ class RoomArticleRepository(
         database.internalArticleDao().findHistory(profileId).map { it.toDomain() }
     }
 
+    override suspend fun findBySourceUrl(url: String): Result<Article?> = runStorage {
+        database.internalArticleDao().findBySourceUrl(url)?.toDomain()
+    }
+
     private suspend fun <T> runStorage(block: suspend () -> T): Result<T> = try {
         Result.success(withContext(ioDispatcher) { block() })
     } catch (cancellation: CancellationException) {

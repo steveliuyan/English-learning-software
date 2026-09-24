@@ -88,4 +88,29 @@ class ArticleQualityPolicyTest {
             ArticleQualityPolicy.validate(raw(english = "ab\u0000cd" + " word".repeat(200)), length).isFailure,
         )
     }
+
+    @Test
+    fun fetchedArticlesAreValidatedWithoutATranslation() {
+        // 外刊抓取没有译文也不伪造（Task C）：除译文相关检查外全部照走。
+        val fetchedLength = ArticleLengthPolicy.Resolved(
+            tier = ArticleLengthTier.LONG,
+            targetWords = 100..2000,
+            acceptedWords = 60..2000,
+        )
+        val result = ArticleQualityPolicy.validateFetched(raw(chinese = ""), fetchedLength)
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrThrow().chineseText.isEmpty())
+    }
+
+    @Test
+    fun fetchedArticlesStillRejectDangerousMarkupAndBadBodies() {
+        val fetchedLength = ArticleLengthPolicy.Resolved(
+            tier = ArticleLengthTier.LONG,
+            targetWords = 100..2000,
+            acceptedWords = 60..2000,
+        )
+        assertTrue(ArticleQualityPolicy.validateFetched(raw(chinese = "", title = "<script>x</script>"), fetchedLength).isFailure)
+        assertTrue(ArticleQualityPolicy.validateFetched(raw(chinese = "", english = "too short"), fetchedLength).isFailure)
+        assertTrue(ArticleQualityPolicy.validateFetched(raw(chinese = "", english = "这是一段中文。".repeat(20)), fetchedLength).isFailure)
+    }
 }

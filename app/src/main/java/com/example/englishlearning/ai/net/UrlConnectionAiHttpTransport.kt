@@ -24,15 +24,20 @@ class UrlConnectionAiHttpTransport(
         var connection: HttpURLConnection? = null
         try {
             connection = (URL(request.url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
+                requestMethod = request.method
                 // 不跟随重定向：跟随会把「公网域名 → 私网地址」这条被 validateEndpoint 挡掉的路重新打开。
                 instanceFollowRedirects = false
                 connectTimeout = request.timeoutSeconds * 1000
                 readTimeout = request.timeoutSeconds * 1000
-                doOutput = true
                 request.headers.forEach { (name, value) -> setRequestProperty(name, value) }
             }
-            connection.outputStream.use { it.write(request.body.toByteArray(Charsets.UTF_8)) }
+            if (request.method == "GET") {
+                // GET 不声明 doOutput：HttpURLConnection 会拒绝带输出的 GET，而抓取本来就没有 body。
+                check(request.body.isEmpty()) { "GET requests must not carry a body" }
+            } else {
+                connection.doOutput = true
+                connection.outputStream.use { it.write(request.body.toByteArray(Charsets.UTF_8)) }
+            }
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.use { readCapped(it, maxResponseBytes) } ?: ReadOutcome.Text("")

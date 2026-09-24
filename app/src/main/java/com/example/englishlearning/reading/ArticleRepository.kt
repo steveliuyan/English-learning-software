@@ -16,4 +16,7 @@ interface ArticleRepository {
     ): Result<Article?>
 
     suspend fun findHistory(profileId: String): Result<List<Article>>
+
+    /** 按抓取来源 URL 找已存文章（跨计划复用同一篇外刊）。仅 WebFetched 文章有 URL。 */
+    suspend fun findBySourceUrl(url: String): Result<Article?>
 }

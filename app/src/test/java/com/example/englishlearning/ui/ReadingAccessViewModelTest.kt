@@ -82,6 +82,7 @@ class ReadingAccessViewModelTest {
         override suspend fun saveNewVersion(article: Article) = Result.success(article)
         override suspend fun findLatest(profileId: String, localDate: String, activeWordBookId: String, articleType: ArticleType, lengthTier: ArticleLengthTier) = Result.success<Article?>(null)
         override suspend fun findHistory(profileId: String) = Result.success(history)
+        override suspend fun findBySourceUrl(url: String) = Result.success<Article?>(null)
     }
 
     private class FakePreferenceRepository(private val preference: ReadingPreference = ReadingPreference("p1")) : ReadingPreferenceRepository {

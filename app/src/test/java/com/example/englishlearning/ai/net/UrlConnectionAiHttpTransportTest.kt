@@ -22,10 +22,12 @@ class UrlConnectionAiHttpTransportTest {
     private var port = 0
     private var lastSeenBody = ""
     private var lastSeenAuth = ""
+    private var lastSeenMethod = ""
 
     @BeforeTest
     fun start() {
-        server = FakeHttpServer { path, headers, body ->
+        server = FakeHttpServer { method, path, headers, body ->
+            lastSeenMethod = method
             if (path.startsWith("/ok")) {
                 lastSeenBody = body
                 lastSeenAuth = headers["authorization"] ?: ""
@@ -63,6 +65,14 @@ class UrlConnectionAiHttpTransportTest {
         timeoutSeconds = timeout,
     )
 
+    private fun getRequest(path: String) = AiHttpRequest(
+        url = "http://127.0.0.1:$port$path",
+        headers = emptyMap(),
+        body = "",
+        timeoutSeconds = 5,
+        method = "GET",
+    )
+
     @Test
     fun postsTheBodyAndReturnsTheStatusCodeAndBody() = runTest {
         val result = transport.send(request("/ok"))
@@ -71,6 +81,16 @@ class UrlConnectionAiHttpTransportTest {
         assertTrue(responded.response.body.contains("hi"))
         assertEquals("""{"model":"m"}""", lastSeenBody)
         assertEquals("Bearer test-key", lastSeenAuth)
+    }
+
+    @Test
+    fun sendsAGetRequestWithoutABodyWhenAskedTo() = runTest {
+        // 抓取外刊走 GET：无 body、无凭据头。method 由调用方显式给出，传输层不猜。
+        val result = transport.send(getRequest("/ok"))
+        val responded = result as AiHttpResult.Responded
+        assertEquals(200, responded.response.statusCode)
+        assertEquals("GET", lastSeenMethod)
+        assertEquals("", lastSeenBody)
     }
 
     @Test
@@ -113,7 +133,7 @@ private class FakeResponse(
 )
 
 private class FakeHttpServer(
-    private val route: (path: String, headers: Map<String, String>, body: String) -> FakeResponse,
+    private val route: (method: String, path: String, headers: Map<String, String>, body: String) -> FakeResponse,
 ) {
     private var serverSocket: ServerSocket? = null
     private var acceptThread: Thread? = null
@@ -158,7 +178,7 @@ private class FakeHttpServer(
                 // 之后直接 read() body 就会阻塞到客户端超时——2026-09-24 实测踩过。
                 while (true) {
                     val request = readRequest(input) ?: return
-                    val response = route(request.path, request.headers, request.body)
+                    val response = route(request.method, request.path, request.headers, request.body)
                     writeResponse(connection, response)
                 }
             }

@@ -24,10 +24,25 @@ object ArticleQualityPolicy {
     private val dangerousMarkup = Regex("<script|<iframe|<img|<a\\s|javascript:|on\\w+\\s*=", RegexOption.IGNORE_CASE)
     private val controlCharacter: (Char) -> Boolean = { it < ' ' && it != '\n' && it != '\t' }
 
-    fun validate(raw: RawArticle, length: ArticleLengthPolicy.Resolved): Result<ValidatedArticle> = runCatching {
+    fun validate(raw: RawArticle, length: ArticleLengthPolicy.Resolved): Result<ValidatedArticle> =
+        validateInternal(raw, length, requireTranslation = true)
+
+    /**
+     * 外刊抓取专用入口：抓取来源没有译文也不伪造（`chineseText` 允许为空串），
+     * 但标题/正文、长度、语言、危险标记等其余检查**全部照走**——抓取内容同属
+     * 不可信输入，不因为来源是知名站点就放松任何一项。
+     */
+    fun validateFetched(raw: RawArticle, length: ArticleLengthPolicy.Resolved): Result<ValidatedArticle> =
+        validateInternal(raw, length, requireTranslation = false)
+
+    private fun validateInternal(
+        raw: RawArticle,
+        length: ArticleLengthPolicy.Resolved,
+        requireTranslation: Boolean,
+    ): Result<ValidatedArticle> = runCatching {
         checkNotBlank(raw.title)
         checkNotBlank(raw.englishText)
-        checkNotBlank(raw.chineseText)
+        if (requireTranslation) checkNotBlank(raw.chineseText)
 
         for (text in listOf(raw.title, raw.englishText, raw.chineseText)) {
             if (text.length > MAX_TEXT_CHARS) throw rejected()
@@ -38,7 +53,7 @@ object ArticleQualityPolicy {
         }
 
         if (isNotEnglish(raw.englishText)) throw rejected()
-        if (isNotChinese(raw.chineseText)) throw rejected()
+        if (requireTranslation && isNotChinese(raw.chineseText)) throw rejected()
 
         val words = raw.englishText.split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.size !in length.acceptedWords) throw rejected()

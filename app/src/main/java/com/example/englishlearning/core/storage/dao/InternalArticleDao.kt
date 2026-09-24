@@ -29,6 +29,9 @@ internal interface InternalArticleDao {
     @Query("SELECT * FROM articles WHERE profileId = :profileId ORDER BY localDate DESC, generatedAtEpochMillis DESC, version DESC")
     suspend fun findHistory(profileId: String): List<ArticleEntity>
 
+    @Query("SELECT * FROM articles WHERE sourceUrl = :url ORDER BY generatedAtEpochMillis DESC LIMIT 1")
+    suspend fun findBySourceUrl(url: String): ArticleEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(article: ArticleEntity)
 }
