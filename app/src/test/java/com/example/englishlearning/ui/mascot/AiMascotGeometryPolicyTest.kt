@@ -54,7 +54,55 @@ class AiMascotGeometryPolicyTest {
         val closed = geometry(blink = 1f)
         assertEquals(1f, open.eyeOpenFactor, "blink=0 时眼睛应完全睁开")
         assertEquals(0f, closed.eyeOpenFactor, "blink=1 时眼睛应完全闭合")
-        assertEquals(open.copy(eyeOpenFactor = 0f), closed, "眨眼不该改动身体与眼睛位置")
+        // 眨眼只允许改眼睛自身的两个厚度字段。这里逐项枚举其余字段，
+        // 而不是只比一个整体 copy——「眨眼顺手把身子也动了」这类缺陷才有机会被抓到。
+        assertEquals(open.bodyHalfWidth, closed.bodyHalfWidth, "眨眼不该改变身体宽度")
+        assertEquals(open.bodyHalfHeight, closed.bodyHalfHeight, "眨眼不该改变身体高度")
+        assertEquals(open.cornerRadius, closed.cornerRadius, "眨眼不该改变圆角")
+        assertEquals(open.eyeOffsetX, closed.eyeOffsetX, "眨眼不该横向移动眼睛")
+        assertEquals(open.eyeOffsetY, closed.eyeOffsetY, "眨眼不该纵向移动眼睛")
+        assertEquals(open.eyeRadius, closed.eyeRadius, "眨眼不该改变眼睛大小")
+        assertEquals(open.highlightAlpha, closed.highlightAlpha, "眨眼不该改变高光")
+    }
+
+    @Test
+    fun `the eye never thins below the closed thickness`() {
+        // 这条锁的是一个真机上抓到的渲染缺陷：早期实现让绘制高度直接等于 eyeOpenFactor，
+        // 于是闭合途中眼睛会降到不足 1px 而几乎看不见，等到归零又切成一条固定粗细的线——
+        // 一次眨眼闪三下。现在厚度下限由几何侧保证，绘制端不再有第二条分支。
+        val floor = AiMascotGeometryPolicy.EYE_CLOSED_THICKNESS_FACTOR
+        for (blink in listOf(0f, 0.25f, 0.5f, 0.75f, 0.9f, 0.999f, 1f)) {
+            val g = geometry(blink = blink)
+            assertTrue(
+                g.eyeHalfHeightFactor >= floor,
+                "眼睛会细到看不见：blink=$blink 厚度=${g.eyeHalfHeightFactor} 下限=$floor",
+            )
+        }
+    }
+
+    @Test
+    fun `the drawn thickness is continuous where the closed eye takes over`() {
+        // 衔接点：eyeOpenFactor 恰好等于下限。两侧厚度必须几乎相等，否则闭合瞬间会「弹」一下。
+        val join = 1f - AiMascotGeometryPolicy.EYE_CLOSED_THICKNESS_FACTOR
+        val justBefore = geometry(blink = join + 1e-4f).eyeHalfHeightFactor
+        val justAfter = geometry(blink = join - 1e-4f).eyeHalfHeightFactor
+        assertTrue(
+            kotlin.math.abs(justBefore - justAfter) < 1e-3f,
+            "衔接处厚度跳变会让眨眼闪一下：$justBefore vs $justAfter",
+        )
+    }
+
+    @Test
+    fun `the drawn eye only thins while the eye is closing`() {
+        val samples = listOf(0f, 0.2f, 0.4f, 0.6f, 0.75f, 1f)
+        val thickness = samples.map { geometry(blink = it).eyeHalfHeightFactor }
+        for (i in 1 until thickness.size) {
+            assertTrue(
+                thickness[i] <= thickness[i - 1] + 1e-6f,
+                "闭合过程中眼睛反而变粗（眨眼会闪）：blink=${samples[i - 1]}->${samples[i]} " +
+                    "厚度=${thickness[i - 1]}->${thickness[i]}",
+            )
+        }
     }
 
     @Test
@@ -116,6 +164,7 @@ class AiMascotGeometryPolicyTest {
                         "eyeOffsetY" to g.eyeOffsetY,
                         "eyeRadius" to g.eyeRadius,
                         "eyeOpenFactor" to g.eyeOpenFactor,
+                        "eyeHalfHeightFactor" to g.eyeHalfHeightFactor,
                         "highlightAlpha" to g.highlightAlpha,
                     )) {
                         assertTrue(value.isFinite(), "$name 不是有限值：$at")
@@ -125,6 +174,10 @@ class AiMascotGeometryPolicyTest {
                     assertTrue(g.cornerRadius > 0f, "cornerRadius 必须为正：$at")
                     assertTrue(g.eyeRadius > 0f, "eyeRadius 必须为正：$at")
                     assertTrue(g.eyeOpenFactor in 0f..1f, "eyeOpenFactor 越界：$at")
+                    assertTrue(
+                        g.eyeHalfHeightFactor in AiMascotGeometryPolicy.EYE_CLOSED_THICKNESS_FACTOR..1f,
+                        "eyeHalfHeightFactor 越界：$at",
+                    )
                     assertTrue(g.highlightAlpha in 0f..1f, "highlightAlpha 越界：$at")
                 }
             }

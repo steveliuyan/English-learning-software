@@ -18,7 +18,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
@@ -45,9 +44,6 @@ private const val BLINK_OPEN_MILLIS = 120
  * 而独立常量会稳稳保持深色。
  */
 private val EyeColor: Color = Color(0xFF188F76)
-
-/** 闭眼判定阈值：低于它就把眼睛画成一条线，避免退化成一条看不清的细缝。 */
-private const val CLOSED_EYE_THRESHOLD = 0.02f
 
 /**
  * 「AI 学」页头部卡顶部的 AI 表情：白色玻璃质感的圆润体 + 两只眼睛。
@@ -145,27 +141,23 @@ private fun DrawScope.drawMascot(geometry: AiMascotGeometry) {
         cornerRadius = CornerRadius(minOf(bodyHalfWidth * 0.72f, bodyHalfHeight * 0.23f)),
     )
 
-    // 4) 眼睛。
+    // 4) 眼睛。始终画圆角矩形——闭合时它自然退化成一条两端圆头的线。
+    //
+    // 不再按阈值切换成 drawLine：那条路径会在闭合瞬间把厚度从不足 1px 跳到固定粗细，
+    // 真机录屏逐帧量化下能看到一次眨眼闪三下（细 → 几乎看不见 → 突然变粗 → 又几乎看不见）。
+    // 现在厚度下限由几何侧的 eyeHalfHeightFactor 统一保证，衔接处连续。
     val eyeHalfWidth = geometry.eyeRadius * half
-    val eyeHalfHeight = eyeHalfWidth * geometry.eyeOpenFactor
+    val eyeHalfHeight = eyeHalfWidth * geometry.eyeHalfHeightFactor
     val eyeCenterY = centerY + geometry.eyeOffsetY * half
+    // 圆角不得超过半高。这里显式取 min，不依赖 Skia 对超限圆角的隐式收窄。
+    val eyeCornerRadius = CornerRadius(minOf(eyeHalfWidth, eyeHalfHeight))
     for (side in listOf(-1f, 1f)) {
         val eyeCenterX = centerX + side * geometry.eyeOffsetX * half
-        if (geometry.eyeOpenFactor <= CLOSED_EYE_THRESHOLD) {
-            drawLine(
-                color = EyeColor,
-                start = Offset(eyeCenterX - eyeHalfWidth, eyeCenterY),
-                end = Offset(eyeCenterX + eyeHalfWidth, eyeCenterY),
-                strokeWidth = eyeHalfWidth * 0.5f,
-                cap = StrokeCap.Round,
-            )
-        } else {
-            drawRoundRect(
-                color = EyeColor,
-                topLeft = Offset(eyeCenterX - eyeHalfWidth, eyeCenterY - eyeHalfHeight),
-                size = Size(eyeHalfWidth * 2f, eyeHalfHeight * 2f),
-                cornerRadius = CornerRadius(eyeHalfWidth),
-            )
-        }
+        drawRoundRect(
+            color = EyeColor,
+            topLeft = Offset(eyeCenterX - eyeHalfWidth, eyeCenterY - eyeHalfHeight),
+            size = Size(eyeHalfWidth * 2f, eyeHalfHeight * 2f),
+            cornerRadius = eyeCornerRadius,
+        )
     }
 }
