@@ -639,7 +639,7 @@ git commit -m "feat(reading): build the generation prompt and outbound request"
     ```
     失败一律 `AppErrorException(AiFailure.InvalidResponse)`（界面文案与操作由 `AiFailure.toUserAction()` 决定，不再新造一套错误枚举）。
 
-- [ ] **Step 1: 写失败的解析测试**
+- [x] **Step 1: 写失败的解析测试**
 
 ```kotlin
 class ArticleResponseParserTest {
@@ -686,7 +686,7 @@ class ArticleResponseParserTest {
 
 > `appFailure()` 是本测试文件里的私有辅助：从 `AppErrorException` 里取出 `AppError` 再断言它是 `AiFailure` 的一员。写成一条小函数，不要在九个测试里各写一遍。
 
-- [ ] **Step 2: 写失败的质量校验测试**
+- [x] **Step 2: 写失败的质量校验测试**
 
 ```kotlin
 class ArticleQualityPolicyTest {
@@ -741,12 +741,12 @@ class ArticleQualityPolicyTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认 RED**
+- [x] **Step 3: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.reading.Article*Test" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败 `Unresolved reference 'ArticleResponseParser'`。
 
-- [ ] **Step 4: 实现解析与校验**
+- [x] **Step 4: 实现解析与校验**
 
 `ArticleResponseParser.parse`：
 1. 状态码映射（Step 1 的表）优先于解析。
@@ -766,11 +766,11 @@ Expected: 编译失败 `Unresolved reference 'ArticleResponseParser'`。
 6. 中文语言判定：含 CJK 字符且 `CJK / 非空字符数 > 0.2`；
 7. 词数落在 `length.acceptedWords` 内（英文按空白切分）。
 
-- [ ] **Step 5: 跑测试确认 GREEN**
+- [x] **Step 5: 跑测试确认 GREEN**
 
 Run: 同 Step 3。Expected: PASS。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/reading app/src/test/java/com/example/englishlearning/reading
@@ -778,6 +778,15 @@ git commit -m "feat(reading): parse and quality-check generated articles"
 ```
 
 ---
+
+
+### Task 4 执行记录与偏差
+
+1. **计划的异常类型不成立，改用 `AiException`**：`AiFailure` 与 `AppError` 是两个独立的封闭接口（`AppError` 枚举里没有 AI 失败分类，且 core 不得反向依赖 ai 包），`AppErrorException(appError: AppError)` 装不下 `AiFailure`。新增 `ai/AiException.kt`（与 `AppErrorException` 同构：无消息、无堆栈、携带封闭的 `AiFailure` data object，自由文本进不来，泄露防线一致）。解析与校验的失败统一 `Result.failure(AiException(...))`。
+2. **计划自带的 `doesNotFalsePositiveOnInnocentWords` 与自身词数规则矛盾**：原版 innocent english 只有 7 个词（< acceptedWords 下限 162），会先被词数规则拒绝、让「无辜词不误伤」的验证意图落空。已把 innocent english 补足到 191 词（保留 conscript/scriptwriter/scripted 关键词），偏差写进测试注释。
+3. **新增一条测试 `extractsTheInnerJsonEvenWhenWrappedInACodeFence`**：模型把 JSON 包在 ```json 围栏里是常见行为，计划 Step 4 明确要求剥围栏，但没有对应断言——补上。
+4. **变异测试**：把危险标记正则改成裸词匹配（`script`）→ `doesNotFalsePositiveOnInnocentWords` 真的变红（会误杀无辜词）；恢复后 12/12 绿。
+5. 全量回归：JVM **51 类 / 292 用例 / 0 失败 / 0 跳过**（2026-09-24）。
 
 ### Task 5: 派生高亮与未覆盖词
 
