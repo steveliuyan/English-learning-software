@@ -551,7 +551,7 @@ git commit -m "feat(reading): import a pasted article without leaving the device
 **Interfaces:**
 - Produces: 阅读页顶部新增来源区；`testTag`：`article_source_name`、`article_attribution`、`article_source_link`、`article_source_url_label`、`article_no_translation_notice`。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 | 测试名 | 断言 |
 | --- | --- |
@@ -567,6 +567,14 @@ git commit -m "feat(reading): import a pasted article without leaving the device
 ```bash
 git commit -m "feat(reading): show the article source, attribution and translation notice"
 ```
+
+**Task E 执行记录与偏差（2026-09-25，与 F2-03 Task 7 同批完成）**：
+
+1. 来源区按 `ArticleSource` 三分支渲染：AI 只显示 `modelName`（`parameterSummary` 是审计字段，**永远不进界面**）；外刊显示 displayName / attributionText / 「原文链接（不会自动打开）」标签 / URL 纯文本；导入显示「手动导入 · <时间>」（`formatImportedAt` internal 供测试复用）与责任说明「内容由你自行提供，请确保你有权使用」。
+2. 原文链接节点**不挂任何点击动作**（`assertDoesNotHaveClickAction` 语义级断言：`config.contains(SemanticsActions.OnClick) == false`）；打开动作留给后续任务经系统选择器接入。
+3. **变异测试抓到哨兵缺陷**：把 `parameterSummary`（含 `endpoint=… key=sk-…`）临时渲染出来，`onNodeWithText("api.test").assertDoesNotExist()` **不红**——`onNodeWithText` 默认全等匹配，来源区整段渲染时对「拼接泄露」恰好免疫（与 Task C `endsWith` 免疫同型的盲点）。哨兵改为 `substring = true` 后变异真红，恢复后全绿。
+4. `article_no_translation_notice` + 译文开关禁用：无译文来源（外刊/导入）在阅读页明确提示，开关三处封死（UI enabled=false、VM toggle 守卫、Compose 断言）。
+5. 真机 **15/15 绿**（MIUI bf353dda，`am instrument -e class`，未动用户数据）。
 
 ---
 

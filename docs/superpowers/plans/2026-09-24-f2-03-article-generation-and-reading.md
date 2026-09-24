@@ -1063,7 +1063,7 @@ git commit -m "feat(reading): generate articles with reuse and regenerate semant
     ```
   - `fun ArticleReadingScreen(state: ArticleReadingUiState?, onBack: () -> Unit, onOpenCard: (WordCard) -> Unit, onModeChange: (ArticleDisplayMode) -> Unit, onToggleTranslation: () -> Unit, onOpenDictionaryPlaceholder: () -> Unit, onOpenPronunciationPlaceholder: () -> Unit, modifier: Modifier = Modifier)`
 
-- [ ] **Step 1: 写失败的 ViewModel 测试**
+- [x] **Step 1: 写失败的 ViewModel 测试**
 
 | 测试名 | 断言 |
 | --- | --- |
@@ -1075,16 +1075,16 @@ git commit -m "feat(reading): generate articles with reuse and regenerate semant
 | `derivesHighlightsFromTheStoredLemmasNotFromTodaysPlan` | 用文章的 `coveredLemmas` 派生，即使今天的计划已换词，高亮仍与原文一致 |
 | `exposesTheUncoveredLemmas` | 未覆盖词列表来自 `ArticleCoverage` |
 
-- [ ] **Step 2: 写失败的 Compose 测试**
+- [x] **Step 2: 写失败的 Compose 测试**
 
 覆盖：三种显示模式各自的可见性（`ENGLISH_FIRST` 隐藏译文、`BILINGUAL` 显示但可折叠、`FULL_TRANSLATION` 默认展开）；高亮词可点击并回调 `onOpenCard`；未覆盖词列表渲染；点未覆盖词（无词卡）走 `onOpenDictionaryPlaceholder`；发音入口走 `onOpenPronunciationPlaceholder`；正文里的 `<script>` 字样以**纯文本**出现而不是被执行/丢弃（用 `assertTextContains` 断言它原样显示为文字）。测试 tag：`article_reading_screen`、`article_title`、`article_english`、`article_translation`、`article_translation_toggle`、`article_uncovered`、`article_mode_{english_first|bilingual|full_translation}`、`article_pronunciation`。
 
-- [ ] **Step 3: 跑测试确认 RED**
+- [x] **Step 3: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.ui.ArticleReadingViewModelTest" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败。
 
-- [ ] **Step 4: 实现**
+- [x] **Step 4: 实现**
 
 渲染要点：
 
@@ -1093,17 +1093,27 @@ Expected: 编译失败。
 - 未覆盖词列表用 `FlowRow` 或 `LazyRow` 排 chips；点击时若 `cardFor` 命中就 `onOpenCard`，否则 `onOpenDictionaryPlaceholder`。
 - 显示模式用三段 `SegmentedButton`/`FilterChip`。
 
-- [ ] **Step 5: 跑测试确认 GREEN**
+- [x] **Step 5: 跑测试确认 GREEN**
 
 Run: 同 Step 3；再跑 `:app:connectedDebugAndroidTest -P...class=com.example.englishlearning.ui.ArticleReadingScreenTest`。
 Expected: PASS。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/ui app/src/test/java/com/example/englishlearning/ui app/src/androidTest/java/com/example/englishlearning/ui
 git commit -m "feat(reading): add the article reading screen"
 ```
+
+**Task 7 执行记录与偏差（2026-09-25，与 F2-06 Task E 同批完成）**：
+
+1. **`ArticleReadingUiState` 增加 `cards: List<WordCard>`**（计划签名没有）：屏幕是无状态组合函数，点击高亮/未覆盖词必须把命中解析回 `WordCard` 才能 `onOpenCard`；`cardFor` 保留在 VM（按 cardId 或 lemma 匹配）。
+2. **`load(article, cards)`**：计划接口没给文章注入方式；文章与今日词卡由调用方（Task 8/9 的入口）注入。高亮一律从 `article.coveredLemmas` 派生（`deriveFromLemmas` 语义），词卡身份用传入 cards 解析——测试 `derivesHighlightsFromTheStoredLemmasNotFromTodaysPlan` 锁死「计划换词不影响重读高亮」。
+3. **偏好读失败回退默认呈现**（ENGLISH_FIRST），不拦阅读；`setMode` 只切模式 + 持久化（保留偏好其他字段），不动 `translationExpanded`。
+4. **无状态屏幕 + snapshot state 测试驱动**：屏幕本身不持状态，Compose 测试里 toggle 类用例必须用 `remember { mutableStateOf }` 驱动重组——传空回调的点击永远无效（首跑 4 红的根因之一）。
+5. **`assertTextContains` 默认全等匹配**：来源区是整段渲染的字符串，部分断言必须 `substring = true`（首跑 4 红的另一根因）。
+6. 无译文来源（`chineseText` 为空）：显示「该来源没有中文翻译」+ 译文开关禁用（`assertIsNotEnabled`）+ VM `toggleTranslation` 再守一道。
+7. **回归**：JVM 全量 **59 类 / 374 用例 / 0 失败**；真机 `ArticleReadingScreenTest` **15/15 绿**；用户库三文件 MD5 前后一致。
 
 ---
 
