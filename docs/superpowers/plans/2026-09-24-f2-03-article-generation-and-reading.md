@@ -2,13 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 让用户用自己配置的 AI Profile 生成一篇包含当天所学词的英文短文与中文翻译，并在应用内以受控文本渲染出来，附派生高亮与未覆盖词列表；AI 不可用时不影响学习完成状态与历史阅读。
+**Goal:** 让用户按当天所学词获得一篇英文短文，并在应用内以受控文本渲染出来，附派生高亮与未覆盖词列表；文章可来自用户自配 AI 生成、已核验许可的外刊抓取或用户自行粘贴导入；任一来源不可用时都不影响学习完成状态与历史阅读。
 
-**Architecture:** 传输层抽成一个 suspend 端口 `AiHttpTransport`，生产实现用 `HttpURLConnection`（零新依赖），JVM 测试用 JDK 内置的 `com.sun.net.httpserver` 起真实本地 HTTP 服务打真实请求。请求构造、响应解析、质量校验、高亮派生都是**纯函数**，可完全在 JVM 上确定性测试。高亮**不落库也不信任模型**：库里只存生成时用到的词条 lemma 列表，渲染时按同一套纯函数重新派生，所以隔天重读历史文章得到的高亮与当天一致。
+> **范围变更（2026-09-23）**：用户确认「两条来源一起做」，本轮新增 F2-06 文章多来源（外刊抓取 + 用户粘贴导入）。多来源的实现任务另见 `docs/superpowers/plans/2026-09-23-f2-06-article-multi-source.md`。两份计划**共享同一套领域类型与阅读页**，任务顺序见下方「执行顺序」。
+
+**Architecture:** 传输层抽成一个 suspend 端口 `AiHttpTransport`，生产实现用 `HttpURLConnection`（零新依赖），JVM 测试用 JDK 内置的 `com.sun.net.httpserver` 起真实本地 HTTP 服务打真实请求。请求构造、响应解析、质量校验、高亮派生都是**纯函数**，可完全在 JVM 上确定性测试。高亮**不落库也不信任模型**：库里只存生成时用到的词条 lemma 列表，渲染时按同一套纯函数重新派生，所以隔天重读历史文章得到的高亮与当天一致。三种来源产出**同一个** `Article` 领域类型，只是在 `ArticleSource` 联合类型上不同，因此校验、复用、派生、渲染四段管线零分叉。
 
 **Tech Stack:** Kotlin、Coroutines、Room 2.8.4、Compose、`kotlinx-serialization-json`（**已在依赖中**，仅用 `Json.parseToJsonElement` 导航，不启用编译器插件）、`java.net.HttpURLConnection`、`com.sun.net.httpserver`（仅测试）、JDK 内置 TTS 不做（见「不在本轮范围」）。
 
-**Spec:** `docs/specs/02-reading-and-ai-content.md` 的 F2-03、F2-04，以及 AC2-01~AC2-06。
+**Spec:** `docs/specs/02-reading-and-ai-content.md` 的 F2-03、F2-04、F2-06，以及 AC2-01~AC2-10。
 
 ## Global Constraints
 
@@ -31,6 +33,29 @@
 3. **端到端验证**：由用户在手机上录入真实密钥后，再做真机走查取证。
 4. **成本护栏**：**暂不设**每日重生成次数上限与历史保留上限。→ 记为**有意偏差**：spec F2-03 要求「每日重生成次数与历史保留上限由实现计划决定并显示成本提示」。本轮实现复用语义与成本提示，但**不加次数/容量上限**；`ArticleRepository` 现有签名已支持后续在不改领域模型的前提下补上限。
 
+### 范围变更后的补充决定（2026-09-23）
+
+5. **来源范围**：三种来源一起做（AI 生成 / 外刊抓取 / 用户粘贴导入）。许可与署名边界见 `docs/decisions/2026-09-23-article-source-licensing.md`；抓取目标只允许白名单来源，当前仅登记 VOA Learning English。
+6. **有意偏差**：spec F2-03 原文要求译文必需。本轮放宽为「AI 生成来源必须含中文翻译；抓取与导入来源允许缺失」，缺失时明确展示「该来源无中文翻译」并禁用全文翻译切换。原因是 VOA 等外刊原文本身不含中文译文，强制要求会让抓取路径永远无法通过质量校验——用「伪造成失败」比放宽更糟。该偏差已回写进 spec F2-03。
+
+### 执行顺序（两份计划合并后）
+
+| 序 | 任务 | 归属 |
+| --- | --- | --- |
+| 1 | 补 `SecretStore` 密钥读回能力（**阻塞 Task 6**） | F2-06 计划 Task A |
+| 2 | `ArticleSource` 领域模型 + Room 9→10 迁移（**阻塞 Task 6、Task 7**） | F2-06 计划 Task B |
+| 3 | Task 2 HTTP 传输端口（无依赖，可并行） | 本计划 |
+| 4 | Task 3 / 4 / 5 提示词、解析校验、高亮派生（纯函数，无依赖） | 本计划 |
+| 5 | 来源注册表、外刊抓取、用户导入用例 | F2-06 计划 Task C / D |
+| 6 | Task 6 生成用例（写 `source = AiGenerated`） | 本计划 |
+| 7 | Task 7 阅读页（含来源与署名展示） | 本计划 + F2-06 计划 Task E |
+| 8 | Task 8 生成入口、出站确认与失败界面 | 本计划 |
+| 9 | Task 9 Hilt 接入、网络权限与端到端验收 | 本计划 |
+
+> **已确认的计划缺口 1**：`SecretStore` 只有 `save`/`delete`/`has`，**没有读取密钥的方法**，生成流程拿不到密钥去填 `Authorization` 头。这不是可绕过的细节，必须先补（执行顺序第 1 项）。
+>
+> **已确认的计划缺口 2**：Task 6 构造函数未注入 `TodayPlanRepository`，但步骤 4 需要 `planId`。改为让 `ArticleGenerationRequest` 直接携带 `planId`（调用方本来就有今日计划），Task 3 的请求类型据此增加该字段。
+
 ---
 
 ## 文件结构
@@ -51,6 +76,10 @@
 | `ui/ArticleReadingScreen.kt` | 阅读页（受控文本渲染 + 高亮 + 未覆盖词 + 词条入口） |
 | `docs/decisions/2026-09-24-article-generation-and-display.md` | 四组「候选方案 vs 决定」 |
 | `docs/verification/f2-03-04/README.md` | 验收记录 |
+| `reading/domain/ArticleSource.kt` | 来源联合类型（AI 生成 / 外刊抓取 / 用户导入）——见 F2-06 计划 |
+| `reading/ArticleSourceRegistry.kt` | 已核验许可的来源白名单——见 F2-06 计划 |
+| `reading/FetchArticleUseCase.kt` | 外刊抓取、正文解析与不可信输入校验——见 F2-06 计划 |
+| `reading/ImportArticleUseCase.kt` | 用户粘贴导入——见 F2-06 计划 |
 
 ---
 
@@ -1185,6 +1214,15 @@ git push
 | AC2-04 未配置/HTTP/私网/401/429/超时/畸形 → 可操作错误且学习状态保持 | Task 3（Endpoint 拒绝）+ Task 4（状态码映射）+ Task 6（失败不落库）+ Task 8（错误界面与操作） |
 | AC2-05 断网后已缓存可读、不可生成、不损坏今日计划 | Task 7（纯本地读取）+ Task 6（失败不写库）+ Task 9 Step 5 第 8 项 |
 | AC2-06 只存非敏感字段与脱敏诊断 | Task 1（列设计）+ Task 6（`parameterSummary` 不含 Key）+ Task 9 Step 5 扫描 |
+| F2-06 三种来源与来源元数据随文章保存 | F2-06 计划 Task B（`ArticleSource` 联合类型 + Room 9→10） |
+| F2-06 来源白名单，禁止任意 URL 抓取 | F2-06 计划 Task C（`ArticleSourceRegistry`） |
+| F2-06 署名与原文链接展示，不自动打开 | F2-06 计划 Task E + 本计划 Task 7 |
+| F2-06 用户导入不联网且用户自负其责 | F2-06 计划 Task D + Task F（界面说明） |
+| F2-06 三来源共用同一管线，不分叉 | 本计划 Task 4 / 5 / 6 / 7 直接复用，实现中不存在按来源分支的展示链路 |
+| AC2-07 来源标识展示（不含 Key / Endpoint） | F2-06 计划 Task E |
+| AC2-08 白名单外 URL 被拒绝且不发请求 | F2-06 计划 Task C |
+| AC2-09 导入内容走不可信输入校验 | F2-06 计划 Task D |
+| AC2-10 抓取 / 导入失败保留今日完成状态 | F2-06 计划 Task C / D 的失败分支 + 本计划 Task 8 |
 
 **2. Placeholder 扫描**：无 TBD/TODO；每个测试步骤都给了具体断言或可直接落地的用例名与期望行为；实现步骤给了关键代码或明确的算法与顺序。Task 6、Task 7 的测试以「用例名 + 断言」表列而非全量代码，是因为这两个文件的测试夹具较长且模式与 Task 2~5 一致——**夹具必须用假实现，不得用 `mockk` 造出「可被任意调用」的宽松桩**，否则「未确认就不发请求」这类关键断言会失去意义。
 
