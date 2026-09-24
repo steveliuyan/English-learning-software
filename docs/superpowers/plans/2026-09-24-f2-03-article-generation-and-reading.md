@@ -963,7 +963,7 @@ git commit -m "feat(reading): derive highlights and uncovered words from the bod
     ```
   - `interface ArticleIdFactory { fun newId(): String }`（仿 `AiProfileIdFactory`，放在 `reading/`）
 
-- [ ] **Step 1: 写失败的用例测试**（JVM，全部注假依赖）
+- [x] **Step 1: 写失败的用例测试**（JVM，全部注假依赖）
 
 测试夹具用可记录调用的假实现：`FakeTransport`（记录被调用与否、按脚本返回 `AiHttpResult`）、`FakeArticleRepository`（内存 `MutableList`，`saveNewVersion` 复刻 max+1 语义）、`FakeEventRepository`（`completedCardIds` 返回固定集合）、`FakeWordCardSource`、`FakeProfileRepository`、`FakeSecrets`。
 
@@ -987,12 +987,12 @@ git commit -m "feat(reading): derive highlights and uncovered words from the bod
 | `excludesPreviouslyUsedWordsOnRegeneration` | 换一篇时 `excludedLemmas` 含上一篇的 `coveredLemmas` |
 | `recordsAGenerationParameterSummaryWithoutTheKey` | 落库文章的 `parameterSummary` 含 `temperature`/`max_tokens`/模型名，且不含密钥 |
 
-- [ ] **Step 2: 跑测试确认 RED**
+- [x] **Step 2: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.reading.GenerateArticleUseCaseTest" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败 `Unresolved reference 'GenerateArticleUseCase'`。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `findReusable`：直接委托 `articles.findLatest(profileId, localDate, activeWordBookId, articleType, lengthTier)`。
 
@@ -1011,16 +1011,27 @@ Expected: 编译失败 `Unresolved reference 'GenerateArticleUseCase'`。
 
 `parameterSummary` 形如：`"model=gpt-x temperature=0.3 top_p=0.9 max_tokens=512 timeout_seconds=20 template=default-reading-v1"`。**绝不拼入 endpoint 与 Key**。
 
-- [ ] **Step 4: 跑测试确认 GREEN**
+- [x] **Step 4: 跑测试确认 GREEN**
 
 Run: 同 Step 2。Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/reading app/src/test/java/com/example/englishlearning/reading
 git commit -m "feat(reading): generate articles with reuse and regenerate semantics"
 ```
+
+**Task 6 执行记录与偏差（2026-09-24）**：
+
+1. **构造函数收敛**：计划列的 `events: LearningEventRepository`、`cards: WordCardSource` 两个依赖**不需要**——`ArticleGenerationRequest.targetCards` 已是权威输入（Task 3 落地的纯函数提示词契约「提示词只由请求决定」），在用例里再经 plan/events/cards 收集一遍等于第二套收集路径。测试 `requestPromptUsesTheCardsCompletedToday` 改为断言「请求里的目标词进提示词、请求外的词不进」。
+2. **`generate` 增加 `regenerate: Boolean = false` 参数**：计划接口只给 `(request, confirmedTextHost)`，但复用短路会让「换一篇」永远返回 `Reused`，与 `regeneratingSavesANewVersionAndKeepsTheOldOneReadable` 直接矛盾。默认 `false` 保持计划行为，`regenerate=true` 跳过复用读直接生成（`saveNewVersion` 版本递增）。
+3. **`NotConfiguredReason` 增加 `InvalidEndpoint`**：Endpoint 不合法时 `requiredConfirmation` 连「要确认哪个域名」都答不出来；计划的三值枚举无处安放。保存侧已校验，此分支是数据被绕过校验写入时的兜底。
+4. **`GenerateArticleResult` 增加 `data object StorageFailed`**：`saveNewVersion` 失败不是 AI 失败，按「传输失败不并入存储错误枚举」的同一量纲原则单独成支。
+5. **`Cancelled` 抛 `CancellationException` 继续传播**（与 FetchArticleUseCase、transport 测试同一约定），不改写成 `AiFailure.Cancelled`——计划第 6 步的映射表在此处不成立。
+6. `coveredLemmas` = 请求词表顺序里、真正出现在正文中的 lemma（`derive` 求交集，保持请求顺序）；`parameterSummary` 形如 `model=… temperature=… top_p=… max_tokens=… timeout_seconds=… template=…`，绝无 endpoint/Key。
+7. **变异测试**：注释掉出站确认闸 → `asksForConfirmationBeforeTheFirstTextCallToAHost`、`asksAgainWhenTheEndpointHostChanged` 双双真红；恢复后 19/19 绿。
+8. **回归**：JVM 全量 **58 类 / 366 用例 / 0 失败 / 0 跳过**。
 
 ---
 
