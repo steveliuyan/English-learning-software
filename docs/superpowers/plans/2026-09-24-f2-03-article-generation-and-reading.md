@@ -807,7 +807,7 @@ git commit -m "feat(reading): parse and quality-check generated articles"
     另需一个按 `List<String>` 重载，供阅读页从库里的 lemma 列表重算（隔天重读历史文章时用）：
   - `fun derive(englishText: String, lemmas: List<String>): ArticleCoverage`
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 ```kotlin
 class ArticleHighlightPolicyTest {
@@ -883,12 +883,12 @@ class ArticleHighlightPolicyTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认 RED**
+- [x] **Step 2: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.reading.ArticleHighlightPolicyTest" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败 `Unresolved reference 'ArticleHighlightPolicy'`。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 正则用 `\b` + `RegexOption.IGNORE_CASE`，词形变化按长度降序拼进 alternation（**长词优先**，否则 `apple` 会先吃掉 `apples` 的前五个字符，留下 `s`）：
 
@@ -901,11 +901,11 @@ private fun patternFor(variants: List<String>): Regex =
 
 重叠处理：把所有卡片的匹配收集成 `(start, end, cardId, lemma, matched)`，按 `start` 升序、`end` 降序排序后**贪心去重**——只保留不与已选中区间重叠的匹配，保证同一段文字不会既标为 `apple` 又标为 `app`。
 
-- [ ] **Step 4: 跑测试确认 GREEN**
+- [x] **Step 4: 跑测试确认 GREEN**
 
 Run: 同 Step 2。Expected: PASS（11 例）。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/reading app/src/test/java/com/example/englishlearning/reading
@@ -913,6 +913,15 @@ git commit -m "feat(reading): derive highlights and uncovered words from the bod
 ```
 
 ---
+
+
+### Task 5 执行记录与偏差
+
+1. **计划自带测试与实现描述矛盾（修正）**：`respectsWordBoundariesSoAppDoesNotMatchInsideApple` 原文断言 `highlights.isEmpty()`，但句子 `apple app grapple` 里 ` app ` 是独立词，`\bapp\b` 必然命中——该断言与计划 Step 3 描述的 `\b` 语义自相矛盾。按测试名锁定的真实意图改写：断言**恰好一个命中**且 `matched == "app"`（即 apple/grapple 内部不命中）。偏差写进测试注释。
+2. **两个 `derive` 重载 JVM 签名冲突**：`List<WordCard>` 与 `List<String>` 擦除后同为 `derive(String, List)`，加 `@JvmName("deriveFromLemmas")` 区分。
+3. 泛型推断：`ArticleCoverage(emptyList(), emptyList())` 与混合重载调用处需要显式类型参数（`emptyList<WordHighlight>()`、`listOf<String>(...)`），否则编译失败。
+4. **变异测试**：去掉 `\b` 词边界改裸匹配 → 3 条用例变红（`respectsWordBoundaries…`、`doesNotMatchAcrossAHyphenOrApostrophe`、`handlesNonAsciiText…`——证明词边界正是防「内部误匹配」的那道闸）；恢复后 11/11 绿。
+5. 全量回归：JVM **52 类 / 303 用例 / 0 失败 / 0 跳过**（2026-09-24）。
 
 ### Task 6: 生成用例（复用 / 换一篇 / 失败映射）
 
