@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Reduced fixture taken from a real capture of
+  https://learningenglish.voanews.com/rss/?count=20&zoneid=1579
+  Site: learningenglish.voanews.com. Captured 2026-09-24.
+  VOA Learning English text is public domain in the US. Development-time test
+  fixture only: this file is on the JVM test source set and never ships in the APK.
+  Reduced to 4 items (one deliberately missing <link>) while keeping the real
+  element order, entities and date format.
+-->
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
+        <title>Science &amp; Technology - Voice of America</title>
+        <link>https://learningenglish.voanews.com/z/1579</link>
+        <description>Learn English as you read and listen to a weekly show about developments in science, technology and medicine.</description>
+        <item>
+            <title>Wilbur and Orville Wright: The First Airplane</title>
+            <description>Wilbur and Orville Wright quietly developed a powered flying machine that proved heavier-than-air flight was possible more than 120 years ago. </description>
+            <link>https://learningenglish.voanews.com/a/wilbur-and-orville-wright-the-first-airplane/7998765.html</link>
+            <guid>https://learningenglish.voanews.com/a/wilbur-and-orville-wright-the-first-airplane/7998765.html</guid>
+            <pubDate>Mon, 17 Mar 2025 22:05:00 +0000</pubDate>
+            <category>All About America</category>
+        </item>
+        <item>
+            <title>Methods for Protecting Earth Against an Asteroid Strike</title>
+            <description>Space agencies keep watching the skies for rocks that could hit Earth, and they have ideas about how to protect the planet.</description>
+            <link>https://learningenglish.voanews.com/a/methods-for-protecting-earth-against-an-asteroid-strike/7989189.html</link>
+            <guid>https://learningenglish.voanews.com/a/methods-for-protecting-earth-against-an-asteroid-strike/7989189.html</guid>
+            <pubDate>Tue, 11 Mar 2025 21:30:00 +0000</pubDate>
+        </item>
+        <item>
+            <title>An item without a link must be skipped</title>
+            <description>This item has no link element at all.</description>
+            <pubDate>Wed, 12 Mar 2025 10:00:00 +0000</pubDate>
+        </item>
+        <item>
+            <title>Quizzes &amp; Lessons: Study Skills</title>
+            <description>A title containing an entity that must be decoded to &quot;Quizzes &amp; Lessons&quot;.</description>
+            <link>https://learningenglish.voanews.com/a/8010810.html</link>
+            <guid>https://learningenglish.voanews.com/a/8010810.html</guid>
+            <pubDate>Thu, 13 Mar 2025 08:15:00 +0000</pubDate>
+        </item>
+</channel></rss>
