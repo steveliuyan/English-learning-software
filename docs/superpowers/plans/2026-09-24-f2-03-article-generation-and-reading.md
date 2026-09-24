@@ -252,7 +252,7 @@ git commit -m "feat(reading): store generation provenance and article display mo
   - `interface AiHttpTransport { suspend fun send(request: AiHttpRequest): AiHttpResult }`
   - `class UrlConnectionAiHttpTransport(private val ioDispatcher: CoroutineDispatcher, private val maxResponseBytes: Int = 512 * 1024) : AiHttpTransport`
 
-- [ ] **Step 1: 写失败测试（JDK 内置 HTTP 服务器，无新依赖）**
+- [x] **Step 1: 写失败测试（JDK 内置 HTTP 服务器，无新依赖）**
 
 ```kotlin
 package com.example.englishlearning.ai.net
@@ -344,12 +344,12 @@ class UrlConnectionAiHttpTransportTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认 RED**
+- [x] **Step 2: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.ai.net.*" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败 `Unresolved reference 'AiHttpTransport'`。
 
-- [ ] **Step 3: 写端口与实现**
+- [x] **Step 3: 写端口与实现**
 
 `AiHttpTransport.kt`：只放上面 Interfaces 里的四个声明，**不含实现**（端口与实现分文件，JVM 测试才能只测实现而不引入 Android 依赖）。
 
@@ -393,12 +393,12 @@ override suspend fun send(request: AiHttpRequest): AiHttpResult = withContext(io
 > 注意 `catch (cancellation: CancellationException)` 必须在 `IOException` **之前**，且协程取消时
 > 不要把它吞成 `NetworkUnavailable`——用户离开页面不等于网络坏了。
 
-- [ ] **Step 4: 跑测试确认 GREEN**
+- [x] **Step 4: 跑测试确认 GREEN**
 
 Run: 同 Step 2。
 Expected: PASS（6 例）。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/ai/net app/src/test/java/com/example/englishlearning/ai/net
@@ -406,6 +406,14 @@ git commit -m "feat(ai): add a dependency-free HTTP transport port"
 ```
 
 ---
+
+
+### Task 2 执行记录与偏差
+
+1. **`com.sun.net.httpserver` 不可用（计划假设错误）**：项目 `sourceCompatibility = 17` 使 Kotlin 编译带上 `-Xjdk-release=17`，ct.sym 不含 `com.sun.*` 内部包，该 API 在 unit test 源集编译报 `Unresolved reference 'sun'`（2026-09-24 实测）。改用手写 `ServerSocket` 假服务器（`FakeHttpServer`，仅测试文件内部），同为 JDK 内置、零新依赖，只覆盖测试需要的一小角。
+2. **假服务器读请求必须全程字节级**：`BufferedReader` 的内部缓冲会把 body 字节一并吞掉，随后直接 `InputStream.read()` 读 body 会阻塞到客户端超时——六个用例全部误报 `TimedOut`（首跑抓到）。改为自写 `readLine` 按 ISO-8859-1 字节读行，body 再从同一流读。
+3. **变异测试**：把 `instanceFollowRedirects` 临时改回默认 `true` → `doesNotFollowRedirects` 真的变红（跟随重定向会重新打开「公网域名 → 私网地址」这条路，正是本断言要锁的安全性质）；恢复后全类 6/6 绿。
+4. 全量回归：JVM **47 类 / 258 用例 / 0 失败 / 0 跳过**（2026-09-24）。
 
 ### Task 3: 出站请求构造
 
