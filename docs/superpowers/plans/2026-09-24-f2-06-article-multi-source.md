@@ -492,7 +492,7 @@ git commit -m "feat(reading): fetch whitelisted foreign articles with attributio
     }
     ```
 
-- [ ] **Step 1: 写失败的导入测试**
+- [x] **Step 1: 写失败的导入测试**
 
 | 测试名 | 断言 |
 | --- | --- |
@@ -507,25 +507,35 @@ git commit -m "feat(reading): fetch whitelisted foreign articles with attributio
 
 > 最后一条是把「用户导入不联网」从口头约定变成可断言的事实：如果有人日后接了传输端口，测试立刻红。
 
-- [ ] **Step 2: 跑测试确认 RED**
+- [x] **Step 2: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.reading.ImportArticleUseCaseTest" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败 `Unresolved reference 'ImportArticleUseCase'`。
 
-- [ ] **Step 3: 实现（复用同一套校验，只换约束数据）**
+- [x] **Step 3: 实现（复用同一套校验，只换约束数据）**
 
 `ImportArticleUseCase` 只做四件事：拼 `RawArticle` → `quality.validate(raw, ArticleQualityPolicy.forImported)` → `ArticleHighlightPolicy.derive` → `saveNewVersion`。**不新增任何校验分支**。
 
-- [ ] **Step 4: 跑测试确认 GREEN**
+- [x] **Step 4: 跑测试确认 GREEN**
 
 Run: 同 Step 2。Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/reading app/src/test/java/com/example/englishlearning/reading
 git commit -m "feat(reading): import a pasted article without leaving the device"
 ```
+
+**Task D 执行记录与偏差（2026-09-24）**：
+
+1. **计划矛盾 1（构造函数过窄）**：计划只给 4 个依赖，但 `importedArticleStillGetsHighlightsFromTodaysPlan` 需要 `TodayPlanRepository` + `LearningEventRepository` + `WordCardSource` 三个端口才能从计划走到词卡。构造函数扩为 6 依赖（+`ids`/`clock`），反射断言只禁 `ai.net` 网络类型，仍然成立。
+2. **计划矛盾 2（`import(…, planId)` 走不通）**：`TodayPlanRepository` 只有 `find(profileId, localDate)`/`findLatest`/`saveIfAbsent`，没有 `findById`；且 `Article` 复用键需要 (profileId, localDate, activeWordBookId) 三元组。改签名 `import(title, body, context: ArticleContext)`——`FetchContext` 就地改名 `ArticleContext` 供抓取/导入共用（该改名同时修正了「上下文只有一个抓取消费者」的命名假设）。
+3. **计划矛盾 3（`ImportRejection` 的具体原因无从产生）**：`validate` 把所有失败折成单一 `AiException(InvalidResponse)`，按计划「不新增校验分支」就给不出 `NotEnglish`/`BodyTooShort` 等具体原因。修法：策略把检查实现收敛为 `firstRejection(raw, constraints): ArticleTextRejection?`，`validate` 变成它的薄包装（抛异常），导入用例消费同一函数映射具体原因——**仍是一份检查实现**。`validateFetched` 相应收敛为 `forWebFetch` 约束（60~2000 词、无译文）。
+4. **计划矛盾 4（存储失败无分支）**：`ImportArticleResult` 原设计只有 `Imported/Rejected`，`saveNewVersion` 失败无处安放——补 `Failed(StorageUnavailable)`。
+5. 领域决策：导入文章 `articleType = STORY`（粘贴文本主题不限，中性桶）、`lengthTier = LONG`（40~1200 词跨 LONG 区间）；同日重复导入走 `saveNewVersion` 版本递增。`coveredLemmas` = 今日完成词卡中出现在正文里的 lemma（按正文出现顺序去重）；计划/词表读不到 → 空表照常导入。
+6. **变异测试**：注释掉危险标记检查 → `rejectsAScriptTag`、`rejectsRawHtmlAndScript`、`webFetchConstraintsStillRejectDangerousMarkupAndBadBodies` 三例真红；恢复后全绿。
+7. **回归**：JVM 全量 **57 类 / 347 用例 / 0 失败 / 0 跳过**。无 Room/Compose 改动，真机无需重跑。
 
 ---
 
@@ -552,7 +562,7 @@ git commit -m "feat(reading): import a pasted article without leaving the device
 | `notifiesWhenTheSourceHasNoChineseText` | `chineseText` 为空 → 显示「该来源无中文翻译」且**全文翻译开关被禁用** |
 | `doesNotExecuteTheSourceLinkAutomatically` | 原文链接是纯文本 + 显式按钮，**没有任何 `openUri` 在加载时被调用** |
 
-- [ ] **Step 2: 跑测试确认 RED** → Step 3 实现 → Step 4 GREEN → Step 5 提交
+- [x] **Step 2: 跑测试确认 RED** → Step 3 实现 → Step 4 GREEN → Step 5 提交
 
 ```bash
 git commit -m "feat(reading): show the article source, attribution and translation notice"

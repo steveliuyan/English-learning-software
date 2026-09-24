@@ -12,10 +12,11 @@ import kotlinx.coroutines.CancellationException
 import java.time.Instant
 
 /**
- * 抓取落库的上下文：哪位用户、哪一天、哪本词书触发的抓取。外刊文章不消费词表
- * （那是 AI 生成的语义），但复用键与归属仍然需要这三元组。
+ * 落库的上下文：哪位用户、哪一天、哪本词书触发的这次阅读文章落库。外刊文章不消费词表
+ * （那是 AI 生成的语义），但复用键与归属仍然需要这三元组。抓取（`FetchArticleUseCase`）
+ * 与用户导入（`ImportArticleUseCase`）共用。
  */
-data class FetchContext(
+data class ArticleContext(
     val profileId: String,
     val localDate: String,
     val activeWordBookId: String,
@@ -64,15 +65,14 @@ enum class FetchFailure {
 class FetchArticleUseCase(
     private val transport: AiHttpTransport,
     private val articles: ArticleRepository,
-    private val quality: ArticleQualityPolicy,
     private val ids: ArticleIdFactory,
     private val clock: () -> Instant,
 ) {
     /**
-     * 外刊文章的接受词数区间。长度由站点内容决定，**不套词书区间**（那会给 AI 生成的
-     * 短文用）；语言判定、危险标记、单字段上限等其余检查全部照走。
+     * 外刊文章的档位标记。词数约束已由 [ArticleQualityPolicy.forWebFetch] 承担
+     * （60~2000 词，不套词书区间）；这份 Resolved 只用于给落库文章填 `lengthTier`。
      */
-    private val fetchAcceptableWords = ArticleLengthPolicy.Resolved(
+    private val fetchTier = ArticleLengthPolicy.Resolved(
         tier = ArticleLengthTier.LONG,
         targetWords = 100..2000,
         acceptedWords = 60..2000,
@@ -90,7 +90,7 @@ class FetchArticleUseCase(
         }
     }
 
-    suspend fun fetch(sourceId: String, item: FeedItem, context: FetchContext): FetchArticleResult {
+    suspend fun fetch(sourceId: String, item: FeedItem, context: ArticleContext): FetchArticleResult {
         val source = ArticleSourceRegistry.byId(sourceId)
             ?: return FetchArticleResult.RejectedTarget(RejectedTargetReason.NotWhitelisted)
         // 白名单第二道闸：RSS 里的链接在发请求前再校验一次，用户/RSS 注入的外站 URL 到此为止。
@@ -125,13 +125,13 @@ class FetchArticleUseCase(
     private suspend fun fetchAndStore(
         source: RegisteredArticleSource,
         item: FeedItem,
-        context: FetchContext,
+        context: ArticleContext,
         body: String,
     ): FetchArticleResult {
         val parsed = ArticlePageParser.parse(body).getOrElse {
             return FetchArticleResult.Failed(FetchFailure.BodyNotFound)
         }
-        val validated = quality.validateFetched(RawArticle(parsed.title, parsed.body, ""), fetchAcceptableWords)
+        val validated = ArticleQualityPolicy.validate(RawArticle(parsed.title, parsed.body, ""), ArticleQualityPolicy.forWebFetch)
             .getOrElse { return FetchArticleResult.Failed(FetchFailure.QualityRejected) }
 
         val article = Article(
@@ -140,7 +140,7 @@ class FetchArticleUseCase(
             localDate = context.localDate,
             activeWordBookId = context.activeWordBookId,
             articleType = ArticleType.NEWS,
-            lengthTier = fetchAcceptableWords.tier,
+            lengthTier = fetchTier.tier,
             version = 0, // saveNewVersion 分配真实版本号
             title = validated.title,
             englishText = validated.englishText,

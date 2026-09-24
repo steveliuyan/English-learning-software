@@ -45,12 +45,11 @@ class FetchArticleUseCaseTest {
     private val transport = FakeTransport()
     private val articles = FakeArticleRepository()
     private val ids = ArticleIdFactory { "article-${articles.stored.size + 1}" }
-    private val context = FetchContext(profileId = "p1", localDate = "2026-09-24", activeWordBookId = "cet4")
+    private val context = ArticleContext(profileId = "p1", localDate = "2026-09-24", activeWordBookId = "cet4")
 
     private fun useCase() = FetchArticleUseCase(
         transport = transport,
         articles = articles,
-        quality = ArticleQualityPolicy,
         ids = ids,
         clock = { java.time.Instant.ofEpochMilli(1_000L) },
     )

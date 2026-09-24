@@ -13,61 +13,62 @@ class ArticleQualityPolicyTest {
         chinese: String = "这是一段中文译文。".repeat(5),
     ) = RawArticle(title, english, chinese)
 
+    private fun validate(
+        raw: RawArticle,
+        constraints: ArticleTextConstraints = ArticleQualityPolicy.forAiGeneration(length),
+    ) = ArticleQualityPolicy.validate(raw, constraints)
+
     @Test
     fun acceptsAWellFormedArticle() {
-        assertTrue(ArticleQualityPolicy.validate(raw(), length).isSuccess)
+        assertTrue(validate(raw()).isSuccess)
     }
 
     @Test
     fun rejectsABlankTitle() {
-        assertTrue(ArticleQualityPolicy.validate(raw(title = "   "), length).isFailure)
+        assertTrue(validate(raw(title = "   ")).isFailure)
     }
 
     @Test
     fun rejectsABlankEnglishBody() {
-        assertTrue(ArticleQualityPolicy.validate(raw(english = ""), length).isFailure)
+        assertTrue(validate(raw(english = "")).isFailure)
     }
 
     @Test
     fun rejectsABlankChineseBody() {
-        assertTrue(ArticleQualityPolicy.validate(raw(chinese = "  "), length).isFailure)
+        assertTrue(validate(raw(chinese = "  ")).isFailure)
     }
 
     @Test
     fun rejectsAnEnglishBodyThatIsActuallyChinese() {
-        assertTrue(ArticleQualityPolicy.validate(raw(english = "这是一段中文。".repeat(20)), length).isFailure)
+        assertTrue(validate(raw(english = "这是一段中文。".repeat(20))).isFailure)
     }
 
     @Test
     fun rejectsAChineseBodyThatIsActuallyEnglish() {
-        assertTrue(ArticleQualityPolicy.validate(raw(chinese = "this is english ".repeat(10)), length).isFailure)
+        assertTrue(validate(raw(chinese = "this is english ".repeat(10))).isFailure)
     }
 
     @Test
     fun rejectsABodyFarShorterThanTheAcceptedRange() {
-        assertTrue(ArticleQualityPolicy.validate(raw(english = "too short"), length).isFailure)
+        assertTrue(validate(raw(english = "too short")).isFailure)
     }
 
     @Test
     fun rejectsABodyFarLongerThanTheAcceptedRange() {
-        assertTrue(
-            ArticleQualityPolicy.validate(raw(english = List(600) { "word" }.joinToString(" ")), length).isFailure,
-        )
+        assertTrue(validate(raw(english = List(600) { "word" }.joinToString(" "))).isFailure)
     }
 
     @Test
     fun rejectsOversizedOutput() {
-        assertTrue(
-            ArticleQualityPolicy.validate(raw(chinese = "中".repeat(ArticleQualityPolicy.MAX_TEXT_CHARS + 1)), length).isFailure,
-        )
+        assertTrue(validate(raw(chinese = "中".repeat(ArticleQualityPolicy.MAX_TEXT_CHARS + 1))).isFailure)
     }
 
     @Test
     fun rejectsRawHtmlAndScript() {
         // 危险片段必须连同它的分隔符一起判，避免 "conscript" 这类词被误伤。
-        assertTrue(ArticleQualityPolicy.validate(raw(title = "<script>alert(1)</script>"), length).isFailure)
-        assertTrue(ArticleQualityPolicy.validate(raw(english = "click javascript:void(0) now"), length).isFailure)
-        assertTrue(ArticleQualityPolicy.validate(raw(english = "<img src=x onerror=alert(1)>"), length).isFailure)
+        assertTrue(validate(raw(title = "<script>alert(1)</script>")).isFailure)
+        assertTrue(validate(raw(english = "click javascript:void(0) now")).isFailure)
+        assertTrue(validate(raw(english = "<img src=x onerror=alert(1)>")).isFailure)
     }
 
     @Test
@@ -79,38 +80,42 @@ class ArticleQualityPolicyTest {
                 List(180) { "word" }.joinToString(" "),
             chinese = "中文" + "这段译文提到剧本与文字，长度足够通过检查。".repeat(4),
         )
-        assertTrue(ArticleQualityPolicy.validate(innocent, length).isSuccess)
+        assertTrue(validate(innocent).isSuccess)
     }
 
     @Test
     fun rejectsControlCharacters() {
-        assertTrue(
-            ArticleQualityPolicy.validate(raw(english = "ab\u0000cd" + " word".repeat(200)), length).isFailure,
-        )
+        assertTrue(validate(raw(english = "ab\u0000cd" + " word".repeat(200))).isFailure)
     }
 
     @Test
-    fun fetchedArticlesAreValidatedWithoutATranslation() {
+    fun webFetchConstraintsValidateWithoutATranslation() {
         // 外刊抓取没有译文也不伪造（Task C）：除译文相关检查外全部照走。
-        val fetchedLength = ArticleLengthPolicy.Resolved(
-            tier = ArticleLengthTier.LONG,
-            targetWords = 100..2000,
-            acceptedWords = 60..2000,
-        )
-        val result = ArticleQualityPolicy.validateFetched(raw(chinese = ""), fetchedLength)
+        val result = ArticleQualityPolicy.validate(raw(chinese = ""), ArticleQualityPolicy.forWebFetch)
         assertTrue(result.isSuccess)
         assertTrue(result.getOrThrow().chineseText.isEmpty())
     }
 
     @Test
-    fun fetchedArticlesStillRejectDangerousMarkupAndBadBodies() {
-        val fetchedLength = ArticleLengthPolicy.Resolved(
-            tier = ArticleLengthTier.LONG,
-            targetWords = 100..2000,
-            acceptedWords = 60..2000,
-        )
-        assertTrue(ArticleQualityPolicy.validateFetched(raw(chinese = "", title = "<script>x</script>"), fetchedLength).isFailure)
-        assertTrue(ArticleQualityPolicy.validateFetched(raw(chinese = "", english = "too short"), fetchedLength).isFailure)
-        assertTrue(ArticleQualityPolicy.validateFetched(raw(chinese = "", english = "这是一段中文。".repeat(20)), fetchedLength).isFailure)
+    fun webFetchConstraintsStillRejectDangerousMarkupAndBadBodies() {
+        val constraints = ArticleQualityPolicy.forWebFetch
+        assertTrue(ArticleQualityPolicy.validate(raw(chinese = "", title = "<script>x</script>"), constraints).isFailure)
+        assertTrue(ArticleQualityPolicy.validate(raw(chinese = "", english = "too short"), constraints).isFailure)
+        assertTrue(ArticleQualityPolicy.validate(raw(chinese = "", english = "这是一段中文。".repeat(20)), constraints).isFailure)
+    }
+
+    @Test
+    fun importedConstraintsAcceptTheDocumentedRange() {
+        // forImported：minWords = 40，maxWords = 1200，不需要译文。
+        val constraints = ArticleQualityPolicy.forImported
+        assertTrue(ArticleQualityPolicy.validate(raw(english = List(40) { "word" }.joinToString(" "), chinese = ""), constraints).isSuccess)
+        assertTrue(ArticleQualityPolicy.validate(raw(english = List(1200) { "word" }.joinToString(" "), chinese = ""), constraints).isSuccess)
+    }
+
+    @Test
+    fun importedConstraintsRejectOutOfRangeBodies() {
+        val constraints = ArticleQualityPolicy.forImported
+        assertTrue(ArticleQualityPolicy.validate(raw(english = List(39) { "word" }.joinToString(" "), chinese = ""), constraints).isFailure)
+        assertTrue(ArticleQualityPolicy.validate(raw(english = List(1201) { "word" }.joinToString(" "), chinese = ""), constraints).isFailure)
     }
 }
