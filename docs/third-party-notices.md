@@ -378,7 +378,7 @@
 - 许可证: 公有领域（美国法下；依据美国版权法对政府作品的规定及 VOA 官方内容使用说明）。VOA 官方允许为教育目的与商业目的转载，条件为署名 `learningenglish.voanews.com`
 - 用途: 为「外刊抓取」来源提供英语文章正文与标题，作为 AI 生成之外的第二条文章来源。仅取文本，不取图片、音频与视频
 - 数据流: 运行期按用户主动触发的抓取请求从 `learningenglish.voanews.com` 下载文章标题与正文；结果保存在应用私有存储中供离线重读。不上传任何用户数据，不发送设备标识，不携带用户自配的 AI Key，不使用任何 Cookie 或登录态
-- NOTICE 位置: `docs/third-party-notices.md`、`docs/decisions/2026-09-23-article-source-licensing.md`；应用内阅读页与历史列表展示署名 `learningenglish.voanews.com` 与原文链接文本
+- NOTICE 位置: `docs/third-party-notices.md`、`docs/decisions/2026-09-24-article-source-licensing.md`；应用内阅读页与历史列表展示署名 `learningenglish.voanews.com` 与原文链接文本
 - 替代方案: 仅保留 AI 生成与用户粘贴导入两条来源；或替换为其他已完成逐源许可核验的外刊来源
 - 商业分发结论: **有条件可商业分发，且发布前必须复核**。条件为保留署名 `learningenglish.voanews.com` 与原文链接文本，且不转载 VOA 所使用的 AP / Reuters 图片与视频。**待闭合项**：VOA 内容在美国法下属公有领域，但其在中国法下的保护状态尚未取得专业法律判断；在完成该判断前，抓取正文不得用于应用商标、宣传或付费墙内容。未通过核验前，抓取路径不得合并进发布构建
 

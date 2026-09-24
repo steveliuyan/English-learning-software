@@ -10,7 +10,7 @@
 
 **Spec:** `docs/specs/02-reading-and-ai-content.md` 的 F2-03、F2-04、F2-06，以及 AC2-07~AC2-10。
 
-**许可依据:** `docs/decisions/2026-09-23-article-source-licensing.md`；台账条目 `docs/third-party-notices.md` 的 `voa-learning-english`。
+**许可依据:** `docs/decisions/2026-09-24-article-source-licensing.md`；台账条目 `docs/third-party-notices.md` 的 `voa-learning-english`。
 
 ## Global Constraints
 
@@ -23,7 +23,7 @@
 - 所有新行为先写失败测试再写最小实现；每个任务独立提交。
 - JVM 测试源集是 **JUnit 5**，`androidTest` 才是 JUnit 4；`kotlin.test` 断言**实际值在前、消息在后**。
 
-## 已实测的来源事实（2026-09-23，经代理实测）
+## 已实测的来源事实（2026-09-24，经代理实测）
 
 写计划前已经把抓取路径实测过，以下不是推测：
 
@@ -329,7 +329,7 @@ git commit -m "feat(reading): model the article source as a closed union type"
 
 - [ ] **Step 2: 写两个解析器的失败测试（用真实缩减样本）**
 
-样本来源与许可写进文件头部注释：站点 `learningenglish.voanews.com`，抓取日期 2026-09-23，VOA Learning English 文本属公有领域，此处仅作开发期测试夹具、**不进入 APK**。
+样本来源与许可写进文件头部注释：站点 `learningenglish.voanews.com`，抓取日期 2026-09-24，VOA Learning English 文本属公有领域，此处仅作开发期测试夹具、**不进入 APK**。
 
 `ArticleFeedParserTest`：解析出 item 数、`title`/`link`/`pubDate`/`description` 正确；**XML 实体解码**（`&amp;` → `&`）；`zoneid=965` 的空 channel → `Result.success(emptyList())`（空不是错误）；缺 `link` 的 item 被跳过；非 RSS 内容 → `isFailure`。
 
