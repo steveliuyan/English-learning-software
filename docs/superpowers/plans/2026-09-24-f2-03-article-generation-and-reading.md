@@ -444,7 +444,7 @@ git commit -m "feat(ai): add a dependency-free HTTP transport port"
   - `object ArticlePromptPolicy { fun build(request: ArticleGenerationRequest): AiPrompt }`
   - `object AiChatRequestBuilder { fun joinEndpoint(endpoint: String): Result<String>; fun build(profile: AiProfile, parameters: AiAdvancedParameters, prompt: AiPrompt, apiKey: CharArray): Result<AiHttpRequest> }`
 
-- [ ] **Step 1: 写失败的提示词测试**
+- [x] **Step 1: 写失败的提示词测试**
 
 ```kotlin
 class ArticlePromptPolicyTest {
@@ -492,7 +492,7 @@ class ArticlePromptPolicyTest {
 }
 ```
 
-- [ ] **Step 2: 写失败的请求体测试**
+- [x] **Step 2: 写失败的请求体测试**
 
 ```kotlin
 class AiChatRequestBuilderTest {
@@ -553,12 +553,12 @@ class AiChatRequestBuilderTest {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认 RED**
+- [x] **Step 3: 跑测试确认 RED**
 
 Run: `./gradlew.bat :app:testDebugUnitTest --tests "com.example.englishlearning.reading.ArticlePromptPolicyTest" --tests "com.example.englishlearning.ai.net.AiChatRequestBuilderTest" --no-daemon --no-build-cache --console=plain`
 Expected: 编译失败 `Unresolved reference 'ArticlePromptPolicy'`。
 
-- [ ] **Step 4: 实现提示词与请求构造**
+- [x] **Step 4: 实现提示词与请求构造**
 
 `ArticlePromptPolicy.build` 的要点（纯字符串拼接，无模板引擎）：
 
@@ -581,12 +581,12 @@ fun joinEndpoint(endpoint: String): Result<String> {
 
 `build`：先 `joinEndpoint`，再用 `JsonObject`/`JsonArray` 手工构造 body（**不用 `@Serializable`**），headers 只放 `Content-Type` 与 `Authorization`。Key 用 `String(apiKey)` 拼进 header 后立即不再持有。
 
-- [ ] **Step 5: 跑测试确认 GREEN**
+- [x] **Step 5: 跑测试确认 GREEN**
 
 Run: 同 Step 3。
 Expected: PASS（4 + 7 例）。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/reading app/src/main/java/com/example/englishlearning/ai/net app/src/test/java/com/example/englishlearning
@@ -594,6 +594,14 @@ git commit -m "feat(reading): build the generation prompt and outbound request"
 ```
 
 ---
+
+
+### Task 3 执行记录与偏差
+
+1. **系统提示的措辞约束是自我指涉的**：计划要求 system 声明「不要输出任何位置、偏移或标记」，同时要求 system **不出现** `highlight`/`offset` 字样（防止把坐标要求带回去）——所以中文语义「偏移」只能用不含这两个词的英文写法（`Do not add positions, markers, annotations`），实现里留了注释说明。
+2. **`AiPrompt` 落在 `ai.net` 包**：测试与 `AiChatRequestBuilder` 同包引用它；`ArticlePromptPolicy`（reading 包）跨包消费，无循环依赖。
+3. **变异测试**：在 `build` 的 headers 里多放一个 `X-Extra-Header` → `sendsExactlyTwoHeadersAndNothingElse` 真的变红（「白名单之外一个头都不放」是「拒绝任意请求覆盖」约束在构造层的落实）；恢复后 7/7 绿。
+4. 全量回归：JVM **49 类 / 269 用例 / 0 失败 / 0 跳过**（2026-09-24）。
 
 ### Task 4: 响应解析与保存前质量校验
 
