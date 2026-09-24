@@ -70,6 +70,55 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV9ToV10_addsSourceColumnsWithoutLosingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 9).apply {
+            // 造一行 v9 版文章与一条阅读偏好。v9 时代只有 AI 生成一条来源路径，所以老行只能
+            // 回填成 AI_GENERATED；其余来源列必须是空串而不是 null（列声明为 NOT NULL）。
+            execSQL(
+                "INSERT INTO articles (articleId, profileId, localDate, activeWordBookId, articleType, lengthTier, " +
+                    "version, title, englishText, chineseText, generatedAtEpochMillis, coveredLemmas, " +
+                    "parameterSummary, modelName) " +
+                    "VALUES ('a1', 'default', '2026-09-24', 'primary-school', 'STORY', 'STANDARD', 1, " +
+                    "'Old title', 'English body', '中文正文', 1, '[\"story\"]', 'model=m1 temperature=0.7', 'm1')",
+            )
+            // displayMode 在 9.json 里没有 defaultValue（迁移 SQL 的 DEFAULT 不会写进 schema 导出），
+            // 所以 v9 造数必须显式给值；只有走迁移的行才会被 DEFAULT 回填。
+            execSQL(
+                "INSERT INTO reading_preferences (profileId, defaultArticleType, explicitLengthTier, displayMode) " +
+                    "VALUES ('default', 'STORY', NULL, 'ENGLISH_FIRST')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 10, true, AppDatabase.MIGRATION_9_10).apply {
+            query(
+                "SELECT title, coveredLemmas, parameterSummary, modelName, sourceType, sourceId, " +
+                    "sourceDisplayName, sourceUrl, sourceLicenseNote, sourceAttribution " +
+                    "FROM articles WHERE articleId = 'a1'",
+            ).use { cursor ->
+                assertTrue("the v9 article row must survive the migration", cursor.moveToFirst())
+                assertEquals("Old title", cursor.getString(0))
+                assertEquals("[\"story\"]", cursor.getString(1))
+                assertEquals("model=m1 temperature=0.7", cursor.getString(2))
+                assertEquals("m1", cursor.getString(3))
+                assertEquals("AI_GENERATED", cursor.getString(4))
+                assertEquals("", cursor.getString(5))
+                assertEquals("", cursor.getString(6))
+                assertEquals("", cursor.getString(7))
+                assertEquals("", cursor.getString(8))
+                assertEquals("", cursor.getString(9))
+            }
+            query("SELECT defaultArticleType, displayMode FROM reading_preferences WHERE profileId = 'default'").use { cursor ->
+                assertTrue("the v9 preference row must survive the migration", cursor.moveToFirst())
+                assertEquals("STORY", cursor.getString(0))
+                assertEquals("ENGLISH_FIRST", cursor.getString(1))
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateAllHistoricalSchemasWithoutDestructiveFallback() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 1).apply {

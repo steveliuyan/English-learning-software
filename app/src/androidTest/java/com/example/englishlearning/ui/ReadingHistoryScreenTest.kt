@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleLengthTier
+import com.example.englishlearning.reading.domain.ArticleSource
 import com.example.englishlearning.reading.domain.ArticleType
 import org.junit.Rule
 import org.junit.Test
@@ -32,7 +33,8 @@ class ReadingHistoryScreenTest {
     private fun article(title: String) = Article(
         articleId = "a1", profileId = "p1", localDate = "2026-09-22", activeWordBookId = "cet4",
         articleType = ArticleType.STORY, lengthTier = ArticleLengthTier.STANDARD, version = 1,
-        title = title, englishText = "text", chineseText = "译文", generatedAtEpochMillis = 1L, modelName = null,
-        coveredLemmas = listOf("title"), parameterSummary = "",
+        title = title, englishText = "text", chineseText = "译文", generatedAtEpochMillis = 1L,
+        coveredLemmas = listOf("title"),
+        source = ArticleSource.AiGenerated(modelName = "", parameterSummary = ""),
     )
 }

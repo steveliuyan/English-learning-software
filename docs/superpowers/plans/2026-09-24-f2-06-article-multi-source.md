@@ -203,16 +203,18 @@ git commit -m "feat(security): read stored secrets back for outbound authorizati
   - `enum class ArticleSourceType { AI_GENERATED, WEB_FETCHED, USER_IMPORTED }`（仅用于存储判别列）
   - `AppDatabase.MIGRATION_9_10`
 
-- [ ] **Step 1: 写失败的迁移测试**
+- [x] **Step 1: 写失败的迁移测试**
 
-新增 `migration9To10AddsSourceColumnsWithoutLosingRows`：造一行 v9 文章与一条偏好，断言老行存活、`sourceType` 回填 `'AI_GENERATED'`、其余来源列为空串。
+新增 `migrateV9ToV10_addsSourceColumnsWithoutLosingRows`：造一行 v9 文章与一条偏好，断言老行存活、`sourceType` 回填 `'AI_GENERATED'`、其余来源列为空串。
+另在 `RoomArticleRepositoryTest` 新增两条：`everySourceBranchSurvivesARoundTripThroughStorage`（三个分支各自 save→read 原样回来）与 `unknownSourceTypeFailsTheReadInsteadOfBecomingUserImported`（判别列未知值整体失败）。
 
-- [ ] **Step 2: 跑测试确认 RED**
+- [x] **Step 2: 跑测试确认 RED**
 
-Run: `./gradlew.bat :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.englishlearning.core.storage.AppDatabaseMigrationTest --no-daemon --no-build-cache --console=plain`
+Run: `./gradlew.bat :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin`（先用编译确认，比 connected 更快）
 Expected: FAIL —— `no such column: sourceType`。
+实测：RED 是**编译失败**而非运行期失败——`Unresolved reference 'ArticleSource'` / `'MIGRATION_9_10'` / `No parameter with name 'source'`（测试引用的类型与迁移还不存在）。计划原文预期的运行期 `no such column` 只有在先写实现的情况下才会出现，与 TDD 顺序矛盾。
 
-- [ ] **Step 3: 实现领域类型、实体与迁移**
+- [x] **Step 3: 实现领域类型、实体与迁移**
 
 `ArticleSource.kt` 的 KDoc 必须写明设计意图：**用类型而不是校验来保证溯源完整性**。
 
@@ -250,12 +252,22 @@ val MIGRATION_9_10: Migration =
 
 `RoomArticleRepository` 的映射集中在这一个文件：`toEntity` 按 `ArticleSource` 分支写列，`toDomain` 按 `sourceType` 还原。**`sourceType` 解析失败时退回 `UserImported` 是错的**——会造成「无署名却显示成用户导入」。正确做法是抛 `AppErrorException(AppError.StorageUnavailable)`（读不出来就说读不出来），并为此写一条测试。
 
-- [ ] **Step 4: 跑迁移与仓储测试确认 GREEN**
+- [x] **Step 4: 跑迁移与仓储测试确认 GREEN**
 
-Run: 同 Step 2 的类 + `:app:connectedDebugAndroidTest -P...class=com.example.englishlearning.reading.RoomArticleRepositoryTest`
+Run: 同 Step 2 的类 + `RoomArticleRepositoryTest`
 Expected: PASS；`app/schemas/.../10.json` 已生成。
+实测：JVM 全量 **46 类 / 252 用例 / 0 失败**；真机两测试类 **OK (17 tests)**（按 `install -r -t` + `am instrument` 保留数据路线，跑前跑后用户库三文件 MD5 全部一致）。
+**真实用户库迁移证据**：基线 `user_version=9`、`today_plans=3` 行、`articles=0` 行；启动应用触发 Room 迁移后 `user_version=10`，行数与计划数据原样，6 个新列全部就位。
+**变异测试**：把 `toSource()` 的解析失败分支临时改成退回 `UserImported`（计划明确警告的错误写法）→ `unknownSourceTypeFailsTheReadInsteadOfBecomingUserImported` **真的变红**；恢复后 17/17 绿。
 
-- [ ] **Step 5: 提交**
+### Task B 执行记录与偏差
+
+1. **迁移测试夹具坑**：`MigrationTestHelper.createDatabase(TEST_DB, 9)` 按 `9.json` 建表，而实体没有 `@ColumnInfo(defaultValue=...)`，迁移 SQL 里的 `DEFAULT` **不会写进 schema 导出**——所以 v9 测试库里 `displayMode` 没有 DEFAULT，v9 造数必须显式给值，否则 `NOT NULL constraint failed: reading_preferences.displayMode`（首次真机跑抓到）。
+2. **Room schema 校验不卡 DEFAULT 差异**：迁移加的 `DEFAULT 'AI_GENERATED'` 与实体声明（无 defaultValue）不一致，但 `runMigrationsAndValidate` 通过——与 MIGRATION_8_9 既有模式一致，未引入新风险。
+3. **`arrayOf(...)` 混型元素**（String/Int/Long/null）会把 reified 类型推断成交叉类型并报 warning，显式 `arrayOf<Any?>(...)` 消除。
+4. **真机验证走保留数据路线**（`assembleDebug` + `assembleDebugAndroidTest` → `adb install -r -t` 两个 APK → `am instrument -e class ...`），**没有用 `connectedDebugAndroidTest`**，用户数据经三文件 MD5 前后比对自证未动。
+
+- [x] **Step 5: 提交**
 
 ```bash
 git add app/src/main/java/com/example/englishlearning/reading app/src/main/java/com/example/englishlearning/core/storage app/src/androidTest app/schemas

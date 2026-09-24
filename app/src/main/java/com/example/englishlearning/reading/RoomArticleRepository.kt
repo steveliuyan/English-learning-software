@@ -6,6 +6,8 @@ import com.example.englishlearning.core.storage.AppErrorException
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleLengthTier
+import com.example.englishlearning.reading.domain.ArticleSource
+import com.example.englishlearning.reading.domain.ArticleSourceType
 import com.example.englishlearning.reading.domain.ArticleType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -72,17 +74,75 @@ class RoomArticleRepository(
         !value.contains('<') && !value.contains('>') && !value.contains("javascript:", ignoreCase = true)
 
     private fun Article.toEntity() = ArticleEntity(
-        articleId, profileId, localDate, activeWordBookId, articleType.name, lengthTier.name,
-        version, title, englishText, chineseText, generatedAtEpochMillis,
-        coveredLemmas.toLemmaJson(), parameterSummary, modelName,
+        articleId = articleId,
+        profileId = profileId,
+        localDate = localDate,
+        activeWordBookId = activeWordBookId,
+        articleType = articleType.name,
+        lengthTier = lengthTier.name,
+        version = version,
+        title = title,
+        englishText = englishText,
+        chineseText = chineseText,
+        generatedAtEpochMillis = generatedAtEpochMillis,
+        coveredLemmas = coveredLemmas.toLemmaJson(),
+        // AiGenerated 复用既有两列承载审计信息；其余来源写空串/NULL，与迁移回填一致。
+        parameterSummary = (source as? ArticleSource.AiGenerated)?.parameterSummary.orEmpty(),
+        modelName = (source as? ArticleSource.AiGenerated)?.modelName,
+        sourceType = source.type().name,
+        sourceId = (source as? ArticleSource.WebFetched)?.sourceId.orEmpty(),
+        sourceDisplayName = (source as? ArticleSource.WebFetched)?.displayName.orEmpty(),
+        sourceUrl = (source as? ArticleSource.WebFetched)?.articleUrl.orEmpty(),
+        sourceLicenseNote = (source as? ArticleSource.WebFetched)?.licenseNote.orEmpty(),
+        sourceAttribution = (source as? ArticleSource.WebFetched)?.attributionText.orEmpty(),
     )
 
     private fun ArticleEntity.toDomain() = Article(
-        articleId, profileId, localDate, activeWordBookId,
-        ArticleType.valueOf(articleType), ArticleLengthTier.valueOf(lengthTier), version,
-        title, englishText, chineseText, generatedAtEpochMillis,
-        coveredLemmas.toLemmaList(), parameterSummary, modelName,
+        articleId = articleId,
+        profileId = profileId,
+        localDate = localDate,
+        activeWordBookId = activeWordBookId,
+        articleType = ArticleType.valueOf(articleType),
+        lengthTier = ArticleLengthTier.valueOf(lengthTier),
+        version = version,
+        title = title,
+        englishText = englishText,
+        chineseText = chineseText,
+        generatedAtEpochMillis = generatedAtEpochMillis,
+        coveredLemmas = coveredLemmas.toLemmaList(),
+        source = toSource(),
     )
+
+    private fun ArticleSource.type(): ArticleSourceType = when (this) {
+        is ArticleSource.AiGenerated -> ArticleSourceType.AI_GENERATED
+        is ArticleSource.WebFetched -> ArticleSourceType.WEB_FETCHED
+        ArticleSource.UserImported -> ArticleSourceType.USER_IMPORTED
+    }
+
+    /**
+     * 判别列解析失败时**不能**退回 UserImported：那会把抓取来源必须展示的署名与许可说明
+     * 凭空抹掉，等于在读取路径上悄悄违反许可。读不出来就说读不出来——抛
+     * [AppErrorException] 让调用方拿到 StorageUnavailable，而不是一篇丢失来源的文章。
+     */
+    private fun ArticleEntity.toSource(): ArticleSource {
+        val type = try {
+            ArticleSourceType.valueOf(sourceType)
+        } catch (_: IllegalArgumentException) {
+            throw AppErrorException(AppError.StorageUnavailable)
+        }
+        return when (type) {
+            ArticleSourceType.AI_GENERATED ->
+                ArticleSource.AiGenerated(modelName = modelName.orEmpty(), parameterSummary = parameterSummary)
+            ArticleSourceType.WEB_FETCHED -> ArticleSource.WebFetched(
+                sourceId = sourceId,
+                displayName = sourceDisplayName,
+                articleUrl = sourceUrl,
+                licenseNote = sourceLicenseNote,
+                attributionText = sourceAttribution,
+            )
+            ArticleSourceType.USER_IMPORTED -> ArticleSource.UserImported
+        }
+    }
 
     private fun List<String>.toLemmaJson(): String = JsonArray(map { JsonPrimitive(it) }).toString()
 

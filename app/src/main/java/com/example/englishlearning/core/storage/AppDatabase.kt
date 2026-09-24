@@ -50,7 +50,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -174,6 +174,21 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_9_10: Migration =
+            object : Migration(9, 10) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // ALTER TABLE 加 NOT NULL 列必须带 DEFAULT；已有行只能是 AI 生成，因为此前只有这一条来源。
+                    // 不改 MIGRATION_8_9 而新开 v10：v9 库已在真机存在，保留版本号却改 schema 会让
+                    // Room 因 identity hash 不匹配而校验失败。
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceType` TEXT NOT NULL DEFAULT 'AI_GENERATED'")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceId` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceDisplayName` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceUrl` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceLicenseNote` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceAttribution` TEXT NOT NULL DEFAULT ''")
+                }
+            }
+
         val MIGRATION_6_7: Migration =
             object : Migration(6, 7) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -266,7 +281,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

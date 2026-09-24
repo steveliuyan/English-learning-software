@@ -22,10 +22,9 @@ data class Article(
      */
     val coveredLemmas: List<String>,
     /**
-     * Non-sensitive summary of the parameters used, e.g. `model=... temperature=...`.
-     *
-     * Kept for auditability. Must never contain the Endpoint or any part of the Key.
+     * Provenance of this article as a closed union: AI generation carries the audit fields,
+     * web fetching carries the license and attribution that must be shown, user import
+     * carries nothing. See [ArticleSource] for why this is a type and not a validation.
      */
-    val parameterSummary: String,
-    val modelName: String?,
+    val source: ArticleSource,
 )

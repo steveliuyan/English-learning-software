@@ -4,6 +4,7 @@ import com.example.englishlearning.reading.ArticleRepository
 import com.example.englishlearning.reading.ReadingPreferenceRepository
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleLengthTier
+import com.example.englishlearning.reading.domain.ArticleSource
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
 import java.time.LocalDate
@@ -72,8 +73,9 @@ class ReadingAccessViewModelTest {
     private fun article(id: String) = Article(
         articleId = id, profileId = "p1", localDate = "2026-09-22", activeWordBookId = "cet4",
         articleType = ArticleType.STORY, lengthTier = ArticleLengthTier.STANDARD, version = 1,
-        title = "title", englishText = "text", chineseText = "译文", generatedAtEpochMillis = 1, modelName = null,
-        coveredLemmas = listOf("title"), parameterSummary = "",
+        title = "title", englishText = "text", chineseText = "译文", generatedAtEpochMillis = 1,
+        coveredLemmas = listOf("title"),
+        source = ArticleSource.AiGenerated(modelName = "", parameterSummary = ""),
     )
 
     private class FakeArticleRepository(private val history: List<Article> = emptyList()) : ArticleRepository {

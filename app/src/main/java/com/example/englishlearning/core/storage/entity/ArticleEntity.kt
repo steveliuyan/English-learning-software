@@ -31,4 +31,12 @@ data class ArticleEntity(
     val coveredLemmas: String,
     val parameterSummary: String,
     val modelName: String?,
+    /** 判别列：[com.example.englishlearning.reading.domain.ArticleSourceType] 的名称。 */
+    val sourceType: String,
+    // 以下五个来源列仅 WEB_FETCHED 非空；其余来源写空串保持 NOT NULL，与迁移回填一致。
+    val sourceId: String,
+    val sourceDisplayName: String,
+    val sourceUrl: String,
+    val sourceLicenseNote: String,
+    val sourceAttribution: String,
 )
