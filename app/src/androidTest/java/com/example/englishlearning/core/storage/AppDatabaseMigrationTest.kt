@@ -35,6 +35,41 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV8ToV9_addsGenerationProvenanceAndDisplayModeWithoutLosingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 8).apply {
+            // 造一行 v8 版文章与一条阅读偏好：既要证明老行没丢，也要证明新列给老行回填了默认值。
+            execSQL(
+                "INSERT INTO articles (articleId, profileId, localDate, activeWordBookId, articleType, lengthTier, " +
+                    "version, title, englishText, chineseText, generatedAtEpochMillis, modelName) " +
+                    "VALUES ('a1', 'default', '2026-09-24', 'primary-school', 'STORY', 'STANDARD', 1, " +
+                    "'Old title', 'English body', '中文正文', 1, 'm1')",
+            )
+            execSQL(
+                "INSERT INTO reading_preferences (profileId, defaultArticleType, explicitLengthTier) " +
+                    "VALUES ('default', 'STORY', NULL)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 9, true, AppDatabase.MIGRATION_8_9).apply {
+            query("SELECT title, englishText, coveredLemmas, parameterSummary FROM articles WHERE articleId = 'a1'").use { cursor ->
+                assertTrue("the v8 article row must survive the migration", cursor.moveToFirst())
+                assertEquals("Old title", cursor.getString(0))
+                assertEquals("English body", cursor.getString(1))
+                assertEquals("", cursor.getString(2))
+                assertEquals("", cursor.getString(3))
+            }
+            query("SELECT defaultArticleType, displayMode FROM reading_preferences WHERE profileId = 'default'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("STORY", cursor.getString(0))
+                assertEquals("ENGLISH_FIRST", cursor.getString(1))
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateAllHistoricalSchemasWithoutDestructiveFallback() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 1).apply {

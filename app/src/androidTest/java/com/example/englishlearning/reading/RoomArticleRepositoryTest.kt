@@ -86,6 +86,8 @@ class RoomArticleRepositoryTest {
         englishText = englishText,
         chineseText = chineseText,
         generatedAtEpochMillis = 1L,
+        coveredLemmas = listOf("story", "learning"),
+        parameterSummary = "model=test-model temperature=0.7",
         modelName = "test-model",
     )
 }

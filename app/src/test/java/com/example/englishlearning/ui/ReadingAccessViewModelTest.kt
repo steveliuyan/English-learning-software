@@ -73,6 +73,7 @@ class ReadingAccessViewModelTest {
         articleId = id, profileId = "p1", localDate = "2026-09-22", activeWordBookId = "cet4",
         articleType = ArticleType.STORY, lengthTier = ArticleLengthTier.STANDARD, version = 1,
         title = "title", englishText = "text", chineseText = "译文", generatedAtEpochMillis = 1, modelName = null,
+        coveredLemmas = listOf("title"), parameterSummary = "",
     )
 
     private class FakeArticleRepository(private val history: List<Article> = emptyList()) : ArticleRepository {

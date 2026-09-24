@@ -50,7 +50,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -157,6 +157,23 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_8_9: Migration =
+            object : Migration(8, 9) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // ALTER TABLE 加 NOT NULL 列必须带 DEFAULT，否则已有的文章行无法回填。
+                    // 默认值刻意取空串/ENGLISH_FIRST：老文章没有生成来源信息，编一个假的比留空更糟。
+                    db.execSQL(
+                        "ALTER TABLE `articles` ADD COLUMN `coveredLemmas` TEXT NOT NULL DEFAULT ''",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE `articles` ADD COLUMN `parameterSummary` TEXT NOT NULL DEFAULT ''",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE `reading_preferences` ADD COLUMN `displayMode` TEXT NOT NULL DEFAULT 'ENGLISH_FIRST'",
+                    )
+                }
+            }
+
         val MIGRATION_6_7: Migration =
             object : Migration(6, 7) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -249,7 +266,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

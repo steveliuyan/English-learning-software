@@ -4,6 +4,7 @@ import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.storage.AppErrorException
 import com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity
+import com.example.englishlearning.reading.domain.ArticleDisplayMode
 import com.example.englishlearning.reading.domain.ArticleLengthTier
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
@@ -42,11 +43,15 @@ class RoomReadingPreferenceRepository(
         profileId = profileId,
         defaultArticleType = defaultArticleType.name,
         explicitLengthTier = explicitLengthTier?.name,
+        displayMode = displayMode.name,
     )
 
     private fun ReadingPreferenceEntity.toDomain() = ReadingPreference(
         profileId = profileId,
         defaultArticleType = ArticleType.valueOf(defaultArticleType),
         explicitLengthTier = explicitLengthTier?.let { ArticleLengthTier.valueOf(it) },
+        // 解析失败退回产品默认：老行或将来删掉的枚举值都不能让阅读页开不出来。
+        displayMode = runCatching { ArticleDisplayMode.valueOf(displayMode) }
+            .getOrElse { ArticleDisplayMode.ENGLISH_FIRST },
     )
 }

@@ -8,4 +8,5 @@ data class ReadingPreferenceEntity(
     @PrimaryKey val profileId: String,
     val defaultArticleType: String,
     val explicitLengthTier: String?,
+    val displayMode: String,
 )

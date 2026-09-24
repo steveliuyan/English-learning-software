@@ -27,5 +27,8 @@ data class ArticleEntity(
     val englishText: String,
     val chineseText: String,
     val generatedAtEpochMillis: Long,
+    /** JSON array of the lemmas used for the request; highlights are re-derived from it. */
+    val coveredLemmas: String,
+    val parameterSummary: String,
     val modelName: String?,
 )

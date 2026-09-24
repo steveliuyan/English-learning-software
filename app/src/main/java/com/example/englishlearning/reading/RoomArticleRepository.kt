@@ -12,6 +12,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 
 class RoomArticleRepository(
     private val database: AppDatabase,
@@ -68,12 +73,26 @@ class RoomArticleRepository(
 
     private fun Article.toEntity() = ArticleEntity(
         articleId, profileId, localDate, activeWordBookId, articleType.name, lengthTier.name,
-        version, title, englishText, chineseText, generatedAtEpochMillis, modelName,
+        version, title, englishText, chineseText, generatedAtEpochMillis,
+        coveredLemmas.toLemmaJson(), parameterSummary, modelName,
     )
 
     private fun ArticleEntity.toDomain() = Article(
         articleId, profileId, localDate, activeWordBookId,
         ArticleType.valueOf(articleType), ArticleLengthTier.valueOf(lengthTier), version,
-        title, englishText, chineseText, generatedAtEpochMillis, modelName,
+        title, englishText, chineseText, generatedAtEpochMillis,
+        coveredLemmas.toLemmaList(), parameterSummary, modelName,
     )
+
+    private fun List<String>.toLemmaJson(): String = JsonArray(map { JsonPrimitive(it) }).toString()
+
+    /**
+     * A column that cannot be parsed yields an empty list rather than throwing: a malformed
+     * lemma column must cost the reader their highlights, not the whole article.
+     */
+    private fun String.toLemmaList(): List<String> {
+        if (isBlank()) return emptyList()
+        return runCatching { Json.parseToJsonElement(this).jsonArray.map { it.jsonPrimitive.content } }
+            .getOrElse { emptyList() }
+    }
 }
