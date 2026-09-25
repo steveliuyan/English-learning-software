@@ -7,6 +7,7 @@ import com.example.englishlearning.learning.LearningStatsRepository
 import com.example.englishlearning.learning.domain.DailyLearningStats
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
+import java.time.YearMonth
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,27 +36,25 @@ class CheckInViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = CheckInUiState.Loading
             val today = clock.instant().atZone(clock.zoneId()).toLocalDate()
-            val monthStart = today.withDayOfMonth(1)
-            val monthEnd = today.withDayOfMonth(today.lengthOfMonth())
-            val result = runCatching { repository.range(profileId, monthStart, monthEnd) }.getOrElse {
+            val month = YearMonth.from(today)
+            val from = month.atDay(1)
+            val to = month.atEndOfMonth()
+            val result = repository.range(profileId, from, to)
+            if (result.isFailure) {
                 _uiState.value = CheckInUiState.Unavailable
-                return@launch
+            } else {
+                val byDate = result.getOrThrow().associateBy { it.localDate }
+                fun stats(date: LocalDate): DailyLearningStats = byDate[date]
+                    ?: DailyLearningStats(date, 0, 0, 0, 0)
+                val monthStats = (0 until month.lengthOfMonth()).map { stats(from.plusDays(it.toLong())) }
+                val weekStart = today.minusDays(today.dayOfWeek.value.toLong() - 1L)
+                val weekStats = (0..6).map { stats(weekStart.plusDays(it.toLong())) }
+                val todayStats = stats(today)
+                val completed = todayStats.reviewedWordCount > 0 ||
+                    todayStats.completedReadingCount > 0 ||
+                    (todayStats.targetTaskCount > 0 && todayStats.completedTaskCount >= todayStats.targetTaskCount)
+                _uiState.value = CheckInUiState.Ready(todayStats, weekStats, monthStats, completed)
             }
-            result.onFailure {
-                _uiState.value = CheckInUiState.Unavailable
-                return@launch
-            }
-            val month = result.getOrThrow().sortedBy { it.localDate }
-            val byDate = month.associateBy { it.localDate }
-            val empty = { date: LocalDate -> DailyLearningStats(date, 0, 0, 0, 0) }
-            val todayStats = byDate[today] ?: empty(today)
-            val week = (0L..6L).map { today.minusDays(6L - it) }.map { byDate[it] ?: empty(it) }
-            _uiState.value = CheckInUiState.Ready(
-                today = todayStats,
-                week = week,
-                month = month,
-                completed = todayStats.reviewedWordCount > 0 || todayStats.completedReadingCount > 0,
-            )
         }
     }
 }
