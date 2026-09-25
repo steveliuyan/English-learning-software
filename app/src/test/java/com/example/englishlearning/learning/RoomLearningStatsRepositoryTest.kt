@@ -6,6 +6,7 @@ import com.example.englishlearning.core.storage.dao.InternalLearningStatsDao
 import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
 import com.example.englishlearning.core.time.FixedClockProvider
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import java.time.Instant
@@ -25,10 +26,10 @@ class RoomLearningStatsRepositoryTest {
         val plans = mockk<InternalTodayPlanDao>()
         every { database.internalLearningStatsDao() } returns stats
         every { database.internalTodayPlanDao() } returns plans
-        every { stats.countReadings("a", "2026-09-25", "2026-09-27") } returns
+        coEvery { stats.countReadings("a", "2026-09-25", "2026-09-27") } returns
             listOf(DateCountRow("2026-09-25", 2), DateCountRow("2026-09-27", 1))
-        every { stats.countReviewedCards("a", any(), any()) } returnsMany listOf(3, 0, 1)
-        every { plans.findPlan("a", any()) } returns null
+        coEvery { stats.countReviewedCards("a", any(), any()) } returnsMany listOf(3, 0, 1)
+        coEvery { plans.findPlan("a", any()) } returns null
 
         val result = RoomLearningStatsRepository(
             database,
