@@ -46,6 +46,7 @@ fun TodayPlanScreen(
     onStartLearning: () -> Unit = {},
     onOpenReading: () -> Unit = {},
     onOpenLearningTools: () -> Unit = {},
+    onOpenCheckIn: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -148,6 +149,15 @@ fun TodayPlanScreen(
                         .semantics { contentDescription = "学习工具与设置" },
                     colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
                 ) { Text("学习工具与设置", fontWeight = FontWeight.Bold) }
+                Button(
+                    onClick = onOpenCheckIn,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("today_plan_open_check_in")
+                        .semantics { contentDescription = "查看打卡与成就" },
+                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
+                ) { Text("查看打卡与成就", fontWeight = FontWeight.Bold) }
             }
         }
     }

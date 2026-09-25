@@ -88,6 +88,7 @@ fun AppScreen(
     readingAccessViewModel: ReadingAccessViewModel? = null,
     articleReadingViewModel: ArticleReadingViewModel? = null,
     aiProfileViewModel: AiProfileSettingsViewModel? = null,
+    checkInViewModel: CheckInViewModel? = null,
 ) {
     var name by remember { mutableStateOf("") }
     when (val state = viewModel.uiState.collectAsState().value) {
@@ -107,6 +108,7 @@ fun AppScreen(
             // 选中的 AI 功能存 key 而不是枚举实例：String 进 Bundle 最省心，将来加功能也不用改存法。
             var selectedFeatureKey by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
             var showAiProfiles by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 阅读来源的二级层：导入页是显式导航；文章页由 readingTarget 驱动；词卡详情是
             // 阅读页之上的本地覆盖层（WordCardViewModel 的详情只服务学习流，不复用）。
             var showArticleImport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -164,7 +166,10 @@ fun AppScreen(
                 showLearning = false
                 todayPlanViewModel.load(state.profile.id)
             }
-            val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory ||
+            LaunchedEffect(showCheckIn, state.profile.id) {
+                if (showCheckIn) checkInViewModel?.load(state.profile.id)
+            }
+            val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn ||
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
@@ -176,6 +181,7 @@ fun AppScreen(
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
+            BackHandler(enabled = showCheckIn) { showCheckIn = false }
             // 历史旧版叠在历史列表之上：返回先关文章回列表，再按一次才退历史。
             BackHandler(enabled = historyArticle != null) { historyArticle = null }
             // 阅读来源的层级从浅到深：导入页 → 文章页 → 点词的词卡详情。
@@ -275,6 +281,13 @@ fun AppScreen(
                     },
                     onBack = { showWorksheetSettings = false },
                 )
+            } else if (showCheckIn) {
+                val checkInState by checkInViewModel?.uiState?.collectAsState() ?: remember { mutableStateOf<CheckInUiState>(CheckInUiState.Loading) }
+                CheckInScreen(
+                    state = checkInState,
+                    onBack = { showCheckIn = false },
+                    onRetry = { checkInViewModel?.load(state.profile.id) },
+                )
             } else if (showAiProfiles) {
                 val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
                 AiProfileSettingsScreen(
@@ -370,6 +383,7 @@ fun AppScreen(
                                 // 全屏页，避免出现「底导之上再压一层」的混乱层级。
                                 onOpenReading = { selectedTab = AppTab.READING },
                                 onOpenLearningTools = { selectedTab = AppTab.SETTINGS },
+                                onOpenCheckIn = { showCheckIn = true },
                             )
                             AppTab.READING -> ReadingAccessScreen(
                                 state = readingState,
