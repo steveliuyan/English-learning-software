@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.learning.domain.WordCard
+import com.example.englishlearning.reading.ArticleCoverage
 import com.example.englishlearning.reading.ArticleHighlightPolicy
 import com.example.englishlearning.reading.ReadingPreferenceRepository
 import com.example.englishlearning.reading.domain.Article
@@ -26,6 +27,8 @@ data class ArticleReadingUiState(
     val uncoveredLemmas: List<String>,
     /** 调用方传入的词卡（今日计划的卡片）。屏幕用它把高亮/未覆盖词解析回 [WordCard]。 */
     val cards: List<WordCard>,
+    /** F3-01C：是否在正文标记已背词。关掉时 [highlights] 为空，但未覆盖词 chips 不受影响。 */
+    val showLearnedMarks: Boolean = true,
 )
 
 @HiltViewModel
@@ -42,7 +45,30 @@ class ArticleReadingViewModel @Inject constructor(
             // 偏好读失败不拦阅读：它只是呈现设置，退回默认呈现即可。
             val preference = preferences.getPreference(article.profileId).getOrNull()
             loadedPreference = preference
-            _uiState.value = buildState(article, cards, preference?.displayMode ?: ArticleDisplayMode.ENGLISH_FIRST)
+            _uiState.value = buildState(
+                article,
+                cards,
+                preference?.displayMode ?: ArticleDisplayMode.ENGLISH_FIRST,
+                preference?.showLearnedMarks ?: true,
+            )
+        }
+    }
+
+    /** F3-01C：切换「标记已背词」。只改呈现与偏好，绝不改写文章内容。 */
+    fun setLearnedMarks(enabled: Boolean) {
+        val current = _uiState.value ?: return
+        if (current.showLearnedMarks == enabled) return
+        _uiState.value = if (enabled) {
+            val coverage = ArticleHighlightPolicy.derive(current.article.englishText, current.article.coveredLemmas)
+            current.copy(showLearnedMarks = true, highlights = validHighlights(current.article, coverage))
+        } else {
+            current.copy(showLearnedMarks = false, highlights = emptyList())
+        }
+        viewModelScope.launch {
+            preferences.savePreference(
+                (loadedPreference ?: ReadingPreference(profileId = current.article.profileId))
+                    .copy(showLearnedMarks = enabled),
+            )
         }
     }
 
@@ -73,19 +99,22 @@ class ArticleReadingViewModel @Inject constructor(
         article: Article,
         cards: List<WordCard>,
         mode: ArticleDisplayMode,
+        showLearnedMarks: Boolean = true,
     ): ArticleReadingUiState {
         val coverage = ArticleHighlightPolicy.derive(article.englishText, article.coveredLemmas)
-        // 区间合法性防御：越界或倒序的脏区间直接丢弃，不让一处坏数据崩掉整页。
-        val highlights = coverage.highlights.filter {
-            it.start >= 0 && it.end <= article.englishText.length && it.start < it.end
-        }
         return ArticleReadingUiState(
             article = article,
             mode = mode,
             translationExpanded = mode == ArticleDisplayMode.FULL_TRANSLATION,
-            highlights = highlights,
+            highlights = if (showLearnedMarks) validHighlights(article, coverage) else emptyList(),
             uncoveredLemmas = coverage.uncoveredLemmas,
             cards = cards,
+            showLearnedMarks = showLearnedMarks,
         )
+    }
+
+    /** 区间合法性防御：越界或倒序的脏区间直接丢弃，不让一处坏数据崩掉整页。 */
+    private fun validHighlights(article: Article, coverage: ArticleCoverage) = coverage.highlights.filter {
+        it.start >= 0 && it.end <= article.englishText.length && it.start < it.end
     }
 }

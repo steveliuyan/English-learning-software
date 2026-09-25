@@ -341,6 +341,7 @@ fun AppScreen(
                         onToggleTranslation = { articleReadingViewModel?.toggleTranslation() },
                         onOpenDictionaryPlaceholder = {},
                         onOpenPronunciationPlaceholder = {},
+                        onSetLearnedMarks = { articleReadingViewModel?.setLearnedMarks(it) },
                     )
                     // 点词的详情是阅读页之上的覆盖层，不动 readingTarget 的状态机。
                     selectedArticleCard?.let { card ->

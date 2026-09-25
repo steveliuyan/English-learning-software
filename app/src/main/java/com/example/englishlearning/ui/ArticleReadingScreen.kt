@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -60,6 +61,7 @@ fun ArticleReadingScreen(
     onToggleTranslation: () -> Unit,
     onOpenDictionaryPlaceholder: () -> Unit,
     onOpenPronunciationPlaceholder: () -> Unit,
+    onSetLearnedMarks: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -143,6 +145,20 @@ fun ArticleReadingScreen(
             ModeChip("英文优先", ArticleDisplayMode.ENGLISH_FIRST, "article_mode_english_first", current.mode, onModeChange)
             ModeChip("双语", ArticleDisplayMode.BILINGUAL, "article_mode_bilingual", current.mode, onModeChange)
             ModeChip("全文对照", ArticleDisplayMode.FULL_TRANSLATION, "article_mode_full_translation", current.mode, onModeChange)
+        }
+
+        // F3-01C：标记已背词开关。只影响高亮呈现，不动文章内容与未覆盖词 chips。
+        Row(
+            modifier = Modifier.fillMaxWidth().testTag("article_marks_row"),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text("标记已背的词", color = MintPrimaryDark)
+            Switch(
+                checked = current.showLearnedMarks,
+                onCheckedChange = onSetLearnedMarks,
+                modifier = Modifier.testTag("article_marks_switch"),
+            )
         }
 
         HighlightedEnglish(

@@ -44,6 +44,7 @@ class RoomReadingPreferenceRepository(
         defaultArticleType = defaultArticleType.name,
         explicitLengthTier = explicitLengthTier?.name,
         displayMode = displayMode.name,
+        showLearnedMarks = showLearnedMarks,
     )
 
     private fun ReadingPreferenceEntity.toDomain() = ReadingPreference(
@@ -53,5 +54,6 @@ class RoomReadingPreferenceRepository(
         // 解析失败退回产品默认：老行或将来删掉的枚举值都不能让阅读页开不出来。
         displayMode = runCatching { ArticleDisplayMode.valueOf(displayMode) }
             .getOrElse { ArticleDisplayMode.ENGLISH_FIRST },
+        showLearnedMarks = showLearnedMarks,
     )
 }

@@ -9,4 +9,5 @@ data class ReadingPreferenceEntity(
     val defaultArticleType: String,
     val explicitLengthTier: String?,
     val displayMode: String,
+    val showLearnedMarks: Boolean,
 )

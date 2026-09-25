@@ -441,4 +441,24 @@ class AppDatabaseMigrationTest {
     private companion object {
         const val TEST_DB = "app-database-migration-test"
     }
+
+    @Test
+    fun migrateV10ToV11_addsShowLearnedMarksDefaultingToOn() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 10).apply {
+            execSQL(
+                "INSERT INTO reading_preferences (profileId, defaultArticleType, explicitLengthTier, displayMode) " +
+                    "VALUES ('default', 'STORY', NULL, 'ENGLISH_FIRST')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 11, true, AppDatabase.MIGRATION_10_11).apply {
+            query("SELECT showLearnedMarks FROM reading_preferences WHERE profileId = 'default'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
+            }
+            close()
+        }
+    }
 }

@@ -330,4 +330,36 @@ class ArticleReadingScreenTest {
 
         composeRule.onNodeWithTag("coverage_popup").assertDoesNotExist()
     }
+
+    @Test
+    fun marksSwitchReportsTheNewValue() {
+        // F3-01C：标记开关回调把新值交给 VM，由 VM 决定高亮与持久化。
+        var reported: Boolean? = null
+        composeRule.setContent {
+            ArticleReadingScreen(state(article()), onBack = {}, onOpenCard = {}, onModeChange = {}, onToggleTranslation = {}, onOpenDictionaryPlaceholder = {}, onOpenPronunciationPlaceholder = {}, onSetLearnedMarks = { reported = it })
+        }
+
+        composeRule.onNodeWithTag("article_marks_switch").performClick()
+        org.junit.Assert.assertEquals(false, reported)
+    }
+
+    @Test
+    fun marksOffRendersNoHighlightsSoTappingTheTextOpensNothing() {
+        val opened = mutableListOf<WordCard>()
+        val singleWord = article(englishText = "apple", coveredLemmas = listOf("apple"))
+        composeRule.setContent {
+            ArticleReadingScreen(
+                state(singleWord).copy(showLearnedMarks = false, highlights = emptyList()),
+                onBack = {},
+                onOpenCard = { opened += it },
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("article_english").performClick()
+        org.junit.Assert.assertTrue(opened.isEmpty())
+    }
 }

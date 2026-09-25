@@ -50,7 +50,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -174,6 +174,16 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_10_11: Migration =
+            object : Migration(10, 11) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // F3-01C：阅读标记偏好。已有行回填产品默认「开启标记」。
+                    db.execSQL(
+                        "ALTER TABLE `reading_preferences` ADD COLUMN `showLearnedMarks` INTEGER NOT NULL DEFAULT 1",
+                    )
+                }
+            }
+
         val MIGRATION_9_10: Migration =
             object : Migration(9, 10) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -281,7 +291,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)
