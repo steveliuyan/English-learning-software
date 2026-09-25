@@ -2,6 +2,7 @@ package com.example.englishlearning.learning
 
 import com.example.englishlearning.learning.domain.DailyLearningStats
 import java.time.LocalDate
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -17,7 +18,7 @@ class LearningStatsRepositoryContractTest {
     }
 
     @Test
-    fun `range contract returns ascending contiguous dates with zero values for missing days`() {
+    fun `range contract returns ascending contiguous dates with zero values for missing days`() = runBlocking {
         val repository = FakeLearningStatsRepository(
             mapOf(
                 "profile-a" to mapOf(
@@ -44,10 +45,10 @@ class LearningStatsRepositoryContractTest {
     private class FakeLearningStatsRepository(
         private val stats: Map<String, Map<LocalDate, DailyLearningStats>>,
     ) : LearningStatsRepository {
-        override fun today(profileId: String, localDate: LocalDate): Result<DailyLearningStats> =
+        override suspend fun today(profileId: String, localDate: LocalDate): Result<DailyLearningStats> =
             Result.success(stats[profileId]?.get(localDate) ?: DailyLearningStats(localDate, 0, 0, 0, 0))
 
-        override fun range(profileId: String, from: LocalDate, to: LocalDate): Result<List<DailyLearningStats>> {
+        override suspend fun range(profileId: String, from: LocalDate, to: LocalDate): Result<List<DailyLearningStats>> {
             if (from.isAfter(to)) return Result.failure(IllegalArgumentException("from must not be after to"))
             val profileStats = stats[profileId].orEmpty()
             return Result.success(generateSequence(from) { date -> date.plusDays(1).takeUnless { it.isAfter(to) } }

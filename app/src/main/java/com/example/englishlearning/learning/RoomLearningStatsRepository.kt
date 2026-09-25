@@ -14,23 +14,20 @@ class RoomLearningStatsRepository(
     private val clock: ClockProvider,
     private val ioDispatcher: CoroutineDispatcher,
 ) : LearningStatsRepository {
-    override suspend fun today(profileId: String, localDate: LocalDate): Result<DailyLearningStats> =
-        withContext(ioDispatcher) {
-            runCatching { load(profileId, localDate, localDate).single() }
-                .recoverCatching { throw AppErrorException(AppError.StorageUnavailable) }
-        }
+    override suspend fun today(profileId: String, localDate: LocalDate): Result<DailyLearningStats> = withContext(ioDispatcher) {
+        runCatching { load(profileId, localDate, localDate).single() }
+            .recoverCatching { throw AppErrorException(AppError.StorageUnavailable) }
+    }
 
-    override suspend fun range(profileId: String, from: LocalDate, to: LocalDate): Result<List<DailyLearningStats>> =
+    override suspend fun range(profileId: String, from: LocalDate, to: LocalDate): Result<List<DailyLearningStats>> = withContext(ioDispatcher) {
         if (from.isAfter(to)) {
             Result.failure(IllegalArgumentException("from must not be after to"))
         } else {
-            withContext(ioDispatcher) {
-                runCatching { load(profileId, from, to) }
-                    .recoverCatching { throw AppErrorException(AppError.StorageUnavailable) }
-            }
+            runCatching { load(profileId, from, to) }
+                .recoverCatching { throw AppErrorException(AppError.StorageUnavailable) }
         }
 
-    private fun load(profileId: String, from: LocalDate, to: LocalDate): List<DailyLearningStats> {
+    private suspend fun load(profileId: String, from: LocalDate, to: LocalDate): List<DailyLearningStats> {
         val statsDao = database.internalLearningStatsDao()
         val plansDao = database.internalTodayPlanDao()
         val zone = clock.zoneId()
