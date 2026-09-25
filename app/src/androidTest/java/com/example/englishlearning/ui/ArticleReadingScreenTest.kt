@@ -296,4 +296,38 @@ class ArticleReadingScreenTest {
         composeRule.onNodeWithTag("article_translation_toggle").assertIsNotEnabled()
         composeRule.onNodeWithTag("article_translation").assertDoesNotExist()
     }
+
+    @Test
+    fun coveragePopupListsTheCoveredLemmasOnFirstOpen() {
+        // F3-01B：进文覆盖词弹窗——打开文章时告诉用户本文与已背词的关联（竞品对标）。
+        val multi = article(englishText = "apple banana", coveredLemmas = listOf("apple", "banana"))
+        composeRule.setContent {
+            ArticleReadingScreen(state(multi), onBack = {}, onOpenCard = {}, onModeChange = {}, onToggleTranslation = {}, onOpenDictionaryPlaceholder = {}, onOpenPronunciationPlaceholder = {})
+        }
+
+        composeRule.onNodeWithTag("coverage_popup").assertExists()
+        composeRule.onNodeWithTag("coverage_popup_count").assertTextContains("2", substring = true)
+        composeRule.onNodeWithTag("coverage_chip_apple").assertExists()
+        composeRule.onNodeWithTag("coverage_chip_banana").assertExists()
+    }
+
+    @Test
+    fun coveragePopupClosesAndStaysClosed() {
+        composeRule.setContent {
+            ArticleReadingScreen(state(article()), onBack = {}, onOpenCard = {}, onModeChange = {}, onToggleTranslation = {}, onOpenDictionaryPlaceholder = {}, onOpenPronunciationPlaceholder = {})
+        }
+
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        composeRule.onNodeWithTag("coverage_popup").assertDoesNotExist()
+    }
+
+    @Test
+    fun coveragePopupIsSkippedWhenTheArticleCoversNothing() {
+        val bare = article(coveredLemmas = emptyList())
+        composeRule.setContent {
+            ArticleReadingScreen(state(bare), onBack = {}, onOpenCard = {}, onModeChange = {}, onToggleTranslation = {}, onOpenDictionaryPlaceholder = {}, onOpenPronunciationPlaceholder = {})
+        }
+
+        composeRule.onNodeWithTag("coverage_popup").assertDoesNotExist()
+    }
 }

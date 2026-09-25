@@ -29,7 +29,7 @@ import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 
 @Composable
-fun ReadingHistoryScreen(history: List<Article>, onBack: () -> Unit) {
+fun ReadingHistoryScreen(history: List<Article>, onBack: () -> Unit, onOpenArticle: (Article) -> Unit = {}) {
     Column(
         modifier = Modifier.fillMaxSize().background(MintBackground).padding(horizontal = 20.dp, vertical = 24.dp).testTag("reading_history_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -45,6 +45,7 @@ fun ReadingHistoryScreen(history: List<Article>, onBack: () -> Unit) {
         } else {
             history.forEach { article ->
                 Card(
+                    onClick = { onOpenArticle(article) },
                     colors = CardDefaults.cardColors(containerColor = MintSurface),
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.fillMaxWidth().testTag("reading_history_item_${article.articleId}"),

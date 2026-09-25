@@ -18,6 +18,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -85,6 +87,46 @@ fun ArticleReadingScreen(
         if (current == null) {
             Text("正在加载…", color = MintTextMuted)
             return@Column
+        }
+
+        // F3-01B：进文覆盖词弹窗——每篇文章首次打开显示一次。coveredLemmas 是文章自带
+        // 的落库字段，弹窗是纯呈现：关闭状态按 articleId 记忆，切换文章重新弹。
+        var coveragePopupDismissed by androidx.compose.runtime.saveable.rememberSaveable(current.article.articleId) {
+            androidx.compose.runtime.mutableStateOf(false)
+        }
+        if (!coveragePopupDismissed && current.article.coveredLemmas.isNotEmpty()) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { coveragePopupDismissed = true },
+                title = {
+                    Text(
+                        "本文覆盖你已背的 ${current.article.coveredLemmas.size} 个词",
+                        modifier = Modifier.testTag("coverage_popup_count"),
+                        fontWeight = FontWeight.Bold,
+                        color = MintPrimaryDark,
+                    )
+                },
+                text = {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        current.article.coveredLemmas.forEach { lemma ->
+                            Text(
+                                lemma,
+                                Modifier
+                                    .fillMaxWidth()
+                                    .testTag("coverage_chip_$lemma")
+                                    .padding(vertical = 3.dp),
+                                color = MintPrimaryDark,
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { coveragePopupDismissed = true },
+                        modifier = Modifier.testTag("coverage_popup_close"),
+                    ) { Text("我知道了") }
+                },
+                modifier = Modifier.testTag("coverage_popup"),
+            )
         }
 
         Text(

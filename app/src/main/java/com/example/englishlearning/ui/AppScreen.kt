@@ -111,6 +111,9 @@ fun AppScreen(
             // 阅读页之上的本地覆盖层（WordCardViewModel 的详情只服务学习流，不复用）。
             var showArticleImport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var selectedArticleCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
+            // F3-01A：从历史列表点开的旧版文章。与 readingTarget 互斥展示；Article 进不了
+            // Bundle，所以和 selectedArticleCard 一样用 remember 而不是 rememberSaveable。
+            var historyArticle by remember { mutableStateOf<com.example.englishlearning.reading.domain.Article?>(null) }
             val selectedFeature = AiFeature.entries.firstOrNull { it.key == selectedFeatureKey }
             LaunchedEffect(state.profile.id) { todayPlanViewModel.load(state.profile.id) }
             // AI 配置是设备级的（与学习者无关），启动时读一次，好让「设置」栏的摘要和「AI 学」页
@@ -141,6 +144,12 @@ fun AppScreen(
                 showArticleImport = false
                 articleReadingViewModel?.load(target.article, target.cards)
             }
+            // 历史旧版没有「今日计划的词卡」，传空表：点词时 cardFor 返回 null，
+            // 屏幕按既有占位路径处理（词典/发音入口本来就是后续版本）。
+            LaunchedEffect(historyArticle) {
+                val article = historyArticle ?: return@LaunchedEffect
+                articleReadingViewModel?.load(article, emptyList())
+            }
             // Only an user-opened setup screen may be dismissed; a mandatory setup (no active
             // word book yet) must stay until a word book is saved, so it gets no escape hatch.
             val cancelSetup: (() -> Unit)? = if (showSetup && !setupRequired) {
@@ -157,7 +166,7 @@ fun AppScreen(
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory ||
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles ||
-                showArticleImport || readingTarget != null || selectedArticleCard != null
+                showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -167,6 +176,8 @@ fun AppScreen(
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
+            // 历史旧版叠在历史列表之上：返回先关文章回列表，再按一次才退历史。
+            BackHandler(enabled = historyArticle != null) { historyArticle = null }
             // 阅读来源的层级从浅到深：导入页 → 文章页 → 点词的词卡详情。
             // 声明顺序即优先级（后声明者先拿返回键），别随手重排。
             BackHandler(enabled = showArticleImport) { showArticleImport = false }
@@ -300,9 +311,13 @@ fun AppScreen(
                         selectedTab = AppTab.LEARNING
                     },
                 )
-            } else if (showReadingHistory) {
+            } else if (showReadingHistory && historyArticle == null) {
                 val history = (readingState as? ReadingAccessUiState.Ready)?.history.orEmpty()
-                ReadingHistoryScreen(history = history, onBack = { showReadingHistory = false })
+                ReadingHistoryScreen(
+                    history = history,
+                    onBack = { showReadingHistory = false },
+                    onOpenArticle = { historyArticle = it },
+                )
             } else if (showArticleImport) {
                 val importState = (readingState as? ReadingAccessUiState.Ready)?.import ?: ImportUiState()
                 ArticleImportScreen(
@@ -312,12 +327,15 @@ fun AppScreen(
                     onImport = { readingAccessViewModel?.submitImport() },
                     onBack = { showArticleImport = false },
                 )
-            } else if (readingTarget != null) {
+            } else if (readingTarget != null || historyArticle != null) {
                 val articleState = articleReadingViewModel?.uiState?.collectAsState()?.value
+                val fromHistory = readingTarget == null
                 Box(Modifier.fillMaxSize()) {
                     ArticleReadingScreen(
                         state = articleState,
-                        onBack = { readingAccessViewModel?.closeArticle() },
+                        onBack = {
+                            if (fromHistory) historyArticle = null else readingAccessViewModel?.closeArticle()
+                        },
                         onOpenCard = { selectedArticleCard = it },
                         onModeChange = { articleReadingViewModel?.setMode(it) },
                         onToggleTranslation = { articleReadingViewModel?.toggleTranslation() },
