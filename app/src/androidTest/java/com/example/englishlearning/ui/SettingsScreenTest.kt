@@ -26,6 +26,7 @@ class SettingsScreenTest {
         onOpenWorksheet: () -> Unit = {},
         onOpenAiProfiles: () -> Unit = {},
         aiProfileSubtitle: String? = null,
+        speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
     ) {
         composeRule.setContent {
             SettingsScreen(
@@ -37,6 +38,7 @@ class SettingsScreenTest {
                 onOpenWorksheet = onOpenWorksheet,
                 onOpenAiProfiles = onOpenAiProfiles,
                 aiProfileSubtitle = aiProfileSubtitle,
+                speechEngineStatuses = speechEngineStatuses,
             )
         }
     }
@@ -130,6 +132,24 @@ class SettingsScreenTest {
     @Test fun ai_profiles_entry_admits_when_there_is_nothing_configured() {
         setScreen(aiProfileSubtitle = "尚未添加，点这里添加第一套 OpenAI 兼容服务")
         composeRule.onNodeWithText("尚未添加，点这里添加第一套 OpenAI 兼容服务").assertExists()
+    }
+
+    @Test fun speech_group_lists_supported_and_pending_engines() {
+        setScreen(speechEngineStatuses = SpeechEngineStatuses(miMo = "已配置", openAi = "未配置", zipVoice = "未下载"))
+        composeRule.onNodeWithTag("settings_group_speech").performScrollTo()
+        listOf("语音合成", "小米 MiMo", "OpenAI TTS", "本地 ZipVoice-Distill", "Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax").forEach {
+            composeRule.onNodeWithText(it).assertExists()
+        }
+        composeRule.onNodeWithText("已配置").assertExists()
+        composeRule.onNodeWithText("未配置").assertExists()
+        composeRule.onNodeWithText("未下载").assertExists()
+    }
+
+    @Test fun speech_pending_engines_are_not_clickable() {
+        setScreen()
+        listOf("settings_pending_speech_azure", "settings_pending_speech_volcengine", "settings_pending_speech_tencent", "settings_pending_speech_bailian", "settings_pending_speech_minimax").forEach { tag ->
+            composeRule.onNodeWithTag(tag).performScrollTo().assertHasNoClickAction()
+        }
     }
 }
 

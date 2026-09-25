@@ -32,6 +32,12 @@ import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
 
+data class SpeechEngineStatuses(
+    val miMo: String = "未配置",
+    val openAi: String = "未配置",
+    val zipVoice: String = "未下载",
+)
+
 /**
  * 「设置」一级页。
  *
@@ -56,6 +62,7 @@ fun SettingsScreen(
     onOpenAiProfiles: () -> Unit,
     /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
     aiProfileSubtitle: String? = null,
+    speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
 ) {
     Column(
         modifier = Modifier
@@ -128,6 +135,19 @@ fun SettingsScreen(
             )
         }
 
+        SettingsGroup(title = "语音合成", tag = "settings_group_speech") {
+            SettingsStatusRow("小米 MiMo", speechEngineStatuses.miMo, "settings_speech_mimo")
+            SettingsStatusRow("OpenAI TTS", speechEngineStatuses.openAi, "settings_speech_openai")
+            SettingsStatusRow("本地 ZipVoice-Distill", speechEngineStatuses.zipVoice, "settings_speech_zipvoice")
+            listOf(
+                "Azure" to "settings_pending_speech_azure",
+                "火山引擎" to "settings_pending_speech_volcengine",
+                "腾讯云" to "settings_pending_speech_tencent",
+                "阿里云百炼" to "settings_pending_speech_bailian",
+                "MiniMax" to "settings_pending_speech_minimax",
+            ).forEach { (title, tag) -> SettingsPendingRow(title, "待接入", tag) }
+        }
+
         SettingsGroup(title = "账户", tag = "settings_group_account") {
             SettingsPendingRow(
                 title = "昵称与头像",
@@ -160,6 +180,14 @@ private fun SettingsGroup(title: String, tag: String, content: @Composable () ->
         ) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { content() }
         }
+    }
+}
+
+@Composable
+private fun SettingsStatusRow(title: String, status: String, tag: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag(tag), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.weight(1f))
+        Text(status, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
     }
 }
 
