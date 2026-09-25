@@ -25,8 +25,12 @@ class CheckInScreenTest {
         composeRule.onNodeWithTag("check_in_screen").assertExists()
         composeRule.onNodeWithTag("check_in_today").assertTextContains("完成任务")
         composeRule.onNodeWithTag("check_in_week_chart").assertExists()
-        composeRule.onNodeWithTag("check_in_completion_ratio").assertTextContains("50%")
+        (0..6).forEach { index -> composeRule.onNodeWithTag("check_in_week_bar_$index").assertExists() }
+        composeRule.onNodeWithTag("check_in_completion_ratio").assertExists()
+        composeRule.onNodeWithTag("check_in_completion_percent").assertTextContains("50%")
         composeRule.onNodeWithTag("check_in_calendar").assertExists()
+        composeRule.onNodeWithContentDescription("2026-09-25 已完成").assertExists()
+        composeRule.onNodeWithContentDescription("2026-09-01 已完成").assertExists()
     }
 
     @Test fun unavailable_offers_retry() {
@@ -48,6 +52,7 @@ class CheckInScreenTest {
         val date = LocalDate.of(2026, 9, 25)
         val zero = DailyLearningStats(date, 0, 0, 0, 0)
         composeRule.setContent { CheckInScreen(CheckInUiState.Ready(zero, List(7) { zero }, listOf(zero), false), onBack = {}) }
-        composeRule.onNodeWithTag("check_in_completion_ratio").assertTextContains("0%")
+        composeRule.onNodeWithTag("check_in_completion_percent").assertTextContains("0%")
+        composeRule.onNodeWithTag("check_in_completion_ratio").assertTextContains("目标 0 项，已完成 0 项")
     }
 }
