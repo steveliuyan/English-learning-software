@@ -3,17 +3,16 @@ package com.example.englishlearning.learning
 import com.example.englishlearning.learning.domain.DailyLearningStats
 import java.time.LocalDate
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFloatEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class LearningStatsRepositoryContractTest {
     @Test
     fun `completion ratio is zero for zero target and clamped to unit interval`() {
-        assertFloatEquals(0f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, 0, 0).completionRatio)
-        assertFloatEquals(0f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, -1, 0).completionRatio)
-        assertFloatEquals(1f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, 8, 4).completionRatio)
-        assertFloatEquals(0f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, -1, 4).completionRatio)
+        assertEquals(0f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, 0, 0).completionRatio, 0.0001f)
+        assertEquals(0f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, -1, 0).completionRatio, 0.0001f)
+        assertEquals(1f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, 8, 4).completionRatio, 0.0001f)
+        assertEquals(0f, DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, -1, 4).completionRatio, 0.0001f)
         assertTrue(DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, 1, 4).completionRatio in 0f..1f)
     }
 
@@ -32,7 +31,14 @@ class LearningStatsRepositoryContractTest {
 
         assertEquals(listOf(LocalDate.of(2026, 9, 25), LocalDate.of(2026, 9, 26), LocalDate.of(2026, 9, 27)), result.map { it.localDate })
         assertEquals(DailyLearningStats(LocalDate.of(2026, 9, 26), 0, 0, 0, 0), result[1])
-        assertEquals(emptyList<DailyLearningStats>(), repository.range("profile-b", LocalDate.of(2026, 9, 25), LocalDate.of(2026, 9, 25)).getOrThrow())
+        assertEquals(
+            listOf(DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, 0, 0)),
+            repository.range("profile-b", LocalDate.of(2026, 9, 25), LocalDate.of(2026, 9, 25)).getOrThrow(),
+        )
+        assertEquals(
+            DailyLearningStats(LocalDate.of(2026, 9, 25), 0, 0, 0, 0),
+            repository.today("profile-b", LocalDate.of(2026, 9, 25)).getOrThrow(),
+        )
     }
 
     private class FakeLearningStatsRepository(
