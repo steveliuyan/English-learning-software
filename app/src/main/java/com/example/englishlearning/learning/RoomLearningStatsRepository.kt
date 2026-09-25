@@ -26,6 +26,7 @@ class RoomLearningStatsRepository(
             runCatching { load(profileId, from, to) }
                 .recoverCatching { throw AppErrorException(AppError.StorageUnavailable) }
         }
+    }
 
     private suspend fun load(profileId: String, from: LocalDate, to: LocalDate): List<DailyLearningStats> {
         val statsDao = database.internalLearningStatsDao()
