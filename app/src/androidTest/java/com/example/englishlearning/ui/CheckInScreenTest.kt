@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.domain.DailyLearningStats
@@ -23,7 +24,7 @@ class CheckInScreenTest {
         val stats = { date: LocalDate -> DailyLearningStats(date, 3, 1, 2, 4) }
         composeRule.setContent { CheckInScreen(CheckInUiState.Ready(stats(today), (0..6).map { stats(today.minusDays(it.toLong())) }, (1..today.lengthOfMonth()).map { stats(today.withDayOfMonth(it)) }, true), onBack = {}) }
         composeRule.onNodeWithTag("check_in_screen").assertExists()
-        composeRule.onNodeWithTag("check_in_today", useUnmergedTree = true).assertTextContains("完成任务")
+        composeRule.onNodeWithText("完成任务 2/4", substring = true).assertExists()
         composeRule.onNodeWithTag("check_in_week_chart").assertExists()
         (0..6).forEach { index -> composeRule.onNodeWithTag("check_in_week_bar_$index").assertExists() }
         composeRule.onNodeWithTag("check_in_completion_ratio").assertExists()
@@ -53,6 +54,6 @@ class CheckInScreenTest {
         val zero = DailyLearningStats(date, 0, 0, 0, 0)
         composeRule.setContent { CheckInScreen(CheckInUiState.Ready(zero, List(7) { zero }, listOf(zero), false), onBack = {}) }
         composeRule.onNodeWithTag("check_in_completion_percent").assertTextContains("0%")
-        composeRule.onNodeWithTag("check_in_completion_ratio", useUnmergedTree = true).assertTextContains("目标 0 项，已完成 0 项")
+        composeRule.onNodeWithText("目标 0 项，已完成 0 项", substring = true).assertExists()
     }
 }
