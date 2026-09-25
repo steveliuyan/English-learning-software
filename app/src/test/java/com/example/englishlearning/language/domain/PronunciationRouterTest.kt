@@ -8,6 +8,16 @@ import org.junit.jupiter.api.Test
 
 class PronunciationRouterTest {
     @Test
+    fun `router is a pronunciation provider and defaults to system`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val router: PronunciationProvider = PronunciationRouter(system, FakeFactory(FakeProvider(PronunciationResult.Played)))
+
+        router.speak("hello")
+
+        assertEquals(1, system.calls)
+    }
+
+    @Test
     fun `default and explicit system use only system provider`() = runTest {
         val system = FakeProvider(PronunciationResult.Played)
         val mimo = FakeProvider(PronunciationResult.Played)

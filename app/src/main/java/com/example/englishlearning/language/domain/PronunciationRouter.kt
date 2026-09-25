@@ -19,7 +19,11 @@ fun interface MiMoPronunciationProviderFactory {
 class PronunciationRouter(
     private val systemProvider: PronunciationProvider,
     private val miMoFactory: MiMoPronunciationProviderFactory,
-) {
+) : PronunciationProvider {
+    override fun capabilities(): Set<PronunciationCapability> = systemProvider.capabilities()
+
+    override suspend fun speak(text: String): PronunciationResult = speak(text, PronunciationSelection())
+
     suspend fun speak(
         text: String,
         selection: PronunciationSelection = PronunciationSelection(),

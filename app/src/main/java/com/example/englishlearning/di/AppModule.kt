@@ -30,8 +30,11 @@ import com.example.englishlearning.learning.worksheet.BuildWorksheetContentUseCa
 import com.example.englishlearning.learning.worksheet.WorksheetDocumentBuilder
 import com.example.englishlearning.learning.worksheet.WorksheetPaginator
 import com.example.englishlearning.learning.domain.FsrsReviewScheduler
+import com.example.englishlearning.language.domain.MiMoPronunciationProviderFactory
 import com.example.englishlearning.language.domain.PronunciationProvider
+import com.example.englishlearning.language.domain.PronunciationRouter
 import com.example.englishlearning.language.infrastructure.AndroidTextToSpeechProvider
+import com.example.englishlearning.language.infrastructure.MiMoPronunciationProvider
 import com.example.englishlearning.learning.RoomTodayPlanRepository
 import com.example.englishlearning.learning.LearningStatsRepository
 import com.example.englishlearning.learning.RoomLearningStatsRepository
@@ -96,7 +99,23 @@ object AppModule {
     @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider, scheduler: FsrsReviewScheduler): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock, scheduler = scheduler)
     @Provides @Singleton fun provideEventIdFactory(): EventIdFactory = EventIdFactory.Random
     @Provides @Singleton fun provideWordCardSource(): WordCardSource = PlaceholderWordCardSource()
-    @Provides @Singleton fun providePronunciationProvider(@ApplicationContext context: Context): PronunciationProvider = AndroidTextToSpeechProvider(context)
+    @Provides @Singleton
+    fun provideSystemPronunciationProvider(@ApplicationContext context: Context): AndroidTextToSpeechProvider = AndroidTextToSpeechProvider(context)
+
+    @Provides @Singleton
+    fun provideMiMoPronunciationProviderFactory(
+        profiles: AiProfileRepository,
+        secrets: AiProfileSecretUseCase,
+        transport: AudioHttpTransport,
+    ): MiMoPronunciationProviderFactory = MiMoPronunciationProviderFactory { profileId ->
+        MiMoPronunciationProvider(profiles, secrets, transport, profileId)
+    }
+
+    @Provides @Singleton
+    fun providePronunciationProvider(
+        system: AndroidTextToSpeechProvider,
+        miMoFactory: MiMoPronunciationProviderFactory,
+    ): PronunciationProvider = PronunciationRouter(system, miMoFactory)
     @Provides @Singleton fun providePlanCardSource(content: WordCardSource, events: LearningEventRepository): PlanCardSource = StoredPlanCardSource(content, events)
     @Provides fun provideBuildWorksheetContentUseCase(plans: TodayPlanRepository, events: LearningEventRepository, content: WordCardSource): BuildWorksheetContentUseCase = BuildWorksheetContentUseCase(plans, events, content)
     @Provides fun provideWorksheetDocumentBuilder(): WorksheetDocumentBuilder = WorksheetDocumentBuilder()
