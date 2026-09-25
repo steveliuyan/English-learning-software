@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,8 @@ import com.example.englishlearning.ui.theme.MintTextMuted
 fun CardDetailScreen(
     card: WordCard,
     onBack: () -> Unit,
+    onSpeak: () -> Unit = {},
+    onRelearn: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -97,7 +100,7 @@ fun CardDetailScreen(
                         .testTag("card_detail_lemma")
                         .semantics { contentDescription = card.lemma },
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (card.ipa.isNotBlank()) {
                         Text(
                             text = card.ipa,
@@ -118,6 +121,16 @@ fun CardDetailScreen(
                                 .semantics { contentDescription = "词性 ${card.partOfSpeech}" },
                         )
                     }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = onSpeak,
+                        modifier = Modifier.semantics { contentDescription = "播放 ${card.lemma} 发音" },
+                    ) { Text("播放发音") }
+                    TextButton(
+                        onClick = onRelearn,
+                        modifier = Modifier.semantics { contentDescription = "重新学习 ${card.lemma}" },
+                    ) { Text("重新学习") }
                 }
                 if (card.meaningZh.isNotBlank()) {
                     Text(

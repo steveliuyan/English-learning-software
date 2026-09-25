@@ -76,6 +76,25 @@ class CardDetailScreenTest {
     }
 
     @Test
+    fun pronunciationAndRelearnActionsInvokeCallbacks() {
+        var spoken = 0
+        var relearned = 0
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(),
+                onBack = {},
+                onSpeak = { spoken++ },
+                onRelearn = { relearned++ },
+            )
+        }
+
+        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
+        composeRule.onNodeWithContentDescription("重新学习 ability").performClick()
+        assertEquals(1, spoken)
+        assertEquals(1, relearned)
+    }
+
+    @Test
     fun backInvokesCallback() {
         var backed = 0
         composeRule.setContent { CardDetailScreen(card = card(), onBack = { backed++ }) }
