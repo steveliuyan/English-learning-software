@@ -12,9 +12,12 @@ import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -28,12 +31,46 @@ class MiMoPronunciationProviderTest {
     @Test fun `successful speech sends request and returns played`() = runTest {
         val transport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1)))
         val key = "secret".toCharArray()
-        val provider = provider(transport, FakeSecretStore(key))
+        val store = FakeSecretStore(key)
+        val provider = provider(transport, store)
 
         assertIs<PronunciationResult.Played>(provider.speak("hello"))
         assertEquals("https://api.test/v1/audio/speech", transport.request!!.url)
+        assertEquals("POST", transport.request!!.method)
+        assertEquals("application/json", transport.request!!.headers["Content-Type"])
         assertEquals("Bearer secret", transport.request!!.headers["Authorization"])
-        assertTrue(key.all { it == '\u0000' })
+        assertEquals(12, transport.request!!.timeoutSeconds)
+        assertTrue(transport.request!!.body.decodeToString().contains("\"input\":\"hello\""))
+        assertTrue(store.lastRead!!.all { it == '\u0000' })
+    }
+
+    @Test fun `profile id is injectable`() = runTest {
+        val custom = profile.copy(profileId = "custom-profile")
+        val result = provider(profile = custom, profileId = "custom-profile").speak("hello")
+        assertIs<PronunciationResult.Played>(result)
+    }
+
+    @Test fun `blank text does not access dependencies`() = runTest {
+        val profiles = CountingProfileRepository(profile)
+        val store = FakeSecretStore("secret".toCharArray())
+        val result = MiMoPronunciationProvider(profiles, AiProfileSecretUseCase(store), RecordingTransport(AudioHttpResult.Success(byteArrayOf())), "mimo").speak("   ")
+        assertIs<PronunciationResult.Unavailable>(result)
+        assertEquals(0, profiles.findCalls)
+        assertEquals(0, store.readCalls)
+    }
+
+    @Test fun `builder failure returns failed`() = runTest {
+        val result = provider(profile = profile.copy(endpoint = "http://api.test")).speak("hello")
+        assertIs<PronunciationResult.Failed>(result)
+    }
+
+    @Test fun `transport exception returns failed`() = runTest {
+        val result = provider(ThrowingTransport(IllegalStateException("transport"))).speak("hello")
+        assertIs<PronunciationResult.Failed>(result)
+    }
+
+    @Test fun `cancellation is rethrown`() = runTest {
+        assertFailsWith<CancellationException> { provider(ThrowingTransport(CancellationException("cancel"))).speak("hello") }
     }
 
     @Test fun `missing profile is unavailable`() = runTest {
@@ -66,14 +103,15 @@ class MiMoPronunciationProviderTest {
         transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1))),
         secretStore: SecretStore = FakeSecretStore("secret".toCharArray()),
         profile: AiProfile? = this.profile,
+        profileId: String = profile?.profileId ?: "mimo",
     ) = MiMoPronunciationProvider(
         profiles = FakeProfileRepository(profile),
         secrets = AiProfileSecretUseCase(secretStore),
         transport = transport,
-        profileId = "mimo",
+        profileId = profileId,
     )
 
-    private class FakeProfileRepository(private val profile: AiProfile?) : AiProfileRepository {
+    private open class FakeProfileRepository(private val profile: AiProfile?) : AiProfileRepository {
         override suspend fun list() = Result.success(listOfNotNull(profile))
         override suspend fun find(profileId: String) = Result.success(profile?.takeIf { it.profileId == profileId })
         override suspend fun save(profile: AiProfile) = Result.success(Unit)
@@ -81,10 +119,24 @@ class MiMoPronunciationProviderTest {
     }
 
     private class FakeSecretStore(private val value: CharArray?, private val fail: Boolean = false) : SecretStore {
+        var readCalls = 0
+        var lastRead: CharArray? = null
         override fun save(reference: SecretReference, secret: CharArray) = Result.success(Unit)
-        override fun read(reference: SecretReference): Result<CharArray> = if (fail) Result.failure(IllegalStateException("secret unavailable")) else value?.copyOf()?.let { Result.success(it) } ?: Result.failure(IllegalStateException("missing"))
+        override fun read(reference: SecretReference): Result<CharArray> {
+            readCalls++
+            return if (fail) Result.failure(IllegalStateException("secret unavailable")) else value?.copyOf()?.also { lastRead = it }?.let { Result.success(it) } ?: Result.failure(IllegalStateException("missing"))
+        }
         override fun delete(reference: SecretReference) = Result.success(Unit)
         override fun has(reference: SecretReference) = Result.success(value != null)
+    }
+
+    private class CountingProfileRepository(private val profile: AiProfile) : FakeProfileRepository(profile) {
+        var findCalls = 0
+        override suspend fun find(profileId: String): Result<AiProfile?> { findCalls++; return super.find(profileId) }
+    }
+
+    private class ThrowingTransport(private val error: Throwable) : AudioHttpTransport {
+        override suspend fun send(request: AudioHttpRequest): AudioHttpResult = throw error
     }
 
     private class RecordingTransport(private val outcome: AudioHttpResult) : AudioHttpTransport {

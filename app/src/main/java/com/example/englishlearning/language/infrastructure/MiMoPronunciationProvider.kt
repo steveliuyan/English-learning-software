@@ -1,6 +1,7 @@
 package com.example.englishlearning.language.infrastructure
 
 import com.example.englishlearning.ai.AiProfileRepository
+import kotlinx.coroutines.CancellationException
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.net.AudioHttpRequest
 import com.example.englishlearning.ai.net.AudioHttpResult
@@ -36,6 +37,8 @@ class MiMoPronunciationProvider(
                 is AudioHttpResult.Success -> PronunciationResult.Played
                 else -> PronunciationResult.Failed()
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             PronunciationResult.Failed()
         } finally {
