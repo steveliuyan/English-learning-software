@@ -1,0 +1,350 @@
+package com.example.englishlearning.core.storage
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.englishlearning.core.storage.dao.InternalAiProfileDao
+import com.example.englishlearning.core.storage.dao.InternalArticleDao
+import com.example.englishlearning.core.storage.dao.InternalAssetDao
+import com.example.englishlearning.core.storage.dao.InternalReadingPreferenceDao
+import com.example.englishlearning.core.storage.dao.InternalReadingCompletionDao
+import com.example.englishlearning.core.storage.dao.InternalLearningEventDao
+import com.example.englishlearning.core.storage.dao.InternalLearningStatsDao
+import com.example.englishlearning.core.storage.dao.InternalLearningProfileDao
+import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
+import com.example.englishlearning.core.storage.dao.InternalProfileDao
+import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
+import com.example.englishlearning.core.storage.dao.InternalWordBookDao
+import com.example.englishlearning.core.storage.entity.AiProfileEntity
+import com.example.englishlearning.core.storage.entity.ArticleEntity
+import com.example.englishlearning.core.storage.entity.AssetRecordEntity
+import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
+import com.example.englishlearning.core.storage.entity.KeyAliasEntity
+import com.example.englishlearning.core.storage.entity.LearningEventEntity
+import com.example.englishlearning.core.storage.entity.LearningProfileEntity
+import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
+import com.example.englishlearning.core.storage.entity.LocalProfileEntity
+import com.example.englishlearning.core.storage.entity.ReadingCompletionEntity
+import com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity
+import com.example.englishlearning.core.storage.entity.SchemaMetaEntity
+import com.example.englishlearning.core.storage.entity.TodayPlanEntity
+import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
+import com.example.englishlearning.core.storage.entity.WordBookEntity
+
+/**
+ * Versioned Room metadata store. Every version transition must be supplied through [MIGRATIONS].
+ * Destructive migration fallback is intentionally never configured by callers.
+ */
+@Database(
+    entities = [
+        SchemaMetaEntity::class,
+        AiProfileEntity::class,
+        ArticleEntity::class,
+        ReadingPreferenceEntity::class,
+        ReadingCompletionEntity::class,
+        AssetRecordEntity::class,
+        KeyAliasEntity::class,
+        LocalProfileEntity::class,
+        WordBookEntity::class,
+        LearningProfileEntity::class,
+        TodayPlanEntity::class,
+        TodayPlanTaskEntity::class,
+        LearningEventEntity::class,
+        CardReviewStateEntity::class,
+        LearningSettingsEntity::class,
+    ],
+    version = 12,
+    exportSchema = true,
+)
+abstract class AppDatabase : RoomDatabase() {
+    internal abstract fun internalAiProfileDao(): InternalAiProfileDao
+
+    internal abstract fun internalArticleDao(): InternalArticleDao
+
+    internal abstract fun internalReadingPreferenceDao(): InternalReadingPreferenceDao
+
+    internal abstract fun internalReadingCompletionDao(): InternalReadingCompletionDao
+
+    internal abstract fun internalAssetDao(): InternalAssetDao
+
+    internal abstract fun internalProfileDao(): InternalProfileDao
+
+    internal abstract fun internalWordBookDao(): InternalWordBookDao
+
+    internal abstract fun internalLearningProfileDao(): InternalLearningProfileDao
+
+    internal abstract fun internalLearningSettingsDao(): InternalLearningSettingsDao
+
+    internal abstract fun internalTodayPlanDao(): InternalTodayPlanDao
+
+    internal abstract fun internalLearningEventDao(): InternalLearningEventDao
+
+    internal abstract fun internalLearningStatsDao(): InternalLearningStatsDao
+
+    companion object {
+        val MIGRATION_1_2: Migration =
+            object : Migration(1, 2) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `local_profiles` " +
+                            "(`id` TEXT NOT NULL, `displayName` TEXT NOT NULL, " +
+                            "`createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+                    )
+                }
+            }
+
+        val MIGRATION_2_3: Migration =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `word_books` " +
+                            "(`id` TEXT NOT NULL, `displayName` TEXT NOT NULL, " +
+                            "`level` TEXT NOT NULL, `totalWords` INTEGER NOT NULL, " +
+                            "`dataVersion` TEXT NOT NULL, `sourceId` TEXT NOT NULL, " +
+                            "PRIMARY KEY(`id`))",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `learning_profiles` " +
+                            "(`profileId` TEXT NOT NULL, `activeWordBookId` TEXT NOT NULL, " +
+                            "`dailyNewTarget` INTEGER NOT NULL, " +
+                            "PRIMARY KEY(`profileId`), FOREIGN KEY(`activeWordBookId`) " +
+                            "REFERENCES `word_books`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_learning_profiles_activeWordBookId` " +
+                            "ON `learning_profiles` (`activeWordBookId`)",
+                    )
+                    createDailyTargetConstraintTriggers(db)
+                }
+            }
+
+        val MIGRATION_3_4: Migration =
+            object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `today_plans` " +
+                            "(`planId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `localDate` TEXT NOT NULL, " +
+                            "`zoneId` TEXT NOT NULL, `activeWordBookId` TEXT NOT NULL, `newTarget` INTEGER NOT NULL, " +
+                            "`dueTarget` INTEGER NOT NULL, `ruleVersion` TEXT NOT NULL, " +
+                            "`generatedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`planId`))",
+                    )
+                    db.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_today_plans_profileId_localDate` " +
+                            "ON `today_plans` (`profileId`, `localDate`)",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `today_plan_tasks` " +
+                            "(`planId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `taskKind` TEXT NOT NULL, " +
+                            "`ordinal` INTEGER NOT NULL, PRIMARY KEY(`planId`, `cardId`), " +
+                            "FOREIGN KEY(`planId`) REFERENCES `today_plans`(`planId`) " +
+                            "ON UPDATE NO ACTION ON DELETE NO ACTION )",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_today_plan_tasks_planId` " +
+                            "ON `today_plan_tasks` (`planId`)",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_today_plan_tasks_planId_ordinal` " +
+                            "ON `today_plan_tasks` (`planId`, `ordinal`)",
+                    )
+                }
+            }
+
+        val MIGRATION_7_8: Migration =
+            object : Migration(7, 8) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `ai_profiles` " +
+                            "(`profileId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `websiteUrl` TEXT NOT NULL, " +
+                            "`endpoint` TEXT NOT NULL, `model` TEXT NOT NULL, `capabilities` TEXT NOT NULL, " +
+                            "`secretAlias` TEXT NOT NULL, `temperature` REAL NOT NULL, `topP` REAL NOT NULL, " +
+                            "`maxTokens` INTEGER NOT NULL, `timeoutSeconds` INTEGER NOT NULL, " +
+                            "`systemPromptTemplateId` TEXT NOT NULL, PRIMARY KEY(`profileId`))",
+                    )
+                }
+            }
+
+        val MIGRATION_8_9: Migration =
+            object : Migration(8, 9) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // ALTER TABLE 加 NOT NULL 列必须带 DEFAULT，否则已有的文章行无法回填。
+                    // 默认值刻意取空串/ENGLISH_FIRST：老文章没有生成来源信息，编一个假的比留空更糟。
+                    db.execSQL(
+                        "ALTER TABLE `articles` ADD COLUMN `coveredLemmas` TEXT NOT NULL DEFAULT ''",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE `articles` ADD COLUMN `parameterSummary` TEXT NOT NULL DEFAULT ''",
+                    )
+                    db.execSQL(
+                        "ALTER TABLE `reading_preferences` ADD COLUMN `displayMode` TEXT NOT NULL DEFAULT 'ENGLISH_FIRST'",
+                    )
+                }
+            }
+
+        val MIGRATION_11_12: Migration =
+            object : Migration(11, 12) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // F3-02：阅读完成记录。articleId 做主键天然幂等——同一篇文章重复点完成只算一次。
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `reading_completions` " +
+                            "(`articleId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `localDate` TEXT NOT NULL, " +
+                            "`completedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`articleId`))",
+                    )
+                }
+            }
+
+        val MIGRATION_10_11: Migration =
+            object : Migration(10, 11) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // F3-01C：阅读标记偏好。已有行回填产品默认「开启标记」。
+                    db.execSQL(
+                        "ALTER TABLE `reading_preferences` ADD COLUMN `showLearnedMarks` INTEGER NOT NULL DEFAULT 1",
+                    )
+                }
+            }
+
+        val MIGRATION_9_10: Migration =
+            object : Migration(9, 10) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // ALTER TABLE 加 NOT NULL 列必须带 DEFAULT；已有行只能是 AI 生成，因为此前只有这一条来源。
+                    // 不改 MIGRATION_8_9 而新开 v10：v9 库已在真机存在，保留版本号却改 schema 会让
+                    // Room 因 identity hash 不匹配而校验失败。
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceType` TEXT NOT NULL DEFAULT 'AI_GENERATED'")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceId` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceDisplayName` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceUrl` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceLicenseNote` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `articles` ADD COLUMN `sourceAttribution` TEXT NOT NULL DEFAULT ''")
+                }
+            }
+
+        val MIGRATION_6_7: Migration =
+            object : Migration(6, 7) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `articles` " +
+                            "(`articleId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `localDate` TEXT NOT NULL, " +
+                            "`activeWordBookId` TEXT NOT NULL, `articleType` TEXT NOT NULL, `lengthTier` TEXT NOT NULL, " +
+                            "`version` INTEGER NOT NULL, `title` TEXT NOT NULL, `englishText` TEXT NOT NULL, " +
+                            "`chineseText` TEXT NOT NULL, `generatedAtEpochMillis` INTEGER NOT NULL, `modelName` TEXT, " +
+                            "PRIMARY KEY(`articleId`))",
+                    )
+                    db.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_articles_reuse_key` " +
+                            "ON `articles` (`profileId`, `localDate`, `activeWordBookId`, `articleType`, `lengthTier`, `version`)",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_articles_profileId_generatedAtEpochMillis` " +
+                            "ON `articles` (`profileId`, `generatedAtEpochMillis`)",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `reading_preferences` " +
+                            "(`profileId` TEXT NOT NULL, `defaultArticleType` TEXT NOT NULL DEFAULT 'STORY', " +
+                            "`explicitLengthTier` TEXT, PRIMARY KEY(`profileId`))",
+                    )
+                }
+            }
+
+        val MIGRATION_5_6: Migration =
+            object : Migration(5, 6) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `learning_settings` " +
+                            "(`profileId` TEXT NOT NULL, `openDetailOnKnown` INTEGER NOT NULL DEFAULT 0, " +
+                            "`openDetailOnFuzzy` INTEGER NOT NULL DEFAULT 1, " +
+                            "`openDetailOnForgotten` INTEGER NOT NULL DEFAULT 1, " +
+                            "PRIMARY KEY(`profileId`))",
+                    )
+                    db.execSQL(
+                        "INSERT INTO `learning_settings` " +
+                            "(`profileId`, `openDetailOnKnown`, `openDetailOnFuzzy`, `openDetailOnForgotten`) " +
+                            "SELECT `profileId`, 0, 1, 1 FROM `learning_profiles` " +
+                            "WHERE `profileId` NOT IN (SELECT `profileId` FROM `learning_settings`)",
+                    )
+                }
+            }
+
+        val MIGRATION_4_5: Migration =
+            object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `learning_events` " +
+                            "(`eventId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `planId` TEXT NOT NULL, " +
+                            "`cardId` TEXT NOT NULL, `wordBookId` TEXT NOT NULL, `feedback` TEXT NOT NULL, " +
+                            "`occurredAtEpochMillis` INTEGER NOT NULL, `algorithmVersion` TEXT NOT NULL, " +
+                            "`paramsVersion` TEXT NOT NULL, `dueBeforeEpochMillis` INTEGER, " +
+                            "`nextReviewAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`eventId`))",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_learning_events_profileId_cardId` " +
+                            "ON `learning_events` (`profileId`, `cardId`)",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_learning_events_planId` " +
+                            "ON `learning_events` (`planId`)",
+                    )
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `card_review_states` " +
+                            "(`cardId` TEXT NOT NULL, `wordBookId` TEXT NOT NULL, `lastFeedback` TEXT NOT NULL, " +
+                            "`lastReviewedAtEpochMillis` INTEGER NOT NULL, " +
+                            "`nextReviewAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`cardId`))",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS " +
+                            "`index_card_review_states_wordBookId_nextReviewAtEpochMillis` " +
+                            "ON `card_review_states` (`wordBookId`, `nextReviewAtEpochMillis`)",
+                    )
+                }
+            }
+
+        internal val CONSTRAINT_CALLBACK: RoomDatabase.Callback =
+            object : RoomDatabase.Callback() {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    createDailyTargetConstraintTriggers(db)
+                    createTodayPlanTaskKindTrigger(db)
+                }
+
+                override fun onOpen(db: SupportSQLiteDatabase) {
+                    createTodayPlanTaskKindTrigger(db)
+                }
+            }
+
+        val MIGRATIONS: Array<Migration> =
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+
+        private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
+            db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)
+            db.execSQL(DAILY_TARGET_UPDATE_TRIGGER_SQL)
+        }
+
+        private fun createTodayPlanTaskKindTrigger(db: SupportSQLiteDatabase) {
+            db.execSQL(TODAY_PLAN_TASK_KIND_INSERT_TRIGGER_SQL)
+            db.execSQL(TODAY_PLAN_TASK_KIND_UPDATE_TRIGGER_SQL)
+        }
+
+        private const val TODAY_PLAN_TASK_KIND_INSERT_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `today_plan_tasks_kind_insert_check` " +
+                "BEFORE INSERT ON `today_plan_tasks` FOR EACH ROW " +
+                "WHEN NEW.`taskKind` NOT IN ('NEW', 'DUE') BEGIN " +
+                "SELECT RAISE(ABORT, 'taskKind must be NEW or DUE'); END"
+
+        private const val TODAY_PLAN_TASK_KIND_UPDATE_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `today_plan_tasks_kind_update_check` " +
+                "BEFORE UPDATE OF `taskKind` ON `today_plan_tasks` FOR EACH ROW " +
+                "WHEN NEW.`taskKind` NOT IN ('NEW', 'DUE') BEGIN " +
+                "SELECT RAISE(ABORT, 'taskKind must be NEW or DUE'); END"
+
+        private const val DAILY_TARGET_INSERT_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `learning_profiles_daily_target_insert_check` " +
+                "BEFORE INSERT ON `learning_profiles` FOR EACH ROW " +
+                "WHEN NEW.`dailyNewTarget` < 1 BEGIN " +
+                "SELECT RAISE(ABORT, 'dailyNewTarget must be at least 1'); END"
+
+        private const val DAILY_TARGET_UPDATE_TRIGGER_SQL =
+            "CREATE TRIGGER IF NOT EXISTS `learning_profiles_daily_target_update_check` " +
+                "BEFORE UPDATE OF `dailyNewTarget` ON `learning_profiles` FOR EACH ROW " +
+                "WHEN NEW.`dailyNewTarget` < 1 BEGIN " +
+                "SELECT RAISE(ABORT, 'dailyNewTarget must be at least 1'); END"
+    }
+}
