@@ -32,6 +32,7 @@ class CheckInViewModelTest {
         assertEquals(7, state.week.size)
         assertEquals(date, state.today.localDate)
         assertEquals(30, state.month.size)
+        assertTrue(state.month.zipWithNext().all { (previous, next) -> next.localDate == previous.localDate.plusDays(1) })
         assertTrue(state.completed)
         Dispatchers.resetMain()
     }
@@ -57,6 +58,16 @@ class CheckInViewModelTest {
     }
 
     @Test
+    fun `throwing repository is unavailable`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val vm = CheckInViewModel(ThrowingStats(), clock)
+        vm.load("p")
+        advanceUntilIdle()
+        assertEquals(CheckInUiState.Unavailable, vm.uiState.value)
+        Dispatchers.resetMain()
+    }
+
+    @Test
     fun `failure is unavailable and reload starts loading`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val repository = FakeStats(Result.failure(IllegalStateException()))
@@ -71,5 +82,12 @@ class CheckInViewModelTest {
     private class FakeStats(private val result: Result<List<DailyLearningStats>>) : LearningStatsRepository {
         override suspend fun today(profileId: String, localDate: LocalDate) = Result.failure<DailyLearningStats>(UnsupportedOperationException())
         override suspend fun range(profileId: String, from: LocalDate, to: LocalDate) = result
+    }
+
+    private class ThrowingStats : LearningStatsRepository {
+        override suspend fun today(profileId: String, localDate: LocalDate) = Result.failure<DailyLearningStats>(UnsupportedOperationException())
+        override suspend fun range(profileId: String, from: LocalDate, to: LocalDate): Result<List<DailyLearningStats>> {
+            throw IllegalStateException("boom")
+        }
     }
 }
