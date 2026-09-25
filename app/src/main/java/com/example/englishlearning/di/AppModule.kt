@@ -9,7 +9,9 @@ import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.RoomAiProfileRepository
 import com.example.englishlearning.ai.net.AiHttpTransport
+import com.example.englishlearning.ai.net.AudioHttpTransport
 import com.example.englishlearning.ai.net.UrlConnectionAiHttpTransport
+import com.example.englishlearning.ai.net.UrlConnectionAudioHttpTransport
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.security.AndroidKeyStoreSecretStore
 import com.example.englishlearning.core.security.SecretStore
@@ -109,6 +111,7 @@ object AppModule {
     @Provides fun provideAiProfileSecretUseCase(secretStore: SecretStore): AiProfileSecretUseCase = AiProfileSecretUseCase(secretStore)
     @Provides @Singleton fun provideAiProfileIdFactory(): AiProfileIdFactory = AiProfileIdFactory.Random
     @Provides @Singleton fun provideAiHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AiHttpTransport = UrlConnectionAiHttpTransport(dispatcher)
+    @Provides @Singleton fun provideAudioHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AudioHttpTransport = UrlConnectionAudioHttpTransport(dispatcher)
     @Provides @Singleton fun provideArticleIdFactory(): ArticleIdFactory = ArticleIdFactory.Random
     @Provides @Singleton fun provideGenerateArticleUseCase(
         profiles: AiProfileRepository,
