@@ -6,6 +6,7 @@ import com.example.englishlearning.core.storage.AppErrorException
 import com.example.englishlearning.core.time.ClockProvider
 import com.example.englishlearning.learning.domain.DailyLearningStats
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
@@ -15,16 +16,26 @@ class RoomLearningStatsRepository(
     private val ioDispatcher: CoroutineDispatcher,
 ) : LearningStatsRepository {
     override suspend fun today(profileId: String, localDate: LocalDate): Result<DailyLearningStats> = withContext(ioDispatcher) {
-        runCatching { load(profileId, localDate, localDate).single() }
-            .recoverCatching { throw AppErrorException(AppError.StorageUnavailable) }
+        try {
+            Result.success(load(profileId, localDate, localDate).single())
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            Result.failure(AppErrorException(AppError.StorageUnavailable))
+        }
     }
 
     override suspend fun range(profileId: String, from: LocalDate, to: LocalDate): Result<List<DailyLearningStats>> = withContext(ioDispatcher) {
         if (from.isAfter(to)) {
             Result.failure(IllegalArgumentException("from must not be after to"))
         } else {
-            runCatching { load(profileId, from, to) }
-                .recoverCatching { throw AppErrorException(AppError.StorageUnavailable) }
+            try {
+                Result.success(load(profileId, from, to))
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                Result.failure(AppErrorException(AppError.StorageUnavailable))
+            }
         }
     }
 
