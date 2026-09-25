@@ -85,7 +85,7 @@ object AppModule {
     @Provides fun provideWordBookMetadataAssetSource(@ApplicationContext context: Context): WordBookMetadataAssetSource = WordBookMetadataAssetSource { context.assets.open("wordbooks/metadata.json").bufferedReader().use { it.readText() } }
     @Provides fun provideSeedWordBooksUseCase(source: WordBookMetadataAssetSource, repository: LearningProfileRepository): SeedWordBooksUseCase = SeedWordBooksUseCase(source, repository)
     @Provides @Singleton fun provideTodayPlanRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): TodayPlanRepository = RoomTodayPlanRepository(database, dispatcher)
-    @Provides @Singleton fun provideLearningStatsRepository(database: AppDatabase, clock: ClockProvider): LearningStatsRepository = RoomLearningStatsRepository(database, clock)
+    @Provides @Singleton fun provideLearningStatsRepository(database: AppDatabase, clock: ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): LearningStatsRepository = RoomLearningStatsRepository(database, clock, dispatcher)
     @Provides @Singleton fun provideArticleRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): ArticleRepository = RoomArticleRepository(database, dispatcher)
     @Provides @Singleton fun provideLearningEventRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningEventRepository = RoomLearningEventRepository(database, dispatcher)
     @Provides @Singleton fun provideFsrsReviewScheduler(): FsrsReviewScheduler = FsrsReviewScheduler()
