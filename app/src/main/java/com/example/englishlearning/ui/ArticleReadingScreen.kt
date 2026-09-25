@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,6 +63,7 @@ fun ArticleReadingScreen(
     onOpenDictionaryPlaceholder: () -> Unit,
     onOpenPronunciationPlaceholder: () -> Unit,
     onSetLearnedMarks: (Boolean) -> Unit = {},
+    onCompleteReading: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -191,6 +193,17 @@ fun ArticleReadingScreen(
                 color = MintPrimaryDark,
             )
         }
+
+        // F3-02：完成阅读。落库成功后按钮转为「已完成」并禁用；幂等由 articleId 主键保证。
+        Button(
+            onClick = onCompleteReading,
+            enabled = !current.completed,
+            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("article_complete_reading"),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (current.completed) MintSurface else MintPrimary,
+                contentColor = MintPrimaryDark,
+            ),
+        ) { Text(if (current.completed) "已完成阅读" else "完成阅读", fontWeight = FontWeight.Bold) }
 
         if (current.uncoveredLemmas.isNotEmpty()) {
             Text("未覆盖词", fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.testTag("article_uncovered"))

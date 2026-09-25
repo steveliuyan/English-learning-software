@@ -23,6 +23,7 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArticleReadingViewModelTest {
+    private val fakeCompletions = FakeCompletions()
     private val dispatcher = StandardTestDispatcher()
 
     @AfterEach
@@ -59,7 +60,7 @@ class ArticleReadingViewModelTest {
         preferences: FakePreferenceRepository = FakePreferenceRepository(preference),
     ): Pair<ArticleReadingViewModel, FakePreferenceRepository> {
         Dispatchers.setMain(dispatcher)
-        val viewModel = ArticleReadingViewModel(preferences)
+        val viewModel = ArticleReadingViewModel(preferences, fakeCompletions)
         return viewModel to preferences
     }
 
@@ -157,7 +158,7 @@ class ArticleReadingViewModelTest {
     fun preferenceReadFailureFallsBackToTheDefaultMode() = runTest(dispatcher) {
         Dispatchers.setMain(dispatcher)
         val preferences = FakePreferenceRepository(failRead = true)
-        val viewModel = ArticleReadingViewModel(preferences)
+        val viewModel = ArticleReadingViewModel(preferences, fakeCompletions)
 
         viewModel.load(article(listOf("apple")), todayCards)
         advanceUntilIdle()
@@ -179,4 +180,52 @@ class ArticleReadingViewModelTest {
             return Result.success(Unit)
         }
     }
+    @Test
+    fun completeReadingRecordsAndMarksTheState() = runTest(dispatcher) {
+        val (viewModel, _) = viewModel()
+
+        viewModel.load(article(listOf("apple")), todayCards)
+        advanceUntilIdle()
+        viewModel.completeReading()
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value?.completed)
+        assertEquals(1, fakeCompletions.recorded)
+    }
+
+    @Test
+    fun completionFailureLeavesTheStateUnchangedForRetry() = runTest(dispatcher) {
+        fakeCompletions.fail = true
+        val (viewModel, _) = viewModel()
+
+        viewModel.load(article(listOf("apple")), todayCards)
+        advanceUntilIdle()
+        viewModel.completeReading()
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value?.completed)
+    }
+
+    @Test
+    fun completingTwiceOnlyRecordsOnce() = runTest(dispatcher) {
+        val (viewModel, _) = viewModel()
+
+        viewModel.load(article(listOf("apple")), todayCards)
+        advanceUntilIdle()
+        viewModel.completeReading()
+        advanceUntilIdle()
+        viewModel.completeReading()
+        advanceUntilIdle()
+
+        assertEquals(1, fakeCompletions.recorded)
+    }
+
+}
+
+private class FakeCompletions : com.example.englishlearning.reading.ReadingCompletionRepository {
+    var recorded = 0
+    var fail = false
+    override suspend fun record(article: com.example.englishlearning.reading.domain.Article): Result<Boolean> =
+        if (fail) Result.failure(IllegalStateException()) else Result.success(true).also { recorded++ }
+    override suspend fun completionsToday(profileId: String): Result<Int> = Result.success(recorded)
 }

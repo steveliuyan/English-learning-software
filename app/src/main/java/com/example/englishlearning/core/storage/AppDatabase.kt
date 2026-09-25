@@ -8,6 +8,7 @@ import com.example.englishlearning.core.storage.dao.InternalAiProfileDao
 import com.example.englishlearning.core.storage.dao.InternalArticleDao
 import com.example.englishlearning.core.storage.dao.InternalAssetDao
 import com.example.englishlearning.core.storage.dao.InternalReadingPreferenceDao
+import com.example.englishlearning.core.storage.dao.InternalReadingCompletionDao
 import com.example.englishlearning.core.storage.dao.InternalLearningEventDao
 import com.example.englishlearning.core.storage.dao.InternalLearningProfileDao
 import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
@@ -23,6 +24,7 @@ import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
 import com.example.englishlearning.core.storage.entity.LocalProfileEntity
+import com.example.englishlearning.core.storage.entity.ReadingCompletionEntity
 import com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity
 import com.example.englishlearning.core.storage.entity.SchemaMetaEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
@@ -39,6 +41,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         AiProfileEntity::class,
         ArticleEntity::class,
         ReadingPreferenceEntity::class,
+        ReadingCompletionEntity::class,
         AssetRecordEntity::class,
         KeyAliasEntity::class,
         LocalProfileEntity::class,
@@ -50,7 +53,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,6 +62,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalArticleDao(): InternalArticleDao
 
     internal abstract fun internalReadingPreferenceDao(): InternalReadingPreferenceDao
+
+    internal abstract fun internalReadingCompletionDao(): InternalReadingCompletionDao
 
     internal abstract fun internalAssetDao(): InternalAssetDao
 
@@ -170,6 +175,18 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     db.execSQL(
                         "ALTER TABLE `reading_preferences` ADD COLUMN `displayMode` TEXT NOT NULL DEFAULT 'ENGLISH_FIRST'",
+                    )
+                }
+            }
+
+        val MIGRATION_11_12: Migration =
+            object : Migration(11, 12) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // F3-02：阅读完成记录。articleId 做主键天然幂等——同一篇文章重复点完成只算一次。
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `reading_completions` " +
+                            "(`articleId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `localDate` TEXT NOT NULL, " +
+                            "`completedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`articleId`))",
                     )
                 }
             }
@@ -291,7 +308,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

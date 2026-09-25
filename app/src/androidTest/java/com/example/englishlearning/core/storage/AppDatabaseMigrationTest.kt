@@ -461,4 +461,36 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    @Test
+    fun migrateV11ToV12_createsReadingCompletions() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 11).apply {
+            execSQL(
+                "INSERT INTO articles (articleId, profileId, localDate, activeWordBookId, articleType, lengthTier, " +
+                    "version, title, englishText, chineseText, generatedAtEpochMillis, coveredLemmas, " +
+                    "parameterSummary, modelName, sourceType, sourceId, sourceDisplayName, sourceUrl, " +
+                    "sourceLicenseNote, sourceAttribution) " +
+                    "VALUES ('a1', 'default', '2026-09-25', 'primary-school', 'STORY', 'STANDARD', 1, " +
+                    "'T', 'E', 'C', 1, '[]', '', 'm1', 'AI_GENERATED', '', '', '', '', '')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 12, true, AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12).apply {
+            execSQL(
+                "INSERT INTO reading_completions (articleId, profileId, localDate, completedAtEpochMillis) " +
+                    "VALUES ('a1', 'default', '2026-09-25', 5)",
+            )
+            query("SELECT COUNT(*) FROM articles").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(1, cursor.getInt(0))
+            }
+            query("SELECT COUNT(*) FROM reading_completions").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(1, cursor.getInt(0))
+            }
+            close()
+        }
+    }
 }

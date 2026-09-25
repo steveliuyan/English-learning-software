@@ -29,11 +29,15 @@ data class ArticleReadingUiState(
     val cards: List<WordCard>,
     /** F3-01C：是否在正文标记已背词。关掉时 [highlights] 为空，但未覆盖词 chips 不受影响。 */
     val showLearnedMarks: Boolean = true,
+    /** F3-02：本会话内已完成阅读。落库成功才置位；[firstCompletion] 区分首记与幂等重放。 */
+    val completed: Boolean = false,
+    val firstCompletion: Boolean = true,
 )
 
 @HiltViewModel
 class ArticleReadingViewModel @Inject constructor(
     private val preferences: ReadingPreferenceRepository,
+    private val completions: com.example.englishlearning.reading.ReadingCompletionRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ArticleReadingUiState?>(null)
     val uiState: StateFlow<ArticleReadingUiState?> = _uiState
@@ -94,6 +98,17 @@ class ArticleReadingViewModel @Inject constructor(
     /** 点词开词卡详情用；未命中返回 null（例如来自 lemma 占位、词卡已不在词书里）。 */
     fun cardFor(cardId: String): WordCard? =
         _uiState.value?.cards?.firstOrNull { it.cardId == cardId || it.lemma == cardId }
+
+    /** F3-02：完成阅读。幂等落库；失败不改本地状态（按钮仍可重试）。 */
+    fun completeReading() {
+        val current = _uiState.value ?: return
+        if (current.completed) return
+        viewModelScope.launch {
+            completions.record(current.article).getOrNull()?.let { firstTime ->
+                _uiState.value = _uiState.value?.copy(completed = true, firstCompletion = firstTime)
+            }
+        }
+    }
 
     private fun buildState(
         article: Article,

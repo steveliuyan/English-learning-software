@@ -97,6 +97,8 @@ object AppModule {
     @Provides fun provideTodayPlanUseCase(learning: LearningProfileRepository, plans: TodayPlanRepository, cards: PlanCardSource, clock: ClockProvider): GetOrCreateTodayPlanUseCase = GetOrCreateTodayPlanUseCase(learning, plans, cards, clock)
     @Provides fun provideTodayPlanUseCaseContract(useCase: GetOrCreateTodayPlanUseCase): TodayPlanUseCaseContract = TodayPlanUseCaseContract { profileId -> useCase(profileId) }
     @Provides @Singleton fun provideReadingPreferenceRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): ReadingPreferenceRepository = RoomReadingPreferenceRepository(database, dispatcher)
+
+    @Provides @Singleton fun provideReadingCompletionRepository(database: AppDatabase, clock: com.example.englishlearning.core.time.ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): com.example.englishlearning.reading.ReadingCompletionRepository = com.example.englishlearning.reading.RoomReadingCompletionRepository(database, clock, dispatcher)
     @Provides @Singleton fun provideAiProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): AiProfileRepository = RoomAiProfileRepository(database, dispatcher)
     @Provides fun provideAiProfileSecretUseCase(secretStore: SecretStore): AiProfileSecretUseCase = AiProfileSecretUseCase(secretStore)
     @Provides @Singleton fun provideAiProfileIdFactory(): AiProfileIdFactory = AiProfileIdFactory.Random
