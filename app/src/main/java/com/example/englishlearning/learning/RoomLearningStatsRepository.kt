@@ -44,15 +44,18 @@ class RoomLearningStatsRepository(
         val plansDao = database.internalTodayPlanDao()
         val zone = clock.zoneId()
         val readings = statsDao.countReadings(profileId, from.toString(), to.toString()).associate { LocalDate.parse(it.localDate) to it.count }
-        return generateSequence(from) { date -> date.plusDays(1).takeUnless { it.isAfter(to) } }
-            .map { date ->
-                val start = date.atStartOfDay(zone).toInstant().toEpochMilli()
-                val end = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-                val reviewed = statsDao.countReviewedCards(profileId, start, end)
-                val plan = plansDao.findPlan(profileId, date.toString())
-                val target = plan?.let { it.newTarget + it.dueTarget } ?: 0
-                val readingCount = readings[date] ?: 0
-                DailyLearningStats(date, reviewed, readingCount, reviewed + readingCount, target)
-            }.toList()
+        val result = mutableListOf<DailyLearningStats>()
+        var date = from
+        while (!date.isAfter(to)) {
+            val start = date.atStartOfDay(zone).toInstant().toEpochMilli()
+            val end = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val reviewed = statsDao.countReviewedCards(profileId, start, end)
+            val plan = plansDao.findPlan(profileId, date.toString())
+            val target = plan?.let { it.newTarget + it.dueTarget } ?: 0
+            val readingCount = readings[date] ?: 0
+            result += DailyLearningStats(date, reviewed, readingCount, reviewed + readingCount, target)
+            date = date.plusDays(1)
+        }
+        return result
     }
 }

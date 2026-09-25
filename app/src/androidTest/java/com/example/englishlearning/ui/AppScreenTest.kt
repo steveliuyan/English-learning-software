@@ -124,6 +124,24 @@ class AppScreenTest {
     }
 
     @Test
+    fun checkInEntryOpensOverlayAndBackReturnsToTodayPlan() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_check_in")
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("check_in_screen").assertExists()
+        composeRule.onNodeWithTag("check_in_back").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        composeRule.onNodeWithTag("check_in_screen").assertDoesNotExist()
+        AppTab.entries.forEach { tab ->
+            composeRule.onNodeWithTag("app_tab_${tab.name.lowercase()}").assertExists()
+        }
+    }
+
+    @Test
     fun aiTabOpensTheAiLearningScreen() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
