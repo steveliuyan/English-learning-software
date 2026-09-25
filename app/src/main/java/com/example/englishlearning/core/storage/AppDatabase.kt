@@ -10,6 +10,7 @@ import com.example.englishlearning.core.storage.dao.InternalAssetDao
 import com.example.englishlearning.core.storage.dao.InternalReadingPreferenceDao
 import com.example.englishlearning.core.storage.dao.InternalReadingCompletionDao
 import com.example.englishlearning.core.storage.dao.InternalLearningEventDao
+import com.example.englishlearning.core.storage.dao.InternalLearningStatsDao
 import com.example.englishlearning.core.storage.dao.InternalLearningProfileDao
 import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
 import com.example.englishlearning.core.storage.dao.InternalProfileDao
@@ -78,6 +79,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalTodayPlanDao(): InternalTodayPlanDao
 
     internal abstract fun internalLearningEventDao(): InternalLearningEventDao
+
+    internal abstract fun internalLearningStatsDao(): InternalLearningStatsDao
 
     companion object {
         val MIGRATION_1_2: Migration =
