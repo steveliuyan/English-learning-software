@@ -310,7 +310,8 @@ class ReadingAccessViewModel @Inject constructor(
         _uiState.value = current.copy(feed = state)
     }
 
-    private fun today(): LocalDate = LocalDate.ofInstant(clock.instant(), clock.zoneId())
+    // 不用 LocalDate.ofInstant：那是 API 34+ 的方法，Android 13 真机直接 NoSuchMethodError。
+    private fun today(): LocalDate = clock.instant().atZone(clock.zoneId()).toLocalDate()
 
     private suspend fun planOf(profileId: String): TodayPlan? =
         (plans.find(profileId, today()) as? TodayPlanResult.Ready)?.plan

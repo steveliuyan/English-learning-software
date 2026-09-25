@@ -275,6 +275,40 @@ class GenerateArticleUseCaseTest {
     }
 
     @Test
+    fun selectsTheFirstProfileWithAKey_regardlessOfTheLearningProfileId() = runTest {
+        // AI 配置是设备级的：profileId 是配置自己的主键，与学习 profileId 无关。
+        // 生成用第一套存有 Key 的配置；这里两套配置的 id 都不是学习 profileId "p1"。
+        val first = defaultProfile(endpoint = "https://nokey.test/v1").copy(
+            profileId = "device-a", secretReference = SecretReference("ai-profile-device-a"),
+        )
+        val second = defaultProfile().copy(
+            profileId = "device-b", secretReference = SecretReference("ai-profile-device-b"),
+        )
+        val secretStore = FakeSecretStore().apply { put("ai-profile-device-b", TEST_KEY) }
+        val harness = Harness(profiles = listOf(first, second), secretStore = secretStore)
+        harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
+
+        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+
+        assertTrue(result is GenerateArticleResult.Generated, "must fall through to the keyed profile, got $result")
+        assertEquals(1, harness.transport.callCount)
+        // 落库文章的来源摘要里是第二套配置的模型名与参数，不是学习 profileId。
+        val source = harness.repository.stored.single().source as ArticleSource.AiGenerated
+        assertEquals("gpt-x", source.modelName)
+    }
+
+    @Test
+    fun reportsNoKeyWhenEveryDeviceProfileLacksAKey() = runTest {
+        val first = defaultProfile().copy(profileId = "device-a", secretReference = SecretReference("ai-profile-device-a"))
+        val harness = Harness(profiles = listOf(first), secretStore = FakeSecretStore())
+
+        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+
+        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoKey), result)
+        assertEquals(0, harness.transport.callCount)
+    }
+
+    @Test
     fun maps401ToUnauthorizedAndStoresNothing() = runTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(401, "{\"error\":\"denied\"}"))

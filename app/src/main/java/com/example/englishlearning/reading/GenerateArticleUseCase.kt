@@ -70,14 +70,27 @@ class GenerateArticleUseCase(
                 ?.let { return GenerateArticleResult.Reused(it) }
         }
 
-        val profile = profiles.find(request.profileId).getOrElse { return GenerateArticleResult.NotConfigured(NotConfiguredReason.ProfileUnreadable) }
-            ?: return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoProfile)
-
-        val key = secrets.loadKey(profile).getOrElse { return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoKey) }
-        if (key.isEmpty()) {
-            key.fill('\u0000')
-            return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoKey)
+        // AI 配置是设备级的（AiProfile.profileId 是配置自己的主键，与学习 profileId 无关）。
+        // V1 默认策略：按保存顺序取第一套存有 Key 的配置；「默认 Profile 选择」（F2-02 残留）
+        // 落地后换成用户指定的一套——领域模型不用动。
+        val deviceProfiles = profiles.list().getOrElse {
+            return GenerateArticleResult.NotConfigured(NotConfiguredReason.ProfileUnreadable)
         }
+        if (deviceProfiles.isEmpty()) {
+            return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoProfile)
+        }
+        var selectedProfile: AiProfile? = null
+        var selectedKey: CharArray? = null
+        for (candidate in deviceProfiles) {
+            val candidateKey = secrets.loadKey(candidate).getOrNull()
+            if (candidateKey == null || candidateKey.isEmpty()) continue
+            selectedProfile = candidate
+            selectedKey = candidateKey
+            break
+        }
+        val profile = selectedProfile
+            ?: return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoKey)
+        val key = checkNotNull(selectedKey)
 
         try {
             // 出站确认在任何字节发出去之前。Endpoint 不合法时连「要确认哪个域名」都答不出。

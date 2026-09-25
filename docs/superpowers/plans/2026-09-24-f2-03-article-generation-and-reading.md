@@ -1178,7 +1178,7 @@ git commit -m "feat(reading): add generation entry, outbound confirmation and fa
 **Interfaces:**
 - Produces: `AiHttpTransport`、`GenerateArticleUseCase`、`ArticleIdFactory`、`ArticleReadingViewModel` 的 Hilt provider
 
-- [ ] **Step 1: 加 `INTERNET` 权限**
+- [x] **Step 1: 加 `INTERNET` 权限**
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
@@ -1187,22 +1187,22 @@ git commit -m "feat(reading): add generation entry, outbound confirmation and fa
 > 这是本应用**第一次**申请网络权限。它必须与「出站确认」同时在位：权限让请求成为可能，确认框让用户知情。
 > 不允许顺手加 `ACCESS_NETWORK_STATE` 等本轮用不到的权限。
 
-- [ ] **Step 2: 补 Hilt provider 并核对接入点**
+- [x] **Step 2: 补 Hilt provider 并核对接入点**
 
 在 `AppModule` 加：`AiHttpTransport`（`UrlConnectionAiHttpTransport(ioDispatcher)`）、`ArticleIdFactory.Random`、`GenerateArticleUseCase`、`ArticleReadingViewModel` 所需的仓储注入。
 
 **「类存在」不等于「能力存在」**（F2-02 的教训）：逐个核对 provider、`MainActivity` 的 `hiltViewModel` 收集、`AppScreen` 的渲染分支三处都在位，再进入验证。
 
-- [ ] **Step 3: 全量测试**
+- [x] **Step 3: 全量测试**
 
 Run: JVM 全量 + 真机全量 `am instrument`。
 Expected: 全绿。记录精确计数与基线差。
 
-- [ ] **Step 4: 请用户在手机上录入真实密钥**
+- [x] **Step 4: 请用户在手机上录入真实密钥**
 
 **这一步必须由用户完成**（本轮已确认的验证方式）。给出精确路径：设置 → AI 服务与密钥 → 新增或编辑配置 → 填入真实 Endpoint / 模型 / 密钥 → 保存。**不要让用户把密钥发到聊天里**。
 
-- [ ] **Step 5: 真机端到端走查**
+- [x] **Step 5: 真机端到端走查**
 
 按既有方式取证（`adb install -r -t` + 走查脚本，**禁用 `connectedDebugAndroidTest`**）：
 
@@ -1217,7 +1217,7 @@ Expected: 全绿。记录精确计数与基线差。
 
 数据完整性按既有约定做**三文件 MD5 四时点比对**（db / `-wal` / `-shm`，必须 `MSYS_NO_PATHCONV=1`）。注意本轮与以往不同：**成功生成会真实写入文章行**，所以 MD5 **预期会变**——必须如实说明哪一次变化是生成导致的正常写入，而不是假装一致。首次写库前先取基线。
 
-- [ ] **Step 6: 写决策记录与验收文档**
+- [x] **Step 6: 写决策记录与验收文档**
 
 `docs/decisions/2026-09-24-article-generation-and-display.md` 四组「候选方案 vs 决定」：
 
@@ -1228,7 +1228,7 @@ Expected: 全绿。记录精确计数与基线差。
 
 `docs/verification/f2-03-04/README.md` 逐条对照 AC2-01~AC2-06，写清：精确计数、设备、APK md5、三文件 MD5 各时点（含说明哪次变化来自真实生成）、哪些条目是**契约级**验证（未真机触达）、以及所有已知限制。**不要抄当前 HEAD**。
 
-- [ ] **Step 7: 提交并推送**
+- [x] **Step 7: 提交并推送**
 
 ```bash
 git add app/src/main/AndroidManifest.xml app/src/main/java/com/example/englishlearning/di docs

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 本应用第一次申请网络权限（F2-03）。它必须与「出站确认」同时在位：
+         权限让请求成为可能，确认框让用户知情。不要顺手加其他网络类权限。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".EnglishLearningApplication"
         android:allowBackup="false"

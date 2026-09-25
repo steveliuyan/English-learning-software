@@ -3,10 +3,12 @@ package com.example.englishlearning.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.reading.FeedItem
@@ -160,6 +162,17 @@ class ReadingAccessScreenTest {
         composeRule.onNodeWithTag("feed_source").assertExists()
         composeRule.onNodeWithText("VOA Learning English", substring = true).assertExists()
         composeRule.onNodeWithTag("feed_item_0").assertExists().assertHasClickAction()
+    }
+
+    @Test
+    fun readyStateHistoryEntryIsReachableByScrolling() {
+        // 真机走查发现：Ready 态内容高于屏幕后，根 Column 没有 verticalScroll，
+        // 历史入口被折叠在折叠线以下且无法滚动到——在这台设备上不可达。
+        // 本测试要求根容器可滚动，历史入口必须能滚到并保持可点击。
+        composeRule.setContent { readyScreen(todayArticle = todayArticle()) }
+        composeRule.onNodeWithTag("reading_access_screen")
+            .performScrollToNode(hasTestTag("reading_history_entry"))
+        composeRule.onNodeWithTag("reading_history_entry").assertExists().assertHasClickAction()
     }
 
     @Composable
