@@ -42,6 +42,10 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.englishlearning.language.domain.PronunciationProvider
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -63,6 +67,7 @@ import com.example.englishlearning.export.WorksheetShareLauncher
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
+import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintLight
 import com.example.englishlearning.ui.theme.AppleMintMiddle
@@ -89,6 +94,7 @@ fun AppScreen(
     articleReadingViewModel: ArticleReadingViewModel? = null,
     aiProfileViewModel: AiProfileSettingsViewModel? = null,
     checkInViewModel: CheckInViewModel? = null,
+    pronunciationProvider: PronunciationProvider? = null,
 ) {
     var name by remember { mutableStateOf("") }
     when (val state = viewModel.uiState.collectAsState().value) {
@@ -211,6 +217,7 @@ fun AppScreen(
                 )
             } else if (showLearning) {
                 val cardState by wordCardViewModel.uiState.collectAsState()
+                val pronunciationScope = rememberCoroutineScope()
                 val detailCard by wordCardViewModel.detailCard.collectAsState()
                 // The detail page is an overlay inside the learning branch: it leaves the
                 // showLearning state machine untouched, and returning from it (clearDetail) drops
@@ -226,6 +233,9 @@ fun AppScreen(
                         CardDetailScreen(
                             card = detailCard!!,
                             onBack = wordCardViewModel::clearDetail,
+                            onSpeak = {
+                                pronunciationScope.launch { pronunciationProvider?.speak(detailCard!!.lemma) }
+                            },
                         )
                     }
                 }
@@ -342,6 +352,7 @@ fun AppScreen(
                 )
             } else if (readingTarget != null || historyArticle != null) {
                 val articleState = articleReadingViewModel?.uiState?.collectAsState()?.value
+                val pronunciationScope = rememberCoroutineScope()
                 val fromHistory = readingTarget == null
                 Box(Modifier.fillMaxSize()) {
                     ArticleReadingScreen(
@@ -358,8 +369,12 @@ fun AppScreen(
                         onCompleteReading = { articleReadingViewModel?.completeReading() },
                     )
                     // 点词的详情是阅读页之上的覆盖层，不动 readingTarget 的状态机。
-                    selectedArticleCard?.let { card ->
-                        CardDetailScreen(card = card, onBack = { selectedArticleCard = null })
+                        selectedArticleCard?.let { card ->
+                        CardDetailScreen(
+                            card = card,
+                            onBack = { selectedArticleCard = null },
+                            onSpeak = { pronunciationScope.launch { pronunciationProvider?.speak(card.lemma) } },
+                        )
                     }
                 }
             } else {

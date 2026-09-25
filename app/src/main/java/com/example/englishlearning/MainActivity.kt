@@ -15,9 +15,12 @@ import com.example.englishlearning.ui.TodayPlanViewModel
 import com.example.englishlearning.ui.WordCardViewModel
 import com.example.englishlearning.ui.WorksheetViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import com.example.englishlearning.language.domain.PronunciationProvider
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var pronunciationProvider: PronunciationProvider
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -32,6 +35,7 @@ class MainActivity : ComponentActivity() {
                 articleReadingViewModel = hiltViewModel<ArticleReadingViewModel>(),
                 aiProfileViewModel = hiltViewModel<AiProfileSettingsViewModel>(),
                 checkInViewModel = hiltViewModel<CheckInViewModel>(),
+                pronunciationProvider = pronunciationProvider,
             )
         }
     }
