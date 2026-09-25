@@ -96,6 +96,7 @@ fun AppScreen(
     checkInViewModel: CheckInViewModel? = null,
     pronunciationProvider: PronunciationProvider? = null,
 ) {
+    val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
     when (val state = viewModel.uiState.collectAsState().value) {
         AppUiState.Loading -> BrandLaunchSurface()
