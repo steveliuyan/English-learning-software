@@ -33,8 +33,8 @@ class CheckInViewModel @Inject constructor(
     val uiState: StateFlow<CheckInUiState> = _uiState
 
     fun load(profileId: String) {
+        _uiState.value = CheckInUiState.Loading
         viewModelScope.launch {
-            _uiState.value = CheckInUiState.Loading
             val today = clock.instant().atZone(clock.zoneId()).toLocalDate()
             val month = YearMonth.from(today)
             val from = month.atDay(1)
@@ -51,8 +51,7 @@ class CheckInViewModel @Inject constructor(
                 val weekStats = (0..6).map { stats(weekStart.plusDays(it.toLong())) }
                 val todayStats = stats(today)
                 val completed = todayStats.reviewedWordCount > 0 ||
-                    todayStats.completedReadingCount > 0 ||
-                    (todayStats.targetTaskCount > 0 && todayStats.completedTaskCount >= todayStats.targetTaskCount)
+                    todayStats.completedReadingCount > 0
                 _uiState.value = CheckInUiState.Ready(todayStats, weekStats, monthStats, completed)
             }
         }

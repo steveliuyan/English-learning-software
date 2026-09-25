@@ -37,6 +37,26 @@ class CheckInViewModelTest {
     }
 
     @Test
+    fun `sparse month is padded with zero stats and target alone is not completed`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val sparse = listOf(
+            DailyLearningStats(date, 0, 0, 1, 3),
+            DailyLearningStats(date.minusDays(2), 1, 0, 0, 0),
+        )
+        val vm = CheckInViewModel(FakeStats(Result.success(sparse)), clock)
+        vm.load("p"); advanceUntilIdle()
+        val state = vm.uiState.value as CheckInUiState.Ready
+        assertEquals(30, state.month.size)
+        assertEquals(LocalDate.of(2026, 9, 1), state.month.first().localDate)
+        assertEquals(0, state.month.first().reviewedWordCount)
+        assertEquals(0, state.month.first().completedReadingCount)
+        assertEquals(0, state.month.first().completedTaskCount)
+        assertEquals(0, state.month.first().targetTaskCount)
+        assertEquals(false, state.completed)
+        Dispatchers.resetMain()
+    }
+
+    @Test
     fun `failure is unavailable and reload starts loading`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val repository = FakeStats(Result.failure(IllegalStateException()))
