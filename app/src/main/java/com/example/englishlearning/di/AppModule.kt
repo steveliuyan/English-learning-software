@@ -34,6 +34,8 @@ import com.example.englishlearning.language.domain.MiMoPronunciationProviderFact
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationRouter
 import com.example.englishlearning.language.infrastructure.AndroidTextToSpeechProvider
+import com.example.englishlearning.language.infrastructure.AndroidAudioPlayer
+import com.example.englishlearning.language.infrastructure.AudioPlayer
 import com.example.englishlearning.language.infrastructure.MiMoPronunciationProvider
 import com.example.englishlearning.learning.RoomTodayPlanRepository
 import com.example.englishlearning.learning.LearningStatsRepository
@@ -103,12 +105,16 @@ object AppModule {
     fun provideSystemPronunciationProvider(@ApplicationContext context: Context): AndroidTextToSpeechProvider = AndroidTextToSpeechProvider(context)
 
     @Provides @Singleton
+    fun provideAudioPlayer(@ApplicationContext context: Context): AudioPlayer = AndroidAudioPlayer(context)
+
+    @Provides @Singleton
     fun provideMiMoPronunciationProviderFactory(
         profiles: AiProfileRepository,
         secrets: AiProfileSecretUseCase,
         transport: AudioHttpTransport,
+        player: AudioPlayer,
     ): MiMoPronunciationProviderFactory = MiMoPronunciationProviderFactory { profileId ->
-        MiMoPronunciationProvider(profiles, secrets, transport, profileId)
+        MiMoPronunciationProvider(profiles, secrets, transport, player, profileId)
     }
 
     @Provides @Singleton

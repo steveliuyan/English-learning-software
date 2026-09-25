@@ -15,6 +15,7 @@ class MiMoPronunciationProvider(
     private val profiles: AiProfileRepository,
     private val secrets: AiProfileSecretUseCase,
     private val transport: AudioHttpTransport,
+    private val player: AudioPlayer,
     private val profileId: String = DEFAULT_PROFILE_ID,
 ) : PronunciationProvider {
     override fun capabilities(): Set<PronunciationCapability> = setOf(PronunciationCapability.RemoteAudio)
@@ -33,8 +34,14 @@ class MiMoPronunciationProvider(
                 method = request.method,
                 body = request.body.toByteArray(),
             )
-            when (transport.send(audioRequest)) {
-                is AudioHttpResult.Success -> PronunciationResult.Played
+            when (val response = transport.send(audioRequest)) {
+                is AudioHttpResult.Success -> try {
+                    if (response.body.isEmpty()) PronunciationResult.Failed()
+                    else if (player.play(response.body, RESPONSE_FORMAT) is AudioPlaybackResult.Played) PronunciationResult.Played
+                    else PronunciationResult.Failed()
+                } finally {
+                    response.body.fill(0)
+                }
                 else -> PronunciationResult.Failed()
             }
         } catch (cancelled: CancellationException) {

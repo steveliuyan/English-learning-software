@@ -28,13 +28,16 @@ class MiMoPronunciationProviderTest {
         secretReference = SecretReference("ai-profile-mimo"), advancedParameters = AiAdvancedParameters(timeoutSeconds = 12),
     )
 
-    @Test fun `successful speech sends request and returns played`() = runTest {
-        val transport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1)))
+    @Test fun `successful speech plays audio and returns played`() = runTest {
+        val transport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1, 2)))
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
         val key = "secret".toCharArray()
         val store = FakeSecretStore(key)
-        val provider = provider(transport, store)
+        val provider = provider(transport, store, player)
 
         assertIs<PronunciationResult.Played>(provider.speak("hello"))
+        assertContentEquals(byteArrayOf(1, 2), player.bytes)
+        assertEquals("mp3", player.format)
         assertEquals("https://api.test/v1/audio/speech", transport.request!!.url)
         assertEquals("POST", transport.request!!.method)
         assertEquals("application/json", transport.request!!.headers["Content-Type"])
@@ -42,6 +45,20 @@ class MiMoPronunciationProviderTest {
         assertEquals(12, transport.request!!.timeoutSeconds)
         assertTrue(transport.request!!.body.decodeToString().contains("\"input\":\"hello\""))
         assertTrue(store.lastRead!!.all { it == '\u0000' })
+    }
+
+    @Test fun `empty audio returns failed without playing`() = runTest {
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
+        val result = provider(RecordingTransport(AudioHttpResult.Success(byteArrayOf())), player = player).speak("hello")
+        assertIs<PronunciationResult.Failed>(result)
+        assertEquals(null, player.bytes)
+    }
+
+    @Test fun `playback failure returns failed`() = runTest {
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Failed)
+        val result = provider(player = player).speak("hello")
+        assertIs<PronunciationResult.Failed>(result)
+        assertContentEquals(byteArrayOf(1), player.bytes)
     }
 
     @Test fun `profile id is injectable`() = runTest {
@@ -102,14 +119,26 @@ class MiMoPronunciationProviderTest {
     private fun provider(
         transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1))),
         secretStore: SecretStore = FakeSecretStore("secret".toCharArray()),
+        player: AudioPlayer = RecordingAudioPlayer(AudioPlaybackResult.Played),
         profile: AiProfile? = this.profile,
         profileId: String = profile?.profileId ?: "mimo",
     ) = MiMoPronunciationProvider(
         profiles = FakeProfileRepository(profile),
         secrets = AiProfileSecretUseCase(secretStore),
         transport = transport,
+        player = player,
         profileId = profileId,
     )
+
+    private class RecordingAudioPlayer(private val outcome: AudioPlaybackResult) : AudioPlayer {
+        var bytes: ByteArray? = null
+        var format: String? = null
+        override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult {
+            this.bytes = bytes.copyOf()
+            this.format = format
+            return outcome
+        }
+    }
 
     private open class FakeProfileRepository(private val profile: AiProfile?) : AiProfileRepository {
         override suspend fun list() = Result.success(listOfNotNull(profile))
@@ -141,6 +170,7 @@ class MiMoPronunciationProviderTest {
 
     private class RecordingTransport(private val outcome: AudioHttpResult) : AudioHttpTransport {
         var request: AudioHttpRequest? = null
+        val outcomeBody: ByteArray get() = (outcome as? AudioHttpResult.Success)?.body ?: byteArrayOf()
         override suspend fun send(request: AudioHttpRequest): AudioHttpResult { this.request = request; return outcome }
     }
 }
