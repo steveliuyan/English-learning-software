@@ -23,7 +23,7 @@ class CheckInScreenTest {
         val stats = { date: LocalDate -> DailyLearningStats(date, 3, 1, 2, 4) }
         composeRule.setContent { CheckInScreen(CheckInUiState.Ready(stats(today), (0..6).map { stats(today.minusDays(it.toLong())) }, (1..today.lengthOfMonth()).map { stats(today.withDayOfMonth(it)) }, true), onBack = {}) }
         composeRule.onNodeWithTag("check_in_screen").assertExists()
-        composeRule.onNodeWithTag("check_in_today").assertTextContains("完成任务")
+        composeRule.onNodeWithTag("check_in_today", useUnmergedTree = true).assertTextContains("完成任务")
         composeRule.onNodeWithTag("check_in_week_chart").assertExists()
         (0..6).forEach { index -> composeRule.onNodeWithTag("check_in_week_bar_$index").assertExists() }
         composeRule.onNodeWithTag("check_in_completion_ratio").assertExists()
@@ -53,6 +53,6 @@ class CheckInScreenTest {
         val zero = DailyLearningStats(date, 0, 0, 0, 0)
         composeRule.setContent { CheckInScreen(CheckInUiState.Ready(zero, List(7) { zero }, listOf(zero), false), onBack = {}) }
         composeRule.onNodeWithTag("check_in_completion_percent").assertTextContains("0%")
-        composeRule.onNodeWithTag("check_in_completion_ratio").assertTextContains("目标 0 项，已完成 0 项")
+        composeRule.onNodeWithTag("check_in_completion_ratio", useUnmergedTree = true).assertTextContains("目标 0 项，已完成 0 项")
     }
 }
