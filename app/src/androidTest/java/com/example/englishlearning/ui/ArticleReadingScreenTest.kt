@@ -344,6 +344,45 @@ class ArticleReadingScreenTest {
     }
 
     @Test
+    fun completeReadingButtonInvokesCallback() {
+        var completed = 0
+        composeRule.setContent {
+            ArticleReadingScreen(
+                state(article()),
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+                onCompleteReading = { completed++ },
+            )
+        }
+
+        composeRule.onNodeWithTag("article_complete_reading").performClick()
+        composeRule.waitForIdle()
+
+        org.junit.Assert.assertEquals(1, completed)
+    }
+
+    @Test
+    fun completedReadingButtonIsDisabled() {
+        composeRule.setContent {
+            ArticleReadingScreen(
+                state(article()).copy(completed = true),
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("article_complete_reading").assertIsNotEnabled()
+    }
+
+    @Test
     fun marksOffRendersNoHighlightsSoTappingTheTextOpensNothing() {
         val opened = mutableListOf<WordCard>()
         val singleWord = article(englishText = "apple", coveredLemmas = listOf("apple"))
