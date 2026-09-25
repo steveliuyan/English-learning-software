@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -84,10 +87,10 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("本周学习", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
             Row(Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                state.week.take(7).forEach { day ->
+                state.week.take(7).forEachIndexed { index, day ->
                     val ratio = if (day.targetTaskCount > 0) (day.completedTaskCount.toFloat() / day.targetTaskCount).coerceIn(0f, 1f) else 0f
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) MintPrimary else MintTint).semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
+                        Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) MintPrimary else MintTint).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
                         Text(day.localDate.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA), color = MintTextMuted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -98,7 +101,16 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
     Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_completion_ratio")) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("今日完成度", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Text("${(ratio * 100).toInt()}%", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MintPrimary)
+            Box(Modifier.size(132.dp).align(Alignment.CenterHorizontally), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val strokeWidth = 12.dp.toPx()
+                    drawArc(color = MintTint, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
+                    if (ratio > 0f) {
+                        drawArc(color = MintPrimary, startAngle = -90f, sweepAngle = ratio * 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
+                    }
+                }
+                Text("${(ratio * 100).toInt()}%", modifier = Modifier.testTag("check_in_completion_percent"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MintPrimary)
+            }
             Text("目标 ${today.targetTaskCount} 项，已完成 ${today.completedTaskCount} 项", color = MintTextMuted)
         }
     }
