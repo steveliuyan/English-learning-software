@@ -3,12 +3,17 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -17,15 +22,23 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.language.domain.PronunciationEngine
+import com.example.englishlearning.ui.components.glass.pressableScale
+import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.theme.DomainAccent
+import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -166,12 +179,16 @@ fun SettingsScreen(
                 subtitle = aiProfileSubtitle ?: "添加多套 OpenAI 兼容服务，管理 Endpoint、模型与密钥",
                 tag = "settings_open_ai_profiles",
                 onClick = onOpenAiProfiles,
+                badge = "AI",
+                accent = DomainColors.Settings,
             )
             SettingsActionRow(
                 title = "语音朗读",
                 subtitle = "当前供应商：${speechEngineStatuses.currentProvider}",
                 tag = "settings_open_speech",
                 onClick = onOpenSpeechSettings,
+                badge = "♪",
+                accent = DomainColors.AiSpeech,
             )
         }
 
@@ -210,20 +227,59 @@ private fun SettingsGroup(title: String, tag: String, content: @Composable () ->
     }
 }
 
+/**
+ * 可点入口行。传 `badge` + `accent` 时为域色化形态：行首 32dp 圆角域色方块（白色符号）、
+ * 文字层级用 AppType、按压缩放反馈；不传时保持旧版视觉（其他分组，批 2/3 再改）。
+ */
 @Composable
-private fun SettingsActionRow(title: String, subtitle: String, tag: String, onClick: () -> Unit) {
+private fun SettingsActionRow(
+    title: String,
+    subtitle: String,
+    tag: String,
+    onClick: () -> Unit,
+    badge: String? = null,
+    accent: DomainAccent? = null,
+) {
+    val domainStyled = badge != null && accent != null
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .testTag(tag)
-            .clickable(onClick = onClick)
+            .then(
+                if (domainStyled) {
+                    Modifier
+                        .pressableScale(interaction)
+                        .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                } else {
+                    Modifier.clickable(onClick = onClick)
+                },
+            )
             .semantics { contentDescription = title },
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (domainStyled) {
+            Box(
+                modifier = Modifier.size(32.dp).background(accent.base, AppShape.Button),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(badge, style = AppType.Label, color = Color.White, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.width(12.dp))
+        }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
+            Text(
+                title,
+                style = if (domainStyled) AppType.Title else MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MintPrimaryDark,
+            )
+            Text(
+                subtitle,
+                style = if (domainStyled) AppType.Footnote else MaterialTheme.typography.bodySmall,
+                color = MintTextMuted,
+            )
         }
         Text("›", style = MaterialTheme.typography.titleLarge, color = MintPrimary)
     }
