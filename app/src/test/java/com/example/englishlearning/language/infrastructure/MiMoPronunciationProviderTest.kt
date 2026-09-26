@@ -70,7 +70,7 @@ class MiMoPronunciationProviderTest {
     @Test fun `blank text does not access dependencies`() = runTest {
         val profiles = CountingProfileRepository(profile)
         val store = FakeSecretStore("secret".toCharArray())
-        val result = MiMoPronunciationProvider(profiles, AiProfileSecretUseCase(store), RecordingTransport(AudioHttpResult.Success(byteArrayOf())), "mimo").speak("   ")
+        val result = MiMoPronunciationProvider(profiles, AiProfileSecretUseCase(store), RecordingTransport(AudioHttpResult.Success(byteArrayOf())), RecordingAudioPlayer(AudioPlaybackResult.Played), "mimo").speak("   ")
         assertIs<PronunciationResult.Unavailable>(result)
         assertEquals(0, profiles.findCalls)
         assertEquals(0, store.readCalls)

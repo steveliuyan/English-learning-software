@@ -16,6 +16,10 @@ fun interface MiMoPronunciationProviderFactory {
     fun create(profileId: String): PronunciationProvider
 }
 
+fun interface OpenAiPronunciationProviderFactory {
+    fun create(profileId: String): PronunciationProvider
+}
+
 class PronunciationRouter(
     private val systemProvider: PronunciationProvider,
     private val miMoFactory: MiMoPronunciationProviderFactory,

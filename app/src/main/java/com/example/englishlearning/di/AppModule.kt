@@ -33,12 +33,14 @@ import com.example.englishlearning.learning.domain.FsrsReviewScheduler
 import com.example.englishlearning.language.RoomSpeechPreferenceRepository
 import com.example.englishlearning.language.SpeechPreferenceRepository
 import com.example.englishlearning.language.domain.MiMoPronunciationProviderFactory
+import com.example.englishlearning.language.domain.OpenAiPronunciationProviderFactory
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationRouter
 import com.example.englishlearning.language.infrastructure.AndroidTextToSpeechProvider
 import com.example.englishlearning.language.infrastructure.AndroidAudioPlayer
 import com.example.englishlearning.language.infrastructure.AudioPlayer
 import com.example.englishlearning.language.infrastructure.MiMoPronunciationProvider
+import com.example.englishlearning.language.infrastructure.OpenAiCompatiblePronunciationProvider
 import com.example.englishlearning.learning.RoomTodayPlanRepository
 import com.example.englishlearning.learning.LearningStatsRepository
 import com.example.englishlearning.learning.RoomLearningStatsRepository
@@ -117,6 +119,24 @@ object AppModule {
         player: AudioPlayer,
     ): MiMoPronunciationProviderFactory = MiMoPronunciationProviderFactory { profileId ->
         MiMoPronunciationProvider(profiles, secrets, transport, player, profileId)
+    }
+
+    @Provides @Singleton
+    fun provideOpenAiPronunciationProviderFactory(
+        profiles: AiProfileRepository,
+        secrets: AiProfileSecretUseCase,
+        transport: AudioHttpTransport,
+        player: AudioPlayer,
+    ): OpenAiPronunciationProviderFactory = OpenAiPronunciationProviderFactory { profileId ->
+        OpenAiCompatiblePronunciationProvider(
+            profileId = profileId,
+            voice = "alloy",
+            responseFormat = "mp3",
+            profiles = profiles,
+            secrets = secrets,
+            transport = transport,
+            player = player,
+        )
     }
 
     @Provides @Singleton
