@@ -63,15 +63,27 @@ class SpeechSettingsScreenTest {
         composeRule.onNodeWithTag("speech_pending_azure").assertDoesNotExist()
     }
 
+    @Test fun openAiEngineRowNoLongerExists() {
+        composeRule.setContent {
+            SpeechSettingsScreen(
+                state = SpeechSettingsUiState(selectedEngine = PronunciationEngine.MiMo),
+                onSelect = { _, _ -> }, onOpenAiProfiles = {}, onAddMiMoPreset = {}, onPreview = {}, onBack = {},
+            )
+        }
+        composeRule.onNodeWithContentDescription("选择 OpenAI TTS").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("选择 系统 TTS").assertExists()
+        composeRule.onNodeWithContentDescription("选择 小米 MiMo").assertExists()
+    }
+
     @Test fun candidatesAreCollapsedUntilTheUserExpandsThem() {
         composeRule.setContent {
             SpeechSettingsScreen(
                 state = SpeechSettingsUiState(
-                    selectedEngine = PronunciationEngine.OpenAi,
-                    openAiProfileId = "bound",
+                    selectedEngine = PronunciationEngine.MiMo,
+                    miMoProfileId = "bound",
                     candidates = listOf(
-                        SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.Available),
-                        SpeechProfileCandidate("other", "新配置", SpeechProfileStatus.Available),
+                        SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.Available, AiProviderKind.XIAOMI_MIMO),
+                        SpeechProfileCandidate("other", "新配置", SpeechProfileStatus.Available, AiProviderKind.XIAOMI_MIMO),
                     ),
                 ),
                 onSelect = { _, _ -> }, onOpenAiProfiles = {}, onAddMiMoPreset = {}, onPreview = {}, onBack = {},
@@ -79,7 +91,7 @@ class SpeechSettingsScreenTest {
         }
 
         // 引擎行直接显示绑定配置名（不展开也能看到）；候选列表默认收起。
-        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("原配置 · 可用")
+        composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("原配置 · 可用")
         composeRule.onNodeWithTag("speech_profile_bound").assertDoesNotExist()
         composeRule.onNodeWithTag("speech_open_ai_profiles").assertDoesNotExist()
 
@@ -94,10 +106,10 @@ class SpeechSettingsScreenTest {
         composeRule.setContent {
             SpeechSettingsScreen(
                 state = SpeechSettingsUiState(
-                    selectedEngine = PronunciationEngine.OpenAi,
+                    selectedEngine = PronunciationEngine.MiMo,
                     candidates = listOf(
-                        SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.Available),
-                        SpeechProfileCandidate("other", "新配置", SpeechProfileStatus.Available),
+                        SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.Available, AiProviderKind.XIAOMI_MIMO),
+                        SpeechProfileCandidate("other", "新配置", SpeechProfileStatus.Available, AiProviderKind.XIAOMI_MIMO),
                     ),
                 ),
                 onSelect = { engine, profileId -> selected = engine to profileId },
@@ -109,7 +121,7 @@ class SpeechSettingsScreenTest {
         composeRule.onNodeWithContentDescription("选择 新配置").performClick()
         composeRule.waitForIdle()
 
-        assertEquals(PronunciationEngine.OpenAi to "other", selected)
+        assertEquals(PronunciationEngine.MiMo to "other", selected)
         // 选中即收起：列表不再常驻。
         composeRule.onNodeWithTag("speech_profile_other").assertDoesNotExist()
     }
@@ -118,11 +130,11 @@ class SpeechSettingsScreenTest {
         composeRule.setContent {
             SpeechSettingsScreen(
                 state = SpeechSettingsUiState(
-                    selectedEngine = PronunciationEngine.OpenAi,
-                    openAiProfileId = "bound",
+                    selectedEngine = PronunciationEngine.MiMo,
+                    miMoProfileId = "bound",
                     candidates = listOf(
-                        SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.Available),
-                        SpeechProfileCandidate("other", "新配置", SpeechProfileStatus.Available),
+                        SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.Available, AiProviderKind.XIAOMI_MIMO),
+                        SpeechProfileCandidate("other", "新配置", SpeechProfileStatus.Available, AiProviderKind.XIAOMI_MIMO),
                     ),
                     message = "本机存储暂时不可用，改动没有保存。",
                 ),
@@ -151,24 +163,24 @@ class SpeechSettingsScreenTest {
         composeRule.setContent {
             SpeechSettingsScreen(
                 state = SpeechSettingsUiState(
-                    selectedEngine = PronunciationEngine.OpenAi,
-                    openAiProfileId = "bound",
-                    candidates = listOf(SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.MissingKey)),
+                    selectedEngine = PronunciationEngine.MiMo,
+                    miMoProfileId = "bound",
+                    candidates = listOf(SpeechProfileCandidate("bound", "原配置", SpeechProfileStatus.MissingKey, AiProviderKind.XIAOMI_MIMO)),
                 ),
                 onSelect = { _, _ -> }, onOpenAiProfiles = {}, onAddMiMoPreset = {}, onPreview = {}, onBack = {},
             )
         }
-        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("原配置 · 缺少密钥")
+        composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("原配置 · 缺少密钥")
     }
 
     @Test fun selectedEngineShowsInvalidBindingOnItsOwnRow() {
         composeRule.setContent {
             SpeechSettingsScreen(
-                state = SpeechSettingsUiState(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "removed"),
+                state = SpeechSettingsUiState(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "removed"),
                 onSelect = { _, _ -> }, onOpenAiProfiles = {}, onAddMiMoPreset = {}, onPreview = {}, onBack = {},
             )
         }
-        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("绑定失效")
+        composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("绑定失效")
     }
 
     @Test fun profileSelectionUsesRememberedStateAndReportsTheSelectedProfile() {
@@ -176,7 +188,10 @@ class SpeechSettingsScreenTest {
         composeRule.setContent {
             var engine by remember { mutableStateOf(PronunciationEngine.SystemTts) }
             SpeechSettingsScreen(
-                state = SpeechSettingsUiState(selectedEngine = engine, candidates = listOf(SpeechProfileCandidate("openai", "OpenAI", SpeechProfileStatus.Available))),
+                state = SpeechSettingsUiState(
+                    selectedEngine = engine,
+                    candidates = listOf(SpeechProfileCandidate("mimo", "MiMo 语音", SpeechProfileStatus.Available, AiProviderKind.XIAOMI_MIMO)),
+                ),
                 onSelect = { next, profile ->
                     engine = next
                     selected = next to profile
@@ -188,10 +203,10 @@ class SpeechSettingsScreenTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("选择 OpenAI TTS").performClick()
+        composeRule.onNodeWithContentDescription("选择 小米 MiMo").performClick()
         expandCandidates()
-        composeRule.onNodeWithContentDescription("选择 OpenAI").performClick()
-        assertEquals(PronunciationEngine.OpenAi to "openai", selected)
+        composeRule.onNodeWithContentDescription("选择 MiMo 语音").performClick()
+        assertEquals(PronunciationEngine.MiMo to "mimo", selected)
     }
 
     @Test fun mimoEngineWithoutCompatibleCandidateOffersOneTapPresetInsideTheExpandedList() {
@@ -245,18 +260,6 @@ class SpeechSettingsScreenTest {
         composeRule.onNodeWithTag("speech_add_mimo_preset").assertDoesNotExist()
         composeRule.onNodeWithTag("speech_profile_mimo-1").assertExists()
         composeRule.onNodeWithTag("speech_profile_openai").assertDoesNotExist()
-    }
-
-    @Test fun openAiEngineNeverOffersMimoPresetEntry() {
-        composeRule.setContent {
-            SpeechSettingsScreen(
-                state = SpeechSettingsUiState(selectedEngine = PronunciationEngine.OpenAi),
-                onSelect = { _, _ -> }, onOpenAiProfiles = {}, onAddMiMoPreset = {}, onPreview = {}, onBack = {},
-            )
-        }
-
-        expandCandidates()
-        composeRule.onNodeWithTag("speech_add_mimo_preset").assertDoesNotExist()
     }
 
     @Test fun previewCardSendsTheTypedTextToTheCallbackAndShowsFeedback() {

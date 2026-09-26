@@ -59,6 +59,24 @@ class SpeechSettingsViewModelTest {
             SpeechProfileCandidate::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
     }
 
+    /**
+     * OpenAI 引擎选项已从语音页移除：历史存储里选中 OpenAi 的用户在界面上按系统 TTS 呈现。
+     * 显示层回落不改写存储——偏好文件里仍保留 OpenAi，用户数据不被静默迁移。
+     */
+    @Test fun storedOpenAiSelectionFallsBackToSystemTtsForDisplay() = runTest(dispatcher) {
+        val preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "x"))
+        val viewModel = viewModel(preferences = preferences)
+
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals(PronunciationEngine.SystemTts, viewModel.state.value.selectedEngine)
+        // 存储不被改写：偏好仓库的值原样保留，也没有任何 save 调用。
+        assertEquals(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "x"), preferences.get().getOrThrow())
+        assertEquals(0, preferences.saved.size)
+        assertEquals("系统 TTS", viewModel.state.value.engineStatuses().currentProvider)
+    }
+
     @Test fun selectOpenAiSavesItsProfileIdAndKeepsMimoBinding() = runTest(dispatcher) {
         val preferences = FakePreferences(SpeechPreference(miMoProfileId = "mimo"))
         val viewModel = viewModel(profiles = RecordingProfiles(listOf(profile("openai", setOf(AiCapability.Speech)))), preferences = preferences)
@@ -74,18 +92,21 @@ class SpeechSettingsViewModelTest {
 
     @Test fun failedSaveRetainsThePreviousUiSelection() = runTest(dispatcher) {
         val preferences = FakePreferences(
-            SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "bound"),
+            SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "bound"),
             failSave = true,
         )
-        val viewModel = viewModel(profiles = RecordingProfiles(listOf(profile("bound", setOf(AiCapability.Speech)))), preferences = preferences)
+        val viewModel = viewModel(
+            profiles = RecordingProfiles(listOf(profile("bound", setOf(AiCapability.Speech), AiProviderKind.XIAOMI_MIMO))),
+            preferences = preferences,
+        )
         viewModel.load()
         advanceUntilIdle()
 
-        viewModel.select(PronunciationEngine.OpenAi, "new")
+        viewModel.select(PronunciationEngine.MiMo, "new")
         advanceUntilIdle()
 
-        assertEquals(PronunciationEngine.OpenAi, viewModel.state.value.selectedEngine)
-        assertEquals("bound", viewModel.state.value.openAiProfileId)
+        assertEquals(PronunciationEngine.MiMo, viewModel.state.value.selectedEngine)
+        assertEquals("bound", viewModel.state.value.miMoProfileId)
         assertTrue(viewModel.state.value.message != null)
     }
 
@@ -95,16 +116,17 @@ class SpeechSettingsViewModelTest {
                 profile("openai", setOf(AiCapability.Speech)),
                 profile("mimo", setOf(AiCapability.Speech), AiProviderKind.XIAOMI_MIMO),
             )),
-            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai")),
+            // OpenAI 引擎行已移除，「当前供应商 ·」前缀改在 MiMo 行上验证协议匹配。
+            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo")),
             secretStore = SpeechFakeSecretStore(setOf("openai", "mimo")),
         )
         viewModel.load()
         advanceUntilIdle()
 
-        assertEquals("OpenAI TTS", viewModel.state.value.engineStatuses().currentProvider)
-        assertEquals("当前供应商 · 已配置", viewModel.state.value.engineStatuses().openAi)
-        // MiMo 侧有 XIAOMI_MIMO 候选但没绑定 → 可选配置 · 未绑定。
-        assertEquals("可选配置 · 未绑定", viewModel.state.value.engineStatuses().miMo)
+        assertEquals("小米 MiMo", viewModel.state.value.engineStatuses().currentProvider)
+        assertEquals("当前供应商 · 已配置", viewModel.state.value.engineStatuses().miMo)
+        // openai 兼容候选未绑定且可用 → 可选配置 · 未绑定（协议匹配的候选才算数）。
+        assertEquals("可选配置 · 未绑定", viewModel.state.value.engineStatuses().openAi)
         assertEquals("未下载", viewModel.state.value.engineStatuses().zipVoice)
     }
 
@@ -140,24 +162,24 @@ class SpeechSettingsViewModelTest {
     @Test fun profileWithoutSpeechCapabilityDoesNotMarkProviderConfigured() = runTest(dispatcher) {
         val viewModel = viewModel(
             profiles = RecordingProfiles(listOf(profile("text-only", setOf(AiCapability.Text)))),
-            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "text-only")),
+            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "text-only")),
             secretStore = SpeechFakeSecretStore(setOf("text-only")),
         )
         viewModel.load()
         advanceUntilIdle()
 
-        assertEquals("当前供应商 · 绑定失效", viewModel.state.value.engineStatuses().openAi)
+        assertEquals("当前供应商 · 绑定失效", viewModel.state.value.engineStatuses().miMo)
     }
 
     @Test fun boundProfileWithoutKeyIsExplicitlyReportedMissingKey() = runTest(dispatcher) {
         val viewModel = viewModel(
-            profiles = RecordingProfiles(listOf(profile("openai", setOf(AiCapability.Speech)))),
-            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai")),
+            profiles = RecordingProfiles(listOf(profile("mimo", setOf(AiCapability.Speech), AiProviderKind.XIAOMI_MIMO))),
+            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo")),
         )
         viewModel.load()
         advanceUntilIdle()
 
-        assertEquals("当前供应商 · 缺少密钥", viewModel.state.value.engineStatuses().openAi)
+        assertEquals("当前供应商 · 缺少密钥", viewModel.state.value.engineStatuses().miMo)
     }
 
     @Test fun addMiMoPresetSavesTalkifyDefaultsAndBindsMiMoEngine() = runTest(dispatcher) {

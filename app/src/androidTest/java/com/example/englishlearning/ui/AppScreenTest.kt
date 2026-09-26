@@ -21,6 +21,7 @@ import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.core.time.FixedClockProvider
@@ -187,7 +188,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
-        composeRule.onNodeWithText("当前供应商：OpenAI TTS").assertExists()
+        composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
         // 新层级：一级设置页不再出现引擎状态行与「待接入」厂商占位行。
         composeRule.onNodeWithTag("settings_speech_openai").assertDoesNotExist()
         composeRule.onNodeWithTag("settings_speech_mimo").assertDoesNotExist()
@@ -209,13 +210,13 @@ class AppScreenTest {
         composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
         composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
-        fixture.keys += "openai"
+        fixture.keys += "mimo"
         composeRule.onNodeWithContentDescription("返回上一层").performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
         composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
-        composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
+        composeRule.onNodeWithTag("speech_profile_mimo").performScrollTo()
         composeRule.onNodeWithText("可用").assertExists()
-        composeRule.onNodeWithTag("speech_bound_profile_openai", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
         composeRule.onNodeWithTag("settings_screen").assertExists()
     }
@@ -227,7 +228,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
-        composeRule.onNodeWithText("当前供应商：OpenAI TTS").assertExists()
+        composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
         composeRule.onNodeWithTag("settings_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys.clear()
@@ -239,7 +240,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
         // 引擎行详情是「配置名 · 密钥状态」格式；Key 被删后必须立刻反映。
-        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
+        composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
     }
 
     @Test
@@ -250,7 +251,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
-        composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
+        composeRule.onNodeWithTag("speech_profile_mimo").performScrollTo()
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
@@ -258,13 +259,13 @@ class AppScreenTest {
         pressSystemBack()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
         composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
-        composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
-        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
-        composeRule.onNodeWithTag("speech_bound_profile_openai", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("speech_profile_mimo").performScrollTo()
+        composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
+        composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
         composeRule.onNodeWithTag("settings_screen").assertExists()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
-        composeRule.onNodeWithText("当前供应商：OpenAI TTS").assertExists()
+        composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
     }
 
     @Test
@@ -326,14 +327,17 @@ class AppScreenTest {
 
     private fun speechFixture(): SpeechFixture {
         val keys = mutableSetOf<String>()
+        // OpenAI 引擎选项已移除：fixture 改用 MiMo 引擎 + XIAOMI_MIMO 协议 Profile，
+        // 与真实存储路径（语音页只能选中系统 TTS / MiMo）保持一致。
         val profile = AiProfile(
-            profileId = "openai",
+            profileId = "mimo",
             displayName = "测试语音",
             websiteUrl = "https://example.com",
             endpoint = "https://api.example.com/v1",
             model = "tts-1",
             capabilities = setOf(AiCapability.Speech),
-            secretReference = AiProfileSecretUseCase.referenceFor("openai"),
+            secretReference = AiProfileSecretUseCase.referenceFor("mimo"),
+            providerKind = AiProviderKind.XIAOMI_MIMO,
         )
         val profiles = object : AiProfileRepository {
             override suspend fun list() = Result.success(listOf(profile))
@@ -348,7 +352,7 @@ class AppScreenTest {
             override fun has(reference: SecretReference) = Result.success(reference.alias.removePrefix("ai-profile-") in keys)
         })
         val preferences = object : SpeechPreferenceRepository {
-            override suspend fun get() = Result.success(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai"))
+            override suspend fun get() = Result.success(SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo"))
             override suspend fun save(preference: SpeechPreference) = Result.success(Unit)
         }
         return SpeechFixture(
@@ -364,7 +368,7 @@ class AppScreenTest {
             ),
             AiProfileSettingsViewModel(profiles, secrets, AiProfileIdFactory { "new-id" }),
             keys,
-        ).also { it.keys += "openai" }
+        ).also { it.keys += "mimo" }
     }
 
     @Composable

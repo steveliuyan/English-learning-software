@@ -67,14 +67,8 @@ fun SpeechSettingsScreen(
             detail = null,
             onSelect = onSelect,
         )
-        EngineRow(
-            name = "OpenAI TTS",
-            engine = PronunciationEngine.OpenAi,
-            selected = state.selectedEngine,
-            boundProfileId = state.openAiProfileId,
-            detail = detailFor(state, PronunciationEngine.OpenAi, statuses.openAi),
-            onSelect = onSelect,
-        )
+        // OpenAI 引擎行已移除；engineStatuses() 仍计算 openAi 字段供设置页摘要兼容，
+        // 但本页 UI 不再消费。
         EngineRow(
             name = "小米 MiMo",
             engine = PronunciationEngine.MiMo,

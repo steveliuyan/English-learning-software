@@ -156,7 +156,10 @@ class SpeechSettingsViewModel @Inject constructor(
         val preference = preferences.get().getOrDefault(SpeechPreference())
         val speechProfiles = profiles.list().getOrDefault(emptyList()).filter { AiCapability.Speech in it.capabilities }
         _state.value = SpeechSettingsUiState(
-            selectedEngine = preference.selectedEngine,
+            // OpenAI 引擎选项已从语音页移除：历史存储选中 OpenAi 的用户在界面上按系统 TTS
+            // 呈现。只回落显示层，偏好文件里的原始选择原样保留，不被静默迁移。
+            selectedEngine = preference.selectedEngine.takeUnless { it == PronunciationEngine.OpenAi }
+                ?: PronunciationEngine.SystemTts,
             openAiProfileId = preference.openAiProfileId,
             miMoProfileId = preference.miMoProfileId,
             candidates = speechProfiles.map { it.toCandidate() },
