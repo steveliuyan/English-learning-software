@@ -25,7 +25,10 @@ import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.language.SpeechPreferenceRepository
+import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationEngine
+import com.example.englishlearning.language.domain.PronunciationProvider
+import com.example.englishlearning.language.domain.PronunciationResult
 import com.example.englishlearning.language.domain.SpeechPreference
 import com.example.englishlearning.learning.LearningProfile
 import com.example.englishlearning.learning.LearningProfileRepository
@@ -185,12 +188,12 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
         composeRule.onNodeWithText("当前供应商：OpenAI TTS").assertExists()
-        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
-        composeRule.onNodeWithText("当前供应商 · 已配置").assertExists()
-        composeRule.onNodeWithTag("settings_speech_mimo").performScrollTo()
-        composeRule.onNodeWithText("可选配置 · 未绑定").assertExists()
-        composeRule.onNodeWithTag("settings_speech_zipvoice").performScrollTo()
-        composeRule.onNodeWithText("未下载").assertExists()
+        // 新层级：一级设置页不再出现引擎状态行与「待接入」厂商占位行。
+        composeRule.onNodeWithTag("settings_speech_openai").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_speech_mimo").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_speech_zipvoice").assertDoesNotExist()
+        composeRule.onNodeWithText("当前供应商 · 已配置").assertDoesNotExist()
+        composeRule.onNodeWithText("待接入").assertDoesNotExist()
     }
 
     @Test
@@ -202,11 +205,14 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        // 候选配置现在是折叠二级菜单：先展开再操作。
+        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
         composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys += "openai"
         composeRule.onNodeWithContentDescription("返回上一层").performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
         composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_bound_profile_openai", useUnmergedTree = true).assertExists()
@@ -220,15 +226,20 @@ class AppScreenTest {
         composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
-        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
-        composeRule.onNodeWithText("当前供应商 · 已配置").assertExists()
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
+        composeRule.onNodeWithText("当前供应商：OpenAI TTS").assertExists()
         composeRule.onNodeWithTag("settings_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys.clear()
         pressSystemBack()
         composeRule.onNodeWithTag("settings_screen").assertExists()
-        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
-        composeRule.onNodeWithText("当前供应商 · 缺少密钥").assertExists()
+        // 一级页不再有引擎状态行；刷新语义下沉到语音二级页——直接进入 AI Profile 改完 Key
+        // 返回后再进语音设置，状态必须是新鲜的。
+        composeRule.onNodeWithTag("settings_speech_openai").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
+        composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        // 引擎行详情是「配置名 · 密钥状态」格式；Key 被删后必须立刻反映。
+        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
     }
 
     @Test
@@ -238,6 +249,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
+        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
         composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
@@ -245,13 +257,14 @@ class AppScreenTest {
         fixture.keys.clear()
         pressSystemBack()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
         composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
-        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("缺少密钥")
+        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
         composeRule.onNodeWithTag("speech_bound_profile_openai", useUnmergedTree = true).assertExists()
         pressSystemBack()
         composeRule.onNodeWithTag("settings_screen").assertExists()
-        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
-        composeRule.onNodeWithText("当前供应商 · 缺少密钥").assertExists()
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
+        composeRule.onNodeWithText("当前供应商：OpenAI TTS").assertExists()
     }
 
     @Test
@@ -339,7 +352,16 @@ class AppScreenTest {
             override suspend fun save(preference: SpeechPreference) = Result.success(Unit)
         }
         return SpeechFixture(
-            SpeechSettingsViewModel(profiles, secrets, preferences),
+            SpeechSettingsViewModel(
+                profiles,
+                secrets,
+                preferences,
+                AiProfileIdFactory { "new-id" },
+                object : PronunciationProvider {
+                    override fun capabilities() = setOf(PronunciationCapability.RemoteAudio)
+                    override suspend fun speak(text: String) = PronunciationResult.Played
+                },
+            ),
             AiProfileSettingsViewModel(profiles, secrets, AiProfileIdFactory { "new-id" }),
             keys,
         ).also { it.keys += "openai" }

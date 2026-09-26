@@ -149,6 +149,55 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV13ToV14_addsProviderKindDefaultingToOpenAiCompatibleWithoutLosingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 13).apply {
+            execSQL(
+                "INSERT INTO ai_profiles (profileId, displayName, websiteUrl, endpoint, model, capabilities, " +
+                    "secretAlias, temperature, topP, maxTokens, timeoutSeconds, systemPromptTemplateId) " +
+                    "VALUES ('existing-profile', 'Existing', 'https://example.com', 'https://example.com/v1', " +
+                    "'model', 'Speech', 'alias', 0.7, 1.0, 256, 30, 'default')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 14, true, AppDatabase.MIGRATION_13_14).apply {
+            // 老行必须活下来，且 providerKind 回填为历史事实：全部是 OpenAI 兼容协议。
+            query("SELECT displayName, providerKind FROM ai_profiles WHERE profileId = 'existing-profile'").use { cursor ->
+                assertTrue("the v13 AI Profile must survive the migration", cursor.moveToFirst())
+                assertEquals("Existing", cursor.getString(0))
+                assertEquals("OPENAI_COMPATIBLE", cursor.getString(1))
+            }
+            close()
+        }
+    }
+
+    @Test
+    fun migrateV14ToV15_addsVoiceDefaultingToAutoWithoutLosingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 14).apply {
+            execSQL(
+                "INSERT INTO ai_profiles (profileId, displayName, websiteUrl, endpoint, model, capabilities, " +
+                    "secretAlias, temperature, topP, maxTokens, timeoutSeconds, systemPromptTemplateId, providerKind) " +
+                    "VALUES ('existing-profile', 'Existing', 'https://example.com', 'https://example.com/v1', " +
+                    "'model', 'Speech', 'alias', 0.7, 1.0, 256, 30, 'default', 'XIAOMI_MIMO')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 15, true, AppDatabase.MIGRATION_14_15).apply {
+            // 老行活下来，voice 回填空串 = 自动音色，行为与升级前一致。
+            query("SELECT displayName, providerKind, voice FROM ai_profiles WHERE profileId = 'existing-profile'").use { cursor ->
+                assertTrue("the v14 AI Profile must survive the migration", cursor.moveToFirst())
+                assertEquals("Existing", cursor.getString(0))
+                assertEquals("XIAOMI_MIMO", cursor.getString(1))
+                assertEquals("", cursor.getString(2))
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateAllHistoricalSchemasWithoutDestructiveFallback() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 1).apply {

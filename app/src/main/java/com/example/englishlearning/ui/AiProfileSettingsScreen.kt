@@ -20,12 +20,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +44,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.domain.AiCapability
+import com.example.englishlearning.ai.domain.AiVoiceCatalog
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -271,6 +278,20 @@ private fun AiProfileEditor(
             }
         }
 
+        if (AiCapability.Speech in draft.capabilities) {
+            Text("语音角色", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+            Text(
+                text = "留空 = 自动：MiMo 按语言选冰糖/Mia，OpenAI 兼容走服务默认。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MintTextMuted,
+            )
+            VoiceDropdown(
+                selected = draft.voice,
+                options = AiVoiceCatalog.optionsFor(state.providerKind),
+                onSelect = { onDraftChange(draft.copy(voice = it)) },
+            )
+        }
+
         Text("高级参数", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
         Text(
             text = "可选范围：temperature 0–2、top_p 0–1、max_tokens 1–4096、超时 5–120 秒。",
@@ -388,6 +409,50 @@ private fun EditorField(
             unfocusedTextColor = MintPrimaryDark,
         ),
     )
+}
+
+@Composable
+private fun VoiceDropdown(
+    selected: String,
+    options: List<String>,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .testTag("ai_profile_voice")
+                .semantics { contentDescription = "选择语音角色" },
+        ) {
+            Text(
+                if (selected.isBlank()) "自动（推荐）" else selected,
+                fontWeight = FontWeight.Bold,
+                color = MintPrimaryDark,
+            )
+            Text("  ▾", color = MintPrimary)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(if (selected.isBlank()) "自动（当前）" else "自动（推荐）") },
+                onClick = {
+                    onSelect("")
+                    expanded = false
+                },
+                modifier = Modifier.testTag("ai_profile_voice_auto"),
+            )
+            options.forEach { voice ->
+                DropdownMenuItem(
+                    text = { Text(if (voice == selected) "$voice（当前）" else voice) },
+                    onClick = {
+                        onSelect(voice)
+                        expanded = false
+                    },
+                    modifier = Modifier.testTag("ai_profile_voice_${voice}"),
+                )
+            }
+        }
+    }
 }
 
 @Composable

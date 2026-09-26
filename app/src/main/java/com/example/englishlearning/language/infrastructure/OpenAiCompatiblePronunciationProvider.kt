@@ -2,6 +2,7 @@ package com.example.englishlearning.language.infrastructure
 
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.ai.net.AudioHttpRequest
 import com.example.englishlearning.ai.net.AudioHttpResult
 import com.example.englishlearning.ai.net.AudioHttpTransport
@@ -25,8 +26,15 @@ class OpenAiCompatiblePronunciationProvider(
     override suspend fun speak(text: String): PronunciationResult {
         if (text.isBlank()) return PronunciationResult.Unavailable("blank text")
         val profile = profiles.find(profileId).getOrNull() ?: return PronunciationResult.Unavailable("profile unavailable")
+        if (profile.providerKind != AiProviderKind.OPENAI_COMPATIBLE) {
+            // MiMo 预设绑进 OpenAI 槽位时直接不可用：对 chat/completions 端点发
+            // /audio/speech 请求只会 404，还可能把密钥送进不认识它的服务。
+            return PronunciationResult.Unavailable("profile kind mismatch")
+        }
         val key = secrets.loadKey(profile).getOrNull() ?: return PronunciationResult.Unavailable("key unavailable")
         return try {
+            // 音色优先级：Profile 显式选择 > 工厂默认（alloy）。
+            val voice = profile.voice.takeIf { it.isNotBlank() } ?: this.voice
             val request = TtsRequestBuilder.build(profile, text, voice, responseFormat, key)
                 .getOrElse { return PronunciationResult.Failed() }
             val response = transport.send(

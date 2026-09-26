@@ -6,6 +6,7 @@ import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
@@ -236,6 +237,39 @@ class AiProfileSettingsViewModelTest {
     }
 
     @Test
+    fun editingAMimoPresetKeepsItsProviderKind() = runTest(dispatcher) {
+        // 真机事故复现：给 MiMo 预设填 Key 保存后，providerKind 被编辑器重置成
+        // OPENAI_COMPATIBLE，MiMo 引擎按协议过滤候选时它就「消失」了（绑定失效、
+        // 反复要求重新添加预设）。编辑器必须原样保留协议身份。
+        val repository = repository(
+            initial = listOf(
+                profile("mimo-1").copy(
+                    endpoint = "https://api.xiaomimimo.com/v1/chat/completions",
+                    model = "mimo-v2.5-tts",
+                    capabilities = setOf(AiCapability.Speech),
+                    providerKind = AiProviderKind.XIAOMI_MIMO,
+                ),
+            ),
+        )
+        val viewModel = viewModel(repository)
+        viewModel.load()
+        advanceUntilIdle()
+        viewModel.startEdit("mimo-1")
+        advanceUntilIdle()
+
+        viewModel.updateDraft(viewModel.editor.value!!.draft.copy(pendingKey = "sk-mimo", voice = "茉莉"))
+        viewModel.save()
+        advanceUntilIdle()
+
+        val saved = repository.stored.getValue("mimo-1")
+        assertEquals(AiProviderKind.XIAOMI_MIMO, saved.providerKind)
+        assertEquals("https://api.xiaomimimo.com/v1/chat/completions", saved.endpoint)
+        assertEquals("mimo-v2.5-tts", saved.model)
+        assertEquals("茉莉", saved.voice)
+        assertEquals("sk-mimo", secrets.entries[AiProfileSecretUseCase.referenceFor("mimo-1").alias])
+    }
+
+    @Test
     fun editingWithoutTypingANewKeyKeepsTheStoredOne() = runTest(dispatcher) {
         secrets.entries[AiProfileSecretUseCase.referenceFor("p1").alias] = "sk-old"
         val repository = repository(initial = listOf(profile("p1")))
@@ -303,6 +337,33 @@ class AiProfileSettingsViewModelTest {
 
         assertFalse((viewModel.listState.value as AiProfileListUiState.Ready).items.single().hasKey)
         assertTrue(repository.stored.containsKey("p1"), "删密钥不该顺手把配置也删了")
+    }
+
+    @Test
+    fun savingASpeechProfilePersistsTheSelectedVoice() = runTest(dispatcher) {
+        val repository = repository()
+        val viewModel = viewModel(repository)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft().copy(capabilities = setOf(AiCapability.Speech), voice = "nova"))
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals("nova", repository.stored.getValue("ai-test-1").voice)
+    }
+
+    @Test
+    fun savingAProfileWithAVoiceOutsideTheCatalogIsRejected() = runTest(dispatcher) {
+        val repository = repository()
+        val viewModel = viewModel(repository)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft().copy(capabilities = setOf(AiCapability.Speech), voice = "不存在的音色"))
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertEquals(AiProfileFieldError.VoiceInvalid, viewModel.editor.value?.fieldError)
+        assertTrue(repository.stored.isEmpty(), "校验失败就不该落库")
     }
 
     @Test

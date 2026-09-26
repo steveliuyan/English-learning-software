@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.language.domain.PronunciationEngine
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -41,15 +42,21 @@ data class SpeechEngineStatuses(
 )
 
 fun SpeechSettingsUiState.engineStatuses(): SpeechEngineStatuses {
-    fun status(profileId: String?): String = when {
-        profileId == null && candidates.any { it.status == SpeechProfileStatus.Available } -> "可选配置 · 未绑定"
-        profileId == null -> "未配置"
-        candidates.firstOrNull { it.profileId == profileId }?.status == SpeechProfileStatus.Available -> "已配置"
-        candidates.any { it.profileId == profileId } -> "缺少密钥"
-        else -> "绑定失效"
+    // 状态按协议匹配的候选派生：OpenAI 槽位只认 OPENAI_COMPATIBLE，MiMo 槽位只认
+    // XIAOMI_MIMO。把通用 Profile 算进 MiMo、或把 MiMo 预设算进 OpenAI，都会把
+    // 「根本发不出正确请求的绑定」误报成已配置。
+    fun status(profileId: String?, kind: AiProviderKind): String {
+        val kindCandidates = candidates.filter { it.providerKind == kind }
+        return when {
+            profileId == null && kindCandidates.any { it.status == SpeechProfileStatus.Available } -> "可选配置 · 未绑定"
+            profileId == null -> "未配置"
+            kindCandidates.firstOrNull { it.profileId == profileId }?.status == SpeechProfileStatus.Available -> "已配置"
+            kindCandidates.any { it.profileId == profileId } -> "缺少密钥"
+            else -> "绑定失效"
+        }
     }
-    val openAiStatus = status(openAiProfileId)
-    val miMoStatus = status(miMoProfileId)
+    val openAiStatus = status(openAiProfileId, AiProviderKind.OPENAI_COMPATIBLE)
+    val miMoStatus = status(miMoProfileId, AiProviderKind.XIAOMI_MIMO)
     return SpeechEngineStatuses(
         openAi = if (selectedEngine == PronunciationEngine.OpenAi) "当前供应商 · $openAiStatus" else openAiStatus,
         miMo = if (selectedEngine == PronunciationEngine.MiMo) "当前供应商 · $miMoStatus" else miMoStatus,
@@ -150,27 +157,22 @@ fun SettingsScreen(
             )
         }
 
-        SettingsGroup(title = "AI", tag = "settings_group_ai") {
+        // 「AI 与语音」是这一页唯一的云服务入口组：一级页只放两个可点入口，引擎状态与
+        // 「待接入」厂商属于二级页的信息量——此前它们在一级页占了近一半屏（9 行里 6 行
+        // 点不了），用户学习成本过高。
+        SettingsGroup(title = "AI 与语音", tag = "settings_group_ai_speech") {
             SettingsActionRow(
                 title = "AI 服务与密钥",
                 subtitle = aiProfileSubtitle ?: "添加多套 OpenAI 兼容服务，管理 Endpoint、模型与密钥",
                 tag = "settings_open_ai_profiles",
                 onClick = onOpenAiProfiles,
             )
-        }
-
-        SettingsGroup(title = "语音合成", tag = "settings_group_speech") {
-            SettingsActionRow("语音服务", "当前供应商：${speechEngineStatuses.currentProvider}", "settings_open_speech", onOpenSpeechSettings)
-            SettingsStatusRow("小米 MiMo", speechEngineStatuses.miMo, "settings_speech_mimo")
-            SettingsStatusRow("OpenAI TTS", speechEngineStatuses.openAi, "settings_speech_openai")
-            SettingsStatusRow("本地 ZipVoice-Distill", speechEngineStatuses.zipVoice, "settings_speech_zipvoice")
-            listOf(
-                "Azure" to "settings_pending_speech_azure",
-                "火山引擎" to "settings_pending_speech_volcengine",
-                "腾讯云" to "settings_pending_speech_tencent",
-                "阿里云百炼" to "settings_pending_speech_bailian",
-                "MiniMax" to "settings_pending_speech_minimax",
-            ).forEach { (title, tag) -> SettingsPendingRow(title, "待接入", tag) }
+            SettingsActionRow(
+                title = "语音朗读",
+                subtitle = "当前供应商：${speechEngineStatuses.currentProvider}",
+                tag = "settings_open_speech",
+                onClick = onOpenSpeechSettings,
+            )
         }
 
         SettingsGroup(title = "账户", tag = "settings_group_account") {
@@ -205,14 +207,6 @@ private fun SettingsGroup(title: String, tag: String, content: @Composable () ->
         ) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { content() }
         }
-    }
-}
-
-@Composable
-private fun SettingsStatusRow(title: String, status: String, tag: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag(tag), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.weight(1f))
-        Text(status, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
     }
 }
 

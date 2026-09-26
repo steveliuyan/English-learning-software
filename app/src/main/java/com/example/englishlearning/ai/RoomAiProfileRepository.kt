@@ -3,6 +3,7 @@ package com.example.englishlearning.ai
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.storage.AppDatabase
@@ -56,6 +57,8 @@ class RoomAiProfileRepository(
         maxTokens = advancedParameters.maxTokens,
         timeoutSeconds = advancedParameters.timeoutSeconds,
         systemPromptTemplateId = advancedParameters.systemPromptTemplateId,
+        providerKind = providerKind.name,
+        voice = voice,
     )
 
     private fun AiProfileEntity.toDomain() = AiProfile(
@@ -67,5 +70,7 @@ class RoomAiProfileRepository(
         capabilities = capabilities.split(",").filter { it.isNotBlank() }.map { AiCapability.valueOf(it) }.toSet(),
         secretReference = SecretReference(secretAlias),
         advancedParameters = AiAdvancedParameters(temperature, topP, maxTokens, timeoutSeconds, systemPromptTemplateId),
+        providerKind = AiProviderKind.valueOf(providerKind),
+        voice = voice,
     )
 }

@@ -25,6 +25,7 @@ class SettingsScreenTest {
         onOpenSetup: () -> Unit = {},
         onOpenWorksheet: () -> Unit = {},
         onOpenAiProfiles: () -> Unit = {},
+        onOpenSpeechSettings: () -> Unit = {},
         aiProfileSubtitle: String? = null,
         speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
     ) {
@@ -37,6 +38,7 @@ class SettingsScreenTest {
                 onOpenSetup = onOpenSetup,
                 onOpenWorksheet = onOpenWorksheet,
                 onOpenAiProfiles = onOpenAiProfiles,
+                onOpenSpeechSettings = onOpenSpeechSettings,
                 aiProfileSubtitle = aiProfileSubtitle,
                 speechEngineStatuses = speechEngineStatuses,
             )
@@ -47,7 +49,7 @@ class SettingsScreenTest {
         setScreen()
         composeRule.onNodeWithTag("settings_screen").assertExists()
         composeRule.onNodeWithTag("settings_profile_card").assertExists()
-        listOf("学习", "阅读", "AI", "账户").forEach { group ->
+        listOf("学习", "阅读", "AI 与语音", "账户").forEach { group ->
             composeRule.onNodeWithTag("settings_group_${groupTagOf(group)}").assertExists().performScrollTo()
             composeRule.onNodeWithText(group).assertExists()
         }
@@ -124,6 +126,16 @@ class SettingsScreenTest {
         composeRule.onNodeWithTag("settings_pending_ai").assertDoesNotExist()
     }
 
+    @Test fun speech_entry_is_clickable_and_reports_its_callback() {
+        var opened = 0
+        setScreen(onOpenSpeechSettings = { opened++ })
+
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(1, opened)
+    }
+
     @Test fun ai_profiles_entry_reports_the_real_summary_when_it_has_one() {
         setScreen(aiProfileSubtitle = "已配置 2 套 · 1 套已设置密钥")
         composeRule.onNodeWithText("已配置 2 套 · 1 套已设置密钥").assertExists()
@@ -134,28 +146,32 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("尚未添加，点这里添加第一套 OpenAI 兼容服务").assertExists()
     }
 
-    @Test fun speech_group_lists_supported_and_pending_engines() {
+    /**
+     * 「AI 与语音」组在一级页只允许出现两个可点入口。引擎状态行与「待接入」厂商是二级页的
+     * 信息量——它们曾在一级页占了近一半屏（9 行里 6 行点不了），用户学习成本过高，这里锁死
+     * 它们不再回到一级页。
+     */
+    @Test fun ai_and_speech_group_collapses_to_two_action_entries() {
         setScreen(speechEngineStatuses = SpeechEngineStatuses(miMo = "已配置", openAi = "未配置", zipVoice = "未下载"))
-        composeRule.onNodeWithTag("settings_group_speech").performScrollTo()
-        listOf("语音合成", "小米 MiMo", "OpenAI TTS", "本地 ZipVoice-Distill", "Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax").forEach {
-            composeRule.onNodeWithText(it).assertExists()
-        }
-        composeRule.onNodeWithText("已配置").assertExists()
-        composeRule.onNodeWithText("未配置").assertExists()
-        composeRule.onNodeWithText("未下载").assertExists()
-    }
+        composeRule.onNodeWithTag("settings_group_ai_speech").performScrollTo()
+        composeRule.onNodeWithTag("settings_open_ai_profiles").assertExists()
+        composeRule.onNodeWithTag("settings_open_speech").assertExists()
+        composeRule.onNodeWithText("当前供应商：系统 TTS").assertExists()
 
-    @Test fun speech_pending_engines_are_not_clickable() {
-        setScreen()
-        listOf("settings_pending_speech_azure", "settings_pending_speech_volcengine", "settings_pending_speech_tencent", "settings_pending_speech_bailian", "settings_pending_speech_minimax").forEach { tag ->
-            composeRule.onNodeWithTag(tag).performScrollTo().assertHasNoClickAction()
+        // 状态行与占位行不得出现在一级页。
+        listOf("settings_speech_mimo", "settings_speech_openai", "settings_speech_zipvoice").forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
+        listOf("Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax", "本地 ZipVoice-Distill").forEach {
+            composeRule.onNodeWithText(it).assertDoesNotExist()
+        }
+        composeRule.onNodeWithText("当前供应商 · 已配置").assertDoesNotExist()
     }
 }
 
 private fun groupTagOf(group: String): String = when (group) {
     "学习" -> "learning"
     "阅读" -> "reading"
-    "AI" -> "ai"
+    "AI 与语音" -> "ai_speech"
     else -> "account"
 }

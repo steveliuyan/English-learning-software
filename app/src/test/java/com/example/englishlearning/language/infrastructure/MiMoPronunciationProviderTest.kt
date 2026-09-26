@@ -5,6 +5,7 @@ import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.ai.net.AudioHttpRequest
 import com.example.englishlearning.ai.net.AudioHttpResult
 import com.example.englishlearning.ai.net.AudioHttpTransport
@@ -12,6 +13,7 @@ import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationResult
+import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -22,29 +24,70 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class MiMoPronunciationProviderTest {
+    private val wav = byteArrayOf(1, 2, 3, 4, 5)
+    private val responseBody = """
+        {"choices":[{"message":{"role":"assistant","content":"","audio":{"data":"${Base64.getEncoder().encodeToString(wav)}"}}}]}
+    """.trimIndent().encodeToByteArray()
+
     private val profile = AiProfile(
         profileId = "mimo", displayName = "MiMo", websiteUrl = "https://mimo.test",
-        endpoint = "https://api.test/v1", model = "mimo-tts", capabilities = setOf(AiCapability.Speech),
-        secretReference = SecretReference("ai-profile-mimo"), advancedParameters = AiAdvancedParameters(timeoutSeconds = 12),
+        endpoint = "https://api.xiaomimimo.com/v1/chat/completions", model = "mimo-v2.5-tts",
+        capabilities = setOf(AiCapability.Speech),
+        secretReference = SecretReference("ai-profile-mimo"),
+        advancedParameters = AiAdvancedParameters(timeoutSeconds = 12),
+        providerKind = AiProviderKind.XIAOMI_MIMO,
     )
 
-    @Test fun `successful speech plays audio and returns played`() = runTest {
-        val transport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1, 2)))
+    @Test fun `successful speech plays decoded wav via chat completions protocol`() = runTest {
+        val transport = RecordingTransport(AudioHttpResult.Success(responseBody))
         val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
         val key = "secret".toCharArray()
         val store = FakeSecretStore(key)
         val provider = provider(transport, store, player)
 
         assertIs<PronunciationResult.Played>(provider.speak("hello"))
-        assertContentEquals(byteArrayOf(1, 2), player.bytes)
-        assertEquals("mp3", player.format)
-        assertEquals("https://api.test/v1/audio/speech", transport.request!!.url)
+        assertContentEquals(wav, player.bytes)
+        assertEquals("wav", player.format)
+        // URL 是 Profile 端点原样（完整 chat/completions），不追加 /audio/speech。
+        assertEquals("https://api.xiaomimimo.com/v1/chat/completions", transport.request!!.url)
         assertEquals("POST", transport.request!!.method)
         assertEquals("application/json", transport.request!!.headers["Content-Type"])
-        assertEquals("Bearer secret", transport.request!!.headers["Authorization"])
+        assertEquals("secret", transport.request!!.headers["api-key"])
+        assertTrue(transport.request!!.headers.keys.none { it.equals("Authorization", ignoreCase = true) })
         assertEquals(12, transport.request!!.timeoutSeconds)
-        assertTrue(transport.request!!.body.decodeToString().contains("\"input\":\"hello\""))
+        val body = transport.request!!.body.decodeToString()
+        assertTrue(body.contains("\"role\":\"assistant\""))
+        assertTrue(body.contains("\"content\":\"hello\""))
+        assertTrue(body.contains("\"stream\":false"))
+        assertTrue(body.contains("\"voice\":\"Mia\""))
+        // 密钥读出用完必须清零。
         assertTrue(store.lastRead!!.all { it == '\u0000' })
+        // 响应体（含 base64 音频）用完清零。
+        assertTrue(responseBody.all { it == 0.toByte() })
+    }
+
+    @Test fun `profile with openai kind is unavailable without touching key`() = runTest {
+        val openAiProfile = profile.copy(providerKind = AiProviderKind.OPENAI_COMPATIBLE)
+        val store = FakeSecretStore("secret".toCharArray())
+        val transport = RecordingTransport(AudioHttpResult.Success(responseBody))
+
+        val result = provider(transport, store, profile = openAiProfile).speak("hello")
+
+        assertIs<PronunciationResult.Unavailable>(result)
+        assertEquals(0, store.readCalls)
+        assertEquals(null, transport.request)
+    }
+
+    @Test fun `response without audio returns failed and clears body`() = runTest {
+        val body = """{"choices":[{"message":{"role":"assistant","content":"no audio"}}]}""".encodeToByteArray()
+        val transport = RecordingTransport(AudioHttpResult.Success(body))
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
+
+        val result = provider(transport, player = player).speak("hello")
+
+        assertIs<PronunciationResult.Failed>(result)
+        assertEquals(null, player.bytes)
+        assertTrue(body.all { it == 0.toByte() })
     }
 
     @Test fun `empty audio returns failed without playing`() = runTest {
@@ -58,7 +101,7 @@ class MiMoPronunciationProviderTest {
         val player = RecordingAudioPlayer(AudioPlaybackResult.Failed)
         val result = provider(player = player).speak("hello")
         assertIs<PronunciationResult.Failed>(result)
-        assertContentEquals(byteArrayOf(1), player.bytes)
+        assertContentEquals(wav, player.bytes)
     }
 
     @Test fun `profile id is injectable`() = runTest {
@@ -76,8 +119,8 @@ class MiMoPronunciationProviderTest {
         assertEquals(0, store.readCalls)
     }
 
-    @Test fun `builder failure returns failed`() = runTest {
-        val result = provider(profile = profile.copy(endpoint = "http://api.test")).speak("hello")
+    @Test fun `insecure endpoint returns failed`() = runTest {
+        val result = provider(profile = profile.copy(endpoint = "http://api.xiaomimimo.com/v1/chat/completions")).speak("hello")
         assertIs<PronunciationResult.Failed>(result)
     }
 
@@ -106,9 +149,11 @@ class MiMoPronunciationProviderTest {
     }
 
     @Test fun `network timeout cancellation and http errors are failed`() = runTest {
-        for (outcome in listOf(AudioHttpResult.NetworkUnavailable, AudioHttpResult.TimedOut, AudioHttpResult.Cancelled, AudioHttpResult.HttpError(500, byteArrayOf()))) {
-            val result = provider(RecordingTransport(outcome)).speak("hello")
+        for (outcome in listOf(AudioHttpResult.NetworkUnavailable, AudioHttpResult.TimedOut, AudioHttpResult.Cancelled, AudioHttpResult.HttpError(500, byteArrayOf(9)))) {
+            val transport = RecordingTransport(outcome)
+            val result = provider(transport).speak("hello")
             assertIs<PronunciationResult.Failed>(result)
+            assertTrue(transport.responseBody.all { it == 0.toByte() })
         }
     }
 
@@ -117,7 +162,7 @@ class MiMoPronunciationProviderTest {
     }
 
     private fun provider(
-        transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1))),
+        transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(responseBody.copyOf())),
         secretStore: SecretStore = FakeSecretStore("secret".toCharArray()),
         player: AudioPlayer = RecordingAudioPlayer(AudioPlaybackResult.Played),
         profile: AiProfile? = this.profile,
@@ -170,7 +215,11 @@ class MiMoPronunciationProviderTest {
 
     private class RecordingTransport(private val outcome: AudioHttpResult) : AudioHttpTransport {
         var request: AudioHttpRequest? = null
-        val outcomeBody: ByteArray get() = (outcome as? AudioHttpResult.Success)?.body ?: byteArrayOf()
+        val responseBody: ByteArray get() = when (outcome) {
+            is AudioHttpResult.Success -> outcome.body
+            is AudioHttpResult.HttpError -> outcome.body
+            else -> byteArrayOf()
+        }
         override suspend fun send(request: AudioHttpRequest): AudioHttpResult { this.request = request; return outcome }
     }
 }

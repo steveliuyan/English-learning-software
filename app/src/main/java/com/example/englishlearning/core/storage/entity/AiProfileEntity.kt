@@ -17,4 +17,6 @@ data class AiProfileEntity(
     val maxTokens: Int,
     val timeoutSeconds: Int,
     val systemPromptTemplateId: String,
+    val providerKind: String,
+    val voice: String,
 )

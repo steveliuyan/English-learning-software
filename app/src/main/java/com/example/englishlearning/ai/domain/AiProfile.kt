@@ -27,4 +27,7 @@ data class AiProfile(
     val capabilities: Set<AiCapability>,
     val secretReference: SecretReference,
     val advancedParameters: AiAdvancedParameters = AiAdvancedParameters(),
+    val providerKind: AiProviderKind = AiProviderKind.OPENAI_COMPATIBLE,
+    /** 语音角色；空串 = 自动（MiMo 按语言选冰糖/Mia，OpenAI 兼容走服务默认）。 */
+    val voice: String = "",
 )

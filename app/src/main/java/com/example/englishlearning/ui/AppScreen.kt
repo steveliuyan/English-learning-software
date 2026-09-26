@@ -330,6 +330,8 @@ fun AppScreen(
                         aiProfileViewModel?.load()
                         showAiProfiles = aiProfileViewModel != null
                     },
+                    onAddMiMoPreset = { speechSettingsViewModel?.addMiMoPreset() },
+                    onPreview = { text -> speechSettingsViewModel?.preview(text) },
                     onBack = { showSpeechSettings = false },
                 )
             } else if (selectedFeature != null) {

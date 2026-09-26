@@ -57,7 +57,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         LearningSettingsEntity::class,
         SpeechPreferenceEntity::class,
     ],
-    version = 13,
+    version = 15,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -210,6 +210,24 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_13_14: Migration =
+            object : Migration(13, 14) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // MiMo 专用协议上线：老 Profile 全部是 OpenAI 兼容协议，DEFAULT 回填即历史事实。
+                    db.execSQL(
+                        "ALTER TABLE `ai_profiles` ADD COLUMN `providerKind` TEXT NOT NULL DEFAULT 'OPENAI_COMPATIBLE'",
+                    )
+                }
+            }
+
+        val MIGRATION_14_15: Migration =
+            object : Migration(14, 15) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // 语音角色（Talkify 式音色选择）：空串 = 自动，老 Profile 行为不变。
+                    db.execSQL("ALTER TABLE `ai_profiles` ADD COLUMN `voice` TEXT NOT NULL DEFAULT ''")
+                }
+            }
+
         val MIGRATION_10_11: Migration =
             object : Migration(10, 11) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -327,7 +345,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

@@ -8,6 +8,8 @@ import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.ai.domain.AiProviderKind
+import com.example.englishlearning.ai.domain.AiVoiceCatalog
 import com.example.englishlearning.ai.domain.validateEndpoint
 import com.example.englishlearning.ai.validateRequestParameters
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +45,7 @@ enum class AiProfileFieldError(val message: String) {
     EndpointInvalid("Endpoint 必须是 https 公网地址，且不能带账号密码。"),
     ModelRequired("请填写要调用的模型名。"),
     CapabilityRequired("至少选择一种能力。"),
+    VoiceInvalid("语音角色不在该服务的可选列表里。"),
     ParameterNotNumeric("高级参数请填写数字。"),
     ParameterOutOfRange("高级参数超出允许范围。"),
 }
@@ -61,6 +64,8 @@ data class AiProfileDraft(
     val endpoint: String = "",
     val model: String = "",
     val capabilities: Set<AiCapability> = setOf(AiCapability.Text),
+    /** 语音角色；空串 = 自动。仅当能力含「语音」时在编辑器里出现。 */
+    val voice: String = "",
     val temperature: String = AiAdvancedParameters().temperature.toString(),
     val topP: String = AiAdvancedParameters().topP.toString(),
     val maxTokens: String = AiAdvancedParameters().maxTokens.toString(),
@@ -73,6 +78,12 @@ data class AiProfileEditorUiState(
     val profileId: String?,
     val draft: AiProfileDraft,
     val hasStoredKey: Boolean,
+    /**
+     * 协议身份随编辑会话保存：草稿只覆盖用户可见的字段，`providerKind` 不在表单里，
+     * 保存时必须从这里原样带回——否则编辑一次 MiMo 预设就会被重置成 OpenAI 兼容，
+     * MiMo 引擎按协议过滤候选时它就「消失」了（真机实证过）。
+     */
+    val providerKind: AiProviderKind = AiProviderKind.OPENAI_COMPATIBLE,
     val saving: Boolean = false,
     val fieldError: AiProfileFieldError? = null,
     val message: String? = null,
@@ -116,6 +127,7 @@ class AiProfileSettingsViewModel @Inject constructor(
                 profileId = found.profileId,
                 draft = found.toDraft(),
                 hasStoredKey = secrets.hasKey(found).getOrDefault(false),
+                providerKind = found.providerKind,
             )
         }
     }
@@ -132,7 +144,7 @@ class AiProfileSettingsViewModel @Inject constructor(
 
     fun save() {
         val current = _editor.value ?: return
-        val check = check(current.draft)
+        val check = check(current.draft, current.providerKind)
         if (check is DraftCheck.Invalid) {
             _editor.value = current.copy(fieldError = check.error, message = null)
             return
@@ -141,8 +153,7 @@ class AiProfileSettingsViewModel @Inject constructor(
         _editor.value = current.copy(saving = true, fieldError = null, message = null)
         viewModelScope.launch {
             val profileId = current.profileId ?: ids.newId()
-            val profile = current.draft.toProfile(profileId, parameters)
-            // 顺序不可换：先落元数据。反过来的话，元数据保存失败就会留下一个谁也认领不了的密钥槽。
+            val profile = current.draft.toProfile(profileId, parameters, current.providerKind)            // 顺序不可换：先落元数据。反过来的话，元数据保存失败就会留下一个谁也认领不了的密钥槽。
             if (profiles.save(profile).isFailure) {
                 _editor.value = current.copy(saving = false, message = STORAGE_FAILED_MESSAGE)
                 return@launch
@@ -211,6 +222,7 @@ class AiProfileSettingsViewModel @Inject constructor(
         endpoint = endpoint,
         model = model,
         capabilities = capabilities,
+        voice = voice,
         temperature = advancedParameters.temperature.toString(),
         topP = advancedParameters.topP.toString(),
         maxTokens = advancedParameters.maxTokens.toString(),
@@ -222,6 +234,7 @@ class AiProfileSettingsViewModel @Inject constructor(
     private fun AiProfileDraft.toProfile(
         profileId: String,
         parameters: AiAdvancedParameters,
+        providerKind: AiProviderKind,
     ) = AiProfile(
         profileId = profileId,
         displayName = displayName.trim(),
@@ -233,6 +246,8 @@ class AiProfileSettingsViewModel @Inject constructor(
         // 别的 Profile 的密钥槽。
         secretReference = AiProfileSecretUseCase.referenceFor(profileId),
         advancedParameters = parameters,
+        providerKind = providerKind,
+        voice = voice.trim(),
     )
 
     private sealed interface DraftCheck {
@@ -240,7 +255,7 @@ class AiProfileSettingsViewModel @Inject constructor(
         data class Invalid(val error: AiProfileFieldError) : DraftCheck
     }
 
-    private fun check(draft: AiProfileDraft): DraftCheck {
+    private fun check(draft: AiProfileDraft, providerKind: AiProviderKind): DraftCheck {
         if (draft.displayName.isBlank()) return DraftCheck.Invalid(AiProfileFieldError.NameRequired)
         if (draft.websiteUrl.isNotBlank() &&
             !draft.websiteUrl.startsWith("http://") &&
@@ -254,6 +269,9 @@ class AiProfileSettingsViewModel @Inject constructor(
         }
         if (draft.model.isBlank()) return DraftCheck.Invalid(AiProfileFieldError.ModelRequired)
         if (draft.capabilities.isEmpty()) return DraftCheck.Invalid(AiProfileFieldError.CapabilityRequired)
+        if (!AiVoiceCatalog.isValid(providerKind, draft.voice.trim())) {
+            return DraftCheck.Invalid(AiProfileFieldError.VoiceInvalid)
+        }
         val raw = draft.toParameterMap() ?: return DraftCheck.Invalid(AiProfileFieldError.ParameterNotNumeric)
         val parameters = validateRequestParameters(raw)
             .getOrElse { return DraftCheck.Invalid(AiProfileFieldError.ParameterOutOfRange) }

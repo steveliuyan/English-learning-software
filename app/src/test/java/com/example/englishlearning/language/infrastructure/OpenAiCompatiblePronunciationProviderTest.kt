@@ -5,6 +5,7 @@ import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.ai.net.AudioHttpRequest
 import com.example.englishlearning.ai.net.AudioHttpResult
 import com.example.englishlearning.ai.net.AudioHttpTransport
@@ -72,6 +73,44 @@ class OpenAiCompatiblePronunciationProviderTest {
         assertFailsWith<CancellationException> {
             provider(transport = ThrowingTransport(CancellationException("cancel"))).speak("hello")
         }
+    }
+
+    @Test
+    fun `profile voice overrides the factory default`() = runTest {
+        val voiced = profile.copy(voice = "nova")
+        val transport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1, 2)))
+        val provider = OpenAiCompatiblePronunciationProvider(
+            profileId = voiced.profileId,
+            voice = "alloy",
+            responseFormat = "mp3",
+            profiles = FakeProfileRepository(voiced),
+            secrets = AiProfileSecretUseCase(FakeSecretStore("secret".toCharArray())),
+            transport = transport,
+            player = RecordingAudioPlayer(AudioPlaybackResult.Played),
+        )
+
+        assertIs<PronunciationResult.Played>(provider.speak("hello"))
+        assertTrue(transport.request!!.body.decodeToString().contains("\"voice\":\"nova\""))
+    }
+
+    @Test
+    fun `mimo kind profile is unavailable without touching key or transport`() = runTest {
+        val mimoProfile = profile.copy(providerKind = AiProviderKind.XIAOMI_MIMO)
+        val store = FakeSecretStore("secret".toCharArray())
+        val transport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1, 2)))
+        val provider = OpenAiCompatiblePronunciationProvider(
+            profileId = mimoProfile.profileId,
+            voice = "alloy",
+            responseFormat = "mp3",
+            profiles = FakeProfileRepository(mimoProfile),
+            secrets = AiProfileSecretUseCase(store),
+            transport = transport,
+            player = RecordingAudioPlayer(AudioPlaybackResult.Played),
+        )
+
+        assertIs<PronunciationResult.Unavailable>(provider.speak("hello"))
+        assertTrue(store.lastRead == null)
+        assertTrue(transport.request == null)
     }
 
     private fun provider(
