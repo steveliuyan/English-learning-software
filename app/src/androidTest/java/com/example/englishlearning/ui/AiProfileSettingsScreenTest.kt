@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import android.view.KeyEvent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
@@ -296,6 +299,38 @@ class AiProfileSettingsScreenTest {
         composeRule.waitForIdle()
 
         assertEquals(voice, captured?.voice)
+    }
+
+    /**
+     * 浮层打开时按系统返回键必须只关浮层：编辑器（和未保存的草稿）原地不动。
+     * 浮层迁成页内 GlassOverlay 后没有弹窗 Window，返回键直达编辑层 BackHandler 会丢草稿，
+     * 所以编辑器里声明了 `BackHandler(enabled = voiceOverlayVisible)` 拦在前面。
+     */
+    @Test fun back_closes_the_voice_overlay_before_the_editor() {
+        var closed = 0
+        setScreen(
+            editor = editorState(capabilities = setOf(AiCapability.Text, AiCapability.Speech)),
+            onCloseEditor = { closed++ },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_voice").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_profile_voice_overlay").assertExists()
+
+        pressSystemBack()
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("ai_profile_voice_overlay").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag("ai_profile_voice").assertExists()
+        composeRule.onNodeWithTag("ai_profile_editor").assertExists()
+        assertEquals(0, closed)
+    }
+
+    private fun pressSystemBack() {
+        composeRule.waitForIdle()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        composeRule.waitForIdle()
     }
 
     private fun editorState(

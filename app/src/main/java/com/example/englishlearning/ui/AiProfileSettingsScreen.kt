@@ -214,6 +214,9 @@ private fun AiProfileEditor(
 ) {
     val draft = state.draft
     var voiceOverlayVisible by rememberSaveable { mutableStateOf(false) }
+    // 声明在编辑层 BackHandler（AiProfileSettingsScreen 里）之后，浮层打开时返回键先关浮层，
+    // 不会直达编辑层把未保存的草稿一起丢掉。
+    BackHandler(enabled = voiceOverlayVisible) { voiceOverlayVisible = false }
     Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier

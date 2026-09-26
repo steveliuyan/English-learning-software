@@ -1,6 +1,7 @@
 package com.example.englishlearning.ui.components.glass
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
 
@@ -31,6 +33,7 @@ fun Modifier.frosted(active: Boolean): Modifier = if (active) this.blur(8.dp) el
 
 /**
  * 页内玻璃浮层（下拉菜单替代品）：全屏 scrim + 居中玻璃面板，点击 scrim 关闭。
+ * `modifier` 应用于全屏 scrim（不用于浮层面板本体）。
  * visible=false 时不组合任何内容。
  */
 @Composable
@@ -44,8 +47,10 @@ fun BoxScope.GlassOverlay(
     val panelInteraction = remember { MutableInteractionSource() }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn() + scaleIn(initialScale = 0.92f),
-        exit = fadeOut() + scaleOut(targetScale = 0.92f),
+        enter = fadeIn(tween(AppMotion.Normal, easing = AppMotion.Easing)) +
+            scaleIn(tween(AppMotion.Normal, easing = AppMotion.Easing), initialScale = 0.92f),
+        exit = fadeOut(tween(AppMotion.Normal, easing = AppMotion.Easing)) +
+            scaleOut(tween(AppMotion.Normal, easing = AppMotion.Easing), targetScale = 0.92f),
         modifier = Modifier.align(Alignment.Center),
     ) {
         Box(
