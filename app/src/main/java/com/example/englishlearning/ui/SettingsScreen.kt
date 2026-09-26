@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.language.domain.PronunciationEngine
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -36,7 +37,29 @@ data class SpeechEngineStatuses(
     val miMo: String = "未配置",
     val openAi: String = "未配置",
     val zipVoice: String = "未下载",
+    val currentProvider: String = "系统 TTS",
 )
+
+fun SpeechSettingsUiState.engineStatuses(): SpeechEngineStatuses {
+    fun status(profileId: String?): String = when {
+        profileId == null && candidates.any { it.status == SpeechProfileStatus.Available } -> "可选配置 · 未绑定"
+        profileId == null -> "未配置"
+        candidates.firstOrNull { it.profileId == profileId }?.status == SpeechProfileStatus.Available -> "已配置"
+        candidates.any { it.profileId == profileId } -> "缺少密钥"
+        else -> "绑定失效"
+    }
+    val openAiStatus = status(openAiProfileId)
+    val miMoStatus = status(miMoProfileId)
+    return SpeechEngineStatuses(
+        openAi = if (selectedEngine == PronunciationEngine.OpenAi) "当前供应商 · $openAiStatus" else openAiStatus,
+        miMo = if (selectedEngine == PronunciationEngine.MiMo) "当前供应商 · $miMoStatus" else miMoStatus,
+        currentProvider = when (selectedEngine) {
+            PronunciationEngine.SystemTts -> "系统 TTS"
+            PronunciationEngine.OpenAi -> "OpenAI TTS"
+            PronunciationEngine.MiMo -> "小米 MiMo"
+        },
+    )
+}
 
 /**
  * 「设置」一级页。
@@ -137,7 +160,7 @@ fun SettingsScreen(
         }
 
         SettingsGroup(title = "语音合成", tag = "settings_group_speech") {
-            SettingsActionRow("语音服务", "选择系统 TTS 或云端语音服务", "settings_open_speech", onOpenSpeechSettings)
+            SettingsActionRow("语音服务", "当前供应商：${speechEngineStatuses.currentProvider}", "settings_open_speech", onOpenSpeechSettings)
             SettingsStatusRow("小米 MiMo", speechEngineStatuses.miMo, "settings_speech_mimo")
             SettingsStatusRow("OpenAI TTS", speechEngineStatuses.openAi, "settings_speech_openai")
             SettingsStatusRow("本地 ZipVoice-Distill", speechEngineStatuses.zipVoice, "settings_speech_zipvoice")

@@ -40,12 +40,20 @@ fun SpeechSettingsScreen(
         TextButton(onClick = onBack) { Text("← 返回设置") }
         Text("语音合成", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
         Text("选择朗读服务。密钥仅保存在系统安全区。", color = MintTextMuted, style = MaterialTheme.typography.bodySmall)
-        EngineRow("系统 TTS", PronunciationEngine.SystemTts, state.selectedEngine, null, onSelect)
-        EngineRow("OpenAI TTS", PronunciationEngine.OpenAi, state.selectedEngine, state.openAiProfileId, onSelect)
-        EngineRow("小米 MiMo", PronunciationEngine.MiMo, state.selectedEngine, state.miMoProfileId, onSelect)
+        val statuses = state.engineStatuses()
+        EngineRow("系统 TTS", PronunciationEngine.SystemTts, state.selectedEngine, null, null, onSelect)
+        EngineRow("OpenAI TTS", PronunciationEngine.OpenAi, state.selectedEngine, state.openAiProfileId,
+            statuses.openAi.removePrefix("当前供应商 · "), onSelect)
+        EngineRow("小米 MiMo", PronunciationEngine.MiMo, state.selectedEngine, state.miMoProfileId,
+            statuses.miMo.removePrefix("当前供应商 · "), onSelect)
         if (state.selectedEngine != PronunciationEngine.SystemTts) {
             Text("选择语音配置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
             state.candidates.forEach { candidate ->
+                val boundProfileId = when (state.selectedEngine) {
+                    PronunciationEngine.OpenAi -> state.openAiProfileId
+                    PronunciationEngine.MiMo -> state.miMoProfileId
+                    PronunciationEngine.SystemTts -> null
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { onSelect(state.selectedEngine, candidate.profileId) }
                         .padding(vertical = 10.dp).testTag("speech_profile_${candidate.profileId}")
@@ -53,6 +61,9 @@ fun SpeechSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(candidate.displayName, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+                    if (candidate.profileId == boundProfileId) {
+                        Text("当前绑定", modifier = Modifier.testTag("speech_bound_profile_${candidate.profileId}"), color = MintPrimaryDark)
+                    }
                     Text(if (candidate.status == SpeechProfileStatus.Available) "可用" else "缺少密钥", color = MintTextMuted)
                 }
             }
@@ -72,6 +83,7 @@ private fun EngineRow(
     engine: PronunciationEngine,
     selected: PronunciationEngine,
     profileId: String?,
+    status: String?,
     onSelect: (PronunciationEngine, String?) -> Unit,
 ) {
     Row(
@@ -80,6 +92,11 @@ private fun EngineRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(name, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-        if (engine == selected) Text("当前供应商", modifier = Modifier.testTag("speech_current_${engine.name.lowercase()}"), color = MintPrimaryDark)
+        if (engine == selected) {
+            Text("当前供应商", modifier = Modifier.testTag("speech_current_${engine.name.lowercase()}"), color = MintPrimaryDark)
+            if (status != null) {
+                Text(status, modifier = Modifier.padding(start = 8.dp).testTag("speech_engine_status_${engine.name.lowercase()}"), color = MintTextMuted)
+            }
+        }
     }
 }

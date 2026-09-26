@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import android.view.KeyEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,7 +16,17 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.englishlearning.ai.AiProfileIdFactory
+import com.example.englishlearning.ai.AiProfileRepository
+import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.domain.AiCapability
+import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.core.security.SecretReference
+import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.core.time.FixedClockProvider
+import com.example.englishlearning.language.SpeechPreferenceRepository
+import com.example.englishlearning.language.domain.PronunciationEngine
+import com.example.englishlearning.language.domain.SpeechPreference
 import com.example.englishlearning.learning.LearningProfile
 import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.RepositoryResult
@@ -167,6 +178,83 @@ class AppScreenTest {
     }
 
     @Test
+    fun speechStatusUsesLiveSpeechKeyStateAndShowsCurrentProvider() {
+        val fixture = speechFixture()
+        composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
+        composeRule.onNodeWithText("当前供应商：OpenAI TTS").assertExists()
+        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
+        composeRule.onNodeWithText("当前供应商 · 已配置").assertExists()
+        composeRule.onNodeWithTag("settings_speech_mimo").performScrollTo()
+        composeRule.onNodeWithText("可选配置 · 未绑定").assertExists()
+        composeRule.onNodeWithTag("settings_speech_zipvoice").performScrollTo()
+        composeRule.onNodeWithText("未下载").assertExists()
+    }
+
+    @Test
+    fun aiProfilesOpenedFromSpeechReturnToSpeechWithRefreshedCandidates() {
+        val fixture = speechFixture()
+        fixture.keys.clear()
+        composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
+        composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
+        fixture.keys += "openai"
+        composeRule.onNodeWithContentDescription("返回上一层").performClick()
+        composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
+        composeRule.onNodeWithText("可用").assertExists()
+        composeRule.onNodeWithTag("speech_bound_profile_openai", useUnmergedTree = true).assertExists()
+        pressSystemBack()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+    }
+
+    @Test
+    fun returningFromAiProfilesOpenedDirectlyFromSettingsRefreshesSpeechSummary() {
+        val fixture = speechFixture()
+        composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
+        composeRule.onNodeWithText("当前供应商 · 已配置").assertExists()
+        composeRule.onNodeWithTag("settings_open_ai_profiles").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
+        fixture.keys.clear()
+        pressSystemBack()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
+        composeRule.onNodeWithText("当前供应商 · 缺少密钥").assertExists()
+    }
+
+    @Test
+    fun returningFromAiProfilesRefreshesRemovedKeyWithoutDroppingSpeechLayer() {
+        val fixture = speechFixture()
+        composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
+        composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
+        composeRule.onNodeWithText("可用").assertExists()
+        composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
+        fixture.keys.clear()
+        pressSystemBack()
+        composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        composeRule.onNodeWithTag("speech_profile_openai").performScrollTo()
+        composeRule.onNodeWithTag("speech_engine_status_openai", useUnmergedTree = true).assertTextEquals("缺少密钥")
+        composeRule.onNodeWithTag("speech_bound_profile_openai", useUnmergedTree = true).assertExists()
+        pressSystemBack()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("settings_speech_openai").performScrollTo()
+        composeRule.onNodeWithText("当前供应商 · 缺少密钥").assertExists()
+    }
+
+    @Test
     fun readingTabOpensTheReadingScreenWithoutItsOwnBackButton() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
@@ -217,8 +305,51 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
     }
 
+    private data class SpeechFixture(
+        val speech: SpeechSettingsViewModel,
+        val ai: AiProfileSettingsViewModel,
+        val keys: MutableSet<String>,
+    )
+
+    private fun speechFixture(): SpeechFixture {
+        val keys = mutableSetOf<String>()
+        val profile = AiProfile(
+            profileId = "openai",
+            displayName = "测试语音",
+            websiteUrl = "https://example.com",
+            endpoint = "https://api.example.com/v1",
+            model = "tts-1",
+            capabilities = setOf(AiCapability.Speech),
+            secretReference = AiProfileSecretUseCase.referenceFor("openai"),
+        )
+        val profiles = object : AiProfileRepository {
+            override suspend fun list() = Result.success(listOf(profile))
+            override suspend fun find(profileId: String) = Result.success(profile.takeIf { it.profileId == profileId })
+            override suspend fun save(profile: AiProfile) = Result.success(Unit)
+            override suspend fun delete(profileId: String) = Result.success(Unit)
+        }
+        val secrets = AiProfileSecretUseCase(object : SecretStore {
+            override fun save(reference: SecretReference, secret: CharArray) = Result.success(Unit)
+            override fun read(reference: SecretReference) = Result.success(charArrayOf())
+            override fun delete(reference: SecretReference) = Result.success(Unit)
+            override fun has(reference: SecretReference) = Result.success(reference.alias.removePrefix("ai-profile-") in keys)
+        })
+        val preferences = object : SpeechPreferenceRepository {
+            override suspend fun get() = Result.success(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai"))
+            override suspend fun save(preference: SpeechPreference) = Result.success(Unit)
+        }
+        return SpeechFixture(
+            SpeechSettingsViewModel(profiles, secrets, preferences),
+            AiProfileSettingsViewModel(profiles, secrets, AiProfileIdFactory { "new-id" }),
+            keys,
+        ).also { it.keys += "openai" }
+    }
+
     @Composable
-    private fun readyAppScreen() {
+    private fun readyAppScreen(
+        speechSettingsViewModel: SpeechSettingsViewModel? = null,
+        aiProfileViewModel: AiProfileSettingsViewModel? = null,
+    ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
         val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
@@ -227,6 +358,8 @@ class AppScreenTest {
             learningSetupViewModel = setupViewModel(),
             todayPlanViewModel = TodayPlanViewModel({ placeholderCardPlan() }, FakeLearningProfileRepository()),
             wordCardViewModel = wordCardFixtureViewModel(),
+            speechSettingsViewModel = speechSettingsViewModel,
+            aiProfileViewModel = aiProfileViewModel,
         )
     }
 

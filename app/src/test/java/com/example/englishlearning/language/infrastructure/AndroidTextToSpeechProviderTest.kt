@@ -11,10 +11,12 @@ class AndroidTextToSpeechProviderTest {
         val engine = FakeEngine(initialized = false)
         val provider = AndroidTextToSpeechProvider(engine)
 
-        val result = kotlinx.coroutines.test.runTest { provider.speak("ability") }
+        kotlinx.coroutines.test.runTest {
+            val result = provider.speak("ability")
 
-        assertIs<PronunciationResult.Unavailable>(result)
-        assertEquals("text to speech unavailable", result.reason)
+            assertIs<PronunciationResult.Unavailable>(result)
+            assertEquals("text to speech unavailable", result.reason)
+        }
     }
 
     @Test
@@ -22,11 +24,13 @@ class AndroidTextToSpeechProviderTest {
         val engine = FakeEngine(initialized = true)
         val provider = AndroidTextToSpeechProvider(engine)
 
-        val result = kotlinx.coroutines.test.runTest { provider.speak("  ") }
+        kotlinx.coroutines.test.runTest {
+            val result = provider.speak("  ")
 
-        assertIs<PronunciationResult.Unavailable>(result)
-        assertEquals("blank text", result.reason)
-        assertEquals(emptyList(), engine.spoken)
+            assertIs<PronunciationResult.Unavailable>(result)
+            assertEquals("blank text", result.reason)
+            assertEquals(emptyList(), engine.spoken)
+        }
     }
 
     @Test
@@ -34,11 +38,13 @@ class AndroidTextToSpeechProviderTest {
         val engine = FakeEngine(initialized = true)
         val provider = AndroidTextToSpeechProvider(engine)
 
-        val result = kotlinx.coroutines.test.runTest { provider.speak(" ability ") }
+        kotlinx.coroutines.test.runTest {
+            val result = provider.speak(" ability ")
 
-        assertIs<PronunciationResult.Played>(result)
-        assertEquals(listOf(" ability "), engine.spoken)
-        assertEquals(java.util.Locale.ENGLISH, engine.locale)
+            assertIs<PronunciationResult.Played>(result)
+            assertEquals(listOf(" ability "), engine.spoken)
+            assertEquals(java.util.Locale.ENGLISH, engine.locale)
+        }
     }
 
     @Test

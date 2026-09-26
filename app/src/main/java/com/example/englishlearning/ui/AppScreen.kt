@@ -130,6 +130,7 @@ fun AppScreen(
             LaunchedEffect(state.profile.id) { aiProfileViewModel?.load() }
             LaunchedEffect(state.profile.id) { speechSettingsViewModel?.load() }
             val aiProfiles = aiProfileViewModel?.listState?.collectAsState()?.value as? AiProfileListUiState.Ready
+            val speechState = speechSettingsViewModel?.state?.collectAsState()?.value ?: SpeechSettingsUiState()
             val aiConfigured = aiProfiles?.items?.any { it.hasKey } == true
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val todayReady = todayState as? TodayPlanUiState.Ready
@@ -205,8 +206,11 @@ fun AppScreen(
             }
             // 这一层内部还有「列表 / 编辑」两态，编辑态会自己再声明一条更靠后的 BackHandler，
             // 因此从编辑页按返回键先关编辑页，而不是直接退掉整层。
-            BackHandler(enabled = showAiProfiles) { showAiProfiles = false }
             BackHandler(enabled = showSpeechSettings) { showSpeechSettings = false }
+            BackHandler(enabled = showAiProfiles) {
+                showAiProfiles = false
+                speechSettingsViewModel?.load()
+            }
             BackHandler(enabled = selectedFeature != null) { selectedFeatureKey = null }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
@@ -301,18 +305,6 @@ fun AppScreen(
                     onBack = { showCheckIn = false },
                     onRetry = { checkInViewModel?.load(state.profile.id) },
                 )
-            } else if (showSpeechSettings) {
-                val speechState by speechSettingsViewModel?.state?.collectAsState() ?: remember { mutableStateOf(SpeechSettingsUiState()) }
-                SpeechSettingsScreen(
-                    state = speechState,
-                    onSelect = { engine, profileId -> speechSettingsViewModel?.select(engine, profileId) },
-                    onOpenAiProfiles = {
-                        showSpeechSettings = false
-                        aiProfileViewModel?.load()
-                        showAiProfiles = aiProfileViewModel != null
-                    },
-                    onBack = { showSpeechSettings = false },
-                )
             } else if (showAiProfiles) {
                 val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
                 AiProfileSettingsScreen(
@@ -325,7 +317,20 @@ fun AppScreen(
                     onCloseEditor = { aiProfileViewModel?.closeEditor() },
                     onDeleteProfile = { aiProfileViewModel?.deleteProfile(it) },
                     onDeleteKey = { aiProfileViewModel?.deleteKey(it) },
-                    onBack = { showAiProfiles = false },
+                    onBack = {
+                        showAiProfiles = false
+                        speechSettingsViewModel?.load()
+                    },
+                )
+            } else if (showSpeechSettings) {
+                SpeechSettingsScreen(
+                    state = speechState,
+                    onSelect = { engine, profileId -> speechSettingsViewModel?.select(engine, profileId) },
+                    onOpenAiProfiles = {
+                        aiProfileViewModel?.load()
+                        showAiProfiles = aiProfileViewModel != null
+                    },
+                    onBack = { showSpeechSettings = false },
                 )
             } else if (selectedFeature != null) {
                 AiFeatureScreen(
@@ -462,6 +467,7 @@ fun AppScreen(
                                     speechSettingsViewModel?.load()
                                     showSpeechSettings = speechSettingsViewModel != null
                                 },
+                                speechEngineStatuses = speechState.engineStatuses(),
                                 aiProfileSubtitle = aiProfiles?.let { ready ->
                                     if (ready.items.isEmpty()) {
                                         "尚未添加，点这里添加第一套 OpenAI 兼容服务"

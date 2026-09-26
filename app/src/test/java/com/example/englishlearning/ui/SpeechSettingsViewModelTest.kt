@@ -21,7 +21,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -49,7 +48,10 @@ class SpeechSettingsViewModelTest {
         assertEquals(PronunciationEngine.SystemTts, state.selectedEngine)
         assertEquals(listOf("openai", "mimo"), state.candidates.map { it.profileId })
         assertEquals(listOf(SpeechProfileStatus.Available, SpeechProfileStatus.MissingKey), state.candidates.map { it.status })
-        assertFalse(state.toString().contains("secret-value"))
+        assertEquals(setOf("selectedEngine", "openAiProfileId", "miMoProfileId", "candidates", "message"),
+            SpeechSettingsUiState::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
+        assertEquals(setOf("profileId", "displayName", "status"),
+            SpeechProfileCandidate::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
     }
 
     @Test fun selectOpenAiSavesItsProfileIdAndKeepsMimoBinding() = runTest(dispatcher) {
@@ -66,16 +68,85 @@ class SpeechSettingsViewModelTest {
     }
 
     @Test fun failedSaveRetainsThePreviousUiSelection() = runTest(dispatcher) {
-        val preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.SystemTts), failSave = true)
-        val viewModel = viewModel(profiles = listOf(profile("openai", setOf(AiCapability.Speech))), preferences = preferences)
+        val preferences = FakePreferences(
+            SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "bound"),
+            failSave = true,
+        )
+        val viewModel = viewModel(profiles = listOf(profile("bound", setOf(AiCapability.Speech))), preferences = preferences)
         viewModel.load()
         advanceUntilIdle()
 
-        viewModel.select(PronunciationEngine.OpenAi, "openai")
+        viewModel.select(PronunciationEngine.OpenAi, "new")
         advanceUntilIdle()
 
-        assertEquals(PronunciationEngine.SystemTts, viewModel.state.value.selectedEngine)
+        assertEquals(PronunciationEngine.OpenAi, viewModel.state.value.selectedEngine)
+        assertEquals("bound", viewModel.state.value.openAiProfileId)
         assertTrue(viewModel.state.value.message != null)
+    }
+
+    @Test fun providerSummaryUsesSpeechCandidatesKeysAndTheCurrentBinding() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            profiles = listOf(profile("openai", setOf(AiCapability.Speech)), profile("mimo", setOf(AiCapability.Speech))),
+            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai")),
+            secretStore = SpeechFakeSecretStore(setOf("openai")),
+        )
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals("OpenAI TTS", viewModel.state.value.engineStatuses().currentProvider)
+        assertEquals("当前供应商 · 已配置", viewModel.state.value.engineStatuses().openAi)
+        assertEquals("可选配置 · 未绑定", viewModel.state.value.engineStatuses().miMo)
+        assertEquals("未下载", viewModel.state.value.engineStatuses().zipVoice)
+    }
+
+    @Test fun invalidatedBindingIsNotReportedAsConfigured() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            profiles = listOf(profile("openai", setOf(AiCapability.Speech))),
+            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "removed")),
+            secretStore = SpeechFakeSecretStore(setOf("openai")),
+        )
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals("当前供应商 · 绑定失效", viewModel.state.value.engineStatuses().miMo)
+        assertEquals("可选配置 · 未绑定", viewModel.state.value.engineStatuses().openAi)
+    }
+
+    @Test fun unboundSpeechCandidateIsNotMisreportedAsAnActiveBinding() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            profiles = listOf(profile("voice", setOf(AiCapability.Speech))),
+            secretStore = SpeechFakeSecretStore(setOf("voice")),
+        )
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals("可选配置 · 未绑定", viewModel.state.value.engineStatuses().openAi)
+        assertEquals("可选配置 · 未绑定", viewModel.state.value.engineStatuses().miMo)
+        assertEquals("未下载", viewModel.state.value.engineStatuses().zipVoice)
+        assertEquals("系统 TTS", viewModel.state.value.engineStatuses().currentProvider)
+    }
+
+    @Test fun profileWithoutSpeechCapabilityDoesNotMarkProviderConfigured() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            profiles = listOf(profile("text-only", setOf(AiCapability.Text))),
+            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "text-only")),
+            secretStore = SpeechFakeSecretStore(setOf("text-only")),
+        )
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals("当前供应商 · 绑定失效", viewModel.state.value.engineStatuses().openAi)
+    }
+
+    @Test fun boundProfileWithoutKeyIsExplicitlyReportedMissingKey() = runTest(dispatcher) {
+        val viewModel = viewModel(
+            profiles = listOf(profile("openai", setOf(AiCapability.Speech))),
+            preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai")),
+        )
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals("当前供应商 · 缺少密钥", viewModel.state.value.engineStatuses().openAi)
     }
 
     private fun viewModel(
