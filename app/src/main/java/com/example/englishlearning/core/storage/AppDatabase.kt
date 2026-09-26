@@ -8,6 +8,7 @@ import com.example.englishlearning.core.storage.dao.InternalAiProfileDao
 import com.example.englishlearning.core.storage.dao.InternalArticleDao
 import com.example.englishlearning.core.storage.dao.InternalAssetDao
 import com.example.englishlearning.core.storage.dao.InternalReadingPreferenceDao
+import com.example.englishlearning.core.storage.dao.InternalSpeechPreferenceDao
 import com.example.englishlearning.core.storage.dao.InternalReadingCompletionDao
 import com.example.englishlearning.core.storage.dao.InternalLearningEventDao
 import com.example.englishlearning.core.storage.dao.InternalLearningStatsDao
@@ -28,6 +29,7 @@ import com.example.englishlearning.core.storage.entity.LocalProfileEntity
 import com.example.englishlearning.core.storage.entity.ReadingCompletionEntity
 import com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity
 import com.example.englishlearning.core.storage.entity.SchemaMetaEntity
+import com.example.englishlearning.core.storage.entity.SpeechPreferenceEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
 import com.example.englishlearning.core.storage.entity.WordBookEntity
@@ -53,8 +55,9 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         LearningEventEntity::class,
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
+        SpeechPreferenceEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -65,6 +68,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalReadingPreferenceDao(): InternalReadingPreferenceDao
 
     internal abstract fun internalReadingCompletionDao(): InternalReadingCompletionDao
+
+    internal abstract fun internalSpeechPreferenceDao(): InternalSpeechPreferenceDao
 
     internal abstract fun internalAssetDao(): InternalAssetDao
 
@@ -194,6 +199,17 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_12_13: Migration =
+            object : Migration(12, 13) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `speech_preferences` " +
+                            "(`preferenceId` TEXT NOT NULL, `selectedEngine` TEXT NOT NULL, " +
+                            "`openAiProfileId` TEXT, `miMoProfileId` TEXT, PRIMARY KEY(`preferenceId`))",
+                    )
+                }
+            }
+
         val MIGRATION_10_11: Migration =
             object : Migration(10, 11) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -311,7 +327,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

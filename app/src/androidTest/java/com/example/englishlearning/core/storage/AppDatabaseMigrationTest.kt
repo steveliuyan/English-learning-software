@@ -119,6 +119,36 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV12ToV13_preservesAiProfileAndCreatesSpeechPreferencesWithoutCredentialFields() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 12).apply {
+            execSQL(
+                "INSERT INTO ai_profiles (profileId, displayName, websiteUrl, endpoint, model, capabilities, " +
+                    "secretAlias, temperature, topP, maxTokens, timeoutSeconds, systemPromptTemplateId) " +
+                    "VALUES ('existing-profile', 'Existing', 'https://example.com', 'https://example.com/v1', " +
+                    "'model', 'Speech', 'alias', 0.7, 1.0, 256, 30, 'default')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 13, true, AppDatabase.MIGRATION_12_13).apply {
+            query("SELECT displayName FROM ai_profiles WHERE profileId = 'existing-profile'").use { cursor ->
+                assertTrue("the v12 AI Profile must survive the migration", cursor.moveToFirst())
+                assertEquals("Existing", cursor.getString(0))
+            }
+            query("PRAGMA table_info(speech_preferences)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(
+                    setOf("preferenceId", "selectedEngine", "openAiProfileId", "miMoProfileId"),
+                    names.toSet(),
+                )
+                assertFalse(names.any { it.contains("key", ignoreCase = true) || it.contains("endpoint", ignoreCase = true) })
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateAllHistoricalSchemasWithoutDestructiveFallback() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 1).apply {

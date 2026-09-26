@@ -30,6 +30,8 @@ import com.example.englishlearning.learning.worksheet.BuildWorksheetContentUseCa
 import com.example.englishlearning.learning.worksheet.WorksheetDocumentBuilder
 import com.example.englishlearning.learning.worksheet.WorksheetPaginator
 import com.example.englishlearning.learning.domain.FsrsReviewScheduler
+import com.example.englishlearning.language.RoomSpeechPreferenceRepository
+import com.example.englishlearning.language.SpeechPreferenceRepository
 import com.example.englishlearning.language.domain.MiMoPronunciationProviderFactory
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationRouter
@@ -133,6 +135,7 @@ object AppModule {
 
     @Provides @Singleton fun provideReadingCompletionRepository(database: AppDatabase, clock: com.example.englishlearning.core.time.ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): com.example.englishlearning.reading.ReadingCompletionRepository = com.example.englishlearning.reading.RoomReadingCompletionRepository(database, clock, dispatcher)
     @Provides @Singleton fun provideAiProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): AiProfileRepository = RoomAiProfileRepository(database, dispatcher)
+    @Provides @Singleton fun provideSpeechPreferenceRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): SpeechPreferenceRepository = RoomSpeechPreferenceRepository(database, dispatcher)
     @Provides fun provideAiProfileSecretUseCase(secretStore: SecretStore): AiProfileSecretUseCase = AiProfileSecretUseCase(secretStore)
     @Provides @Singleton fun provideAiProfileIdFactory(): AiProfileIdFactory = AiProfileIdFactory.Random
     @Provides @Singleton fun provideAiHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AiHttpTransport = UrlConnectionAiHttpTransport(dispatcher)
