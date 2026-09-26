@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,11 @@ import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleDisplayMode
 import com.example.englishlearning.reading.domain.ArticleSource
+import com.example.englishlearning.ui.components.glass.GlassDialog
+import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -99,38 +105,43 @@ fun ArticleReadingScreen(
             androidx.compose.runtime.mutableStateOf(false)
         }
         if (!coveragePopupDismissed && current.article.coveredLemmas.isNotEmpty()) {
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { coveragePopupDismissed = true },
-                title = {
-                    Text(
-                        "本文覆盖你已背的 ${current.article.coveredLemmas.size} 个词",
-                        modifier = Modifier.testTag("coverage_popup_count"),
-                        fontWeight = FontWeight.Bold,
-                        color = MintPrimaryDark,
-                    )
-                },
-                text = {
-                    Column(Modifier.verticalScroll(rememberScrollState())) {
-                        current.article.coveredLemmas.forEach { lemma ->
-                            Text(
-                                lemma,
-                                Modifier
-                                    .fillMaxWidth()
-                                    .testTag("coverage_chip_$lemma")
-                                    .padding(vertical = 3.dp),
-                                color = MintPrimaryDark,
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = { coveragePopupDismissed = true },
-                        modifier = Modifier.testTag("coverage_popup_close"),
-                    ) { Text("我知道了") }
-                },
+            GlassDialog(
+                onDismiss = { coveragePopupDismissed = true },
                 modifier = Modifier.testTag("coverage_popup"),
-            )
+            ) {
+                Text(
+                    "本文覆盖你已背的 ${current.article.coveredLemmas.size} 个词",
+                    modifier = Modifier.testTag("coverage_popup_count"),
+                    style = AppType.Headline,
+                )
+                Column(
+                    Modifier
+                        .padding(top = 8.dp)
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    current.article.coveredLemmas.forEach { lemma ->
+                        Text(
+                            lemma,
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag("coverage_chip_$lemma")
+                                .padding(vertical = 3.dp),
+                            style = AppType.Body,
+                        )
+                    }
+                }
+                PillButton(
+                    text = "我知道了",
+                    onClick = { coveragePopupDismissed = true },
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .fillMaxWidth(),
+                    style = PillStyle.Primary,
+                    accent = DomainColors.Reading,
+                    testTag = "coverage_popup_close",
+                )
+            }
         }
 
         Text(

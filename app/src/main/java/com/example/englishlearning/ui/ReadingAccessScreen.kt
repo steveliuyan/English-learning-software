@@ -12,14 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +34,11 @@ import com.example.englishlearning.reading.FeedItem
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
+import com.example.englishlearning.ui.components.glass.GlassDialog
+import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -234,28 +237,39 @@ private fun GenerationFailureBanner(failure: AiFailure, onOpenAiSettings: () -> 
 
 @Composable
 private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean) -> Unit) {
-    AlertDialog(
-        onDismissRequest = { onConfirmOutbound(false) },
-        title = { Text("确认发送请求", fontWeight = FontWeight.Bold) },
-        text = {
-            Text(
-                "你的文本与该服务的密钥将发送给 $host，并可能产生费用。",
-                modifier = Modifier.testTag("outbound_confirmation_text"),
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirmOutbound(true) },
-                modifier = Modifier.testTag("outbound_confirm"),
-            ) { Text("确认发送", fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            TextButton(
+    GlassDialog(onDismiss = { onConfirmOutbound(false) }) {
+        Text("确认发送请求", style = AppType.Headline)
+        Text(
+            "你的文本与该服务的密钥将发送给 $host，并可能产生费用。",
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .testTag("outbound_confirmation_text"),
+            style = AppType.Body,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PillButton(
+                text = "取消",
                 onClick = { onConfirmOutbound(false) },
-                modifier = Modifier.testTag("outbound_cancel"),
-            ) { Text("取消") }
-        },
-    )
+                modifier = Modifier.weight(1f),
+                style = PillStyle.Secondary,
+                accent = DomainColors.Reading,
+                testTag = "outbound_cancel",
+            )
+            PillButton(
+                text = "确认发送",
+                onClick = { onConfirmOutbound(true) },
+                modifier = Modifier.weight(1f),
+                style = PillStyle.Primary,
+                accent = DomainColors.Reading,
+                testTag = "outbound_confirm",
+            )
+        }
+    }
 }
 
 /** 外刊列表区。Idle 不渲染任何东西；空态与失败态都显式给出文字。 */
