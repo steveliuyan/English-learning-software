@@ -10,13 +10,13 @@ import androidx.compose.ui.graphics.Color
  * screen is invisible to the rest of the app, and small hex differences then creep in between
  * screens that are meant to look the same.
  */
-internal val MintBackground: Color = Color(0xFFF1FBF5)
-internal val MintSurface: Color = Color(0xEFFFFFFF)
+internal val MintBackground: Color = AppPalette.Background
+internal val MintSurface: Color = AppPalette.Surface
 internal val MintTint: Color = Color(0xFFDDF7E8)
-internal val MintPrimary: Color = Color(0xFF2EC99C)
-internal val MintPrimaryDark: Color = Color(0xFF188F76)
-internal val MintOutline: Color = Color(0xFFADE7D2)
-internal val MintTextMuted: Color = Color(0xFF4E756A)
+internal val MintPrimary: Color = DomainColors.AiSpeech.base
+internal val MintPrimaryDark: Color = AppPalette.TextPrimary
+internal val MintOutline: Color = AppPalette.Separator
+internal val MintTextMuted: Color = AppPalette.TextSecondary
 
 /** Brand gradient stops used by the launch/lock surfaces. */
 internal val AppleMintStart: Color = Color(0xFFA8F3C8)
