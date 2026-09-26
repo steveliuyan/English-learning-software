@@ -21,17 +21,17 @@ class PronunciationRouter(
     private val systemProvider: PronunciationProvider,
     private val miMoFactory: MiMoPronunciationProviderFactory,
     private val openAiFactory: OpenAiPronunciationProviderFactory,
-    private val preferences: SpeechPreferenceRepository? = null,
+    private val preferences: SpeechPreferenceRepository,
 ) : PronunciationProvider {
     override fun capabilities(): Set<PronunciationCapability> = systemProvider.capabilities()
 
     override suspend fun speak(text: String): PronunciationResult = speak(text, savedPreference())
 
     private suspend fun savedPreference(): SpeechPreference = try {
-        preferences?.get()?.getOrElse { error ->
+        preferences.get().getOrElse { error ->
             if (error is CancellationException) throw error
             SpeechPreference()
-        } ?: SpeechPreference()
+        }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {

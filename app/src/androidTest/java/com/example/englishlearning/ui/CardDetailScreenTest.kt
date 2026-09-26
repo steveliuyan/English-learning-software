@@ -8,6 +8,10 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.domain.WordCard
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import java.lang.reflect.Modifier
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,17 +101,22 @@ class CardDetailScreenTest {
     }
 
     @Test
-    fun pronunciationUiOnlyContainsLemmaAndNoSecretText() {
-        composeRule.setContent {
-            CardDetailScreen(
-                card = card(),
-                onBack = {},
-                onSpeak = {},
-            )
-        }
+    fun cardDetailPublicBoundaryOnlyAcceptsCardAndActionCallbacks() {
+        val screenMethod = Class.forName("com.example.englishlearning.ui.CardDetailScreenKt")
+            .declaredMethods
+            .singleOrNull { method ->
+                method.name == "CardDetailScreen" && Modifier.isPublic(method.modifiers)
+            }
 
-        composeRule.onNodeWithContentDescription("播放 ability 发音").assertExists()
-        composeRule.onNodeWithText("sk-example-secret").assertDoesNotExist()
+        assertNotNull(screenMethod)
+        val parameterTypes = requireNotNull(screenMethod).parameterTypes
+        assertTrue(parameterTypes.any { it == WordCard::class.java })
+        assertFalse(parameterTypes.any { type ->
+            type.name in setOf(
+                "com.example.englishlearning.language.domain.SpeechPreference",
+                "com.example.englishlearning.core.security.SecretReference",
+            ) || type == CharArray::class.java || type == String::class.java
+        })
     }
 
     @Test

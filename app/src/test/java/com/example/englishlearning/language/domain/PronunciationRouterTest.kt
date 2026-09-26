@@ -7,8 +7,20 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import kotlin.reflect.full.primaryConstructor
 
 class PronunciationRouterTest {
+    @Test
+    fun `router requires a speech preference repository`() {
+        val repositoryParameter = requireNotNull(PronunciationRouter::class.primaryConstructor)
+            .parameters
+            .single { it.name == "preferences" }
+
+        assertEquals(SpeechPreferenceRepository::class, repositoryParameter.type.classifier)
+        assertEquals(false, repositoryParameter.type.isMarkedNullable)
+        assertEquals(false, repositoryParameter.isOptional)
+    }
+
     @Test
     fun `router is a pronunciation provider and defaults to system`() = runTest {
         val system = FakeProvider(PronunciationResult.Played)
@@ -16,6 +28,7 @@ class PronunciationRouterTest {
             system,
             CountingFactory(FakeProvider(PronunciationResult.Played)),
             CountingFactory(FakeProvider(PronunciationResult.Played)),
+            FixedSpeechPreferenceRepository(),
         )
 
         router.speak("hello")
@@ -129,7 +142,7 @@ class PronunciationRouterTest {
         val miMo = FakeProvider(PronunciationResult.Played)
         val openAiFactory = CountingFactory(openAi)
         val miMoFactory = CountingFactory(miMo)
-        val router = PronunciationRouter(system, miMoFactory, openAiFactory)
+        val router = PronunciationRouter(system, miMoFactory, openAiFactory, FixedSpeechPreferenceRepository())
 
         router.speak(
             "hello",
@@ -152,7 +165,7 @@ class PronunciationRouterTest {
         val miMo = FakeProvider(PronunciationResult.Played)
         val openAiFactory = CountingFactory(openAi)
         val miMoFactory = CountingFactory(miMo)
-        val router = PronunciationRouter(system, miMoFactory, openAiFactory)
+        val router = PronunciationRouter(system, miMoFactory, openAiFactory, FixedSpeechPreferenceRepository())
         val preference = SpeechPreference(
             selectedEngine = PronunciationEngine.OpenAi,
             openAiProfileId = "openai-profile",
@@ -177,7 +190,7 @@ class PronunciationRouterTest {
         val openAiFactory = LoggingFactory(events, "openai", openAi)
         val miMoFactory = LoggingFactory(events, "mimo", miMo)
 
-        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+        PronunciationRouter(system, miMoFactory, openAiFactory, FixedSpeechPreferenceRepository()).speak(
             "hello",
             SpeechPreference(
                 selectedEngine = PronunciationEngine.OpenAi,
@@ -206,7 +219,7 @@ class PronunciationRouterTest {
         val openAiFactory = ThrowingFactory(events, "openai", IllegalStateException("factory failed"))
         val miMoFactory = LoggingFactory(events, "mimo", miMo)
 
-        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+        PronunciationRouter(system, miMoFactory, openAiFactory, FixedSpeechPreferenceRepository()).speak(
             "hello",
             SpeechPreference(
                 selectedEngine = PronunciationEngine.OpenAi,
@@ -238,7 +251,7 @@ class PronunciationRouterTest {
 
         val error = assertThrows(CancellationException::class.java) {
             runBlocking {
-                PronunciationRouter(system, miMoFactory, unusedOpenAiFactory).speak(
+                PronunciationRouter(system, miMoFactory, unusedOpenAiFactory, FixedSpeechPreferenceRepository()).speak(
                     "hello",
                     SpeechPreference(
                         selectedEngine = PronunciationEngine.MiMo,
@@ -260,7 +273,7 @@ class PronunciationRouterTest {
         val openAiFactory = CountingFactory(openAi)
         val miMoFactory = CountingFactory(miMo)
 
-        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+        PronunciationRouter(system, miMoFactory, openAiFactory, FixedSpeechPreferenceRepository()).speak(
             "hello",
             SpeechPreference(
                 selectedEngine = PronunciationEngine.OpenAi,
@@ -281,7 +294,7 @@ class PronunciationRouterTest {
         val miMo = FakeProvider(PronunciationResult.Played)
         val openAiFactory = CountingFactory(openAi)
         val miMoFactory = CountingFactory(miMo)
-        val router = PronunciationRouter(system, miMoFactory, openAiFactory)
+        val router = PronunciationRouter(system, miMoFactory, openAiFactory, FixedSpeechPreferenceRepository())
 
         router.speak(
             "hello",
@@ -308,7 +321,7 @@ class PronunciationRouterTest {
         val miMo = ThrowingProvider()
         val miMoFactory = CountingFactory(miMo)
         val unusedOpenAiFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
-        val miMoRouter = PronunciationRouter(system, miMoFactory, unusedOpenAiFactory)
+        val miMoRouter = PronunciationRouter(system, miMoFactory, unusedOpenAiFactory, FixedSpeechPreferenceRepository())
 
         assertThrows(CancellationException::class.java) {
             runBlocking {
@@ -326,7 +339,7 @@ class PronunciationRouterTest {
 
         val openAi = ThrowingProvider()
         val unusedMiMoFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
-        val openAiRouter = PronunciationRouter(system, unusedMiMoFactory, CountingFactory(openAi))
+        val openAiRouter = PronunciationRouter(system, unusedMiMoFactory, CountingFactory(openAi), FixedSpeechPreferenceRepository())
         assertThrows(CancellationException::class.java) {
             runBlocking {
                 openAiRouter.speak(
@@ -349,7 +362,7 @@ class PronunciationRouterTest {
         val miMoFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
         val openAiFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
 
-        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+        PronunciationRouter(system, miMoFactory, openAiFactory, FixedSpeechPreferenceRepository()).speak(
             "hello",
             SpeechPreference(
                 selectedEngine = PronunciationEngine.SystemTts,
