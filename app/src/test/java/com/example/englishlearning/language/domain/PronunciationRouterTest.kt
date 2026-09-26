@@ -1,6 +1,7 @@
 package com.example.englishlearning.language.domain
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -10,7 +11,11 @@ class PronunciationRouterTest {
     @Test
     fun `router is a pronunciation provider and defaults to system`() = runTest {
         val system = FakeProvider(PronunciationResult.Played)
-        val router: PronunciationProvider = PronunciationRouter(system, FakeFactory(FakeProvider(PronunciationResult.Played)))
+        val router: PronunciationProvider = PronunciationRouter(
+            system,
+            CountingFactory(FakeProvider(PronunciationResult.Played)),
+            CountingFactory(FakeProvider(PronunciationResult.Played)),
+        )
 
         router.speak("hello")
 
@@ -18,72 +23,169 @@ class PronunciationRouterTest {
     }
 
     @Test
-    fun `default and explicit system use only system provider`() = runTest {
+    fun `openai success does not call fallback providers`() = runTest {
         val system = FakeProvider(PronunciationResult.Played)
-        val mimo = FakeProvider(PronunciationResult.Played)
-        val router = PronunciationRouter(system, FakeFactory(mimo))
+        val openAi = FakeProvider(PronunciationResult.Played)
+        val miMo = FakeProvider(PronunciationResult.Played)
+        val openAiFactory = CountingFactory(openAi)
+        val miMoFactory = CountingFactory(miMo)
+        val router = PronunciationRouter(system, miMoFactory, openAiFactory)
 
-        router.speak("hello")
-        router.speak("hello", PronunciationSelection(PronunciationEngine.SystemTts))
-
-        assertEquals(2, system.calls)
-        assertEquals(0, mimo.calls)
-    }
-
-    @Test
-    fun `mimo without profile falls back to system`() = runTest {
-        val system = FakeProvider(PronunciationResult.Played)
-        val mimo = FakeProvider(PronunciationResult.Played)
-        PronunciationRouter(system, FakeFactory(mimo)).speak(
-            "hello", PronunciationSelection(PronunciationEngine.MiMo, null)
+        router.speak(
+            "hello",
+            SpeechPreference(
+                selectedEngine = PronunciationEngine.OpenAi,
+                openAiProfileId = "openai-profile",
+                miMoProfileId = "mimo-profile",
+            ),
         )
-        assertEquals(1, system.calls)
-        assertEquals(0, mimo.calls)
-    }
 
-    @Test
-    fun `mimo factory receives profile and successful mimo does not call system`() = runTest {
-        val system = FakeProvider(PronunciationResult.Played)
-        val mimo = FakeProvider(PronunciationResult.Played)
-        val factory = FakeFactory(mimo)
-        PronunciationRouter(system, factory).speak(
-            "hello", PronunciationSelection(PronunciationEngine.MiMo, "profile-7")
-        )
-        assertEquals("profile-7", factory.profileId)
+        assertEquals(listOf("openai-profile"), openAiFactory.profileIds)
+        assertEquals(emptyList<String>(), miMoFactory.profileIds)
         assertEquals(0, system.calls)
-        assertEquals(1, mimo.calls)
     }
 
     @Test
-    fun `mimo unavailable or failed falls back to system`() = runTest {
+    fun `openai unavailable or failed falls back to mimo`() = runTest {
         val system = FakeProvider(PronunciationResult.Played)
-        val mimo = FakeProvider(PronunciationResult.Unavailable("offline"))
-        val router = PronunciationRouter(system, FakeFactory(mimo))
-        router.speak("hello", PronunciationSelection(PronunciationEngine.MiMo, "p"))
+        val openAi = FakeProvider(PronunciationResult.Unavailable("offline"))
+        val miMo = FakeProvider(PronunciationResult.Played)
+        val openAiFactory = CountingFactory(openAi)
+        val miMoFactory = CountingFactory(miMo)
+        val router = PronunciationRouter(system, miMoFactory, openAiFactory)
+        val preference = SpeechPreference(
+            selectedEngine = PronunciationEngine.OpenAi,
+            openAiProfileId = "openai-profile",
+            miMoProfileId = "mimo-profile",
+        )
+
+        router.speak("hello", preference)
+        openAi.result = PronunciationResult.Failed()
+        router.speak("hello", preference)
+
+        assertEquals(listOf("openai-profile", "openai-profile"), openAiFactory.profileIds)
+        assertEquals(listOf("mimo-profile", "mimo-profile"), miMoFactory.profileIds)
+        assertEquals(0, system.calls)
+    }
+
+    @Test
+    fun `openai and mimo failures fall back to system`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val openAi = FakeProvider(PronunciationResult.Failed())
+        val miMo = FakeProvider(PronunciationResult.Unavailable("offline"))
+        val openAiFactory = CountingFactory(openAi)
+        val miMoFactory = CountingFactory(miMo)
+
+        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+            "hello",
+            SpeechPreference(
+                selectedEngine = PronunciationEngine.OpenAi,
+                openAiProfileId = "openai-profile",
+                miMoProfileId = "mimo-profile",
+            ),
+        )
+
+        assertEquals(1, openAi.calls)
+        assertEquals(1, miMo.calls)
         assertEquals(1, system.calls)
-        mimo.result = PronunciationResult.Failed()
-        router.speak("hello", PronunciationSelection(PronunciationEngine.MiMo, "p"))
-        assertEquals(2, system.calls)
     }
 
     @Test
-    fun `mimo cancellation is rethrown without fallback`() = runTest {
+    fun `missing profile skips that remote provider`() = runTest {
         val system = FakeProvider(PronunciationResult.Played)
-        val mimo = ThrowingProvider()
+        val openAi = FakeProvider(PronunciationResult.Played)
+        val miMo = FakeProvider(PronunciationResult.Played)
+        val openAiFactory = CountingFactory(openAi)
+        val miMoFactory = CountingFactory(miMo)
+        val router = PronunciationRouter(system, miMoFactory, openAiFactory)
+
+        router.speak(
+            "hello",
+            SpeechPreference(
+                selectedEngine = PronunciationEngine.OpenAi,
+                openAiProfileId = null,
+                miMoProfileId = "mimo-profile",
+            ),
+        )
+        router.speak(
+            "hello",
+            SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = null),
+        )
+
+        assertEquals(emptyList<String>(), openAiFactory.profileIds)
+        assertEquals(listOf("mimo-profile"), miMoFactory.profileIds)
+        assertEquals(1, miMo.calls)
+        assertEquals(1, system.calls)
+    }
+
+    @Test
+    fun `remote cancellation is rethrown without fallback`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val miMo = ThrowingProvider()
+        val miMoFactory = CountingFactory(miMo)
+        val unusedOpenAiFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+        val miMoRouter = PronunciationRouter(system, miMoFactory, unusedOpenAiFactory)
+
         assertThrows(CancellationException::class.java) {
-            kotlinx.coroutines.runBlocking {
-                PronunciationRouter(system, FakeFactory(mimo)).speak(
-                    "hello", PronunciationSelection(PronunciationEngine.MiMo, "p")
+            runBlocking {
+                miMoRouter.speak(
+                    "hello",
+                    SpeechPreference(
+                        selectedEngine = PronunciationEngine.MiMo,
+                        miMoProfileId = "mimo-profile",
+                    ),
                 )
             }
         }
         assertEquals(0, system.calls)
+        assertEquals(emptyList<String>(), unusedOpenAiFactory.profileIds)
+
+        val openAi = ThrowingProvider()
+        val unusedMiMoFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+        val openAiRouter = PronunciationRouter(system, unusedMiMoFactory, CountingFactory(openAi))
+        assertThrows(CancellationException::class.java) {
+            runBlocking {
+                openAiRouter.speak(
+                    "hello",
+                    SpeechPreference(
+                        selectedEngine = PronunciationEngine.OpenAi,
+                        openAiProfileId = "openai-profile",
+                        miMoProfileId = "mimo-profile",
+                    ),
+                )
+            }
+        }
+        assertEquals(0, system.calls)
+        assertEquals(emptyList<String>(), unusedMiMoFactory.profileIds)
     }
 
-    private class FakeFactory(private val provider: PronunciationProvider) : MiMoPronunciationProviderFactory {
-        var profileId: String? = null
+    @Test
+    fun `explicit system does not create remote providers`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val miMoFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+        val openAiFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+
+        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+            "hello",
+            SpeechPreference(
+                selectedEngine = PronunciationEngine.SystemTts,
+                openAiProfileId = "openai-profile",
+                miMoProfileId = "mimo-profile",
+            ),
+        )
+
+        assertEquals(emptyList<String>(), openAiFactory.profileIds)
+        assertEquals(emptyList<String>(), miMoFactory.profileIds)
+        assertEquals(1, system.calls)
+    }
+
+    private class CountingFactory(private val provider: PronunciationProvider) :
+        MiMoPronunciationProviderFactory,
+        OpenAiPronunciationProviderFactory {
+        val profileIds = mutableListOf<String>()
+
         override fun create(profileId: String): PronunciationProvider {
-            this.profileId = profileId
+            profileIds += profileId
             return provider
         }
     }
@@ -91,10 +193,16 @@ class PronunciationRouterTest {
     private open class FakeProvider(var result: PronunciationResult) : PronunciationProvider {
         var calls = 0
         override fun capabilities() = emptySet<PronunciationCapability>()
-        override suspend fun speak(text: String): PronunciationResult { calls++; return result }
+        override suspend fun speak(text: String): PronunciationResult {
+            calls++
+            return result
+        }
     }
 
     private class ThrowingProvider : FakeProvider(PronunciationResult.Played) {
-        override suspend fun speak(text: String): PronunciationResult { calls++; throw CancellationException("cancel") }
+        override suspend fun speak(text: String): PronunciationResult {
+            calls++
+            throw CancellationException("cancel")
+        }
     }
 }

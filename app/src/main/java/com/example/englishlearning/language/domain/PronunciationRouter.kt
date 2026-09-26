@@ -5,12 +5,8 @@ import kotlinx.coroutines.CancellationException
 enum class PronunciationEngine {
     SystemTts,
     MiMo,
+    OpenAi,
 }
-
-data class PronunciationSelection(
-    val engine: PronunciationEngine = PronunciationEngine.SystemTts,
-    val profileId: String? = null,
-)
 
 fun interface MiMoPronunciationProviderFactory {
     fun create(profileId: String): PronunciationProvider
@@ -23,28 +19,42 @@ fun interface OpenAiPronunciationProviderFactory {
 class PronunciationRouter(
     private val systemProvider: PronunciationProvider,
     private val miMoFactory: MiMoPronunciationProviderFactory,
+    private val openAiFactory: OpenAiPronunciationProviderFactory,
 ) : PronunciationProvider {
     override fun capabilities(): Set<PronunciationCapability> = systemProvider.capabilities()
 
-    override suspend fun speak(text: String): PronunciationResult = speak(text, PronunciationSelection())
+    override suspend fun speak(text: String): PronunciationResult = systemProvider.speak(text)
 
-    suspend fun speak(
-        text: String,
-        selection: PronunciationSelection = PronunciationSelection(),
-    ): PronunciationResult {
-        if (selection.engine == PronunciationEngine.SystemTts || selection.profileId == null) {
-            return systemProvider.speak(text)
+    suspend fun speak(text: String, preference: SpeechPreference): PronunciationResult = when (preference.selectedEngine) {
+        PronunciationEngine.SystemTts -> systemProvider.speak(text)
+        PronunciationEngine.MiMo -> speakRemoteOrSystem(text, preference.miMoProfileId, miMoFactory::create)
+        PronunciationEngine.OpenAi -> {
+            val openAiResult = speakRemote(text, preference.openAiProfileId, openAiFactory::create)
+            if (openAiResult == PronunciationResult.Played) openAiResult
+            else speakRemoteOrSystem(text, preference.miMoProfileId, miMoFactory::create)
         }
-        val result = try {
-            miMoFactory.create(selection.profileId).speak(text)
+    }
+
+    private suspend fun speakRemoteOrSystem(
+        text: String,
+        profileId: String?,
+        factory: (String) -> PronunciationProvider,
+    ): PronunciationResult = speakRemote(text, profileId, factory).let { result ->
+        if (result == PronunciationResult.Played) result else systemProvider.speak(text)
+    }
+
+    private suspend fun speakRemote(
+        text: String,
+        profileId: String?,
+        factory: (String) -> PronunciationProvider,
+    ): PronunciationResult {
+        if (profileId == null) return PronunciationResult.Unavailable("Missing speech profile")
+        return try {
+            factory(profileId).speak(text)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             PronunciationResult.Failed()
-        }
-        return when (result) {
-            PronunciationResult.Played -> result
-            is PronunciationResult.Unavailable, is PronunciationResult.Failed -> systemProvider.speak(text)
         }
     }
 }
