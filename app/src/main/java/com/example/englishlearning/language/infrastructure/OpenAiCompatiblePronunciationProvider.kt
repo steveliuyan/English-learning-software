@@ -38,13 +38,20 @@ class OpenAiCompatiblePronunciationProvider(
                     body = request.body.toByteArray(),
                 ),
             )
-            if (response !is AudioHttpResult.Success) return PronunciationResult.Failed()
-            try {
-                if (response.body.isEmpty()) PronunciationResult.Failed()
-                else if (player.play(response.body, responseFormat) is AudioPlaybackResult.Played) PronunciationResult.Played
-                else PronunciationResult.Failed()
-            } finally {
-                response.body.fill(0)
+            when (response) {
+                is AudioHttpResult.Success -> try {
+                    if (response.body.isEmpty()) PronunciationResult.Failed()
+                    else if (player.play(response.body, responseFormat) is AudioPlaybackResult.Played) PronunciationResult.Played
+                    else PronunciationResult.Failed()
+                } finally {
+                    response.body.fill(0)
+                }
+                is AudioHttpResult.HttpError -> try {
+                    PronunciationResult.Failed()
+                } finally {
+                    response.body.fill(0)
+                }
+                else -> PronunciationResult.Failed()
             }
         } catch (cancelled: CancellationException) {
             throw cancelled

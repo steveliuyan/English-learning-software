@@ -60,10 +60,11 @@ class OpenAiCompatiblePronunciationProviderTest {
     }
 
     @Test
-    fun `HTTP failure returns failed`() = runTest {
-        assertIs<PronunciationResult.Failed>(
-            provider(transport = RecordingTransport(AudioHttpResult.HttpError(500, byteArrayOf()))).speak("hello"),
-        )
+    fun `HTTP failure returns failed and clears error audio`() = runTest {
+        val transport = RecordingTransport(AudioHttpResult.HttpError(500, byteArrayOf(1, 2)))
+
+        assertIs<PronunciationResult.Failed>(provider(transport = transport).speak("hello"))
+        assertTrue(transport.responseBody.all { it == 0.toByte() })
     }
 
     @Test
@@ -118,7 +119,11 @@ class OpenAiCompatiblePronunciationProviderTest {
 
     private class RecordingTransport(private val outcome: AudioHttpResult) : AudioHttpTransport {
         var request: AudioHttpRequest? = null
-        val responseBody: ByteArray get() = (outcome as? AudioHttpResult.Success)?.body ?: byteArrayOf()
+        val responseBody: ByteArray get() = when (outcome) {
+            is AudioHttpResult.Success -> outcome.body
+            is AudioHttpResult.HttpError -> outcome.body
+            else -> byteArrayOf()
+        }
         override suspend fun send(request: AudioHttpRequest): AudioHttpResult {
             this.request = request
             return outcome
