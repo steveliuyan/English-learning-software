@@ -77,3 +77,23 @@
 ### Remaining follow-up
 
 - The focused Router suite is green. Full `:app:check` was not rerun for this test-only coverage slice.
+
+## Fix round 2 — CardDetailScreen API boundary allowlist
+
+### Implemented slices
+
+- Replaced the former blacklist-only reflection assertion in `CardDetailScreenTest` with a stable top-level parameter allowlist: `WordCard`, `Modifier`, Compose `Composer`, function callbacks, primitive compiler parameters, and `DefaultConstructorMarker` only.
+- Explicitly asserts `AiProfile`, raw `String`, and `CharArray` are rejected, while requiring `WordCard` and at least three callback parameters (including `onBack`, `onSpeak`, and `onRelearn`) to remain present.
+
+### TDD / mutation record
+
+- GREEN baseline: `CardDetailScreenTest` compiled with the allowlist test and existing production signature.
+- Mutation: temporarily added `aiProfile: AiProfile? = null` to `CardDetailScreen`; after assembling and installing both APKs, the focused instrumentation test failed at the allowlist assertion (`CardDetailScreenTest.kt:127`).
+- Mutation was reverted; no production API change remains.
+
+### Verification results
+
+- PASS: `:app:compileDebugAndroidTestKotlin`.
+- PASS (mutation build): `:app:assembleDebug :app:assembleDebugAndroidTest`.
+- PASS (mutation detection): `adb install -r -t` for both APKs; `am instrument -w -e class com.example.englishlearning.ui.CardDetailScreenTest ...` produced 6 passing tests and the expected boundary failure.
+- Pending after mutation revert: rerun final assemble/install/instrumentation and `git diff --check`.
