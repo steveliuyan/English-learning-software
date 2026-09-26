@@ -20,6 +20,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
+import com.example.englishlearning.ai.domain.AiProviderKind
+import com.example.englishlearning.ai.domain.AiVoiceCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -257,12 +259,53 @@ class AiProfileSettingsScreenTest {
         composeRule.onNodeWithTag("ai_profile_save").performScrollTo().assertIsNotEnabled()
     }
 
+    /**
+     * 音色下拉已改为玻璃浮层（GlassOverlay）：触发行只负责开浮层，选项在浮层面板里，
+     * 选中后先回调 `onDraftChange` 再关闭。浮层关闭时选项不组合，所以必须先点开再断言。
+     */
+    @Test fun voice_picker_opens_the_glass_overlay_and_reports_the_auto_selection() {
+        var captured: AiProfileDraft? = null
+        setScreen(
+            editor = editorState(capabilities = setOf(AiCapability.Text, AiCapability.Speech)),
+            onDraftChange = { captured = it },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_voice").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("ai_profile_voice_overlay").assertExists()
+        composeRule.onNodeWithTag("ai_profile_voice_auto").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("", captured?.voice)
+        composeRule.onNodeWithTag("ai_profile_voice_overlay").assertDoesNotExist()
+    }
+
+    @Test fun voice_picker_lists_catalog_voices_and_reports_the_selected_voice() {
+        var captured: AiProfileDraft? = null
+        setScreen(
+            editor = editorState(capabilities = setOf(AiCapability.Text, AiCapability.Speech)),
+            onDraftChange = { captured = it },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_voice").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        val voice = AiVoiceCatalog.optionsFor(AiProviderKind.OPENAI_COMPATIBLE).first()
+        composeRule.onNodeWithTag("ai_profile_voice_${voice}").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(voice, captured?.voice)
+    }
+
     private fun editorState(
         profileId: String? = "p1",
         hasStoredKey: Boolean = true,
         pendingKey: String = "",
         displayName: String = "公司网关",
         fieldError: AiProfileFieldError? = null,
+        capabilities: Set<AiCapability> = setOf(AiCapability.Text),
+        voice: String = "",
     ) = AiProfileEditorUiState(
         profileId = profileId,
         draft = AiProfileDraft(
@@ -270,7 +313,8 @@ class AiProfileSettingsScreenTest {
             websiteUrl = "https://example.com",
             endpoint = "https://api.example.com/v1",
             model = "gpt-4o-mini",
-            capabilities = setOf(AiCapability.Text),
+            capabilities = capabilities,
+            voice = voice,
             pendingKey = pendingKey,
         ),
         hasStoredKey = hasStoredKey,
