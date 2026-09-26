@@ -69,6 +69,90 @@ class PronunciationRouterTest {
     }
 
     @Test
+    fun `openai failure runs remote fallback and system in order`() = runTest {
+        val events = mutableListOf<String>()
+        val system = LoggingProvider(events, "system", PronunciationResult.Played)
+        val openAi = LoggingProvider(events, "openai", PronunciationResult.Failed())
+        val miMo = LoggingProvider(events, "mimo", PronunciationResult.Unavailable("offline"))
+        val openAiFactory = LoggingFactory(events, "openai", openAi)
+        val miMoFactory = LoggingFactory(events, "mimo", miMo)
+
+        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+            "hello",
+            SpeechPreference(
+                selectedEngine = PronunciationEngine.OpenAi,
+                openAiProfileId = "openai-profile",
+                miMoProfileId = "mimo-profile",
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                "openai factory:create(openai-profile)",
+                "openai:speak(hello)",
+                "mimo factory:create(mimo-profile)",
+                "mimo:speak(hello)",
+                "system:speak(hello)",
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun `remote factory exception uses next fallback`() = runTest {
+        val events = mutableListOf<String>()
+        val system = LoggingProvider(events, "system", PronunciationResult.Played)
+        val miMo = LoggingProvider(events, "mimo", PronunciationResult.Played)
+        val openAiFactory = ThrowingFactory(events, "openai", IllegalStateException("factory failed"))
+        val miMoFactory = LoggingFactory(events, "mimo", miMo)
+
+        PronunciationRouter(system, miMoFactory, openAiFactory).speak(
+            "hello",
+            SpeechPreference(
+                selectedEngine = PronunciationEngine.OpenAi,
+                openAiProfileId = "openai-profile",
+                miMoProfileId = "mimo-profile",
+            ),
+        )
+
+        assertEquals(
+            listOf(
+                "openai factory:create(openai-profile)",
+                "mimo factory:create(mimo-profile)",
+                "mimo:speak(hello)",
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun `factory cancellation is rethrown without fallback`() = runTest {
+        val events = mutableListOf<String>()
+        val system = LoggingProvider(events, "system", PronunciationResult.Played)
+        val miMoFactory = ThrowingFactory(events, "mimo", CancellationException("cancel"))
+        val unusedOpenAiFactory = LoggingFactory(
+            events,
+            "openai",
+            LoggingProvider(events, "openai", PronunciationResult.Played),
+        )
+
+        val error = assertThrows(CancellationException::class.java) {
+            runBlocking {
+                PronunciationRouter(system, miMoFactory, unusedOpenAiFactory).speak(
+                    "hello",
+                    SpeechPreference(
+                        selectedEngine = PronunciationEngine.MiMo,
+                        miMoProfileId = "mimo-profile",
+                    ),
+                )
+            }
+        }
+
+        assertEquals("cancel", error.message)
+        assertEquals(listOf("mimo factory:create(mimo-profile)"), events)
+    }
+
+    @Test
     fun `openai and mimo failures fall back to system`() = runTest {
         val system = FakeProvider(PronunciationResult.Played)
         val openAi = FakeProvider(PronunciationResult.Failed())
@@ -177,6 +261,40 @@ class PronunciationRouterTest {
         assertEquals(emptyList<String>(), openAiFactory.profileIds)
         assertEquals(emptyList<String>(), miMoFactory.profileIds)
         assertEquals(1, system.calls)
+    }
+
+    private class LoggingFactory(
+        private val events: MutableList<String>,
+        private val name: String,
+        private val provider: PronunciationProvider,
+    ) : MiMoPronunciationProviderFactory, OpenAiPronunciationProviderFactory {
+        override fun create(profileId: String): PronunciationProvider {
+            events += "$name factory:create($profileId)"
+            return provider
+        }
+    }
+
+    private class ThrowingFactory(
+        private val events: MutableList<String>,
+        private val name: String,
+        private val error: Exception,
+    ) : MiMoPronunciationProviderFactory, OpenAiPronunciationProviderFactory {
+        override fun create(profileId: String): PronunciationProvider {
+            events += "$name factory:create($profileId)"
+            throw error
+        }
+    }
+
+    private class LoggingProvider(
+        private val events: MutableList<String>,
+        private val name: String,
+        private val result: PronunciationResult,
+    ) : PronunciationProvider {
+        override fun capabilities() = emptySet<PronunciationCapability>()
+        override suspend fun speak(text: String): PronunciationResult {
+            events += "$name:speak($text)"
+            return result
+        }
     }
 
     private class CountingFactory(private val provider: PronunciationProvider) :

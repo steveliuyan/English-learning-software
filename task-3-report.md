@@ -54,3 +54,26 @@
 ### Remaining follow-up
 
 - Re-run connected instrumentation after device installation is allowed. No code defect or compiler failure remains in the instrumented source.
+
+## Fix round 2 — pronunciation router coverage recovery
+
+### Implemented slices
+
+- Added a shared event log regression for the OpenAI failure path. It verifies the exact consumer-visible chain: OpenAI factory/speak, MiMo factory/speak, then system TTS.
+- Added factory-boundary coverage for a normal exception: an OpenAI factory `IllegalStateException` is converted to a failed remote attempt and continues to the MiMo fallback.
+- Added factory-boundary cancellation coverage: a MiMo factory `CancellationException` is rethrown and neither alternate remote nor system fallback is invoked.
+
+### TDD record
+
+- RED: the focused `*PronunciationRouterTest` command failed during test compilation because the new shared event-log provider/factory fixtures did not yet exist. The unresolved references were `LoggingProvider`, `LoggingFactory`, and `ThrowingFactory`.
+- GREEN: after adding only those test-local fixtures, the focused Router JVM test suite passed. No production change was required: `PronunciationRouter.speakRemote` already catches ordinary `Exception` while explicitly rethrowing `CancellationException`.
+
+### Verification results
+
+- PASS: `GRADLE_USER_HOME=D:/Android/GradleCache gradlew.bat --project-dir D:/EnglishLearningWorktrees/f1-04-unlock-verify :app:testDebugUnitTest --tests '*PronunciationRouterTest' --no-daemon --no-build-cache`.
+- PASS: `git diff --check`.
+- Not applicable: `:app:ktlintDebugUnitTestSourceSetCheck` is not a registered Gradle task in this project; attempting it failed at task lookup only and did not run or invalidate source/tests.
+
+### Remaining follow-up
+
+- The focused Router suite is green. Full `:app:check` was not rerun for this test-only coverage slice.
