@@ -144,7 +144,8 @@ object AppModule {
         system: AndroidTextToSpeechProvider,
         miMoFactory: MiMoPronunciationProviderFactory,
         openAiFactory: OpenAiPronunciationProviderFactory,
-    ): PronunciationProvider = PronunciationRouter(system, miMoFactory, openAiFactory)
+        preferences: SpeechPreferenceRepository,
+    ): PronunciationProvider = PronunciationRouter(system, miMoFactory, openAiFactory, preferences)
     @Provides @Singleton fun providePlanCardSource(content: WordCardSource, events: LearningEventRepository): PlanCardSource = StoredPlanCardSource(content, events)
     @Provides fun provideBuildWorksheetContentUseCase(plans: TodayPlanRepository, events: LearningEventRepository, content: WordCardSource): BuildWorksheetContentUseCase = BuildWorksheetContentUseCase(plans, events, content)
     @Provides fun provideWorksheetDocumentBuilder(): WorksheetDocumentBuilder = WorksheetDocumentBuilder()

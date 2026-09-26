@@ -97,6 +97,20 @@ class CardDetailScreenTest {
     }
 
     @Test
+    fun pronunciationUiOnlyContainsLemmaAndNoSecretText() {
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(),
+                onBack = {},
+                onSpeak = {},
+            )
+        }
+
+        composeRule.onNodeWithContentDescription("播放 ability 发音").assertExists()
+        composeRule.onNodeWithText("sk-example-secret").assertDoesNotExist()
+    }
+
+    @Test
     fun backInvokesCallback() {
         var backed = 0
         composeRule.setContent { CardDetailScreen(card = card(), onBack = { backed++ }) }

@@ -1,5 +1,6 @@
 package com.example.englishlearning.language.domain
 
+import com.example.englishlearning.language.SpeechPreferenceRepository
 import kotlinx.coroutines.CancellationException
 
 enum class PronunciationEngine {
@@ -20,10 +21,22 @@ class PronunciationRouter(
     private val systemProvider: PronunciationProvider,
     private val miMoFactory: MiMoPronunciationProviderFactory,
     private val openAiFactory: OpenAiPronunciationProviderFactory,
+    private val preferences: SpeechPreferenceRepository? = null,
 ) : PronunciationProvider {
     override fun capabilities(): Set<PronunciationCapability> = systemProvider.capabilities()
 
-    override suspend fun speak(text: String): PronunciationResult = systemProvider.speak(text)
+    override suspend fun speak(text: String): PronunciationResult = speak(text, savedPreference())
+
+    private suspend fun savedPreference(): SpeechPreference = try {
+        preferences?.get()?.getOrElse { error ->
+            if (error is CancellationException) throw error
+            SpeechPreference()
+        } ?: SpeechPreference()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        SpeechPreference()
+    }
 
     suspend fun speak(text: String, preference: SpeechPreference): PronunciationResult = when (preference.selectedEngine) {
         PronunciationEngine.SystemTts -> systemProvider.speak(text)

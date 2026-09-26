@@ -1,5 +1,6 @@
 package com.example.englishlearning.language.domain
 
+import com.example.englishlearning.language.SpeechPreferenceRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -20,6 +21,105 @@ class PronunciationRouterTest {
         router.speak("hello")
 
         assertEquals(1, system.calls)
+    }
+
+    @Test
+    fun `no saved preference uses system`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val miMoFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+        val openAiFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+
+        PronunciationRouter(
+            system,
+            miMoFactory,
+            openAiFactory,
+            FixedSpeechPreferenceRepository(SpeechPreference()),
+        ).speak("hello")
+
+        assertEquals(1, system.calls)
+        assertEquals(emptyList<String>(), miMoFactory.profileIds)
+        assertEquals(emptyList<String>(), openAiFactory.profileIds)
+    }
+
+    @Test
+    fun `saved mimo preference uses saved profile`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val miMo = FakeProvider(PronunciationResult.Played)
+        val miMoFactory = CountingFactory(miMo)
+        val openAiFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+
+        PronunciationRouter(
+            system,
+            miMoFactory,
+            openAiFactory,
+            FixedSpeechPreferenceRepository(
+                SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo-profile"),
+            ),
+        ).speak("hello")
+
+        assertEquals(listOf("mimo-profile"), miMoFactory.profileIds)
+        assertEquals(1, miMo.calls)
+        assertEquals(0, system.calls)
+    }
+
+    @Test
+    fun `saved openai preference uses openai then fallback`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val openAi = FakeProvider(PronunciationResult.Failed())
+        val miMo = FakeProvider(PronunciationResult.Played)
+        val openAiFactory = CountingFactory(openAi)
+        val miMoFactory = CountingFactory(miMo)
+
+        PronunciationRouter(
+            system,
+            miMoFactory,
+            openAiFactory,
+            FixedSpeechPreferenceRepository(
+                SpeechPreference(
+                    selectedEngine = PronunciationEngine.OpenAi,
+                    openAiProfileId = "openai-profile",
+                    miMoProfileId = "mimo-profile",
+                ),
+            ),
+        ).speak("hello")
+
+        assertEquals(listOf("openai-profile"), openAiFactory.profileIds)
+        assertEquals(listOf("mimo-profile"), miMoFactory.profileIds)
+        assertEquals(0, system.calls)
+    }
+
+    @Test
+    fun `preference repository failure uses system`() = runTest {
+        val system = FakeProvider(PronunciationResult.Played)
+        val miMoFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+        val openAiFactory = CountingFactory(FakeProvider(PronunciationResult.Played))
+
+        PronunciationRouter(
+            system,
+            miMoFactory,
+            openAiFactory,
+            FixedSpeechPreferenceRepository(error = IllegalStateException("storage failed")),
+        ).speak("hello")
+
+        assertEquals(1, system.calls)
+        assertEquals(emptyList<String>(), miMoFactory.profileIds)
+        assertEquals(emptyList<String>(), openAiFactory.profileIds)
+    }
+
+    @Test
+    fun `preference repository cancellation is rethrown`() = runTest {
+        val router = PronunciationRouter(
+            FakeProvider(PronunciationResult.Played),
+            CountingFactory(FakeProvider(PronunciationResult.Played)),
+            CountingFactory(FakeProvider(PronunciationResult.Played)),
+            FixedSpeechPreferenceRepository(error = CancellationException("cancel")),
+        )
+
+        val error = assertThrows(CancellationException::class.java) {
+            runBlocking { router.speak("hello") }
+        }
+
+        assertEquals("cancel", error.message)
     }
 
     @Test
@@ -261,6 +361,16 @@ class PronunciationRouterTest {
         assertEquals(emptyList<String>(), openAiFactory.profileIds)
         assertEquals(emptyList<String>(), miMoFactory.profileIds)
         assertEquals(1, system.calls)
+    }
+
+    private class FixedSpeechPreferenceRepository(
+        private val preference: SpeechPreference = SpeechPreference(),
+        private val error: Throwable? = null,
+    ) : SpeechPreferenceRepository {
+        override suspend fun get(): Result<SpeechPreference> = error?.let(Result.Companion::failure)
+            ?: Result.success(preference)
+
+        override suspend fun save(preference: SpeechPreference): Result<Unit> = Result.success(Unit)
     }
 
     private class LoggingFactory(
