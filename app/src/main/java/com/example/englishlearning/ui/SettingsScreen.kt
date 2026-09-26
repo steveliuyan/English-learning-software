@@ -60,6 +60,7 @@ fun SettingsScreen(
     onOpenSetup: () -> Unit,
     onOpenWorksheet: () -> Unit,
     onOpenAiProfiles: () -> Unit,
+    onOpenSpeechSettings: () -> Unit = {},
     /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
     aiProfileSubtitle: String? = null,
     speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
@@ -136,6 +137,7 @@ fun SettingsScreen(
         }
 
         SettingsGroup(title = "语音合成", tag = "settings_group_speech") {
+            SettingsActionRow("语音服务", "选择系统 TTS 或云端语音服务", "settings_open_speech", onOpenSpeechSettings)
             SettingsStatusRow("小米 MiMo", speechEngineStatuses.miMo, "settings_speech_mimo")
             SettingsStatusRow("OpenAI TTS", speechEngineStatuses.openAi, "settings_speech_openai")
             SettingsStatusRow("本地 ZipVoice-Distill", speechEngineStatuses.zipVoice, "settings_speech_zipvoice")

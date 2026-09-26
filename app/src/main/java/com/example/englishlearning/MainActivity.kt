@@ -12,6 +12,7 @@ import com.example.englishlearning.ui.CheckInViewModel
 import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.ReadingAccessViewModel
 import com.example.englishlearning.ui.TodayPlanViewModel
+import com.example.englishlearning.ui.SpeechSettingsViewModel
 import com.example.englishlearning.ui.WordCardViewModel
 import com.example.englishlearning.ui.WorksheetViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -34,6 +35,7 @@ class MainActivity : ComponentActivity() {
                 readingAccessViewModel = hiltViewModel<ReadingAccessViewModel>(),
                 articleReadingViewModel = hiltViewModel<ArticleReadingViewModel>(),
                 aiProfileViewModel = hiltViewModel<AiProfileSettingsViewModel>(),
+                speechSettingsViewModel = hiltViewModel<SpeechSettingsViewModel>(),
                 checkInViewModel = hiltViewModel<CheckInViewModel>(),
                 pronunciationProvider = pronunciationProvider,
             )

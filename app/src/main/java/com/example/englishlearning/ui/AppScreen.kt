@@ -91,6 +91,7 @@ fun AppScreen(
     readingAccessViewModel: ReadingAccessViewModel? = null,
     articleReadingViewModel: ArticleReadingViewModel? = null,
     aiProfileViewModel: AiProfileSettingsViewModel? = null,
+    speechSettingsViewModel: SpeechSettingsViewModel? = null,
     checkInViewModel: CheckInViewModel? = null,
     pronunciationProvider: PronunciationProvider? = null,
 ) {
@@ -113,6 +114,7 @@ fun AppScreen(
             // 选中的 AI 功能存 key 而不是枚举实例：String 进 Bundle 最省心，将来加功能也不用改存法。
             var selectedFeatureKey by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
             var showAiProfiles by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showSpeechSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 阅读来源的二级层：导入页是显式导航；文章页由 readingTarget 驱动；词卡详情是
             // 阅读页之上的本地覆盖层（WordCardViewModel 的详情只服务学习流，不复用）。
@@ -126,6 +128,7 @@ fun AppScreen(
             // AI 配置是设备级的（与学习者无关），启动时读一次，好让「设置」栏的摘要和「AI 学」页
             // 的徽章说的是本机真实状态，而不是写死的假设。
             LaunchedEffect(state.profile.id) { aiProfileViewModel?.load() }
+            LaunchedEffect(state.profile.id) { speechSettingsViewModel?.load() }
             val aiProfiles = aiProfileViewModel?.listState?.collectAsState()?.value as? AiProfileListUiState.Ready
             val aiConfigured = aiProfiles?.items?.any { it.hasKey } == true
             val todayState by todayPlanViewModel.uiState.collectAsState()
@@ -175,7 +178,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
@@ -203,6 +206,7 @@ fun AppScreen(
             // 这一层内部还有「列表 / 编辑」两态，编辑态会自己再声明一条更靠后的 BackHandler，
             // 因此从编辑页按返回键先关编辑页，而不是直接退掉整层。
             BackHandler(enabled = showAiProfiles) { showAiProfiles = false }
+            BackHandler(enabled = showSpeechSettings) { showSpeechSettings = false }
             BackHandler(enabled = selectedFeature != null) { selectedFeatureKey = null }
             if (setupRequired || showSetup) {
                 LearningSetupScreen(
@@ -296,6 +300,18 @@ fun AppScreen(
                     state = checkInState,
                     onBack = { showCheckIn = false },
                     onRetry = { checkInViewModel?.load(state.profile.id) },
+                )
+            } else if (showSpeechSettings) {
+                val speechState by speechSettingsViewModel?.state?.collectAsState() ?: remember { mutableStateOf(SpeechSettingsUiState()) }
+                SpeechSettingsScreen(
+                    state = speechState,
+                    onSelect = { engine, profileId -> speechSettingsViewModel?.select(engine, profileId) },
+                    onOpenAiProfiles = {
+                        showSpeechSettings = false
+                        aiProfileViewModel?.load()
+                        showAiProfiles = aiProfileViewModel != null
+                    },
+                    onBack = { showSpeechSettings = false },
                 )
             } else if (showAiProfiles) {
                 val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
@@ -441,6 +457,10 @@ fun AppScreen(
                                 onOpenAiProfiles = {
                                     aiProfileViewModel?.load()
                                     showAiProfiles = aiProfileViewModel != null
+                                },
+                                onOpenSpeechSettings = {
+                                    speechSettingsViewModel?.load()
+                                    showSpeechSettings = speechSettingsViewModel != null
                                 },
                                 aiProfileSubtitle = aiProfiles?.let { ready ->
                                     if (ready.items.isEmpty()) {
