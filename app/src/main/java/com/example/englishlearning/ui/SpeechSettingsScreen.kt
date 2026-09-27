@@ -133,9 +133,12 @@ fun SpeechSettingsScreen(
                             "还没有小米 MiMo 配置。可以一键创建预设：服务地址与模型名已按官方默认值填好，只需再填密钥。",
                             style = AppType.Footnote,
                         )
-                        TextButton(onClick = onAddMiMoPreset, modifier = Modifier.testTag("speech_add_mimo_preset")) {
-                            Text("添加小米 MiMo 预设", style = AppType.Body, color = DomainColors.AiSpeech.deep)
-                        }
+                        PillButton(
+                            text = "添加小米 MiMo 预设",
+                            onClick = onAddMiMoPreset,
+                            style = PillStyle.Primary,
+                            testTag = "speech_add_mimo_preset",
+                        )
                     }
                     PillButton(
                         text = "AI 服务与密钥",

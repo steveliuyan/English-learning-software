@@ -3,6 +3,7 @@ package com.example.englishlearning.ui.components.glass
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -11,6 +12,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -52,14 +55,28 @@ fun PillButton(
         .heightIn(min = 48.dp)
     if (testTag != null) m = m.testTag(testTag)
     if (contentDescription != null) m = m.semantics { this.contentDescription = contentDescription }
-    val (container, contentColor, border) = when (style) {
-        PillStyle.Primary -> Triple(accent.base, androidx.compose.ui.graphics.Color.White, null)
-        PillStyle.Secondary -> Triple(AppPalette.Surface, accent.deep, BorderStroke(1.dp, AppPalette.Separator))
-        PillStyle.Text -> Triple(androidx.compose.ui.graphics.Color.Transparent, accent.deep, null)
+    // Primary 用垂直渐变（base→deep）增加品牌质感；Secondary/Text 保持纯色。
+    val contentColor = when (style) {
+        PillStyle.Primary -> Color.White
+        PillStyle.Secondary -> accent.deep
+        PillStyle.Text -> accent.deep
+    }
+    val border = if (style == PillStyle.Secondary) BorderStroke(1.dp, AppPalette.Separator) else null
+    val containerColor = when (style) {
+        // Surface 无 brush 重载的等价写法：透明容器 + Modifier.background(brush, shape)
+        PillStyle.Primary -> Color.Transparent
+        PillStyle.Secondary -> AppPalette.Surface
+        PillStyle.Text -> Color.Transparent
+    }
+    if (style == PillStyle.Primary) {
+        m = m.background(
+            Brush.verticalGradient(colors = listOf(accent.base, accent.deep)),
+            shape = AppShape.Pill,
+        )
     }
     Surface(
         shape = AppShape.Pill,
-        color = container,
+        color = containerColor,
         contentColor = contentColor,
         border = border,
         modifier = m.clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick),
