@@ -1,13 +1,18 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.englishlearning.ui.theme.DomainColors
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,6 +43,32 @@ class AppBottomBarTest {
         AppTab.entries.forEach { tab ->
             composeRule.onNodeWithContentDescription(tab.contentDescription).assertExists()
         }
+    }
+
+    @Test fun selected_learning_slot_uses_learning_domain_color() {
+        assertSelectedSlotUsesColor(AppTab.LEARNING, DomainColors.Learn.base.toArgb())
+    }
+
+    @Test fun selected_reading_slot_uses_reading_domain_color() {
+        assertSelectedSlotUsesColor(AppTab.READING, DomainColors.Reading.base.toArgb())
+    }
+
+    @Test fun selected_ai_slot_uses_ai_domain_color() {
+        assertSelectedSlotUsesColor(AppTab.AI, DomainColors.AiSpeech.base.toArgb())
+    }
+
+    @Test fun selected_settings_slot_uses_settings_domain_color() {
+        assertSelectedSlotUsesColor(AppTab.SETTINGS, DomainColors.Settings.base.toArgb())
+    }
+
+    private fun assertSelectedSlotUsesColor(selectedTab: AppTab, expectedColor: Int) {
+        composeRule.setContent { AppBottomBar(selected = selectedTab, onSelect = {}) }
+        val selectedNode = composeRule.onNodeWithTag("app_tab_${selectedTab.name.lowercase()}")
+        val bitmap = selectedNode.captureToImage().asAndroidBitmap()
+        val hasDomainColor = (0 until bitmap.width).any { x ->
+            (0 until bitmap.height).any { y -> bitmap.getPixel(x, y) == expectedColor }
+        }
+        assertTrue("${selectedTab.name} should use its domain color", hasDomainColor)
     }
 
     @Test fun tapping_the_ai_slot_reports_the_ai_tab() {

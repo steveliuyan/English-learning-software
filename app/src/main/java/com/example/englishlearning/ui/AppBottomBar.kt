@@ -31,10 +31,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
 
 /**
  * 四栏底部导航。
@@ -68,7 +68,16 @@ fun AppBottomBar(
 
 @Composable
 private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) -> Unit) {
-    val tint = if (selected) MintPrimary else MintTextMuted
+    val tint = if (selected) {
+        when (tab) {
+            AppTab.LEARNING -> DomainColors.Learn.base
+            AppTab.READING -> DomainColors.Reading.base
+            AppTab.AI -> DomainColors.AiSpeech.base
+            AppTab.SETTINGS -> DomainColors.Settings.base
+        }
+    } else {
+        AppPalette.TextSecondary
+    }
     Column(
         modifier = Modifier
             .weight(1f)
