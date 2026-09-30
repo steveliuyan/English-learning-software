@@ -2,11 +2,19 @@ package com.example.englishlearning.ui
 
 import androidx.compose.runtime.Composer
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.learning.domain.DerivedWord
@@ -78,7 +86,9 @@ class CardDetailScreenTest {
         composeRule.onNodeWithTag("card_detail_example").assertExists()
         composeRule.onNodeWithText("She has the ability to explain ideas.").assertExists()
         composeRule.onNodeWithTag("card_detail_inflections").assertExists()
-        composeRule.onNodeWithText("词形变化：abilities").assertExists()
+        // 词形变化是一个带标题的小节，不再是「词形变化：…」一行灰字
+        composeRule.onNodeWithText("词形变化").assertExists()
+        composeRule.onNodeWithText("abilities").assertExists()
     }
 
     @Test
@@ -92,6 +102,9 @@ class CardDetailScreenTest {
 
         composeRule.onNodeWithTag("card_detail_example").assertDoesNotExist()
         composeRule.onNodeWithTag("card_detail_inflections").assertDoesNotExist()
+        // 缺模块整块隐藏：连小节标题也不留
+        composeRule.onNodeWithText("例句").assertDoesNotExist()
+        composeRule.onNodeWithText("词形变化").assertDoesNotExist()
     }
 
     @Test
@@ -266,8 +279,95 @@ class CardDetailScreenTest {
         assertEquals(1, asked)
     }
 
+    // ---------------------------------------------------------------- 版式（2026-09-30 真机走查）
+
+    /** 有多词性释义时只列一遍：不再在顶部重复第一条释义。 */
+    @Test
+    fun meaningIsListedOnceWhenSensesArePresent() {
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(
+                    lemma = "surf",
+                    meaningZh = "冲浪；（在互联网上）冲浪，浏览",
+                    senses = listOf(WordSense("v.", "冲浪；（在互联网上）冲浪，浏览"), WordSense("n.", "拍岸碎浪；浪")),
+                ),
+                onBack = {},
+            )
+        }
+
+        composeRule.onAllNodesWithText("冲浪；（在互联网上）冲浪，浏览").assertCountEquals(1)
+        composeRule.onNodeWithText("v.").assertExists()
+        composeRule.onNodeWithText("n.").assertExists()
+    }
+
+    @Test
+    fun backSharesTheTitleRowWithAFullTouchTarget() {
+        composeRule.setContent { CardDetailScreen(card = card(), onBack = {}) }
+
+        val title = composeRule.onNodeWithText("词义详情").getUnclippedBoundsInRoot()
+        val back = composeRule.onNodeWithContentDescription("返回").getUnclippedBoundsInRoot()
+        val titleCenter = (title.top + title.bottom) / 2
+        assertTrue("返回应与标题同一行", back.top <= titleCenter && titleCenter <= back.bottom)
+        assertTrue("返回的点击区域至少 48dp 高", back.bottom - back.top >= 48.dp)
+    }
+
+    @Test
+    fun speakButtonSitsOnTheIpaLine() {
+        composeRule.setContent { CardDetailScreen(card = card(), onBack = {}) }
+
+        val ipa = composeRule.onNodeWithTag("card_detail_ipa").getUnclippedBoundsInRoot()
+        val speak = composeRule.onNodeWithContentDescription("播放 ability 发音").getUnclippedBoundsInRoot()
+        val ipaCenter = (ipa.top + ipa.bottom) / 2
+        assertTrue("发音按钮应紧跟音标", speak.top <= ipaCenter && ipaCenter <= speak.bottom)
+    }
+
+    /** 配图是理解词义的主要辅助，紧跟单词卡，而不是滑到最底才看到。 */
+    @Test
+    fun illustrationComesBeforeTheExample() {
+        composeRule.setContent { CardDetailScreen(card = card(), onBack = {}) }
+
+        val image = composeRule.onNodeWithTag("card_detail_illustration").getUnclippedBoundsInRoot()
+        val example = composeRule.onNodeWithTag("card_detail_example").getUnclippedBoundsInRoot()
+        assertTrue("配图应在例句之前", image.bottom <= example.top)
+    }
+
+    @Test
+    fun exampleIsAHeadedSectionWithTheWordInBold() {
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(example = "She has the ability to explain ideas.", exampleZh = "她有能力解释想法。"),
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithText("例句").assertExists()
+        val example = composeRule.onNodeWithTag("card_detail_example").annotatedText()
+        val start = example.text.indexOf("ability")
+        assertTrue("例句中的单词应加粗", example.isBold(start until start + "ability".length))
+    }
+
+    @Test
+    fun relationLinesBoldTheEnglishWord() {
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(lemma = "surf", derived = listOf(DerivedWord("surfer", "n.", "冲浪者；网虫"))),
+                onBack = {},
+            )
+        }
+
+        val line = composeRule.onNodeWithText("surfer", substring = true).annotatedText()
+        assertTrue("派生词的英文应加粗", line.isBold(0 until "surfer".length))
+    }
+
+    private fun SemanticsNodeInteraction.annotatedText(): AnnotatedString =
+        fetchSemanticsNode().config[SemanticsProperties.Text].first()
+
+    private fun AnnotatedString.isBold(range: IntRange): Boolean =
+        spanStyles.any { it.item.fontWeight == FontWeight.Bold && it.start <= range.first && it.end > range.last }
+
     private fun card(
         lemma: String = "ability",
+        meaningZh: String = "能力；才能",
         example: String? = "She has the ability to explain complex ideas simply.",
         inflections: List<String> = emptyList(),
         imagePath: String? = null,
@@ -282,7 +382,7 @@ class CardDetailScreenTest {
         lemma = lemma,
         ipa = "əˈbɪləti",
         partOfSpeech = "n.",
-        meaningZh = "能力；才能",
+        meaningZh = meaningZh,
         example = example,
         inflections = inflections,
         imagePath = imagePath,
