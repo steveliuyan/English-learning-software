@@ -68,16 +68,7 @@ fun AppBottomBar(
 
 @Composable
 private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) -> Unit) {
-    val tint = if (selected) {
-        when (tab) {
-            AppTab.LEARNING -> DomainColors.Learn.base
-            AppTab.READING -> DomainColors.Reading.base
-            AppTab.AI -> DomainColors.AiSpeech.base
-            AppTab.SETTINGS -> DomainColors.Settings.base
-        }
-    } else {
-        AppPalette.TextSecondary
-    }
+    val tint = if (selected) DomainColors.AiSpeech.deep else AppPalette.TextSecondary
     Column(
         modifier = Modifier
             .weight(1f)

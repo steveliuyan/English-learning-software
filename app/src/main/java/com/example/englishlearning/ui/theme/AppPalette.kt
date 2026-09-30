@@ -22,7 +22,7 @@ data class DomainAccent(val base: Color, val deep: Color)
 object DomainColors {
     val AiSpeech = DomainAccent(Color(0xFF2EC99C), Color(0xFF188F76))   // 薄荷绿（品牌锚点）
     val Learn = DomainAccent(Color(0xFF0A84FF), Color(0xFF075EB4))      // 学习
-    val Review = DomainAccent(Color(0xFFFF9F0A), Color(0xFFC46A00))     // 复习
+    val Review = DomainAccent(Color(0xFFFF9F0A), Color(0xFFAB5700))     // 复习
     val Library = DomainAccent(Color(0xFFBF5AF2), Color(0xFF8E34B8))    // 词库
     val Reading = DomainAccent(Color(0xFFFF375F), Color(0xFFC81E46))    // 阅读
     val Settings = DomainAccent(Color(0xFF8E8E93), Color(0xFF48484A))   // 设置/中性

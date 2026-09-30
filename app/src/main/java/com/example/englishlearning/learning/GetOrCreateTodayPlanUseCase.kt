@@ -18,10 +18,9 @@ class GetOrCreateTodayPlanUseCase(
         // localDate), not to the current clock value: a clock value is not monotonic, and a
         // timezone/clock rollback must reuse the existing snapshot instead of issuing a second
         // batch of new words. Only a strictly later local date starts a new plan.
-        when (val latest = todayPlanRepository.findLatest(profileId)) {
-            is TodayPlanResult.Ready ->
-                if (!localDate.isAfter(latest.plan.localDate)) return latest
-            TodayPlanResult.NotFound -> Unit
+        val latest = when (val result = todayPlanRepository.findLatest(profileId)) {
+            is TodayPlanResult.Ready -> result
+            TodayPlanResult.NotFound -> null
             TodayPlanResult.StorageUnavailable -> return TodayPlanResult.StorageUnavailable
             TodayPlanResult.MissingLearningSetup -> return TodayPlanResult.StorageUnavailable
         }
@@ -29,6 +28,12 @@ class GetOrCreateTodayPlanUseCase(
         val profile = when (val result = learningProfileRepository.current(profileId)) {
             is RepositoryResult.Failure -> return TodayPlanResult.StorageUnavailable
             is RepositoryResult.Success -> result.value ?: return TodayPlanResult.MissingLearningSetup
+        }
+        if (latest != null) {
+            if (localDate.isBefore(latest.plan.localDate)) return latest
+            if (localDate == latest.plan.localDate && latest.plan.activeWordBookId == profile.activeWordBookId) {
+                return latest
+            }
         }
         val dueCardIds: List<String>
         val newCardIds: List<String>
@@ -53,6 +58,10 @@ class GetOrCreateTodayPlanUseCase(
             ruleVersion = "f1-v1",
             generatedAt = generationInstant,
         )
-        return todayPlanRepository.saveIfAbsent(plan)
+        return if (latest?.plan?.localDate == localDate) {
+            todayPlanRepository.replaceForDate(plan)
+        } else {
+            todayPlanRepository.saveIfAbsent(plan)
+        }
     }
 }

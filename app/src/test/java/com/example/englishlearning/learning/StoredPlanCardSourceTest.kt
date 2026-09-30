@@ -41,6 +41,15 @@ class StoredPlanCardSourceTest {
     }
 
     @Test
+    fun `ten word sample fills target ten and target three truncates`() = runTest {
+        val ids = (1..10).map { "sample:word-$it" }
+        val source = StoredPlanCardSource(Content(ids), FakeEvents())
+
+        assertEquals(ids, source.newCardIds("sample", 10))
+        assertEquals(ids.take(3), source.newCardIds("sample", 3))
+    }
+
+    @Test
     fun `due cards come from the derived schedule at the requested instant`() = runTest {
         val events = FakeEvents(due = listOf("cet4:ability"))
         val source = StoredPlanCardSource(Content(listOf("cet4:ability")), events)

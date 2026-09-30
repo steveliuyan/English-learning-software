@@ -2,7 +2,8 @@ package com.example.englishlearning.ui
 
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.ai.AiProfileSecretUseCase
-import com.example.englishlearning.ai.AiProfileRepository
+import com.example.englishlearning.ai.DefaultTextProfileResolver
+import com.example.englishlearning.ai.DefaultTextProfileResult
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.ai.net.AiHttpResponse
@@ -547,11 +548,10 @@ class ReadingAccessViewModelTest {
         }
     }
 
-    private class FakeProfiles(private val profiles: List<AiProfile>) : AiProfileRepository {
-        override suspend fun list() = Result.success(profiles)
-        override suspend fun find(profileId: String) = Result.success(profiles.firstOrNull { it.profileId == profileId })
-        override suspend fun save(profile: AiProfile) = Result.success(Unit)
-        override suspend fun delete(profileId: String) = Result.success(Unit)
+    private class FakeDefaultTextProfileResolver(
+        private val profile: AiProfile,
+    ) : DefaultTextProfileResolver {
+        override suspend fun select(): DefaultTextProfileResult = DefaultTextProfileResult.Selected(profile)
     }
 
     private class FakeSecretStore : SecretStore {
@@ -597,7 +597,7 @@ class ReadingAccessViewModelTest {
             events = FakeEvents(completed = listOf("c1", "c2")),
             cardSource = FakeCards(),
             generateArticles = GenerateArticleUseCase(
-                profiles = FakeProfiles(listOf(profile())),
+                defaultTextProfile = FakeDefaultTextProfileResolver(profile()),
                 secrets = AiProfileSecretUseCase(FakeSecretStore().apply { put("ai-profile-p1", TEST_KEY) }),
                 transport = transport,
                 articles = articles,

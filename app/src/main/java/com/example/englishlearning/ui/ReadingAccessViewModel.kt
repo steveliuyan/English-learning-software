@@ -45,6 +45,7 @@ sealed interface GenerationUiState {
 
     /** 需要用户对 [host] 给出站确认；确认与否由 [ReadingAccessViewModel.confirmOutbound] 收口。 */
     data class NeedsConfirmation(val host: String) : GenerationUiState
+    data class NotConfigured(val reason: com.example.englishlearning.reading.NotConfiguredReason) : GenerationUiState
     data class Failed(val failure: AiFailure) : GenerationUiState
 
     /** 校验与请求都成功但本地存储失败——处置是「稍后再试」，与 AI 失败分开，不得混用。 */
@@ -271,8 +272,7 @@ class ReadingAccessViewModel @Inject constructor(
                         setGeneration(GenerationUiState.NeedsConfirmation(result.host))
                     is GenerateArticleResult.Failed -> setGeneration(GenerationUiState.Failed(result.failure))
                     is GenerateArticleResult.NotConfigured ->
-                        // 配置类问题的处置也是「去配置」，界面动作与 NotConfigured 一致。
-                        setGeneration(GenerationUiState.Failed(AiFailure.NotConfigured))
+                        setGeneration(GenerationUiState.NotConfigured(result.reason))
                     GenerateArticleResult.StorageFailed -> setGeneration(GenerationUiState.StorageFailed)
                 }
             } catch (e: CancellationException) {

@@ -86,8 +86,8 @@
 - 名称: Kotlinx Serialization JSON
 - 版本: 1.8.1
 - 许可证: Apache-2.0
-- 用途: 对齐 Room migration test 运行时所需的 Kotlin serialization API
-- 数据流: 仅在设备内序列化 Room schema 测试元数据，不传输用户数据
+- 用途: 解析导入的词书包 `book.json` 与 `manifest.json`；并对齐 Room migration test 运行时所需的 Kotlin serialization API
+- 数据流: 仅在设备内解析用户主动导入的词书包文件与 Room schema 测试元数据，不传输用户数据
 - NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
 - 替代方案: 保持与 Room 传递依赖兼容的 Kotlinx Serialization 版本
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
@@ -270,6 +270,16 @@
 - 数据流: 仅在构建环境编译本地源代码，不处理用户数据
 - NOTICE 位置: 构建插件不打包进 release APK；本文件
 - 替代方案: Android Views 编译路径
+- 商业分发结论: 构建插件不随 APK 分发，可商业使用并保留 Apache-2.0 说明
+
+## plugin-kotlin-serialization
+- 名称: Kotlin Serialization Gradle Plugin
+- 版本: 2.1.21
+- 许可证: Apache-2.0
+- 用途: 为词书包 `book.json`、`manifest.json` 的 `@Serializable` DTO 生成序列化器
+- 数据流: 仅在构建环境编译本地源代码，不处理用户数据
+- NOTICE 位置: 构建插件不打包进 release APK；本文件
+- 替代方案: 手写 JSON 解析（org.json）
 - 商业分发结论: 构建插件不随 APK 分发，可商业使用并保留 Apache-2.0 说明
 
 ## plugin-hilt

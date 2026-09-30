@@ -77,4 +77,29 @@ enum class AiFeature(
             "多轮对话：保留上下文并限制每次请求的输入量",
         ),
     ),
+    SENTENCE_ANALYSIS(
+        key = "sentence-analysis",
+        glyph = "析",
+        title = "长难句分析",
+        summary = "把一句英文拆成主句、从句和短语，逐段给中文解释",
+        status = "已可用：去「设置 · AI」选好默认文本服务，回这里输入一句英文即可分析。",
+        implemented = true,
+        dependencies = listOf(
+            "默认文本 AI 服务：在设置里选好一套带密钥的模型",
+            "出站确认：按域名确认一次，与文章生成同语义",
+        ),
+    ),
+    IMAGE_STUDIO(
+        key = "image-studio",
+        glyph = "画",
+        title = "AI 生图",
+        summary = "用文字 AI 生成画面描述，再交给生图服务出图",
+        status = "已可用：去「设置 · AI」添加一套生图服务并设为生图默认，回这里输入主题即可出图。",
+        implemented = true,
+        dependencies = listOf(
+            "生图配置：独立 Profile 指向 OpenAI 兼容生图接口",
+            "两段式确认：提示词按域名一次，出图每次都要确认",
+            "成本提示：按张计费，通常是文本调用的数十倍",
+        ),
+    ),
 }

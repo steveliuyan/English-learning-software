@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import android.view.KeyEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -16,10 +17,38 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.englishlearning.ai.AiPreferenceRepository
+import com.example.englishlearning.ai.DefaultImageProfileResult
+import com.example.englishlearning.ai.DefaultImageProfileResolver
+import com.example.englishlearning.ai.DefaultTextProfileResolver
+import com.example.englishlearning.ai.DefaultTextProfileResult
+import com.example.englishlearning.ai.net.AiHttpRequest
+import com.example.englishlearning.ai.net.AiHttpTransport
+import com.example.englishlearning.ai.net.AudioHttpRequest
+import com.example.englishlearning.ai.net.AudioHttpTransport
+import com.example.englishlearning.imagegen.DrawingPromptUseCase
+import com.example.englishlearning.imagegen.GeneratedImageStore
+import com.example.englishlearning.imagegen.ImageGenerationUseCase
+import com.example.englishlearning.learning.LearningEventRepository
+import com.example.englishlearning.learning.TodayPlanRepository
+import com.example.englishlearning.learning.PlaceholderWordCardSource
+import com.example.englishlearning.reading.ArticleIdFactory
+import com.example.englishlearning.reading.ArticleRepository
+import com.example.englishlearning.reading.FetchArticleUseCase
+import com.example.englishlearning.reading.GenerateArticleUseCase
+import com.example.englishlearning.reading.ImportArticleUseCase
+import com.example.englishlearning.reading.ReadingCompletionRepository
+import com.example.englishlearning.reading.ReadingPreferenceRepository
+import com.example.englishlearning.reading.domain.Article
+import com.example.englishlearning.reading.domain.ArticleLengthTier
+import com.example.englishlearning.reading.domain.ArticleSource
+import com.example.englishlearning.reading.domain.ArticleType
+import com.example.englishlearning.reading.domain.ReadingPreference
 import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiCapability
+import com.example.englishlearning.ai.domain.AiPreference
 import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.core.security.SecretReference
@@ -46,6 +75,10 @@ import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
 import com.example.englishlearning.profile.InMemoryLocalProfileRepository
+import com.example.englishlearning.wordqa.WordAiNote
+import com.example.englishlearning.wordqa.WordAiNoteRepository
+import com.example.englishlearning.wordqa.WordQaUseCase
+import com.example.englishlearning.sentence.SentenceAnalysisUseCase
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -164,6 +197,9 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_learning_screen").assertExists()
         composeRule.onNodeWithTag("ai_learning_header").assertExists()
+        // 功能列表默认收起在展开键后面，先展开再断言入口存在。
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
         AiFeature.entries.forEach { feature ->
             composeRule.onNodeWithTag("ai_feature_${feature.key}").assertExists()
         }
@@ -286,6 +322,9 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_ai").performClick()
         composeRule.waitForIdle()
+        // 功能列表默认收起，先展开才能点具体功能。
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_feature_cloze").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_feature_screen").assertExists()
@@ -317,6 +356,412 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("word_card_screen").assertExists()
         composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
+    }
+
+    @Test
+    fun learningCardPronunciationRoutesTheVisibleLemmaToTheProvider() {
+        val provider = RecordingPronunciationProvider(PronunciationResult.Played)
+        composeRule.setContent { readyAppScreen(pronunciationProvider = provider) }
+        createProfile()
+
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_speak").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts == listOf("ability") }
+
+        assertEquals(listOf("ability"), provider.spokenTexts)
+        composeRule.onNodeWithTag("word_card_pronunciation_message").assertExists()
+        composeRule.onNodeWithText("发音已播放。").assertExists()
+    }
+
+    @Test
+    fun learningCardPronunciationFailureShowsSafeMessageAndKeepsFeedbackActions() {
+        val provider = RecordingPronunciationProvider(PronunciationResult.Failed(IllegalStateException("secret endpoint")))
+        composeRule.setContent { readyAppScreen(pronunciationProvider = provider) }
+        createProfile()
+
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_speak").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("发音播放失败，请重试。").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithText("发音播放失败，请重试。").assertExists()
+        composeRule.onNodeWithText("secret endpoint").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("不认识").assertHasClickAction()
+        composeRule.onNodeWithContentDescription("模糊").assertHasClickAction()
+        composeRule.onNodeWithContentDescription("认识").assertHasClickAction()
+    }
+
+    @Test
+    fun submittedCardDetailPronunciationRoutesTheHeldLemmaToTheProvider() {
+        val provider = RecordingPronunciationProvider(PronunciationResult.Played)
+        composeRule.setContent { readyAppScreen(pronunciationProvider = provider) }
+        createProfile()
+
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_feedback_fuzzy").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_feedback_fuzzy").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts == listOf("ability") }
+
+        assertEquals(listOf("ability"), provider.spokenTexts)
+        composeRule.onNodeWithText("发音已播放。").assertExists()
+    }
+
+    @Test
+    fun readingHighlightDetailPronunciationRoutesSelectedLemmaToProvider() {
+        val provider = RecordingPronunciationProvider(PronunciationResult.Failed(IllegalStateException("private endpoint")))
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                pronunciationProvider = provider,
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_open_today").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("reading_open_today").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        composeRule.onNodeWithTag("article_english").performClick()
+        composeRule.onNodeWithTag("card_detail_screen").assertExists()
+        composeRule.onNodeWithContentDescription("播放 apple 发音").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("发音播放失败，请重试。").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(listOf("apple"), provider.spokenTexts)
+        composeRule.onNodeWithText("private endpoint", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun wordQaOverlayOpensFromReadingCardDetailAndAsksThroughViewModel() {
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+                wordQaViewModel = wordQaViewModelWith(DefaultTextProfileResult.NoSelection),
+            )
+        }
+        openReadingWordDetail()
+
+        composeRule.onNodeWithContentDescription("问 AI（apple）").performClick()
+        composeRule.onNodeWithTag("word_qa_screen").assertExists()
+        composeRule.onNodeWithTag("word_qa_chip_Sentence").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_qa_not_configured").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_qa_back").performClick()
+        composeRule.onNodeWithTag("card_detail_screen").assertExists()
+        assert(composeRule.onAllNodesWithTag("word_qa_screen").fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
+    fun wordQaOutboundConfirmationWiredThroughOverlayBeforeAnyNetwork() {
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+                wordQaViewModel = wordQaViewModelWith(DefaultTextProfileResult.Selected(wordQaTextProfile())),
+            )
+        }
+        openReadingWordDetail()
+
+        composeRule.onNodeWithContentDescription("问 AI（apple）").performClick()
+        composeRule.onNodeWithTag("word_qa_chip_Mnemonic").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_qa_outbound_confirmation_text").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("api.example.com", substring = true).assertExists()
+        composeRule.onNodeWithTag("word_qa_decline_outbound").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("word_qa_chip_Mnemonic").assertIsEnabled()
+        assert(composeRule.onAllNodesWithTag("word_qa_outbound_confirmation_text").fetchSemanticsNodes().isEmpty())
+    }
+
+    /** 阅读流导航到点词详情：profile → 阅读 tab → 今日文章 → 关覆盖窗 → 点正文词。 */
+    private fun openReadingWordDetail() {
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_open_today").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("reading_open_today").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        composeRule.onNodeWithTag("article_english").performClick()
+        composeRule.onNodeWithTag("card_detail_screen").assertExists()
+    }
+
+    /** 词问答 ViewModel 夹具：transport 一旦被调用就失败——出站确认前零字节的证明。 */
+    private fun wordQaViewModelWith(selection: DefaultTextProfileResult): WordAiQaViewModel {
+        val transport = object : AiHttpTransport {
+            override suspend fun send(request: AiHttpRequest) =
+                error("word QA wiring test must not perform network requests")
+        }
+        val secrets = AiProfileSecretUseCase(object : SecretStore {
+            override fun save(reference: SecretReference, secret: CharArray) = Result.success(Unit)
+            override fun read(reference: SecretReference) = Result.success(charArrayOf('k'))
+            override fun delete(reference: SecretReference) = Result.success(Unit)
+            override fun has(reference: SecretReference) = Result.success(true)
+        })
+        val notes = object : WordAiNoteRepository {
+            override suspend fun save(note: WordAiNote) = Result.success(Unit)
+            override suspend fun list(profileId: String, lemma: String) = Result.success(emptyList<WordAiNote>())
+        }
+        return WordAiQaViewModel(
+            WordQaUseCase(DefaultTextProfileResolver { selection }, secrets, transport),
+            notes,
+            WordNoteIdFactory { "note-1" },
+            FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC),
+        )
+    }
+
+    private fun wordQaTextProfile() = AiProfile(
+        profileId = "qa",
+        displayName = "问答配置",
+        websiteUrl = "https://example.com",
+        endpoint = "https://api.example.com/v1",
+        model = "gpt-test",
+        capabilities = setOf(AiCapability.Text),
+        secretReference = AiProfileSecretUseCase.referenceFor("qa"),
+    )
+
+    @Test
+    fun sentenceAnalysisFeatureRoutesToItsRealScreenAndAsksThroughViewModel() {
+        composeRule.setContent {
+            readyAppScreen(
+                sentenceAnalysisViewModel = sentenceAnalysisViewModelWith(DefaultTextProfileResult.NoSelection),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_ai").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_feature_sentence-analysis").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("sentence_analysis_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_ai").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("sentence_analysis_input").performTextInput("Birds fly.")
+        composeRule.onNodeWithTag("sentence_analysis_analyze").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("sentence_analysis_not_configured").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("sentence_analysis_back").performClick()
+        composeRule.onNodeWithTag("ai_learning_screen").assertExists()
+        composeRule.onAllNodesWithTag("sentence_analysis_screen").fetchSemanticsNodes().isEmpty()
+    }
+
+    /** 长难句分析 ViewModel 夹具：transport 一旦被调用就失败——出站确认前零字节的证明。 */
+    private fun sentenceAnalysisViewModelWith(selection: DefaultTextProfileResult): SentenceAnalysisViewModel {
+        val transport = object : AiHttpTransport {
+            override suspend fun send(request: AiHttpRequest) =
+                error("sentence analysis wiring test must not perform network requests")
+        }
+        val secrets = AiProfileSecretUseCase(object : SecretStore {
+            override fun save(reference: SecretReference, secret: CharArray) = Result.success(Unit)
+            override fun read(reference: SecretReference) = Result.success(charArrayOf('k'))
+            override fun delete(reference: SecretReference) = Result.success(Unit)
+            override fun has(reference: SecretReference) = Result.success(true)
+        })
+        return SentenceAnalysisViewModel(
+            SentenceAnalysisUseCase(DefaultTextProfileResolver { selection }, secrets, transport),
+        )
+    }
+
+    @Test
+    fun imageStudioFeatureRoutesToItsRealScreenAndAsksThroughViewModel() {
+        composeRule.setContent {
+            readyAppScreen(
+                imageStudioViewModel = imageStudioViewModelWith(DefaultTextProfileResult.NoSelection),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_ai").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("ai_feature_image-studio").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("image_studio_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_ai").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("image_studio_subject_input").performTextInput("苹果")
+        composeRule.onNodeWithTag("image_studio_generate_prompt").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("image_studio_not_configured").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("image_studio_back").performClick()
+        composeRule.onNodeWithTag("ai_learning_screen").assertExists()
+        composeRule.onAllNodesWithTag("image_studio_screen").fetchSemanticsNodes().isEmpty()
+    }
+
+    /** 生图 ViewModel 夹具：两个出站通道一旦被调用就失败——确认前零字节的证明。 */
+    private fun imageStudioViewModelWith(selection: DefaultTextProfileResult): ImageStudioViewModel {
+        val transport = object : AiHttpTransport {
+            override suspend fun send(request: AiHttpRequest) =
+                error("image studio wiring test must not perform network requests")
+        }
+        val audioTransport = object : AudioHttpTransport {
+            override suspend fun send(request: AudioHttpRequest) =
+                error("image studio wiring test must not download images")
+        }
+        val secrets = AiProfileSecretUseCase(object : SecretStore {
+            override fun save(reference: SecretReference, secret: CharArray) = Result.success(Unit)
+            override fun read(reference: SecretReference) = Result.success(charArrayOf('k'))
+            override fun delete(reference: SecretReference) = Result.success(Unit)
+            override fun has(reference: SecretReference) = Result.success(true)
+        })
+        val directory = java.io.File(
+            InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
+            "image-studio-wiring",
+        )
+        return ImageStudioViewModel(
+            drawPrompt = DrawingPromptUseCase(DefaultTextProfileResolver { selection }, secrets, transport),
+            generateImage = ImageGenerationUseCase(
+                DefaultImageProfileResolver { DefaultImageProfileResult.NoSelection },
+                secrets,
+                transport,
+            ),
+            store = GeneratedImageStore(audioTransport, directory),
+        )
+    }
+
+    private data class ReadingFixture(        val access: ReadingAccessViewModel,
+        val article: ArticleReadingViewModel,
+        val todayPlan: TodayPlanViewModel,
+    )
+
+    private fun readingFixture(): ReadingFixture {
+        // 固定时钟锚定「今日」：Asia/Shanghai 下 Instant.EPOCH 的本地日就是 1970-01-01，
+        // 计划 localDate 与文章 localDate 必须等于它。仓储 fake 按真实检索键校验，
+        // 键不匹配一律返回空——无条件返回文章会把生产代码的日期/身份错配掩盖成绿灯。
+        val plan = TodayPlan(
+            planId = "plan-1",
+            profileId = "default",
+            localDate = java.time.LocalDate.of(1970, 1, 1),
+            zoneId = "Asia/Shanghai",
+            activeWordBookId = "cet4",
+            newTarget = 1,
+            dueTarget = 0,
+            newCardIds = listOf("apple-id"),
+            dueCardIds = emptyList(),
+            ruleVersion = "v1",
+            generatedAt = java.time.Instant.EPOCH,
+        )
+        val article = Article(
+            articleId = "a1", profileId = "default", localDate = plan.localDate.toString(),
+            activeWordBookId = plan.activeWordBookId, articleType = ArticleType.STORY,
+            lengthTier = ArticleLengthTier.STANDARD, version = 1, title = "Apple Day",
+            englishText = "apple", chineseText = "苹果", generatedAtEpochMillis = 1,
+            coveredLemmas = listOf("apple"), source = ArticleSource.UserImported,
+        )
+        val events = object : LearningEventRepository by NoopLearningEventRepository() {
+            override suspend fun completedCardIds(planId: String) =
+                RepositoryResult.Success(if (planId == plan.planId) listOf("apple-id") else emptyList())
+        }
+        val plans = object : TodayPlanRepository {
+            override suspend fun find(profileId: String, localDate: java.time.LocalDate) =
+                if (profileId == plan.profileId && localDate == plan.localDate) TodayPlanResult.Ready(plan)
+                else TodayPlanResult.NotFound
+            override suspend fun findLatest(profileId: String) =
+                if (profileId == plan.profileId) TodayPlanResult.Ready(plan) else TodayPlanResult.NotFound
+            override suspend fun saveIfAbsent(plan: TodayPlan) = TodayPlanResult.Ready(plan)
+        }
+        val articles = object : ArticleRepository {
+            override suspend fun saveNewVersion(article: Article) = Result.success(article)
+            override suspend fun findLatest(
+                profileId: String, localDate: String, activeWordBookId: String,
+                articleType: ArticleType, lengthTier: ArticleLengthTier,
+            ) = if (profileId == plan.profileId && localDate == plan.localDate.toString() &&
+                activeWordBookId == plan.activeWordBookId && articleType == ArticleType.STORY &&
+                lengthTier == ArticleLengthTier.STANDARD
+            ) {
+                Result.success(article)
+            } else {
+                Result.success(null)
+            }
+            override suspend fun findHistory(profileId: String) = Result.success(listOf(article))
+            override suspend fun findBySourceUrl(url: String) = Result.success<Article?>(null)
+        }
+        val preferences = object : ReadingPreferenceRepository {
+            override suspend fun getPreference(profileId: String) =
+                if (profileId == plan.profileId) Result.success(ReadingPreference(profileId))
+                else Result.failure(IllegalStateException("unexpected reading profileId"))
+            override suspend fun savePreference(preference: ReadingPreference) = Result.success(Unit)
+        }
+        val cards = object : com.example.englishlearning.learning.WordCardSource {
+            override suspend fun cardIds(wordBookId: String) =
+                if (wordBookId == plan.activeWordBookId) listOf("apple-id") else emptyList()
+            override suspend fun cards(cardIds: List<String>) = cardIds.mapNotNull { id ->
+                if (id == "apple-id") com.example.englishlearning.learning.domain.WordCard(id, "cet4", "apple", "", "", "苹果") else null
+            }
+        }
+        val clock = FixedClockProvider(plan.generatedAt, java.time.ZoneId.of(plan.zoneId))
+        val ids = ArticleIdFactory { "new-article" }
+        val offline = object : AiHttpTransport {
+            override suspend fun send(request: AiHttpRequest): com.example.englishlearning.ai.net.AiHttpResult =
+                error("Reading pronunciation test must not perform network requests")
+        }
+        val secrets = AiProfileSecretUseCase(object : SecretStore {
+            override fun save(reference: SecretReference, secret: CharArray) = Result.success(Unit)
+            override fun read(reference: SecretReference) = Result.success(charArrayOf())
+            override fun delete(reference: SecretReference) = Result.success(Unit)
+            override fun has(reference: SecretReference) = Result.success(false)
+        })
+        val generated = GenerateArticleUseCase(
+            DefaultTextProfileResolver { DefaultTextProfileResult.NoSelection }, secrets, offline, articles, ids, { clock.instant() },
+        )
+        return ReadingFixture(
+            ReadingAccessViewModel(
+                articles, preferences, plans, events, cards, generated,
+                FetchArticleUseCase(offline, articles, ids, { clock.instant() }),
+                ImportArticleUseCase(articles, plans, events, cards, ids, { clock.instant() }), clock,
+            ),
+            ArticleReadingViewModel(preferences, object : ReadingCompletionRepository {
+                override suspend fun record(article: Article) = Result.success(true)
+                override suspend fun completionsToday(profileId: String) = Result.success(0)
+            }),
+            TodayPlanViewModel({ TodayPlanResult.Ready(plan) }, FakeLearningProfileRepository(), events),
+        )
+    }
+
+    private class RecordingPronunciationProvider(
+        private val result: PronunciationResult,
+    ) : PronunciationProvider {
+        val spokenTexts = mutableListOf<String>()
+
+        override fun capabilities() = setOf(PronunciationCapability.RemoteAudio)
+
+        override suspend fun speak(text: String): PronunciationResult {
+            spokenTexts += text
+            return result
+        }
     }
 
     private data class SpeechFixture(
@@ -366,7 +811,10 @@ class AppScreenTest {
                     override suspend fun speak(text: String) = PronunciationResult.Played
                 },
             ),
-            AiProfileSettingsViewModel(profiles, secrets, AiProfileIdFactory { "new-id" }),
+            AiProfileSettingsViewModel(profiles, secrets, AiProfileIdFactory { "new-id" }, object : AiPreferenceRepository {
+                override suspend fun get() = Result.success(AiPreference())
+                override suspend fun save(preference: AiPreference) = Result.success(Unit)
+            }),
             keys,
         ).also { it.keys += "mimo" }
     }
@@ -375,6 +823,13 @@ class AppScreenTest {
     private fun readyAppScreen(
         speechSettingsViewModel: SpeechSettingsViewModel? = null,
         aiProfileViewModel: AiProfileSettingsViewModel? = null,
+        pronunciationProvider: PronunciationProvider? = null,
+        todayPlanViewModel: TodayPlanViewModel? = null,
+        readingAccessViewModel: ReadingAccessViewModel? = null,
+        articleReadingViewModel: ArticleReadingViewModel? = null,
+        wordQaViewModel: WordAiQaViewModel? = null,
+        sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
+        imageStudioViewModel: ImageStudioViewModel? = null,
     ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
@@ -382,10 +837,16 @@ class AppScreenTest {
         AppScreen(
             viewModel = vm,
             learningSetupViewModel = setupViewModel(),
-            todayPlanViewModel = TodayPlanViewModel({ placeholderCardPlan() }, FakeLearningProfileRepository()),
+            todayPlanViewModel = todayPlanViewModel ?: TodayPlanViewModel({ placeholderCardPlan() }, FakeLearningProfileRepository()),
             wordCardViewModel = wordCardFixtureViewModel(),
+            readingAccessViewModel = readingAccessViewModel,
+            articleReadingViewModel = articleReadingViewModel,
             speechSettingsViewModel = speechSettingsViewModel,
             aiProfileViewModel = aiProfileViewModel,
+            pronunciationProvider = pronunciationProvider,
+            wordQaViewModel = wordQaViewModel,
+            sentenceAnalysisViewModel = sentenceAnalysisViewModel,
+            imageStudioViewModel = imageStudioViewModel,
         )
     }
 

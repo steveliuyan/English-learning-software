@@ -72,6 +72,8 @@ fun AiProfileSettingsScreen(
     onDeleteProfile: (String) -> Unit,
     onDeleteKey: (String) -> Unit,
     onBack: () -> Unit,
+    onSetDefaultTextProfile: (String) -> Unit = {},
+    onSetDefaultImageProfile: (String) -> Unit = {},
 ) {
     if (editor != null) {
         // 在列表层之后声明，因此编辑态的返回键优先：先关编辑页，再退整层。
@@ -89,6 +91,8 @@ fun AiProfileSettingsScreen(
             state = listState,
             onAdd = onAdd,
             onEdit = onEdit,
+            onSetDefaultTextProfile = onSetDefaultTextProfile,
+            onSetDefaultImageProfile = onSetDefaultImageProfile,
             onBack = onBack,
         )
     }
@@ -99,6 +103,8 @@ private fun AiProfileList(
     state: AiProfileListUiState,
     onAdd: () -> Unit,
     onEdit: (String) -> Unit,
+    onSetDefaultTextProfile: (String) -> Unit,
+    onSetDefaultImageProfile: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     Column(
@@ -147,7 +153,12 @@ private fun AiProfileList(
                     )
                 }
                 state.items.forEach { item ->
-                    AiProfileRow(item = item, onEdit = onEdit)
+                    AiProfileRow(
+                        item = item,
+                        onEdit = onEdit,
+                        onSetDefaultTextProfile = onSetDefaultTextProfile,
+                        onSetDefaultImageProfile = onSetDefaultImageProfile,
+                    )
                 }
             }
         }
@@ -165,7 +176,12 @@ private fun AiProfileList(
 }
 
 @Composable
-private fun AiProfileRow(item: AiProfileListItem, onEdit: (String) -> Unit) {
+private fun AiProfileRow(
+    item: AiProfileListItem,
+    onEdit: (String) -> Unit,
+    onSetDefaultTextProfile: (String) -> Unit,
+    onSetDefaultImageProfile: (String) -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     Surface(
         shape = AppShape.Card,
@@ -178,7 +194,7 @@ private fun AiProfileRow(item: AiProfileListItem, onEdit: (String) -> Unit) {
             .clickable(interactionSource = interaction, indication = null) { onEdit(item.profile.profileId) }
             .semantics { contentDescription = "编辑配置 ${item.profile.displayName}" },
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(item.profile.displayName, style = AppType.Title)
             Text(
                 text = "${item.profile.model} · ${hostOf(item.profile.endpoint)}",
@@ -197,6 +213,38 @@ private fun AiProfileRow(item: AiProfileListItem, onEdit: (String) -> Unit) {
                 Text(
                     text = capabilitiesLabel(item.profile.capabilities),
                     style = AppType.Label,
+                )
+            }
+            when {
+                item.isDefaultTextProfile -> Text(
+                    text = "文章默认",
+                    style = AppType.Label,
+                    color = DomainColors.AiSpeech.deep,
+                    modifier = Modifier.testTag("ai_profile_default_${item.profile.profileId}"),
+                )
+                item.canBeDefaultTextProfile -> PillButton(
+                    text = "设为文章默认",
+                    onClick = { onSetDefaultTextProfile(item.profile.profileId) },
+                    style = PillStyle.Text,
+                    accent = DomainColors.AiSpeech,
+                    modifier = Modifier.testTag("ai_profile_set_default_${item.profile.profileId}"),
+                    contentDescription = "将 ${item.profile.displayName} 设为文章默认",
+                )
+            }
+            when {
+                item.isDefaultImageProfile -> Text(
+                    text = "生图默认",
+                    style = AppType.Label,
+                    color = DomainColors.AiSpeech.deep,
+                    modifier = Modifier.testTag("ai_profile_image_default_${item.profile.profileId}"),
+                )
+                item.canBeDefaultImageProfile -> PillButton(
+                    text = "设为生图默认",
+                    onClick = { onSetDefaultImageProfile(item.profile.profileId) },
+                    style = PillStyle.Text,
+                    accent = DomainColors.AiSpeech,
+                    modifier = Modifier.testTag("ai_profile_set_image_default_${item.profile.profileId}"),
+                    contentDescription = "将 ${item.profile.displayName} 设为生图默认",
                 )
             }
         }
@@ -534,6 +582,7 @@ private fun capabilitiesLabel(capabilities: Set<AiCapability>): String =
 private val AiCapability.label: String
     get() = when (this) {
         AiCapability.Text -> "文本"
-        AiCapability.Vision -> "图片"
+        AiCapability.Vision -> "读图"
         AiCapability.Speech -> "语音"
+        AiCapability.ImageGeneration -> "生图"
     }

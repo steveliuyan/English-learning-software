@@ -55,11 +55,13 @@ fun PillButton(
         .heightIn(min = 48.dp)
     if (testTag != null) m = m.testTag(testTag)
     if (contentDescription != null) m = m.semantics { this.contentDescription = contentDescription }
-    // Primary 用垂直渐变（base→deep）增加品牌质感；Secondary/Text 保持纯色。
-    val contentColor = when (style) {
-        PillStyle.Primary -> Color.White
-        PillStyle.Secondary -> accent.deep
-        PillStyle.Text -> accent.deep
+    // 品牌 CTA 以浅薄荷到柔和青绿渐变搭配深青字；其他域色维持原语义。
+    val usesBrandGradient = accent == DomainColors.AiSpeech
+    val contentColor = when {
+        !enabled -> AppPalette.TextSecondary
+        style == PillStyle.Primary && usesBrandGradient -> Color(0xFF174C44)
+        style == PillStyle.Primary -> Color.White
+        else -> accent.deep
     }
     val border = if (style == PillStyle.Secondary) BorderStroke(1.dp, AppPalette.Separator) else null
     val containerColor = when (style) {
@@ -69,10 +71,16 @@ fun PillButton(
         PillStyle.Text -> Color.Transparent
     }
     if (style == PillStyle.Primary) {
-        m = m.background(
-            Brush.verticalGradient(colors = listOf(accent.base, accent.deep)),
-            shape = AppShape.Pill,
-        )
+        m = if (enabled) {
+            val gradient = if (usesBrandGradient) {
+                Brush.verticalGradient(listOf(AppleMintStart, AppleMintMiddle, Color(0xFF65D3B9)))
+            } else {
+                Brush.verticalGradient(listOf(accent.base, accent.deep))
+            }
+            m.background(gradient, AppShape.Pill)
+        } else {
+            m.background(AppPalette.Separator, AppShape.Pill)
+        }
     }
     Surface(
         shape = AppShape.Pill,

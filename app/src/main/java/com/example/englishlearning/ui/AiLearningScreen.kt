@@ -22,7 +22,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,13 +38,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.mascot.AiMascot
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
+import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
@@ -66,8 +67,8 @@ private val AI_MASCOT_SIZE = 140.dp
 /**
  * 「AI 学」一级页。
  *
- * 页面上的每一句状态描述都来自 [AiFeature]，不做本地改写：四个功能的生成逻辑尚未实现，
- * 所以全页只提供「入口 + 如实说明」，不制造点开即坏的假功能。
+ * 页面上的每一句状态描述都来自 [AiFeature]，不做本地改写：尚未实现的功能，
+ * 全页只提供「入口 + 如实说明」，不制造点开即坏的假功能。
  *
  * @param todayWordCount 今日计划的新词数，`null` 表示今日计划还不可读。
  * @param dueWordCount 今日计划的待复习词数，`null` 同上。
@@ -85,6 +86,8 @@ fun AiLearningScreen(
     onOpenWordList: () -> Unit,
 ) {
     var explainerOpen by rememberSaveable { mutableStateOf(false) }
+    // 功能入口默认收起：用户反感扁平长列表，展开键把目录折叠成一行，点开才见全部功能。
+    var featuresOpen by rememberSaveable { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -95,8 +98,28 @@ fun AiLearningScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         AiHeaderCard(aiConfigured = aiConfigured)
-        AiFeature.entries.forEach { feature ->
-            AiFeatureRow(feature = feature, onOpen = { onOpenFeature(feature) })
+        TextButton(
+            onClick = { featuresOpen = !featuresOpen },
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("ai_learning_features_toggle")
+                .semantics { contentDescription = "AI 功能列表展开收起" },
+            colors = ButtonDefaults.textButtonColors(contentColor = MintPrimaryDark),
+        ) {
+            Text(
+                text = if (featuresOpen) "AI 功能 收起 ˄" else "AI 功能（${AiFeature.entries.size} 个）展开 ˅",
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        if (featuresOpen) {
+            Column(
+                modifier = Modifier.fillMaxWidth().animateContentSize(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                AiFeature.entries.forEach { feature ->
+                    AiFeatureRow(feature = feature, onOpen = { onOpenFeature(feature) })
+                }
+            }
         }
         AiNavigationCard(
             todayWordCount = todayWordCount,
@@ -150,7 +173,7 @@ private fun AiHeaderCard(aiConfigured: Boolean) {
                     text = if (aiConfigured) "AI 已配置" else "AI 尚未接通",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MintPrimaryDark,
+                    color = if (aiConfigured) DomainColors.AiSpeech.deep else AppPalette.TextSecondary,
                 )
             }
         }
@@ -230,16 +253,15 @@ private fun AiNavigationCard(todayWordCount: Int?, dueWordCount: Int?, onOpenWor
                             color = MintTextMuted,
                             modifier = Modifier.testTag("ai_learning_word_list_count"),
                         )
-                        Button(
+                        PillButton(
+                            text = "查看详情",
                             onClick = onOpenWordList,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(46.dp)
-                                .testTag("ai_learning_nav_detail")
-                                .semantics { contentDescription = "查看详情" },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
-                        ) { Text("查看详情", fontWeight = FontWeight.Bold) }
+                                .height(46.dp),
+                            testTag = "ai_learning_nav_detail",
+                            contentDescription = "查看详情",
+                        )
                     }
                 }
             }
@@ -286,7 +308,7 @@ private fun AiExplainer(open: Boolean, onToggle: () -> Unit) {
                 ) {
                     ExplainerLine("会用到的数据", "今日新词与待复习词、当前词书等级、你的复习反馈记录。")
                     ExplainerLine("数据发往哪里", "只发给你自己配置的第三方 AI 服务；应用不内置密钥，也不上传到我们的服务器。")
-                    ExplainerLine("现在的状态", "AI 网关尚未接通，四个功能都还没开发完，点开只能看到进度与依赖。")
+                    ExplainerLine("现在的状态", "AI 能力分批接通中：长难句分析与生图正在开发，其余功能点开只能看到进度与依赖。")
                     ExplainerLine("不配置会怎样", "背词、复习、默写纸、阅读记录全部离线可用，不受影响。")
                 }
             }

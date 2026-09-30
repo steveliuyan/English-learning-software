@@ -155,6 +155,55 @@ class ArticleReadingViewModelTest {
     }
 
     @Test
+    fun togglingLearnedMarksOffClearsHighlightsButKeepsUncoveredLemmas() = runTest(dispatcher) {
+        val (viewModel, preferences) = viewModel()
+        // 正文只出现 apple，banana 是未覆盖词——开关只管高亮，不许连未覆盖词一起清。
+        viewModel.load(article(listOf("apple", "banana"), englishText = "The apple grows quietly"), todayCards)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value?.highlights.orEmpty().isNotEmpty())
+
+        viewModel.setLearnedMarks(false)
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.uiState.value?.highlights.orEmpty().isEmpty())
+        assertEquals(false, viewModel.uiState.value?.showLearnedMarks)
+        assertEquals(listOf("banana"), viewModel.uiState.value?.uncoveredLemmas)
+        assertEquals(false, preferences.saved?.showLearnedMarks)
+    }
+
+    @Test
+    fun togglingLearnedMarksBackOnRecomputesHighlightsFromStoredLemmas() = runTest(dispatcher) {
+        val (viewModel, preferences) = viewModel()
+
+        viewModel.load(article(listOf("apple")), todayCards)
+        advanceUntilIdle()
+        viewModel.setLearnedMarks(false)
+        advanceUntilIdle()
+        viewModel.setLearnedMarks(true)
+        advanceUntilIdle()
+
+        // 重新打开必须按文章存储的 lemma 重算高亮，而不是停留在空表。
+        assertTrue(
+            viewModel.uiState.value?.highlights.orEmpty().any { it.lemma == "apple" },
+            "re-enabling must recompute highlights from the stored lemmas",
+        )
+        assertEquals(true, viewModel.uiState.value?.showLearnedMarks)
+        assertEquals(true, preferences.saved?.showLearnedMarks)
+    }
+
+    @Test
+    fun settingTheSameLearnedMarksValueDoesNotSaveAgain() = runTest(dispatcher) {
+        val (viewModel, preferences) = viewModel()
+
+        viewModel.load(article(listOf("apple")), todayCards)
+        advanceUntilIdle()
+        viewModel.setLearnedMarks(true) // 默认已是开：同值调用是空操作
+        advanceUntilIdle()
+
+        assertEquals(null, preferences.saved)
+    }
+
+    @Test
     fun preferenceReadFailureFallsBackToTheDefaultMode() = runTest(dispatcher) {
         Dispatchers.setMain(dispatcher)
         val preferences = FakePreferenceRepository(failRead = true)

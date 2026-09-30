@@ -13,13 +13,20 @@ import org.junit.jupiter.api.Test
  */
 class AiFeatureTest {
     @Test
-    fun `the page shows exactly the four features the user asked for, in order`() {
+    fun `the page shows exactly the six features, in order`() {
         assertEquals(
-            listOf(AiFeature.WORD_PASSAGE, AiFeature.CLOZE, AiFeature.LISTENING, AiFeature.COACH),
+            listOf(
+                AiFeature.WORD_PASSAGE,
+                AiFeature.CLOZE,
+                AiFeature.LISTENING,
+                AiFeature.COACH,
+                AiFeature.SENTENCE_ANALYSIS,
+                AiFeature.IMAGE_STUDIO,
+            ),
             AiFeature.entries.toList(),
         )
         assertEquals(
-            listOf("词文串学", "AI 短文填词", "单词随身听", "单词串讲"),
+            listOf("词文串学", "AI 短文填词", "单词随身听", "单词串讲", "长难句分析", "AI 生图"),
             AiFeature.entries.map { it.title },
         )
     }
@@ -55,13 +62,12 @@ class AiFeatureTest {
     }
 
     @Test
-    fun `no feature is advertised as implemented while the AI gateway is still missing`() {
-        AiFeature.entries.forEach { feature ->
-            assertFalse(
-                feature.implemented,
-                "${feature.name} 被标记为已实现，但本轮并未接通 AI 网关；接通前必须保持 false",
-            )
-        }
+    fun `only the features with real screens are marked as implemented`() {
+        // 长难句分析与 AI 生图已接通；其余功能仍未实现。接通新的功能时在这里同步集合。
+        assertEquals(
+            setOf(AiFeature.SENTENCE_ANALYSIS, AiFeature.IMAGE_STUDIO),
+            AiFeature.entries.filter { it.implemented }.toSet(),
+        )
     }
 
     /**

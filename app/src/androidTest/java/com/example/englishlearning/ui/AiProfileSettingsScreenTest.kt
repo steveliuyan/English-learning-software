@@ -44,6 +44,7 @@ class AiProfileSettingsScreenTest {
         onCloseEditor: () -> Unit = {},
         onDeleteProfile: (String) -> Unit = {},
         onDeleteKey: (String) -> Unit = {},
+        onSetDefaultTextProfile: (String) -> Unit = {},
         onBack: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -57,6 +58,7 @@ class AiProfileSettingsScreenTest {
                 onCloseEditor = onCloseEditor,
                 onDeleteProfile = onDeleteProfile,
                 onDeleteKey = onDeleteKey,
+                onSetDefaultTextProfile = onSetDefaultTextProfile,
                 onBack = onBack,
             )
         }
@@ -79,6 +81,40 @@ class AiProfileSettingsScreenTest {
         composeRule.onNodeWithTag("ai_profile_key_state_p1", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("已设置密钥").assertExists()
         composeRule.onNodeWithText("还没有设置密钥").assertExists()
+    }
+
+    @Test fun list_marks_the_default_profile_and_reports_set_default_callback() {
+        var selected: String? = null
+        setScreen(
+            listState = AiProfileListUiState.Ready(
+                listOf(AiProfileListItem(profile("p1", "公司网关"), hasKey = true, isDefaultTextProfile = true)),
+            ),
+            onSetDefaultTextProfile = { selected = it },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_default_p1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("文章默认").assertExists()
+        composeRule.onNodeWithTag("ai_profile_set_default_p1").assertDoesNotExist()
+    }
+
+    @Test fun list_only_offers_set_default_for_a_qualified_profile() {
+        var selected: String? = null
+        setScreen(
+            listState = AiProfileListUiState.Ready(
+                listOf(
+                    AiProfileListItem(profile("p1", "有资格"), hasKey = true, canBeDefaultTextProfile = true),
+                    AiProfileListItem(profile("p2", "没有密钥"), hasKey = false),
+                    AiProfileListItem(profile("p3", "没有文本能力").copy(capabilities = setOf(AiCapability.Speech)), hasKey = true),
+                ),
+            ),
+            onSetDefaultTextProfile = { selected = it },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_set_default_p1").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals("p1", selected)
+        composeRule.onNodeWithTag("ai_profile_set_default_p2").assertDoesNotExist()
+        composeRule.onNodeWithTag("ai_profile_set_default_p3").assertDoesNotExist()
     }
 
     /** 列表把 Endpoint 里最要紧的信息（域名）显示出来，而不是只显示一个模型名。 */

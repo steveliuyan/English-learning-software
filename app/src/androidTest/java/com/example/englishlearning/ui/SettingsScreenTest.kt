@@ -28,6 +28,10 @@ class SettingsScreenTest {
         onOpenSpeechSettings: () -> Unit = {},
         aiProfileSubtitle: String? = null,
         speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
+        onImportWordBook: () -> Unit = {},
+        onExportWordBook: () -> Unit = {},
+        importedBookCount: Int = 0,
+        transferMessage: String? = null,
     ) {
         composeRule.setContent {
             SettingsScreen(
@@ -41,6 +45,10 @@ class SettingsScreenTest {
                 onOpenSpeechSettings = onOpenSpeechSettings,
                 aiProfileSubtitle = aiProfileSubtitle,
                 speechEngineStatuses = speechEngineStatuses,
+                onImportWordBook = onImportWordBook,
+                onExportWordBook = onExportWordBook,
+                importedBookCount = importedBookCount,
+                transferMessage = transferMessage,
             )
         }
     }
@@ -53,6 +61,7 @@ class SettingsScreenTest {
             composeRule.onNodeWithTag("settings_group_${groupTagOf(group)}").assertExists().performScrollTo()
             composeRule.onNodeWithText(group).assertExists()
         }
+        composeRule.onNodeWithTag("settings_group_word_books").performScrollTo().assertExists()
     }
 
     @Test fun profile_card_reports_the_word_book_and_the_plan_numbers() {
@@ -108,10 +117,41 @@ class SettingsScreenTest {
         listOf(
             "settings_pending_reading",
             "settings_pending_profile",
-            "settings_pending_backup",
         ).forEach { tag ->
             composeRule.onNodeWithTag(tag).performScrollTo().assertExists().assertHasNoClickAction()
         }
+    }
+
+    /**
+     * 词书导入/导出已是**真能力**（离线 `.wbpack`），不再是「数据与备份 · 后续版本」占位。
+     * 这里锁住两条入口可点，且旧的占位行不再出现。
+     */
+    @Test fun word_book_import_and_export_entries_are_clickable() {
+        var imported = 0
+        var exported = 0
+        setScreen(onImportWordBook = { imported++ }, onExportWordBook = { exported++ }, importedBookCount = 2)
+
+        composeRule.onNodeWithTag("settings_import_word_book").performScrollTo().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_export_word_book").performScrollTo().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(1, imported)
+        assertEquals(1, exported)
+        composeRule.onNodeWithTag("settings_pending_backup").assertDoesNotExist()
+        composeRule.onNodeWithText("数据与备份").assertDoesNotExist()
+    }
+
+    @Test fun word_book_group_admits_when_nothing_was_imported_yet() {
+        setScreen(importedBookCount = 0)
+        composeRule.onNodeWithTag("settings_group_word_books").performScrollTo().assertExists()
+        composeRule.onNodeWithText("先导入一册词书后才能导出").assertExists()
+    }
+
+    @Test fun word_book_transfer_message_is_shown_when_present() {
+        setScreen(transferMessage = "已导入《ngsl-core-100》，可在「调整词书与目标」中选用。")
+        composeRule.onNodeWithTag("settings_word_book_message").performScrollTo().assertExists()
+        composeRule.onNodeWithText("已导入《ngsl-core-100》，可在「调整词书与目标」中选用。").assertExists()
     }
 
     /** AI 服务配置已经是真能力（F2-02），这里锁住它不再是「后续版本」占位。 */

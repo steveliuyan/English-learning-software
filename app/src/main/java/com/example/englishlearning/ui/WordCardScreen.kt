@@ -47,6 +47,8 @@ import com.example.englishlearning.ui.theme.MintTint
 fun WordCardScreen(
     state: WordCardUiState,
     onSubmit: (CardFeedback) -> Unit = {},
+    onSpeak: (String) -> Unit = {},
+    pronunciationMessage: String? = null,
     onRetry: () -> Unit = {},
     onBackToPlan: () -> Unit = {},
 ) {
@@ -155,6 +157,12 @@ fun WordCardScreen(
                                 .testTag("word_card_meaning")
                                 .semantics { contentDescription = "释义 ${state.card.meaningZh}" },
                         )
+                        androidx.compose.material3.TextButton(
+                            onClick = { onSpeak(state.card.lemma) },
+                            modifier = Modifier
+                                .testTag("word_card_speak")
+                                .semantics { contentDescription = "播放 ${state.card.lemma} 发音" },
+                        ) { Text("播放发音") }
                         state.card.example?.let { example ->
                             Text(
                                 text = example,
@@ -187,6 +195,15 @@ fun WordCardScreen(
                 }
                 if (state.submitting) {
                     Text("正在保存…", color = MintTextMuted, modifier = Modifier.testTag("word_card_submitting"))
+                }
+                pronunciationMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MintTextMuted,
+                        modifier = Modifier
+                            .testTag("word_card_pronunciation_message")
+                            .semantics { contentDescription = message },
+                    )
                 }
                 FeedbackButton(state, CardFeedback.Unknown, "不认识", "word_card_feedback_unknown", onSubmit)
                 FeedbackButton(state, CardFeedback.Fuzzy, "模糊", "word_card_feedback_fuzzy", onSubmit)

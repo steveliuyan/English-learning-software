@@ -9,4 +9,7 @@ enum class AiCapability {
     Text,
     Vision,
     Speech,
+
+    /** 文生图（OpenAI 兼容 images/generations）。与 Vision（读图）是两个方向。 */
+    ImageGeneration,
 }

@@ -1,6 +1,13 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertHasClickAction
+import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.theme.AppleMintEnd
+import com.example.englishlearning.ui.theme.AppleMintStart
+import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -56,8 +63,70 @@ class AiLearningScreenTest {
         composeRule.onNodeWithText("AI 尚未接通").assertDoesNotExist()
     }
 
-    @Test fun renders_all_four_feature_rows() {
+    @Test fun unconfigured_badge_is_neutral_while_ai_action_stays_mint() {
+        setScreen(aiConfigured = false)
+        val badge = composeRule.onNodeWithTag("ai_learning_status_badge").captureToImage().asAndroidBitmap()
+        val neutral = AppPalette.TextSecondary.toArgb()
+        assertTrue("unconfigured badge should use neutral text", (0 until badge.width).any { x ->
+            (0 until badge.height).any { y -> badge.getPixel(x, y) == neutral }
+        })
+        val action = composeRule.onNodeWithTag("ai_learning_nav_detail").performScrollTo().captureToImage().asAndroidBitmap()
+        val mint = AppleMintStart.toArgb()
+        assertTrue("AI action should preserve mint gradient", (0 until action.width).any { x ->
+            (0 until action.height).any { y -> colorDistance(action.getPixel(x, y), mint) <= 18.0 }
+        })
+    }
+
+    @Test fun ai_detail_action_uses_brand_gradient_and_dark_text() {
+        setScreen(aiConfigured = true)
+        val action = composeRule.onNodeWithTag("ai_learning_nav_detail").performScrollTo().captureToImage().asAndroidBitmap()
+        val pixels = (0 until action.width).flatMap { x ->
+            (0 until action.height).map { y -> action.getPixel(x, y) }
+        }
+        assertTrue("AI detail action should render mint gradient start", pixels.minOf { colorDistance(it, AppleMintStart.toArgb()) } <= 18.0)
+        assertTrue("AI detail action should render softened mint end", pixels.minOf { colorDistance(it, 0xFF65D3B9.toInt()) } <= 18.0)
+        assertTrue("AI detail action should use readable teal text", pixels.minOf { colorDistance(it, 0xFF174C44.toInt()) } <= 18.0)
+    }
+
+    private fun colorDistance(actual: Int, expected: Int): Double {
+        val dr = ((actual shr 16 and 0xFF) - (expected shr 16 and 0xFF)).toDouble()
+        val dg = ((actual shr 8 and 0xFF) - (expected shr 8 and 0xFF)).toDouble()
+        val db = ((actual and 0xFF) - (expected and 0xFF)).toDouble()
+        return Math.sqrt(dr * dr + dg * dg + db * db)
+    }
+
+    /** 展开键：功能入口默认收起，一键展开、再点收起——页面不能是一张扁平长列表。 */
+    @Test fun feature_rows_start_collapsed_and_expand_on_tap() {
         setScreen()
+        AiFeature.entries.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").assertDoesNotExist()
+        }
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().assertExists()
+
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performClick()
+        composeRule.waitForIdle()
+        AiFeature.entries.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").assertExists().assertHasClickAction()
+            composeRule.onNodeWithText(feature.summary).assertExists()
+        }
+        composeRule.onNodeWithText("AI 功能 收起 ˄").assertExists()
+
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performClick()
+        composeRule.waitForIdle()
+        AiFeature.entries.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").assertDoesNotExist()
+        }
+    }
+
+    /** 展开键默认收起，需要先展开再断言功能行。 */
+    private fun expandFeatures() {
+        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
+    }
+
+    @Test fun renders_all_feature_rows_after_expanding() {
+        setScreen()
+        expandFeatures()
         AiFeature.entries.forEach { feature ->
             composeRule
                 .onNodeWithTag("ai_feature_${feature.key}")
@@ -68,11 +137,12 @@ class AiLearningScreenTest {
     }
 
     /**
-     * 用户明确抱怨过「点了没反应」。四个入口都必须真的把回调打出去。
+     * 用户明确抱怨过「点了没反应」。每个入口都必须真的把回调打出去。
      */
     @Test fun every_feature_row_reports_its_own_feature() {
         val received = mutableListOf<AiFeature>()
         setScreen(onOpenFeature = { received += it })
+        expandFeatures()
         AiFeature.entries.forEach { feature ->
             composeRule.onNodeWithTag("ai_feature_${feature.key}").performScrollTo().performClick()
         }

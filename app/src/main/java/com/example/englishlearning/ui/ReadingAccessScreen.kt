@@ -31,6 +31,7 @@ import com.example.englishlearning.ai.UserAction
 import com.example.englishlearning.ai.toUserAction
 import com.example.englishlearning.reading.FetchFailure
 import com.example.englishlearning.reading.FeedItem
+import com.example.englishlearning.reading.NotConfiguredReason
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
@@ -166,6 +167,7 @@ private fun ReadyContent(
             modifier = Modifier.testTag("generation_storage_failed"),
         )
         is GenerationUiState.Failed -> GenerationFailureBanner(generation.failure, onOpenAiSettings)
+        is GenerationUiState.NotConfigured -> NotConfiguredBanner(generation.reason, onOpenAiSettings)
         is GenerationUiState.NeedsConfirmation -> OutboundConfirmationDialog(generation.host, onConfirmOutbound)
         GenerationUiState.Idle -> Unit
     }
@@ -215,6 +217,33 @@ private fun ReadyContent(
 }
 
 /** 生成失败横幅：文案与按钮标签全部来自常量（AiFailure 的泄露防线），不发自由文本。 */
+@Composable
+private fun NotConfiguredBanner(reason: NotConfiguredReason, onOpenAiSettings: () -> Unit) {
+    val message = when (reason) {
+        NotConfiguredReason.NoDefaultProfile -> "请先选择文章默认 AI 服务。"
+        NotConfiguredReason.DefaultProfileUnavailable -> "文章默认 AI 服务已不可用，请重新选择。"
+        NotConfiguredReason.NoProfile,
+        NotConfiguredReason.NoKey,
+        NotConfiguredReason.ProfileUnreadable,
+        NotConfiguredReason.InvalidEndpoint,
+        -> "本机 AI 配置暂时不可用，请检查设置。"
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MintSurface),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(18.dp)).testTag("generation_failure"),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(message, color = MintPrimaryDark, modifier = Modifier.semantics { contentDescription = "生成失败原因" })
+            Button(
+                onClick = onOpenAiSettings,
+                modifier = Modifier.testTag("generation_failure_action"),
+                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+            ) { Text("去配置", fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
 @Composable
 private fun GenerationFailureBanner(failure: AiFailure, onOpenAiSettings: () -> Unit) {
     Card(

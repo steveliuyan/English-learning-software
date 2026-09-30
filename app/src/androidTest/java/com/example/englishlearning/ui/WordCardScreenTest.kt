@@ -43,6 +43,35 @@ class WordCardScreenTest {
     }
 
     @Test
+    fun readyOffersPronunciationAndPassesTheVisibleLemmaToTheCallback() {
+        var spoken = ""
+        composeRule.setContent {
+            WordCardScreen(
+                state = ready(),
+                onSpeak = { spoken = it },
+            )
+        }
+
+        composeRule.onNodeWithTag("word_card_speak").assertExists().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("ability", spoken)
+    }
+
+    @Test
+    fun pronunciationFailureMessageDoesNotChangeFeedbackActions() {
+        composeRule.setContent {
+            WordCardScreen(state = ready(), pronunciationMessage = "发音播放失败，请重试。")
+        }
+
+        composeRule.onNodeWithTag("word_card_pronunciation_message").assertExists()
+        composeRule.onNodeWithContentDescription("发音播放失败，请重试。").assertExists()
+        composeRule.onNodeWithContentDescription("不认识").assertHasClickAction()
+        composeRule.onNodeWithContentDescription("模糊").assertHasClickAction()
+        composeRule.onNodeWithContentDescription("认识").assertHasClickAction()
+    }
+
+    @Test
     fun theThreeTiersReportTheirFixedFeedback() {
         val reported = mutableListOf<CardFeedback>()
         composeRule.setContent { WordCardScreen(state = ready(), onSubmit = { reported += it }) }

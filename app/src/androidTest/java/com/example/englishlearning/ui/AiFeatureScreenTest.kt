@@ -45,11 +45,12 @@ class AiFeatureScreenTest {
     }
 
     /**
-     * 四个功能页都只是骨架，但骨架也必须是完整的：标题、进度、依赖、数据、动作一个不少。
+     * 骨架页只属于**未实现**的功能（已实现的渲染各自的真实屏幕）。
+     * 骨架也必须是完整的：标题、进度、依赖、数据、动作一个不少。
      */
-    @Test fun every_feature_renders_a_complete_skeleton() {
+    @Test fun every_unimplemented_feature_renders_a_complete_skeleton() {
         val current = setScreen()
-        AiFeature.entries.forEach { feature ->
+        AiFeature.entries.filter { !it.implemented }.forEach { feature ->
             current.value = feature
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("ai_feature_screen").assertExists()
@@ -65,7 +66,7 @@ class AiFeatureScreenTest {
 
     @Test fun dependency_list_matches_the_feature_catalogue() {
         val current = setScreen()
-        AiFeature.entries.forEach { feature ->
+        AiFeature.entries.filter { !it.implemented }.forEach { feature ->
             current.value = feature
             composeRule.waitForIdle()
             feature.dependencies.indices.forEach { index ->
@@ -78,7 +79,7 @@ class AiFeatureScreenTest {
     /** 骨架页面上必须出现该功能自己的状态文案，不能被泛化成一句万金油。 */
     @Test fun status_block_repeats_the_catalogue_wording() {
         val current = setScreen()
-        AiFeature.entries.forEach { feature ->
+        AiFeature.entries.filter { !it.implemented }.forEach { feature ->
             current.value = feature
             composeRule.waitForIdle()
             composeRule.onNodeWithText(feature.status).assertExists()

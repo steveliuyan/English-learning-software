@@ -19,6 +19,12 @@ internal interface InternalTodayPlanDao {
     @Query("SELECT * FROM today_plan_tasks WHERE planId = :planId ORDER BY ordinal ASC")
     suspend fun findTasks(planId: String): List<TodayPlanTaskEntity>
 
+    @Query("DELETE FROM today_plan_tasks WHERE planId = :planId")
+    suspend fun deleteTasks(planId: String)
+
+    @Query("DELETE FROM today_plans WHERE profileId = :profileId AND localDate = :localDate")
+    suspend fun deletePlan(profileId: String, localDate: String)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertPlan(plan: TodayPlanEntity)
 
@@ -27,6 +33,20 @@ internal interface InternalTodayPlanDao {
 
     @Transaction
     suspend fun insertIfAbsent(plan: TodayPlanEntity, tasks: List<TodayPlanTaskEntity>) {
+        insertPlan(plan)
+        insertTasks(tasks)
+    }
+
+    @Transaction
+    suspend fun replaceForDate(
+        oldPlan: TodayPlanEntity?,
+        plan: TodayPlanEntity,
+        tasks: List<TodayPlanTaskEntity>,
+    ) {
+        oldPlan?.let {
+            deleteTasks(it.planId)
+            deletePlan(it.profileId, it.localDate)
+        }
         insertPlan(plan)
         insertTasks(tasks)
     }

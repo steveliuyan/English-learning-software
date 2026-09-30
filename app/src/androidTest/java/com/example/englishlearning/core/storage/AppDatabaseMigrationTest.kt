@@ -198,6 +198,53 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV15ToV16_preservesAiSpeechAndArticleRowsAndCreatesCredentialFreeAiPreferences() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 15).apply {
+            execSQL(
+                "INSERT INTO ai_profiles (profileId, displayName, websiteUrl, endpoint, model, capabilities, " +
+                    "secretAlias, temperature, topP, maxTokens, timeoutSeconds, systemPromptTemplateId, providerKind, voice) " +
+                    "VALUES ('existing-profile', 'Existing', 'https://example.com', 'https://example.com/v1', " +
+                    "'model', 'Text', 'alias', 0.7, 1.0, 256, 30, 'default-reading-v1', 'OPENAI_COMPATIBLE', '')",
+            )
+            execSQL(
+                "INSERT INTO speech_preferences (preferenceId, selectedEngine, openAiProfileId, miMoProfileId) " +
+                    "VALUES ('device', 'SystemTts', NULL, NULL)",
+            )
+            execSQL(
+                "INSERT INTO articles (articleId, profileId, localDate, activeWordBookId, articleType, lengthTier, " +
+                    "version, title, englishText, chineseText, generatedAtEpochMillis, coveredLemmas, " +
+                    "parameterSummary, modelName, sourceType, sourceId, sourceDisplayName, sourceUrl, " +
+                    "sourceLicenseNote, sourceAttribution) VALUES ('article-1', 'default', '2026-09-27', " +
+                    "'primary-school', 'STORY', 'STANDARD', 1, 'Today', 'English', '中文', 1, '[]', '', " +
+                    "'model', 'AI_GENERATED', '', '', '', '', '')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 16, true, AppDatabase.MIGRATION_15_16).apply {
+            query("SELECT displayName FROM ai_profiles WHERE profileId = 'existing-profile'").use { cursor ->
+                assertTrue("the v15 AI Profile must survive the migration", cursor.moveToFirst())
+                assertEquals("Existing", cursor.getString(0))
+            }
+            query("SELECT selectedEngine FROM speech_preferences WHERE preferenceId = 'device'").use { cursor ->
+                assertTrue("the v15 speech preference must survive the migration", cursor.moveToFirst())
+                assertEquals("SystemTts", cursor.getString(0))
+            }
+            query("SELECT title FROM articles WHERE articleId = 'article-1'").use { cursor ->
+                assertTrue("the v15 article must survive the migration", cursor.moveToFirst())
+                assertEquals("Today", cursor.getString(0))
+            }
+            query("PRAGMA table_info(ai_preferences)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(setOf("preferenceId", "defaultTextProfileId"), names.toSet())
+                assertFalse(names.any { it.contains("key", ignoreCase = true) || it.contains("secret", ignoreCase = true) || it.contains("endpoint", ignoreCase = true) || it.contains("model", ignoreCase = true) })
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateAllHistoricalSchemasWithoutDestructiveFallback() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 1).apply {
@@ -568,6 +615,51 @@ class AppDatabaseMigrationTest {
             query("SELECT COUNT(*) FROM reading_completions").use { cursor ->
                 cursor.moveToFirst()
                 assertEquals(1, cursor.getInt(0))
+            }
+            close()
+        }
+    }
+
+    @Test
+    fun migrateV16ToV17_createsWordAiNotes() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 16).close()
+
+        helper.runMigrationsAndValidate(TEST_DB, 17, true, AppDatabase.MIGRATION_16_17).apply {
+            assertTableExists("word_ai_notes")
+            assertIndexExists("word_ai_notes", "index_word_ai_notes_profileId_lemma")
+            execSQL(
+                "INSERT INTO word_ai_notes (noteId, profileId, lemma, kind, answer, createdAtEpochMillis) " +
+                    "VALUES ('n1', 'default', 'apple', 'Sentence', 'I ate an apple.', 10)",
+            )
+            query("SELECT lemma, kind, answer FROM word_ai_notes WHERE profileId = 'default'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("apple", cursor.getString(0))
+                assertEquals("Sentence", cursor.getString(1))
+                assertEquals("I ate an apple.", cursor.getString(2))
+            }
+            close()
+        }
+    }
+
+    @Test
+    fun migrateV17ToV18_addsDefaultImageProfileId() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 17).apply {
+            execSQL("INSERT INTO ai_preferences (preferenceId, defaultTextProfileId) VALUES ('device', 'p-text')")
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 18, true, AppDatabase.MIGRATION_17_18).apply {
+            query("SELECT defaultTextProfileId, defaultImageProfileId FROM ai_preferences WHERE preferenceId = 'device'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("p-text", cursor.getString(0))
+                assertTrue("迁移后新列必须是 NULL，不能伪造一个默认值", cursor.isNull(1))
+            }
+            execSQL("UPDATE ai_preferences SET defaultImageProfileId = 'p-img' WHERE preferenceId = 'device'")
+            query("SELECT defaultImageProfileId FROM ai_preferences WHERE preferenceId = 'device'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("p-img", cursor.getString(0))
             }
             close()
         }

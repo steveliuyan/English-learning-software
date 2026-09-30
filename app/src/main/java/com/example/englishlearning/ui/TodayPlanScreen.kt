@@ -1,9 +1,11 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -30,13 +33,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
-import com.example.englishlearning.ui.theme.MintTint
 
 @Composable
 fun TodayPlanScreen(
@@ -61,7 +65,7 @@ fun TodayPlanScreen(
         Text("今日学习计划", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.semantics { contentDescription = "今日学习计划" })
         when (state) {
             TodayPlanUiState.Loading -> {
-                CircularProgressIndicator(color = MintPrimary, modifier = Modifier.size(48.dp).testTag("today_plan_loading"))
+                CircularProgressIndicator(color = DomainColors.AiSpeech.deep, modifier = Modifier.size(48.dp).testTag("today_plan_loading"))
                 Text("正在准备今日计划…", color = MintTextMuted)
             }
             TodayPlanUiState.MissingSetup -> {
@@ -69,7 +73,7 @@ fun TodayPlanScreen(
                 Button(
                     onClick = onOpenSetup,
                     modifier = Modifier.testTag("today_plan_open_setup").semantics { contentDescription = "去设置词书" },
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = DomainColors.AiSpeech.deep, contentColor = Color.White),
                 ) { Text("去设置词书") }
             }
             TodayPlanUiState.Unavailable -> {
@@ -77,7 +81,7 @@ fun TodayPlanScreen(
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.testTag("today_plan_retry").semantics { contentDescription = "重试" },
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = DomainColors.AiSpeech.deep, contentColor = Color.White),
                 ) { Text("重试") }
             }
             is TodayPlanUiState.Ready -> {
@@ -100,46 +104,63 @@ fun TodayPlanScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
                 ) { Text("调整词书与目标", fontWeight = FontWeight.Bold) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    CountCard("今日新增 ${state.newTarget} 词", "今日新增 ${state.newTarget} 词", "today_plan_new_count")
-                    CountCard("今日复习 ${state.dueTarget} 词", "今日复习 ${state.dueTarget} 词", "today_plan_due_count")
+                    CountCard("今日新增 ${state.newTarget} 词", "今日新增 ${state.newTarget} 词", "today_plan_new_count", Color(0xFF68BDA6))
+                    CountCard("今日复习 ${state.dueTarget} 词", "今日复习 ${state.dueTarget} 词", "today_plan_due_count", Color(0xFFC7A47D))
                 }
-                if (state.totalTasks == 0) Text("今天暂无学习任务", color = MintTextMuted, modifier = Modifier.testTag("today_plan_empty"))
-                else Text("今日计划共 ${state.totalTasks} 项", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_task_total"))
-                Text("新增 ${state.newDone}/${state.newTarget} · 复习 ${state.dueDone}/${state.dueTarget}", color = MintPrimaryDark, modifier = Modifier.testTag("today_plan_progress"))
                 val totalDone = state.newDone + state.dueDone
                 val totalTarget = state.newTarget + state.dueTarget
-                Text("总进度 $totalDone/$totalTarget", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_total_progress"))
-                val unlockText = if (state.isUnlocked) "已解锁：文章已解锁" else "未解锁：${state.unlockReason}"
-                Text(unlockText, color = if (state.isUnlocked) MintPrimary else MintTextMuted, modifier = Modifier.testTag("today_plan_unlock_status"))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = AppPalette.Surface),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, AppPalette.Separator, RoundedCornerShape(18.dp))
+                        .testTag("today_plan_progress_summary"),
+                ) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (state.totalTasks == 0) {
+                            Text("今天暂无学习任务", color = MintTextMuted, modifier = Modifier.testTag("today_plan_empty"))
+                        } else {
+                            Text("今日学习进度", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_task_total"))
+                            Text("$totalDone/$totalTarget 项已完成", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_total_progress"))
+                            Text("新增 ${state.newDone}/${state.newTarget} · 复习 ${state.dueDone}/${state.dueTarget}", color = MintTextMuted, modifier = Modifier.testTag("today_plan_progress"))
+                        }
+                    }
+                }
+                val unlockText = if (state.isUnlocked) "已解锁：文章已解锁" else "未解锁"
+                Text(unlockText, color = if (state.isUnlocked) DomainColors.AiSpeech.deep else MintTextMuted, modifier = Modifier.testTag("today_plan_unlock_status"))
+                PillButton(
+                    text = "开始学习",
+                    onClick = onStartLearning,
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    testTag = "today_plan_start_learning",
+                    contentDescription = "开始学习",
+                )
                 Button(
                     onClick = onOpenReading,
                     enabled = state.isUnlocked,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
+                        .height(46.dp)
                         .testTag("today_plan_open_reading")
                         .semantics { contentDescription = "阅读文章" },
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, AppPalette.Separator),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MintPrimary,
-                        contentColor = Color.White,
-                        disabledContainerColor = MintTint,
-                        disabledContentColor = MintPrimaryDark,
+                        containerColor = AppPalette.Surface,
+                        contentColor = DomainColors.Reading.deep,
+                        disabledContainerColor = AppPalette.Surface,
+                        disabledContentColor = AppPalette.TextSecondary,
                     ),
-                ) { Text("阅读文章", fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = onStartLearning,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                        .testTag("today_plan_start_learning")
-                        .semantics { contentDescription = "开始学习" },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MintPrimary,
-                        contentColor = Color.White,
-                        disabledContainerColor = MintTint,
-                        disabledContentColor = MintPrimaryDark,
-                    ),
-                ) { Text("开始学习", fontWeight = FontWeight.Bold) }
+                ) { Text("阅读文章", fontWeight = FontWeight.Medium) }
+                if (!state.isUnlocked) {
+                    Text(
+                        "完成新词与复习后解锁文章",
+                        color = MintTextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag("today_plan_reading_status"),
+                    )
+                }
                 Button(
                     onClick = onOpenLearningTools,
                     modifier = Modifier
@@ -156,7 +177,7 @@ fun TodayPlanScreen(
                         .height(50.dp)
                         .testTag("today_plan_open_check_in")
                         .semantics { contentDescription = "查看打卡与成就" },
-                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = Color(0xFF795B36)),
                 ) { Text("查看打卡与成就", fontWeight = FontWeight.Bold) }
             }
         }
@@ -164,8 +185,21 @@ fun TodayPlanScreen(
 }
 
 @Composable
-private fun RowScope.CountCard(text: String, description: String, tag: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = MintTint), shape = RoundedCornerShape(18.dp), modifier = Modifier.weight(1f).testTag(tag).semantics { contentDescription = description }) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MintPrimaryDark, modifier = Modifier.padding(18.dp))
+private fun RowScope.CountCard(text: String, description: String, tag: String, marker: Color) {
+    val shape = RoundedCornerShape(18.dp)
+    Card(
+        colors = CardDefaults.cardColors(containerColor = AppPalette.Surface),
+        shape = shape,
+        modifier = Modifier.weight(1f).border(1.dp, AppPalette.Separator, shape).testTag(tag)
+            .semantics { contentDescription = description },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(Modifier.size(7.dp).background(marker, CircleShape))
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = AppPalette.TextPrimary)
+        }
     }
 }

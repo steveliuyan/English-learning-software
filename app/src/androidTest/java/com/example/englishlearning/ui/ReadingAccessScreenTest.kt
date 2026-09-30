@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.reading.FeedItem
+import com.example.englishlearning.reading.NotConfiguredReason
 import com.example.englishlearning.reading.domain.ArticleLengthTier
 import com.example.englishlearning.reading.domain.ArticleSource
 import com.example.englishlearning.reading.domain.ArticleType
@@ -95,6 +96,31 @@ class ReadingAccessScreenTest {
         composeRule.onNodeWithTag("generation_failure_action").assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(1, settingsOpened)
+    }
+
+    @Test
+    fun noDefaultProfileShowsSpecificConfigurationGuidance() {
+        var settingsOpened = 0
+        composeRule.setContent {
+            readyScreen(
+                generation = GenerationUiState.NotConfigured(NotConfiguredReason.NoDefaultProfile),
+                onOpenAiSettings = { settingsOpened++ },
+            )
+        }
+
+        composeRule.onNodeWithText("请先选择文章默认 AI 服务。", substring = true).assertExists()
+        composeRule.onNodeWithTag("generation_failure_action").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, settingsOpened)
+    }
+
+    @Test
+    fun unavailableDefaultProfileShowsSpecificConfigurationGuidance() {
+        composeRule.setContent {
+            readyScreen(generation = GenerationUiState.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable))
+        }
+
+        composeRule.onNodeWithText("文章默认 AI 服务已不可用，请重新选择。", substring = true).assertExists()
     }
 
     @Test

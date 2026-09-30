@@ -3,7 +3,9 @@ package com.example.englishlearning.ui
 import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.AiPreferenceRepository
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
+import com.example.englishlearning.ai.domain.AiPreference
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.ai.domain.AiProviderKind
@@ -42,6 +44,7 @@ class AiProfileSettingsViewModelTest {
     /** 记录仓储与密钥库的调用顺序，用来断言「谁先谁后」。 */
     private val ops = mutableListOf<String>()
     private val secrets = FakeSecretStore(ops)
+    private val preferences = FakeAiPreferenceRepository()
 
     @BeforeEach
     fun setUp() {
@@ -64,6 +67,164 @@ class AiProfileSettingsViewModelTest {
         val items = (viewModel.listState.value as AiProfileListUiState.Ready).items
         assertEquals(listOf("p1", "p2"), items.map { it.profile.profileId })
         assertEquals(listOf(true, false), items.map { it.hasKey })
+    }
+
+    @Test
+    fun loadDerivesTheDefaultTextProfileAndEligibilityFromStoredPreferenceAndKeyState() = runTest(dispatcher) {
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p1").alias] = "sk-secret-value"
+        preferences.value = AiPreference(defaultTextProfileId = "p1")
+        val viewModel = viewModel(repository(initial = listOf(profile("p1"), profile("p2"))))
+
+        viewModel.load()
+        advanceUntilIdle()
+
+        val items = (viewModel.listState.value as AiProfileListUiState.Ready).items
+        assertEquals(true, items.first { it.profile.profileId == "p1" }.isDefaultTextProfile)
+        assertEquals(true, items.first { it.profile.profileId == "p1" }.canBeDefaultTextProfile)
+        assertEquals(false, items.first { it.profile.profileId == "p2" }.isDefaultTextProfile)
+        assertEquals(false, items.first { it.profile.profileId == "p2" }.canBeDefaultTextProfile)
+    }
+
+    @Test
+    fun setDefaultTextProfilePersistsOnlyAQualifiedTextProfile() = runTest(dispatcher) {
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p1").alias] = "sk-secret-value"
+        val viewModel = viewModel(repository(initial = listOf(profile("p1"))))
+
+        viewModel.setDefaultTextProfile("p1")
+        advanceUntilIdle()
+
+        assertEquals("p1", preferences.value.defaultTextProfileId)
+        assertTrue((viewModel.listState.value as AiProfileListUiState.Ready).items.single().isDefaultTextProfile)
+    }
+
+    @Test
+    fun setDefaultTextProfileRejectsAProfileWithoutTextOrKey() = runTest(dispatcher) {
+        val speech = profile("speech").copy(capabilities = setOf(AiCapability.Speech))
+        val repository = repository(initial = listOf(profile("p1"), speech))
+        val viewModel = viewModel(repository)
+
+        viewModel.setDefaultTextProfile("p1")
+        advanceUntilIdle()
+        assertNull(preferences.value.defaultTextProfileId)
+        assertFalse((viewModel.listState.value as AiProfileListUiState.Ready).items.first { it.profile.profileId == "p1" }.isDefaultTextProfile)
+
+        secrets.entries[AiProfileSecretUseCase.referenceFor("speech").alias] = "sk-speech"
+        viewModel.setDefaultTextProfile("speech")
+        advanceUntilIdle()
+        assertNull(preferences.value.defaultTextProfileId)
+    }
+
+    @Test
+    fun setDefaultImageProfilePersistsOnlyAQualifiedImageProfile() = runTest(dispatcher) {
+        val image = profile("p-img").copy(capabilities = setOf(AiCapability.ImageGeneration))
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p-img").alias] = "sk-img"
+        val viewModel = viewModel(repository(initial = listOf(image)))
+
+        viewModel.setDefaultImageProfile("p-img")
+        advanceUntilIdle()
+
+        assertEquals("p-img", preferences.value.defaultImageProfileId)
+        assertTrue((viewModel.listState.value as AiProfileListUiState.Ready).items.single().isDefaultImageProfile)
+    }
+
+    @Test
+    fun setDefaultImageProfileRejectsAProfileWithoutImageGenerationOrKey() = runTest(dispatcher) {
+        val textOnly = profile("p-text")
+        val viewModel = viewModel(repository(initial = listOf(textOnly)))
+
+        viewModel.setDefaultImageProfile("p-text")
+        advanceUntilIdle()
+
+        assertNull(preferences.value.defaultImageProfileId)
+        assertFalse((viewModel.listState.value as AiProfileListUiState.Ready).items.single().isDefaultImageProfile)
+    }
+
+    @Test
+    fun settingTheImageDefaultPreservesTheTextDefault() = runTest(dispatcher) {
+        val text = profile("p-text")
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p-text").alias] = "sk-text"
+        preferences.value = AiPreference(defaultTextProfileId = "p-text")
+        val image = profile("p-img").copy(capabilities = setOf(AiCapability.ImageGeneration))
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p-img").alias] = "sk-img"
+        val viewModel = viewModel(repository(initial = listOf(text, image)))
+
+        viewModel.setDefaultImageProfile("p-img")
+        advanceUntilIdle()
+
+        assertEquals("p-text", preferences.value.defaultTextProfileId)
+        assertEquals("p-img", preferences.value.defaultImageProfileId)
+    }
+
+    @Test
+    fun settingTheTextDefaultPreservesTheImageDefault() = runTest(dispatcher) {
+        preferences.value = AiPreference(defaultImageProfileId = "p-img")
+        val image = profile("p-img").copy(capabilities = setOf(AiCapability.ImageGeneration))
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p-img").alias] = "sk-img"
+        val text = profile("p-text")
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p-text").alias] = "sk-text"
+        val viewModel = viewModel(repository(initial = listOf(image, text)))
+
+        viewModel.setDefaultTextProfile("p-text")
+        advanceUntilIdle()
+
+        assertEquals("p-img", preferences.value.defaultImageProfileId)
+        assertEquals("p-text", preferences.value.defaultTextProfileId)
+    }
+
+    @Test
+    fun deletingTheImageDefaultProfileClearsOnlyTheImageField() = runTest(dispatcher) {
+        val text = profile("p-text")
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p-text").alias] = "sk-text"
+        preferences.value = AiPreference(defaultTextProfileId = "p-text", defaultImageProfileId = "p-img")
+        val image = profile("p-img").copy(capabilities = setOf(AiCapability.ImageGeneration))
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p-img").alias] = "sk-img"
+        val viewModel = viewModel(repository(initial = listOf(text, image)))
+
+        viewModel.deleteProfile("p-img")
+        advanceUntilIdle()
+
+        assertEquals("p-text", preferences.value.defaultTextProfileId)
+        assertNull(preferences.value.defaultImageProfileId)
+    }
+
+    @Test
+    fun deletingTheDefaultKeyClearsTheDevicePreference() = runTest(dispatcher) {
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p1").alias] = "sk-old"
+        preferences.value = AiPreference(defaultTextProfileId = "p1")
+        val viewModel = viewModel(repository(initial = listOf(profile("p1"))))
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.deleteKey("p1")
+        advanceUntilIdle()
+
+        assertNull(preferences.value.defaultTextProfileId)
+        assertFalse((viewModel.listState.value as AiProfileListUiState.Ready).items.single().isDefaultTextProfile)
+    }
+
+    @Test
+    fun deletingTheDefaultProfileClearsTheDevicePreference() = runTest(dispatcher) {
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p1").alias] = "sk-old"
+        preferences.value = AiPreference(defaultTextProfileId = "p1")
+        val viewModel = viewModel(repository(initial = listOf(profile("p1"))))
+
+        viewModel.deleteProfile("p1")
+        advanceUntilIdle()
+
+        assertNull(preferences.value.defaultTextProfileId)
+        assertTrue((viewModel.listState.value as AiProfileListUiState.Ready).items.isEmpty())
+    }
+
+    @Test
+    fun loadClearsAStaleDefaultBindingWhenItsProfileHasNoKey() = runTest(dispatcher) {
+        preferences.value = AiPreference(defaultTextProfileId = "p1")
+        val viewModel = viewModel(repository(initial = listOf(profile("p1"))))
+
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertNull(preferences.value.defaultTextProfileId)
+        assertFalse((viewModel.listState.value as AiProfileListUiState.Ready).items.single().isDefaultTextProfile)
     }
 
     @Test
@@ -212,7 +373,7 @@ class AiProfileSettingsViewModelTest {
         assertEquals("https://api.example.com/v1", stored.endpoint)
         assertEquals(AiProfileSecretUseCase.referenceFor("ai-test-1"), stored.secretReference)
         assertEquals(
-            AiProfileListUiState.Ready(listOf(AiProfileListItem(stored, hasKey = true))),
+            AiProfileListUiState.Ready(listOf(AiProfileListItem(stored, hasKey = true, canBeDefaultTextProfile = true))),
             viewModel.listState.value,
         )
         assertNull(viewModel.editor.value, "保存成功后编辑页应当关闭")
@@ -393,7 +554,7 @@ class AiProfileSettingsViewModelTest {
     private fun viewModel(
         repository: AiProfileRepository = repository(),
         ids: AiProfileIdFactory = AiProfileIdFactory { "ai-test-${ops.count { it.startsWith("profile-save:") } + 1}" },
-    ) = AiProfileSettingsViewModel(repository, AiProfileSecretUseCase(secrets), ids)
+    ) = AiProfileSettingsViewModel(repository, AiProfileSecretUseCase(secrets), ids, preferences)
 
     private fun repository(
         initial: List<AiProfile> = emptyList(),
@@ -419,6 +580,21 @@ class AiProfileSettingsViewModelTest {
         capabilities = setOf(AiCapability.Text),
         secretReference = AiProfileSecretUseCase.referenceFor(id),
     )
+}
+
+private class FakeAiPreferenceRepository : AiPreferenceRepository {
+    var value = AiPreference()
+    var failGet = false
+    var failSave = false
+
+    override suspend fun get(): Result<AiPreference> =
+        if (failGet) Result.failure(AppErrorException(AppError.StorageUnavailable)) else Result.success(value)
+
+    override suspend fun save(preference: AiPreference): Result<Unit> {
+        if (failSave) return Result.failure(AppErrorException(AppError.StorageUnavailable))
+        value = preference
+        return Result.success(Unit)
+    }
 }
 
 private class FakeAiProfileRepository(

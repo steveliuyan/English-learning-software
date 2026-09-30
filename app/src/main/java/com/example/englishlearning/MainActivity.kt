@@ -9,10 +9,13 @@ import com.example.englishlearning.ui.AiProfileSettingsViewModel
 import com.example.englishlearning.ui.AppScreen
 import com.example.englishlearning.ui.ArticleReadingViewModel
 import com.example.englishlearning.ui.CheckInViewModel
+import com.example.englishlearning.ui.ImageStudioViewModel
 import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.ReadingAccessViewModel
+import com.example.englishlearning.ui.SentenceAnalysisViewModel
 import com.example.englishlearning.ui.TodayPlanViewModel
 import com.example.englishlearning.ui.SpeechSettingsViewModel
+import com.example.englishlearning.ui.WordAiQaViewModel
 import com.example.englishlearning.ui.WordCardViewModel
 import com.example.englishlearning.ui.WorksheetViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -37,6 +40,10 @@ class MainActivity : ComponentActivity() {
                 aiProfileViewModel = hiltViewModel<AiProfileSettingsViewModel>(),
                 speechSettingsViewModel = hiltViewModel<SpeechSettingsViewModel>(),
                 checkInViewModel = hiltViewModel<CheckInViewModel>(),
+                wordQaViewModel = hiltViewModel<WordAiQaViewModel>(),
+                sentenceAnalysisViewModel = hiltViewModel<SentenceAnalysisViewModel>(),
+                imageStudioViewModel = hiltViewModel<ImageStudioViewModel>(),
+                wordBookTransferViewModel = hiltViewModel<com.example.englishlearning.wordbook.WordBookTransferViewModel>(),
                 pronunciationProvider = pronunciationProvider,
             )
         }

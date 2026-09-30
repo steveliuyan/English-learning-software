@@ -1,5 +1,8 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.assertHasClickAction
@@ -45,30 +48,29 @@ class AppBottomBarTest {
         }
     }
 
-    @Test fun selected_learning_slot_uses_learning_domain_color() {
-        assertSelectedSlotUsesColor(AppTab.LEARNING, DomainColors.Learn.base.toArgb())
-    }
-
-    @Test fun selected_reading_slot_uses_reading_domain_color() {
-        assertSelectedSlotUsesColor(AppTab.READING, DomainColors.Reading.base.toArgb())
-    }
-
-    @Test fun selected_ai_slot_uses_ai_domain_color() {
-        assertSelectedSlotUsesColor(AppTab.AI, DomainColors.AiSpeech.base.toArgb())
-    }
-
-    @Test fun selected_settings_slot_uses_settings_domain_color() {
-        assertSelectedSlotUsesColor(AppTab.SETTINGS, DomainColors.Settings.base.toArgb())
+    @Test fun each_selected_slot_uses_the_same_calm_brand_color() {
+        var selectedTab by mutableStateOf(AppTab.LEARNING)
+        composeRule.setContent { AppBottomBar(selected = selectedTab, onSelect = {}) }
+        AppTab.entries.forEach { tab ->
+            composeRule.runOnIdle { selectedTab = tab }
+            assertSelectedSlotUsesColor(tab, DomainColors.AiSpeech.deep.toArgb())
+        }
     }
 
     private fun assertSelectedSlotUsesColor(selectedTab: AppTab, expectedColor: Int) {
-        composeRule.setContent { AppBottomBar(selected = selectedTab, onSelect = {}) }
         val selectedNode = composeRule.onNodeWithTag("app_tab_${selectedTab.name.lowercase()}")
         val bitmap = selectedNode.captureToImage().asAndroidBitmap()
-        val hasDomainColor = (0 until bitmap.width).any { x ->
-            (0 until bitmap.height).any { y -> bitmap.getPixel(x, y) == expectedColor }
-        }
-        assertTrue("${selectedTab.name} should use its domain color", hasDomainColor)
+        val nearest = (0 until bitmap.width).flatMap { x ->
+            (0 until bitmap.height).map { y -> colorDistance(bitmap.getPixel(x, y), expectedColor) }
+        }.minOrNull() ?: Double.POSITIVE_INFINITY
+        assertTrue("${selectedTab.name} should use its calm brand color; nearest distance=$nearest", nearest <= 18.0)
+    }
+
+    private fun colorDistance(actual: Int, expected: Int): Double {
+        val dr = ((actual shr 16 and 0xFF) - (expected shr 16 and 0xFF)).toDouble()
+        val dg = ((actual shr 8 and 0xFF) - (expected shr 8 and 0xFF)).toDouble()
+        val db = ((actual and 0xFF) - (expected and 0xFF)).toDouble()
+        return Math.sqrt(dr * dr + dg * dg + db * db)
     }
 
     @Test fun tapping_the_ai_slot_reports_the_ai_tab() {

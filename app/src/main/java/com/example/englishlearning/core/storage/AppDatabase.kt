@@ -17,6 +17,8 @@ import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
 import com.example.englishlearning.core.storage.dao.InternalProfileDao
 import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
 import com.example.englishlearning.core.storage.dao.InternalWordBookDao
+import com.example.englishlearning.core.storage.entity.AiPreferenceEntity
+import com.example.englishlearning.core.storage.entity.WordAiNoteEntity
 import com.example.englishlearning.core.storage.entity.AiProfileEntity
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
@@ -42,6 +44,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
     entities = [
         SchemaMetaEntity::class,
         AiProfileEntity::class,
+        AiPreferenceEntity::class,
         ArticleEntity::class,
         ReadingPreferenceEntity::class,
         ReadingCompletionEntity::class,
@@ -56,12 +59,17 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         CardReviewStateEntity::class,
         LearningSettingsEntity::class,
         SpeechPreferenceEntity::class,
+        WordAiNoteEntity::class,
     ],
-    version = 15,
+    version = 18,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalAiProfileDao(): InternalAiProfileDao
+
+    internal abstract fun internalAiPreferenceDao(): com.example.englishlearning.core.storage.dao.InternalAiPreferenceDao
+
+    internal abstract fun internalWordAiNoteDao(): com.example.englishlearning.core.storage.dao.InternalWordAiNoteDao
 
     internal abstract fun internalArticleDao(): InternalArticleDao
 
@@ -228,6 +236,42 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_15_16: Migration =
+            object : Migration(15, 16) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `ai_preferences` " +
+                            "(`preferenceId` TEXT NOT NULL, `defaultTextProfileId` TEXT, " +
+                            "PRIMARY KEY(`preferenceId`))",
+                    )
+                }
+            }
+
+        val MIGRATION_16_17: Migration =
+            object : Migration(16, 17) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // F3-03：词 AI 问答笔记。只存 lemma/kind/回答/时间，绝不存 Key 或 Endpoint。
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `word_ai_notes` " +
+                            "(`noteId` TEXT NOT NULL, `profileId` TEXT NOT NULL, `lemma` TEXT NOT NULL, " +
+                            "`kind` TEXT NOT NULL, `answer` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, " +
+                            "PRIMARY KEY(`noteId`))",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_word_ai_notes_profileId_lemma` " +
+                            "ON `word_ai_notes` (`profileId`, `lemma`)",
+                    )
+                }
+            }
+
+        val MIGRATION_17_18: Migration =
+            object : Migration(17, 18) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // F3-04：默认生图服务选择。可空列，已有行保持 NULL，不伪造默认值。
+                    db.execSQL("ALTER TABLE `ai_preferences` ADD COLUMN `defaultImageProfileId` TEXT")
+                }
+            }
+
         val MIGRATION_10_11: Migration =
             object : Migration(10, 11) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -345,7 +389,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)

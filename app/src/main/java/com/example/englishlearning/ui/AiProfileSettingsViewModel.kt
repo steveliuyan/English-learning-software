@@ -2,11 +2,13 @@ package com.example.englishlearning.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.englishlearning.ai.AiPreferenceRepository
 import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiCapability
+import com.example.englishlearning.ai.domain.AiPreference
 import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.ai.domain.AiVoiceCatalog
@@ -33,6 +35,10 @@ sealed interface AiProfileListUiState {
 data class AiProfileListItem(
     val profile: AiProfile,
     val hasKey: Boolean,
+    val isDefaultTextProfile: Boolean = false,
+    val canBeDefaultTextProfile: Boolean = false,
+    val isDefaultImageProfile: Boolean = false,
+    val canBeDefaultImageProfile: Boolean = false,
 )
 
 /**
@@ -100,6 +106,7 @@ class AiProfileSettingsViewModel @Inject constructor(
     private val profiles: AiProfileRepository,
     private val secrets: AiProfileSecretUseCase,
     private val ids: AiProfileIdFactory,
+    private val preferences: AiPreferenceRepository,
 ) : ViewModel() {
     private val _listState = MutableStateFlow<AiProfileListUiState>(AiProfileListUiState.Loading)
     val listState: StateFlow<AiProfileListUiState> = _listState
@@ -173,6 +180,44 @@ class AiProfileSettingsViewModel @Inject constructor(
         }
     }
 
+    fun setDefaultTextProfile(profileId: String) {
+        viewModelScope.launch {
+            val found = profiles.find(profileId).getOrNull() ?: return@launch
+            if (AiCapability.Text !in found.capabilities || !secrets.hasKey(found).getOrDefault(false)) {
+                _listState.value = refreshItems()?.withMessage(DEFAULT_PROFILE_INVALID_MESSAGE)
+                    ?: AiProfileListUiState.Unavailable
+                return@launch
+            }
+            // 读改写而不是整表覆盖：生图默认是另一个独立字段，不能被文本默认保存抹掉。
+            val current = preferences.get().getOrNull() ?: AiPreference()
+            if (preferences.save(current.copy(defaultTextProfileId = profileId)).isFailure) {
+                _listState.value = refreshItems()?.withMessage(STORAGE_FAILED_MESSAGE)
+                    ?: AiProfileListUiState.Unavailable
+                return@launch
+            }
+            refresh()
+        }
+    }
+
+    fun setDefaultImageProfile(profileId: String) {
+        viewModelScope.launch {
+            val found = profiles.find(profileId).getOrNull() ?: return@launch
+            if (AiCapability.ImageGeneration !in found.capabilities || !secrets.hasKey(found).getOrDefault(false)) {
+                _listState.value = refreshItems()?.withMessage(DEFAULT_IMAGE_PROFILE_INVALID_MESSAGE)
+                    ?: AiProfileListUiState.Unavailable
+                return@launch
+            }
+            // 读改写：文本默认是另一个独立字段，不能被生图默认保存抹掉。
+            val current = preferences.get().getOrNull() ?: AiPreference()
+            if (preferences.save(current.copy(defaultImageProfileId = profileId)).isFailure) {
+                _listState.value = refreshItems()?.withMessage(STORAGE_FAILED_MESSAGE)
+                    ?: AiProfileListUiState.Unavailable
+                return@launch
+            }
+            refresh()
+        }
+    }
+
     fun deleteProfile(profileId: String) {
         viewModelScope.launch {
             val found = profiles.find(profileId).getOrNull() ?: return@launch
@@ -183,7 +228,12 @@ class AiProfileSettingsViewModel @Inject constructor(
                     ?: AiProfileListUiState.Unavailable
                 return@launch
             }
-            profiles.delete(profileId)
+            if (profiles.delete(profileId).isFailure) {
+                _listState.value = refreshItems()?.withMessage(STORAGE_FAILED_MESSAGE)
+                    ?: AiProfileListUiState.Unavailable
+                return@launch
+            }
+            clearDefaultBindingFor(profileId)
             _editor.value = null
             refresh()
         }
@@ -197,8 +247,21 @@ class AiProfileSettingsViewModel @Inject constructor(
                     ?: AiProfileListUiState.Unavailable
                 return@launch
             }
+            clearDefaultBindingFor(profileId)
             refresh()
         }
+    }
+
+    /** 删除配置/密钥后把两个默认里指向它的字段清掉，另一个字段原样保留。 */
+    private suspend fun clearDefaultBindingFor(profileId: String) {
+        val current = preferences.get().getOrNull() ?: return
+        if (current.defaultTextProfileId != profileId && current.defaultImageProfileId != profileId) return
+        preferences.save(
+            current.copy(
+                defaultTextProfileId = current.defaultTextProfileId.takeIf { it != profileId },
+                defaultImageProfileId = current.defaultImageProfileId.takeIf { it != profileId },
+            ),
+        )
     }
 
     private suspend fun refresh() {
@@ -207,14 +270,49 @@ class AiProfileSettingsViewModel @Inject constructor(
 
     private suspend fun refreshItems(): AiProfileListUiState.Ready? {
         val loaded = profiles.list()
-        if (loaded.isFailure) return null
-        return AiProfileListUiState.Ready(loaded.getOrThrow().map { it.toItem() })
+        val preference = preferences.get()
+        if (loaded.isFailure || preference.isFailure) return null
+        val profilesList = loaded.getOrThrow()
+        val stored = preference.getOrThrow()
+
+        val defaultTextId = stored.defaultTextProfileId
+        val defaultTextProfile = profilesList.firstOrNull { it.profileId == defaultTextId }
+        val textValid = defaultTextProfile != null &&
+            AiCapability.Text in defaultTextProfile.capabilities &&
+            secrets.hasKey(defaultTextProfile).getOrDefault(false)
+
+        val defaultImageId = stored.defaultImageProfileId
+        val defaultImageProfile = profilesList.firstOrNull { it.profileId == defaultImageId }
+        val imageValid = defaultImageProfile != null &&
+            AiCapability.ImageGeneration in defaultImageProfile.capabilities &&
+            secrets.hasKey(defaultImageProfile).getOrDefault(false)
+
+        // 失效清除只清各自的字段：文本默认失效不能连带清掉生图默认，反之亦然。
+        if (defaultTextId != null && !textValid) {
+            preferences.save(stored.copy(defaultTextProfileId = null, defaultImageProfileId = defaultImageId.takeIf { imageValid }))
+        }
+        if (defaultImageId != null && !imageValid) {
+            preferences.save(stored.copy(defaultImageProfileId = null, defaultTextProfileId = defaultTextId.takeIf { textValid }))
+        }
+
+        val effectiveTextId = defaultTextId.takeIf { textValid }
+        val effectiveImageId = defaultImageId.takeIf { imageValid }
+        return AiProfileListUiState.Ready(profilesList.map { it.toItem(effectiveTextId, effectiveImageId) })
     }
 
     private fun AiProfileListUiState.Ready.withMessage(text: String) = copy(message = text)
 
-    private fun AiProfile.toItem(): AiProfileListItem =
-        AiProfileListItem(profile = this, hasKey = secrets.hasKey(this).getOrDefault(false))
+    private fun AiProfile.toItem(defaultTextId: String?, defaultImageId: String?): AiProfileListItem {
+        val hasKey = secrets.hasKey(this).getOrDefault(false)
+        return AiProfileListItem(
+            profile = this,
+            hasKey = hasKey,
+            isDefaultTextProfile = profileId == defaultTextId && AiCapability.Text in capabilities && hasKey,
+            canBeDefaultTextProfile = AiCapability.Text in capabilities && hasKey,
+            isDefaultImageProfile = profileId == defaultImageId && AiCapability.ImageGeneration in capabilities && hasKey,
+            canBeDefaultImageProfile = AiCapability.ImageGeneration in capabilities && hasKey,
+        )
+    }
 
     private fun AiProfile.toDraft() = AiProfileDraft(
         displayName = displayName,
@@ -295,5 +393,7 @@ class AiProfileSettingsViewModel @Inject constructor(
     private companion object {
         const val STORAGE_FAILED_MESSAGE = "本机存储暂时不可用，改动没有保存。"
         const val KEY_FAILED_MESSAGE = "配置已保存，但密钥没能写入安全存储。"
+        const val DEFAULT_PROFILE_INVALID_MESSAGE = "这套配置需要文本能力和已保存的密钥，才能设为文章默认。"
+        const val DEFAULT_IMAGE_PROFILE_INVALID_MESSAGE = "这套配置需要生图能力和已保存的密钥，才能设为生图默认。"
     }
 }

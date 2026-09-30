@@ -1,7 +1,12 @@
 package com.example.englishlearning.reading
 
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.DefaultTextProfileSelector
+import com.example.englishlearning.ai.DefaultTextProfileResult
+import com.example.englishlearning.ai.DefaultTextProfileResolver
+
 import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
@@ -65,11 +70,17 @@ class GenerateArticleUseCaseTest {
             Result.failure(AppErrorException(AppError.StorageUnavailable))
     }
 
-    private class FakeProfiles(private val profiles: List<AiProfile>) : com.example.englishlearning.ai.AiProfileRepository {
+    private class FakeProfiles(private val profiles: List<AiProfile>) : AiProfileRepository {
         override suspend fun list() = Result.success(profiles)
         override suspend fun find(profileId: String) = Result.success(profiles.firstOrNull { it.profileId == profileId })
         override suspend fun save(profile: AiProfile) = Result.success(Unit)
         override suspend fun delete(profileId: String) = Result.success(Unit)
+    }
+
+    private class FakeDefaultTextProfileSelector(
+        private val result: DefaultTextProfileResult,
+    ) : DefaultTextProfileResolver {
+        override suspend fun select(): DefaultTextProfileResult = result
     }
 
     private class FakeSecretStore : SecretStore {
@@ -98,11 +109,12 @@ class GenerateArticleUseCaseTest {
     private class Harness(
         profiles: List<AiProfile> = listOf(defaultProfile()),
         secretStore: FakeSecretStore = FakeSecretStore().apply { put("ai-profile-p1", TEST_KEY) },
+        selected: DefaultTextProfileResult = DefaultTextProfileResult.Selected(profiles.firstOrNull() ?: defaultProfile()),
     ) {
         val transport = FakeTransport()
         val repository = FakeArticleRepository()
         val useCase = GenerateArticleUseCase(
-            profiles = FakeProfiles(profiles),
+            defaultTextProfile = FakeDefaultTextProfileSelector(selected),
             secrets = AiProfileSecretUseCase(secretStore),
             transport = transport,
             articles = repository,
@@ -255,56 +267,77 @@ class GenerateArticleUseCaseTest {
     }
 
     @Test
-    fun reportsNotConfiguredWhenNoProfileExists() = runTest {
-        val harness = Harness(profiles = emptyList())
+    fun reportsNotConfiguredWhenNoDefaultProfileIsSelected() = runTest {
+        val harness = Harness(selected = DefaultTextProfileResult.NoSelection)
 
         val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
 
-        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoProfile), result)
+        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoDefaultProfile), result)
         assertEquals(0, harness.transport.callCount)
     }
 
     @Test
-    fun reportsNotConfiguredWhenTheProfileHasNoStoredKey() = runTest {
-        val harness = Harness(secretStore = FakeSecretStore())
+    fun reportsNotConfiguredWhenTheSelectedProfileIsUnavailable() = runTest {
+        val harness = Harness(selected = DefaultTextProfileResult.Unavailable)
 
         val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
 
-        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoKey), result)
+        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, harness.transport.callCount)
     }
 
     @Test
-    fun selectsTheFirstProfileWithAKey_regardlessOfTheLearningProfileId() = runTest {
-        // AI 配置是设备级的：profileId 是配置自己的主键，与学习 profileId 无关。
-        // 生成用第一套存有 Key 的配置；这里两套配置的 id 都不是学习 profileId "p1"。
-        val first = defaultProfile(endpoint = "https://nokey.test/v1").copy(
+    fun usesOnlyTheExplicitlySelectedDeviceProfile() = runTest {
+        // AI 配置是设备级的：profileId 是配置自己的主键，与学习 profileId "p1" 无关。
+        val first = defaultProfile(endpoint = "https://first.test/v1").copy(
             profileId = "device-a", secretReference = SecretReference("ai-profile-device-a"),
         )
-        val second = defaultProfile().copy(
+        val second = defaultProfile(endpoint = "https://second.test/v1").copy(
             profileId = "device-b", secretReference = SecretReference("ai-profile-device-b"),
         )
         val secretStore = FakeSecretStore().apply { put("ai-profile-device-b", TEST_KEY) }
-        val harness = Harness(profiles = listOf(first, second), secretStore = secretStore)
+        val harness = Harness(
+            profiles = listOf(first, second),
+            secretStore = secretStore,
+            selected = DefaultTextProfileResult.Selected(second),
+        )
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHost = "second.test")
 
-        assertTrue(result is GenerateArticleResult.Generated, "must fall through to the keyed profile, got $result")
+        assertTrue(result is GenerateArticleResult.Generated, "must use the selected profile, got $result")
         assertEquals(1, harness.transport.callCount)
-        // 落库文章的来源摘要里是第二套配置的模型名与参数，不是学习 profileId。
-        val source = harness.repository.stored.single().source as ArticleSource.AiGenerated
-        assertEquals("gpt-x", source.modelName)
+        assertEquals("gpt-x", (harness.repository.stored.single().source as ArticleSource.AiGenerated).modelName)
     }
 
     @Test
-    fun reportsNoKeyWhenEveryDeviceProfileLacksAKey() = runTest {
-        val first = defaultProfile().copy(profileId = "device-a", secretReference = SecretReference("ai-profile-device-a"))
-        val harness = Harness(profiles = listOf(first), secretStore = FakeSecretStore())
+    fun reportsNoDefaultAndSendsNoRequest() = runTest {
+        val harness = Harness(selected = DefaultTextProfileResult.NoSelection)
 
         val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
 
-        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoKey), result)
+        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoDefaultProfile), result)
+        assertEquals(0, harness.transport.callCount)
+    }
+
+    @Test
+    fun doesNotFallBackToAnotherKeyedProfileWhenDefaultIsUnavailable() = runTest {
+        val harness = Harness(selected = DefaultTextProfileResult.Unavailable)
+
+        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+
+        assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable), result)
+        assertEquals(0, harness.transport.callCount)
+    }
+
+    @Test
+    fun reusesLocalArticleWithoutReadingTheDefaultProfile() = runTest {
+        val harness = Harness(selected = DefaultTextProfileResult.NoSelection)
+        harness.repository.stored += existingArticle(version = 1)
+
+        val result = harness.useCase.generate(request(), confirmedTextHost = null)
+
+        assertTrue(result is GenerateArticleResult.Reused)
         assertEquals(0, harness.transport.callCount)
     }
 
@@ -377,7 +410,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         val failing = FailingSaveRepository()
         val useCase = GenerateArticleUseCase(
-            profiles = FakeProfiles(listOf(defaultProfile())),
+            defaultTextProfile = FakeDefaultTextProfileSelector(DefaultTextProfileResult.Selected(defaultProfile())),
             secrets = AiProfileSecretUseCase(FakeSecretStore().apply { put("ai-profile-p1", TEST_KEY) }),
             transport = harness.transport,
             articles = failing,

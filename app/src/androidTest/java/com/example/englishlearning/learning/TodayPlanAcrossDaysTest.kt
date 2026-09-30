@@ -42,6 +42,22 @@ class TodayPlanAcrossDaysTest {
     private val day2Instant = Instant.parse("2026-09-20T16:01:00Z")
 
     @Test
+    fun tenWordSourceFillsTenWordDailyTarget() = runBlocking {
+        withDatabase { database ->
+            seed(database, target = 10)
+            val result = useCase(
+                database,
+                MutableClockProvider(day1Instant, zone),
+                cardSource = TenWordPlanCardSource,
+            ).ready()
+
+            assertEquals(10, result.newTarget)
+            assertEquals(10, result.newCardIds.size)
+            assertEquals(10, findTasks(database, result.planId).size)
+        }
+    }
+
+    @Test
     fun sameLocalDateReusesPersistedPlanWithoutDuplicatingRows() = runBlocking {
         withDatabase { database ->
             seed(database)
@@ -146,17 +162,21 @@ class TodayPlanAcrossDaysTest {
         }
     }
 
-    private suspend fun seed(database: AppDatabase) {
+    private suspend fun seed(database: AppDatabase, target: Int = dailyNewTarget) {
         val profiles = RoomLearningProfileRepository(database, Dispatchers.Unconfined)
         profiles.upsertWordBook(WordBook(wordBookId, "四级", "基础", 12, "v1", "ngsl-nawl-1.2"))
-        profiles.save(LearningProfile(profileId, wordBookId, dailyNewTarget))
+        profiles.save(LearningProfile(profileId, wordBookId, target))
     }
 
-    private fun useCase(database: AppDatabase, clock: ClockProvider): GetOrCreateTodayPlanUseCase =
+    private fun useCase(
+        database: AppDatabase,
+        clock: ClockProvider,
+        cardSource: PlanCardSource? = null,
+    ): GetOrCreateTodayPlanUseCase =
         GetOrCreateTodayPlanUseCase(
             learningProfileRepository = RoomLearningProfileRepository(database, Dispatchers.Unconfined),
             todayPlanRepository = RoomTodayPlanRepository(database, Dispatchers.Unconfined),
-            cardSource = StoredPlanCardSource(
+            cardSource = cardSource ?: StoredPlanCardSource(
                 content = PlaceholderWordCardSource(),
                 events = RoomLearningEventRepository(database, Dispatchers.Unconfined),
             ),
@@ -200,6 +220,13 @@ class TodayPlanAcrossDaysTest {
             .addMigrations(*AppDatabase.MIGRATIONS)
             .addCallback(AppDatabase.CONSTRAINT_CALLBACK)
             .build()
+}
+
+private object TenWordPlanCardSource : PlanCardSource {
+    override suspend fun dueCardIds(wordBookId: String, now: Instant): List<String> = emptyList()
+
+    override suspend fun newCardIds(wordBookId: String, limit: Int): List<String> =
+        (1..10).map { "$wordBookId:word-$it" }.take(limit)
 }
 
 private class MutableClockProvider(

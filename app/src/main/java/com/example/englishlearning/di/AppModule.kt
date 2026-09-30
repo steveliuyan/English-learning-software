@@ -4,9 +4,13 @@ import android.content.Context
 import com.example.englishlearning.export.WorksheetPdfRenderer
 import com.example.englishlearning.export.WorksheetPdfWriter
 import androidx.room.Room
+import com.example.englishlearning.ai.AiPreferenceRepository
+import com.example.englishlearning.ai.DefaultTextProfileResolver
+import com.example.englishlearning.ai.DefaultTextProfileSelector
 import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.RoomAiPreferenceRepository
 import com.example.englishlearning.ai.RoomAiProfileRepository
 import com.example.englishlearning.ai.net.AiHttpTransport
 import com.example.englishlearning.ai.net.AudioHttpTransport
@@ -46,6 +50,8 @@ import com.example.englishlearning.learning.LearningStatsRepository
 import com.example.englishlearning.learning.RoomLearningStatsRepository
 import com.example.englishlearning.learning.TodayPlanRepository
 import com.example.englishlearning.ui.TodayPlanUseCaseContract
+import com.example.englishlearning.wordbook.CompositeWordCardSource
+import com.example.englishlearning.wordbook.ImportedWordBookSource
 import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.LearningSettingsRepository
 import com.example.englishlearning.learning.RoomLearningProfileRepository
@@ -104,7 +110,21 @@ object AppModule {
     @Provides @Singleton fun provideFsrsReviewScheduler(): FsrsReviewScheduler = FsrsReviewScheduler()
     @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider, scheduler: FsrsReviewScheduler): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock, scheduler = scheduler)
     @Provides @Singleton fun provideEventIdFactory(): EventIdFactory = EventIdFactory.Random
-    @Provides @Singleton fun provideWordCardSource(): WordCardSource = PlaceholderWordCardSource()
+    /**
+     * 词卡内容端口：**导入册优先、内置占位册兜底**。
+     *
+     * 绑定合成实现而不是单个来源，导入的 `.wbpack` 才能真正参与学习流程；只绑
+     * `PlaceholderWordCardSource` 的话，导入成功也只会在设置页多出一个名字。
+     */
+    @Provides @Singleton
+    fun provideWordCardSource(
+        @ApplicationContext context: Context,
+        @Named("io") dispatcher: CoroutineDispatcher,
+    ): WordCardSource =
+        CompositeWordCardSource(
+            imported = ImportedWordBookSource(java.io.File(context.filesDir, "wordbooks"), dispatcher),
+            bundled = PlaceholderWordCardSource(),
+        )
     @Provides @Singleton
     fun provideSystemPronunciationProvider(@ApplicationContext context: Context): AndroidTextToSpeechProvider = AndroidTextToSpeechProvider(context)
 
@@ -157,20 +177,33 @@ object AppModule {
 
     @Provides @Singleton fun provideReadingCompletionRepository(database: AppDatabase, clock: com.example.englishlearning.core.time.ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): com.example.englishlearning.reading.ReadingCompletionRepository = com.example.englishlearning.reading.RoomReadingCompletionRepository(database, clock, dispatcher)
     @Provides @Singleton fun provideAiProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): AiProfileRepository = RoomAiProfileRepository(database, dispatcher)
+    @Provides @Singleton fun provideAiPreferenceRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): AiPreferenceRepository = RoomAiPreferenceRepository(database, dispatcher)
+    @Provides @Singleton fun provideDefaultTextProfileSelector(preferences: AiPreferenceRepository, profiles: AiProfileRepository, secrets: AiProfileSecretUseCase): DefaultTextProfileResolver = DefaultTextProfileSelector(preferences, profiles, secrets)
+    @Provides @Singleton fun provideDefaultImageProfileSelector(preferences: AiPreferenceRepository, profiles: AiProfileRepository, secrets: AiProfileSecretUseCase): com.example.englishlearning.ai.DefaultImageProfileResolver = com.example.englishlearning.ai.DefaultImageProfileSelector(preferences, profiles, secrets)
+    @Provides @Singleton fun provideWordAiNoteRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): com.example.englishlearning.wordqa.WordAiNoteRepository = com.example.englishlearning.wordqa.RoomWordAiNoteRepository(database, dispatcher)
+    @Provides @Singleton fun provideWordQaUseCase(defaultTextProfile: DefaultTextProfileResolver, secrets: AiProfileSecretUseCase, transport: AiHttpTransport): com.example.englishlearning.wordqa.WordQaUseCase = com.example.englishlearning.wordqa.WordQaUseCase(defaultTextProfile, secrets, transport)
+    @Provides @Singleton fun provideWordNoteIdFactory(): com.example.englishlearning.ui.WordNoteIdFactory = com.example.englishlearning.ui.WordNoteIdFactory.Random
+    @Provides @Singleton fun provideSentenceAnalysisUseCase(defaultTextProfile: DefaultTextProfileResolver, secrets: AiProfileSecretUseCase, transport: AiHttpTransport): com.example.englishlearning.sentence.SentenceAnalysisUseCase = com.example.englishlearning.sentence.SentenceAnalysisUseCase(defaultTextProfile, secrets, transport)
     @Provides @Singleton fun provideSpeechPreferenceRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): SpeechPreferenceRepository = RoomSpeechPreferenceRepository(database, dispatcher)
     @Provides fun provideAiProfileSecretUseCase(secretStore: SecretStore): AiProfileSecretUseCase = AiProfileSecretUseCase(secretStore)
     @Provides @Singleton fun provideAiProfileIdFactory(): AiProfileIdFactory = AiProfileIdFactory.Random
     @Provides @Singleton fun provideAiHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AiHttpTransport = UrlConnectionAiHttpTransport(dispatcher)
+    /** 生图响应（1024×1024 b64）可达 ~14MB，文本传输的 512KB 上限会把它整条路堵死。 */
+    @Provides @Singleton @Named("imageAi") fun provideImageAiHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AiHttpTransport = UrlConnectionAiHttpTransport(dispatcher, maxResponseBytes = 16 * 1024 * 1024)
+    @Provides @Singleton fun provideDrawingPromptUseCase(defaultTextProfile: DefaultTextProfileResolver, secrets: AiProfileSecretUseCase, transport: AiHttpTransport): com.example.englishlearning.imagegen.DrawingPromptUseCase = com.example.englishlearning.imagegen.DrawingPromptUseCase(defaultTextProfile, secrets, transport)
+    @Provides @Singleton fun provideImageGenerationUseCase(defaultImageProfile: com.example.englishlearning.ai.DefaultImageProfileResolver, secrets: AiProfileSecretUseCase, @Named("imageAi") transport: AiHttpTransport): com.example.englishlearning.imagegen.ImageGenerationUseCase = com.example.englishlearning.imagegen.ImageGenerationUseCase(defaultImageProfile, secrets, transport)
     @Provides @Singleton fun provideAudioHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AudioHttpTransport = UrlConnectionAudioHttpTransport(dispatcher)
+    /** 生图产物只写应用 cache 目录（`generated-images/`），不进相册、不进 Room、不备份。 */
+    @Provides @Singleton fun provideGeneratedImageStore(@ApplicationContext context: Context, transport: AudioHttpTransport): com.example.englishlearning.imagegen.GeneratedImageStore = com.example.englishlearning.imagegen.GeneratedImageStore(transport, java.io.File(context.cacheDir, "generated-images"))
     @Provides @Singleton fun provideArticleIdFactory(): ArticleIdFactory = ArticleIdFactory.Random
-    @Provides @Singleton fun provideGenerateArticleUseCase(
-        profiles: AiProfileRepository,
+    @Provides @Singleton     fun provideGenerateArticleUseCase(
+        defaultTextProfile: DefaultTextProfileResolver,
         secrets: AiProfileSecretUseCase,
         transport: AiHttpTransport,
         articles: ArticleRepository,
         ids: ArticleIdFactory,
         clock: ClockProvider,
-    ): GenerateArticleUseCase = GenerateArticleUseCase(profiles, secrets, transport, articles, ids, { clock.instant() })
+    ): GenerateArticleUseCase = GenerateArticleUseCase(defaultTextProfile, secrets, transport, articles, ids, { clock.instant() })
     @Provides @Singleton fun provideFetchArticleUseCase(
         transport: AiHttpTransport,
         articles: ArticleRepository,

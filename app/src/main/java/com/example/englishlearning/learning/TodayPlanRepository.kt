@@ -36,4 +36,7 @@ interface TodayPlanRepository {
     suspend fun findLatest(profileId: String): TodayPlanResult
 
     suspend fun saveIfAbsent(plan: TodayPlan): TodayPlanResult
+
+    /** Replaces the current calendar day's snapshot after learning setup changes. */
+    suspend fun replaceForDate(plan: TodayPlan): TodayPlanResult = TodayPlanResult.StorageUnavailable
 }

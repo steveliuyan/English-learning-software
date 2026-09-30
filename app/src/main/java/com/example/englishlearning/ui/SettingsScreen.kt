@@ -107,6 +107,14 @@ fun SettingsScreen(
     /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
     aiProfileSubtitle: String? = null,
     speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
+    /** 词书导入入口：拉起系统文件选择器（SAF），文件由用户挑。 */
+    onImportWordBook: () -> Unit = {},
+    /** 词书导出入口：拉起系统「另存为」（SAF）。 */
+    onExportWordBook: () -> Unit = {},
+    /** 已导入的词书册数，决定导出副标题与可点性。 */
+    importedBookCount: Int = 0,
+    /** 导入/导出的一句结果提示，`null` 时不占位。 */
+    transferMessage: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -198,11 +206,42 @@ fun SettingsScreen(
                 subtitle = "后续版本：支持更换昵称与自定义头像",
                 tag = "settings_pending_profile",
             )
-            SettingsPendingRow(
-                title = "数据与备份",
-                subtitle = "后续版本：导出学习档案与恢复",
-                tag = "settings_pending_backup",
+        }
+
+        // 词书导入/导出走的是**完全离线**的 `.wbpack`：文件由用户自己传递，不依赖任何服务器。
+        // 独立成组是因为它既不属于「学习」也不属于「账户」——它是内容包管理。
+        SettingsGroup(title = "词书内容包", tag = "settings_group_word_books") {
+            SettingsActionRow(
+                title = "导入词书",
+                subtitle = "选择 `.wbpack` 文件，校验通过后加入本机词书",
+                tag = "settings_import_word_book",
+                onClick = onImportWordBook,
+                badge = "↓",
+                accent = DomainColors.Library,
             )
+            SettingsActionRow(
+                title = "导出词书",
+                subtitle = if (importedBookCount > 0) {
+                    "已导入 $importedBookCount 册，导出为 `.wbpack` 分享给别的设备"
+                } else {
+                    "先导入一册词书后才能导出"
+                },
+                tag = "settings_export_word_book",
+                onClick = onExportWordBook,
+                badge = "↑",
+                accent = DomainColors.Library,
+            )
+            transferMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MintPrimaryDark,
+                    modifier = Modifier
+                        .padding(vertical = 6.dp)
+                        .testTag("settings_word_book_message")
+                        .semantics { contentDescription = message },
+                )
+            }
         }
     }
 }

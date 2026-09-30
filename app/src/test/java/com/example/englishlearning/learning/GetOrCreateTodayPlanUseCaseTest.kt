@@ -29,6 +29,25 @@ class GetOrCreateTodayPlanUseCaseTest {
     }
 
     @Test
+    fun `same local date rebuilds the plan after active word book changes`() = runTest {
+        val existing = plan(localDate = today)
+        val planRepository = FakeTodayPlanRepository(findLatestResult = TodayPlanResult.Ready(existing))
+        val cardSource = FakePlanCardSource(newIds = listOf("new-1", "new-2", "new-3"))
+        val profiles = FakeLearningProfileRepository(
+            currentResult = RepositoryResult.Success(LearningProfile("profile", "imported", 10)),
+        )
+
+        val result = useCase(planRepository, cardSource, profiles)("profile")
+
+        val rebuilt = (result as TodayPlanResult.Ready).plan
+        assertEquals("imported", rebuilt.activeWordBookId)
+        assertEquals(listOf("new-1", "new-2", "new-3"), rebuilt.newCardIds)
+        assertEquals("imported", cardSource.dueWordBookId)
+        assertEquals("imported", cardSource.newWordBookId)
+        assertEquals(1, planRepository.replaceCalls)
+    }
+
+    @Test
     fun `local date regression reuses the anchored plan without writing a new one`() = runTest {
         // The device clock reads 2026-09-19, but the anchored learning day is 2026-09-20: a
         // timezone/clock rollback. The plan must be reused verbatim, never rebuilt or rewritten.
@@ -218,6 +237,7 @@ class GetOrCreateTodayPlanUseCaseTest {
         private val saveResult: TodayPlanResult? = null,
     ) : TodayPlanRepository {
         var saveCalls = 0
+        var replaceCalls = 0
         var savedPlan: TodayPlan? = null
 
         override suspend fun find(profileId: String, localDate: LocalDate): TodayPlanResult =
@@ -229,6 +249,12 @@ class GetOrCreateTodayPlanUseCaseTest {
             saveCalls++
             savedPlan = plan
             return saveResult ?: TodayPlanResult.Ready(plan)
+        }
+
+        override suspend fun replaceForDate(plan: TodayPlan): TodayPlanResult {
+            replaceCalls++
+            savedPlan = plan
+            return TodayPlanResult.Ready(plan)
         }
     }
 
@@ -242,6 +268,7 @@ class GetOrCreateTodayPlanUseCaseTest {
         var dueWordBookId: String? = null
         var dueNow: Instant? = null
         var newLimit: Int? = null
+        var newWordBookId: String? = null
 
         override suspend fun dueCardIds(wordBookId: String, now: Instant): List<String> {
             dueCalls++
@@ -256,6 +283,7 @@ class GetOrCreateTodayPlanUseCaseTest {
         override suspend fun newCardIds(wordBookId: String, limit: Int): List<String> {
             newCalls++
             newLimit = limit
+            newWordBookId = wordBookId
             return newIds
         }
     }

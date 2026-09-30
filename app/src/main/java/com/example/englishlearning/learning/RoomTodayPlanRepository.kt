@@ -44,6 +44,21 @@ class RoomTodayPlanRepository(
         }
     }
 
+    override suspend fun replaceForDate(plan: TodayPlan): TodayPlanResult {
+        return try {
+            withContext(ioDispatcher) {
+                val dao = database.internalTodayPlanDao()
+                val existing = dao.findPlan(plan.profileId, plan.localDate.toString())
+                dao.replaceForDate(existing, plan.toEntity(), plan.toTaskEntities())
+                TodayPlanResult.Ready(plan)
+            }
+        } catch (cancellation: CancellationException) {
+            if (currentCoroutineContext().isActive) TodayPlanResult.StorageUnavailable else throw cancellation
+        } catch (_: Exception) {
+            TodayPlanResult.StorageUnavailable
+        }
+    }
+
     override suspend fun saveIfAbsent(plan: TodayPlan): TodayPlanResult {
         return try {
             withContext(ioDispatcher) {

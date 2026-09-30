@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -44,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.englishlearning.language.domain.PronunciationProvider
+import com.example.englishlearning.language.domain.PronunciationResult
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,6 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -94,6 +97,10 @@ fun AppScreen(
     speechSettingsViewModel: SpeechSettingsViewModel? = null,
     checkInViewModel: CheckInViewModel? = null,
     pronunciationProvider: PronunciationProvider? = null,
+    wordQaViewModel: WordAiQaViewModel? = null,
+    sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
+    imageStudioViewModel: ImageStudioViewModel? = null,
+    wordBookTransferViewModel: com.example.englishlearning.wordbook.WordBookTransferViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -116,10 +123,18 @@ fun AppScreen(
             var showAiProfiles by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showSpeechSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showWordBookExportPicker by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var exportWordBookId by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
             // 阅读来源的二级层：导入页是显式导航；文章页由 readingTarget 驱动；词卡详情是
             // 阅读页之上的本地覆盖层（WordCardViewModel 的详情只服务学习流，不复用）。
             var showArticleImport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var selectedArticleCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
+            var wordCardPronunciationMessage by remember { mutableStateOf<String?>(null) }
+            // 详情页只持有无字段状态枚举（安全边界），文案映射在 CardDetailScreen 内完成。
+            var detailPronunciationMessage by remember { mutableStateOf<PronunciationStatus?>(null) }
+            // F3-03 词 AI 问答覆盖层：从任一词卡详情的「问 AI」进入；WordCard 进不了
+            // Bundle，所以和 selectedArticleCard 一样用 remember 而不是 rememberSaveable。
+            var showWordQaCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             // F3-01A：从历史列表点开的旧版文章。与 readingTarget 互斥展示；Article 进不了
             // Bundle，所以和 selectedArticleCard 一样用 remember 而不是 rememberSaveable。
             var historyArticle by remember { mutableStateOf<com.example.englishlearning.reading.domain.Article?>(null) }
@@ -133,6 +148,7 @@ fun AppScreen(
             val speechState = speechSettingsViewModel?.state?.collectAsState()?.value ?: SpeechSettingsUiState()
             val aiConfigured = aiProfiles?.items?.any { it.hasKey } == true
             val todayState by todayPlanViewModel.uiState.collectAsState()
+            val wordQaUiState = wordQaViewModel?.uiState?.collectAsState()?.value ?: WordAiQaUiState.Idle
             val todayReady = todayState as? TodayPlanUiState.Ready
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
             // 进入阅读 tab 才算准入；今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
@@ -180,7 +196,8 @@ fun AppScreen(
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn ||
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings ||
-                showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null
+                showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
+                showWordQaCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -198,6 +215,8 @@ fun AppScreen(
             BackHandler(enabled = showArticleImport) { showArticleImport = false }
             BackHandler(enabled = readingTarget != null) { readingAccessViewModel?.closeArticle() }
             BackHandler(enabled = selectedArticleCard != null) { selectedArticleCard = null }
+            // 词 AI 问答是最内层覆盖层：最后声明，返回键先关它，再按才轮到详情页与文章页。
+            BackHandler(enabled = showWordQaCard != null) { showWordQaCard = null }
             // 设置页先声明、预览页后声明：两者同时为真时（从设置页点进预览）返回键要先关预览。
             BackHandler(enabled = showWorksheetSettings) { showWorksheetSettings = false }
             BackHandler(enabled = showWorksheetPreview) {
@@ -233,17 +252,42 @@ fun AppScreen(
                     WordCardScreen(
                         state = cardState,
                         onSubmit = wordCardViewModel::submit,
+                        onSpeak = { lemma ->
+                            pronunciationScope.launch {
+                                wordCardPronunciationMessage = pronunciationStatus(pronunciationProvider?.speak(lemma)).message()
+                            }
+                        },
+                        pronunciationMessage = wordCardPronunciationMessage,
                         onRetry = { wordCardViewModel.load(state.profile.id) },
                         onBackToPlan = exitLearning,
                     )
                     if (detailCard != null) {
+                        val card = detailCard!!
                         CardDetailScreen(
-                            card = detailCard!!,
+                            card = card,
                             onBack = wordCardViewModel::clearDetail,
                             onSpeak = {
-                                pronunciationScope.launch { pronunciationProvider?.speak(detailCard!!.lemma) }
+                                pronunciationScope.launch {
+                                    detailPronunciationMessage = pronunciationStatus(pronunciationProvider?.speak(card.lemma))
+                                }
+                            },
+                            pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                            onAskAi = {
+                                // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
+                                showWordQaCard = card
+                                wordQaViewModel?.reset()
                             },
                         )
+                        showWordQaCard?.let { qaCard ->
+                            WordAiQaScreen(
+                                lemma = qaCard.lemma,
+                                state = wordQaUiState,
+                                onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
+                                onSaveNote = { wordQaViewModel?.saveNote() },
+                                onBack = { showWordQaCard = null },
+                            )
+                        }
                     }
                 }
             } else if (showWorksheetPreview) {
@@ -317,6 +361,8 @@ fun AppScreen(
                     onCloseEditor = { aiProfileViewModel?.closeEditor() },
                     onDeleteProfile = { aiProfileViewModel?.deleteProfile(it) },
                     onDeleteKey = { aiProfileViewModel?.deleteKey(it) },
+                    onSetDefaultTextProfile = { aiProfileViewModel?.setDefaultTextProfile(it) },
+                    onSetDefaultImageProfile = { aiProfileViewModel?.setDefaultImageProfile(it) },
                     onBack = {
                         showAiProfiles = false
                         speechSettingsViewModel?.load()
@@ -333,6 +379,26 @@ fun AppScreen(
                     onAddMiMoPreset = { speechSettingsViewModel?.addMiMoPreset() },
                     onPreview = { text -> speechSettingsViewModel?.preview(text) },
                     onBack = { showSpeechSettings = false },
+                )
+            } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
+                // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
+                val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
+                    ?: SentenceAnalysisUiState.Idle
+                SentenceAnalysisScreen(
+                    state = sentenceState,
+                    onAnalyze = { sentence -> sentenceAnalysisViewModel?.analyze(sentence, state.profile.id) },
+                    onConfirmOutbound = { sentenceAnalysisViewModel?.confirmOutbound(it) },
+                    onBack = { selectedFeatureKey = null },
+                )
+            } else if (selectedFeature == AiFeature.IMAGE_STUDIO) {
+                val studioState = imageStudioViewModel?.uiState?.collectAsState()?.value
+                    ?: ImageStudioUiState.Idle
+                ImageStudioScreen(
+                    state = studioState,
+                    onGeneratePrompt = { subject -> imageStudioViewModel?.generatePrompt(subject) },
+                    onGenerateImage = { imageStudioViewModel?.generateImage() },
+                    onConfirm = { imageStudioViewModel?.confirm(it) },
+                    onBack = { selectedFeatureKey = null },
                 )
             } else if (selectedFeature != null) {
                 AiFeatureScreen(
@@ -395,8 +461,28 @@ fun AppScreen(
                         CardDetailScreen(
                             card = card,
                             onBack = { selectedArticleCard = null },
-                            onSpeak = { pronunciationScope.launch { pronunciationProvider?.speak(card.lemma) } },
+                            onSpeak = {
+                                pronunciationScope.launch {
+                                    detailPronunciationMessage = pronunciationStatus(pronunciationProvider?.speak(card.lemma))
+                                }
+                            },
+                            pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                            onAskAi = {
+                                // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
+                                showWordQaCard = card
+                                wordQaViewModel?.reset()
+                            },
                         )
+                        showWordQaCard?.let { qaCard ->
+                            WordAiQaScreen(
+                                lemma = qaCard.lemma,
+                                state = wordQaUiState,
+                                onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
+                                onSaveNote = { wordQaViewModel?.saveNote() },
+                                onBack = { showWordQaCard = null },
+                            )
+                        }
                     }
                 }
             } else {
@@ -448,36 +534,105 @@ fun AppScreen(
                                 dueWordCount = todayReady?.dueTarget,
                                 // 读的是本机真实配置：至少有一套配置设了密钥才算「已配置」。
                                 aiConfigured = aiConfigured,
-                                onOpenFeature = { selectedFeatureKey = it.key },
+                                onOpenFeature = {
+                                    selectedFeatureKey = it.key
+                                    // 每次进入功能页都清掉上一句的分析结果与上一张的生图状态，防止旧结果串屏。
+                                    if (it == AiFeature.SENTENCE_ANALYSIS) sentenceAnalysisViewModel?.reset()
+                                    if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
+                                },
                                 onOpenWordList = { selectedTab = AppTab.LEARNING },
                             )
-                            AppTab.SETTINGS -> SettingsScreen(
-                                profileName = state.profile.displayName,
-                                wordBookName = todayReady?.wordBookName,
-                                todayNewTarget = todayReady?.newTarget,
-                                todayDueTarget = todayReady?.dueTarget,
-                                onOpenSetup = { showSetup = true },
-                                onOpenWorksheet = {
-                                    worksheetViewModel?.load(state.profile.id)
-                                    showWorksheetSettings = worksheetViewModel != null
-                                },
-                                onOpenAiProfiles = {
-                                    aiProfileViewModel?.load()
-                                    showAiProfiles = aiProfileViewModel != null
-                                },
-                                onOpenSpeechSettings = {
-                                    speechSettingsViewModel?.load()
-                                    showSpeechSettings = speechSettingsViewModel != null
-                                },
-                                speechEngineStatuses = speechState.engineStatuses(),
-                                aiProfileSubtitle = aiProfiles?.let { ready ->
-                                    if (ready.items.isEmpty()) {
-                                        "尚未添加，点这里添加第一套 OpenAI 兼容服务"
-                                    } else {
-                                        "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                            AppTab.SETTINGS -> {
+                                val context = androidx.compose.ui.platform.LocalContext.current
+                                val transferState = wordBookTransferViewModel?.uiState?.collectAsState()?.value
+                                // SAF 的导入/导出：文件位置由用户选，应用不申请任何存储权限。
+                                // `.wbpack` 是私有格式，MIME 用 */*（系统没有它的注册类型）。
+                                val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                                    androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+                                ) { uri -> uri?.let { wordBookTransferViewModel?.importFrom(it) } }
+                                val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                                    androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
+                                ) { uri ->
+                                    val bookId = exportWordBookId
+                                    exportWordBookId = null
+                                    uri?.let { selectedUri ->
+                                        bookId?.let { wordBookTransferViewModel?.exportTo(selectedUri, it) }
                                     }
-                                },
-                            )
+                                }
+                                LaunchedEffect(Unit) { wordBookTransferViewModel?.refresh() }
+                                if (showWordBookExportPicker) {
+                                    AlertDialog(
+                                        onDismissRequest = { showWordBookExportPicker = false },
+                                        title = { Text("选择要导出的词书") },
+                                        text = {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                transferState?.books.orEmpty().forEach { bookId ->
+                                                    Text(
+                                                        text = bookId,
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable {
+                                                                exportWordBookId = bookId
+                                                                showWordBookExportPicker = false
+                                                                exportLauncher.launch("$bookId.wbpack")
+                                                            }
+                                                            .padding(vertical = 14.dp)
+                                                            .testTag("settings_export_book_$bookId"),
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        confirmButton = {
+                                            TextButton(onClick = { showWordBookExportPicker = false }) { Text("取消") }
+                                        },
+                                    )
+                                }
+                                SettingsScreen(
+                                    profileName = state.profile.displayName,
+                                    wordBookName = todayReady?.wordBookName,
+                                    todayNewTarget = todayReady?.newTarget,
+                                    todayDueTarget = todayReady?.dueTarget,
+                                    onOpenSetup = { showSetup = true },
+                                    onOpenWorksheet = {
+                                        worksheetViewModel?.load(state.profile.id)
+                                        showWorksheetSettings = worksheetViewModel != null
+                                    },
+                                    onOpenAiProfiles = {
+                                        aiProfileViewModel?.load()
+                                        showAiProfiles = aiProfileViewModel != null
+                                    },
+                                    onOpenSpeechSettings = {
+                                        speechSettingsViewModel?.load()
+                                        showSpeechSettings = speechSettingsViewModel != null
+                                    },
+                                    speechEngineStatuses = speechState.engineStatuses(),
+                                    aiProfileSubtitle = aiProfiles?.let { ready ->
+                                        if (ready.items.isEmpty()) {
+                                            "尚未添加，点这里添加第一套 OpenAI 兼容服务"
+                                        } else {
+                                            "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                                        }
+                                    },
+                                    onImportWordBook = {
+                                        wordBookTransferViewModel?.consumeMessage()
+                                        importLauncher.launch(arrayOf("*/*"))
+                                    },
+                                    onExportWordBook = {
+                                        val books = transferState?.books.orEmpty()
+                                        if (transferState?.canExport == true) {
+                                            wordBookTransferViewModel?.consumeMessage()
+                                            if (books.size == 1) {
+                                                exportWordBookId = books.single()
+                                                exportLauncher.launch("${books.single()}.wbpack")
+                                            } else {
+                                                showWordBookExportPicker = true
+                                            }
+                                        }
+                                    },
+                                    importedBookCount = transferState?.books?.size ?: 0,
+                                    transferMessage = transferState?.message,
+                                )
+                            }
                         }
                     }
                 }

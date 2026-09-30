@@ -3,8 +3,9 @@ package com.example.englishlearning.reading
 import com.example.englishlearning.ai.AiException
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.ai.AiPayloadKind
-import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.DefaultTextProfileResult
+import com.example.englishlearning.ai.DefaultTextProfileResolver
 import com.example.englishlearning.ai.ConfirmationRequirement
 import com.example.englishlearning.ai.requiredConfirmation
 import com.example.englishlearning.ai.domain.AiProfile
@@ -35,7 +36,14 @@ sealed interface GenerateArticleResult {
     data object StorageFailed : GenerateArticleResult
 }
 
-enum class NotConfiguredReason { NoProfile, NoKey, ProfileUnreadable, InvalidEndpoint }
+enum class NotConfiguredReason {
+    NoProfile,
+    NoKey,
+    NoDefaultProfile,
+    DefaultProfileUnavailable,
+    ProfileUnreadable,
+    InvalidEndpoint,
+}
 
 /**
  * 文章生成用例：复用 / 换一篇 / 出站确认 / 失败映射。
@@ -50,7 +58,7 @@ enum class NotConfiguredReason { NoProfile, NoKey, ProfileUnreadable, InvalidEnd
  * 永不进落库文章与参数摘要。
  */
 class GenerateArticleUseCase(
-    private val profiles: AiProfileRepository,
+    private val defaultTextProfile: DefaultTextProfileResolver,
     private val secrets: AiProfileSecretUseCase,
     private val transport: AiHttpTransport,
     private val articles: ArticleRepository,
@@ -70,27 +78,22 @@ class GenerateArticleUseCase(
                 ?.let { return GenerateArticleResult.Reused(it) }
         }
 
-        // AI 配置是设备级的（AiProfile.profileId 是配置自己的主键，与学习 profileId 无关）。
-        // V1 默认策略：按保存顺序取第一套存有 Key 的配置；「默认 Profile 选择」（F2-02 残留）
-        // 落地后换成用户指定的一套——领域模型不用动。
-        val deviceProfiles = profiles.list().getOrElse {
-            return GenerateArticleResult.NotConfigured(NotConfiguredReason.ProfileUnreadable)
+        val profile = when (val selected = defaultTextProfile.select()) {
+            is DefaultTextProfileResult.Selected -> selected.profile
+            DefaultTextProfileResult.NoSelection ->
+                return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoDefaultProfile)
+            DefaultTextProfileResult.Unavailable ->
+                return GenerateArticleResult.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable)
+            DefaultTextProfileResult.StorageUnavailable ->
+                return GenerateArticleResult.NotConfigured(NotConfiguredReason.ProfileUnreadable)
         }
-        if (deviceProfiles.isEmpty()) {
-            return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoProfile)
+        val key = secrets.loadKey(profile).getOrElse {
+            return GenerateArticleResult.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable)
         }
-        var selectedProfile: AiProfile? = null
-        var selectedKey: CharArray? = null
-        for (candidate in deviceProfiles) {
-            val candidateKey = secrets.loadKey(candidate).getOrNull()
-            if (candidateKey == null || candidateKey.isEmpty()) continue
-            selectedProfile = candidate
-            selectedKey = candidateKey
-            break
+        if (key.isEmpty()) {
+            key.fill('\u0000')
+            return GenerateArticleResult.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable)
         }
-        val profile = selectedProfile
-            ?: return GenerateArticleResult.NotConfigured(NotConfiguredReason.NoKey)
-        val key = checkNotNull(selectedKey)
 
         try {
             // 出站确认在任何字节发出去之前。Endpoint 不合法时连「要确认哪个域名」都答不出。
