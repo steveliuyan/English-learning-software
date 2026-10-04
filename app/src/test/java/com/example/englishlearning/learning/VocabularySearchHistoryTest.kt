@@ -2,6 +2,7 @@ package com.example.englishlearning.learning
 
 import java.time.Instant
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import kotlinx.coroutines.runBlocking
@@ -39,7 +40,14 @@ class VocabularySearchHistoryTest {
     }
 
     @Test
-    fun `empty and whitespace-only queries do not produce valid records`() {
+    fun `empty and whitespace-only queries do not call record or create history`() = runBlocking {
+        val repository = InMemoryVocabularySearchHistoryRepository()
+
+        recordSearch(repository, "profile-1", "")
+        recordSearch(repository, "profile-1", " \t\n ")
+
+        assertEquals(0, repository.recordCallCount)
+        assertTrue(repository.list("profile-1", 20).successValue().isEmpty())
         assertNull(normalizeVocabularySearchQuery(""))
         assertNull(normalizeVocabularySearchQuery(" \t\n "))
     }
@@ -51,18 +59,69 @@ class VocabularySearchHistoryTest {
     }
 
     @Test
-    fun `display setting is independent from accumulated count`() = runBlocking {
+    fun `disabling count display leaves persisted history statistics unchanged`() = runBlocking {
         val repository = InMemoryVocabularySearchHistoryRepository()
         repository.record("profile-1", "ability", null, Instant.EPOCH)
         repository.record("profile-1", "ability", null, Instant.EPOCH.plusSeconds(1))
+        val settings = SearchHistoryDisplaySettings(showCount = true)
+        val before = repository.find("profile-1", "ability").successValue()!!
 
-        val history = repository.find("profile-1", "ability").successValue()!!
-        val showCount = false
-        assertEquals(2, history.searchCount)
-        assertTrue(!showCount)
+        settings.showCount = false
+        val after = repository.find("profile-1", "ability").successValue()!!
+
+        assertFalse(settings.showCount)
+        assertEquals(before, after)
+        assertEquals(2, after.searchCount)
+    }
+
+    @Test
+    fun `repository failures are exposed as RepositoryResult Failure`() = runBlocking {
+        val repository = FailingVocabularySearchHistoryRepository()
+
+        assertFailure(repository.list("profile-1", 20))
+        assertFailure(repository.record("profile-1", "ability", null, Instant.EPOCH))
+        assertFailure(repository.find("profile-1", "ability"))
+        assertFailure(repository.clear("profile-1"))
+    }
+
+    private suspend fun recordSearch(
+        repository: InMemoryVocabularySearchHistoryRepository,
+        profileId: String,
+        query: String,
+    ) {
+        if (normalizeVocabularySearchQuery(query) != null) {
+            repository.record(profileId, query, null, Instant.EPOCH)
+        }
+    }
+
+    private fun <T> assertFailure(result: RepositoryResult<T>) {
+        assertTrue(result is RepositoryResult.Failure)
+        assertEquals(LearningProfileRepositoryError.StorageUnavailable, (result as RepositoryResult.Failure).error)
+    }
+
+    private data class SearchHistoryDisplaySettings(var showCount: Boolean)
+
+    private class FailingVocabularySearchHistoryRepository : VocabularySearchHistoryRepository {
+        override suspend fun list(profileId: String, limit: Int): RepositoryResult<List<VocabularySearchHistory>> = failure()
+
+        override suspend fun record(
+            profileId: String,
+            query: String,
+            representative: SearchRepresentative?,
+            at: Instant,
+        ): RepositoryResult<Unit> = failure()
+
+        override suspend fun find(profileId: String, normalizedQuery: String): RepositoryResult<VocabularySearchHistory?> = failure()
+
+        override suspend fun clear(profileId: String): RepositoryResult<Unit> = failure()
+
+        private fun <T> failure(): RepositoryResult<T> =
+            RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
     }
 
     private class InMemoryVocabularySearchHistoryRepository : VocabularySearchHistoryRepository {
+        var recordCallCount = 0
+            private set
         private val rows = linkedMapOf<Pair<String, String>, VocabularySearchHistory>()
 
         override suspend fun list(profileId: String, limit: Int): RepositoryResult<List<VocabularySearchHistory>> =
@@ -74,6 +133,7 @@ class VocabularySearchHistoryTest {
             representative: SearchRepresentative?,
             at: Instant,
         ): RepositoryResult<Unit> {
+            recordCallCount += 1
             val normalized = normalizeVocabularySearchQuery(query) ?: return RepositoryResult.Success(Unit)
             val key = profileId to normalized
             val existing = rows[key]
