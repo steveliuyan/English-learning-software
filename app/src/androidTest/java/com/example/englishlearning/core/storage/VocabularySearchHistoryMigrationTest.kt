@@ -21,6 +21,7 @@ class VocabularySearchHistoryMigrationTest {
         )
         helper.createDatabase(TEST_DB, 22).apply {
             execSQL("INSERT INTO schema_meta(`key`, `value`) VALUES ('migration-test', 'preserved')")
+            execSQL("INSERT INTO word_books(`id`, `displayName`, `level`, `totalWords`, `dataVersion`, `sourceId`) VALUES ('book-existing', 'Existing', 'A1', 1, 'v1', 'fixture')")
             close()
         }
 
@@ -28,6 +29,10 @@ class VocabularySearchHistoryMigrationTest {
             query("SELECT value FROM schema_meta WHERE `key` = 'migration-test'").use { cursor ->
                 assertTrue(cursor.moveToFirst())
                 assertEquals("preserved", cursor.getString(0))
+            }
+            query("SELECT displayName FROM word_books WHERE id = 'book-existing'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("Existing", cursor.getString(0))
             }
             query("PRAGMA table_info(vocabulary_search_history)").use { cursor ->
                 val columns = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
@@ -40,6 +45,15 @@ class VocabularySearchHistoryMigrationTest {
                 var found = false
                 while (cursor.moveToNext()) found = found || cursor.getString(cursor.getColumnIndexOrThrow("name")) == "index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis"
                 assertTrue(found)
+            }
+            AppDatabase.MIGRATION_22_23.migrate(this)
+            query("SELECT COUNT(*) FROM vocabulary_search_history").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+            query("SELECT COUNT(*) FROM word_books WHERE id = 'book-existing'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
             }
             close()
         }
