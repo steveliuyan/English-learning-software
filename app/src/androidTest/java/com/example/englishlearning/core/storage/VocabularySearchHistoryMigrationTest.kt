@@ -46,14 +46,29 @@ class VocabularySearchHistoryMigrationTest {
                 while (cursor.moveToNext()) found = found || cursor.getString(cursor.getColumnIndexOrThrow("name")) == "index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis"
                 assertTrue(found)
             }
+            execSQL("INSERT INTO vocabulary_search_history(`profileId`, `normalizedQuery`, `displayQuery`, `searchCount`, `firstSearchedAtEpochMillis`, `lastSearchedAtEpochMillis`, `representativeWordBookId`, `representativeCardId`) VALUES ('profile-existing', 'ability', 'Ability', 2, 100, 200, 'book-existing', 'card-existing')")
             AppDatabase.MIGRATION_22_23.migrate(this)
-            query("SELECT COUNT(*) FROM vocabulary_search_history").use { cursor ->
+            query("SELECT searchCount, displayQuery FROM vocabulary_search_history WHERE profileId = 'profile-existing' AND normalizedQuery = 'ability'").use { cursor ->
                 assertTrue(cursor.moveToFirst())
-                assertEquals(0, cursor.getInt(0))
+                assertEquals(2, cursor.getInt(0))
+                assertEquals("Ability", cursor.getString(1))
+            }
+            query("SELECT COUNT(*) FROM schema_meta WHERE `key` = 'migration-test'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
             }
             query("SELECT COUNT(*) FROM word_books WHERE id = 'book-existing'").use { cursor ->
                 assertTrue(cursor.moveToFirst())
                 assertEquals(1, cursor.getInt(0))
+            }
+            query("PRAGMA index_list('vocabulary_search_history')").use { cursor ->
+                var indexCount = 0
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis") {
+                        indexCount += 1
+                    }
+                }
+                assertEquals(1, indexCount)
             }
             close()
         }
