@@ -17,6 +17,9 @@ import com.example.englishlearning.core.storage.dao.InternalLearningSettingsDao
 import com.example.englishlearning.core.storage.dao.InternalProfileDao
 import com.example.englishlearning.core.storage.dao.InternalTodayPlanDao
 import com.example.englishlearning.core.storage.dao.InternalWordBookDao
+import com.example.englishlearning.core.storage.dao.InternalWordBookProgressMigrationAuditDao
+import com.example.englishlearning.core.storage.dao.InternalVocabularyEntryDao
+import com.example.englishlearning.core.storage.dao.InternalVocabularySearchHistoryDao
 import com.example.englishlearning.core.storage.entity.AiPreferenceEntity
 import com.example.englishlearning.core.storage.entity.WordAiNoteEntity
 import com.example.englishlearning.core.storage.entity.AiProfileEntity
@@ -35,6 +38,9 @@ import com.example.englishlearning.core.storage.entity.SpeechPreferenceEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanTaskEntity
 import com.example.englishlearning.core.storage.entity.WordBookEntity
+import com.example.englishlearning.core.storage.entity.WordBookProgressMigrationAuditEntity
+import com.example.englishlearning.core.storage.entity.VocabularyEntryEntity
+import com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEntity
 
 /**
  * Versioned Room metadata store. Every version transition must be supplied through [MIGRATIONS].
@@ -60,8 +66,11 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
         LearningSettingsEntity::class,
         SpeechPreferenceEntity::class,
         WordAiNoteEntity::class,
+        VocabularyEntryEntity::class,
+        WordBookProgressMigrationAuditEntity::class,
+        VocabularySearchHistoryEntity::class,
     ],
-    version = 18,
+    version = 23,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -94,6 +103,12 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalLearningEventDao(): InternalLearningEventDao
 
     internal abstract fun internalLearningStatsDao(): InternalLearningStatsDao
+
+    internal abstract fun internalVocabularyEntryDao(): InternalVocabularyEntryDao
+
+    internal abstract fun internalVocabularySearchHistoryDao(): InternalVocabularySearchHistoryDao
+
+    internal abstract fun internalWordBookProgressMigrationAuditDao(): InternalWordBookProgressMigrationAuditDao
 
     companion object {
         val MIGRATION_1_2: Migration =
@@ -388,8 +403,133 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_18_19: Migration =
+            object : Migration(18, 19) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("CREATE TABLE IF NOT EXISTS `vocabulary_entries` (`profileId` TEXT NOT NULL, `wordBookId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `addedAtEpochMillis` INTEGER NOT NULL, `lastFeedback` TEXT NOT NULL, PRIMARY KEY(`profileId`, `wordBookId`, `cardId`))")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_entries_profileId_addedAtEpochMillis` ON `vocabulary_entries` (`profileId`, `addedAtEpochMillis`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_entries_profileId_wordBookId_addedAtEpochMillis` ON `vocabulary_entries` (`profileId`, `wordBookId`, `addedAtEpochMillis`)")
+                }
+            }
+
+        val MIGRATION_19_20: Migration = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `word_ai_notes` ADD COLUMN `wordBookId` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `word_ai_notes` ADD COLUMN `cardId` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_20_21: Migration = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `word_book_progress_migration_audits` (`profileId` TEXT NOT NULL, `sourceBookId` TEXT NOT NULL, `targetBookId` TEXT NOT NULL, `sourceCardId` TEXT NOT NULL, `targetCardId` TEXT NOT NULL, `migratedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`profileId`, `sourceBookId`, `targetBookId`, `sourceCardId`, `targetCardId`))")
+            }
+        }
+
+        /**
+         * 把早期版本写下的 `placeholder:<册>:<词>` 卡片 id 对齐成现在的 `<册>:<词>`。
+         *
+         * 为什么必须修：`PlaceholderWordCardSource` 已经不再被 DI 绑定，真实词书交付 `<册>:<词>`；
+         * 而进度、到期队列、新词去重全都按 id 取交集，前缀不同就等于交集恒为空。三处可见后果：
+         * 1. 首页「已学」永远是 0（分子与分母不在同一个 id 空间）；
+         * 2. 到期复习队列拿到的是解析不出卡片的 id（`BundledWordBookSource` 会把 `placeholder` 当册名）；
+         * 3. 已经学过、正在复习的词被当成新词重新排进当天计划（同一单词同时出现在复习与新学）。
+         *
+         * 只改前缀，不改「哪一册的哪个词」——`<册>:<词>` 正是 `WordCardSource` 现在期望的形式
+         * （册 id 由 `cardId.substringBefore(':')` 反解，且册 id 正则不允许出现冒号，所以前缀可安全剥离）。
+         */
+        val MIGRATION_21_22: Migration = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                repairLegacyPlaceholderCardIds(db)
+            }
+        }
+
+        val MIGRATION_22_23: Migration = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `vocabulary_search_history` (`profileId` TEXT NOT NULL, `normalizedQuery` TEXT NOT NULL, `displayQuery` TEXT NOT NULL, `searchCount` INTEGER NOT NULL, `firstSearchedAtEpochMillis` INTEGER NOT NULL, `lastSearchedAtEpochMillis` INTEGER NOT NULL, `representativeWordBookId` TEXT, `representativeCardId` TEXT, PRIMARY KEY(`profileId`, `normalizedQuery`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis` ON `vocabulary_search_history` (`profileId`, `lastSearchedAtEpochMillis`)")
+            }
+        }
+
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23)
+
+        /** 早期占位卡片 id 的前缀；真实词书的卡片 id 以 `<册>:` 开头。 */
+        private val LEGACY_PLACEHOLDER_ID_PREFIX = LegacyCardIdRepair.PLACEHOLDER_PREFIX
+
+        /**
+         * [MIGRATION_21_22] 的实现，拆出来是为了让「先解冲突、再统一改写、最后收敛目标数」
+         * 这个顺序在一处看清。
+         *
+         * 改写是**幂等**的：前缀已被剥掉的行不再匹配 `LIKE 'placeholder:%'`，重复执行不会二次改动。
+         *
+         * @param db 迁移事务内的数据库句柄。
+         */
+        private fun repairLegacyPlaceholderCardIds(db: SupportSQLiteDatabase) {
+            // 计划任务的 PK 是 (planId, cardId)：改写后可能与同一计划里已有的新格式行撞主键。
+            // 会出现这种撞车，本身就是当初去重失效的后果——同一个词既排了复习又排了新学。
+            // 因为 `placeholder:` 只可能出现在前缀位置，一组冲突最多两行（旧格式 + 新格式各一）。
+            // 取舍规则见 [LegacyCardIdRepair.collisionVictim]（复习优先）。
+            val plansLosingTasks = mutableListOf<String>()
+            val doomedRows = mutableListOf<Pair<String, String>>()
+            db.query(
+                "SELECT t1.planId, t1.cardId, t1.taskKind, t2.cardId, t2.taskKind " +
+                    "FROM today_plan_tasks t1 JOIN today_plan_tasks t2 " +
+                    "ON t2.planId = t1.planId " +
+                    "AND t2.cardId = replace(t1.cardId, '$LEGACY_PLACEHOLDER_ID_PREFIX', '') " +
+                    "WHERE t1.cardId LIKE '$LEGACY_PLACEHOLDER_ID_PREFIX%'",
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val planId = cursor.getString(0)
+                    val legacyId = cursor.getString(1)
+                    val legacyKind = cursor.getString(2)
+                    val modernId = cursor.getString(3)
+                    val modernKind = cursor.getString(4)
+                    val doomed = LegacyCardIdRepair.collisionVictim(legacyId, legacyKind, modernId, modernKind)
+                    doomedRows += planId to doomed
+                }
+            }
+            doomedRows.forEach { (planId, cardId) ->
+                db.execSQL(
+                    "DELETE FROM today_plan_tasks WHERE planId = ? AND cardId = ?",
+                    arrayOf(planId, cardId),
+                )
+                if (planId !in plansLosingTasks) plansLosingTasks += planId
+            }
+            db.execSQL(
+                "UPDATE today_plan_tasks SET cardId = replace(cardId, '$LEGACY_PLACEHOLDER_ID_PREFIX', '') " +
+                    "WHERE cardId LIKE '$LEGACY_PLACEHOLDER_ID_PREFIX%'",
+            )
+            // 少了一行就必须把计划的目标数收敛到实际任务数：严格模式要求
+            // newDone == newTarget 且 dueDone == dueTarget，目标数悬空等于当天永远解锁不了文章。
+            plansLosingTasks.forEach { planId ->
+                db.execSQL(
+                    "UPDATE today_plans SET " +
+                        "newTarget = (SELECT count(*) FROM today_plan_tasks WHERE planId = ? " +
+                        "AND taskKind = '${LegacyCardIdRepair.NEW_TASK_KIND}'), " +
+                        "dueTarget = (SELECT count(*) FROM today_plan_tasks WHERE planId = ? " +
+                        "AND taskKind = '${LegacyCardIdRepair.DUE_TASK_KIND}') " +
+                        "WHERE planId = ?",
+                    arrayOf(planId, planId, planId),
+                )
+            }
+
+            // 复习状态的 PK 是 cardId，先让位再改写。
+            db.execSQL(
+                "DELETE FROM card_review_states WHERE cardId LIKE '$LEGACY_PLACEHOLDER_ID_PREFIX%' " +
+                    "AND replace(cardId, '$LEGACY_PLACEHOLDER_ID_PREFIX', '') IN " +
+                    "(SELECT cardId FROM card_review_states WHERE cardId NOT LIKE '$LEGACY_PLACEHOLDER_ID_PREFIX%')",
+            )
+            db.execSQL(
+                "UPDATE card_review_states SET cardId = replace(cardId, '$LEGACY_PLACEHOLDER_ID_PREFIX', '') " +
+                    "WHERE cardId LIKE '$LEGACY_PLACEHOLDER_ID_PREFIX%'",
+            )
+
+            // 学习事件的 PK 是 eventId，cardId 只是普通列，直接改写即可。
+            db.execSQL(
+                "UPDATE learning_events SET cardId = replace(cardId, '$LEGACY_PLACEHOLDER_ID_PREFIX', '') " +
+                    "WHERE cardId LIKE '$LEGACY_PLACEHOLDER_ID_PREFIX%'",
+            )
+        }
 
         private fun createDailyTargetConstraintTriggers(db: SupportSQLiteDatabase) {
             db.execSQL(DAILY_TARGET_INSERT_TRIGGER_SQL)
