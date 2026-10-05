@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.learning.LearningProfileRepository
+import com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase
 import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.WordBook
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,6 +47,12 @@ class WordBookTransferViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: LearningProfileRepository,
     @Named("io") private val io: CoroutineDispatcher,
+    /**
+     * 导入成功后立刻补齐该册的词条索引，用户下一次查词就不必等「首次解析整包」。
+     *
+     * 可空仅为了让既有单测不必构造索引依赖；生产装配点一定会传入。
+     */
+    private val refreshIndex: RefreshVocabularySearchIndexUseCase? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WordBookTransferUiState())
@@ -87,6 +94,8 @@ class WordBookTransferViewModel @Inject constructor(
                 onSuccess = { directory ->
                     // register 会重新解析整包（读图算哈希），不能留在 Main
                     val registered = withContext(io) { register(directory) }
+                    // 登记成功才建索引：登记失败时这册还不在可见列表里，建了也会被刷新清掉。
+                    if (registered) withContext(io) { refreshIndex?.invoke() }
                     _uiState.value = _uiState.value.copy(
                         busy = false,
                         message = if (registered) {
@@ -148,6 +157,7 @@ class WordBookTransferViewModel @Inject constructor(
     private suspend fun register(directory: File): Boolean {
         val parsed = WordBookPackageParser.parse(directory).getOrNull() ?: return false
         val metadata = parsed.metadata
+        if (metadata.totalWords != parsed.cards.size || metadata.totalWords <= 0) return false
         val wordBook = WordBook(
             id = metadata.id,
             displayName = metadata.displayName,
@@ -169,7 +179,7 @@ class WordBookTransferViewModel @Inject constructor(
             -> "词书包里的配图与清单对不上，文件可能已损坏。"
 
             WordBookPackageRejection.MetadataRejected ->
-                "这个词书包的词表来源未获授权，已拒绝导入。"
+                "这个词书包的来源或署名信息不完整，已拒绝导入。"
 
             WordBookPackageRejection.UnsupportedFormatVersion ->
                 "词书包版本过新，请升级应用后再导入。"

@@ -15,6 +15,14 @@ import kotlin.test.fail
  */
 class WordBookPackageParserTest {
 
+    private val metadataJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    @kotlinx.serialization.Serializable
+    private data class BundledMetadataDto(
+        val id: String,
+        val totalWords: Int,
+    )
+
     private fun tempDirectory(prefix: String): File =
         Files.createTempDirectory(prefix).toFile()
 
@@ -23,6 +31,25 @@ class WordBookPackageParserTest {
         fail("expected rejection for ${directory.name}")
     } catch (expected: WordBookPackageException) {
         expected.rejection
+    }
+
+    @Test
+    fun allBundledWordBooksAreAcceptedByTheRuntimeParser() {
+        val root = File("src/main/assets/wordbooks")
+        val metadata = File(root, "metadata.json")
+            .readText(Charsets.UTF_8)
+            .let {
+                metadataJson.decodeFromString<List<BundledMetadataDto>>(it)
+            }
+
+        assertEquals(10, metadata.size)
+        metadata.forEach { entry ->
+            val parsed = WordBookPackageParser.parse(File(root, entry.id)).getOrThrow()
+            assertEquals(entry.id, parsed.metadata.id)
+            assertEquals(entry.totalWords, parsed.cards.size)
+            assertTrue(parsed.cards.all { it.cardId.startsWith("${entry.id}:") })
+            assertEquals(parsed.cards.size, parsed.cards.map { it.cardId }.toSet().size)
+        }
     }
 
     @Test
@@ -204,6 +231,7 @@ class WordBookPackageParserTest {
                     dataVersion = "v1",
                     sourceId = WordBookMetadataPolicy.PACKAGED_BOOK_SOURCE_ID,
                     sourcePolicy = WordBookMetadataPolicy.PACKAGED_BOOK_POLICY,
+                    attribution = "test",
                 ),
             ),
         )

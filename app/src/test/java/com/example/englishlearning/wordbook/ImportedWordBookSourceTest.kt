@@ -124,9 +124,22 @@ class ImportedWordBookSourceTest {
 
     @Test
     fun isImportedDistinguishesInstalledBooks() = runTest {
-        val source = ImportedWordBookSource(rootWithPackage())
+        val root = rootWithPackage()
+        val source = ImportedWordBookSource(root)
 
         assertTrue(source.isImported(WordBookPackageFixture.BOOK_ID))
         assertTrue(!source.isImported("cet4-planning"))
+    }
+
+    @Test
+    fun isImportedDoesNotTreatWorkDirectoryAsInstalledBook() = runTest {
+        val root = rootWithPackage()
+        WordBookPackageFixture.writePackage(
+            File(root, ".backup-${WordBookPackageFixture.BOOK_ID}"),
+            cards = listOf(WordBookPackageFixture.CardSpec("stale", 1)),
+        )
+        val source = ImportedWordBookSource(root)
+
+        assertTrue(!source.isImported(".backup-${WordBookPackageFixture.BOOK_ID}"))
     }
 }

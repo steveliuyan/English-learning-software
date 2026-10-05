@@ -34,6 +34,9 @@ class ImportedWordBookSource(
     private val root: File,
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : WordCardSource {
+    private val cache = WordBookPackageCache<WordBookPackage> { directory ->
+        WordBookPackageParser.parse(directory).getOrNull()
+    }
 
     // 解析会逐张读图算 SHA-256：调用方（学习页）在 Main 上，必须切走，否则开始学习就卡
     override suspend fun cardIds(wordBookId: String): List<String> = withContext(io) {
@@ -58,12 +61,13 @@ class ImportedWordBookSource(
     }
 
     /** 该册是否已经导入（用于界面判断「导入」还是「查看」）。 */
-    fun isImported(wordBookId: String): Boolean = File(root, wordBookId).isDirectory
+    fun isImported(wordBookId: String): Boolean =
+        importedBookDirectories(root).any { it.name == wordBookId }
 
     private fun readCards(wordBookId: String): List<WordCard> {
         val directory = File(root, wordBookId)
         if (!directory.isDirectory) return emptyList()
-        return WordBookPackageParser.parse(directory).getOrNull()?.cards
+        return cache.get(directory)?.cards
             ?.sortedWith(compareBy({ it.rank ?: Int.MAX_VALUE }, { it.lemma }))
             .orEmpty()
     }

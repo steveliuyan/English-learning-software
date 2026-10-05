@@ -107,6 +107,7 @@ object WordBookPackageParser {
             dataVersion = "v1",
             sourceId = book.sourceId,
             sourcePolicy = book.sourcePolicy,
+            attribution = book.attribution,
         )
         if (WordBookMetadataPolicy.validatePackaged(metadata) != MetadataValidationResult.Valid) {
             throw reject(WordBookPackageRejection.MetadataRejected)

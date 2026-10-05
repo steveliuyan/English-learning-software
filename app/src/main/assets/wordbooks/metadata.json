@@ -1,56 +1,102 @@
 [
   {
-    "id": "primary-school",
-    "displayName": "小学",
-    "level": "基础",
-    "totalWords": 0,
-    "dataVersion": "v1",
-    "sourceId": "ngsl-nawl-1.2",
-    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
-  },
-  {
-    "id": "junior-high-school",
-    "displayName": "初中",
-    "level": "初中",
-    "totalWords": 0,
-    "dataVersion": "v1",
-    "sourceId": "ngsl-nawl-1.2",
-    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
-  },
-  {
-    "id": "senior-high-school",
-    "displayName": "高中",
-    "level": "高中",
-    "totalWords": 0,
-    "dataVersion": "v1",
-    "sourceId": "ngsl-nawl-1.2",
-    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
-  },
-  {
     "id": "cet4",
-    "displayName": "大学英语四级",
+    "displayName": "四级英语词汇",
     "level": "CET-4",
-    "totalWords": 0,
-    "dataVersion": "v1",
-    "sourceId": "cefr-j-1.5",
-    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+    "totalWords": 4308,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《四级词汇全书》；仅作本地学习资料。"
   },
   {
     "id": "cet6",
-    "displayName": "大学英语六级",
+    "displayName": "六级英语词汇",
     "level": "CET-6",
-    "totalWords": 0,
-    "dataVersion": "v1",
-    "sourceId": "cefr-j-1.5",
-    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+    "totalWords": 4634,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《六级英语词汇全书》；仅作本地学习资料。"
   },
   {
-    "id": "postgraduate-entrance-exam",
-    "displayName": "考研",
-    "level": "研究生入学考试",
-    "totalWords": 0,
-    "dataVersion": "v1",
-    "sourceId": "cefr-j-1.5",
-    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。词条尚未随本任务打包。"
+    "id": "doctoral-english",
+    "displayName": "博士英语词汇",
+    "level": "博士",
+    "totalWords": 8537,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《博士英语词汇全书》；仅作本地学习资料。"
+  },
+  {
+    "id": "graduate-english",
+    "displayName": "研究生英语词汇",
+    "level": "研究生",
+    "totalWords": 4581,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《研究生英语词汇全书》；仅作本地学习资料。"
+  },
+  {
+    "id": "ielts",
+    "displayName": "雅思词汇",
+    "level": "IELTS",
+    "totalWords": 5215,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《雅思词汇全书》；仅作本地学习资料。"
+  },
+  {
+    "id": "junior-high-school",
+    "displayName": "初中英语词汇",
+    "level": "初中",
+    "totalWords": 1732,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《初中英语词汇全书》；仅作本地学习资料。"
+  },
+  {
+    "id": "kaoyan-english",
+    "displayName": "考研英语词汇",
+    "level": "考研",
+    "totalWords": 4815,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《考研英语词汇全书》；仅作本地学习资料。"
+  },
+  {
+    "id": "primary-school",
+    "displayName": "小学英语词汇",
+    "level": "小学",
+    "totalWords": 816,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《小学英语词汇全书》；仅作本地学习资料。"
+  },
+  {
+    "id": "senior-high-school",
+    "displayName": "高中英语词汇",
+    "level": "高中",
+    "totalWords": 3214,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《高中英语词汇全书》；仅作本地学习资料。"
+  },
+  {
+    "id": "toefl",
+    "displayName": "托福词汇",
+    "level": "TOEFL",
+    "totalWords": 7438,
+    "dataVersion": "v1-xlsx-20261003",
+    "sourceId": "ngsl-nawl-1.2",
+    "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
+    "attribution": "用户提供的《托福词汇全书》；仅作本地学习资料。"
   }
 ]

@@ -412,6 +412,15 @@
 - 替代方案: 经独立许可核验、允许离线再分发并可完成完整台账的数据集，或暂不提供词条正文
 - 商业分发结论: 本任务未分发 NGSL/NAWL 词条正文；未来分发仅可在保留署名并满足 CC BY-SA 4.0 ShareAlike 条件后进行
 
+## ngsl-core-10-acceptance-package
+- 名称: NGSL 目标 10 验收词书包（`outputs/word-book-packing/ngsl-core-10`）
+- 版本: 仅用于本地导入链路验收，不是正式内置词书
+- 许可证: 验收包中的词条与中文释义/例句为测试夹具；配图标记为 `ai-generated`、模型 `m-test`，未完成商业再分发许可核验
+- 用途: 验证 wbpack 解析、图片哈希校验、导入登记、真实词卡读取、搜索与详情展示
+- 数据流: 仅保存在本地 `outputs/` 验收目录，不进入 APK，不进入正式发布包，不作为默认词书
+- NOTICE 位置: 本条目、`outputs/word-book-packing/ngsl-core-10/ngsl-core-10/book.json`、`manifest.json`
+- 商业分发结论: **禁止进入发布构建**。完成词条来源、中文释义/例句、图片许可和署名逐项核验后，必须创建新的正式版本条目，不能直接把验收包升级为发布资源
+
 ## cefr-j-1.5
 - 名称: CEFR-J
 - 版本: 1.5

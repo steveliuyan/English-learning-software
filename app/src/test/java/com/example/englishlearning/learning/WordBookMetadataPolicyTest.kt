@@ -66,7 +66,7 @@ class WordBookMetadataPolicyTest {
     }
 
     @Test
-    fun `packaged wordbook metadata contains exactly six compliant learning groupings`() {
+    fun `packaged wordbook metadata contains all ten compliant learning groupings`() {
         val entries =
             Json.parseToJsonElement(metadataAsset().readText())
                 .jsonArray
@@ -79,24 +79,28 @@ class WordBookMetadataPolicyTest {
                 "senior-high-school",
                 "cet4",
                 "cet6",
-                "postgraduate-entrance-exam",
+                "doctoral-english",
+                "graduate-english",
+                "ielts",
+                "kaoyan-english",
+                "toefl",
             ),
             entries.map { it.requiredString("id") }.toSet(),
         )
-        assertEquals(6, entries.size)
+        assertEquals(10, entries.size)
 
         entries.forEach { entry ->
             assertEquals(
-                setOf("id", "displayName", "level", "totalWords", "dataVersion", "sourceId", "sourcePolicy"),
+                setOf("id", "displayName", "level", "totalWords", "dataVersion", "sourceId", "sourcePolicy", "attribution"),
                 entry.keys,
             )
             assertTrue(entry.requiredString("displayName").isNotBlank())
             assertTrue(entry.requiredString("level").isNotBlank())
-            assertEquals(0, entry.requiredInt("totalWords"))
-            assertEquals("v1", entry.requiredString("dataVersion"))
+            assertTrue(entry.requiredInt("totalWords") > 0)
+            assertTrue(entry.requiredString("dataVersion").startsWith("v1-xlsx-"))
             assertTrue(entry.requiredString("sourcePolicy").contains("应用内学习分组"))
             assertTrue(entry.requiredString("sourcePolicy").contains("不是官方"))
-            assertTrue(entry.requiredString("sourcePolicy").contains("词条尚未随本任务打包"))
+            assertTrue(entry.requiredString("attribution").isNotBlank())
 
             assertEquals(
                 MetadataValidationResult.Valid,

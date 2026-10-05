@@ -8,6 +8,7 @@ data class WordBookMetadata(
     val dataVersion: String,
     val sourceId: String,
     val sourcePolicy: String,
+    val attribution: String? = null,
 )
 
 sealed interface MetadataValidationResult {
@@ -16,6 +17,8 @@ sealed interface MetadataValidationResult {
     data object UnknownSource : MetadataValidationResult
 
     data object OfficialDescriptionNotAllowed : MetadataValidationResult
+
+    data object MissingAttribution : MetadataValidationResult
 }
 
 object WordBookMetadataPolicy {
@@ -35,12 +38,13 @@ object WordBookMetadataPolicy {
     const val PACKAGED_BOOK_SOURCE_ID = "ngsl-nawl-1.2"
 
     /** 内置分组占位册：词表来源 ID 白名单（NGSL/NAWL 与 CEFR-J 已登记第三方声明）。 */
-    private val approvedSourceIds = setOf("ngsl-nawl-1.2", "cefr-j-1.5")
+    private val approvedSourceIds = setOf("ngsl-nawl-1.2", "cefr-j-1.5", "user-provided-xlsx")
 
     fun validate(metadata: WordBookMetadata): MetadataValidationResult =
         when {
             metadata.sourceId !in approvedSourceIds -> MetadataValidationResult.UnknownSource
-            metadata.sourcePolicy != APPLICATION_GROUPING_POLICY ->
+            metadata.sourcePolicy != APPLICATION_GROUPING_POLICY &&
+                metadata.sourcePolicy != PACKAGED_BOOK_POLICY ->
                 MetadataValidationResult.OfficialDescriptionNotAllowed
             else -> MetadataValidationResult.Valid
         }
@@ -54,6 +58,7 @@ object WordBookMetadataPolicy {
             metadata.sourceId !in approvedSourceIds -> MetadataValidationResult.UnknownSource
             metadata.sourcePolicy != PACKAGED_BOOK_POLICY ->
                 MetadataValidationResult.OfficialDescriptionNotAllowed
+            metadata.attribution.isNullOrBlank() -> MetadataValidationResult.MissingAttribution
             else -> MetadataValidationResult.Valid
         }
 }
