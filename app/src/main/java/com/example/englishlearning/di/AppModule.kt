@@ -24,6 +24,10 @@ import com.example.englishlearning.core.time.SystemClockProvider
 import com.example.englishlearning.learning.EventIdFactory
 import com.example.englishlearning.learning.GetOrCreateTodayPlanUseCase
 import com.example.englishlearning.learning.LearningEventRepository
+import com.example.englishlearning.learning.LearningRecordRepository
+import com.example.englishlearning.learning.RoomLearningRecordRepository
+import com.example.englishlearning.learning.RoomVocabularyRepository
+import com.example.englishlearning.learning.VocabularyRepository
 import com.example.englishlearning.learning.PlaceholderWordCardSource
 import com.example.englishlearning.learning.PlanCardSource
 import com.example.englishlearning.learning.RoomLearningEventRepository
@@ -52,7 +56,14 @@ import com.example.englishlearning.learning.TodayPlanRepository
 import com.example.englishlearning.ui.TodayPlanUseCaseContract
 import com.example.englishlearning.wordbook.CompositeWordCardSource
 import com.example.englishlearning.wordbook.ImportedWordBookSource
+import com.example.englishlearning.wordbook.BundledWordBookSource
 import com.example.englishlearning.learning.LearningProfileRepository
+import com.example.englishlearning.learning.SearchVocabularyOperator
+import com.example.englishlearning.learning.SearchVocabularyUseCase
+import com.example.englishlearning.learning.VocabularySearchHistoryRepository
+import com.example.englishlearning.learning.RoomVocabularySearchHistoryRepository
+import com.example.englishlearning.learning.VocabularySearchIndexRepository
+import com.example.englishlearning.learning.RoomVocabularySearchIndexRepository
 import com.example.englishlearning.learning.LearningSettingsRepository
 import com.example.englishlearning.learning.RoomLearningProfileRepository
 import com.example.englishlearning.learning.RoomLearningSettingsRepository
@@ -98,23 +109,37 @@ object AppModule {
     @Provides fun provideCreateUseCase(repository: LocalProfileRepository, clock: ClockProvider): CreateLocalProfileUseCase = CreateLocalProfileUseCase(repository, clock)
     @Provides @Singleton fun provideLearningProfileRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningProfileRepository = RoomLearningProfileRepository(database, dispatcher)
     @Provides @Singleton fun provideLearningSettingsRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningSettingsRepository = RoomLearningSettingsRepository(database, dispatcher)
+    @Provides @Singleton fun provideVocabularySearchHistoryRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): VocabularySearchHistoryRepository = RoomVocabularySearchHistoryRepository(database, dispatcher)
+    @Provides @Singleton fun provideVocabularySearchIndexRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): VocabularySearchIndexRepository = RoomVocabularySearchIndexRepository(database, dispatcher)
+    @Provides fun provideSearchVocabularyUseCase(history: VocabularySearchHistoryRepository, index: VocabularySearchIndexRepository, clock: ClockProvider): SearchVocabularyOperator = SearchVocabularyUseCase(history = history, index = index, clock = clock)
+    /** 索引只存结果列表要显示的列，详情所需的完整词卡由这个用例在点开时回源取。 */
+    @Provides fun provideOpenVocabularySearchResultUseCase(cards: WordCardSource): com.example.englishlearning.learning.OpenVocabularySearchResultUseCase = com.example.englishlearning.learning.OpenVocabularySearchResultUseCase(cards)
+    @Provides fun provideRefreshVocabularySearchIndexUseCase(profiles: LearningProfileRepository, cards: WordCardSource, index: VocabularySearchIndexRepository, bundled: com.example.englishlearning.learning.BundledWordBookIdSource, imported: com.example.englishlearning.learning.ImportedWordBookIdSource): com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase = com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase(profiles, cards, index, bundled, imported)
     @Provides fun provideGetLearningSettingsUseCase(repository: LearningSettingsRepository): GetLearningSettingsUseCase = GetLearningSettingsUseCase(repository)
     @Provides fun provideSaveLearningSettingsUseCase(repository: LearningSettingsRepository): SaveLearningSettingsUseCase = SaveLearningSettingsUseCase(repository)
     @Provides fun provideSelectLearningSetupUseCase(repository: LearningProfileRepository): SelectWordBookAndSetDailyTargetUseCase = SelectWordBookAndSetDailyTargetUseCase(repository)
     @Provides fun provideWordBookMetadataAssetSource(@ApplicationContext context: Context): WordBookMetadataAssetSource = WordBookMetadataAssetSource { context.assets.open("wordbooks/metadata.json").bufferedReader().use { it.readText() } }
     @Provides fun provideSeedWordBooksUseCase(source: WordBookMetadataAssetSource, repository: LearningProfileRepository): SeedWordBooksUseCase = SeedWordBooksUseCase(source, repository)
+    /** 内置词书 id 以 `assets/wordbooks/metadata.json` 为唯一事实来源，不再在代码里重复维护一份清单。 */
+    @Provides @Singleton fun provideBundledWordBookIdSource(source: WordBookMetadataAssetSource): com.example.englishlearning.learning.BundledWordBookIdSource = com.example.englishlearning.learning.BundledWordBookIdSource { com.example.englishlearning.learning.bundledWordBookIds(source.read()) }
+    @Provides @Singleton fun provideImportedWordBookIdSource(@ApplicationContext context: Context): com.example.englishlearning.learning.ImportedWordBookIdSource = com.example.englishlearning.learning.ImportedWordBookIdSource { com.example.englishlearning.wordbook.importedBookDirectories(java.io.File(context.filesDir, "wordbooks")).map { it.name }.toSet() }
+    @Provides @Singleton fun provideWordBookDeletionService(repository: LearningProfileRepository, @ApplicationContext context: Context, bundled: com.example.englishlearning.learning.BundledWordBookIdSource): com.example.englishlearning.learning.WordBookDeletionService = com.example.englishlearning.learning.WordBookDeletionService(repository, java.io.File(context.filesDir, "wordbooks")) { bundled.ids() }
+    @Provides @Singleton fun provideWordBookProgressMigrationService(cards: WordCardSource, events: LearningEventRepository): com.example.englishlearning.learning.WordBookProgressMigrationService = com.example.englishlearning.learning.WordBookProgressMigrationService(cards, events)
+    @Provides @Singleton fun provideWordBookProgressMigrationCoordinator(service: com.example.englishlearning.learning.WordBookProgressMigrationService): com.example.englishlearning.learning.WordBookProgressMigrationCoordinator = com.example.englishlearning.learning.WordBookProgressMigrationCoordinator(service)
     @Provides @Singleton fun provideTodayPlanRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): TodayPlanRepository = RoomTodayPlanRepository(database, dispatcher)
     @Provides @Singleton fun provideLearningStatsRepository(database: AppDatabase, clock: ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): LearningStatsRepository = RoomLearningStatsRepository(database, clock, dispatcher)
     @Provides @Singleton fun provideArticleRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): ArticleRepository = RoomArticleRepository(database, dispatcher)
     @Provides @Singleton fun provideLearningEventRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningEventRepository = RoomLearningEventRepository(database, dispatcher)
+    @Provides @Singleton fun provideLearningRecordRepository(database: AppDatabase, cards: WordCardSource, clock: ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): LearningRecordRepository = RoomLearningRecordRepository(database, cards, clock, dispatcher)
+    @Provides @Singleton fun provideVocabularyRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): VocabularyRepository = RoomVocabularyRepository(database, dispatcher)
     @Provides @Singleton fun provideFsrsReviewScheduler(): FsrsReviewScheduler = FsrsReviewScheduler()
     @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider, scheduler: FsrsReviewScheduler): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock, scheduler = scheduler)
     @Provides @Singleton fun provideEventIdFactory(): EventIdFactory = EventIdFactory.Random
     /**
-     * 词卡内容端口：**导入册优先、内置占位册兜底**。
+     * 词卡内容端口：**导入册优先、内置正式册兜底**。
      *
      * 绑定合成实现而不是单个来源，导入的 `.wbpack` 才能真正参与学习流程；只绑
-     * `PlaceholderWordCardSource` 的话，导入成功也只会在设置页多出一个名字。
+     * 没有合成来源的话，导入成功也只会在设置页多出一个名字。
      */
     @Provides @Singleton
     fun provideWordCardSource(
@@ -123,7 +148,11 @@ object AppModule {
     ): WordCardSource =
         CompositeWordCardSource(
             imported = ImportedWordBookSource(java.io.File(context.filesDir, "wordbooks"), dispatcher),
-            bundled = PlaceholderWordCardSource(),
+            bundled = BundledWordBookSource(
+                assets = context.assets,
+                root = java.io.File(context.filesDir, "bundled-wordbooks"),
+                io = dispatcher,
+            ),
         )
     @Provides @Singleton
     fun provideSystemPronunciationProvider(@ApplicationContext context: Context): AndroidTextToSpeechProvider = AndroidTextToSpeechProvider(context)

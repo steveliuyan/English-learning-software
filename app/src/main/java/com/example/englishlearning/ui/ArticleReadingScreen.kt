@@ -21,8 +21,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -68,15 +70,22 @@ fun ArticleReadingScreen(
     onToggleTranslation: () -> Unit,
     onOpenDictionaryPlaceholder: () -> Unit,
     onOpenPronunciationPlaceholder: () -> Unit,
+    onOpenDictionary: (String) -> Unit = { onOpenDictionaryPlaceholder() },
     onSetLearnedMarks: (Boolean) -> Unit = {},
     onCompleteReading: () -> Unit = {},
     modifier: Modifier = Modifier,
+    articleScrollPosition: Int = 0,
+    onArticleScrollPositionChange: (Int) -> Unit = {},
 ) {
+    val scrollState = rememberScrollState(articleScrollPosition)
+    LaunchedEffect(scrollState) {
+        snapshotFlow { scrollState.value }.collect(onArticleScrollPositionChange)
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MintBackground)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 24.dp)
             .testTag("article_reading_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -179,7 +188,7 @@ fun ArticleReadingScreen(
             highlights = current.highlights,
             cards = current.cards,
             onOpenCard = onOpenCard,
-            onOpenDictionaryPlaceholder = onOpenDictionaryPlaceholder,
+            onOpenDictionary = onOpenDictionary,
         )
 
         if (current.article.chineseText.isEmpty()) {
@@ -223,7 +232,7 @@ fun ArticleReadingScreen(
                     val card = current.cards.firstOrNull { it.lemma == lemma || it.cardId == lemma }
                     AssistChip(
                         onClick = {
-                            if (card != null) onOpenCard(card) else onOpenDictionaryPlaceholder()
+                            if (card != null) onOpenCard(card) else onOpenDictionary(lemma)
                         },
                         label = { Text(lemma) },
                         modifier = Modifier.testTag("article_uncovered_$lemma"),
@@ -256,7 +265,7 @@ private fun HighlightedEnglish(
     highlights: List<com.example.englishlearning.reading.WordHighlight>,
     cards: List<WordCard>,
     onOpenCard: (WordCard) -> Unit,
-    onOpenDictionaryPlaceholder: () -> Unit,
+    onOpenDictionary: (String) -> Unit,
 ) {
     val annotated = buildAnnotatedString {
         var cursor = 0
@@ -277,7 +286,7 @@ private fun HighlightedEnglish(
         onClick = { offset ->
             val hit = highlights.firstOrNull { offset in it.start until it.end } ?: return@ClickableText
             val card = cards.firstOrNull { it.cardId == hit.cardId || it.lemma == hit.lemma }
-            if (card != null) onOpenCard(card) else onOpenDictionaryPlaceholder()
+            if (card != null) onOpenCard(card) else onOpenDictionary(hit.matched.ifBlank { hit.lemma })
         },
     )
 }
