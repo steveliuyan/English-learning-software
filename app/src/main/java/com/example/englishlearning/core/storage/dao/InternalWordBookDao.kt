@@ -15,4 +15,7 @@ internal interface InternalWordBookDao {
 
     @Upsert
     suspend fun upsert(wordBook: WordBookEntity)
+
+    @Query("DELETE FROM word_books WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

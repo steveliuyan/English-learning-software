@@ -113,6 +113,8 @@ fun SettingsScreen(
     onExportWordBook: () -> Unit = {},
     /** 已导入的词书册数，决定导出副标题与可点性。 */
     importedBookCount: Int = 0,
+    /** 导入/导出进行中：入口置灰，避免重复拉起文件选择器。 */
+    transferBusy: Boolean = false,
     /** 导入/导出的一句结果提示，`null` 时不占位。 */
     transferMessage: String? = null,
 ) {
@@ -213,23 +215,29 @@ fun SettingsScreen(
         SettingsGroup(title = "词书内容包", tag = "settings_group_word_books") {
             SettingsActionRow(
                 title = "导入词书",
-                subtitle = "选择 `.wbpack` 文件，校验通过后加入本机词书",
+                subtitle = if (transferBusy) {
+                    "正在处理，请稍候…"
+                } else {
+                    "选择 `.wbpack` 文件，校验通过后加入本机词书"
+                },
                 tag = "settings_import_word_book",
                 onClick = onImportWordBook,
                 badge = "↓",
                 accent = DomainColors.Library,
+                enabled = !transferBusy,
             )
             SettingsActionRow(
                 title = "导出词书",
-                subtitle = if (importedBookCount > 0) {
-                    "已导入 $importedBookCount 册，导出为 `.wbpack` 分享给别的设备"
-                } else {
-                    "先导入一册词书后才能导出"
+                subtitle = when {
+                    transferBusy -> "正在处理，请稍候…"
+                    importedBookCount > 0 -> "已导入 $importedBookCount 册，导出为 `.wbpack` 分享给别的设备"
+                    else -> "先导入一册词书后才能导出"
                 },
                 tag = "settings_export_word_book",
                 onClick = onExportWordBook,
                 badge = "↑",
                 accent = DomainColors.Library,
+                enabled = !transferBusy && importedBookCount > 0,
             )
             transferMessage?.let { message ->
                 Text(
@@ -278,6 +286,7 @@ private fun SettingsActionRow(
     onClick: () -> Unit,
     badge: String? = null,
     accent: DomainAccent? = null,
+    enabled: Boolean = true,
 ) {
     val domainStyled = badge != null && accent != null
     val interaction = remember { MutableInteractionSource() }
@@ -287,12 +296,14 @@ private fun SettingsActionRow(
             .padding(vertical = 8.dp)
             .testTag(tag)
             .then(
-                if (domainStyled) {
+                if (enabled && domainStyled) {
                     Modifier
                         .pressableScale(interaction)
                         .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                } else {
+                } else if (enabled) {
                     Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
                 },
             )
             .semantics { contentDescription = title },
@@ -312,7 +323,7 @@ private fun SettingsActionRow(
                 title,
                 style = if (domainStyled) AppType.Title else MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MintPrimaryDark,
+                color = if (enabled) MintPrimaryDark else MintTextMuted,
             )
             Text(
                 subtitle,

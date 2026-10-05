@@ -81,7 +81,7 @@ class WordAiQaViewModelTest {
         var failSave = false
         override suspend fun save(note: WordAiNote): Result<Unit> =
             if (failSave) Result.failure(IllegalStateException("closed")) else Result.success(Unit).also { saved += note }
-        override suspend fun list(profileId: String, lemma: String): Result<List<WordAiNote>> = Result.success(saved)
+        override suspend fun list(profileId: String, lemma: String, wordBookId: String, cardId: String): Result<List<WordAiNote>> = Result.success(saved)
     }
 
     /** 构造真实用例 + 内存笔记库；transport/resolver 行为可由测试改写。 */
@@ -211,6 +211,43 @@ class WordAiQaViewModelTest {
 
         assertEquals(WordAiQaUiState.Idle, viewModel.uiState.value)
         assertEquals(0, transport.sends)
+    }
+
+    @Test
+    fun personalNoteSaveReportsSuccessAndKeepsCardIdentity() = runTest(dispatcher) {
+        val (viewModel, _, notes) = viewModel()
+
+        viewModel.loadNotes("default", "apple", "book-a", "card-a")
+        viewModel.savePersonalNote("apple", "记忆方法", "book-a", "card-a")
+        advanceUntilIdle()
+
+        assertEquals(PersonalNoteSaveStatus.Saved, viewModel.personalNoteSaveStatus.value)
+        assertEquals("book-a", notes.saved.single().wordBookId)
+        assertEquals("card-a", notes.saved.single().cardId)
+    }
+
+    @Test
+    fun failedPersonalNoteSaveReportsFailure() = runTest(dispatcher) {
+        val notes = RecordingNotes().apply { failSave = true }
+        val (viewModel, _, _) = viewModel(notes = notes)
+
+        viewModel.loadNotes("default", "apple", "book-a", "card-a")
+        viewModel.savePersonalNote("apple", "记忆方法", "book-a", "card-a")
+        advanceUntilIdle()
+
+        assertEquals(PersonalNoteSaveStatus.Failed, viewModel.personalNoteSaveStatus.value)
+    }
+
+    @Test
+    fun loadingAnotherCardCannotBeOverwrittenByOlderNotesRequest() = runTest(dispatcher) {
+        val notes = RecordingNotes()
+        val (viewModel, _, _) = viewModel(notes = notes)
+
+        viewModel.loadNotes("default", "apple", "book-a", "card-a")
+        viewModel.loadNotes("default", "apple", "book-b", "card-b")
+        advanceUntilIdle()
+
+        assertTrue(viewModel.savedNotes.value.all { it.wordBookId == "book-b" && it.cardId == "card-b" })
     }
 
     @Test

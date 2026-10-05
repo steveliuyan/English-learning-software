@@ -91,6 +91,10 @@ class SetupScreenScreenshotTest {
             selectWordBook = SelectWordBookAndSetDailyTargetUseCase(repository),
             getSettings = GetLearningSettingsUseCase(settingsRepo),
             saveSettings = SaveLearningSettingsUseCase(settingsRepo),
+            // 这三册是测试种子里的「内置册」，不声明就会被可见性策略过滤掉。
+            bundledIds = com.example.englishlearning.learning.BundledWordBookIdSource {
+                setOf("cet4", "cet6", "kaoyan")
+            },
         )
     }
 

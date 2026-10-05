@@ -13,9 +13,10 @@ data class LearningSettings(
     val openDetailOnKnown: Boolean,
     val openDetailOnFuzzy: Boolean,
     val openDetailOnForgotten: Boolean,
+    val showVocabularySearchCount: Boolean = true,
 ) {
     companion object {
-        fun defaults(profileId: String) = LearningSettings(profileId, false, true, true)
+        fun defaults(profileId: String) = LearningSettings(profileId, false, true, true, true)
     }
 }
 
@@ -53,8 +54,8 @@ class RoomLearningSettingsRepository(
         }
 
     private fun LearningSettingsEntity.toDomain() =
-        LearningSettings(profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten)
+        LearningSettings(profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten, showVocabularySearchCount)
 
     private fun LearningSettings.toEntity() =
-        LearningSettingsEntity(profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten)
+        LearningSettingsEntity(profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten, showVocabularySearchCount)
 }

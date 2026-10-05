@@ -2,6 +2,8 @@ package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.CardFeedback
+import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -50,6 +53,7 @@ fun WordCardScreen(
     onSpeak: (String) -> Unit = {},
     pronunciationMessage: String? = null,
     onRetry: () -> Unit = {},
+    onStartNewPhase: () -> Unit = {},
     onBackToPlan: () -> Unit = {},
 ) {
     Column(
@@ -93,6 +97,31 @@ fun WordCardScreen(
                 BackToPlanButton(onBackToPlan)
             }
 
+            is WordCardUiState.ReviewCompleted -> {
+                Text(
+                    text = "到期复习已完成",
+                    color = DomainColors.Review.deep,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.testTag("word_card_review_completed"),
+                )
+                Text(
+                    "已完成复习 ${state.reviewCompleted}/${state.reviewTotal}，接下来学习 ${state.newTotal} 个新增词",
+                    color = MintTextMuted,
+                    modifier = Modifier.testTag("word_card_phase_transition"),
+                )
+                Button(
+                    onClick = onStartNewPhase,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("word_card_start_new_phase")
+                        .semantics { contentDescription = "开始学习新增词" },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                ) { Text("开始学习新增词", fontWeight = FontWeight.Bold) }
+                BackToPlanButton(onBackToPlan)
+            }
+
             is WordCardUiState.AllDone -> {
                 Text(
                     text = "今天的词卡都提交完了",
@@ -101,6 +130,11 @@ fun WordCardScreen(
                     modifier = Modifier.testTag("word_card_all_done"),
                 )
                 Text("共完成 ${state.completedCount} / ${state.total} 张", color = MintTextMuted)
+                Text(
+                    "复习 ${state.reviewCompleted}/${state.reviewTotal} · 新增 ${state.newCompleted}/${state.newTotal}",
+                    color = MintTextMuted,
+                    modifier = Modifier.testTag("word_card_completion_breakdown"),
+                )
                 BackToPlanButton(onBackToPlan)
             }
 
@@ -112,6 +146,19 @@ fun WordCardScreen(
                     modifier = Modifier
                         .testTag("word_card_progress")
                         .semantics { contentDescription = "第 ${state.position} 张，共 ${state.total} 张" },
+                )
+                Text(
+                    text = if (state.isReview) {
+                        "到期复习 ${state.taskCompletedCount}/${state.taskTotal}"
+                    } else {
+                        "今日新增 ${state.taskCompletedCount}/${state.taskTotal}"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (state.isReview) DomainColors.Review.deep else DomainColors.Learn.deep,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .testTag("word_card_task_type")
+                        .semantics { contentDescription = if (state.isReview) "到期复习" else "今日新增" },
                 )
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MintSurface),
@@ -157,12 +204,51 @@ fun WordCardScreen(
                                 .testTag("word_card_meaning")
                                 .semantics { contentDescription = "释义 ${state.card.meaningZh}" },
                         )
-                        androidx.compose.material3.TextButton(
-                            onClick = { onSpeak(state.card.lemma) },
+                        Canvas(
                             modifier = Modifier
+                                .size(48.dp)
                                 .testTag("word_card_speak")
-                                .semantics { contentDescription = "播放 ${state.card.lemma} 发音" },
-                        ) { Text("播放发音") }
+                                .semantics { contentDescription = "播放 ${state.card.lemma} 发音" }
+                                .clickable { onSpeak(state.card.lemma) },
+                        ) {
+                            val left = size.width * 0.18f
+                            val right = size.width * 0.48f
+                            val top = size.height * 0.34f
+                            val bottom = size.height * 0.66f
+                            drawRect(
+                                color = MintPrimary,
+                                topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                                size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                            )
+                            drawPath(
+                                path = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(right, top)
+                                    lineTo(size.width * 0.72f, size.height * 0.22f)
+                                    lineTo(size.width * 0.72f, size.height * 0.78f)
+                                    lineTo(right, bottom)
+                                    close()
+                                },
+                                color = MintPrimary,
+                            )
+                            drawArc(
+                                color = MintPrimary,
+                                startAngle = -42f,
+                                sweepAngle = 84f,
+                                useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
+                                topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.54f, size.height * 0.28f),
+                                size = androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.44f),
+                            )
+                            drawArc(
+                                color = MintPrimary,
+                                startAngle = -38f,
+                                sweepAngle = 76f,
+                                useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
+                                topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.60f, size.height * 0.14f),
+                                size = androidx.compose.ui.geometry.Size(size.width * 0.42f, size.height * 0.72f),
+                            )
+                        }
                         state.card.example?.let { example ->
                             Text(
                                 text = example,

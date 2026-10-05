@@ -530,7 +530,7 @@ class AppScreenTest {
         })
         val notes = object : WordAiNoteRepository {
             override suspend fun save(note: WordAiNote) = Result.success(Unit)
-            override suspend fun list(profileId: String, lemma: String) = Result.success(emptyList<WordAiNote>())
+            override suspend fun list(profileId: String, lemma: String, wordBookId: String, cardId: String) = Result.success(emptyList<WordAiNote>())
         }
         return WordAiQaViewModel(
             WordQaUseCase(DefaultTextProfileResolver { selection }, secrets, transport),
@@ -1027,6 +1027,8 @@ class AppScreenTest {
             SelectWordBookAndSetDailyTargetUseCase(repository),
             GetLearningSettingsUseCase(settingsRepo),
             SaveLearningSettingsUseCase(settingsRepo),
+            // `test-book` 是种子里的内置册，不声明就会被可见性策略过滤掉。
+            bundledIds = com.example.englishlearning.learning.BundledWordBookIdSource { setOf("test-book") },
         )
     }
 

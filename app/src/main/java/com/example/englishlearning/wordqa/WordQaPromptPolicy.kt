@@ -15,6 +15,9 @@ enum class WordQaKind(val label: String) {
 
     /** 谐音 / 词根记忆法。 */
     Mnemonic("谐音记忆"),
+
+    /** 本地个人笔记，不参与 AI 问答。 */
+    Personal("个人笔记"),
 }
 
 /** 一次词问答的全部输入。字段是终态值，提示词只由它决定（纯函数）。 */
@@ -45,6 +48,7 @@ object WordQaPromptPolicy {
                     WordQaKind.Sentence -> "请用单词「$lemma」造两个例句，并给出每个例句的中文翻译。"
                     WordQaKind.Breakdown -> "请辨析单词「$lemma」最易混淆的近义词，说明差异并各给一个例句。"
                     WordQaKind.Mnemonic -> "请为单词「$lemma」提供词根拆解或谐音记忆法，帮助快速记住词义。"
+                    WordQaKind.Personal -> error("personal notes do not use AI prompts")
                 })
                 request.context?.trim()?.takeIf { it.isNotEmpty() }?.let { context ->
                     append("这个词出现在这段话里：")

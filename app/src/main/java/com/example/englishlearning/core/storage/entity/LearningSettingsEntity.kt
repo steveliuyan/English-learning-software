@@ -9,4 +9,5 @@ data class LearningSettingsEntity(
     val openDetailOnKnown: Boolean,
     val openDetailOnFuzzy: Boolean,
     val openDetailOnForgotten: Boolean,
+    val showVocabularySearchCount: Boolean = true,
 )

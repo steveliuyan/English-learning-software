@@ -14,6 +14,19 @@ internal data class PlanCardFeedbackRow(
     val feedback: String,
 )
 
+internal data class LearningRecordEventRow(
+    val planId: String,
+    val cardId: String,
+    val feedback: String,
+    val occurredAtEpochMillis: Long,
+    val localDate: String,
+)
+
+internal data class ReviewStateRow(
+    val cardId: String,
+    val nextReviewAtEpochMillis: Long,
+)
+
 /**
  * Append-only access to the learning event log (spec F1-03).
  *
@@ -31,6 +44,24 @@ internal interface InternalLearningEventDao {
 
     @Query("SELECT * FROM learning_events WHERE eventId = :eventId LIMIT 1")
     suspend fun findEvent(eventId: String): LearningEventEntity?
+
+    @Query("SELECT e.planId AS planId, e.cardId AS cardId, e.feedback AS feedback, e.occurredAtEpochMillis AS occurredAtEpochMillis, p.localDate AS localDate FROM learning_events e INNER JOIN today_plans p ON p.planId = e.planId WHERE e.profileId = :profileId AND e.planId = :planId ORDER BY e.occurredAtEpochMillis ASC")
+    suspend fun todayRecords(profileId: String, planId: String): List<LearningRecordEventRow>
+
+    @Query("SELECT e.planId AS planId, e.cardId AS cardId, e.feedback AS feedback, e.occurredAtEpochMillis AS occurredAtEpochMillis, p.localDate AS localDate FROM learning_events e INNER JOIN today_plans p ON p.planId = e.planId WHERE e.profileId = :profileId ORDER BY p.localDate DESC, e.occurredAtEpochMillis ASC")
+    suspend fun historyRecords(profileId: String): List<LearningRecordEventRow>
+
+    @Query("SELECT cardId, nextReviewAtEpochMillis FROM card_review_states WHERE wordBookId = :wordBookId")
+    suspend fun reviewStates(wordBookId: String): List<ReviewStateRow>
+
+    @Query("SELECT * FROM card_review_states WHERE wordBookId = :wordBookId")
+    suspend fun fullReviewStates(wordBookId: String): List<CardReviewStateEntity>
+
+    @Query("DELETE FROM card_review_states WHERE wordBookId = :wordBookId")
+    suspend fun deleteReviewStates(wordBookId: String)
+
+    @Query("DELETE FROM learning_events WHERE wordBookId = :wordBookId")
+    suspend fun deleteEvents(wordBookId: String)
 
     @Query("SELECT COUNT(*) FROM learning_events WHERE planId = :planId AND cardId = :cardId")
     suspend fun countEventsForCard(planId: String, cardId: String): Int
@@ -65,6 +96,9 @@ internal interface InternalLearningEventDao {
 
     @Upsert
     suspend fun upsertCardState(state: CardReviewStateEntity)
+
+    @Query("SELECT * FROM card_review_states WHERE cardId = :cardId LIMIT 1")
+    suspend fun findCardStateByCardId(cardId: String): CardReviewStateEntity?
 
     @Transaction
     suspend fun appendEvent(event: LearningEventEntity, next: CardReviewStateEntity): Long {

@@ -12,8 +12,11 @@ internal interface InternalWordAiNoteDao {
     suspend fun insert(note: WordAiNoteEntity)
 
     @Query(
-        "SELECT * FROM word_ai_notes WHERE profileId = :profileId AND lemma = :lemma " +
-            "ORDER BY createdAtEpochMillis DESC",
+        "SELECT * FROM word_ai_notes WHERE profileId = :profileId AND wordBookId = :wordBookId " +
+            "AND cardId = :cardId AND lemma = :lemma ORDER BY createdAtEpochMillis DESC",
     )
-    suspend fun findForLemma(profileId: String, lemma: String): List<WordAiNoteEntity>
+    suspend fun findForCard(profileId: String, wordBookId: String, cardId: String, lemma: String): List<WordAiNoteEntity>
+
+    @Query("DELETE FROM word_ai_notes WHERE wordBookId = :wordBookId")
+    suspend fun deleteForWordBook(wordBookId: String)
 }

@@ -12,4 +12,7 @@ internal interface InternalLearningProfileDao {
 
     @Upsert
     suspend fun upsert(profile: LearningProfileEntity)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM learning_profiles WHERE profileId = :profileId AND activeWordBookId = :wordBookId)")
+    suspend fun isActiveWordBook(profileId: String, wordBookId: String): Boolean
 }

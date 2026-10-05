@@ -17,6 +17,16 @@ import kotlin.test.assertTrue
 class AppScreenProductionWiringTest {
 
     @Test
+    fun `learning records ViewModel is registered with Hilt`() {
+        val viewModelSource = projectFile("src/main/java/com/example/englishlearning/ui/LearningRecordsViewModel.kt").readText()
+
+        assertTrue(
+            Regex("""@HiltViewModel\s+class LearningRecordsViewModel""").containsMatchIn(viewModelSource),
+            "LearningRecordsViewModel must be registered with Hilt to avoid the default zero-argument factory",
+        )
+    }
+
+    @Test
     fun `every optional AppScreen parameter is supplied by the production host`() {
         val appScreenSource = projectFile("src/main/java/com/example/englishlearning/ui/AppScreen.kt").readText()
         val mainActivitySource = projectFile("src/main/java/com/example/englishlearning/MainActivity.kt").readText()

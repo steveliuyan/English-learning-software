@@ -36,6 +36,13 @@ internal fun wordCardFixtureViewModel(
         submitFeedback = SubmitCardFeedbackUseCase(events, FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)),
         eventIds = EventIdFactory { "event-1" },
         settings = NoopLearningSettingsRepository(),
+        vocabulary = object : com.example.englishlearning.learning.VocabularyRepository {
+            override suspend fun add(profileId: String, wordBookId: String, cardId: String, feedback: String, addedAt: Instant) = Unit
+            override suspend fun remove(profileId: String, wordBookId: String, cardId: String) = Unit
+            override suspend fun contains(profileId: String, wordBookId: String, cardId: String) = false
+            override suspend fun list(profileId: String, wordBookId: String?) = RepositoryResult.Success(emptyList<com.example.englishlearning.learning.VocabularyEntry>())
+        },
+        clock = FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC),
     )
 }
 

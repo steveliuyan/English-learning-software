@@ -18,6 +18,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+enum class PersonalNoteSaveStatus {
+    Idle,
+    Saving,
+    Saved,
+    Failed,
+}
+
 sealed interface WordAiQaUiState {
     /** 初始态：三个固定问题 chips 可点。 */
     data object Idle : WordAiQaUiState
@@ -62,8 +69,14 @@ class WordAiQaViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<WordAiQaUiState>(WordAiQaUiState.Idle)
     val uiState: StateFlow<WordAiQaUiState> = _uiState
+    private val _savedNotes = MutableStateFlow<List<WordAiNote>>(emptyList())
+    val savedNotes: StateFlow<List<WordAiNote>> = _savedNotes
+    private val _personalNoteSaveStatus = MutableStateFlow(PersonalNoteSaveStatus.Idle)
+    val personalNoteSaveStatus: StateFlow<PersonalNoteSaveStatus> = _personalNoteSaveStatus
 
     private var profileId: String = ""
+    private var wordBookId: String = ""
+    private var cardId: String = ""
     private var pendingRequest: WordQaRequest? = null
     private var lastAnswer: Pair<WordQaKind, String>? = null
 
@@ -71,7 +84,59 @@ class WordAiQaViewModel @Inject constructor(
     fun reset() {
         pendingRequest = null
         lastAnswer = null
+        _savedNotes.value = emptyList()
+        _personalNoteSaveStatus.value = PersonalNoteSaveStatus.Idle
         _uiState.value = WordAiQaUiState.Idle
+    }
+
+    fun savePersonalNote(lemma: String, text: String, wordBookId: String = this.wordBookId, cardId: String = this.cardId) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        this.wordBookId = wordBookId
+        this.cardId = cardId
+        _personalNoteSaveStatus.value = PersonalNoteSaveStatus.Saving
+        viewModelScope.launch {
+            notes.save(
+                WordAiNote(
+                    noteId = noteIds.newId(),
+                    profileId = profileId,
+                    wordBookId = wordBookId,
+                    cardId = cardId,
+                    lemma = lemma,
+                    kind = WordQaKind.Personal,
+                    answer = trimmed,
+                    createdAtEpochMillis = clock.instant().toEpochMilli(),
+                ),
+            ).onSuccess {
+                _personalNoteSaveStatus.value = PersonalNoteSaveStatus.Saved
+                loadNotes(profileId, lemma, wordBookId, cardId)
+            }.onFailure {
+                _personalNoteSaveStatus.value = PersonalNoteSaveStatus.Failed
+            }
+        }
+    }
+
+    fun loadNotes(profileId: String, lemma: String, wordBookId: String = "", cardId: String = "") {
+        val identityChanged = this.profileId != profileId ||
+            this.wordBookId != wordBookId ||
+            this.cardId != cardId
+        this.profileId = profileId
+        this.wordBookId = wordBookId
+        this.cardId = cardId
+        if (identityChanged) {
+            _savedNotes.value = emptyList()
+            _personalNoteSaveStatus.value = PersonalNoteSaveStatus.Idle
+        }
+        viewModelScope.launch {
+            notes.list(profileId, lemma, wordBookId, cardId).onSuccess { loaded ->
+                if (this@WordAiQaViewModel.profileId == profileId &&
+                    this@WordAiQaViewModel.wordBookId == wordBookId &&
+                    this@WordAiQaViewModel.cardId == cardId
+                ) {
+                    _savedNotes.value = loaded
+                }
+            }
+        }
     }
 
     fun ask(kind: WordQaKind, lemma: String, context: String?, profileId: String) {
@@ -109,6 +174,8 @@ class WordAiQaViewModel @Inject constructor(
                 WordAiNote(
                     noteId = noteIds.newId(),
                     profileId = profileId,
+                    wordBookId = wordBookId,
+                    cardId = cardId,
                     lemma = request.lemma,
                     kind = kind,
                     answer = text,
@@ -117,6 +184,7 @@ class WordAiQaViewModel @Inject constructor(
             )
             // 仅当用户还停留在同一条回答上才更新可见状态；期间换问法的结果不被覆盖。
             if (_uiState.value is WordAiQaUiState.Answered && lastAnswer == answer) {
+                if (result.isSuccess) loadNotes(profileId, request.lemma, wordBookId, cardId)
                 _uiState.value = if (result.isSuccess) {
                     answered.copy(saved = true, saveFailed = false)
                 } else {

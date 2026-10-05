@@ -1,12 +1,16 @@
 package com.example.englishlearning.learning.domain
 
+import kotlinx.serialization.Serializable
+
 /** 一条按词性分组的释义（参考竞品词详情页：一词多词性多条）。 */
+@Serializable
 data class WordSense(
     val partOfSpeech: String,
     val meaningZh: String,
 )
 
 /** 派生词（如 surf → surfer / surfing）。 */
+@Serializable
 data class DerivedWord(
     val lemma: String,
     val partOfSpeech: String,
@@ -14,12 +18,14 @@ data class DerivedWord(
 )
 
 /** 常见关联短语（如 surf the Internet）。 */
+@Serializable
 data class PhraseEntry(
     val text: String,
     val meaningZh: String,
 )
 
 /** 近义词（如 surf → breaker）。 */
+@Serializable
 data class RelatedWord(
     val lemma: String,
     val partOfSpeech: String,
@@ -39,6 +45,7 @@ data class RelatedWord(
  * [imagePath] 是**已落盘图片的绝对路径**（词书包导入后位于应用私有目录），
  * 不是文件名——渲染方直接读文件，不需要知道包结构，也不会碰网络。
  */
+@Serializable
 data class WordCard(
     val cardId: String,
     val wordBookId: String,

@@ -2,6 +2,7 @@ package com.example.englishlearning.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.englishlearning.core.time.ClockProvider
 import com.example.englishlearning.learning.EventIdFactory
 import com.example.englishlearning.learning.LearningEventRepository
 import com.example.englishlearning.learning.RepositoryResult
@@ -11,6 +12,7 @@ import com.example.englishlearning.learning.SubmitFeedbackResult
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
 import com.example.englishlearning.learning.WordCardSource
+import com.example.englishlearning.learning.VocabularyRepository
 import com.example.englishlearning.learning.LearningSettings
 import com.example.englishlearning.learning.LearningSettingsRepository
 import com.example.englishlearning.learning.LearningSettingsRepositoryResult
@@ -33,10 +35,26 @@ sealed interface WordCardUiState {
         val completedCount: Int,
         val submitting: Boolean,
         val message: String?,
+        val isReview: Boolean = false,
+        val taskCompletedCount: Int = 0,
+        val taskTotal: Int = 0,
     ) : WordCardUiState
 
     /** Every card of the session has a recorded feedback; unlocking is F1-04's concern. */
-    data class AllDone(val total: Int, val completedCount: Int) : WordCardUiState
+    data class AllDone(
+        val total: Int,
+        val completedCount: Int,
+        val reviewTotal: Int = 0,
+        val reviewCompleted: Int = 0,
+        val newTotal: Int = 0,
+        val newCompleted: Int = 0,
+    ) : WordCardUiState
+
+    data class ReviewCompleted(
+        val reviewTotal: Int,
+        val reviewCompleted: Int,
+        val newTotal: Int,
+    ) : WordCardUiState
 
     data object NoCards : WordCardUiState
 
@@ -62,6 +80,8 @@ class WordCardViewModel @Inject constructor(
     private val submitFeedback: SubmitCardFeedbackUseCase,
     private val eventIds: EventIdFactory,
     private val settings: LearningSettingsRepository,
+    private val vocabulary: VocabularyRepository,
+    private val clock: ClockProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<WordCardUiState>(WordCardUiState.Loading)
     val uiState: StateFlow<WordCardUiState> = _uiState
@@ -87,6 +107,13 @@ class WordCardViewModel @Inject constructor(
                 -> _uiState.value = WordCardUiState.Unavailable
             }
         }
+    }
+
+    fun startNewPhase() {
+        val current = session ?: return
+        if (current.phase != SessionPhase.REVIEW || current.reviewCardIds.any { it !in current.completed }) return
+        current.phase = SessionPhase.NEW
+        emit(current)
     }
 
     fun submit(feedback: CardFeedback) {
@@ -117,6 +144,9 @@ class WordCardViewModel @Inject constructor(
                 is SubmitFeedbackResult.AlreadyRecorded,
                 -> {
                     pendingEventId = null
+                    if (feedback == CardFeedback.Unknown) {
+                        vocabulary.add(current.profileId, current.wordBookId, card.cardId, "Again", clock.instant())
+                    }
                     current.completed += card.cardId
                     emit(current)
                     // Only after the local event is written and the completion set is updated do we
@@ -157,6 +187,34 @@ class WordCardViewModel @Inject constructor(
         _detailCard.value = null
     }
 
+    /** Whether the current detail overlay has another card in the same learning phase. */
+    fun hasNextDetail(): Boolean {
+        val currentCard = _detailCard.value ?: return false
+        val currentSession = session ?: return false
+        val phaseCards = currentSession.cards.filter { card ->
+            when (currentSession.phase) {
+                SessionPhase.REVIEW -> card.cardId in currentSession.reviewCardIds
+                SessionPhase.NEW -> card.cardId in currentSession.newCardIds
+            }
+        }
+        val currentIndex = phaseCards.indexOfFirst { it.cardId == currentCard.cardId }
+        return currentIndex >= 0 && currentIndex + 1 < phaseCards.size
+    }
+
+    /** Opens the next card in the current learning phase without changing learning progress. */
+    fun nextDetail() {
+        val currentCard = _detailCard.value ?: return
+        val currentSession = session ?: return
+        val phaseCards = currentSession.cards.filter { card ->
+            when (currentSession.phase) {
+                SessionPhase.REVIEW -> card.cardId in currentSession.reviewCardIds
+                SessionPhase.NEW -> card.cardId in currentSession.newCardIds
+            }
+        }
+        val nextIndex = phaseCards.indexOfFirst { it.cardId == currentCard.cardId } + 1
+        _detailCard.value = phaseCards.getOrNull(nextIndex)
+    }
+
     private suspend fun startSession(profileId: String, plan: TodayPlan) {
         val completed =
             when (val stored = events.completedCardIds(plan.planId)) {
@@ -166,8 +224,10 @@ class WordCardViewModel @Inject constructor(
                     return
                 }
             }
-        // Due cards first: overdue reviews must not be crowded out by new ones.
-        val cards = content.cards((plan.dueCardIds + plan.newCardIds).distinct())
+        // Keep review and new cards as separate phases: review must be explicitly completed first.
+        val dueIds = plan.dueCardIds.distinct()
+        val newIds = plan.newCardIds.filterNot { it in dueIds }.distinct()
+        val cards = content.cards((dueIds + newIds).distinct())
         if (cards.isEmpty()) {
             _uiState.value = WordCardUiState.NoCards
             return
@@ -179,27 +239,59 @@ class WordCardViewModel @Inject constructor(
                 wordBookId = plan.activeWordBookId,
                 cards = cards,
                 completed = completed.toMutableSet(),
+                dueCardIds = dueIds.toSet(),
+                reviewCardIds = dueIds.toSet(),
+                newCardIds = newIds.toSet(),
+                phase = if (dueIds.any { it !in completed }) SessionPhase.REVIEW else SessionPhase.NEW,
             )
         session = started
         emit(started)
     }
 
     private fun emit(current: Session, message: String? = null) {
-        val index = current.cards.indexOfFirst { it.cardId !in current.completed }
-        _uiState.value =
-            if (index < 0) {
-                WordCardUiState.AllDone(total = current.cards.size, completedCount = current.completed.size)
-            } else {
+        val phaseCards = current.cards.filter { card ->
+            when (current.phase) {
+                SessionPhase.REVIEW -> card.cardId in current.reviewCardIds
+                SessionPhase.NEW -> card.cardId in current.newCardIds
+            }
+        }
+        val index = phaseCards.indexOfFirst { it.cardId !in current.completed }
+        _uiState.value = when {
+            index >= 0 -> {
+                val card = phaseCards[index]
                 WordCardUiState.Ready(
-                    card = current.cards[index],
+                    card = card,
                     position = index + 1,
-                    total = current.cards.size,
-                    completedCount = current.completed.size,
+                    total = phaseCards.size,
+                    completedCount = current.completed.count { it in phaseCards.map(WordCard::cardId) },
                     submitting = false,
                     message = message,
+                    isReview = current.phase == SessionPhase.REVIEW,
+                    taskCompletedCount = phaseCards.count { it.cardId in current.completed },
+                    taskTotal = phaseCards.size,
                 )
             }
+            current.phase == SessionPhase.REVIEW && current.newCardIds.isNotEmpty() -> {
+                WordCardUiState.ReviewCompleted(
+                    reviewTotal = current.reviewCardIds.size,
+                    reviewCompleted = current.reviewCardIds.count { it in current.completed },
+                    newTotal = current.newCardIds.size,
+                )
+            }
+            else -> {
+                WordCardUiState.AllDone(
+                    total = current.cards.size,
+                    completedCount = current.completed.intersect(current.cards.map(WordCard::cardId).toSet()).size,
+                    reviewTotal = current.reviewCardIds.size,
+                    reviewCompleted = current.reviewCardIds.count { it in current.completed },
+                    newTotal = current.newCardIds.size,
+                    newCompleted = current.newCardIds.count { it in current.completed },
+                )
+            }
+        }
     }
+
+    private enum class SessionPhase { REVIEW, NEW }
 
     private class Session(
         val profileId: String,
@@ -207,6 +299,10 @@ class WordCardViewModel @Inject constructor(
         val wordBookId: String,
         val cards: List<WordCard>,
         val completed: MutableSet<String>,
+        val dueCardIds: Set<String>,
+        val reviewCardIds: Set<String>,
+        val newCardIds: Set<String>,
+        var phase: SessionPhase,
     )
 
     private companion object {

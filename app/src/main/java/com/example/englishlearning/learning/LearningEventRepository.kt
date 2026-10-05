@@ -47,4 +47,17 @@ interface LearningEventRepository {
 
     /** Cards of [wordBookId] whose derived schedule is due at or before [now], earliest first. */
     suspend fun dueCardIds(wordBookId: String, now: Instant): RepositoryResult<List<String>>
+
+    suspend fun reviewedStates(wordBookId: String): RepositoryResult<List<CardReviewState>> =
+        RepositoryResult.Success(emptyList())
+
+    suspend fun upsertReviewState(state: CardReviewState): RepositoryResult<Unit> =
+        RepositoryResult.Success(Unit)
+
+    suspend fun migrateReviewStates(
+        profileId: String,
+        sourceBookId: String,
+        targetBookId: String,
+        candidates: List<ProgressMigrationCandidate>,
+    ): RepositoryResult<Int> = RepositoryResult.Success(candidates.size)
 }

@@ -1,8 +1,10 @@
 package com.example.englishlearning.ui
 
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,7 +25,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,11 +48,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.englishlearning.learning.domain.WordCard
+import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
+import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
@@ -68,11 +77,17 @@ fun CardDetailScreen(
     card: WordCard,
     onBack: () -> Unit,
     onSpeak: () -> Unit = {},
-    onRelearn: () -> Unit = {},
+    onRelearn: (() -> Unit)? = null,
+    onNext: (() -> Unit)? = null,
+    vocabularyPresent: Boolean? = null,
+    onToggleVocabulary: (() -> Unit)? = null,
     // 安全边界：详情页只收无字段的发音状态枚举，固定文案由本屏映射——
     // 任意字符串（含潜在敏感内容）无法从调用方塞进详情页。
     pronunciationStatus: PronunciationStatus = PronunciationStatus.Idle,
-    onAskAi: () -> Unit = {},
+    onAskAi: (() -> Unit)? = null,
+    notes: List<WordAiNote> = emptyList(),
+    onSavePersonalNote: ((String) -> Unit)? = null,
+    personalNoteSaveStatus: PersonalNoteSaveStatus = PersonalNoteSaveStatus.Idle,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -106,7 +121,13 @@ fun CardDetailScreen(
             pronunciationStatus = pronunciationStatus,
             onSpeak = onSpeak,
             onRelearn = onRelearn,
+            onNext = onNext,
+            vocabularyPresent = vocabularyPresent,
+            onToggleVocabulary = onToggleVocabulary,
             onAskAi = onAskAi,
+            notes = notes,
+            onSavePersonalNote = onSavePersonalNote,
+            personalNoteSaveStatus = personalNoteSaveStatus,
         )
 
         // 配图优先用词书包导入的真实文件（`imagePath`）；没有才回退到内置 drawable 映射。
@@ -184,8 +205,14 @@ private fun WordHeroCard(
     card: WordCard,
     pronunciationStatus: PronunciationStatus,
     onSpeak: () -> Unit,
-    onRelearn: () -> Unit,
-    onAskAi: () -> Unit,
+    onRelearn: (() -> Unit)?,
+    onNext: (() -> Unit)?,
+    vocabularyPresent: Boolean?,
+    onToggleVocabulary: (() -> Unit)?,
+    onAskAi: (() -> Unit)?,
+    notes: List<WordAiNote>,
+    onSavePersonalNote: ((String) -> Unit)?,
+    personalNoteSaveStatus: PersonalNoteSaveStatus,
 ) {
     DetailCard {
         Text(
@@ -205,7 +232,43 @@ private fun WordHeroCard(
                         .semantics { contentDescription = "音标 ${card.ipa}" },
                 )
             }
-            PillButton(label = "播放发音", description = "播放 ${card.lemma} 发音", onClick = onSpeak)
+            Canvas(
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("card_detail_speak")
+                    .size(48.dp)
+                    .semantics { contentDescription = "播放 ${card.lemma} 发音" }
+                    .clickable { onSpeak() },
+            ) {
+                val left = size.width * 0.18f
+                val right = size.width * 0.48f
+                val top = size.height * 0.34f
+                val bottom = size.height * 0.66f
+                drawRect(
+                    color = MintPrimary,
+                    topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                    size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                )
+                drawPath(
+                    path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(right, top)
+                        lineTo(size.width * 0.72f, size.height * 0.22f)
+                        lineTo(size.width * 0.72f, size.height * 0.78f)
+                        lineTo(right, bottom)
+                        close()
+                    },
+                    color = MintPrimary,
+                )
+                drawArc(
+                    color = MintPrimary,
+                    startAngle = -42f,
+                    sweepAngle = 84f,
+                    useCenter = false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.54f, size.height * 0.28f),
+                    size = androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.44f),
+                )
+            }
         }
         pronunciationStatus.message()?.let { message ->
             Text(
@@ -235,19 +298,95 @@ private fun WordHeroCard(
             )
         }
 
+        if (notes.isNotEmpty() || onSavePersonalNote != null) {
+            DetailSection(title = "我的笔记", tag = "card_detail_notes") {
+                notes.forEach { note ->
+                    Text(note.answer, style = AppType.Body, modifier = Modifier.testTag("card_detail_note_${note.noteId}"))
+                }
+                onSavePersonalNote?.let { save ->
+                    PersonalNoteEditor(onSave = save, saveStatus = personalNoteSaveStatus)
+                }
+            }
+        }
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PillButton(label = "重新学习", description = "重新学习 ${card.lemma}", onClick = onRelearn)
-            PillButton(
-                label = "问 AI",
-                description = "问 AI（${card.lemma}）",
-                onClick = onAskAi,
-                modifier = Modifier.testTag("card_detail_ask_ai"),
-            )
+            if (vocabularyPresent != null && onToggleVocabulary != null) {
+                PillButton(
+                    label = if (vocabularyPresent) "移出生词本" else "加入生词本",
+                    description = if (vocabularyPresent) "移出 ${card.lemma} 生词本" else "加入 ${card.lemma} 生词本",
+                    onClick = onToggleVocabulary,
+                    modifier = Modifier.testTag("card_detail_vocabulary_toggle"),
+                )
+            }
+            onRelearn?.let { callback ->
+                PillButton(label = "重新学习", description = "重新学习 ${card.lemma}", onClick = callback)
+            }
+            onNext?.let { callback ->
+                PillButton(
+                    label = "下一个单词",
+                    description = "查看下一个单词",
+                    onClick = callback,
+                    modifier = Modifier.testTag("card_detail_next"),
+                )
+            }
+            onAskAi?.let { callback ->
+                PillButton(
+                    label = "问 AI",
+                    description = "问 AI（${card.lemma}）",
+                    onClick = callback,
+                    modifier = Modifier.testTag("card_detail_ask_ai"),
+                )
+            }
         }
     }
 }
 
 /** 一条词性释义：词性做成浅绿小标签（深色字，保证对比度），释义用正文深色。 */
+@Composable
+private fun PersonalNoteEditor(
+    onSave: (String) -> Unit,
+    saveStatus: PersonalNoteSaveStatus,
+) {
+    var draft by remember { androidx.compose.runtime.mutableStateOf("") }
+    LaunchedEffect(saveStatus) {
+        if (saveStatus == PersonalNoteSaveStatus.Saved) draft = ""
+    }
+    androidx.compose.material3.OutlinedTextField(
+        value = draft,
+        onValueChange = { draft = it },
+        label = { Text("添加个人笔记") },
+        placeholder = { Text("记录记忆方法、易错点或例句") },
+        minLines = 2,
+        modifier = Modifier.fillMaxWidth().testTag("card_detail_personal_note_input"),
+    )
+    TextButton(
+        onClick = { onSave(draft.trim()) },
+        enabled = draft.isNotBlank() && saveStatus != PersonalNoteSaveStatus.Saving,
+        modifier = Modifier.testTag("card_detail_personal_note_save"),
+    ) {
+        Text(
+            when (saveStatus) {
+                PersonalNoteSaveStatus.Saving -> "保存中…"
+                PersonalNoteSaveStatus.Saved -> "已保存笔记"
+                else -> "保存笔记"
+            },
+        )
+    }
+    when (saveStatus) {
+        PersonalNoteSaveStatus.Failed -> Text(
+            "笔记保存失败，请重试。",
+            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+            modifier = Modifier.testTag("card_detail_personal_note_save_failed"),
+        )
+        PersonalNoteSaveStatus.Saved -> Text(
+            "笔记已保存。",
+            color = MintPrimaryDark,
+            modifier = Modifier.testTag("card_detail_personal_note_saved"),
+        )
+        else -> Unit
+    }
+}
+
 @Composable
 private fun SenseRow(
     partOfSpeech: String,

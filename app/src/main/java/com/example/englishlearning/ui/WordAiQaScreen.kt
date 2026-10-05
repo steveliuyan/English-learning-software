@@ -18,7 +18,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -39,6 +44,7 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.wordqa.WordQaKind
 import com.example.englishlearning.wordqa.WordQaNotConfiguredReason
 
@@ -57,6 +63,8 @@ fun WordAiQaScreen(
     onAsk: (WordQaKind) -> Unit,
     onConfirmOutbound: (Boolean) -> Unit,
     onSaveNote: () -> Unit,
+    onSavePersonalNote: (String) -> Unit = {},
+    savedNotes: List<WordAiNote> = emptyList(),
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -82,6 +90,41 @@ fun WordAiQaScreen(
 
         Text("AI 问词", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
         Text("单词：$lemma", color = MintTextMuted, modifier = Modifier.testTag("word_qa_lemma"))
+
+        var personalNote by remember(lemma) { mutableStateOf("") }
+        OutlinedTextField(
+            value = personalNote,
+            onValueChange = { personalNote = it },
+            label = { Text("我的笔记") },
+            placeholder = { Text("记录记忆方法、易错点或例句") },
+            modifier = Modifier.fillMaxWidth().testTag("word_qa_personal_note"),
+            minLines = 3,
+        )
+        Button(
+            onClick = {
+                onSavePersonalNote(personalNote)
+                personalNote = ""
+            },
+            enabled = personalNote.isNotBlank(),
+            modifier = Modifier.fillMaxWidth().testTag("word_qa_save_personal_note"),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+        ) { Text("保存我的笔记") }
+
+        if (savedNotes.isNotEmpty()) {
+            Text("已保存笔记", style = AppType.Title, color = MintPrimaryDark)
+            savedNotes.forEach { note ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MintSurface),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("word_qa_saved_note_${note.noteId}"),
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(note.kind.label, style = AppType.Footnote, color = MintTextMuted)
+                        Text(note.answer, color = MintPrimaryDark)
+                    }
+                }
+            }
+        }
 
         WordQaKind.entries.forEach { kind ->
             QuestionChip(kind, enabled = state != WordAiQaUiState.Asking, onAsk)

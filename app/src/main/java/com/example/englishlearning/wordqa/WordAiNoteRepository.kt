@@ -14,6 +14,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 data class WordAiNote(
     val noteId: String,
     val profileId: String,
+    val wordBookId: String = "",
+    val cardId: String = "",
     val lemma: String,
     val kind: WordQaKind,
     val answer: String,
@@ -24,7 +26,7 @@ interface WordAiNoteRepository {
     suspend fun save(note: WordAiNote): Result<Unit>
 
     /** 指定 profile 与词的笔记，按创建时间降序；跨 profile 不可见。 */
-    suspend fun list(profileId: String, lemma: String): Result<List<WordAiNote>>
+    suspend fun list(profileId: String, lemma: String, wordBookId: String = "", cardId: String = ""): Result<List<WordAiNote>>
 }
 
 class RoomWordAiNoteRepository(
@@ -35,8 +37,8 @@ class RoomWordAiNoteRepository(
         database.internalWordAiNoteDao().insert(note.toEntity())
     }
 
-    override suspend fun list(profileId: String, lemma: String): Result<List<WordAiNote>> = runStorage {
-        database.internalWordAiNoteDao().findForLemma(profileId, lemma).map { it.toDomain() }
+    override suspend fun list(profileId: String, lemma: String, wordBookId: String, cardId: String): Result<List<WordAiNote>> = runStorage {
+        database.internalWordAiNoteDao().findForCard(profileId, wordBookId, cardId, lemma).map { it.toDomain() }
     }
 
     private suspend fun <T> runStorage(block: suspend () -> T): Result<T> = try {
@@ -54,6 +56,8 @@ class RoomWordAiNoteRepository(
     private fun WordAiNote.toEntity() = WordAiNoteEntity(
         noteId = noteId,
         profileId = profileId,
+        wordBookId = wordBookId,
+        cardId = cardId,
         lemma = lemma,
         kind = kind.name,
         answer = answer,
@@ -63,6 +67,8 @@ class RoomWordAiNoteRepository(
     private fun WordAiNoteEntity.toDomain() = WordAiNote(
         noteId = noteId,
         profileId = profileId,
+        wordBookId = wordBookId,
+        cardId = cardId,
         lemma = lemma,
         kind = WordQaKind.valueOf(kind),
         answer = answer,

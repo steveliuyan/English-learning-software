@@ -664,4 +664,284 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * v21→v22 是历史遗留 id 的一次性对齐：早期版本把卡片 id 写成 `placeholder:<册>:<词>`，
+     * 真实词书交付 `<册>:<词>`，前缀不同意味着进度、到期队列、新词去重全都取不到交集。
+     *
+     * 这条用例把三件事一起钉住：三张表都改写、撞主键时按「复习优先」丢行、计划目标数收敛到实际任务数
+     * （目标数悬空就等于当天永远解锁不了文章）。
+     */
+    @Test
+    fun migrateV21ToV22_realignsLegacyPlaceholderCardIds() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 21).apply {
+            execSQL(
+                "INSERT INTO today_plans (planId, profileId, localDate, zoneId, activeWordBookId, " +
+                    "newTarget, dueTarget, ruleVersion, generatedAtEpochMillis) " +
+                    "VALUES ('p1', 'default', '2026-10-04', 'Asia/Shanghai', 'cet4', 3, 2, 'f1-v1', 1)",
+            )
+            // 新学 3 个，其中 ability 与下面那条到期复习是同一个词——正是去重失效留下的重复。
+            listOf("cet4:a", "cet4:ability", "cet4:able").forEachIndexed { index, cardId ->
+                execSQL(
+                    "INSERT INTO today_plan_tasks (planId, cardId, taskKind, ordinal) " +
+                        "VALUES ('p1', '$cardId', 'NEW', $index)",
+                )
+            }
+            listOf("placeholder:cet4:ability", "placeholder:cet4:benefit").forEachIndexed { index, cardId ->
+                execSQL(
+                    "INSERT INTO today_plan_tasks (planId, cardId, taskKind, ordinal) " +
+                        "VALUES ('p1', '$cardId', 'DUE', $index)",
+                )
+            }
+            execSQL(
+                "INSERT INTO card_review_states (cardId, wordBookId, lastFeedback, lastReviewedAtEpochMillis, " +
+                    "nextReviewAtEpochMillis) VALUES ('placeholder:cet4:ability', 'cet4', 'Good', 1, 2)",
+            )
+            execSQL(
+                "INSERT INTO learning_events (eventId, profileId, planId, cardId, wordBookId, feedback, " +
+                    "occurredAtEpochMillis, algorithmVersion, paramsVersion, dueBeforeEpochMillis, " +
+                    "nextReviewAtEpochMillis) " +
+                    "VALUES ('e1', 'default', 'p1', 'placeholder:cet4:benefit', 'cet4', 'Good', 1, 'fsrs-v1', 'p1', NULL, 2)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 22, true, AppDatabase.MIGRATION_21_22).apply {
+            query("SELECT count(*) FROM card_review_states WHERE cardId LIKE 'placeholder:%'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+            query("SELECT wordBookId FROM card_review_states WHERE cardId = 'cet4:ability'").use { cursor ->
+                assertTrue("改写必须保住「哪一册的哪个词」，只改前缀", cursor.moveToFirst())
+                assertEquals("cet4", cursor.getString(0))
+            }
+            query("SELECT cardId FROM learning_events WHERE eventId = 'e1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("cet4:benefit", cursor.getString(0))
+            }
+            query("SELECT count(*) FROM today_plan_tasks WHERE cardId LIKE 'placeholder:%'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+            query("SELECT taskKind, count(*) FROM today_plan_tasks GROUP BY taskKind ORDER BY taskKind").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("DUE", cursor.getString(0))
+                assertEquals("复习任务一条都不能少", 2, cursor.getInt(1))
+                assertTrue(cursor.moveToNext())
+                assertEquals("NEW", cursor.getString(0))
+                assertEquals("ability 已经在复习队列里，新学那一份必须丢掉", 2, cursor.getInt(1))
+            }
+            query("SELECT newTarget, dueTarget FROM today_plans WHERE planId = 'p1'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("newTarget 必须收敛到实际 NEW 任务数", 2, cursor.getInt(0))
+                assertEquals("dueTarget 不该被动", 2, cursor.getInt(1))
+            }
+            close()
+        }
+    }
+
+    /** 没有冲突行时只做改写，目标数一动不动——收敛逻辑不能误伤正常计划。 */
+    @Test
+    fun migrateV21ToV22_keepsPlanTargetsWhenNothingCollides() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 21).apply {
+            execSQL(
+                "INSERT INTO today_plans (planId, profileId, localDate, zoneId, activeWordBookId, " +
+                    "newTarget, dueTarget, ruleVersion, generatedAtEpochMillis) " +
+                    "VALUES ('p2', 'default', '2026-09-27', 'Asia/Shanghai', 'cet4', 2, 0, 'f1-v1', 1)",
+            )
+            listOf("placeholder:cet4:economy", "placeholder:cet4:feature").forEachIndexed { index, cardId ->
+                execSQL(
+                    "INSERT INTO today_plan_tasks (planId, cardId, taskKind, ordinal) " +
+                        "VALUES ('p2', '$cardId', 'NEW', $index)",
+                )
+            }
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 22, true, AppDatabase.MIGRATION_21_22).apply {
+            query("SELECT cardId FROM today_plan_tasks WHERE planId = 'p2' ORDER BY ordinal").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("cet4:economy", cursor.getString(0))
+                assertTrue(cursor.moveToNext())
+                assertEquals("cet4:feature", cursor.getString(0))
+                assertFalse("没有冲突就不该删行", cursor.moveToNext())
+            }
+            query("SELECT newTarget, dueTarget FROM today_plans WHERE planId = 'p2'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(2, cursor.getInt(0))
+                assertEquals(0, cursor.getInt(1))
+            }
+            close()
+        }
+    }
+
+    /** 同一个词同时存在两种 id 的复习状态时是纯重复：保留新格式那行，旧行必须让位。 */
+    @Test
+    fun migrateV21ToV22_dropsTheDuplicateLegacyReviewState() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 21).apply {
+            execSQL(
+                "INSERT INTO card_review_states (cardId, wordBookId, lastFeedback, lastReviewedAtEpochMillis, " +
+                    "nextReviewAtEpochMillis) VALUES ('placeholder:cet4:ability', 'cet4', 'Again', 1, 2)",
+            )
+            execSQL(
+                "INSERT INTO card_review_states (cardId, wordBookId, lastFeedback, lastReviewedAtEpochMillis, " +
+                    "nextReviewAtEpochMillis) VALUES ('cet4:ability', 'cet4', 'Good', 7, 8)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 22, true, AppDatabase.MIGRATION_21_22).apply {
+            query("SELECT count(*) FROM card_review_states").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("撞主键的两行必须合成一行，否则同一张卡会有两份进度", 1, cursor.getInt(0))
+            }
+            query("SELECT lastFeedback, lastReviewedAtEpochMillis FROM card_review_states").use { cursor ->
+                assertTrue("活下来的是新格式那一行", cursor.moveToFirst())
+                assertEquals("Good", cursor.getString(0))
+                assertEquals(7L, cursor.getLong(1))
+            }
+            close()
+        }
+    }
+
+    /**
+     * v23 → v24：新增词条搜索索引表。
+     *
+     * 这一版迁移只加表、不改既有表，所以最需要证明的是「老数据一行不少」——
+     * 搜索历史是用户可见的数据，建索引绝不能顺手把它重置掉。
+     */
+    @Test
+    fun migrateV23ToV24_createsSearchIndexTableAndKeepsEveryExistingRow() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 23).apply {
+            execSQL(
+                "INSERT INTO vocabulary_search_history (profileId, normalizedQuery, displayQuery, searchCount, " +
+                    "firstSearchedAtEpochMillis, lastSearchedAtEpochMillis, representativeWordBookId, representativeCardId) " +
+                    "VALUES ('default', 'ability', 'Ability', 3, 1, 2, 'cet4', 'cet4:ability')",
+            )
+            execSQL(
+                "INSERT INTO learning_settings (profileId, openDetailOnKnown, openDetailOnFuzzy, " +
+                    "openDetailOnForgotten, showVocabularySearchCount) VALUES ('default', 1, 0, 0, 1)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 24, true, AppDatabase.MIGRATION_23_24).apply {
+            query("SELECT searchCount, normalizedQuery, representativeCardId FROM vocabulary_search_history WHERE profileId = 'default'").use { cursor ->
+                assertTrue("v23 的搜索历史必须原样保留", cursor.moveToFirst())
+                assertEquals(3, cursor.getInt(0))
+                assertEquals("ability", cursor.getString(1))
+                assertEquals("cet4:ability", cursor.getString(2))
+            }
+            query("SELECT showVocabularySearchCount FROM learning_settings WHERE profileId = 'default'").use { cursor ->
+                assertTrue("设置行也必须保留", cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
+            }
+            query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'vocabulary_search_index'").use { cursor ->
+                assertTrue("v24 必须建出词条索引表", cursor.moveToFirst())
+            }
+            query("PRAGMA table_info(vocabulary_search_index)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(
+                    "列顺序必须与实体声明一致，否则 Room 校验会失败",
+                    listOf(
+                        "wordBookId",
+                        "cardId",
+                        "wordBookName",
+                        "dataVersion",
+                        "lemma",
+                        "normalizedLemma",
+                        "normalizedPhrases",
+                        "cardJson",
+                    ),
+                    names,
+                )
+            }
+            // 迁移后的表要能真的用：写入一行再按 normalizedLemma 检索命中。
+            execSQL(
+                "INSERT INTO vocabulary_search_index VALUES " +
+                    "('cet4', 'cet4:ability', '四级词书', 'v1', 'ability', 'ability', '', '{\"cardId\":\"cet4:ability\"}')",
+            )
+            query("SELECT cardId FROM vocabulary_search_index WHERE normalizedLemma = 'ability'").use { cursor ->
+                assertTrue("索引表必须可写可查", cursor.moveToFirst())
+                assertEquals("cet4:ability", cursor.getString(0))
+            }
+            close()
+        }
+    }
+
+    /**
+     * v24 → v25：索引行从「整张词卡的 JSON 快照」精简为查询与结果列表所需的列。
+     *
+     * 三条要一起成立：
+     * 1. 新表**没有** `cardJson`、有 `ipa` / `meaningZh`（结果列表要显示的列）；
+     * 2. 索引是派生数据，允许重建，所以迁移里直接 `DROP` 重来——但**别的业务表一行都不能少**；
+     * 3. 新形状的表必须真的可写可查，否则重建出来的索引也建不起来。
+     */
+    @Test
+    fun migrateV24ToV25_dropsTheCardSnapshotColumnAndKeepsEveryOtherRow() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 24).apply {
+            execSQL(
+                "INSERT INTO vocabulary_search_index VALUES " +
+                    "('cet4', 'cet4:ability', '四级词书', 'v1', 'ability', 'ability', '', " +
+                    "'{\"cardId\":\"cet4:ability\",\"ipa\":\"/əˈbɪləti/\",\"meaningZh\":\"能力\"}')",
+            )
+            execSQL(
+                "INSERT INTO vocabulary_search_history (profileId, normalizedQuery, displayQuery, searchCount, " +
+                    "firstSearchedAtEpochMillis, lastSearchedAtEpochMillis, representativeWordBookId, representativeCardId) " +
+                    "VALUES ('default', 'ability', 'Ability', 5, 1, 2, 'cet4', 'cet4:ability')",
+            )
+            execSQL(
+                "INSERT INTO learning_settings (profileId, openDetailOnKnown, openDetailOnFuzzy, " +
+                    "openDetailOnForgotten, showVocabularySearchCount) VALUES ('default', 1, 0, 0, 0)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 25, true, AppDatabase.MIGRATION_24_25).apply {
+            query("PRAGMA table_info(vocabulary_search_index)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(
+                    "索引行必须只剩查询与结果列表所需的列",
+                    listOf(
+                        "wordBookId",
+                        "cardId",
+                        "wordBookName",
+                        "dataVersion",
+                        "lemma",
+                        "normalizedLemma",
+                        "normalizedPhrases",
+                        "ipa",
+                        "meaningZh",
+                    ),
+                    names,
+                )
+                assertFalse("整卡 JSON 快照列必须消失", names.contains("cardJson"))
+            }
+            query("SELECT searchCount, representativeCardId FROM vocabulary_search_history WHERE profileId = 'default'").use { cursor ->
+                assertTrue("搜索历史必须原样保留", cursor.moveToFirst())
+                assertEquals(5, cursor.getInt(0))
+                assertEquals("cet4:ability", cursor.getString(1))
+            }
+            query("SELECT showVocabularySearchCount FROM learning_settings WHERE profileId = 'default'").use { cursor ->
+                assertTrue("学习设置必须原样保留", cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+            // 重建出来的表要能真的用：写入一行再按 normalizedLemma 检索命中。
+            execSQL(
+                "INSERT INTO vocabulary_search_index VALUES " +
+                    "('cet4', 'cet4:ability', '四级词书', 'v1', 'ability', 'ability', '', '/əˈbɪləti/', '能力')",
+            )
+            query("SELECT ipa, meaningZh FROM vocabulary_search_index WHERE normalizedLemma = 'ability'").use { cursor ->
+                assertTrue("瘦身后的索引表必须可写可查", cursor.moveToFirst())
+                assertEquals("/əˈbɪləti/", cursor.getString(0))
+                assertEquals("能力", cursor.getString(1))
+            }
+            close()
+        }
+    }
 }

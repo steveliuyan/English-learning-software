@@ -15,6 +15,8 @@ import androidx.room.PrimaryKey
 data class WordAiNoteEntity(
     @PrimaryKey val noteId: String,
     val profileId: String,
+    val wordBookId: String,
+    val cardId: String,
     val lemma: String,
     val kind: String,
     val answer: String,

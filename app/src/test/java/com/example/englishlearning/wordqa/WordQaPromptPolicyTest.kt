@@ -35,7 +35,7 @@ class WordQaPromptPolicyTest {
 
     @Test
     fun systemPromptIsFixedRegardlessOfInput() {
-        val kinds = WordQaKind.entries
+        val kinds = WordQaKind.entries.filter { it != WordQaKind.Personal }
         val baseline = WordQaPromptPolicy.build(WordQaRequest(kinds.first(), "apple")).system
         kinds.drop(1).forEach { kind ->
             assertEquals(baseline, WordQaPromptPolicy.build(WordQaRequest(kind, "banana")).system)

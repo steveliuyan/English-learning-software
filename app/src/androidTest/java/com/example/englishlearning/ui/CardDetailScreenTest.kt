@@ -207,6 +207,12 @@ class CardDetailScreenTest {
     }
 
     @Test
+    fun relearnActionIsHiddenWithoutCallback() {
+        composeRule.setContent { CardDetailScreen(card = card(), onBack = {}) }
+        composeRule.onNodeWithContentDescription("重新学习 ability").assertDoesNotExist()
+    }
+
+    @Test
     fun pronunciationAndRelearnActionsInvokeCallbacks() {
         var spoken = 0
         var spokenLemma = ""

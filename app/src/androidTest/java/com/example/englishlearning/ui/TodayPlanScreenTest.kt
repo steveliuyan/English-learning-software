@@ -2,10 +2,12 @@ package com.example.englishlearning.ui
 
 import android.graphics.Color as AndroidColor
 import androidx.compose.ui.graphics.asAndroidBitmap
+import com.example.englishlearning.learning.WordBookProgress
 import com.example.englishlearning.ui.theme.DomainColors
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
@@ -81,6 +83,32 @@ class TodayPlanScreenTest {
         composeRule.onNodeWithTag("today_plan_total_progress").assertExists()
         composeRule.onNodeWithTag("today_plan_unlock_status").assertExists()
         composeRule.onAllNodesWithText("今日计划共 5 项").assertCountEquals(0)
+    }
+
+    /**
+     * 首页词书卡上的整册进度：左边百分比、右边「已学/总数 词」、下面一条进度条和「未学」。
+     * 2680/3039 取截断后是 88.1%（四舍五入会给 88.2%，所以这条断言同时钉住了取整方式）。
+     */
+    @Test fun ready_summary_card_shows_word_book_progress() {
+        composeRule.setContent {
+            TodayPlanScreen(
+                TodayPlanUiState.Ready(
+                    "高等职业教育专科英语", "2026-10-03", 10, 12, 22,
+                    bookProgress = WordBookProgress(learned = 2680, total = 3039),
+                ),
+            )
+        }
+        composeRule.onNodeWithTag("today_plan_learned_percent").assertTextEquals("已学 88.1%")
+        composeRule.onNodeWithTag("today_plan_book_words").assertTextEquals("2680/3039 词")
+        composeRule.onNodeWithTag("today_plan_book_unlearned").assertTextEquals("未学 359 词")
+        composeRule.onNodeWithTag("today_plan_book_progress").assertExists()
+    }
+
+    /** 还没算出行时不能画成 0%：占位行整体不出现，而不是给一个假进度。 */
+    @Test fun ready_without_progress_hides_the_progress_row() {
+        composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
+        composeRule.onNodeWithTag("today_plan_learned_percent").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_book_progress").assertDoesNotExist()
     }
 
     @Test fun locked_reading_explains_state_without_looking_like_primary_action() {

@@ -12,4 +12,7 @@ internal interface InternalAssetDao {
 
     @Upsert
     suspend fun upsert(asset: AssetRecordEntity)
+
+    @Query("DELETE FROM asset_records WHERE id LIKE :wordBookId || '/%' OR relativePath LIKE :wordBookId || '/%'")
+    suspend fun deleteForWordBook(wordBookId: String)
 }

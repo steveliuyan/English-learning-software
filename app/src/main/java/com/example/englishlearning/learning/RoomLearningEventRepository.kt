@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import androidx.room.withTransaction
 import kotlinx.coroutines.withContext
 
 class RoomLearningEventRepository(
@@ -55,6 +56,43 @@ class RoomLearningEventRepository(
 
     override suspend fun dueCardIds(wordBookId: String, now: Instant): RepositoryResult<List<String>> =
         runStorage { database.internalLearningEventDao().dueCardIds(wordBookId, now.toEpochMilli()) }
+
+    override suspend fun reviewedStates(wordBookId: String): RepositoryResult<List<CardReviewState>> =
+        runStorage { database.internalLearningEventDao().fullReviewStates(wordBookId).map { it.toDomain() } }
+
+    override suspend fun upsertReviewState(state: CardReviewState): RepositoryResult<Unit> =
+        runStorage { database.internalLearningEventDao().upsertCardState(state.toEntity()) }
+
+    override suspend fun migrateReviewStates(
+        profileId: String,
+        sourceBookId: String,
+        targetBookId: String,
+        candidates: List<ProgressMigrationCandidate>,
+    ): RepositoryResult<Int> = runStorage {
+        database.withTransaction {
+            var count = 0
+            candidates.forEach { candidate ->
+                val audit = com.example.englishlearning.core.storage.entity.WordBookProgressMigrationAuditEntity(
+                    profileId = profileId,
+                    sourceBookId = sourceBookId,
+                    targetBookId = targetBookId,
+                    sourceCardId = candidate.source.cardId,
+                    targetCardId = candidate.target.cardId,
+                    migratedAtEpochMillis = candidate.sourceState.lastReviewedAt.toEpochMilli(),
+                )
+                val auditId = database.internalWordBookProgressMigrationAuditDao().insertIfAbsent(audit)
+                if (auditId == -1L) return@forEach
+                val existing = database.internalLearningEventDao().findCardStateByCardId(candidate.target.cardId)
+                if (existing == null || existing.lastReviewedAtEpochMillis < candidate.sourceState.lastReviewedAt.toEpochMilli()) {
+                    database.internalLearningEventDao().upsertCardState(
+                        candidate.sourceState.copy(cardId = candidate.target.cardId, wordBookId = targetBookId).toEntity(),
+                    )
+                    count++
+                }
+            }
+            count
+        }
+    }
 
     private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> {
         return try {

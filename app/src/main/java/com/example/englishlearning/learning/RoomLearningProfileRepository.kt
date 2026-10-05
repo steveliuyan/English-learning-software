@@ -3,6 +3,7 @@ package com.example.englishlearning.learning
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.WordBookEntity
+import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
@@ -27,6 +28,22 @@ class RoomLearningProfileRepository(
 
     override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> =
         runStorage { database.internalWordBookDao().upsert(wordBook.toEntity()) }
+
+    override suspend fun deleteWordBook(profileId: String, wordBookId: String): RepositoryResult<Unit> =
+        runStorage {
+            database.withTransaction {
+                database.internalLearningProfileDao().isActiveWordBook(profileId, wordBookId).let { active ->
+                    check(!active) { "cannot delete active word book" }
+                }
+                database.internalLearningEventDao().deleteEvents(wordBookId)
+                database.internalLearningEventDao().deleteReviewStates(wordBookId)
+                database.internalVocabularyEntryDao().deleteForWordBook(wordBookId)
+                database.internalWordBookProgressMigrationAuditDao().deleteForWordBook(wordBookId)
+                database.internalWordAiNoteDao().deleteForWordBook(wordBookId)
+                database.internalAssetDao().deleteForWordBook(wordBookId)
+                database.internalWordBookDao().deleteById(wordBookId)
+            }
+        }
 
     private suspend fun <T> runStorage(block: suspend () -> T): RepositoryResult<T> {
         return try {
