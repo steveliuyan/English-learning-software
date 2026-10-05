@@ -20,6 +20,7 @@ import com.example.englishlearning.core.storage.dao.InternalWordBookDao
 import com.example.englishlearning.core.storage.dao.InternalWordBookProgressMigrationAuditDao
 import com.example.englishlearning.core.storage.dao.InternalVocabularyEntryDao
 import com.example.englishlearning.core.storage.dao.InternalVocabularySearchHistoryDao
+import com.example.englishlearning.core.storage.dao.InternalVocabularySearchIndexDao
 import com.example.englishlearning.core.storage.entity.AiPreferenceEntity
 import com.example.englishlearning.core.storage.entity.WordAiNoteEntity
 import com.example.englishlearning.core.storage.entity.AiProfileEntity
@@ -41,6 +42,7 @@ import com.example.englishlearning.core.storage.entity.WordBookEntity
 import com.example.englishlearning.core.storage.entity.WordBookProgressMigrationAuditEntity
 import com.example.englishlearning.core.storage.entity.VocabularyEntryEntity
 import com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEntity
+import com.example.englishlearning.core.storage.entity.VocabularySearchIndexEntity
 
 /**
  * Versioned Room metadata store. Every version transition must be supplied through [MIGRATIONS].
@@ -69,8 +71,9 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEn
         VocabularyEntryEntity::class,
         WordBookProgressMigrationAuditEntity::class,
         VocabularySearchHistoryEntity::class,
+        VocabularySearchIndexEntity::class,
     ],
-    version = 23,
+    version = 25,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -107,6 +110,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalVocabularyEntryDao(): InternalVocabularyEntryDao
 
     internal abstract fun internalVocabularySearchHistoryDao(): InternalVocabularySearchHistoryDao
+
+    internal abstract fun internalVocabularySearchIndexDao(): InternalVocabularySearchIndexDao
 
     internal abstract fun internalWordBookProgressMigrationAuditDao(): InternalWordBookProgressMigrationAuditDao
 
@@ -445,13 +450,81 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_22_23: Migration = object : Migration(22, 23) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                var learningSettingsExists = false
+                db.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'learning_settings' LIMIT 1").use { cursor ->
+                    learningSettingsExists = cursor.moveToFirst()
+                }
+                if (!learningSettingsExists) {
+                    // 防御不完整的 v22 fixture/旧安装：Room v23 需要完整实体表，不能只跳过 ALTER。
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `learning_settings` " +
+                            "(`profileId` TEXT NOT NULL, `openDetailOnKnown` INTEGER NOT NULL, " +
+                            "`openDetailOnFuzzy` INTEGER NOT NULL, `openDetailOnForgotten` INTEGER NOT NULL, " +
+                            "`showVocabularySearchCount` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`profileId`))",
+                    )
+                } else {
+                    db.query("PRAGMA table_info(`learning_settings`)").use { cursor ->
+                        var hasSearchCount = false
+                        while (cursor.moveToNext()) {
+                            if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "showVocabularySearchCount") {
+                                hasSearchCount = true
+                                break
+                            }
+                        }
+                        if (!hasSearchCount) {
+                            db.execSQL("ALTER TABLE `learning_settings` ADD COLUMN `showVocabularySearchCount` INTEGER NOT NULL DEFAULT 1")
+                        }
+                    }
+                }
                 db.execSQL("CREATE TABLE IF NOT EXISTS `vocabulary_search_history` (`profileId` TEXT NOT NULL, `normalizedQuery` TEXT NOT NULL, `displayQuery` TEXT NOT NULL, `searchCount` INTEGER NOT NULL, `firstSearchedAtEpochMillis` INTEGER NOT NULL, `lastSearchedAtEpochMillis` INTEGER NOT NULL, `representativeWordBookId` TEXT, `representativeCardId` TEXT, PRIMARY KEY(`profileId`, `normalizedQuery`))")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis` ON `vocabulary_search_history` (`profileId`, `lastSearchedAtEpochMillis`)")
             }
         }
 
+        val MIGRATION_23_24: Migration = object : Migration(23, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `vocabulary_search_index` " +
+                        "(`wordBookId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `wordBookName` TEXT NOT NULL, " +
+                        "`dataVersion` TEXT NOT NULL, `lemma` TEXT NOT NULL, `normalizedLemma` TEXT NOT NULL, " +
+                        "`normalizedPhrases` TEXT NOT NULL, `cardJson` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`wordBookId`, `cardId`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_search_index_normalizedLemma` ON `vocabulary_search_index` (`normalizedLemma`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_search_index_wordBookId_normalizedLemma` ON `vocabulary_search_index` (`wordBookId`, `normalizedLemma`)")
+            }
+        }
+
+        /**
+         * v24→v25：索引行从「整张词卡的 JSON 快照」精简为查询与结果列表所需的列。
+         *
+         * **索引是派生数据，这里直接重建空表**（`DROP` + `CREATE`），由
+         * `RefreshVocabularySearchIndexUseCase` 在应用启动时按 `dataVersion` 整册重建。
+         *
+         * 不做数据搬运的理由：旧行里的 `ipa` / `meaningZh` 只存在于 `cardJson` 内部，
+         * 要搬就得在迁移里解析 JSON（把「数据库能否打开」押在平台的 JSON1 扩展上），
+         * 或者再复制一份快照——两条路都比「重建」更危险，而重建的结果与原状等价。
+         *
+         * 代价：升级后、首次刷新完成前搜索为空。索引本来就在启动时立即重建，
+         * 且重建不会缺失任何词书，所以这是一个短暂且自愈的窗口。
+         */
+        val MIGRATION_24_25: Migration = object : Migration(24, 25) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `vocabulary_search_index`")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `vocabulary_search_index` " +
+                        "(`wordBookId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `wordBookName` TEXT NOT NULL, " +
+                        "`dataVersion` TEXT NOT NULL, `lemma` TEXT NOT NULL, `normalizedLemma` TEXT NOT NULL, " +
+                        "`normalizedPhrases` TEXT NOT NULL, `ipa` TEXT NOT NULL, `meaningZh` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`wordBookId`, `cardId`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_search_index_normalizedLemma` ON `vocabulary_search_index` (`normalizedLemma`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vocabulary_search_index_wordBookId_normalizedLemma` ON `vocabulary_search_index` (`wordBookId`, `normalizedLemma`)")
+            }
+        }
+
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
 
         /** 早期占位卡片 id 的前缀；真实词书的卡片 id 以 `<册>:` 开头。 */
         private val LEGACY_PLACEHOLDER_ID_PREFIX = LegacyCardIdRepair.PLACEHOLDER_PREFIX

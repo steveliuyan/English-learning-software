@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 23,
-    "identityHash": "e32a87f69e709d8060aec3440b84b6a1",
+    "version": 22,
+    "identityHash": "d4a0373b0a7e21764b35e58f505256f2",
     "entities": [
       {
         "tableName": "schema_meta",
@@ -893,7 +893,7 @@
       },
       {
         "tableName": "learning_settings",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `openDetailOnKnown` INTEGER NOT NULL, `openDetailOnFuzzy` INTEGER NOT NULL, `openDetailOnForgotten` INTEGER NOT NULL, `showVocabularySearchCount` INTEGER NOT NULL, PRIMARY KEY(`profileId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `openDetailOnKnown` INTEGER NOT NULL, `openDetailOnFuzzy` INTEGER NOT NULL, `openDetailOnForgotten` INTEGER NOT NULL, PRIMARY KEY(`profileId`))",
         "fields": [
           {
             "fieldPath": "profileId",
@@ -916,12 +916,6 @@
           {
             "fieldPath": "openDetailOnForgotten",
             "columnName": "openDetailOnForgotten",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "showVocabularySearchCount",
-            "columnName": "showVocabularySearchCount",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -1157,82 +1151,11 @@
             "targetCardId"
           ]
         }
-      },
-      {
-        "tableName": "vocabulary_search_history",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `normalizedQuery` TEXT NOT NULL, `displayQuery` TEXT NOT NULL, `searchCount` INTEGER NOT NULL, `firstSearchedAtEpochMillis` INTEGER NOT NULL, `lastSearchedAtEpochMillis` INTEGER NOT NULL, `representativeWordBookId` TEXT, `representativeCardId` TEXT, PRIMARY KEY(`profileId`, `normalizedQuery`))",
-        "fields": [
-          {
-            "fieldPath": "profileId",
-            "columnName": "profileId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "normalizedQuery",
-            "columnName": "normalizedQuery",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "displayQuery",
-            "columnName": "displayQuery",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "searchCount",
-            "columnName": "searchCount",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "firstSearchedAtEpochMillis",
-            "columnName": "firstSearchedAtEpochMillis",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "lastSearchedAtEpochMillis",
-            "columnName": "lastSearchedAtEpochMillis",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "representativeWordBookId",
-            "columnName": "representativeWordBookId",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "representativeCardId",
-            "columnName": "representativeCardId",
-            "affinity": "TEXT"
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "profileId",
-            "normalizedQuery"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis",
-            "unique": false,
-            "columnNames": [
-              "profileId",
-              "lastSearchedAtEpochMillis"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis` ON `${TABLE_NAME}` (`profileId`, `lastSearchedAtEpochMillis`)"
-          }
-        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e32a87f69e709d8060aec3440b84b6a1')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd4a0373b0a7e21764b35e58f505256f2')"
     ]
   }
 }

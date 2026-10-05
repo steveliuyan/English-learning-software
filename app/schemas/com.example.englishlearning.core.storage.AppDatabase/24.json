@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 23,
-    "identityHash": "e32a87f69e709d8060aec3440b84b6a1",
+    "version": 24,
+    "identityHash": "75482bde227654455de275a9c1ad7da0",
     "entities": [
       {
         "tableName": "schema_meta",
@@ -1228,11 +1228,93 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_vocabulary_search_history_profileId_lastSearchedAtEpochMillis` ON `${TABLE_NAME}` (`profileId`, `lastSearchedAtEpochMillis`)"
           }
         ]
+      },
+      {
+        "tableName": "vocabulary_search_index",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`wordBookId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `wordBookName` TEXT NOT NULL, `dataVersion` TEXT NOT NULL, `lemma` TEXT NOT NULL, `normalizedLemma` TEXT NOT NULL, `normalizedPhrases` TEXT NOT NULL, `cardJson` TEXT NOT NULL, PRIMARY KEY(`wordBookId`, `cardId`))",
+        "fields": [
+          {
+            "fieldPath": "wordBookId",
+            "columnName": "wordBookId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardId",
+            "columnName": "cardId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wordBookName",
+            "columnName": "wordBookName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dataVersion",
+            "columnName": "dataVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lemma",
+            "columnName": "lemma",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedLemma",
+            "columnName": "normalizedLemma",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedPhrases",
+            "columnName": "normalizedPhrases",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cardJson",
+            "columnName": "cardJson",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "wordBookId",
+            "cardId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_vocabulary_search_index_normalizedLemma",
+            "unique": false,
+            "columnNames": [
+              "normalizedLemma"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_vocabulary_search_index_normalizedLemma` ON `${TABLE_NAME}` (`normalizedLemma`)"
+          },
+          {
+            "name": "index_vocabulary_search_index_wordBookId_normalizedLemma",
+            "unique": false,
+            "columnNames": [
+              "wordBookId",
+              "normalizedLemma"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_vocabulary_search_index_wordBookId_normalizedLemma` ON `${TABLE_NAME}` (`wordBookId`, `normalizedLemma`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e32a87f69e709d8060aec3440b84b6a1')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '75482bde227654455de275a9c1ad7da0')"
     ]
   }
 }
