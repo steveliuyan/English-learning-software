@@ -35,26 +35,6 @@ class LearningRecordsViewModelTest {
     }
 
     @Test
-    fun `switching to all words loads only once and filtering stays local`() = runTest {
-        val repository = FakeLearningRecordRepository()
-        repository.allWordsResult = listOf(
-            WordBookRecord(null, "book:a", "a", WordBookRecordStatus.Unlearned, false),
-            WordBookRecord(null, "book:b", "b", WordBookRecordStatus.Due, false),
-        )
-        val vm = LearningRecordsViewModel(repository, FixedClockProvider(Instant.EPOCH, ZoneId.of("UTC")), StandardTestDispatcher(testScheduler))
-        vm.load("profile", "plan", "book")
-        testScheduler.advanceUntilIdle()
-        vm.selectTab(LearningRecordsTab.ALL_WORDS)
-        testScheduler.advanceUntilIdle()
-        vm.selectAllWordsFilter(WordBookRecordStatus.Due)
-        vm.selectTab(LearningRecordsTab.ALL_WORDS)
-        testScheduler.advanceUntilIdle()
-        assertEquals(1, repository.allWordsCalls)
-        assertEquals(WordBookRecordStatus.Due, vm.state.value.filter)
-        assertEquals(2, vm.state.value.allWords.size)
-    }
-
-    @Test
     fun `failed tab can be retried without reloading other tabs`() = runTest {
         val repository = FakeLearningRecordRepository()
         repository.historyResults += RepositoryResult.Failure(com.example.englishlearning.learning.LearningProfileRepositoryError.StorageUnavailable)

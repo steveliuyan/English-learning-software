@@ -52,6 +52,7 @@ fun SpeechSettingsScreen(
     onOpenAiProfiles: () -> Unit,
     onAddMiMoPreset: () -> Unit,
     onPreview: (String) -> Unit,
+    onToggleAutoSpeakOnCardReady: (Boolean) -> Unit = {},
     onBack: () -> Unit,
 ) {
     Column(
@@ -85,10 +86,31 @@ fun SpeechSettingsScreen(
             onSelect = onSelect,
         )
 
+        // 学习时自动发音（D1）：新词卡出现自动读一次；关闭后仅点击「播放发音」触发。
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggleAutoSpeakOnCardReady(!state.autoSpeakOnCardReady) }
+                .padding(vertical = 10.dp)
+                .testTag("speech_auto_speak_toggle")
+                .semantics { contentDescription = "学习时自动发音" },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("学习时自动发音", style = AppType.Title)
+                Text("新词卡出现时自动朗读一次；关闭后仅点击「播放发音」时朗读。", style = AppType.Footnote)
+            }
+            Text(
+                if (state.autoSpeakOnCardReady) "开" else "关",
+                modifier = Modifier.testTag("speech_auto_speak_state"),
+                style = AppType.Label,
+                color = DomainColors.AiSpeech.deep,
+            )
+        }
+
         // 候选配置收进折叠二级菜单：引擎行已经显示绑定的配置名，列表平时不占屏，
         // 选中即收起——不再出现「上下两处都显示配置」的重复。
-        if (state.selectedEngine != PronunciationEngine.SystemTts) {
-            var candidatesExpanded by rememberSaveable { mutableStateOf(false) }
+        if (state.selectedEngine != PronunciationEngine.SystemTts) {            var candidatesExpanded by rememberSaveable { mutableStateOf(false) }
             val engineCandidates = state.candidatesForSelectedEngine()
             PillButton(
                 text = if (candidatesExpanded) "收起语音配置" else "选择语音配置 ▾",

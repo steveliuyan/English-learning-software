@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -164,6 +165,79 @@ class GlobalVocabularySearchScreenTest {
         composeRule.onNodeWithTag("global_search_submit").performClick()
 
         assertEquals("ability", submitted)
+    }
+
+    /**
+     * 空输入不是死路：页面提示写着「空输入会显示最近搜索」，那这个动作就必须真的能触发。
+     *
+     * 旧实现把按钮 `enabled` 绑在「输入非空」上，于是用户清空输入后回不到最近搜索，
+     * 只能退出页面从主页入口重进——文案承诺的能力在界面上够不着。
+     */
+    @Test
+    fun blank_query_keeps_the_submit_action_available_and_says_recent_searches() {
+        var submits = 0
+        composeRule.setContent {
+            GlobalVocabularySearchScreen(
+                state = GlobalVocabularySearchUiState.Idle,
+                query = "",
+                onQueryChange = {},
+                onSubmit = { submits++ },
+                onRetry = {},
+                onClearHistory = {},
+                onOpenHistory = {},
+                onSelect = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("global_search_submit").assertIsEnabled()
+        composeRule.onNodeWithText("查看最近搜索").assertExists()
+        composeRule.onNodeWithTag("global_search_submit").performClick()
+
+        assertEquals(1, submits)
+    }
+
+    @Test
+    fun non_blank_query_labels_the_submit_as_full_search() {
+        composeRule.setContent {
+            GlobalVocabularySearchScreen(
+                state = GlobalVocabularySearchUiState.Idle,
+                query = "ability",
+                onQueryChange = {},
+                onSubmit = {},
+                onRetry = {},
+                onClearHistory = {},
+                onOpenHistory = {},
+                onSelect = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithText("全量搜索").assertExists()
+    }
+
+    /**
+     * 「非空输入时不再出现最近搜索文案」单独成一条：和上一条写在同一个用例里时，
+     * 前一条断言失败会先行中断，这条哨兵根本不会执行——看着有断言，实际从没跑过
+     * （2026-10-05 变异验证实证）。哨兵用 substring 匹配，防「新文案后面又拼一句旧的」。
+     */
+    @Test
+    fun non_blank_query_never_says_recent_searches() {
+        composeRule.setContent {
+            GlobalVocabularySearchScreen(
+                state = GlobalVocabularySearchUiState.Idle,
+                query = "ability",
+                onQueryChange = {},
+                onSubmit = {},
+                onRetry = {},
+                onClearHistory = {},
+                onOpenHistory = {},
+                onSelect = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithText("查看最近搜索", substring = true).assertDoesNotExist()
     }
 
     @Test

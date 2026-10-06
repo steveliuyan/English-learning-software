@@ -280,4 +280,25 @@ class SpeechSettingsScreenTest {
         assertEquals("ability", previewed)
         composeRule.onNodeWithTag("speech_preview_message").assertTextEquals("试听已播放。")
     }
+
+    /** D1：自动发音开关行显示当前状态，点击把相反值发给回调。 */
+    @Test fun autoSpeakToggleShowsStateAndForwardsTheInvertedValue() {
+        var toggled: Boolean? = null
+        composeRule.setContent {
+            SpeechSettingsScreen(
+                state = SpeechSettingsUiState(autoSpeakOnCardReady = true),
+                onSelect = { _, _ -> },
+                onOpenAiProfiles = {},
+                onAddMiMoPreset = {},
+                onPreview = {},
+                onToggleAutoSpeakOnCardReady = { toggled = it },
+                onBack = {},
+            )
+        }
+
+        // 状态文本在可点击 Row 内被语义合并，必须查未合并树。
+        composeRule.onNodeWithTag("speech_auto_speak_state", useUnmergedTree = true).assertTextEquals("开")
+        composeRule.onNodeWithTag("speech_auto_speak_toggle").performClick()
+        assertEquals(false, toggled)
+    }
 }

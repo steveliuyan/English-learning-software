@@ -133,13 +133,16 @@ fun GlobalVocabularySearchScreen(
                     cursorColor = MintPrimary,
                 ),
             )
+            val trimmedQuery = query.trim()
             Button(
                 onClick = submit,
-                enabled = query.trim().isNotEmpty(),
+                // 空输入时**也必须可用**：页面提示写着「空输入会显示最近搜索」，按钮一禁用，
+                // 用户清空输入后就回不到最近搜索，只能退出页面从主页重进——文案承诺的能力
+                // 必须真的能触发。所以这里不设 `enabled`，只是把文案切成对应的动作。
                 modifier = Modifier.fillMaxWidth().height(48.dp).testTag("global_search_submit"),
                 colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
                 shape = RoundedCornerShape(14.dp),
-            ) { Text("全量搜索") }
+            ) { Text(if (trimmedQuery.isEmpty()) "查看最近搜索" else "全量搜索") }
 
             when (state) {
                 GlobalVocabularySearchUiState.Idle -> GlobalSearchHint()

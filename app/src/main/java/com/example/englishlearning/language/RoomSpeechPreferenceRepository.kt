@@ -41,6 +41,7 @@ class RoomSpeechPreferenceRepository(
         selectedEngine = selectedEngine.name,
         openAiProfileId = openAiProfileId,
         miMoProfileId = miMoProfileId,
+        autoSpeakOnCardReady = autoSpeakOnCardReady,
     )
 
     private fun SpeechPreferenceEntity.toDomain() = SpeechPreference(
@@ -48,5 +49,6 @@ class RoomSpeechPreferenceRepository(
         selectedEngine = PronunciationEngine.valueOf(selectedEngine),
         openAiProfileId = openAiProfileId,
         miMoProfileId = miMoProfileId,
+        autoSpeakOnCardReady = autoSpeakOnCardReady,
     )
 }

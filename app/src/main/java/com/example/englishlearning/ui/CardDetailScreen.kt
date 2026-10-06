@@ -77,6 +77,9 @@ fun CardDetailScreen(
     card: WordCard,
     onBack: () -> Unit,
     onSpeak: () -> Unit = {},
+    onSpeakBritish: (() -> Unit)? = null,
+    onRegenerateAmerican: (() -> Unit)? = null,
+    onRegenerateBritish: (() -> Unit)? = null,
     onRelearn: (() -> Unit)? = null,
     onNext: (() -> Unit)? = null,
     vocabularyPresent: Boolean? = null,
@@ -120,6 +123,9 @@ fun CardDetailScreen(
             card = card,
             pronunciationStatus = pronunciationStatus,
             onSpeak = onSpeak,
+            onSpeakBritish = onSpeakBritish,
+            onRegenerateAmerican = onRegenerateAmerican,
+            onRegenerateBritish = onRegenerateBritish,
             onRelearn = onRelearn,
             onNext = onNext,
             vocabularyPresent = vocabularyPresent,
@@ -205,6 +211,9 @@ private fun WordHeroCard(
     card: WordCard,
     pronunciationStatus: PronunciationStatus,
     onSpeak: () -> Unit,
+    onSpeakBritish: (() -> Unit)?,
+    onRegenerateAmerican: (() -> Unit)?,
+    onRegenerateBritish: (() -> Unit)?,
     onRelearn: (() -> Unit)?,
     onNext: (() -> Unit)?,
     vocabularyPresent: Boolean?,
@@ -232,42 +241,39 @@ private fun WordHeroCard(
                         .semantics { contentDescription = "音标 ${card.ipa}" },
                 )
             }
-            Canvas(
+            SpeakerGlyph(
                 modifier = Modifier
-                    .size(48.dp)
                     .testTag("card_detail_speak")
-                    .size(48.dp)
                     .semantics { contentDescription = "播放 ${card.lemma} 发音" }
                     .clickable { onSpeak() },
-            ) {
-                val left = size.width * 0.18f
-                val right = size.width * 0.48f
-                val top = size.height * 0.34f
-                val bottom = size.height * 0.66f
-                drawRect(
-                    color = MintPrimary,
-                    topLeft = androidx.compose.ui.geometry.Offset(left, top),
-                    size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+            )
+            onSpeakBritish?.let { speakBritish ->
+                SpeakerGlyph(
+                    modifier = Modifier
+                        .testTag("card_detail_speak_british")
+                        .semantics { contentDescription = "播放 ${card.lemma} 英式发音" }
+                        .clickable { speakBritish() },
                 )
-                drawPath(
-                    path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(right, top)
-                        lineTo(size.width * 0.72f, size.height * 0.22f)
-                        lineTo(size.width * 0.72f, size.height * 0.78f)
-                        lineTo(right, bottom)
-                        close()
-                    },
-                    color = MintPrimary,
-                )
-                drawArc(
-                    color = MintPrimary,
-                    startAngle = -42f,
-                    sweepAngle = 84f,
-                    useCenter = false,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
-                    topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.54f, size.height * 0.28f),
-                    size = androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.44f),
-                )
+            }
+        }
+        if (onRegenerateAmerican != null || onRegenerateBritish != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                onRegenerateAmerican?.let { regenerate ->
+                    TextButton(
+                        onClick = regenerate,
+                        modifier = Modifier
+                            .testTag("card_detail_regenerate_american")
+                            .semantics { contentDescription = "重新生成 ${card.lemma} 美式发音" },
+                    ) { Text("重新生成美式") }
+                }
+                onRegenerateBritish?.let { regenerate ->
+                    TextButton(
+                        onClick = regenerate,
+                        modifier = Modifier
+                            .testTag("card_detail_regenerate_british")
+                            .semantics { contentDescription = "重新生成 ${card.lemma} 英式发音" },
+                    ) { Text("重新生成英式") }
+                }
             }
         }
         pronunciationStatus.message()?.let { message ->
@@ -384,6 +390,41 @@ private fun PersonalNoteEditor(
             modifier = Modifier.testTag("card_detail_personal_note_saved"),
         )
         else -> Unit
+    }
+}
+
+/** 单个发音按钮：美式为默认入口，英式由调用方显式提供。 */
+@Composable
+private fun SpeakerGlyph(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(48.dp)) {
+        val left = size.width * 0.18f
+        val right = size.width * 0.48f
+        val top = size.height * 0.34f
+        val bottom = size.height * 0.66f
+        drawRect(
+            color = MintPrimary,
+            topLeft = androidx.compose.ui.geometry.Offset(left, top),
+            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+        )
+        drawPath(
+            path = androidx.compose.ui.graphics.Path().apply {
+                moveTo(right, top)
+                lineTo(size.width * 0.72f, size.height * 0.22f)
+                lineTo(size.width * 0.72f, size.height * 0.78f)
+                lineTo(right, bottom)
+                close()
+            },
+            color = MintPrimary,
+        )
+        drawArc(
+            color = MintPrimary,
+            startAngle = -42f,
+            sweepAngle = 84f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
+            topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.54f, size.height * 0.28f),
+            size = androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.44f),
+        )
     }
 }
 

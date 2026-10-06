@@ -49,6 +49,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import kotlinx.coroutines.Job
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
 import kotlinx.coroutines.launch
@@ -124,6 +125,7 @@ fun AppScreen(
     speechSettingsViewModel: SpeechSettingsViewModel? = null,
     checkInViewModel: CheckInViewModel? = null,
     learningRecordsViewModel: LearningRecordsViewModel? = null,
+    wordBookWordsViewModel: WordBookWordsViewModel? = null,
     vocabularyViewModel: VocabularyViewModel? = null,
     vocabularyRelearnViewModel: VocabularyRelearnViewModel? = null,
     pronunciationProvider: PronunciationProvider? = null,
@@ -156,6 +158,7 @@ fun AppScreen(
             var showSpeechSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showVocabulary by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showVocabularyRelearn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var selectedRelearnCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
@@ -179,6 +182,7 @@ fun AppScreen(
             var selectedLearningRecordCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             var learningRecordPronunciationRequest by remember { mutableStateOf(0L) }
             val learningRecordsState by learningRecordsViewModel?.state?.collectAsState() ?: remember { mutableStateOf(LearningRecordsUiState()) }
+            val wordBookWordsState by wordBookWordsViewModel?.state?.collectAsState() ?: remember { mutableStateOf(WordBookWordsUiState()) }
             val vocabularyState by vocabularyViewModel?.state?.collectAsState() ?: remember { mutableStateOf<VocabularyUiState>(VocabularyUiState.Loading) }
             val globalSearchState = globalVocabularySearchViewModel?.uiState?.collectAsState()?.value
                 ?: GlobalVocabularySearchUiState.Idle
@@ -224,7 +228,6 @@ fun AppScreen(
             val recordCards = when (learningRecordsState.selectedTab) {
                 LearningRecordsTab.TODAY -> learningRecordsState.today.mapNotNull { it.wordCard }
                 LearningRecordsTab.HISTORY -> learningRecordsState.history.flatMap { it.records }.mapNotNull { it.wordCard }
-                LearningRecordsTab.ALL_WORDS -> learningRecordsState.allWords.mapNotNull { it.card }
             }
             val vocabularyMembership by vocabularyViewModel?.membership?.collectAsState() ?: remember { mutableStateOf<VocabularyMembership?>(null) }
             val vocabularyMasteryState by vocabularyViewModel?.mastery?.collectAsState() ?: remember { mutableStateOf<VocabularyMasteryState>(VocabularyMasteryState.Idle) }
@@ -263,6 +266,9 @@ fun AppScreen(
             val setupRequired = todayState == TodayPlanUiState.MissingSetup
             LaunchedEffect(showLearningRecords, state.profile.id, todayReady?.planId, todayReady?.activeWordBookId) {
                 if (showLearningRecords) learningRecordsViewModel?.load(state.profile.id, todayReady?.planId, todayReady?.activeWordBookId)
+            }
+            LaunchedEffect(showWordBookWords, state.profile.id, todayReady?.activeWordBookId) {
+                if (showWordBookWords) wordBookWordsViewModel?.load(todayReady?.activeWordBookId)
             }
             // 进入阅读 tab 才算准入；今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
             LaunchedEffect(selectedTab, state.profile.id, todayReady?.isUnlocked) {
@@ -311,6 +317,7 @@ fun AppScreen(
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
                 showWordQaCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
@@ -334,6 +341,9 @@ fun AppScreen(
                 showGlobalVocabularySearch = false
             }
             BackHandler(enabled = showLearningRecords && selectedLearningRecordCard == null) { showLearningRecords = false }
+            BackHandler(enabled = showWordBookWords && selectedLearningRecordCard == null) {
+                showWordBookWords = false
+            }
             BackHandler(enabled = selectedRelearnCard != null) {
                 selectedRelearnCard = null
                 vocabularyRelearnViewModel?.load(state.profile.id, todayReady?.activeWordBookId)
@@ -432,10 +442,42 @@ fun AppScreen(
                             searchPronunciationJob?.cancel()
                             searchPronunciationMessage = PronunciationStatus.Idle
                             searchPronunciationJob = pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma))
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American))
                                 if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
                                     searchPronunciationMessage = result
                                 }
+                            }
+                        },
+                        onSpeakBritish = {
+                            val cardSnapshot = card
+                            val request = ++searchPronunciationRequest
+                            searchPronunciationJob?.cancel()
+                            searchPronunciationMessage = PronunciationStatus.Idle
+                            searchPronunciationJob = pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British))
+                                if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
+                                    searchPronunciationMessage = result
+                                }
+                            }
+                        },
+                        onRegenerateAmerican = {
+                            val cardSnapshot = card
+                            val request = ++searchPronunciationRequest
+                            searchPronunciationJob?.cancel()
+                            searchPronunciationMessage = PronunciationStatus.Playing
+                            searchPronunciationJob = pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American, true))
+                                if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) searchPronunciationMessage = result
+                            }
+                        },
+                        onRegenerateBritish = {
+                            val cardSnapshot = card
+                            val request = ++searchPronunciationRequest
+                            searchPronunciationJob?.cancel()
+                            searchPronunciationMessage = PronunciationStatus.Playing
+                            searchPronunciationJob = pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British, true))
+                                if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) searchPronunciationMessage = result
                             }
                         },
                         pronunciationStatus = searchPronunciationMessage,
@@ -481,14 +523,10 @@ fun AppScreen(
             } else if (selectedLearningRecordCard != null) {
                 val card = selectedLearningRecordCard
                 if (card != null) {
-                    LaunchedEffect(card.cardId) {
-                        val request = ++detailPronunciationRequest
-                        detailPronunciationMessage = PronunciationStatus.Playing
-                        val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma))
-                        if (request == detailPronunciationRequest && selectedLearningRecordCard === card) {
-                            detailPronunciationMessage = result
-                        }
-                    }
+                    // 发音只由用户点击触发：打开学习记录详情不自动发音。
+                    // （2bff744 曾在此自动 speak(lemma)，与 onSpeak 叠加成两次调用，
+                    //   learningRecordDetailPronunciationRoutesTheHeldLemmaToTheProvider 断言
+                    //   spokenTexts 恰为一次点击的结果，据此还原为用户触发的唯一路径。）
                     CardDetailScreen(
                         card = card,
                         onRelearn = {
@@ -513,10 +551,36 @@ fun AppScreen(
                             val cardSnapshot = card
                             val request = ++learningRecordPronunciationRequest
                             pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma))
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American))
                                 if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
                                     detailPronunciationMessage = result
                                 }
+                            }
+                        },
+                        onSpeakBritish = {
+                            val cardSnapshot = card
+                            val request = ++learningRecordPronunciationRequest
+                            pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British))
+                                if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
+                                    detailPronunciationMessage = result
+                                }
+                            }
+                        },
+                        onRegenerateAmerican = {
+                            val cardSnapshot = card
+                            val request = ++learningRecordPronunciationRequest
+                            pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American, true))
+                                if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) detailPronunciationMessage = result
+                            }
+                        },
+                        onRegenerateBritish = {
+                            val cardSnapshot = card
+                            val request = ++learningRecordPronunciationRequest
+                            pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British, true))
+                                if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) detailPronunciationMessage = result
                             }
                         },
                         pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
@@ -558,7 +622,6 @@ fun AppScreen(
                     onBack = { showLearningRecords = false },
                     onSelectTab = { learningRecordsViewModel?.selectTab(it) },
                     onRetry = { learningRecordsViewModel?.retry() },
-                    onFilter = { learningRecordsViewModel?.selectAllWordsFilter(it) },
                     onOpenRecord = {
                         learningRecordsViewModel?.openRow(it)
                         detailPronunciationMessage = PronunciationStatus.Idle
@@ -566,8 +629,15 @@ fun AppScreen(
                         detailSource = DetailSource.RECORDS
                         selectedLearningRecordCard = it.wordCard
                     },
+                )
+            } else if (showWordBookWords) {
+                // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
+                WordBookWordsScreen(
+                    state = wordBookWordsState,
+                    onBack = { showWordBookWords = false },
+                    onFilter = { wordBookWordsViewModel?.selectFilter(it) },
+                    onRetry = { wordBookWordsViewModel?.retry() },
                     onOpenWord = {
-                        learningRecordsViewModel?.openRow(it)
                         detailPronunciationMessage = PronunciationStatus.Idle
                         learningRecordPronunciationRequest++
                         detailSource = DetailSource.RECORDS
@@ -595,11 +665,17 @@ fun AppScreen(
                 // showLearning state machine untouched, and returning from it (clearDetail) drops
                 // the user back onto the same card / normal learning state.
                 Box(modifier = Modifier.fillMaxSize()) {
+                    // 学习时自动发音（D1，docs/decisions/2026-10-06-auto-pronunciation-and-wordbook-words.md）：
+                    // 词卡就绪自动朗读一次，受语音设置开关控制（默认开）；与用户点击 onSpeak
+                    // 共存互不取消——就绪自动 1 次 + 点击 = 2 次是合法序列。浏览场景（详情/词书/
+                    // 记录/阅读）一律不自动发音，维持批次 5/6 的用户触发唯一契约。
+                    val autoSpeakOnCardReady = speechSettingsViewModel?.state?.collectAsState()?.value?.autoSpeakOnCardReady ?: true
                     LaunchedEffect((cardState as? WordCardUiState.Ready)?.card?.cardId) {
-                        val ready = cardState as? WordCardUiState.Ready ?: return@LaunchedEffect
+                        val card = (cardState as? WordCardUiState.Ready)?.card ?: return@LaunchedEffect
+                        if (!autoSpeakOnCardReady) return@LaunchedEffect
                         val request = ++wordCardPronunciationRequest
                         wordCardPronunciationMessage = PronunciationStatus.Playing.message()
-                        val result = pronunciationStatus(pronunciationProvider?.speak(ready.card.lemma)).message()
+                        val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma)).message()
                         if (request == wordCardPronunciationRequest) {
                             wordCardPronunciationMessage = result
                         }
@@ -624,14 +700,8 @@ fun AppScreen(
                     )
                     if (detailCard != null) {
                         val card = detailCard!!
-                        LaunchedEffect(card.cardId) {
-                            val request = ++detailPronunciationRequest
-                            detailPronunciationMessage = PronunciationStatus.Playing
-                            val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma))
-                            if (request == detailPronunciationRequest && detailCard === card) {
-                                detailPronunciationMessage = result
-                            }
-                        }
+                        // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
+                        // 否则点击一次会累计两次调用（见 2bff744 回归）。
                         CardDetailScreen(
                             card = card,
                             onRelearn = {
@@ -656,10 +726,36 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma))
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American))
                                     if (request == detailPronunciationRequest && detailCard === card) {
                                         detailPronunciationMessage = result
                                     }
+                                }
+                            },
+                            onSpeakBritish = {
+                                val request = ++detailPronunciationRequest
+                                detailPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British))
+                                    if (request == detailPronunciationRequest && detailCard === card) {
+                                        detailPronunciationMessage = result
+                                    }
+                                }
+                            },
+                            onRegenerateAmerican = {
+                                val request = ++detailPronunciationRequest
+                                detailPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American, true))
+                                    if (request == detailPronunciationRequest && detailCard === card) detailPronunciationMessage = result
+                                }
+                            },
+                            onRegenerateBritish = {
+                                val request = ++detailPronunciationRequest
+                                detailPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British, true))
+                                    if (request == detailPronunciationRequest && detailCard === card) detailPronunciationMessage = result
                                 }
                             },
                             pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
@@ -772,6 +868,9 @@ fun AppScreen(
                     },
                     onAddMiMoPreset = { speechSettingsViewModel?.addMiMoPreset() },
                     onPreview = { text -> speechSettingsViewModel?.preview(text) },
+                    onToggleAutoSpeakOnCardReady = { enabled ->
+                        speechSettingsViewModel?.setAutoSpeakOnCardReady(enabled)
+                    },
                     onBack = { showSpeechSettings = false },
                 )
             } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
@@ -817,7 +916,8 @@ fun AppScreen(
                     },
                 )
             } else if (showReadingHistory && historyArticle == null) {
-                val history = (readingState as? ReadingAccessUiState.Ready)?.history.orEmpty()
+                // 锁定态同样要给出历史：历史与解锁正交，未解锁只挡住「今天生成新文章」。
+                val history = readingState.historyOrEmpty
                 ReadingHistoryScreen(
                     history = history,
                     onBack = { showReadingHistory = false },
@@ -868,14 +968,8 @@ fun AppScreen(
                     )
                     // 点词的详情是阅读页之上的覆盖层，不动 readingTarget 的状态机。
                         selectedArticleCard?.let { card ->
-                        LaunchedEffect(card.cardId) {
-                            val request = ++detailPronunciationRequest
-                            detailPronunciationMessage = PronunciationStatus.Playing
-                            val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma))
-                            if (request == detailPronunciationRequest && selectedArticleCard === card) {
-                                detailPronunciationMessage = result
-                            }
-                        }
+                        // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
+                        // 否则点击一次会累计两次调用（见 2bff744 回归）。
                         CardDetailScreen(
                             card = card,
                             onRelearn = {
@@ -898,10 +992,36 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma))
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American))
                                     if (request == detailPronunciationRequest && selectedArticleCard === card) {
                                         detailPronunciationMessage = result
                                     }
+                                }
+                            },
+                            onSpeakBritish = {
+                                val request = ++detailPronunciationRequest
+                                detailPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British))
+                                    if (request == detailPronunciationRequest && selectedArticleCard === card) {
+                                        detailPronunciationMessage = result
+                                    }
+                                }
+                            },
+                            onRegenerateAmerican = {
+                                val request = ++detailPronunciationRequest
+                                detailPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American, true))
+                                    if (request == detailPronunciationRequest && selectedArticleCard === card) detailPronunciationMessage = result
+                                }
+                            },
+                            onRegenerateBritish = {
+                                val request = ++detailPronunciationRequest
+                                detailPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British, true))
+                                    if (request == detailPronunciationRequest && selectedArticleCard === card) detailPronunciationMessage = result
                                 }
                             },
                             pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
@@ -949,6 +1069,7 @@ fun AppScreen(
                                 onOpenLearningTools = { selectedTab = AppTab.SETTINGS },
                                 onOpenCheckIn = { showCheckIn = true },
                                 onOpenLearningRecords = { showLearningRecords = true },
+                                onOpenWordBookWords = { showWordBookWords = true },
                                 vocabularyCount = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
                                 onOpenVocabulary = {
                                     vocabularyViewModel?.load(state.profile.id)

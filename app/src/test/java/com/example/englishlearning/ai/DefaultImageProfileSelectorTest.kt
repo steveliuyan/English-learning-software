@@ -62,8 +62,9 @@ class DefaultImageProfileSelectorTest {
     }
 
     @Test
-    fun selectedProfileWithoutKeyIsClearedAndTextSelectionIsPreserved() = runTest {
-        val preferences = FakePreferences(AiPreference(defaultTextProfileId = "p-text", defaultImageProfileId = "p1"))
+    fun selectedProfileWithoutKeyRemainsBoundAndTextSelectionIsPreserved() = runTest {
+        val current = AiPreference(defaultTextProfileId = "p-text", defaultImageProfileId = "p1")
+        val preferences = FakePreferences(current)
         val result = DefaultImageProfileSelector(
             preferences,
             FakeProfiles(listOf(profile("p1", AiCapability.ImageGeneration))),
@@ -71,7 +72,8 @@ class DefaultImageProfileSelectorTest {
         ).select()
 
         assertEquals(DefaultImageProfileResult.Unavailable, result)
-        assertEquals(AiPreference(defaultTextProfileId = "p-text"), preferences.saved.single())
+        assertTrue(preferences.saved.isEmpty(), "缺少 Key 时保留生图 Profile 绑定，等待用户重新录入")
+        assertEquals(current, preferences.get().getOrThrow())
     }
 
     @Test

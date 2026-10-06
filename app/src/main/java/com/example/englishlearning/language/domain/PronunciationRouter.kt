@@ -27,6 +27,15 @@ class PronunciationRouter(
 
     override suspend fun speak(text: String): PronunciationResult = speak(text, savedPreference())
 
+    override suspend fun speak(text: String, accent: PronunciationAccent): PronunciationResult =
+        speak(text, accent, false, savedPreference())
+
+    override suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+    ): PronunciationResult = speak(text, accent, forceRegenerate, savedPreference())
+
     private suspend fun savedPreference(): SpeechPreference = try {
         preferences.get().getOrElse { error ->
             if (error is CancellationException) throw error
@@ -38,32 +47,44 @@ class PronunciationRouter(
         SpeechPreference()
     }
 
-    suspend fun speak(text: String, preference: SpeechPreference): PronunciationResult = when (preference.selectedEngine) {
+    suspend fun speak(text: String, preference: SpeechPreference): PronunciationResult =
+        speak(text, PronunciationAccent.American, false, preference)
+
+    private suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        preference: SpeechPreference,
+    ): PronunciationResult = when (preference.selectedEngine) {
         PronunciationEngine.SystemTts -> systemProvider.speak(text)
-        PronunciationEngine.MiMo -> speakRemoteOrSystem(text, preference.miMoProfileId, miMoFactory::create)
+        PronunciationEngine.MiMo -> speakRemoteOrSystem(text, accent, forceRegenerate, preference.miMoProfileId, miMoFactory::create)
         PronunciationEngine.OpenAi -> {
-            val openAiResult = speakRemote(text, preference.openAiProfileId, openAiFactory::create)
+            val openAiResult = speakRemote(text, accent, forceRegenerate, preference.openAiProfileId, openAiFactory::create)
             if (openAiResult == PronunciationResult.Played) openAiResult
-            else speakRemoteOrSystem(text, preference.miMoProfileId, miMoFactory::create)
+            else speakRemoteOrSystem(text, accent, forceRegenerate, preference.miMoProfileId, miMoFactory::create)
         }
     }
 
     private suspend fun speakRemoteOrSystem(
         text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
         profileId: String?,
         factory: (String) -> PronunciationProvider,
-    ): PronunciationResult = speakRemote(text, profileId, factory).let { result ->
+    ): PronunciationResult = speakRemote(text, accent, forceRegenerate, profileId, factory).let { result ->
         if (result == PronunciationResult.Played) result else systemProvider.speak(text)
     }
 
     private suspend fun speakRemote(
         text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
         profileId: String?,
         factory: (String) -> PronunciationProvider,
     ): PronunciationResult {
         if (profileId == null) return PronunciationResult.Unavailable("Missing speech profile")
         return try {
-            factory(profileId).speak(text)
+            factory(profileId).speak(text, accent, forceRegenerate)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

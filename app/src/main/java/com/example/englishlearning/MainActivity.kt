@@ -13,6 +13,7 @@ import com.example.englishlearning.ui.GlobalVocabularySearchViewModel
 import com.example.englishlearning.ui.ImageStudioViewModel
 import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.LearningRecordsViewModel
+import com.example.englishlearning.ui.WordBookWordsViewModel
 import com.example.englishlearning.ui.AppViewModel
 import com.example.englishlearning.ui.ReadingAccessViewModel
 import com.example.englishlearning.ui.SentenceAnalysisViewModel
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
                 speechSettingsViewModel = hiltViewModel<SpeechSettingsViewModel>(),
                 checkInViewModel = hiltViewModel<CheckInViewModel>(),
                 learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
+                wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),
                 vocabularyViewModel = hiltViewModel<VocabularyViewModel>(),
                 vocabularyRelearnViewModel = hiltViewModel<VocabularyRelearnViewModel>(),
                 wordQaViewModel = hiltViewModel<WordAiQaViewModel>(),

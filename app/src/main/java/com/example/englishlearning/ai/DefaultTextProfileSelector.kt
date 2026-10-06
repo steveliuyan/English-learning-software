@@ -31,7 +31,7 @@ class DefaultTextProfileSelector(
         val hasKey = secrets.hasKey(profile).getOrElse {
             return DefaultTextProfileResult.StorageUnavailable
         }
-        if (!hasKey) return clearAndUnavailable(preference)
+        if (!hasKey) return DefaultTextProfileResult.Unavailable
         return DefaultTextProfileResult.Selected(profile)
     }
 

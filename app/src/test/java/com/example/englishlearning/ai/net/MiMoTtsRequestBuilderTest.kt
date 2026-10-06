@@ -5,6 +5,7 @@ import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.core.security.SecretReference
+import com.example.englishlearning.language.domain.PronunciationAccent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,6 +24,50 @@ class MiMoTtsRequestBuilderTest {
     )
 
     @Test
+    fun `american accent request includes fixed standard pronunciation instruction`() {
+        val request = MiMoTtsRequestBuilder.build(
+            profile = profile,
+            input = "schedule",
+            apiKey = "key".toCharArray(),
+            accent = PronunciationAccent.American,
+        ).getOrThrow()
+
+        assertTrue(request.body.contains("American English"))
+        assertTrue(request.body.contains("standard, clear pronunciation"))
+        assertTrue(request.body.contains("Do not add explanations"))
+    }
+
+    @Test
+    fun `british accent request includes fixed british pronunciation instruction`() {
+        val request = MiMoTtsRequestBuilder.build(
+            profile = profile,
+            input = "schedule",
+            apiKey = "key".toCharArray(),
+            accent = PronunciationAccent.British,
+        ).getOrThrow()
+
+        assertTrue(request.body.contains("British English"))
+        assertTrue(request.body.contains("standard, clear pronunciation"))
+        assertTrue(request.body.contains("Do not add explanations"))
+    }
+
+    @Test
+    fun `accent instruction is separate from assistant text`() {
+        val request = MiMoTtsRequestBuilder.build(
+            profile = profile,
+            input = "schedule",
+            apiKey = "key".toCharArray(),
+            accent = PronunciationAccent.American,
+        ).getOrThrow()
+
+        val assistantStart = request.body.indexOf("\"role\":\"assistant\"")
+        val assistantEnd = request.body.indexOf("}", assistantStart)
+        val assistantMessage = request.body.substring(assistantStart, assistantEnd)
+        assertTrue(assistantMessage.contains("schedule"))
+        assertTrue(!assistantMessage.contains("American English"))
+    }
+
+    @Test
     fun `builds chat completions body with assistant role and wav audio`() {
         val request = MiMoTtsRequestBuilder.build(profile, "hello", "key".toCharArray()).getOrThrow()
 
@@ -35,8 +80,9 @@ class MiMoTtsRequestBuilderTest {
         assertTrue(body.contains("\"content\":\"hello\""))
         assertTrue(body.contains("\"audio\":{\"format\":\"wav\",\"voice\":"))
         assertTrue(body.contains("\"stream\":false"))
-        // 合成文本只能出现在 assistant 消息里，不允许任何 user/指令位。
-        assertTrue(!body.contains("\"role\":\"user\""))
+        // 合成文本只能出现在 assistant 消息里；user 仅承载固定风格说明。
+        assertTrue(body.contains("\"role\":\"user\""))
+        assertTrue(body.contains("standard, clear pronunciation"))
     }
 
     @Test

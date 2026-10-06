@@ -11,6 +11,28 @@ import kotlin.reflect.full.primaryConstructor
 
 class PronunciationRouterTest {
     @Test
+    fun `router forwards selected accent and regeneration to mimo provider`() = runTest {
+        val mimo = AccentRecordingProvider(PronunciationResult.Played)
+        val router = PronunciationRouter(
+            FakeProvider(PronunciationResult.Played),
+            CountingFactory(mimo),
+            CountingFactory(FakeProvider(PronunciationResult.Played)),
+            FixedSpeechPreferenceRepository(
+                SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo-profile"),
+            ),
+        )
+
+        router.speak(
+            "schedule",
+            PronunciationAccent.British,
+            true,
+        )
+
+        assertEquals(PronunciationAccent.British, mimo.lastAccent)
+        assertEquals(true, mimo.lastForceRegenerate)
+    }
+
+    @Test
     fun `router requires a speech preference repository`() {
         val repositoryParameter = requireNotNull(PronunciationRouter::class.primaryConstructor)
             .parameters
@@ -428,6 +450,26 @@ class PronunciationRouterTest {
         override fun create(profileId: String): PronunciationProvider {
             profileIds += profileId
             return provider
+        }
+    }
+
+    private class AccentRecordingProvider(result: PronunciationResult) : FakeProvider(result) {
+        var lastAccent: PronunciationAccent? = null
+        var lastForceRegenerate: Boolean? = null
+
+        override suspend fun speak(text: String, accent: PronunciationAccent): PronunciationResult {
+            lastAccent = accent
+            return result
+        }
+
+        override suspend fun speak(
+            text: String,
+            accent: PronunciationAccent,
+            forceRegenerate: Boolean,
+        ): PronunciationResult {
+            lastAccent = accent
+            lastForceRegenerate = forceRegenerate
+            return result
         }
     }
 

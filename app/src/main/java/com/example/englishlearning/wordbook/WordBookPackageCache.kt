@@ -21,6 +21,11 @@ class WordBookPackageCache<T>(
         entries[key] = Entry(next, parsed)
         return parsed
     }
+
+    fun move(from: File, to: File) {
+        val entry = entries.remove(from.canonicalPath) ?: return
+        entries[to.canonicalPath] = entry
+    }
 }
 
 private data class PackageFingerprint(

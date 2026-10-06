@@ -245,6 +245,29 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
+    fun migrateV26ToV27_addsAutoSpeakOnCardReadyDefaultingToOnWithoutLosingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 26).apply {
+            execSQL(
+                "INSERT INTO speech_preferences (preferenceId, selectedEngine, openAiProfileId, miMoProfileId) " +
+                    "VALUES ('device', 'MiMo', NULL, 'mimo')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 27, true, AppDatabase.MIGRATION_26_27).apply {
+            // 老行必须活下来，且 autoSpeakOnCardReady 回填 1（开）= 新域默认值，升级前后行为一致。
+            query("SELECT selectedEngine, miMoProfileId, autoSpeakOnCardReady FROM speech_preferences WHERE preferenceId = 'device'").use { cursor ->
+                assertTrue("the v26 speech preference must survive the migration", cursor.moveToFirst())
+                assertEquals("MiMo", cursor.getString(0))
+                assertEquals("mimo", cursor.getString(1))
+                assertEquals(1, cursor.getInt(2))
+            }
+            close()
+        }
+    }
+
+    @Test
     fun migrateAllHistoricalSchemasWithoutDestructiveFallback() {
         val helper = migrationHelper()
         helper.createDatabase(TEST_DB, 1).apply {

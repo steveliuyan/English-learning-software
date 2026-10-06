@@ -277,22 +277,24 @@ class AiProfileSettingsViewModel @Inject constructor(
 
         val defaultTextId = stored.defaultTextProfileId
         val defaultTextProfile = profilesList.firstOrNull { it.profileId == defaultTextId }
-        val textValid = defaultTextProfile != null &&
-            AiCapability.Text in defaultTextProfile.capabilities &&
-            secrets.hasKey(defaultTextProfile).getOrDefault(false)
+        val textCapabilityValid = defaultTextProfile?.let { AiCapability.Text in it.capabilities } == true
+        val textHasKey = defaultTextProfile?.let { secrets.hasKey(it).getOrNull() } == true
+        val textValid = textCapabilityValid && textHasKey
 
         val defaultImageId = stored.defaultImageProfileId
         val defaultImageProfile = profilesList.firstOrNull { it.profileId == defaultImageId }
-        val imageValid = defaultImageProfile != null &&
-            AiCapability.ImageGeneration in defaultImageProfile.capabilities &&
-            secrets.hasKey(defaultImageProfile).getOrDefault(false)
+        val imageCapabilityValid = defaultImageProfile?.let { AiCapability.ImageGeneration in it.capabilities } == true
+        val imageHasKey = defaultImageProfile?.let { secrets.hasKey(it).getOrNull() } == true
+        val imageValid = imageCapabilityValid && imageHasKey
 
-        // 失效清除只清各自的字段：文本默认失效不能连带清掉生图默认，反之亦然。
-        if (defaultTextId != null && !textValid) {
-            preferences.save(stored.copy(defaultTextProfileId = null, defaultImageProfileId = defaultImageId.takeIf { imageValid }))
-        }
-        if (defaultImageId != null && !imageValid) {
-            preferences.save(stored.copy(defaultImageProfileId = null, defaultTextProfileId = defaultTextId.takeIf { textValid }))
+        // 只有 Profile 已不存在或能力不匹配时才清除绑定。缺少 Key / Keystore 暂不可读时保留
+        // Profile ID，用户补录 Key 后可以自动恢复；两个默认字段始终独立处理。
+        val repaired = stored.copy(
+            defaultTextProfileId = defaultTextId.takeUnless { it != null && !textCapabilityValid },
+            defaultImageProfileId = defaultImageId.takeUnless { it != null && !imageCapabilityValid },
+        )
+        if (repaired != stored) {
+            preferences.save(repaired)
         }
 
         val effectiveTextId = defaultTextId.takeIf { textValid }

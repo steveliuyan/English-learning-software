@@ -33,6 +33,8 @@ data class SpeechSettingsUiState(
     val selectedEngine: PronunciationEngine = PronunciationEngine.SystemTts,
     val openAiProfileId: String? = null,
     val miMoProfileId: String? = null,
+    /** 学习流词卡就绪自动朗读一次；关闭后仅用户点击触发（D1）。 */
+    val autoSpeakOnCardReady: Boolean = true,
     val candidates: List<SpeechProfileCandidate> = emptyList(),
     val message: String? = null,
     /** 试听结果反馈；与选择操作的 message 分开，互不覆盖。 */
@@ -81,6 +83,8 @@ class SpeechSettingsViewModel @Inject constructor(
             selectedEngine = engine,
             openAiProfileId = if (engine == PronunciationEngine.OpenAi) profileId else current.openAiProfileId,
             miMoProfileId = if (engine == PronunciationEngine.MiMo) profileId else current.miMoProfileId,
+            // 引擎选择是读改写：不能把自动发音开关抹回默认值。
+            autoSpeakOnCardReady = current.autoSpeakOnCardReady,
         )
         if (preferences.save(next).isSuccess) {
             _state.value = current.copy(
@@ -91,6 +95,17 @@ class SpeechSettingsViewModel @Inject constructor(
             )
         } else {
             _state.value = current.copy(message = "本机存储暂时不可用，改动没有保存。")
+        }
+    }
+
+    /** 学习时自动发音开关（D1）：读改写保存，失败只报存储错误，不改本地状态。 */
+    fun setAutoSpeakOnCardReady(enabled: Boolean) = viewModelScope.launch {
+        val stored = preferences.get().getOrDefault(SpeechPreference())
+        val next = stored.copy(autoSpeakOnCardReady = enabled)
+        if (preferences.save(next).isSuccess) {
+            _state.value = _state.value.copy(autoSpeakOnCardReady = enabled, message = null)
+        } else {
+            _state.value = _state.value.copy(message = STORAGE_FAILED_MESSAGE)
         }
     }
 
@@ -119,6 +134,7 @@ class SpeechSettingsViewModel @Inject constructor(
             selectedEngine = PronunciationEngine.MiMo,
             openAiProfileId = _state.value.openAiProfileId,
             miMoProfileId = profileId,
+            autoSpeakOnCardReady = _state.value.autoSpeakOnCardReady,
         )
         if (preferences.save(next).isFailure) {
             _state.value = _state.value.copy(message = STORAGE_FAILED_MESSAGE)
@@ -162,6 +178,7 @@ class SpeechSettingsViewModel @Inject constructor(
                 ?: PronunciationEngine.SystemTts,
             openAiProfileId = preference.openAiProfileId,
             miMoProfileId = preference.miMoProfileId,
+            autoSpeakOnCardReady = preference.autoSpeakOnCardReady,
             candidates = speechProfiles.map { it.toCandidate() },
             message = message,
         )

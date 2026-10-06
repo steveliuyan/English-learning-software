@@ -60,6 +60,7 @@ fun TodayPlanScreen(
     onOpenLearningTools: () -> Unit = {},
     onOpenCheckIn: () -> Unit = {},
     onOpenLearningRecords: () -> Unit = {},
+    onOpenWordBookWords: () -> Unit = {},
     onOpenVocabulary: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     vocabularyCount: Int? = null,
@@ -253,6 +254,15 @@ fun TodayPlanScreen(
                         .semantics { contentDescription = "学习记录" },
                     colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = MintPrimaryDark),
                 ) { Text("学习记录", fontWeight = FontWeight.Bold) }
+                Button(
+                    onClick = onOpenWordBookWords,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("today_plan_open_wordbook_words")
+                        .semantics { contentDescription = "词书单词" },
+                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = MintPrimaryDark),
+                ) { Text("词书单词", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenVocabulary,
                     modifier = Modifier.fillMaxWidth().height(50.dp).testTag("today_plan_open_vocabulary")

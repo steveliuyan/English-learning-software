@@ -13,6 +13,7 @@ import com.example.englishlearning.learning.SearchVocabularyResult
 import com.example.englishlearning.learning.SearchVocabularyUseCase
 import com.example.englishlearning.learning.VocabularySearchHistory
 import com.example.englishlearning.learning.VocabularySearchHistoryRepository
+import com.example.englishlearning.learning.normalizeVocabularySearchQuery
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.learning.WordCardSource
 import com.example.englishlearning.learning.domain.PhraseEntry
@@ -76,7 +77,46 @@ class GlobalVocabularySearchViewModelTest {
         val state = assertIs<GlobalVocabularySearchUiState.Ready>(vm.uiState.value)
         assertEquals(listOf("ability"), state.results.map { it.result.lemma })
         assertEquals("四级词书", state.results.single().result.wordBookName)
-        assertEquals(4, state.results.single().searchCount)
+        // 历史里已有 4 次，本次搜索本身也算一次，所以是 5——计数取自**搜索之后**的历史。
+        assertEquals(5, state.results.single().searchCount)
+    }
+
+    /**
+     * 首次搜一个从没搜过的词，列表上必须显示「搜索 1 次」。
+     *
+     * 旧实现「先读历史、再执行搜索」，而计数正是在搜索里写入的：读到的是自增前的快照，
+     * 于是第一次搜永远显示「搜索 0 次」，重复搜也永远少一次。
+     */
+    @Test
+    fun the_first_search_of_a_new_word_counts_itself() = runTest(dispatcher) {
+        val history = ObservableHistory(entries = emptyList())
+        val vm = viewModel(history = history)
+        vm.setProfile("p1")
+        vm.updateQuery("ability")
+        vm.search()
+        advanceUntilIdle()
+
+        val state = assertIs<GlobalVocabularySearchUiState.Ready>(vm.uiState.value)
+        assertEquals(1, state.results.single().searchCount)
+        assertEquals(1, state.results.single().searchCountForDisplay)
+    }
+
+    /**
+     * 大小写/空白混合的查询也要对得上历史行：历史表按**小写归一化**的 `normalizedQuery` 建键，
+     * 拿原始输入去比对（旧实现就是这么写的）会让 `Ability` 永远匹配不到 `ability`，计数恒为 0。
+     */
+    @Test
+    fun a_mixed_case_query_still_finds_its_history_count() = runTest(dispatcher) {
+        val history = ObservableHistory(entries = listOf(history("p1", "ability", 4)))
+        val vm = viewModel(history = history)
+        vm.setProfile("p1")
+        vm.updateQuery("  Ability  ")
+        vm.search()
+        advanceUntilIdle()
+
+        val state = assertIs<GlobalVocabularySearchUiState.Ready>(vm.uiState.value)
+        assertEquals(listOf("ability"), state.results.map { it.result.lemma })
+        assertEquals(5, state.results.single().searchCount, "大小写与多余空白都要归一化后再查计数")
     }
 
     @Test
@@ -164,7 +204,8 @@ class GlobalVocabularySearchViewModelTest {
         val state = assertIs<GlobalVocabularySearchUiState.Ready>(vm.uiState.value)
         assertEquals(null, state.history.single().searchCountForDisplay)
         assertEquals(null, state.results.single().searchCountForDisplay)
-        assertEquals(7, history.entries.single().searchCount)
+        // 关掉的是**显示**，不是计数本身：本次搜索照旧把历史自增到 8（7 + 本次 1）。
+        assertEquals(8, history.entries.single().searchCount)
     }
 
     // ---- 点开结果：索引只给摘要，完整词卡由这里回源补全 ----
@@ -484,7 +525,29 @@ class GlobalVocabularySearchViewModelTest {
             listProfiles += profileId
             return RepositoryResult.Success(entries.filter { it.profileId == profileId }.take(limit))
         }
-        override suspend fun record(profileId: String, query: String, representative: SearchRepresentative?, at: Instant): RepositoryResult<Unit> { recordCalls++; return RepositoryResult.Success(Unit) }
+        /**
+         * 必须**复刻真实写入语义**（已存在则 +1，不存在则插入 1），而不是「记一笔就返回成功」。
+         *
+         * 理由：计数正确与否，取决于「读历史」发生在「写历史」之前还是之后。夹具若不真的自增，
+         * 前后两次读拿到的是同一份快照，缺陷会被掩盖成绿灯——2026-10-05 实测正是如此。
+         */
+        override suspend fun record(profileId: String, query: String, representative: SearchRepresentative?, at: Instant): RepositoryResult<Unit> {
+            recordCalls++
+            val normalized = normalizeVocabularySearchQuery(query) ?: return RepositoryResult.Success(Unit)
+            val existing = entries.firstOrNull { it.profileId == profileId && it.normalizedQuery == normalized }
+            entries = if (existing == null) {
+                entries + VocabularySearchHistory(profileId, normalized, query.trim(), 1, at, at, representative)
+            } else {
+                entries.map {
+                    if (it === existing) {
+                        it.copy(searchCount = it.searchCount + 1, lastSearchedAt = at, representative = representative)
+                    } else {
+                        it
+                    }
+                }
+            }
+            return RepositoryResult.Success(Unit)
+        }
         override suspend fun find(profileId: String, normalizedQuery: String) = RepositoryResult.Success(entries.find { it.profileId == profileId && it.normalizedQuery == normalizedQuery })
         override suspend fun clear(profileId: String): RepositoryResult<Unit> {
             clearProfiles += profileId

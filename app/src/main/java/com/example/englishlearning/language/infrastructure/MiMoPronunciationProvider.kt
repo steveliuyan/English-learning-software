@@ -8,6 +8,7 @@ import com.example.englishlearning.ai.net.AudioHttpResult
 import com.example.englishlearning.ai.net.AudioHttpTransport
 import com.example.englishlearning.ai.net.MiMoTtsRequestBuilder
 import com.example.englishlearning.ai.net.MiMoTtsResponseParser
+import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
@@ -27,18 +28,53 @@ class MiMoPronunciationProvider(
     private val transport: AudioHttpTransport,
     private val player: AudioPlayer,
     private val profileId: String = DEFAULT_PROFILE_ID,
+    private val cache: com.example.englishlearning.language.domain.PronunciationAudioCache? = null,
 ) : PronunciationProvider {
     override fun capabilities(): Set<PronunciationCapability> = setOf(PronunciationCapability.RemoteAudio)
 
-    override suspend fun speak(text: String): PronunciationResult {
+    override suspend fun speak(text: String): PronunciationResult = speak(text, PronunciationAccent.American, false)
+
+    override suspend fun speak(text: String, accent: PronunciationAccent): PronunciationResult = speak(text, accent, false)
+
+    override suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+    ): PronunciationResult {
         if (text.isBlank()) return PronunciationResult.Unavailable("blank text")
         val profile = profiles.find(profileId).getOrNull() ?: return PronunciationResult.Unavailable("profile unavailable")
         if (profile.providerKind != AiProviderKind.XIAOMI_MIMO) {
             return PronunciationResult.Unavailable("profile kind mismatch")
         }
+        val voice = profile.voice.takeIf { it.isNotBlank() }
+            ?: if (text.any { it in '\u4E00'..'\u9FFF' || it in '\u3400'..'\u4DBF' }) {
+                MiMoTtsRequestBuilder.VOICE_CHINESE
+            } else {
+                MiMoTtsRequestBuilder.VOICE_ENGLISH
+            }
+        val cacheKey = com.example.englishlearning.language.domain.PronunciationCacheKey(
+            text = text,
+            accent = accent,
+            providerId = profile.providerKind.name,
+            model = profile.model,
+            voice = voice,
+        )
+        if (!forceRegenerate) {
+            cache?.get(cacheKey)?.let { cached ->
+                return try {
+                    if (player.play(cached, MiMoTtsRequestBuilder.AUDIO_FORMAT) is AudioPlaybackResult.Played) {
+                        PronunciationResult.Played
+                    } else {
+                        PronunciationResult.Failed()
+                    }
+                } finally {
+                    cached.fill(0)
+                }
+            }
+        }
         val key = secrets.loadKey(profile).getOrNull() ?: return PronunciationResult.Unavailable("key unavailable")
         return try {
-            val request = MiMoTtsRequestBuilder.build(profile, text, key)
+            val request = MiMoTtsRequestBuilder.build(profile, text, key, accent)
                 .getOrElse { return PronunciationResult.Failed() }
             val response = transport.send(
                 AudioHttpRequest(
@@ -55,6 +91,7 @@ class MiMoPronunciationProvider(
                     if (wav == null || wav.isEmpty()) {
                         PronunciationResult.Failed()
                     } else if (player.play(wav, MiMoTtsRequestBuilder.AUDIO_FORMAT) is AudioPlaybackResult.Played) {
+                        cache?.put(cacheKey, wav)
                         PronunciationResult.Played
                     } else {
                         PronunciationResult.Failed()

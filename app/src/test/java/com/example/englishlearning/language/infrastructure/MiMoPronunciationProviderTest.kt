@@ -11,6 +11,7 @@ import com.example.englishlearning.ai.net.AudioHttpResult
 import com.example.englishlearning.ai.net.AudioHttpTransport
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
+import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationResult
 import java.util.Base64
@@ -37,6 +38,73 @@ class MiMoPronunciationProviderTest {
         advancedParameters = AiAdvancedParameters(timeoutSeconds = 12),
         providerKind = AiProviderKind.XIAOMI_MIMO,
     )
+
+    @Test fun `cache hit plays without reading key or sending network request`() = runTest {
+        val cache = com.example.englishlearning.language.domain.InMemoryPronunciationAudioCache()
+        val key = com.example.englishlearning.language.domain.PronunciationCacheKey(
+            "schedule", PronunciationAccent.American, "XIAOMI_MIMO", profile.model, "Mia",
+        )
+        cache.put(key, byteArrayOf(8, 9))
+        val transport = RecordingTransport(AudioHttpResult.Success(responseBody.copyOf()))
+        val store = FakeSecretStore(null)
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
+
+        val result = provider(transport, secretStore = store, player = player, cache = cache).speak("schedule")
+
+        assertIs<PronunciationResult.Played>(result)
+        assertEquals(0, store.readCalls)
+        assertEquals(null, transport.request)
+        assertContentEquals(byteArrayOf(8, 9), player.bytes)
+    }
+
+    @Test fun `failed regeneration preserves existing cached audio`() = runTest {
+        val cache = com.example.englishlearning.language.domain.InMemoryPronunciationAudioCache()
+        val key = com.example.englishlearning.language.domain.PronunciationCacheKey(
+            "schedule", PronunciationAccent.American, "XIAOMI_MIMO", profile.model, "Mia",
+        )
+        cache.put(key, byteArrayOf(8, 9))
+        val transport = RecordingTransport(AudioHttpResult.HttpError(500, byteArrayOf(1)))
+
+        val result = provider(transport, cache = cache).speak("schedule", PronunciationAccent.American, true)
+
+        assertIs<PronunciationResult.Failed>(result)
+        assertContentEquals(byteArrayOf(8, 9), cache.get(key))
+    }
+
+    @Test fun `successful regeneration replaces only selected accent cache`() = runTest {
+        val cache = com.example.englishlearning.language.domain.InMemoryPronunciationAudioCache()
+        val american = com.example.englishlearning.language.domain.PronunciationCacheKey(
+            "schedule", PronunciationAccent.American, "XIAOMI_MIMO", profile.model, "Mia",
+        )
+        val british = american.copy(accent = PronunciationAccent.British)
+        cache.put(american, byteArrayOf(8))
+        cache.put(british, byteArrayOf(7))
+        val regenerated = byteArrayOf(4, 5, 6)
+        val response = """{"choices":[{"message":{"role":"assistant","content":"","audio":{"data":"${Base64.getEncoder().encodeToString(regenerated)}"}}}]}""".encodeToByteArray()
+
+        val result = provider(RecordingTransport(AudioHttpResult.Success(response)), cache = cache)
+            .speak("schedule", PronunciationAccent.American, true)
+
+        assertIs<PronunciationResult.Played>(result)
+        assertContentEquals(regenerated, cache.get(american))
+        assertContentEquals(byteArrayOf(7), cache.get(british))
+    }
+
+    @Test fun `british speech passes british accent to chat completions request`() = runTest {
+        val transport = RecordingTransport(AudioHttpResult.Success(responseBody.copyOf()))
+        val result = provider(transport).speak("schedule", PronunciationAccent.British)
+
+        assertIs<PronunciationResult.Played>(result)
+        assertTrue(transport.request!!.body.decodeToString().contains("British English"))
+    }
+
+    @Test fun `default speech uses american accent`() = runTest {
+        val transport = RecordingTransport(AudioHttpResult.Success(responseBody.copyOf()))
+        val result = provider(transport).speak("schedule")
+
+        assertIs<PronunciationResult.Played>(result)
+        assertTrue(transport.request!!.body.decodeToString().contains("American English"))
+    }
 
     @Test fun `successful speech plays decoded wav via chat completions protocol`() = runTest {
         val transport = RecordingTransport(AudioHttpResult.Success(responseBody))
@@ -167,12 +235,14 @@ class MiMoPronunciationProviderTest {
         player: AudioPlayer = RecordingAudioPlayer(AudioPlaybackResult.Played),
         profile: AiProfile? = this.profile,
         profileId: String = profile?.profileId ?: "mimo",
+        cache: com.example.englishlearning.language.domain.PronunciationAudioCache? = null,
     ) = MiMoPronunciationProvider(
         profiles = FakeProfileRepository(profile),
         secrets = AiProfileSecretUseCase(secretStore),
         transport = transport,
         player = player,
         profileId = profileId,
+        cache = cache,
     )
 
     private class RecordingAudioPlayer(private val outcome: AudioPlaybackResult) : AudioPlayer {

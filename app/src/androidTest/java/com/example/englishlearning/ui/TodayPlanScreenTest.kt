@@ -148,6 +148,16 @@ class TodayPlanScreenTest {
         assertEquals(1, opened)
     }
 
+    /** D2：词书单词从学习记录拆出为独立入口，与「学习记录」并排。 */
+    @Test fun ready_offers_a_labelled_word_book_words_entry() {
+        var opened = 0
+        composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5), onOpenWordBookWords = { opened++ }) }
+        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().assertExists().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, opened)
+        composeRule.onNodeWithContentDescription("词书单词").assertExists()
+    }
+
     @Test fun ready_offers_setup_entry_to_reopen_word_book_settings() {
         var opened = 0
         composeRule.setContent {

@@ -5,6 +5,14 @@ interface PronunciationProvider {
     fun capabilities(): Set<PronunciationCapability>
 
     suspend fun speak(text: String): PronunciationResult
+
+    suspend fun speak(text: String, accent: PronunciationAccent): PronunciationResult = speak(text)
+
+    suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+    ): PronunciationResult = speak(text, accent)
 }
 
 sealed interface PronunciationResult {
@@ -17,4 +25,9 @@ enum class PronunciationCapability {
     SystemTextToSpeech,
     OnDeviceAudio,
     RemoteAudio,
+}
+
+enum class PronunciationAccent {
+    American,
+    British,
 }

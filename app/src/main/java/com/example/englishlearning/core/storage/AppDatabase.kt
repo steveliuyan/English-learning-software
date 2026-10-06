@@ -43,6 +43,7 @@ import com.example.englishlearning.core.storage.entity.WordBookProgressMigration
 import com.example.englishlearning.core.storage.entity.VocabularyEntryEntity
 import com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEntity
 import com.example.englishlearning.core.storage.entity.VocabularySearchIndexEntity
+import com.example.englishlearning.core.storage.entity.VocabularySearchGramEntity
 
 /**
  * Versioned Room metadata store. Every version transition must be supplied through [MIGRATIONS].
@@ -72,8 +73,9 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchIndexEnti
         WordBookProgressMigrationAuditEntity::class,
         VocabularySearchHistoryEntity::class,
         VocabularySearchIndexEntity::class,
+        VocabularySearchGramEntity::class,
     ],
-    version = 25,
+    version = 27,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -523,8 +525,57 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_25_26: Migration = object : Migration(25, 26) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createVocabularySearchGramTable(db)
+                // gram 串必须由 Kotlin 计算（迁移是纯 SQL），所以这里清空派生索引行，
+                // 由 RefreshVocabularySearchIndexUseCase 在应用启动时按 dataVersion 整册重建。
+                // 不清空的话 indexedVersions() 会认为各册没变而跳过重建 → gram 表恒为空 →
+                // contains 查询恒空，而表建得好好的、迁移也"成功"：最危险的静默失效。
+                db.execSQL("DELETE FROM `vocabulary_search_index`")
+            }
+        }
+
+        /** v26→v27：语音偏好新增「学习时自动发音」开关（D1，决策文档 2026-10-06）。历史行回填开。 */
+        val MIGRATION_26_27: Migration = object : Migration(26, 27) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `speech_preferences` ADD COLUMN `autoSpeakOnCardReady` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
+
+        /**
+         * 词条字串索引（FTS4 + 3-gram）的表名与建表 DDL。
+         *
+         * **建表由 Room 负责**（`VocabularySearchGramEntity` 是 FTS4 实体，全新安装时由
+         * Room 生成的 createAllTables 建出来）。这里的 DDL 只给迁移用，因此必须与 Room
+         * 生成的那条**逐字一致**——否则迁移后的 schema 校验会失败
+         * （`Migration didn't properly handle: vocabulary_search_gram`）。
+         * 这条约束由 `MigrationTestHelper.runMigrationsAndValidate` 自动把关，不需要额外测试。
+         *
+         * 为什么是 FTS4：真机探针实测 Android 13 的 framework SQLite 是 3.32.2，
+         * `fts3`/`fts4` 可用而 **`fts5` 未编译**，`trigram` 分词器还额外要求 ≥3.34。
+         * 子串匹配因此靠「索引 3-gram token + 短语查询」手工实现，见 `VocabularySearchGram`。
+         */
+        internal const val VOCABULARY_SEARCH_GRAM_TABLE = "vocabulary_search_gram"
+
+        /**
+         * 迁移用的字串索引建表语句——**必须与 Room 为 `VocabularySearchGramEntity` 生成的
+         * `CREATE VIRTUAL TABLE` 逐字一致**（Room 的 schema 校验会把 FTS 表的列与选项一起比对）。
+         * 上面的形式取自 `app/schemas/.../26.json` 里该实体的 `createSql`，只把 `${TABLE_NAME}`
+         * 替换成表名。改了实体注解就必须同步改这里；不一致时
+         * `MigrationTestHelper.runMigrationsAndValidate` 会直接失败。
+         */
+        internal const val VOCABULARY_SEARCH_GRAM_DDL =
+            "CREATE VIRTUAL TABLE IF NOT EXISTS `vocabulary_search_gram` USING FTS4(" +
+                "`tokens` TEXT NOT NULL, `wordBookId` TEXT NOT NULL, `cardId` TEXT NOT NULL, " +
+                "tokenize=unicode61 `tokenchars=~`, notindexed=`wordBookId`, notindexed=`cardId`)"
+
+        private fun createVocabularySearchGramTable(db: SupportSQLiteDatabase) {
+            db.execSQL(VOCABULARY_SEARCH_GRAM_DDL)
+        }
 
         /** 早期占位卡片 id 的前缀；真实词书的卡片 id 以 `<册>:` 开头。 */
         private val LEGACY_PLACEHOLDER_ID_PREFIX = LegacyCardIdRepair.PLACEHOLDER_PREFIX

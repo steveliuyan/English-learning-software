@@ -216,15 +216,28 @@ class AiProfileSettingsViewModelTest {
     }
 
     @Test
-    fun loadClearsAStaleDefaultBindingWhenItsProfileHasNoKey() = runTest(dispatcher) {
+    fun loadKeepsDefaultBindingWhenItsProfileHasNoKey() = runTest(dispatcher) {
         preferences.value = AiPreference(defaultTextProfileId = "p1")
         val viewModel = viewModel(repository(initial = listOf(profile("p1"))))
 
         viewModel.load()
         advanceUntilIdle()
 
-        assertNull(preferences.value.defaultTextProfileId)
+        assertEquals("p1", preferences.value.defaultTextProfileId)
         assertFalse((viewModel.listState.value as AiProfileListUiState.Ready).items.single().isDefaultTextProfile)
+    }
+
+    @Test
+    fun loadKeepsImageDefaultBindingWhenItsProfileHasNoKey() = runTest(dispatcher) {
+        val image = profile("p-img").copy(capabilities = setOf(AiCapability.ImageGeneration))
+        preferences.value = AiPreference(defaultImageProfileId = "p-img")
+        val viewModel = viewModel(repository(initial = listOf(image)))
+
+        viewModel.load()
+        advanceUntilIdle()
+
+        assertEquals("p-img", preferences.value.defaultImageProfileId)
+        assertFalse((viewModel.listState.value as AiProfileListUiState.Ready).items.single().isDefaultImageProfile)
     }
 
     @Test

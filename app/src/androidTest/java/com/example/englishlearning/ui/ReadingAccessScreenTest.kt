@@ -42,6 +42,21 @@ class ReadingAccessScreenTest {
     }
 
     @Test
+    fun lockedStateStillShowsTheOfflineHistoryCount() {
+        // 锁定只限制「当天新文章的生成入口」；历史文章始终可重读，所以锁定态的历史入口
+        // 必须带上真实条数——否则点进去只会看到「暂无本地文章」，而库里其实有文章。
+        composeRule.setContent {
+            ReadingAccessScreen(
+                state = ReadingAccessUiState.Locked("还差 2 个新词、1 个复习词", listOf(historyArticle())),
+                onSelectType = {},
+                onOpenHistory = {},
+            )
+        }
+
+        composeRule.onNodeWithText("（1）", substring = true).assertExists()
+    }
+
+    @Test
     fun unlockedStateShowsFourTypesPreferenceAndOfflineHistoryEntry() {
         var selected: ArticleType? = null
         var historyOpened = 0
@@ -230,6 +245,14 @@ class ReadingAccessScreenTest {
         onOpenAiSettings = onOpenAiSettings,
         onOpenFeed = onOpenFeed,
         onFetchFeedItem = onFetchFeedItem,
+    )
+
+    private fun historyArticle() = com.example.englishlearning.reading.domain.Article(
+        articleId = "a1", profileId = "p1", localDate = "2026-09-28", activeWordBookId = "cet4",
+        articleType = ArticleType.STORY, lengthTier = ArticleLengthTier.STANDARD, version = 1,
+        title = "How Urban Trees Improve City Life", englishText = "text", chineseText = "译文",
+        generatedAtEpochMillis = 1, coveredLemmas = emptyList(),
+        source = ArticleSource.AiGenerated(modelName = "", parameterSummary = ""),
     )
 
     private fun todayArticle() = com.example.englishlearning.reading.domain.Article(

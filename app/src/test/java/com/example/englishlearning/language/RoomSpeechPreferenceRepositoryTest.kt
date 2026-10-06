@@ -28,6 +28,7 @@ class RoomSpeechPreferenceRepositoryTest {
         assertEquals(PronunciationEngine.SystemTts, preference.selectedEngine)
         assertEquals(null, preference.openAiProfileId)
         assertEquals(null, preference.miMoProfileId)
+        assertEquals(true, preference.autoSpeakOnCardReady)
     }
 
     @Test
@@ -80,5 +81,48 @@ class RoomSpeechPreferenceRepositoryTest {
             ),
             preference,
         )
+    }
+
+    /** D1：自动发音开关必须原样落盘（false 不能被吞成默认 true）。 */
+    @Test
+    fun `save persists the auto speak toggle`() = runTest {
+        val database = mockk<AppDatabase>()
+        val dao = mockk<InternalSpeechPreferenceDao>()
+        every { database.internalSpeechPreferenceDao() } returns dao
+        coEvery { dao.upsert(any()) } returns Unit
+
+        RoomSpeechPreferenceRepository(database, Dispatchers.Unconfined)
+            .save(SpeechPreference(autoSpeakOnCardReady = false)).getOrThrow()
+
+        coVerify {
+            dao.upsert(
+                SpeechPreferenceEntity(
+                    preferenceId = "device",
+                    selectedEngine = "SystemTts",
+                    openAiProfileId = null,
+                    miMoProfileId = null,
+                    autoSpeakOnCardReady = false,
+                ),
+            )
+        }
+    }
+
+    /** D1：关闭状态读回来仍是关闭——迁移回填只作用于历史空值，不覆盖显式选择。 */
+    @Test
+    fun `get round trips the auto speak toggle`() = runTest {
+        val database = mockk<AppDatabase>()
+        val dao = mockk<InternalSpeechPreferenceDao>()
+        every { database.internalSpeechPreferenceDao() } returns dao
+        coEvery { dao.find() } returns SpeechPreferenceEntity(
+            preferenceId = "device",
+            selectedEngine = "SystemTts",
+            openAiProfileId = null,
+            miMoProfileId = null,
+            autoSpeakOnCardReady = false,
+        )
+
+        val preference = RoomSpeechPreferenceRepository(database, Dispatchers.Unconfined).get().getOrThrow()
+
+        assertEquals(false, preference.autoSpeakOnCardReady)
     }
 }

@@ -24,6 +24,15 @@ data class VocabularySearchIndexEntry(
 /** 短语之间的分隔符：`\u0001` 不可能出现在真实短语里，用它拼接不会造成跨短语误命中。 */
 internal const val INDEXED_PHRASE_SEPARATOR: String = "\u0001"
 
+/**
+ * `NOT IN ()` 在 SQLite 语法上非法，所以「保留集合为空」这一支改写成
+ * 「删除除一个不可能存在的 id 之外的全部行」，语义等价于清空整表。
+ *
+ * 基表索引与 gram 字串索引**共用同一个占位符**：两张表在「清空」这一支上必须表现一致，
+ * 各自写一个字面量迟早会漂移成不一致的行为。
+ */
+internal const val KEEP_NOTHING_WORD_BOOK: String = "\u0000keep-nothing"
+
 /** 把一批检索词项压成一个可 `LIKE` 的字符串。 */
 internal fun encodeIndexedTerms(terms: List<String>): String =
     terms.joinToString(INDEXED_PHRASE_SEPARATOR)

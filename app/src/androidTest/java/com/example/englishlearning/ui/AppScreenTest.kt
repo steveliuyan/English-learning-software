@@ -30,8 +30,13 @@ import com.example.englishlearning.imagegen.DrawingPromptUseCase
 import com.example.englishlearning.imagegen.GeneratedImageStore
 import com.example.englishlearning.imagegen.ImageGenerationUseCase
 import com.example.englishlearning.learning.LearningEventRepository
+import com.example.englishlearning.learning.LearningHistoryGroup
+import com.example.englishlearning.learning.LearningRecord
+import com.example.englishlearning.learning.LearningRecordRepository
 import com.example.englishlearning.learning.TodayPlanRepository
 import com.example.englishlearning.learning.PlaceholderWordCardSource
+import com.example.englishlearning.learning.WordBookRecord
+import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.reading.ArticleIdFactory
 import com.example.englishlearning.reading.ArticleRepository
 import com.example.englishlearning.reading.FetchArticleUseCase
@@ -358,6 +363,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
     }
 
+    /** D1 新契约：词卡就绪自动朗读 1 次，用户点击再 1 次，两者共存互不取消。 */
     @Test
     fun learningCardPronunciationRoutesTheVisibleLemmaToTheProvider() {
         val provider = RecordingPronunciationProvider(PronunciationResult.Played)
@@ -365,17 +371,16 @@ class AppScreenTest {
         createProfile()
 
         composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.isNotEmpty() }
         composeRule.onNodeWithTag("word_card_speak").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts == listOf("ability") }
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 2 }
 
-        assertEquals(listOf("ability"), provider.spokenTexts)
+        assertEquals(listOf("ability", "ability"), provider.spokenTexts)
         composeRule.onNodeWithTag("word_card_pronunciation_message").assertExists()
         composeRule.onNodeWithText("发音已播放。").assertExists()
     }
 
+    /** D1：自动发音同样走安全文案——失败在词卡就绪时就显示，不泄露 endpoint/密钥。 */
     @Test
     fun learningCardPronunciationFailureShowsSafeMessageAndKeepsFeedbackActions() {
         val provider = RecordingPronunciationProvider(PronunciationResult.Failed(IllegalStateException("secret endpoint")))
@@ -384,12 +389,10 @@ class AppScreenTest {
 
         composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithTag("word_card_speak").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("发音播放失败，请重试。").fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.onNodeWithTag("word_card_speak").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 2 }
 
         composeRule.onNodeWithText("发音播放失败，请重试。").assertExists()
         composeRule.onNodeWithText("secret endpoint").assertDoesNotExist()
@@ -398,6 +401,7 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("认识").assertHasClickAction()
     }
 
+    /** D1：词卡就绪自动 1 次 + 详情点击 1 次 = 2 次，全部是同一个 lemma；详情页自身不自动发音。 */
     @Test
     fun submittedCardDetailPronunciationRoutesTheHeldLemmaToTheProvider() {
         val provider = RecordingPronunciationProvider(PronunciationResult.Played)
@@ -405,10 +409,60 @@ class AppScreenTest {
         createProfile()
 
         composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.isNotEmpty() }
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("word_card_feedback_fuzzy").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag("word_card_feedback_fuzzy").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 2 }
+
+        assertEquals(listOf("ability", "ability"), provider.spokenTexts)
+        composeRule.onNodeWithText("发音已播放。").assertExists()
+    }
+
+    /** D1：开关关闭后词卡就绪不自动发音，点击仍恰好触发一次。 */
+    @Test
+    fun learningAutoSpeakHonoursTheOffToggleAndClickStillSpeaksOnce() {
+        val provider = RecordingPronunciationProvider(PronunciationResult.Played)
+        val speech = speechFixture(autoSpeakOnCardReady = false)
+        composeRule.setContent {
+            readyAppScreen(pronunciationProvider = provider, speechSettingsViewModel = speech.speech)
+        }
+        createProfile()
+
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.waitForIdle()
+        assertEquals(emptyList<String>(), provider.spokenTexts)
+
+        composeRule.onNodeWithTag("word_card_speak").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 1 }
+        assertEquals(listOf("ability"), provider.spokenTexts)
+        composeRule.onNodeWithText("发音已播放。").assertExists()
+    }
+
+    @Test
+    fun learningRecordDetailPronunciationRoutesTheHeldLemmaToTheProvider() {
+        val provider = RecordingPronunciationProvider(PronunciationResult.Played)
+        composeRule.setContent {
+            readyAppScreen(
+                pronunciationProvider = provider,
+                learningRecordsViewModel = learningRecordsViewModelWithAbilityRecord(),
+            )
+        }
+        createProfile()
+
+        composeRule.onNodeWithContentDescription("学习记录").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("learning_record_row_ability").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("learning_record_row_ability").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
         }
@@ -498,6 +552,35 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("word_qa_chip_Mnemonic").assertIsEnabled()
         assert(composeRule.onAllNodesWithTag("word_qa_outbound_confirmation_text").fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
+    fun lockedReadingTabStillListsTheLocalHistory() {
+        // 真机实证的缺陷：今日计划未完成时 readingState=Locked，而 AppScreen 只用
+        // `(readingState as? Ready)?.history` 取历史 → 点「查看本地阅读历史」恒显示
+        // 「暂无本地文章」，可同一个库里确有文章。AGENTS.md：历史已解锁文章始终可重读，
+        // 未解锁只限制「当天新文章生成入口」。
+        val reading = readingFixture(unlocked = false)
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_access_locked_reason").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("reading_history_entry").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("reading_history_screen").assertExists()
+        composeRule.onNodeWithTag("reading_history_item_a1").assertExists().assertHasClickAction()
+        composeRule.onNodeWithText("Apple Day", substring = true).assertExists()
+        composeRule.onNodeWithText("暂无本地文章", substring = true).assertDoesNotExist()
     }
 
     /** 阅读流导航到点词详情：profile → 阅读 tab → 今日文章 → 关覆盖窗 → 点正文词。 */
@@ -657,7 +740,7 @@ class AppScreenTest {
         val todayPlan: TodayPlanViewModel,
     )
 
-    private fun readingFixture(): ReadingFixture {
+    private fun readingFixture(unlocked: Boolean = true): ReadingFixture {
         // 固定时钟锚定「今日」：Asia/Shanghai 下 Instant.EPOCH 的本地日就是 1970-01-01，
         // 计划 localDate 与文章 localDate 必须等于它。仓储 fake 按真实检索键校验，
         // 键不匹配一律返回空——无条件返回文章会把生产代码的日期/身份错配掩盖成绿灯。
@@ -681,9 +764,12 @@ class AppScreenTest {
             englishText = "apple", chineseText = "苹果", generatedAtEpochMillis = 1,
             coveredLemmas = listOf("apple"), source = ArticleSource.UserImported,
         )
+        // unlocked=false 时今日计划一个词都没完成（newTarget=1）→ UnlockPolicy 判锁定。
+        // 锁定与否只改完成集合，不改历史来源：两种情况都得能读到那篇文章。
+        val completed = if (unlocked) listOf("apple-id") else emptyList()
         val events = object : LearningEventRepository by NoopLearningEventRepository() {
             override suspend fun completedCardIds(planId: String) =
-                RepositoryResult.Success(if (planId == plan.planId) listOf("apple-id") else emptyList())
+                RepositoryResult.Success(if (planId == plan.planId) completed else emptyList())
         }
         val plans = object : TodayPlanRepository {
             override suspend fun find(profileId: String, localDate: java.time.LocalDate) =
@@ -770,7 +856,7 @@ class AppScreenTest {
         val keys: MutableSet<String>,
     )
 
-    private fun speechFixture(): SpeechFixture {
+    private fun speechFixture(autoSpeakOnCardReady: Boolean = true): SpeechFixture {
         val keys = mutableSetOf<String>()
         // OpenAI 引擎选项已移除：fixture 改用 MiMo 引擎 + XIAOMI_MIMO 协议 Profile，
         // 与真实存储路径（语音页只能选中系统 TTS / MiMo）保持一致。
@@ -797,7 +883,9 @@ class AppScreenTest {
             override fun has(reference: SecretReference) = Result.success(reference.alias.removePrefix("ai-profile-") in keys)
         })
         val preferences = object : SpeechPreferenceRepository {
-            override suspend fun get() = Result.success(SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo"))
+            override suspend fun get() = Result.success(
+                SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo", autoSpeakOnCardReady = autoSpeakOnCardReady),
+            )
             override suspend fun save(preference: SpeechPreference) = Result.success(Unit)
         }
         return SpeechFixture(
@@ -819,6 +907,33 @@ class AppScreenTest {
         ).also { it.keys += "mimo" }
     }
 
+    /** 学习记录 fixture：今日已学里放一条可打开详情的 ability 记录。
+     *  仓储按真实检索键校验：planId 不是今日计划 fixture 的 plan-1 一律返回空，
+     *  避免把身份/计划错配掩盖成绿灯。 */
+    private fun learningRecordsViewModelWithAbilityRecord(): LearningRecordsViewModel {
+        val cardId = PlaceholderWordCardSource.cardId("cet4", "ability")
+        val card = kotlinx.coroutines.runBlocking { PlaceholderWordCardSource().cards(listOf(cardId)) }.first()
+        val record = LearningRecord(
+            cardId = card.cardId,
+            displayLemma = card.lemma,
+            wordCard = card,
+            feedback = CardFeedback.Fuzzy,
+            occurredAt = java.time.Instant.EPOCH,
+            localDate = java.time.LocalDate.of(1970, 1, 1),
+            planId = "plan-1",
+        )
+        val repository = object : LearningRecordRepository {
+            override suspend fun today(profileId: String, planId: String) =
+                if (planId == "plan-1") RepositoryResult.Success(listOf(record))
+                else RepositoryResult.Success(emptyList())
+            override suspend fun history(profileId: String) =
+                RepositoryResult.Success(emptyList<LearningHistoryGroup>())
+            override suspend fun allWords(wordBookId: String, now: java.time.Instant) =
+                RepositoryResult.Success(emptyList<WordBookRecord>())
+        }
+        return LearningRecordsViewModel(repository, FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC))
+    }
+
     @Composable
     private fun readyAppScreen(
         speechSettingsViewModel: SpeechSettingsViewModel? = null,
@@ -830,6 +945,7 @@ class AppScreenTest {
         wordQaViewModel: WordAiQaViewModel? = null,
         sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
         imageStudioViewModel: ImageStudioViewModel? = null,
+        learningRecordsViewModel: LearningRecordsViewModel? = null,
     ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
@@ -847,6 +963,7 @@ class AppScreenTest {
             wordQaViewModel = wordQaViewModel,
             sentenceAnalysisViewModel = sentenceAnalysisViewModel,
             imageStudioViewModel = imageStudioViewModel,
+            learningRecordsViewModel = learningRecordsViewModel,
         )
     }
 

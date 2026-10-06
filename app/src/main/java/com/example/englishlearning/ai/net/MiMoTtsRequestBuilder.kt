@@ -5,6 +5,7 @@ import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.ai.domain.validateEndpoint
 import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.storage.AppErrorException
+import com.example.englishlearning.language.domain.PronunciationAccent
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -26,10 +27,16 @@ object MiMoTtsRequestBuilder {
     /** 非流式一次性返回整段 WAV，第一版不做 SSE 流式。 */
     const val AUDIO_FORMAT = "wav"
 
+    private const val PRONUNCIATION_INSTRUCTION_PREFIX =
+        "Read the following word in %s with standard, clear pronunciation. " +
+            "Speak only the word exactly as provided. Do not add explanations, " +
+            "sentences, or sound effects."
+
     fun build(
         profile: AiProfile,
         input: String,
         apiKey: CharArray,
+        accent: PronunciationAccent = PronunciationAccent.American,
     ): Result<AiHttpRequest> {
         if (AiCapability.Speech !in profile.capabilities || input.isBlank()) {
             return Result.failure(AppErrorException(AppError.InvalidAiConfiguration))
@@ -41,11 +48,21 @@ object MiMoTtsRequestBuilder {
         // 音色优先级：Profile 显式选择 > 按语言自动（中文冰糖 / 英文 Mia）。
         val voice = profile.voice.takeIf { it.isNotBlank() }
             ?: if (input.any { it.isCjkIdeograph() }) VOICE_CHINESE else VOICE_ENGLISH
+        val accentName = when (accent) {
+            PronunciationAccent.American -> "American English"
+            PronunciationAccent.British -> "British English"
+        }
         val body = buildJsonObject {
             put("model", profile.model)
             put(
                 "messages",
                 buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("role", "user")
+                            put("content", PRONUNCIATION_INSTRUCTION_PREFIX.format(accentName))
+                        },
+                    )
                     add(
                         buildJsonObject {
                             put("role", "assistant")

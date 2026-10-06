@@ -22,17 +22,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class LearningRecordsTab { TODAY, HISTORY, ALL_WORDS }
+// 「全部单词」已拆为独立入口 WordBookWordsViewModel/WordBookWordsScreen（D2，2026-10-06）。
+enum class LearningRecordsTab { TODAY, HISTORY }
 
 data class LearningRecordsUiState(
     val selectedTab: LearningRecordsTab = LearningRecordsTab.TODAY,
     val today: List<LearningRecord> = emptyList(),
     val history: List<LearningHistoryGroup> = emptyList(),
-    val allWords: List<WordBookRecord> = emptyList(),
     val loaded: Set<LearningRecordsTab> = emptySet(),
     val loading: Set<LearningRecordsTab> = emptySet(),
     val errors: Map<LearningRecordsTab, String> = emptyMap(),
-    val filter: WordBookRecordStatus? = null,
     val selectedDetail: WordCard? = null,
 )
 
@@ -64,7 +63,6 @@ class LearningRecordsViewModel @Inject constructor(
             it.copy(
                 today = emptyList(),
                 history = emptyList(),
-                allWords = emptyList(),
                 loaded = emptySet(),
                 loading = emptySet(),
                 errors = emptyMap(),
@@ -83,10 +81,6 @@ class LearningRecordsViewModel @Inject constructor(
         val tab = mutable.value.selectedTab
         mutable.update { it.copy(errors = it.errors - tab, selectedDetail = null) }
         loadTab(tab, force = true)
-    }
-
-    fun selectAllWordsFilter(filter: WordBookRecordStatus?) {
-        mutable.update { it.copy(filter = filter) }
     }
 
     fun openRow(row: LearningRecord) {
@@ -151,27 +145,6 @@ class LearningRecordsViewModel @Inject constructor(
                         when (result) {
                             is RepositoryResult.Success -> current.copy(
                                 history = result.value,
-                                loaded = current.loaded + tab,
-                                loading = current.loading - tab,
-                            )
-                            is RepositoryResult.Failure -> current.copy(
-                                loading = current.loading - tab,
-                                errors = current.errors + (tab to "学习记录暂时无法读取"),
-                            )
-                        }
-                    }
-                }
-                LearningRecordsTab.ALL_WORDS -> {
-                    val result: RepositoryResult<List<WordBookRecord>> = if (snapshot?.wordBookId != null) {
-                        repository.allWords(snapshot.wordBookId, clock.instant())
-                    } else {
-                        RepositoryResult.Success(emptyList())
-                    }
-                    mutable.update { current ->
-                        if (generation != loadGeneration || snapshot !== context) return@update current
-                        when (result) {
-                            is RepositoryResult.Success -> current.copy(
-                                allWords = result.value,
                                 loaded = current.loaded + tab,
                                 loading = current.loading - tab,
                             )

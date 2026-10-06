@@ -42,11 +42,13 @@ import com.example.englishlearning.language.RoomSpeechPreferenceRepository
 import com.example.englishlearning.language.SpeechPreferenceRepository
 import com.example.englishlearning.language.domain.MiMoPronunciationProviderFactory
 import com.example.englishlearning.language.domain.OpenAiPronunciationProviderFactory
+import com.example.englishlearning.language.domain.PronunciationAudioCache
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationRouter
 import com.example.englishlearning.language.infrastructure.AndroidTextToSpeechProvider
 import com.example.englishlearning.language.infrastructure.AndroidAudioPlayer
 import com.example.englishlearning.language.infrastructure.AudioPlayer
+import com.example.englishlearning.language.infrastructure.FilePronunciationAudioCache
 import com.example.englishlearning.language.infrastructure.MiMoPronunciationProvider
 import com.example.englishlearning.language.infrastructure.OpenAiCompatiblePronunciationProvider
 import com.example.englishlearning.learning.RoomTodayPlanRepository
@@ -161,13 +163,18 @@ object AppModule {
     fun provideAudioPlayer(@ApplicationContext context: Context): AudioPlayer = AndroidAudioPlayer(context)
 
     @Provides @Singleton
+    fun providePronunciationAudioCache(@ApplicationContext context: Context): PronunciationAudioCache =
+        FilePronunciationAudioCache(context)
+
+    @Provides @Singleton
     fun provideMiMoPronunciationProviderFactory(
         profiles: AiProfileRepository,
         secrets: AiProfileSecretUseCase,
         transport: AudioHttpTransport,
         player: AudioPlayer,
+        cache: PronunciationAudioCache,
     ): MiMoPronunciationProviderFactory = MiMoPronunciationProviderFactory { profileId ->
-        MiMoPronunciationProvider(profiles, secrets, transport, player, profileId)
+        MiMoPronunciationProvider(profiles, secrets, transport, player, profileId, cache)
     }
 
     @Provides @Singleton

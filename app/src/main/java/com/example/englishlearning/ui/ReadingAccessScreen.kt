@@ -50,7 +50,11 @@ import com.example.englishlearning.ui.theme.MintTint
 
 sealed interface ReadingAccessUiState {
     data object Loading : ReadingAccessUiState
-    data class Locked(val reason: String) : ReadingAccessUiState
+    /**
+     * 计划未完成。只挡「今天生成新文章」，所以仍带着已读到的 [history]：
+     * 历史文章与解锁无关，任何时候都可重读。
+     */
+    data class Locked(val reason: String, val history: List<Article> = emptyList()) : ReadingAccessUiState
     data class Ready(
         val preference: ReadingPreference,
         val history: List<Article>,
@@ -63,6 +67,22 @@ sealed interface ReadingAccessUiState {
     }
     data object Unavailable : ReadingAccessUiState
 }
+
+/**
+ * 该状态下可以重读的本地历史文章。
+ *
+ * 阅读历史与解锁状态**正交**：锁定只限制「当天新文章的生成入口」，历史文章始终可重读
+ * （AGENTS.md：历史已解锁文章始终可重读）。因此这里是一个**全量**访问器——每种状态都必须
+ * 表态，调用点不能再用 `as? Ready` 把锁定态的 history 悄悄丢成空列表。旧写法正是那样：
+ * 2026-10-05 真机走查里今日计划未完成（Locked），点「查看本地阅读历史」恒显示
+ * 「暂无本地文章」，而同一个库中确有 2026-09-28 的文章。
+ */
+val ReadingAccessUiState.historyOrEmpty: List<Article>
+    get() = when (this) {
+        is ReadingAccessUiState.Ready -> history
+        is ReadingAccessUiState.Locked -> history
+        ReadingAccessUiState.Loading, ReadingAccessUiState.Unavailable -> emptyList()
+    }
 
 /**
  * 「阅读」栏的根页面。一级 tab，出口交给底部导航与页内二级层，所以**没有**自带的返回按钮。
@@ -103,7 +123,8 @@ fun ReadingAccessScreen(
                 ArticleType.entries.forEach { type ->
                     TypeButton(type, false, onSelectType)
                 }
-                HistoryButton(onOpenHistory)
+                // 条数照常显示：锁定态的历史入口与解锁态是同一件事，没有理由藏起来。
+                HistoryButton(onOpenHistory, state.history.size)
             }
             is ReadingAccessUiState.Ready -> ReadyContent(
                 state = state,

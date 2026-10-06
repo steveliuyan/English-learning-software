@@ -1,6 +1,9 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.runtime.Composer
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.AnnotatedString
+import kotlin.jvm.functions.Function1
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,6 +26,7 @@ import com.example.englishlearning.learning.domain.PhraseEntry
 import com.example.englishlearning.learning.domain.RelatedWord
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.learning.domain.WordSense
+import com.example.englishlearning.wordqa.WordAiNote
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -213,6 +218,51 @@ class CardDetailScreenTest {
     }
 
     @Test
+    fun detailOffersAmericanByDefaultAndSeparateBritishAction() {
+        var american = 0
+        var british = 0
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(),
+                onBack = {},
+                onSpeak = { american++ },
+                onSpeakBritish = { british++ },
+            )
+        }
+
+        composeRule.onNodeWithContentDescription("播放 ability 发音").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("播放 ability 英式发音").assertExists().performClick()
+
+        assertEquals(1, american)
+        assertEquals(1, british)
+    }
+
+    @Test
+    fun regenerateActionsAreHiddenUntilProvidedAndRemainAccentSpecific() {
+        var showRegenerateActions by mutableStateOf(false)
+        var american = 0
+        var british = 0
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(),
+                onBack = {},
+                onRegenerateAmerican = if (showRegenerateActions) ({ american++ }) else null,
+                onRegenerateBritish = if (showRegenerateActions) ({ british++ }) else null,
+            )
+        }
+        composeRule.onNodeWithContentDescription("重新生成 ability 美式发音").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("重新生成 ability 英式发音").assertDoesNotExist()
+
+        composeRule.runOnUiThread { showRegenerateActions = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("重新生成 ability 美式发音").performClick()
+        composeRule.onNodeWithContentDescription("重新生成 ability 英式发音").performClick()
+
+        assertEquals(1, american)
+        assertEquals(1, british)
+    }
+
+    @Test
     fun pronunciationAndRelearnActionsInvokeCallbacks() {
         var spoken = 0
         var spokenLemma = ""
@@ -248,15 +298,22 @@ class CardDetailScreenTest {
             Modifier::class.java,
             Composer::class.java,
             Function0::class.java,
+            Function1::class.java,
+            Boolean::class.javaObjectType,
+            List::class.java,
+            WordAiNote::class.java,
+            PronunciationStatus::class.java,
+            PersonalNoteSaveStatus::class.java,
             Int::class.javaPrimitiveType,
             Class.forName("kotlin.jvm.internal.DefaultConstructorMarker"),
-            // 无字段发音状态枚举：文案由屏幕固定映射，防泄露设计的合法边界类型。
-            PronunciationStatus::class.java,
         )
 
         assertTrue(parameterTypes.contains(WordCard::class.java))
         assertTrue(parameterTypes.count { it == Function0::class.java } >= 3)
-        assertTrue(parameterTypes.all { it in allowedTypes })
+        assertTrue(
+            parameterTypes.filterNot { it in allowedTypes }.joinToString() { it.name },
+            parameterTypes.all { it in allowedTypes },
+        )
         assertFalse(parameterTypes.contains(AiProfile::class.java))
         assertFalse(parameterTypes.contains(String::class.java))
         assertFalse(parameterTypes.contains(CharArray::class.java))

@@ -36,7 +36,7 @@ class DefaultImageProfileSelector(
         val hasKey = secrets.hasKey(profile).getOrElse {
             return DefaultImageProfileResult.StorageUnavailable
         }
-        if (!hasKey) return clearAndUnavailable(preference)
+        if (!hasKey) return DefaultImageProfileResult.Unavailable
         return DefaultImageProfileResult.Selected(profile)
     }
 

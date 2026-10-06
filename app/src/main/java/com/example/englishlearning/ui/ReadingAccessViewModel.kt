@@ -116,7 +116,8 @@ class ReadingAccessViewModel @Inject constructor(
             val history = articles.findHistory(profileId)
             _uiState.value = when {
                 preference.isFailure || history.isFailure -> ReadingAccessUiState.Unavailable
-                !isUnlocked -> ReadingAccessUiState.Locked(unlockReason)
+                // 锁定态同样把历史带出去：解锁只挡「今天生成新文章」，不是把库里的文章藏起来。
+                !isUnlocked -> ReadingAccessUiState.Locked(unlockReason, history.getOrThrow())
                 else -> {
                     val pref = preference.getOrThrow()
                     ReadingAccessUiState.Ready(pref, history.getOrThrow(), todayArticle = todayArticle(profileId, pref))

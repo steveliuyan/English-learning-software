@@ -9,6 +9,7 @@ import com.example.englishlearning.learning.SearchVocabularyOperator
 import com.example.englishlearning.learning.VocabularySearchHistory
 import com.example.englishlearning.learning.VocabularySearchHistoryRepository
 import com.example.englishlearning.learning.domain.WordCard
+import com.example.englishlearning.learning.normalizeVocabularySearchQuery
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -210,29 +211,61 @@ class GlobalVocabularySearchViewModel @Inject constructor(
         _uiState.value = GlobalVocabularySearchUiState.Loading
         job = viewModelScope.launch {
             try {
-                val historyResult = withContext(io) { historyRepository.list(id, HISTORY_LIMIT) }
-                if (requestGeneration != generation) return@launch
-                when (historyResult) {
+                val normalized = query?.let(::normalizeVocabularySearchQuery)
+                if (normalized == null) {
+                    // 空查询不是一次真实搜索：只列历史，**不写**历史。
+                    showHistory(id, requestGeneration)
+                    return@launch
+                }
+                when (val result = withContext(io) { searchVocabulary.search(id, query) }) {
                     is RepositoryResult.Failure -> _uiState.value = GlobalVocabularySearchUiState.Failure
                     is RepositoryResult.Success -> {
-                        lastHistory = historyResult.value
-                        if (query == null) {
-                            _uiState.value = if (lastHistory.isEmpty()) GlobalVocabularySearchUiState.Empty else ready(lastHistory, emptyList())
-                            return@launch
-                        }
-                        when (val result = withContext(io) { searchVocabulary.search(id, query) }) {
-                            is RepositoryResult.Failure -> _uiState.value = GlobalVocabularySearchUiState.Failure
-                            is RepositoryResult.Success -> {
-                                if (requestGeneration != generation) return@launch
-                                val count = lastHistory.firstOrNull { it.normalizedQuery == query }?.searchCount ?: 0
-                                val items = result.value.map { GlobalVocabularySearchResultItem(it, count, count.takeIf { showCount }) }
-                                _uiState.value = if (items.isEmpty()) GlobalVocabularySearchUiState.Empty else ready(lastHistory, items)
-                            }
-                        }
+                        if (requestGeneration != generation) return@launch
+                        showResults(id, normalized, result.value, requestGeneration)
                     }
                 }
             } catch (c: CancellationException) { throw c } catch (_: Exception) {
                 if (requestGeneration == generation) _uiState.value = GlobalVocabularySearchUiState.Failure
+            }
+        }
+    }
+
+    /** 只列「最近搜索」：没有查询词，也就没有需要回源的词卡。 */
+    private suspend fun showHistory(id: String, requestGeneration: Long) {
+        when (val history = withContext(io) { historyRepository.list(id, HISTORY_LIMIT) }) {
+            is RepositoryResult.Failure -> _uiState.value = GlobalVocabularySearchUiState.Failure
+            is RepositoryResult.Success -> {
+                if (requestGeneration != generation) return
+                lastHistory = history.value
+                _uiState.value =
+                    if (lastHistory.isEmpty()) GlobalVocabularySearchUiState.Empty else ready(lastHistory, emptyList())
+            }
+        }
+    }
+
+    /**
+     * 结果列表 + 历史快照。历史必须在**搜索之后**读：`searchVocabulary.search` 内部会写入并
+     * 自增该词的计数，先读拿到的是自增前的值——于是首次搜索显示「搜索 0 次」、重复搜索永远少一次。
+     *
+     * 比对用的是**归一化后**的查询词：历史表以 `normalizedQuery`（小写、空白折叠）为键，
+     * 拿原始输入去比会让 `Ability` 匹配不到 `ability`，计数同样恒为 0。
+     */
+    private suspend fun showResults(
+        id: String,
+        normalizedQuery: String,
+        results: List<SearchVocabularyResult>,
+        requestGeneration: Long,
+    ) {
+        when (val history = withContext(io) { historyRepository.list(id, HISTORY_LIMIT) }) {
+            is RepositoryResult.Failure -> {
+                if (requestGeneration == generation) _uiState.value = GlobalVocabularySearchUiState.Failure
+            }
+            is RepositoryResult.Success -> {
+                if (requestGeneration != generation) return
+                lastHistory = history.value
+                val count = lastHistory.firstOrNull { it.normalizedQuery == normalizedQuery }?.searchCount ?: 0
+                val items = results.map { GlobalVocabularySearchResultItem(it, count, count.takeIf { showCount }) }
+                _uiState.value = if (items.isEmpty()) GlobalVocabularySearchUiState.Empty else ready(lastHistory, items)
             }
         }
     }

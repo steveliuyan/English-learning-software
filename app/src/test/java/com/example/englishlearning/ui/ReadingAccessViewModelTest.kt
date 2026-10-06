@@ -79,6 +79,23 @@ class ReadingAccessViewModelTest {
     }
 
     @Test
+    fun lockedProfileStillExposesTheOfflineHistory() = runTest(dispatcher) {
+        Dispatchers.setMain(dispatcher)
+        val h = harness(history = listOf(article("a1"), article("a2")))
+
+        h.viewModel.load("p1", isUnlocked = false, unlockReason = "还差 2 个新词")
+        advanceUntilIdle()
+
+        // 锁定只限制「当天新文章的生成入口」，历史文章始终可重读（AGENTS.md）。
+        // 锁定态把已读到的历史丢掉，用户点「查看本地阅读历史」就只能看到空列表，
+        // 而库里其实有文章——2026-10-05 真机走查实证过这个缺陷。
+        assertEquals(
+            listOf(article("a1"), article("a2")),
+            h.viewModel.uiState.value.historyOrEmpty,
+        )
+    }
+
+    @Test
     fun selectingArticleTypePersistsUpdatedPreference() = runTest(dispatcher) {
         Dispatchers.setMain(dispatcher)
         val h = harness()

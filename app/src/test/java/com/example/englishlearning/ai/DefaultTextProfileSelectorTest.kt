@@ -48,8 +48,9 @@ class DefaultTextProfileSelectorTest {
     }
 
     @Test
-    fun selectedProfileWithoutKeyIsClearedAndReportedUnavailable() = runTest {
-        val preferences = FakePreferences(AiPreference(defaultTextProfileId = "p1"))
+    fun selectedProfileWithoutKeyRemainsBoundAndIsReportedUnavailable() = runTest {
+        val current = AiPreference(defaultTextProfileId = "p1")
+        val preferences = FakePreferences(current)
         val result = DefaultTextProfileSelector(
             preferences,
             FakeProfiles(listOf(profile("p1"))),
@@ -57,7 +58,8 @@ class DefaultTextProfileSelectorTest {
         ).select()
 
         assertEquals(DefaultTextProfileResult.Unavailable, result)
-        assertEquals(AiPreference(), preferences.saved.single())
+        assertTrue(preferences.saved.isEmpty(), "缺少 Key 时保留 Profile 绑定，等待用户重新录入")
+        assertEquals(current, preferences.get().getOrThrow())
     }
 
     @Test

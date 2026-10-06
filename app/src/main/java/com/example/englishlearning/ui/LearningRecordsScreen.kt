@@ -3,14 +3,12 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -18,7 +16,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -32,8 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
-import com.example.englishlearning.learning.WordBookRecord
-import com.example.englishlearning.learning.WordBookRecordStatus
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -49,9 +44,7 @@ fun LearningRecordsScreen(
     onBack: () -> Unit,
     onSelectTab: (LearningRecordsTab) -> Unit,
     onRetry: () -> Unit,
-    onFilter: (WordBookRecordStatus?) -> Unit,
     onOpenRecord: (LearningRecord) -> Unit,
-    onOpenWord: (WordBookRecord) -> Unit,
 ) {
     val tabs = LearningRecordsTab.entries
     val selectedIndex = tabs.indexOf(state.selectedTab).coerceAtLeast(0)
@@ -95,9 +88,6 @@ fun LearningRecordsScreen(
                 )
             }
         }
-        if (state.selectedTab == LearningRecordsTab.ALL_WORDS) {
-            FilterBar(state, onFilter)
-        }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 14.dp),
@@ -128,42 +118,8 @@ fun LearningRecordsScreen(
                             }
                         }
                     }
-                    LearningRecordsTab.ALL_WORDS -> {
-                        val rows = state.allWords.filter { state.filter == null || it.status == state.filter }
-                        if (rows.isEmpty()) {
-                            item { EmptyState(allWordsEmptyText(state.filter), "learning_records_empty_all_words") }
-                        } else {
-                            items(rows, key = { "word-${it.cardId}" }) { row ->
-                                WordBookRecordRow(row, onOpenWord)
-                            }
-                        }
-                    }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun FilterBar(state: LearningRecordsUiState, onFilter: (WordBookRecordStatus?) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        val filters = listOf<WordBookRecordStatus?>(null) + WordBookRecordStatus.entries
-        filters.forEach { filter ->
-            val count = filter?.let { status -> state.allWords.count { it.status == status } } ?: state.allWords.size
-            FilterChip(
-                selected = state.filter == filter,
-                onClick = { onFilter(filter) },
-                modifier = Modifier
-                    .testTag(filter.testTag())
-                    .semantics { contentDescription = "${filter.label()} $count" },
-                label = { Text("${filter.label()} $count") },
-            )
         }
     }
 }
@@ -236,19 +192,6 @@ private fun LearningRecordRow(row: LearningRecord, onOpenRow: (LearningRecord) -
 }
 
 @Composable
-private fun WordBookRecordRow(row: WordBookRecord, onOpenRow: (WordBookRecord) -> Unit) {
-    RecordRow(
-        lemma = row.displayLemma,
-        meaning = row.card?.meaningZh,
-        status = row.status.statusLabel(),
-        enabled = row.canOpenDetail,
-        reason = if (row.canOpenDetail) null else "这个词已不在当前词书中",
-        tag = if (row.canOpenDetail) "learning_record_row_${row.safeId()}" else "learning_record_missing_${row.safeId()}",
-        onClick = { onOpenRow(row) },
-    )
-}
-
-@Composable
 private fun RecordRow(
     lemma: String,
     meaning: String?,
@@ -283,48 +226,18 @@ private fun RecordRow(
 private fun LearningRecordsTab.label(): String = when (this) {
     LearningRecordsTab.TODAY -> "今日已学"
     LearningRecordsTab.HISTORY -> "历史记录"
-    LearningRecordsTab.ALL_WORDS -> "全部单词"
 }
 
 private fun LearningRecordsTab.testTag(): String = when (this) {
     LearningRecordsTab.TODAY -> "learning_records_tab_today"
     LearningRecordsTab.HISTORY -> "learning_records_tab_history"
-    LearningRecordsTab.ALL_WORDS -> "learning_records_tab_all_words"
-}
-
-private fun WordBookRecordStatus?.label(): String = when (this) {
-    null -> "全部"
-    WordBookRecordStatus.Unlearned -> "未学"
-    WordBookRecordStatus.Learning -> "学习中"
-    WordBookRecordStatus.Due -> "待复习"
-}
-
-private fun WordBookRecordStatus?.testTag(): String = when (this) {
-    null -> "learning_records_filter_all"
-    WordBookRecordStatus.Unlearned -> "learning_records_filter_unlearned"
-    WordBookRecordStatus.Learning -> "learning_records_filter_learning"
-    WordBookRecordStatus.Due -> "learning_records_filter_due"
 }
 
 private fun LearningRecord.safeId(): String = cardId.substringAfterLast(':').safeId()
-private fun WordBookRecord.safeId(): String = cardId.substringAfterLast(':').safeId()
 private fun String.safeId(): String = replace(Regex("[^A-Za-z0-9一-龥_-]"), "_")
 
 private fun CardFeedback.label(): String = when (this) {
     CardFeedback.Known -> "认识"
     CardFeedback.Fuzzy -> "模糊"
     CardFeedback.Unknown -> "不认识"
-}
-
-private fun WordBookRecordStatus.statusLabel(): String = when (this) {
-    WordBookRecordStatus.Unlearned -> "未学"
-    WordBookRecordStatus.Learning -> "学习中"
-    WordBookRecordStatus.Due -> "待复习"
-}
-
-private fun allWordsEmptyText(filter: WordBookRecordStatus?): String = when (filter) {
-    null -> "当前还没有可显示的词书单词"
-    WordBookRecordStatus.Unlearned -> "当前没有未学单词"
-    WordBookRecordStatus.Learning -> "当前没有学习中的单词"
-    WordBookRecordStatus.Due -> "当前没有待复习单词"
 }

@@ -53,7 +53,7 @@ class SpeechSettingsViewModelTest {
         assertEquals(PronunciationEngine.SystemTts, state.selectedEngine)
         assertEquals(listOf("openai", "mimo"), state.candidates.map { it.profileId })
         assertEquals(listOf(SpeechProfileStatus.Available, SpeechProfileStatus.MissingKey), state.candidates.map { it.status })
-        assertEquals(setOf("selectedEngine", "openAiProfileId", "miMoProfileId", "candidates", "message", "previewMessage"),
+        assertEquals(setOf("selectedEngine", "openAiProfileId", "miMoProfileId", "autoSpeakOnCardReady", "candidates", "message", "previewMessage"),
             SpeechSettingsUiState::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
         assertEquals(setOf("profileId", "displayName", "status", "providerKind"),
             SpeechProfileCandidate::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
@@ -88,6 +88,59 @@ class SpeechSettingsViewModelTest {
 
         assertEquals(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai", miMoProfileId = "mimo"), preferences.saved.single())
         assertEquals(PronunciationEngine.OpenAi, viewModel.state.value.selectedEngine)
+    }
+
+    /** D1：切换引擎是读改写，自动发音开关不能被抹回默认值。 */
+    @Test fun selectKeepsTheAutoSpeakSetting() = runTest(dispatcher) {
+        val preferences = FakePreferences(SpeechPreference(autoSpeakOnCardReady = false, miMoProfileId = "mimo"))
+        val viewModel = viewModel(
+            profiles = RecordingProfiles(listOf(profile("mimo", setOf(AiCapability.Speech), AiProviderKind.XIAOMI_MIMO))),
+            preferences = preferences,
+        )
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.select(PronunciationEngine.MiMo, "mimo")
+        advanceUntilIdle()
+
+        assertEquals(false, preferences.saved.single().autoSpeakOnCardReady)
+        assertEquals(PronunciationEngine.MiMo, viewModel.state.value.selectedEngine)
+        assertEquals(false, viewModel.state.value.autoSpeakOnCardReady)
+    }
+
+    /** D1：开关切换要落盘并反映到状态。 */
+    @Test fun setAutoSpeakOnCardReadyPersistsAndReflectsInState() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+        assertEquals(true, viewModel.state.value.autoSpeakOnCardReady)
+
+        viewModel.setAutoSpeakOnCardReady(false)
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.state.value.autoSpeakOnCardReady)
+        assertEquals(false, preferences.saved.single().autoSpeakOnCardReady)
+        // 读改写：已保存的引擎选择不被抹掉。
+        assertEquals(PronunciationEngine.SystemTts, preferences.saved.single().selectedEngine)
+
+        viewModel.setAutoSpeakOnCardReady(true)
+        advanceUntilIdle()
+        assertEquals(true, viewModel.state.value.autoSpeakOnCardReady)
+        assertEquals(true, preferences.saved.last().autoSpeakOnCardReady)
+    }
+
+    @Test fun failedAutoSpeakSaveKeepsStateAndReportsStorageError() = runTest(dispatcher) {
+        val preferences = FakePreferences(failSave = true)
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.setAutoSpeakOnCardReady(false)
+        advanceUntilIdle()
+
+        assertEquals(true, viewModel.state.value.autoSpeakOnCardReady)
+        assertTrue(viewModel.state.value.message != null)
     }
 
     @Test fun failedSaveRetainsThePreviousUiSelection() = runTest(dispatcher) {
