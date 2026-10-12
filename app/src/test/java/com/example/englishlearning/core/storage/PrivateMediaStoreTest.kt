@@ -151,6 +151,8 @@ private class FakeFileOps(
 
     override fun exists(path: String): Boolean = path in files
 
+    override fun read(path: String): ByteArray = files.getValue(path)
+
     fun finalFiles(): Set<String> = files.keys.filterNot { it.endsWith(".tmp") }.toSet()
 
     fun temporaryFiles(): Set<String> = files.keys.filter { it.endsWith(".tmp") }.toSet()

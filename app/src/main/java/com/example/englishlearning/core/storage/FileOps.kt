@@ -21,6 +21,8 @@ interface FileOps {
 
     fun sha256(path: String): String
 
+    fun read(path: String): ByteArray
+
     fun atomicMove(
         source: String,
         destination: String,
@@ -50,6 +52,9 @@ class AndroidFileOps(filesDir: File) : FileOps {
             }
             digest.digest().joinToString("") { byte -> "%02x".format(byte) }
         }
+
+    override fun read(path: String): ByteArray =
+        FileInputStream(fileFor(path)).use { input -> input.readBytes() }
 
     override fun atomicMove(
         source: String,

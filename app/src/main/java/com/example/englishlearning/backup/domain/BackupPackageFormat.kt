@@ -78,6 +78,9 @@ fun recordPackagePath(type: String, stableId: String): String = "records/$type/$
 
 fun mediaPackagePath(assetId: String): String = "resources/$assetId"
 
+fun isSafePackageId(id: String): Boolean =
+    id.isNotEmpty() && id.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_' }
+
 /** Scope tokens derived from payload paths: present record types plus `media` when resources exist. */
 fun derivePackageScope(paths: List<String>): List<String> {
     val tokens = paths

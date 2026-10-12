@@ -121,6 +121,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     internal abstract fun internalWordBookProgressMigrationAuditDao(): InternalWordBookProgressMigrationAuditDao
 
+    internal abstract fun internalBackupSourceDao(): com.example.englishlearning.backup.infrastructure.InternalBackupSourceDao
+
     companion object {
         val MIGRATION_1_2: Migration =
             object : Migration(1, 2) {
