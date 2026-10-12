@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
                 sentenceAnalysisViewModel = hiltViewModel<SentenceAnalysisViewModel>(),
                 imageStudioViewModel = hiltViewModel<ImageStudioViewModel>(),
                 wordBookTransferViewModel = hiltViewModel<com.example.englishlearning.wordbook.WordBookTransferViewModel>(),
+                backupExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupExportViewModel>(),
                 pronunciationProvider = pronunciationProvider,
                 refreshVocabularySearchIndex = refreshVocabularySearchIndex,
             )

@@ -248,4 +248,34 @@ object AppModule {
         ids: ArticleIdFactory,
         clock: ClockProvider,
     ): ImportArticleUseCase = ImportArticleUseCase(articles, plans, events, cards, ids, { clock.instant() })
+
+    // ---- F4-03 备份导出（无认证 Salvage 包）：只读源 + 媒体校验 + 打包 + SAF 落盘 ----
+    // 导出链路对 Room 严格只读（源契约测试守护），媒体缺失/校验不符一律失败关闭，绝不写业务表。
+    @Provides @Singleton
+    fun provideBackupFileOps(@ApplicationContext context: Context): com.example.englishlearning.core.storage.FileOps =
+        com.example.englishlearning.core.storage.AndroidFileOps(context.filesDir)
+
+    @Provides @Singleton
+    fun provideBackupRowReader(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): com.example.englishlearning.backup.domain.BackupRowReader =
+        com.example.englishlearning.backup.infrastructure.RoomBackupRowReader(database, dispatcher)
+
+    @Provides @Singleton
+    fun provideBackupMediaGateway(fileOps: com.example.englishlearning.core.storage.FileOps): com.example.englishlearning.backup.domain.BackupMediaGateway =
+        com.example.englishlearning.backup.infrastructure.FileOpsBackupMediaGateway(fileOps)
+
+    @Provides @Singleton
+    fun provideBackupPackager(): com.example.englishlearning.backup.domain.PackagePackager =
+        com.example.englishlearning.backup.infrastructure.ZipPackagePackager()
+
+    @Provides @Singleton
+    fun provideBackupExportCoordinator(
+        rowReader: com.example.englishlearning.backup.domain.BackupRowReader,
+        mediaGateway: com.example.englishlearning.backup.domain.BackupMediaGateway,
+        packager: com.example.englishlearning.backup.domain.PackagePackager,
+    ): com.example.englishlearning.backup.domain.BackupExportCoordinator =
+        com.example.englishlearning.backup.domain.BackupExportCoordinator(rowReader, mediaGateway, packager) { System.currentTimeMillis() }
+
+    @Provides @Singleton
+    fun provideBackupDestinationWriter(writer: com.example.englishlearning.backup.infrastructure.ContentResolverBackupDestinationWriter): com.example.englishlearning.ui.BackupDestinationWriter =
+        writer
 }

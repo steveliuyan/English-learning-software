@@ -104,6 +104,8 @@ fun SettingsScreen(
     onOpenAiProfiles: () -> Unit,
     onOpenSpeechSettings: () -> Unit = {},
     onOpenReminderSettings: () -> Unit = {},
+    /** 备份导出入口：打开无认证 Salvage 包导出确认页（SAF 另存为）。 */
+    onOpenBackupExport: () -> Unit = {},
     /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
     aiProfileSubtitle: String? = null,
     speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
@@ -258,6 +260,19 @@ fun SettingsScreen(
                         .semantics { contentDescription = message },
                 )
             }
+        }
+
+        // F4-03：数据留档导出走本机 SAF「另存为」，文件由用户自持，无账户、无云同步。
+        // 明确是**不可用于认证恢复**的 Salvage 包，故入口文案不承诺「备份/恢复」，只说「导出留档」。
+        SettingsGroup(title = "数据备份", tag = "settings_group_backup") {
+            SettingsActionRow(
+                title = "导出学习数据留档",
+                subtitle = "生成 `.elpbak` 文件（不含 API Key，暂不可用于认证恢复）",
+                tag = "settings_open_backup_export",
+                onClick = onOpenBackupExport,
+                badge = "⭕",
+                accent = DomainColors.Settings,
+            )
         }
     }
 }

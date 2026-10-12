@@ -141,6 +141,7 @@ fun AppScreen(
     sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
     imageStudioViewModel: ImageStudioViewModel? = null,
     wordBookTransferViewModel: com.example.englishlearning.wordbook.WordBookTransferViewModel? = null,
+    backupExportViewModel: BackupExportViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -163,6 +164,7 @@ fun AppScreen(
             var showAiProfiles by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showSpeechSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showReminderSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showBackupExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -326,7 +328,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
                 showWordQaCard != null
@@ -405,6 +407,7 @@ fun AppScreen(
             // 因此从编辑页按返回键先关编辑页，而不是直接退掉整层。
             BackHandler(enabled = showSpeechSettings) { showSpeechSettings = false }
             BackHandler(enabled = showReminderSettings) { showReminderSettings = false }
+            BackHandler(enabled = showBackupExport) { showBackupExport = false }
             BackHandler(enabled = showAiProfiles) {
                 showAiProfiles = false
                 speechSettingsViewModel?.load()
@@ -859,6 +862,12 @@ fun AppScreen(
                     },
                     viewModel = reminderSettingsViewModel,
                 )
+            } else if (showBackupExport) {
+                // F4-03：无认证 Salvage 包导出确认页；SAF「另存为」在页面内部处理，取消不写文件。
+                BackupExportScreen(
+                    onBack = { showBackupExport = false },
+                    viewModel = backupExportViewModel,
+                )
             } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
                 // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
                 val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
@@ -1159,6 +1168,9 @@ fun AppScreen(
                                     onOpenReminderSettings = {
                                         reminderSettingsViewModel?.load()
                                         showReminderSettings = reminderSettingsViewModel != null
+                                    },
+                                    onOpenBackupExport = {
+                                        showBackupExport = backupExportViewModel != null
                                     },
                                     speechEngineStatuses = speechState.engineStatuses(),
                                     aiProfileSubtitle = aiProfiles?.let { ready ->
