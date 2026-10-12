@@ -52,6 +52,28 @@ class SelectWordBookAndSetDailyTargetUseCaseTest {
         )
     }
 
+    @Test
+    fun `switching wordbook overwrites only the active pointer and keeps prior profile data`() = runTest {
+        // AC1-06: 切换活动词书只改写学习档案指针，不触碰任何历史记录存储。
+        val repository = FakeLearningProfileRepository().apply {
+            wordBooks["primary-school"] = wordBook()
+            wordBooks["cet4"] = WordBook("cet4", "四级", "cet", 0, "v1", "cet4-1.0")        }
+        val useCase = SelectWordBookAndSetDailyTargetUseCase(repository)
+        assertEquals(SetupResult.Saved, useCase("default", "primary-school", 10))
+        val upsertsBeforeSwitch = repository.upsertCalls
+
+        assertEquals(SetupResult.Saved, useCase("default", "cet4", 15))
+
+        val profile = (repository.current("default") as RepositoryResult.Success).value
+        assertEquals("cet4", profile?.activeWordBookId, "active pointer must follow the new selection")
+        assertEquals(15, profile?.dailyNewTarget)
+        assertEquals(
+            upsertsBeforeSwitch,
+            repository.upsertCalls,
+            "switching must not rewrite or delete any word book record",
+        )
+    }
+
     private fun wordBook() =
         WordBook("primary-school", "小学", "基础", 0, "v1", "ngsl-nawl-1.2")
 
@@ -61,6 +83,7 @@ class SelectWordBookAndSetDailyTargetUseCaseTest {
         var findFailure = false
         var saveFailure = false
         var saveCalls = 0
+        var upsertCalls = 0
 
         override suspend fun current(profileId: String): RepositoryResult<LearningProfile?> =
             RepositoryResult.Success(profiles[profileId])
@@ -83,6 +106,7 @@ class SelectWordBookAndSetDailyTargetUseCaseTest {
             }
 
         override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> {
+            upsertCalls += 1
             wordBooks[wordBook.id] = wordBook
             return RepositoryResult.Success(Unit)
         }

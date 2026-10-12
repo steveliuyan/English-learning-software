@@ -10,10 +10,9 @@ Android 英语背词应用：本地优先词书学习、FSRS 间隔复习、每�
 ## 二、当前进度
 
 - 阶段 0（工程基线）✅ 完成
-- 阶段 1（背词与复习）进行中，主体已完成：今日计划、词卡、三档反馈、FSRS 调度、学习记录、词汇搜索、发音路由
-- 最新工作（已提交并推送至 GitHub）：
-  - `68b82b5` Kokoro 端侧发音生产化（ONNX 模型二进制不入库，约 129MB，在 `.gitignore`；清单/许可/审计文件已入库；模型获取方式见 `docs/decisions/2026-10-06-kokoro-word-pronunciation.md`）
-  - 逻辑备份包格式（`BackupPackageFormat`/`Validator`/`ZipBackupPackageWriter` + JVM 测试，尚未接用户数据和 UI）
+- 阶段 1（背词与复习）✅ JVM 层验收完成（2026-10-12，1026 用例全绿，逐 AC 映射见 `docs/handoff/2026-10-12-stage-1-acceptance-record.md`）；剩两项真机人工走查不阻塞阶段 2
+- 阶段 2+ 前置条件已满足，可在新分支开发
+- 其他已交付（随阶段 1 一起提交）：Kokoro 端侧发音生产化（`68b82b5`，模型二进制不入库）、逻辑备份包格式（`c2560f7`，未接用户数据）
 - 决策文档 `docs/decisions/` 记录了关键取舍，**改代码前先扫一眼**，尤其 `2026-09-19-static-analysis-and-test-baseline.md`
 
 ## 三、关键工作规则
