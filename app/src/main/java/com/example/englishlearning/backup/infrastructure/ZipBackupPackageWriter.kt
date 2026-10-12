@@ -5,6 +5,8 @@ import com.example.englishlearning.backup.domain.BackupPackageValidator
 import com.example.englishlearning.backup.domain.PackageLimits
 import com.example.englishlearning.backup.domain.PackageValidationFailure
 import com.example.englishlearning.backup.domain.PackageValidationResult
+import com.example.englishlearning.backup.domain.derivePackageScope
+import com.example.englishlearning.backup.domain.isAllowedPayloadPath
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
@@ -20,7 +22,8 @@ class ZipBackupPackageWriter(
         data class Invalid(val reason: PackageValidationFailure) : Result
     }
 
-    fun write(entries: List<Entry>): Result {
+    fun write(entries: List<Entry>, createdAtEpochMillis: Long): Result {
+        if (createdAtEpochMillis < 0L) return Result.Invalid(PackageValidationFailure.InvalidManifest)
         val sorted = entries.sortedBy { it.path }
         val seen = mutableSetOf<String>()
         var totalBytes = 0L
@@ -36,10 +39,24 @@ class ZipBackupPackageWriter(
         }
 
         val canonical = descriptors.joinToString("") { "${it.path}\t${it.bytes.size}\t${it.sha256}\n" }
+        val scope = derivePackageScope(descriptors.map { it.path })
         val manifest = buildString {
             append("{\"formatVersion\":")
             append(BackupPackageFormat.CURRENT_VERSION)
-            append(",\"entries\":[")
+            append(",\"createdAtEpochMillis\":")
+            append(createdAtEpochMillis)
+            append(",\"scope\":[")
+            scope.forEachIndexed { index, token ->
+                if (index > 0) append(',')
+                append('"').append(token).append('"')
+            }
+            append("],\"signatureStatus\":\"")
+            append(BackupPackageFormat.SIGNATURE_STATUS)
+            append("\",\"authenticationStatus\":\"")
+            append(BackupPackageFormat.AUTHENTICATION_STATUS)
+            append("\",\"encryptionStatus\":\"")
+            append(BackupPackageFormat.ENCRYPTION_STATUS)
+            append("\",\"entries\":[")
             descriptors.forEachIndexed { index, descriptor ->
                 if (index > 0) append(',')
                 append("{\"path\":\"").append(descriptor.path)
@@ -76,17 +93,6 @@ class ZipBackupPackageWriter(
             zip.closeEntry()
         }
     }
-
-    private fun isAllowedPayloadPath(path: String): Boolean {
-        if (path.startsWith("records/profile/") && path.endsWith(".json")) {
-            return safeId(path.removePrefix("records/profile/").removeSuffix(".json"))
-        }
-        if (path.startsWith("resources/")) return safeId(path.removePrefix("resources/"))
-        return false
-    }
-
-    private fun safeId(id: String): Boolean =
-        id.isNotEmpty() && id.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_' }
 
     private fun sha256(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

@@ -2,6 +2,10 @@ package com.example.englishlearning.backup.domain
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -23,6 +27,7 @@ class BackupPackageValidator(
         return try {
             ZipInputStream(ByteArrayInputStream(snapshot)).use { zip ->
                 var manifest: PackageManifest? = null
+                var earlyFailure: PackageValidationFailure? = null
                 val seen = mutableSetOf<String>()
                 val actual = linkedMapOf<String, PackageEntry>()
                 var totalBytes = 0L
@@ -65,7 +70,27 @@ class BackupPackageValidator(
                         } catch (_: CharacterCodingException) {
                             return invalid(PackageValidationFailure.InvalidManifest)
                         }
-                        manifest = json.decodeFromString<ManifestDto>(manifestText).toModel()
+                        val probe = try {
+                            json.parseToJsonElement(manifestText).jsonObject
+                        } catch (_: SerializationException) {
+                            return invalid(PackageValidationFailure.InvalidManifest)
+                        } catch (_: IllegalArgumentException) {
+                            return invalid(PackageValidationFailure.InvalidManifest)
+                        }
+                        val declaredVersion = probe["formatVersion"]?.jsonPrimitive?.intOrNull
+                            ?: return invalid(PackageValidationFailure.InvalidManifest)
+                        if (declaredVersion != BackupPackageFormat.CURRENT_VERSION) {
+                            // Fail closed on the declared version before trusting any v2 fields.
+                            earlyFailure = PackageValidationFailure.UnsupportedFormat
+                            break
+                        }
+                        manifest = try {
+                            json.decodeFromJsonElement<ManifestDto>(probe).toModel()
+                        } catch (_: SerializationException) {
+                            return invalid(PackageValidationFailure.InvalidManifest)
+                        } catch (_: IllegalArgumentException) {
+                            return invalid(PackageValidationFailure.InvalidManifest)
+                        }
                     } else {
                         actual[path] = PackageEntry(path, size, sha)
                         if (actual.size > limits.maxEntries) return invalid(PackageValidationFailure.LimitExceeded)
@@ -73,11 +98,26 @@ class BackupPackageValidator(
                     entry = zip.nextEntry
                 }
 
+                earlyFailure?.let { return invalid(it) }
                 val parsed = manifest ?: return invalid(PackageValidationFailure.InvalidManifest)
                 if (parsed.formatVersion != BackupPackageFormat.CURRENT_VERSION) return invalid(PackageValidationFailure.UnsupportedFormat)
                 if (parsed.entries.any { !isAllowedPackagePath(it.path) || it.path == "manifest.json" }) return invalid(PackageValidationFailure.InvalidPath)
                 if (parsed.entries.map { it.path }.toSet().size != parsed.entries.size) return invalid(PackageValidationFailure.DuplicateEntry)
                 if (parsed.entries.size > limits.maxEntries) return invalid(PackageValidationFailure.LimitExceeded)
+                if (parsed.signatureStatus != BackupPackageFormat.SIGNATURE_STATUS ||
+                    parsed.authenticationStatus != BackupPackageFormat.AUTHENTICATION_STATUS ||
+                    parsed.encryptionStatus != BackupPackageFormat.ENCRYPTION_STATUS
+                ) {
+                    return invalid(PackageValidationFailure.InvalidManifest)
+                }
+                if (parsed.createdAtEpochMillis < 0L) return invalid(PackageValidationFailure.InvalidManifest)
+                if (parsed.scope.distinct().size != parsed.scope.size) return invalid(PackageValidationFailure.InvalidManifest)
+                if (parsed.scope.any { it != BackupPackageFormat.MEDIA_SCOPE_TOKEN && !BackupRecordTypes.isValidType(it) }) {
+                    return invalid(PackageValidationFailure.InvalidManifest)
+                }
+                if (parsed.scope != derivePackageScope(parsed.entries.map { it.path })) {
+                    return invalid(PackageValidationFailure.InvalidManifest)
+                }
                 if (parsed.entries.map { it.path }.toSet() != actual.keys) return invalid(PackageValidationFailure.LengthMismatch)
 
                 for (declared in parsed.entries) {
@@ -252,8 +292,26 @@ class BackupPackageValidator(
     }
 
     @Serializable
-    private data class ManifestDto(val formatVersion: Int, val entries: List<EntryDto>, val payloadSha256: String) {
-        fun toModel() = PackageManifest(formatVersion, entries.map { it.toModel() }, payloadSha256)
+    private data class ManifestDto(
+        val formatVersion: Int,
+        val createdAtEpochMillis: Long,
+        val scope: List<String>,
+        val signatureStatus: String,
+        val authenticationStatus: String,
+        val encryptionStatus: String,
+        val entries: List<EntryDto>,
+        val payloadSha256: String,
+    ) {
+        fun toModel() = PackageManifest(
+            formatVersion = formatVersion,
+            createdAtEpochMillis = createdAtEpochMillis,
+            scope = scope,
+            signatureStatus = signatureStatus,
+            authenticationStatus = authenticationStatus,
+            encryptionStatus = encryptionStatus,
+            entries = entries.map { it.toModel() },
+            payloadSha256 = payloadSha256,
+        )
     }
 
     @Serializable

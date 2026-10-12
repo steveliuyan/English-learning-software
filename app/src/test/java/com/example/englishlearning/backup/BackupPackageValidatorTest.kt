@@ -8,8 +8,6 @@ import com.example.englishlearning.backup.domain.PackageValidationFailure
 import com.example.englishlearning.backup.domain.PackageValidationResult
 import com.example.englishlearning.backup.domain.PackageReadResult
 import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -19,16 +17,49 @@ import kotlin.test.assertIs
 
 class BackupPackageValidatorTest {
     @Test
-    fun `accepts version one manifest and safe profile path`() {
-        val result = BackupPackageValidator().validate(packageBytes("records/profile/profile-1.json"))
+    fun `accepts version two manifest and safe profiles path`() {
+        val result = BackupPackageValidator().validate(packageBytes("records/profiles/profile-1.json"))
 
         assertIs<PackageValidationResult.Valid>(result)
-        assertEquals(1, result.manifest.formatVersion)
+        assertEquals(2, result.manifest.formatVersion)
+    }
+
+    @Test
+    fun `version two manifest exposes creation time scope and protection status`() {
+        val result = BackupPackageValidator().validate(
+            packageBytes("records/profiles/profile-1.json", createdAt = 1_700_000_000_000L),
+        )
+
+        val valid = assertIs<PackageValidationResult.Valid>(result)
+        assertEquals(1_700_000_000_000L, valid.manifest.createdAtEpochMillis)
+        assertEquals(listOf("profiles"), valid.manifest.scope)
+        assertEquals("not-protected", valid.manifest.signatureStatus)
+        assertEquals("not-supported", valid.manifest.authenticationStatus)
+        assertEquals("none", valid.manifest.encryptionStatus)
+    }
+
+    @Test
+    fun `scope lists media only when resources are present`() {
+        val withMedia = BackupPackageValidator().validate(
+            packageBytes("records/profiles/profile-1.json", extraPayload = listOf("resources/audio" to byteArrayOf(9))),
+        )
+        assertEquals(listOf("media", "profiles"), assertIs<PackageValidationResult.Valid>(withMedia).manifest.scope)
+
+        val withoutMedia = BackupPackageValidator().validate(packageBytes("records/articles/a-1.json"))
+        assertEquals(listOf("articles"), assertIs<PackageValidationResult.Valid>(withoutMedia).manifest.scope)
+    }
+
+    @Test
+    fun `accepts every whitelisted record type path`() {
+        com.example.englishlearning.backup.domain.BackupRecordTypes.all.forEach { type ->
+            val result = BackupPackageValidator().validate(packageBytes("records/$type/item-1.json"))
+            assertIs<PackageValidationResult.Valid>(result, "type $type must be accepted")
+        }
     }
 
     @Test
     fun `rejects traversal path`() {
-        val result = BackupPackageValidator().validate(packageBytes("records/profile/../profile.json"))
+        val result = BackupPackageValidator().validate(packageBytes("records/profiles/../profile.json"))
 
         assertEquals(
             PackageValidationResult.Invalid(PackageValidationFailure.InvalidPath),
@@ -38,9 +69,7 @@ class BackupPackageValidatorTest {
 
     @Test
     fun `rejects traversal path declared only in manifest`() {
-        val result = BackupPackageValidator().validate(
-            packageBytes("records/profile/../profile.json", includePayload = false),
-        )
+        val result = BackupPackageValidator().validate(packageBytes("records/profiles/../profile.json", includePayload = false))
 
         assertEquals(
             PackageValidationResult.Invalid(PackageValidationFailure.InvalidPath),
@@ -49,9 +78,9 @@ class BackupPackageValidatorTest {
     }
 
     @Test
-    fun `rejects unsupported version`() {
+    fun `rejects version one manifest`() {
         val result = BackupPackageValidator().validate(
-            packageBytes("records/profile/profile-1.json", formatVersion = 2),
+            packageBytes("records/profiles/profile-1.json", formatVersion = 1),
         )
 
         assertEquals(
@@ -61,7 +90,17 @@ class BackupPackageValidatorTest {
     }
 
     @Test
-    fun `rejects non-profile record type`() {
+    fun `rejects v1 shaped manifest without v2 fields`() {
+        val manifest = """{"formatVersion":1,"entries":[],"payloadSha256":"${sha256(ByteArray(0))}"}""".toByteArray()
+
+        assertInvalid(
+            PackageValidationFailure.UnsupportedFormat,
+            BackupPackageValidator().validate(rawArchive(listOf("manifest.json" to manifest))),
+        )
+    }
+
+    @Test
+    fun `rejects non-whitelisted record type`() {
         val result = BackupPackageValidator().validate(packageBytes("records/secret/secret-1.json"))
 
         assertEquals(
@@ -71,7 +110,7 @@ class BackupPackageValidatorTest {
     }
 
     @Test
-    fun `rejects manifest declared path outside profile when payload is absent`() {
+    fun `rejects manifest declared path outside whitelist when payload is absent`() {
         val result = BackupPackageValidator().validate(packageBytes("records/secret/secret-1.json", includePayload = false))
 
         assertEquals(
@@ -82,12 +121,76 @@ class BackupPackageValidatorTest {
 
     @Test
     fun `rejects manifest declared traversal path when payload is absent`() {
-        val result = BackupPackageValidator().validate(packageBytes("records/profile/../profile.json", includePayload = false))
+        val result = BackupPackageValidator().validate(packageBytes("records/profiles/../profile.json", includePayload = false))
 
         assertEquals(
             PackageValidationResult.Invalid(PackageValidationFailure.InvalidPath),
             result,
         )
+    }
+
+    @Test
+    fun `rejects extra path segment inside record id`() {
+        val result = BackupPackageValidator().validate(packageBytes("records/profiles/a/b.json"))
+
+        assertEquals(
+            PackageValidationResult.Invalid(PackageValidationFailure.InvalidPath),
+            result,
+        )
+    }
+
+    @Test
+    fun `rejects falsified signature status claim`() {
+        val bytes = archive(
+            listOf("resources/a" to byteArrayOf(1)),
+            signatureStatus = "signed",
+        )
+
+        assertInvalid(PackageValidationFailure.InvalidManifest, BackupPackageValidator().validate(bytes))
+    }
+
+    @Test
+    fun `rejects falsified authentication status claim`() {
+        val bytes = archive(listOf("resources/a" to byteArrayOf(1)), authenticationStatus = "paired")
+
+        assertInvalid(PackageValidationFailure.InvalidManifest, BackupPackageValidator().validate(bytes))
+    }
+
+    @Test
+    fun `rejects falsified encryption status claim`() {
+        val bytes = archive(listOf("resources/a" to byteArrayOf(1)), encryptionStatus = "aes-gcm")
+
+        assertInvalid(PackageValidationFailure.InvalidManifest, BackupPackageValidator().validate(bytes))
+    }
+
+    @Test
+    fun `rejects scope missing a present record type`() {
+        val bytes = archive(
+            listOf("records/articles/a-1.json" to byteArrayOf(1)),
+            scopeOverride = listOf("profiles"),
+        )
+
+        assertInvalid(PackageValidationFailure.InvalidManifest, BackupPackageValidator().validate(bytes))
+    }
+
+    @Test
+    fun `rejects scope containing media without resources`() {
+        val bytes = archive(
+            listOf("records/articles/a-1.json" to byteArrayOf(1)),
+            scopeOverride = listOf("articles", "media"),
+        )
+
+        assertInvalid(PackageValidationFailure.InvalidManifest, BackupPackageValidator().validate(bytes))
+    }
+
+    @Test
+    fun `rejects unknown scope token`() {
+        val bytes = archive(
+            listOf("records/articles/a-1.json" to byteArrayOf(1)),
+            scopeOverride = listOf("api-keys", "articles"),
+        )
+
+        assertInvalid(PackageValidationFailure.InvalidManifest, BackupPackageValidator().validate(bytes))
     }
 
     @Test
@@ -106,7 +209,11 @@ class BackupPackageValidatorTest {
 
     @Test
     fun `rejects duplicate manifest paths`() {
-        val bytes = archive(listOf("resources/a" to byteArrayOf(1, 2)), declaredPaths = listOf("resources/a", "resources/a"))
+        val bytes = archive(
+            listOf("resources/a" to byteArrayOf(1, 2)),
+            declaredPaths = listOf("resources/a", "resources/a"),
+            scopeOverride = listOf("media"),
+        )
         assertInvalid(PackageValidationFailure.DuplicateEntry, BackupPackageValidator().validate(bytes))
     }
 
@@ -167,8 +274,17 @@ class BackupPackageValidatorTest {
     }
 
     @Test
+    fun `empty package with empty scope is valid`() {
+        val bytes = archive(emptyList(), scopeOverride = emptyList())
+
+        val valid = assertIs<PackageValidationResult.Valid>(BackupPackageValidator().validate(bytes))
+        assertEquals(emptyList(), valid.manifest.entries)
+        assertEquals(emptyList(), valid.manifest.scope)
+    }
+
+    @Test
     fun `rejects malformed utf8 manifest`() {
-        val malformedManifest = """{"formatVersion":1,"entries":[],"payloadSha256":""".toByteArray() +
+        val malformedManifest = """{"formatVersion":2,"createdAtEpochMillis":1,"scope":[],"signatureStatus":"not-protected","authenticationStatus":"not-supported","encryptionStatus":"none","entries":[],"payloadSha256":""".toByteArray() +
             byteArrayOf(0xc3.toByte()) + """"}""".toByteArray()
         val bytes = rawArchive(listOf("manifest.json" to malformedManifest))
 
@@ -235,24 +351,54 @@ class BackupPackageValidatorTest {
         assertEquals(PackageValidationResult.Invalid(reason), result)
     }
 
+    private fun packageBytes(
+        path: String,
+        includePayload: Boolean = true,
+        formatVersion: Int = 2,
+        createdAt: Long = 1_700_000_000_000L,
+        extraPayload: List<Pair<String, ByteArray>> = emptyList(),
+    ): ByteArray {
+        val payload = if (includePayload) listOf(path to byteArrayOf(7)) + extraPayload else emptyList()
+        val declared = listOf(path) + extraPayload.map { it.first }
+        return archive(payload, declaredPaths = declared, formatVersionOverride = formatVersion, createdAt = createdAt)
+    }
+
     private fun archive(
         payload: List<Pair<String, ByteArray>>,
         declaredPaths: List<String> = payload.map { it.first },
         declaredSizeDelta: Long = 0,
         corruptEntryDigest: Boolean = false,
         corruptPayloadDigest: Boolean = false,
-        version: Int = 1,
+        version: Int = 2,
+        formatVersionOverride: Int = version,
+        createdAt: Long = 1_700_000_000_000L,
+        scopeOverride: List<String>? = null,
+        signatureStatus: String = "not-protected",
+        authenticationStatus: String = "not-supported",
+        encryptionStatus: String = "none",
     ): ByteArray {
         val entries = declaredPaths.mapIndexed { index, path ->
             val data = payload.getOrNull(index)?.second ?: byteArrayOf()
             PackageEntry(path, data.size.toLong() + declaredSizeDelta, sha256(data) + if (corruptEntryDigest) "x" else "")
         }
+        val scope = scopeOverride ?: derivedScope(entries.map { it.path })
         val canonical = entries.sortedBy { it.path }.joinToString("") { "${it.path}\t${it.byteSize}\t${it.sha256}\n" }.toByteArray()
         val payloadSha = sha256(canonical) + if (corruptPayloadDigest) "x" else ""
-        val manifest = ("""{"formatVersion":$version,"entries":[""" + entries.joinToString(",") {
-            """{"path":"${it.path}","byteSize":${it.byteSize},"sha256":"${it.sha256}"}"""
-        } + """],"payloadSha256":"$payloadSha"}""").toByteArray()
+        val scopeJson = scope.joinToString(",") { "\"$it\"" }
+        val manifest = (
+            """{"formatVersion":$formatVersionOverride,"createdAtEpochMillis":$createdAt,"scope":[""" + scopeJson + """],"signatureStatus":"$signatureStatus",""" +
+                """"authenticationStatus":"$authenticationStatus","encryptionStatus":"$encryptionStatus","entries":[""" + entries.joinToString(",") {
+                """{"path":"${it.path}","byteSize":${it.byteSize},"sha256":"${it.sha256}"}"""
+            } + """],"payloadSha256":"$payloadSha"}"""
+            ).toByteArray()
         return rawArchive(listOf("manifest.json" to manifest) + payload)
+    }
+
+    private fun derivedScope(paths: List<String>): List<String> {
+        val types = paths.filter { it.startsWith("records/") }.map { it.removePrefix("records/").substringBefore("/") }.toSet()
+        val tokens = types.toMutableSet()
+        if (paths.any { it.startsWith("resources/") }) tokens += "media"
+        return tokens.sorted()
     }
 
     private fun rawArchive(entries: List<Pair<String, ByteArray>>): ByteArray {
@@ -274,14 +420,4 @@ class BackupPackageValidatorTest {
         (0..bytes.size - signature.size).first { offset ->
             signature.indices.all { bytes[offset + it] == signature[it] }
         }
-
-    private fun packageBytes(
-        path: String,
-        includePayload: Boolean = true,
-        formatVersion: Int = 1,
-    ): ByteArray = archive(
-        payload = if (includePayload) listOf(path to "{}".toByteArray()) else emptyList(),
-        declaredPaths = listOf(path),
-        version = formatVersion,
-    )
 }
