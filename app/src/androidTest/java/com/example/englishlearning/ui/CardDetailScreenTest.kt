@@ -238,28 +238,16 @@ class CardDetailScreenTest {
     }
 
     @Test
-    fun regenerateActionsAreHiddenUntilProvidedAndRemainAccentSpecific() {
-        var showRegenerateActions by mutableStateOf(false)
-        var american = 0
-        var british = 0
+    fun regenerateActionsAreRemovedWithKokoroOnDeviceSynthesis() {
+        // Kokoro 端侧实时合成后"重新生成"语义已消失（无缓存、无 API 成本）：
+        // 详情页不得再出现任何重新生成入口，口音切换由 美/英 两个发音按钮承担。
         composeRule.setContent {
-            CardDetailScreen(
-                card = card(),
-                onBack = {},
-                onRegenerateAmerican = if (showRegenerateActions) ({ american++ }) else null,
-                onRegenerateBritish = if (showRegenerateActions) ({ british++ }) else null,
-            )
+            CardDetailScreen(card = card(), onBack = {})
         }
         composeRule.onNodeWithContentDescription("重新生成 ability 美式发音").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("重新生成 ability 英式发音").assertDoesNotExist()
-
-        composeRule.runOnUiThread { showRegenerateActions = true }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("重新生成 ability 美式发音").performClick()
-        composeRule.onNodeWithContentDescription("重新生成 ability 英式发音").performClick()
-
-        assertEquals(1, american)
-        assertEquals(1, british)
+        composeRule.onNodeWithTag("card_detail_regenerate_american").assertDoesNotExist()
+        composeRule.onNodeWithTag("card_detail_regenerate_british").assertDoesNotExist()
     }
 
     @Test

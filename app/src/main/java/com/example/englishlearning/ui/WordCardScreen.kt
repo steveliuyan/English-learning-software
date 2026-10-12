@@ -204,51 +204,12 @@ fun WordCardScreen(
                                 .testTag("word_card_meaning")
                                 .semantics { contentDescription = "释义 ${state.card.meaningZh}" },
                         )
-                        Canvas(
+                        WordCardSpeakerButton(
+                            lemma = state.card.lemma,
                             modifier = Modifier
-                                .size(48.dp)
                                 .testTag("word_card_speak")
-                                .semantics { contentDescription = "播放 ${state.card.lemma} 发音" }
                                 .clickable { onSpeak(state.card.lemma) },
-                        ) {
-                            val left = size.width * 0.18f
-                            val right = size.width * 0.48f
-                            val top = size.height * 0.34f
-                            val bottom = size.height * 0.66f
-                            drawRect(
-                                color = MintPrimary,
-                                topLeft = androidx.compose.ui.geometry.Offset(left, top),
-                                size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
-                            )
-                            drawPath(
-                                path = androidx.compose.ui.graphics.Path().apply {
-                                    moveTo(right, top)
-                                    lineTo(size.width * 0.72f, size.height * 0.22f)
-                                    lineTo(size.width * 0.72f, size.height * 0.78f)
-                                    lineTo(right, bottom)
-                                    close()
-                                },
-                                color = MintPrimary,
-                            )
-                            drawArc(
-                                color = MintPrimary,
-                                startAngle = -42f,
-                                sweepAngle = 84f,
-                                useCenter = false,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
-                                topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.54f, size.height * 0.28f),
-                                size = androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.44f),
-                            )
-                            drawArc(
-                                color = MintPrimary,
-                                startAngle = -38f,
-                                sweepAngle = 76f,
-                                useCenter = false,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
-                                topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.60f, size.height * 0.14f),
-                                size = androidx.compose.ui.geometry.Size(size.width * 0.42f, size.height * 0.72f),
-                            )
-                        }
+                        )
                         state.card.example?.let { example ->
                             Text(
                                 text = example,
@@ -340,4 +301,63 @@ private fun BackToPlanButton(onBackToPlan: () -> Unit) {
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
     ) { Text("返回今日计划", fontWeight = FontWeight.Bold) }
+}
+
+/** 学习词卡的发音按钮：小圆片底 + Material 风格自绘喇叭，与详情页发音按钮同族。 */
+@Composable
+private fun WordCardSpeakerButton(lemma: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .background(MintTint, RoundedCornerShape(50))
+            .padding(6.dp)
+            .semantics { contentDescription = "播放 $lemma 发音" },
+    ) {
+        DetailSpeakerIcon()
+    }
+}
+
+/** Material `volume_up` 比例的自绘喇叭（详情页 AccentSpeakerButton 同款几何，20dp）。 */
+@Composable
+private fun DetailSpeakerIcon() {
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val w = size.width
+        val h = size.height
+        val boxLeft = w * 0.14f
+        val boxRight = w * 0.34f
+        val boxTop = h * 0.40f
+        val boxBottom = h * 0.60f
+        drawRect(
+            color = MintPrimaryDark,
+            topLeft = androidx.compose.ui.geometry.Offset(boxLeft, boxTop),
+            size = androidx.compose.ui.geometry.Size(boxRight - boxLeft, boxBottom - boxTop),
+        )
+        drawPath(
+            path = androidx.compose.ui.graphics.Path().apply {
+                moveTo(boxRight, boxTop)
+                lineTo(w * 0.52f, h * 0.24f)
+                lineTo(w * 0.52f, h * 0.76f)
+                lineTo(boxRight, boxBottom)
+                close()
+            },
+            color = MintPrimaryDark,
+        )
+        drawArc(
+            color = MintPrimaryDark,
+            startAngle = -45f,
+            sweepAngle = 90f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+            topLeft = androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.32f),
+            size = androidx.compose.ui.geometry.Size(w * 0.24f, h * 0.36f),
+        )
+        drawArc(
+            color = MintPrimaryDark,
+            startAngle = -45f,
+            sweepAngle = 90f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+            topLeft = androidx.compose.ui.geometry.Offset(w * 0.56f, h * 0.20f),
+            size = androidx.compose.ui.geometry.Size(w * 0.36f, h * 0.60f),
+        )
+    }
 }

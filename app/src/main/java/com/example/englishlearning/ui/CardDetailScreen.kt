@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -78,8 +80,6 @@ fun CardDetailScreen(
     onBack: () -> Unit,
     onSpeak: () -> Unit = {},
     onSpeakBritish: (() -> Unit)? = null,
-    onRegenerateAmerican: (() -> Unit)? = null,
-    onRegenerateBritish: (() -> Unit)? = null,
     onRelearn: (() -> Unit)? = null,
     onNext: (() -> Unit)? = null,
     vocabularyPresent: Boolean? = null,
@@ -124,8 +124,6 @@ fun CardDetailScreen(
             pronunciationStatus = pronunciationStatus,
             onSpeak = onSpeak,
             onSpeakBritish = onSpeakBritish,
-            onRegenerateAmerican = onRegenerateAmerican,
-            onRegenerateBritish = onRegenerateBritish,
             onRelearn = onRelearn,
             onNext = onNext,
             vocabularyPresent = vocabularyPresent,
@@ -212,8 +210,6 @@ private fun WordHeroCard(
     pronunciationStatus: PronunciationStatus,
     onSpeak: () -> Unit,
     onSpeakBritish: (() -> Unit)?,
-    onRegenerateAmerican: (() -> Unit)?,
-    onRegenerateBritish: (() -> Unit)?,
     onRelearn: (() -> Unit)?,
     onNext: (() -> Unit)?,
     vocabularyPresent: Boolean?,
@@ -231,7 +227,7 @@ private fun WordHeroCard(
                 .testTag("card_detail_lemma")
                 .semantics { contentDescription = card.lemma },
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (card.ipa.isNotBlank()) {
                 Text(
                     text = card.ipa,
@@ -241,39 +237,21 @@ private fun WordHeroCard(
                         .semantics { contentDescription = "音标 ${card.ipa}" },
                 )
             }
-            SpeakerGlyph(
-                modifier = Modifier
-                    .testTag("card_detail_speak")
-                    .semantics { contentDescription = "播放 ${card.lemma} 发音" }
-                    .clickable { onSpeak() },
+            Spacer(Modifier.width(4.dp))
+            // 发音入口：喇叭 + 口音标注。默认美式；英式仅在调用方提供时出现。
+            AccentSpeakerButton(
+                accentLabel = "美",
+                accentDescription = "播放 ${card.lemma} 发音",
+                tag = "card_detail_speak",
+                onClick = onSpeak,
             )
             onSpeakBritish?.let { speakBritish ->
-                SpeakerGlyph(
-                    modifier = Modifier
-                        .testTag("card_detail_speak_british")
-                        .semantics { contentDescription = "播放 ${card.lemma} 英式发音" }
-                        .clickable { speakBritish() },
+                AccentSpeakerButton(
+                    accentLabel = "英",
+                    accentDescription = "播放 ${card.lemma} 英式发音",
+                    tag = "card_detail_speak_british",
+                    onClick = speakBritish,
                 )
-            }
-        }
-        if (onRegenerateAmerican != null || onRegenerateBritish != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                onRegenerateAmerican?.let { regenerate ->
-                    TextButton(
-                        onClick = regenerate,
-                        modifier = Modifier
-                            .testTag("card_detail_regenerate_american")
-                            .semantics { contentDescription = "重新生成 ${card.lemma} 美式发音" },
-                    ) { Text("重新生成美式") }
-                }
-                onRegenerateBritish?.let { regenerate ->
-                    TextButton(
-                        onClick = regenerate,
-                        modifier = Modifier
-                            .testTag("card_detail_regenerate_british")
-                            .semantics { contentDescription = "重新生成 ${card.lemma} 英式发音" },
-                    ) { Text("重新生成英式") }
-                }
             }
         }
         pronunciationStatus.message()?.let { message ->
@@ -393,37 +371,83 @@ private fun PersonalNoteEditor(
     }
 }
 
-/** 单个发音按钮：美式为默认入口，英式由调用方显式提供。 */
+/**
+ * 发音按钮：Material 风格喇叭（自绘，24dp）+ 口音标注字（美/英）。
+ *
+ * 不引 material-icons 库（依赖锁定决策见 AppBottomBar 注释），喇叭按 Material Icons
+ * `volume_up` 的几何比例自绘：喇叭主体 + 两道声波弧线。
+ */
+@Composable
+private fun AccentSpeakerButton(
+    accentLabel: String,
+    accentDescription: String,
+    tag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(AppShape.Pill)
+            .background(MintTint)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .testTag(tag)
+            .semantics { contentDescription = accentDescription },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SpeakerGlyph()
+        Text(
+            text = accentLabel,
+            style = AppType.Footnote.copy(color = MintPrimaryDark, fontWeight = FontWeight.SemiBold),
+        )
+    }
+}
+
+/** Material `volume_up` 比例的自绘喇叭，24dp 视觉尺寸。 */
 @Composable
 private fun SpeakerGlyph(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(48.dp)) {
-        val left = size.width * 0.18f
-        val right = size.width * 0.48f
-        val top = size.height * 0.34f
-        val bottom = size.height * 0.66f
+    Canvas(modifier = modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        // 喇叭箱体：小矩形 + 向左张开的梯形号角
+        val boxLeft = w * 0.14f
+        val boxRight = w * 0.34f
+        val boxTop = h * 0.40f
+        val boxBottom = h * 0.60f
         drawRect(
-            color = MintPrimary,
-            topLeft = androidx.compose.ui.geometry.Offset(left, top),
-            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+            color = MintPrimaryDark,
+            topLeft = androidx.compose.ui.geometry.Offset(boxLeft, boxTop),
+            size = androidx.compose.ui.geometry.Size(boxRight - boxLeft, boxBottom - boxTop),
         )
         drawPath(
             path = androidx.compose.ui.graphics.Path().apply {
-                moveTo(right, top)
-                lineTo(size.width * 0.72f, size.height * 0.22f)
-                lineTo(size.width * 0.72f, size.height * 0.78f)
-                lineTo(right, bottom)
+                moveTo(boxRight, boxTop)
+                lineTo(w * 0.52f, h * 0.24f)
+                lineTo(w * 0.52f, h * 0.76f)
+                lineTo(boxRight, boxBottom)
                 close()
             },
-            color = MintPrimary,
+            color = MintPrimaryDark,
+        )
+        // 两道声波弧线
+        drawArc(
+            color = MintPrimaryDark,
+            startAngle = -45f,
+            sweepAngle = 90f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+            topLeft = androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.32f),
+            size = androidx.compose.ui.geometry.Size(w * 0.24f, h * 0.36f),
         )
         drawArc(
-            color = MintPrimary,
-            startAngle = -42f,
-            sweepAngle = 84f,
+            color = MintPrimaryDark,
+            startAngle = -45f,
+            sweepAngle = 90f,
             useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f),
-            topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.54f, size.height * 0.28f),
-            size = androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.44f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+            topLeft = androidx.compose.ui.geometry.Offset(w * 0.56f, h * 0.20f),
+            size = androidx.compose.ui.geometry.Size(w * 0.36f, h * 0.60f),
         )
     }
 }
