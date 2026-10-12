@@ -29,9 +29,9 @@ Android 英语背词应用：本地优先词书学习、FSRS 间隔复习、每�
 
 ## 四、下一阶段候选方向
 
-- 阶段 1 收尾：FSRS 调度验收（F1-05 剩余项，见 `docs/specs/01`）
-- 备份包下一步：接真实数据导出（阶段 4 前置，设计文档 `docs/superpowers/specs/2026-10-11-logical-backup-export-design.md`）
-- 阶段 2：每日文章与 AI 内容
+- **当前任务：阶段 2 收口（F2-04/05/06），任务书 `docs/handoff/2026-10-12-stage-2-closeout-task.md`，分支 `stage-2-f2-closeout`**
+- 之后的候选顺序：F3-01 离线词典 → F4-02 提醒 → F3-03 拍照 OCR → 备份接真实数据（阶段 4）
+- 阶段 1 有两项真机人工走查待做（见 `2026-10-12-stage-1-acceptance-record.md`），不阻塞开发
 
 ## 五、用户偏好
 
