@@ -506,3 +506,13 @@
 - NOTICE 位置: 正式产品未打包；Spike 测试通知见 app/src/androidTest/assets/kokoro-notices
 - 替代方案: 系统能力或不提供对应功能
 - 商业分发结论: 未引入/不打包，完成许可核验前禁止商业分发
+
+## androidx-work-runtime-ktx
+- 名称: AndroidX WorkManager (work-runtime-ktx 及传递依赖 work-runtime/startup-runtime/lifecycle-service/tracing-ktx/concurrent-futures-ktx)
+- 版本: 2.10.0（传递依赖版本以 gradle.lockfile 为准）
+- 许可证: Apache-2.0
+- 用途: F4-02 本地提醒的非精确调度（唯一 WorkRequest replace 语义保证"取消旧任务并重排唯一一次"）；设备重启后自动恢复持久化任务
+- 数据流: 本地任务调度与通知触发；不联网、不读取用户数据；通知文案为固定字符串，不含学习数据
+- NOTICE 位置: 本条目；随包 Apache-2.0 许可文本由 AAR 内嵌 NOTICE 覆盖
+- 替代方案: AlarmManager（非精确 setAndAllowWhileIdle 亦可，但 WorkManager 提供重启恢复与约束）；不提供提醒
+- 商业分发结论: Apache-2.0，允许商业分发

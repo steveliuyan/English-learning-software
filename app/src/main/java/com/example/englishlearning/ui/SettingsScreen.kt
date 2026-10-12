@@ -103,6 +103,7 @@ fun SettingsScreen(
     onOpenWorksheet: () -> Unit,
     onOpenAiProfiles: () -> Unit,
     onOpenSpeechSettings: () -> Unit = {},
+    onOpenReminderSettings: () -> Unit = {},
     /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
     aiProfileSubtitle: String? = null,
     speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
@@ -198,6 +199,14 @@ fun SettingsScreen(
                 onClick = onOpenSpeechSettings,
                 badge = "♪",
                 accent = DomainColors.AiSpeech,
+            )
+            SettingsActionRow(
+                title = "学习提醒",
+                subtitle = "每日提醒，默认关闭（非精确、每天最多一次）",
+                tag = "settings_open_reminder",
+                onClick = onOpenReminderSettings,
+                badge = "⏰",
+                accent = DomainColors.Settings,
             )
         }
 

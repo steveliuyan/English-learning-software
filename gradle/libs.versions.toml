@@ -21,6 +21,7 @@ mockk = "1.14.5"
 turbine = "1.2.1"
 coroutines = "1.10.2"
 serialization = "1.8.1"
+workManager = "2.10.0"
 detekt = "1.23.8"
 ktlint = "12.1.2"
 onnxruntime = "1.29.0"
@@ -55,6 +56,7 @@ kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5", versi
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

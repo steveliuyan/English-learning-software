@@ -11,6 +11,7 @@ import com.example.englishlearning.ui.ArticleReadingViewModel
 import com.example.englishlearning.ui.CheckInViewModel
 import com.example.englishlearning.ui.GlobalVocabularySearchViewModel
 import com.example.englishlearning.ui.ImageStudioViewModel
+import com.example.englishlearning.ui.ReminderSettingsViewModel
 import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.LearningRecordsViewModel
 import com.example.englishlearning.ui.WordBookWordsViewModel
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
                 articleReadingViewModel = hiltViewModel<ArticleReadingViewModel>(),
                 aiProfileViewModel = hiltViewModel<AiProfileSettingsViewModel>(),
                 speechSettingsViewModel = hiltViewModel<SpeechSettingsViewModel>(),
+                reminderSettingsViewModel = hiltViewModel<ReminderSettingsViewModel>(),
                 checkInViewModel = hiltViewModel<CheckInViewModel>(),
                 learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
                 wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),

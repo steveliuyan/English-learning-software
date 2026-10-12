@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -113,6 +114,9 @@ private fun <T> nextAfter(items: List<T>, matches: (T) -> Boolean): T? {
     return if (index >= 0) items.getOrNull(index + 1) else null
 }
 
+/** F4-02：POST_NOTIFICATIONS 运行时权限请求码（非精确提醒，拒绝后不重复弹窗）。 */
+private const val REMINDER_PERMISSION_REQUEST_CODE = 4003
+
 @Composable
 fun AppScreen(
     viewModel: AppViewModel,
@@ -124,6 +128,7 @@ fun AppScreen(
     articleReadingViewModel: ArticleReadingViewModel? = null,
     aiProfileViewModel: AiProfileSettingsViewModel? = null,
     speechSettingsViewModel: SpeechSettingsViewModel? = null,
+    reminderSettingsViewModel: ReminderSettingsViewModel? = null,
     checkInViewModel: CheckInViewModel? = null,
     learningRecordsViewModel: LearningRecordsViewModel? = null,
     wordBookWordsViewModel: WordBookWordsViewModel? = null,
@@ -157,6 +162,7 @@ fun AppScreen(
             var selectedFeatureKey by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
             var showAiProfiles by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showSpeechSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showReminderSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -320,7 +326,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
                 showWordQaCard != null
@@ -398,6 +404,7 @@ fun AppScreen(
             // 这一层内部还有「列表 / 编辑」两态，编辑态会自己再声明一条更靠后的 BackHandler，
             // 因此从编辑页按返回键先关编辑页，而不是直接退掉整层。
             BackHandler(enabled = showSpeechSettings) { showSpeechSettings = false }
+            BackHandler(enabled = showReminderSettings) { showReminderSettings = false }
             BackHandler(enabled = showAiProfiles) {
                 showAiProfiles = false
                 speechSettingsViewModel?.load()
@@ -826,6 +833,32 @@ fun AppScreen(
                     },
                     onBack = { showSpeechSettings = false },
                 )
+            } else if (showReminderSettings) {
+                // F4-02：权限判定在 composable 上下文完成；onEnableRequested 只收"已授权"结果。
+                // 拒绝后不重复请求（Android 记住拒绝态），设置说明提供系统设置入口。
+                val reminderActivity = LocalContext.current as? android.app.Activity
+                val notificationGranted = if (android.os.Build.VERSION.SDK_INT >= 33 && reminderActivity != null) {
+                    androidx.core.content.ContextCompat.checkSelfPermission(
+                        reminderActivity,
+                        android.Manifest.permission.POST_NOTIFICATIONS,
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
+                ReminderSettingsScreen(
+                    onBack = { showReminderSettings = false },
+                    onEnableRequested = {
+                        when {
+                            notificationGranted -> reminderSettingsViewModel?.setEnabled(true)
+                            reminderActivity != null -> androidx.core.app.ActivityCompat.requestPermissions(
+                                reminderActivity,
+                                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                                REMINDER_PERMISSION_REQUEST_CODE,
+                            )
+                        }
+                    },
+                    viewModel = reminderSettingsViewModel,
+                )
             } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
                 // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
                 val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
@@ -1122,6 +1155,10 @@ fun AppScreen(
                                     onOpenSpeechSettings = {
                                         speechSettingsViewModel?.load()
                                         showSpeechSettings = speechSettingsViewModel != null
+                                    },
+                                    onOpenReminderSettings = {
+                                        reminderSettingsViewModel?.load()
+                                        showReminderSettings = reminderSettingsViewModel != null
                                     },
                                     speechEngineStatuses = speechState.engineStatuses(),
                                     aiProfileSubtitle = aiProfiles?.let { ready ->

@@ -22,6 +22,7 @@ import com.example.englishlearning.core.storage.dao.InternalVocabularyEntryDao
 import com.example.englishlearning.core.storage.dao.InternalVocabularySearchHistoryDao
 import com.example.englishlearning.core.storage.dao.InternalVocabularySearchIndexDao
 import com.example.englishlearning.core.storage.entity.AiPreferenceEntity
+import com.example.englishlearning.core.storage.entity.ReminderPreferenceEntity
 import com.example.englishlearning.core.storage.entity.WordAiNoteEntity
 import com.example.englishlearning.core.storage.entity.AiProfileEntity
 import com.example.englishlearning.core.storage.entity.ArticleEntity
@@ -74,8 +75,9 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchGramEntit
         VocabularySearchHistoryEntity::class,
         VocabularySearchIndexEntity::class,
         VocabularySearchGramEntity::class,
+        ReminderPreferenceEntity::class,
     ],
-    version = 27,
+    version = 28,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -92,6 +94,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalReadingCompletionDao(): InternalReadingCompletionDao
 
     internal abstract fun internalSpeechPreferenceDao(): InternalSpeechPreferenceDao
+
+    internal abstract fun internalReminderPreferenceDao(): com.example.englishlearning.core.storage.dao.InternalReminderPreferenceDao
 
     internal abstract fun internalAssetDao(): InternalAssetDao
 
@@ -543,8 +547,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v27→v28：F4-02 本地提醒偏好单行表。默认关、默认 20:00（1200 分钟）。 */
+        val MIGRATION_27_28: Migration = object : Migration(27, 28) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `reminder_preferences` (" +
+                        "`reminderId` TEXT NOT NULL, `enabled` INTEGER NOT NULL, " +
+                        "`minutesOfDay` INTEGER NOT NULL DEFAULT 1200, PRIMARY KEY(`reminderId`))",
+                )
+            }
+        }
+
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
 
         /**
          * 词条字串索引（FTS4 + 3-gram）的表名与建表 DDL。

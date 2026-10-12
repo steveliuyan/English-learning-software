@@ -3,6 +3,8 @@
     <!-- 本应用第一次申请网络权限（F2-03）。它必须与「出站确认」同时在位：
          权限让请求成为可能，确认框让用户知情。不要顺手加其他网络类权限。 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- F4-02 本地提醒：Android 13+ 运行时请求，拒绝后不重复弹窗（设置页提供系统设置入口）。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".EnglishLearningApplication"
