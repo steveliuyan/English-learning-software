@@ -6,35 +6,73 @@ import kotlinx.coroutines.CancellationException
 enum class PronunciationEngine {
     SystemTts,
     MiMo,
-    OpenAi,
 }
 
 fun interface MiMoPronunciationProviderFactory {
     fun create(profileId: String): PronunciationProvider
 }
 
-fun interface OpenAiPronunciationProviderFactory {
-    fun create(profileId: String): PronunciationProvider
-}
-
+/** Routes pronunciation by content semantics, never by a caller-selected remote word provider. */
 class PronunciationRouter(
+    private val kokoroProvider: PronunciationProvider,
     private val systemProvider: PronunciationProvider,
     private val miMoFactory: MiMoPronunciationProviderFactory,
-    private val openAiFactory: OpenAiPronunciationProviderFactory,
     private val preferences: SpeechPreferenceRepository,
 ) : PronunciationProvider {
-    override fun capabilities(): Set<PronunciationCapability> = systemProvider.capabilities()
+    override fun capabilities(): Set<PronunciationCapability> =
+        kokoroProvider.capabilities() + systemProvider.capabilities()
 
-    override suspend fun speak(text: String): PronunciationResult = speak(text, savedPreference())
+    /** Compatibility entry point for existing sentence/preview callers. */
+    override suspend fun speak(text: String): PronunciationResult = speakSentence(text)
 
-    override suspend fun speak(text: String, accent: PronunciationAccent): PronunciationResult =
-        speak(text, accent, false, savedPreference())
+    override suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+    ): PronunciationResult = speakSentence(text, accent)
 
     override suspend fun speak(
         text: String,
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
-    ): PronunciationResult = speak(text, accent, forceRegenerate, savedPreference())
+    ): PronunciationResult = speakSentence(text, accent, forceRegenerate)
+
+    override suspend fun speakWord(
+        word: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+    ): PronunciationResult = kokoroProvider.speak(word, accent, forceRegenerate)
+
+    suspend fun speakWord(word: String, accent: PronunciationAccent): PronunciationResult =
+        speakWord(word, accent, false)
+
+    override suspend fun speakSentence(
+        sentence: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+    ): PronunciationResult = routeSentence(sentence, accent, forceRegenerate)
+
+    suspend fun speakSentence(sentence: String): PronunciationResult =
+        routeSentence(sentence, PronunciationAccent.American, false)
+
+    suspend fun speakSentence(sentence: String, accent: PronunciationAccent): PronunciationResult =
+        routeSentence(sentence, accent, false)
+
+    private suspend fun routeSentence(
+        sentence: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+    ): PronunciationResult {
+        val preference = savedPreference()
+        return when (preference.selectedEngine) {
+            PronunciationEngine.SystemTts -> systemProvider.speak(sentence, accent)
+            PronunciationEngine.MiMo -> speakMiMoOrSystem(
+                sentence = sentence,
+                accent = accent,
+                forceRegenerate = forceRegenerate,
+                profileId = preference.miMoProfileId,
+            )
+        }
+    }
 
     private suspend fun savedPreference(): SpeechPreference = try {
         preferences.get().getOrElse { error ->
@@ -47,48 +85,23 @@ class PronunciationRouter(
         SpeechPreference()
     }
 
-    suspend fun speak(text: String, preference: SpeechPreference): PronunciationResult =
-        speak(text, PronunciationAccent.American, false, preference)
-
-    private suspend fun speak(
-        text: String,
-        accent: PronunciationAccent,
-        forceRegenerate: Boolean,
-        preference: SpeechPreference,
-    ): PronunciationResult = when (preference.selectedEngine) {
-        PronunciationEngine.SystemTts -> systemProvider.speak(text)
-        PronunciationEngine.MiMo -> speakRemoteOrSystem(text, accent, forceRegenerate, preference.miMoProfileId, miMoFactory::create)
-        PronunciationEngine.OpenAi -> {
-            val openAiResult = speakRemote(text, accent, forceRegenerate, preference.openAiProfileId, openAiFactory::create)
-            if (openAiResult == PronunciationResult.Played) openAiResult
-            else speakRemoteOrSystem(text, accent, forceRegenerate, preference.miMoProfileId, miMoFactory::create)
-        }
-    }
-
-    private suspend fun speakRemoteOrSystem(
-        text: String,
+    private suspend fun speakMiMoOrSystem(
+        sentence: String,
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
         profileId: String?,
-        factory: (String) -> PronunciationProvider,
-    ): PronunciationResult = speakRemote(text, accent, forceRegenerate, profileId, factory).let { result ->
-        if (result == PronunciationResult.Played) result else systemProvider.speak(text)
-    }
-
-    private suspend fun speakRemote(
-        text: String,
-        accent: PronunciationAccent,
-        forceRegenerate: Boolean,
-        profileId: String?,
-        factory: (String) -> PronunciationProvider,
     ): PronunciationResult {
-        if (profileId == null) return PronunciationResult.Unavailable("Missing speech profile")
-        return try {
-            factory(profileId).speak(text, accent, forceRegenerate)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            PronunciationResult.Failed()
+        val remote = if (profileId == null) {
+            PronunciationResult.Unavailable("Missing speech profile")
+        } else {
+            try {
+                miMoFactory.create(profileId).speak(sentence, accent, forceRegenerate)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                PronunciationResult.Failed(error)
+            }
         }
+        return if (remote == PronunciationResult.Played) remote else systemProvider.speak(sentence, accent)
     }
 }

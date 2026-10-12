@@ -6,6 +6,18 @@ interface PronunciationProvider {
 
     suspend fun speak(text: String): PronunciationResult
 
+    suspend fun speakWord(
+        text: String,
+        accent: PronunciationAccent = PronunciationAccent.American,
+        forceRegenerate: Boolean = false,
+    ): PronunciationResult = speak(text, accent, forceRegenerate)
+
+    suspend fun speakSentence(
+        text: String,
+        accent: PronunciationAccent = PronunciationAccent.American,
+        forceRegenerate: Boolean = false,
+    ): PronunciationResult = speak(text, accent, forceRegenerate)
+
     suspend fun speak(text: String, accent: PronunciationAccent): PronunciationResult = speak(text)
 
     suspend fun speak(

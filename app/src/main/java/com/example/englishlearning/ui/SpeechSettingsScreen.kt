@@ -121,7 +121,6 @@ fun SpeechSettingsScreen(
             Column(modifier = Modifier.animateContentSize(tween(AppMotion.Normal, easing = AppMotion.Easing))) {
                 if (candidatesExpanded) {
                     val boundProfileId = when (state.selectedEngine) {
-                        PronunciationEngine.OpenAi -> state.openAiProfileId
                         PronunciationEngine.MiMo -> state.miMoProfileId
                         PronunciationEngine.SystemTts -> null
                     }

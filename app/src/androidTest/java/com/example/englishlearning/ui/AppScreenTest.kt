@@ -15,6 +15,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.ai.AiPreferenceRepository
@@ -174,6 +177,92 @@ class AppScreenTest {
         }
         composeRule.onNodeWithContentDescription("AI 学").assertExists()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
+    }
+
+    @Test
+    fun wordBookReturnsToTheLetterAndScrollPositionUsedToOpenWordDetail() {
+        val wordsViewModel = wordBookWordsViewModelWithAlphabetThroughW()
+        composeRule.setContent {
+            readyAppScreen(
+                todayPlanViewModel = TodayPlanViewModel({ readyPlanResult() }, FakeLearningProfileRepository()),
+                wordBookWordsViewModel = wordsViewModel,
+                learningRecordsViewModel = learningRecordsViewModelWithAbilityRecord(),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("wordbook_words_screen").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_aword").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_wonder").performClick()
+        composeRule.onNodeWithTag("card_detail_screen").assertExists()
+        composeRule.onNodeWithText("wonder").assertExists()
+
+        composeRule.onNodeWithTag("card_detail_back").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("wordbook_words_screen").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_wonder").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_aword").assertDoesNotExist()
+    }
+
+    @Test
+    fun wordBookNewBrowsingSessionStartsAtAAfterLeavingW() {
+        val wordsViewModel = wordBookWordsViewModelWithAlphabetThroughW()
+        composeRule.setContent {
+            readyAppScreen(
+                todayPlanViewModel = TodayPlanViewModel({ readyPlanResult() }, FakeLearningProfileRepository()),
+                wordBookWordsViewModel = wordsViewModel,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_back").performClick()
+        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("wordbook_words_rail_active_A").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_aword").assertExists()
+    }
+
+    @Test
+    fun wordBookSystemBackRetainsTheNonzeroScrollOffsetWithinW() {
+        val wordsViewModel = wordBookWordsViewModelWithAlphabetThroughW(wRows = 12)
+        composeRule.setContent {
+            readyAppScreen(
+                todayPlanViewModel = TodayPlanViewModel({ readyPlanResult() }, FakeLearningProfileRepository()),
+                wordBookWordsViewModel = wordsViewModel,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
+        composeRule.waitForIdle()
+        val row = composeRule.onNodeWithTag("wordbook_words_row_wonder")
+        val topAtHeader = row.fetchSemanticsNode().boundsInRoot.top
+        composeRule.onNode(hasScrollToIndexAction()).performSemanticsAction(SemanticsActions.ScrollBy) {
+            it(0f, 47f)
+        }
+        composeRule.waitForIdle()
+        val topBeforeDetail = row.fetchSemanticsNode().boundsInRoot.top
+        assertEquals("夹具必须实际产生非零滚动偏移", 47f, topAtHeader - topBeforeDetail, 1f)
+        row.performClick()
+        composeRule.onNodeWithTag("card_detail_screen").assertExists()
+        pressSystemBack()
+        composeRule.onNodeWithTag("wordbook_words_screen").assertExists()
+        assertEquals(
+            "系统返回必须保留 W 组内原有像素偏移",
+            topBeforeDetail,
+            row.fetchSemanticsNode().boundsInRoot.top,
+            1f,
+        )
+        composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
     }
 
     @Test
@@ -363,6 +452,19 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
     }
 
+    @Test
+    fun recordingProviderKeepsLegacyWordAndSentenceVerbsDistinct() = kotlinx.coroutines.runBlocking {
+        val provider = RecordingPronunciationProvider(PronunciationResult.Played)
+
+        provider.speak("legacy")
+        provider.speakWord("ability", com.example.englishlearning.language.domain.PronunciationAccent.American)
+        provider.speakSentence("Birds fly.", com.example.englishlearning.language.domain.PronunciationAccent.British)
+
+        assertEquals(listOf("legacy"), provider.legacyCalls)
+        assertEquals(listOf(Triple("ability", com.example.englishlearning.language.domain.PronunciationAccent.American, false)), provider.wordCalls)
+        assertEquals(listOf(Triple("Birds fly.", com.example.englishlearning.language.domain.PronunciationAccent.British, false)), provider.sentenceCalls)
+    }
+
     /** D1 新契约：词卡就绪自动朗读 1 次，用户点击再 1 次，两者共存互不取消。 */
     @Test
     fun learningCardPronunciationRoutesTheVisibleLemmaToTheProvider() {
@@ -401,7 +503,7 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("认识").assertHasClickAction()
     }
 
-    /** D1：词卡就绪自动 1 次 + 详情点击 1 次 = 2 次，全部是同一个 lemma；详情页自身不自动发音。 */
+    /** D1：词卡就绪自动 1 次 + 详情美式/英式各点击 1 次，全部是同一个 lemma；详情页自身不自动发音。 */
     @Test
     fun submittedCardDetailPronunciationRoutesTheHeldLemmaToTheProvider() {
         val provider = RecordingPronunciationProvider(PronunciationResult.Played)
@@ -418,9 +520,18 @@ class AppScreenTest {
             composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 2 }
+        composeRule.onNodeWithContentDescription("播放 ability 英式发音").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 3 }
 
-        assertEquals(listOf("ability", "ability"), provider.spokenTexts)
+        assertEquals(listOf("ability", "ability", "ability"), provider.spokenTexts)
+        assertEquals(
+            listOf(
+                com.example.englishlearning.language.domain.PronunciationAccent.American,
+                com.example.englishlearning.language.domain.PronunciationAccent.American,
+                com.example.englishlearning.language.domain.PronunciationAccent.British,
+            ),
+            provider.wordCalls.map { it.second },
+        )
         composeRule.onNodeWithText("发音已播放。").assertExists()
     }
 
@@ -467,9 +578,17 @@ class AppScreenTest {
             composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts == listOf("ability") }
+        composeRule.onNodeWithContentDescription("播放 ability 英式发音").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 2 }
 
-        assertEquals(listOf("ability"), provider.spokenTexts)
+        assertEquals(listOf("ability", "ability"), provider.spokenTexts)
+        assertEquals(
+            listOf(
+                com.example.englishlearning.language.domain.PronunciationAccent.American,
+                com.example.englishlearning.language.domain.PronunciationAccent.British,
+            ),
+            provider.wordCalls.map { it.second },
+        )
         composeRule.onNodeWithText("发音已播放。").assertExists()
     }
 
@@ -841,11 +960,33 @@ class AppScreenTest {
         private val result: PronunciationResult,
     ) : PronunciationProvider {
         val spokenTexts = mutableListOf<String>()
+        val wordCalls = mutableListOf<Triple<String, com.example.englishlearning.language.domain.PronunciationAccent, Boolean>>()
+        val sentenceCalls = mutableListOf<Triple<String, com.example.englishlearning.language.domain.PronunciationAccent, Boolean>>()
+        val legacyCalls = mutableListOf<String>()
 
         override fun capabilities() = setOf(PronunciationCapability.RemoteAudio)
 
         override suspend fun speak(text: String): PronunciationResult {
+            legacyCalls += text
+            return result
+        }
+
+        override suspend fun speakWord(
+            text: String,
+            accent: com.example.englishlearning.language.domain.PronunciationAccent,
+            forceRegenerate: Boolean,
+        ): PronunciationResult {
             spokenTexts += text
+            wordCalls += Triple(text, accent, forceRegenerate)
+            return result
+        }
+
+        override suspend fun speakSentence(
+            text: String,
+            accent: com.example.englishlearning.language.domain.PronunciationAccent,
+            forceRegenerate: Boolean,
+        ): PronunciationResult {
+            sentenceCalls += Triple(text, accent, forceRegenerate)
             return result
         }
     }
@@ -907,9 +1048,28 @@ class AppScreenTest {
         ).also { it.keys += "mimo" }
     }
 
-    /** 学习记录 fixture：今日已学里放一条可打开详情的 ability 记录。
-     *  仓储按真实检索键校验：planId 不是今日计划 fixture 的 plan-1 一律返回空，
-     *  避免把身份/计划错配掩盖成绿灯。 */
+    private fun wordBookWordsViewModelWithAlphabetThroughW(wRows: Int = 1): WordBookWordsViewModel {
+        val lemmas = ('A'..'V').map { "${it.lowercaseChar()}word" } +
+            listOf("wonder") + (2..wRows).map { "wword$it" }
+        val words = lemmas.map { lemma ->
+            val cardId = "test-book:$lemma"
+            WordBookRecord(
+                card = com.example.englishlearning.learning.domain.WordCard(cardId, "test-book", lemma, "", "", "测试释义"),
+                cardId = cardId,
+                displayLemma = lemma,
+                status = com.example.englishlearning.learning.WordBookRecordStatus.Unlearned,
+            )
+        }
+        val repository = object : LearningRecordRepository {
+            override suspend fun today(profileId: String, planId: String) = RepositoryResult.Success(emptyList<LearningRecord>())
+            override suspend fun history(profileId: String) = RepositoryResult.Success(emptyList<LearningHistoryGroup>())
+            override suspend fun allWords(wordBookId: String, now: java.time.Instant) =
+                if (wordBookId == "test-book") RepositoryResult.Success(words)
+                else RepositoryResult.Success(emptyList<WordBookRecord>())
+        }
+        return WordBookWordsViewModel(repository, FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC))
+    }
+
     private fun learningRecordsViewModelWithAbilityRecord(): LearningRecordsViewModel {
         val cardId = PlaceholderWordCardSource.cardId("cet4", "ability")
         val card = kotlinx.coroutines.runBlocking { PlaceholderWordCardSource().cards(listOf(cardId)) }.first()
@@ -946,6 +1106,7 @@ class AppScreenTest {
         sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
         imageStudioViewModel: ImageStudioViewModel? = null,
         learningRecordsViewModel: LearningRecordsViewModel? = null,
+        wordBookWordsViewModel: WordBookWordsViewModel? = null,
     ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
@@ -964,6 +1125,7 @@ class AppScreenTest {
             sentenceAnalysisViewModel = sentenceAnalysisViewModel,
             imageStudioViewModel = imageStudioViewModel,
             learningRecordsViewModel = learningRecordsViewModel,
+            wordBookWordsViewModel = wordBookWordsViewModel,
         )
     }
 
@@ -1115,13 +1277,15 @@ class AppScreenTest {
         composeRule.waitForIdle()
     }
 
-    private fun readyPlanResult(): TodayPlanResult = TodayPlanResult.Ready(
+    private fun readyPlanResult(): TodayPlanResult.Ready = readyPlanResult("test-book")
+
+    private fun readyPlanResult(wordBookId: String): TodayPlanResult.Ready = TodayPlanResult.Ready(
         TodayPlan(
             planId = "plan-1",
             profileId = "profile-1",
             localDate = java.time.LocalDate.of(2026, 9, 19),
             zoneId = "Asia/Shanghai",
-            activeWordBookId = "test-book",
+            activeWordBookId = wordBookId,
             newTarget = 10,
             dueTarget = 0,
             newCardIds = emptyList(),

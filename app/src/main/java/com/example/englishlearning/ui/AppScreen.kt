@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -159,6 +160,9 @@ fun AppScreen(
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            val wordBookWordsListState = key(state.profile.id, showWordBookWords) {
+                rememberLazyListState()
+            }
             var showVocabulary by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showVocabularyRelearn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var selectedRelearnCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
@@ -408,7 +412,7 @@ fun AppScreen(
                         searchPronunciationJob?.cancel()
                         searchPronunciationMessage = PronunciationStatus.Playing
                         searchPronunciationJob = launch {
-                            val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma))
+                            val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma))
                             if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
                                 searchPronunciationMessage = result
                             }
@@ -442,7 +446,7 @@ fun AppScreen(
                             searchPronunciationJob?.cancel()
                             searchPronunciationMessage = PronunciationStatus.Idle
                             searchPronunciationJob = pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American))
                                 if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
                                     searchPronunciationMessage = result
                                 }
@@ -454,7 +458,7 @@ fun AppScreen(
                             searchPronunciationJob?.cancel()
                             searchPronunciationMessage = PronunciationStatus.Idle
                             searchPronunciationJob = pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British))
                                 if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
                                     searchPronunciationMessage = result
                                 }
@@ -466,7 +470,7 @@ fun AppScreen(
                             searchPronunciationJob?.cancel()
                             searchPronunciationMessage = PronunciationStatus.Playing
                             searchPronunciationJob = pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American, true))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, true))
                                 if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) searchPronunciationMessage = result
                             }
                         },
@@ -476,7 +480,7 @@ fun AppScreen(
                             searchPronunciationJob?.cancel()
                             searchPronunciationMessage = PronunciationStatus.Playing
                             searchPronunciationJob = pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British, true))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, true))
                                 if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) searchPronunciationMessage = result
                             }
                         },
@@ -551,7 +555,7 @@ fun AppScreen(
                             val cardSnapshot = card
                             val request = ++learningRecordPronunciationRequest
                             pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American))
                                 if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
                                     detailPronunciationMessage = result
                                 }
@@ -561,7 +565,7 @@ fun AppScreen(
                             val cardSnapshot = card
                             val request = ++learningRecordPronunciationRequest
                             pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British))
                                 if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
                                     detailPronunciationMessage = result
                                 }
@@ -571,7 +575,7 @@ fun AppScreen(
                             val cardSnapshot = card
                             val request = ++learningRecordPronunciationRequest
                             pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.American, true))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, true))
                                 if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) detailPronunciationMessage = result
                             }
                         },
@@ -579,7 +583,7 @@ fun AppScreen(
                             val cardSnapshot = card
                             val request = ++learningRecordPronunciationRequest
                             pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(cardSnapshot.lemma, PronunciationAccent.British, true))
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, true))
                                 if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) detailPronunciationMessage = result
                             }
                         },
@@ -634,6 +638,7 @@ fun AppScreen(
                 // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
                 WordBookWordsScreen(
                     state = wordBookWordsState,
+                    listState = wordBookWordsListState,
                     onBack = { showWordBookWords = false },
                     onFilter = { wordBookWordsViewModel?.selectFilter(it) },
                     onRetry = { wordBookWordsViewModel?.retry() },
@@ -675,7 +680,7 @@ fun AppScreen(
                         if (!autoSpeakOnCardReady) return@LaunchedEffect
                         val request = ++wordCardPronunciationRequest
                         wordCardPronunciationMessage = PronunciationStatus.Playing.message()
-                        val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma)).message()
+                        val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma)).message()
                         if (request == wordCardPronunciationRequest) {
                             wordCardPronunciationMessage = result
                         }
@@ -687,7 +692,7 @@ fun AppScreen(
                             val request = ++wordCardPronunciationRequest
                             wordCardPronunciationMessage = PronunciationStatus.Playing.message()
                             pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speak(lemma)).message()
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(lemma)).message()
                                 if (request == wordCardPronunciationRequest) {
                                     wordCardPronunciationMessage = result
                                 }
@@ -726,7 +731,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American))
                                     if (request == detailPronunciationRequest && detailCard === card) {
                                         detailPronunciationMessage = result
                                     }
@@ -736,7 +741,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British))
                                     if (request == detailPronunciationRequest && detailCard === card) {
                                         detailPronunciationMessage = result
                                     }
@@ -746,7 +751,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American, true))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, true))
                                     if (request == detailPronunciationRequest && detailCard === card) detailPronunciationMessage = result
                                 }
                             },
@@ -754,7 +759,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British, true))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, true))
                                     if (request == detailPronunciationRequest && detailCard === card) detailPronunciationMessage = result
                                 }
                             },
@@ -961,6 +966,11 @@ fun AppScreen(
                             showGlobalVocabularySearch = globalVocabularySearchViewModel != null
                         },
                         onOpenPronunciationPlaceholder = {},
+                        onSpeakSentence = { sentence ->
+                            pronunciationScope.launch {
+                                pronunciationProvider?.speakSentence(sentence)
+                            }
+                        },
                         onSetLearnedMarks = { articleReadingViewModel?.setLearnedMarks(it) },
                         onCompleteReading = { articleReadingViewModel?.completeReading() },
                         articleScrollPosition = articleScrollPosition,
@@ -992,7 +1002,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American))
                                     if (request == detailPronunciationRequest && selectedArticleCard === card) {
                                         detailPronunciationMessage = result
                                     }
@@ -1002,7 +1012,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British))
                                     if (request == detailPronunciationRequest && selectedArticleCard === card) {
                                         detailPronunciationMessage = result
                                     }
@@ -1012,7 +1022,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.American, true))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, true))
                                     if (request == detailPronunciationRequest && selectedArticleCard === card) detailPronunciationMessage = result
                                 }
                             },
@@ -1020,7 +1030,7 @@ fun AppScreen(
                                 val request = ++detailPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speak(card.lemma, PronunciationAccent.British, true))
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, true))
                                     if (request == detailPronunciationRequest && selectedArticleCard === card) detailPronunciationMessage = result
                                 }
                             },

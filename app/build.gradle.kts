@@ -38,6 +38,8 @@ android {
 
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        getByName("test").java.srcDir("src/kokoroSpike/kotlin")
+        getByName("androidTest").java.srcDir("src/kokoroSpike/kotlin")
     }
 
     testOptions {
@@ -64,6 +66,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.onnxruntime.android)
     implementation(libs.hilt.android)
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.compiler)
@@ -83,6 +86,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.onnxruntime.android)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 

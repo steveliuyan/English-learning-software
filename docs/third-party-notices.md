@@ -419,6 +419,7 @@
 - 用途: 验证 wbpack 解析、图片哈希校验、导入登记、真实词卡读取、搜索与详情展示
 - 数据流: 仅保存在本地 `outputs/` 验收目录，不进入 APK，不进入正式发布包，不作为默认词书
 - NOTICE 位置: 本条目、`outputs/word-book-packing/ngsl-core-10/ngsl-core-10/book.json`、`manifest.json`
+- 替代方案: 使用项目自撰且明确许可的最小测试夹具；正式词书须逐项核验来源与再分发许可后另立条目
 - 商业分发结论: **禁止进入发布构建**。完成词条来源、中文释义/例句、图片许可和署名逐项核验后，必须创建新的正式版本条目，不能直接把验收包升级为发布资源
 
 ## cefr-j-1.5
@@ -441,12 +442,67 @@
 - 替代方案: 用户导入且经许可核验的数据，或不提供该资源
 - 商业分发结论: 元数据与应用自撰占位内容可随应用分发；第三方词条正文在完成逐项许可核验前禁止商业分发
 
+## onnxruntime-android
+- 名称: Microsoft ONNX Runtime Android
+- 版本: com.microsoft.onnxruntime:onnxruntime-android:1.29.0；AAR 52,897,836 bytes；SHA-256 e97540ca78fe36f6fe2013f82843414fb843b6c7681fb04644cba5e1406662dd
+- 许可证: MIT，已核验固定 AAR/POM；保留 AAR 所含第三方说明
+- 用途: Kokoro Android Spike 的 CPU 推理，仅 androidTestImplementation，不进入正式 debug/release APK
+- 数据流: 仅在测试设备内读取固定本地模型和测试单词；不读 Room、密钥，不联网
+- NOTICE 位置: 本条目、app/src/androidTest/assets/kokoro-notices/ORT-LICENSE.txt 与 ORT-ThirdPartyNotices.txt、outputs/kokoro-spike-20261006/REPORT.md；AAR 的 classes.jar 仅有 LICENSE-1DS，不代替 ORT 完整许可；测试分发随包保留全部原文
+- 替代方案: Android 系统 TTS；放弃本地模型 Spike
+- 商业分发结论: MIT 允许商业使用；当前仅允许隔离测试，不授权正式产品接入；正式分发前复核最终包 NOTICE
+- 来源: https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/1.29.0/；外部固定文件 D:/kokoro-spike-assets/onnxruntime-1.29.0/
+
+## kokoro-community-int8
+- 名称: Kokoro-82M v1.0 社区 INT8 ONNX 转换
+- 版本: thewh1teagle/kokoro-onnx release model-files-v1.0；kokoro-v1.0.int8.onnx 92,361,271 bytes；SHA-256 6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb
+- 许可证: Kokoro 模型 Apache-2.0；社区转换/打包代码 MIT；代码许可不替代上游模型许可
+- 用途: 测试专用单词音频合成；不是 hexgrad 官方 Android 导出，不进入 main/assets 或正式 APK
+- 数据流: 本地固定测试模型接收测试音素、voice style 和速度，输出临时 PCM；不读数据库、密钥，不联网
+- NOTICE 位置: 本条目、outputs/kokoro-spike-20261006/REPORT.md、.superpowers/sdd/2026-10-06-kokoro-word-pronunciation-spike/research-report.md；测试包须保留模型 Apache-2.0 与社区 MIT 来源说明
+- 替代方案: Android 系统 TTS；经独立许可核验的其他离线模型
+- 商业分发结论: 上游 Apache-2.0 和社区 MIT 允许商业使用，须保留版权、许可证、来源及修改说明；本批只授权外部/测试资产，正式分发 NOTICE 与接入评审仍待完成
+- 来源: https://huggingface.co/hexgrad/Kokoro-82M；https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+
+## kokoro-community-voices
+- 名称: Kokoro v1.0 社区 NPZ voice pack（本次 af_heart / bf_emma）
+- 版本: model-files-v1.0/voices-v1.0.bin；28,214,398 bytes；SHA-256 bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d
+- 许可证: Kokoro 上游模型/声音资产 Apache-2.0；社区打包代码 MIT；不将声音身份或品牌作为授权宣传
+- 用途: 测试专用英美口音 style；NPZ float32[510,1,256]，style 使用 tokenCount 行
+- 数据流: 仅本地读取固定 voice 参数，不录音、不读取用户数据、不联网
+- NOTICE 位置: 本条目、上游 VOICES.md、outputs/kokoro-spike-20261006/REPORT.md；测试分发须附模型许可、社区许可和 voice 来源说明
+- 替代方案: Android 系统 TTS 英美英语 voice
+- 商业分发结论: 保留上游 Apache-2.0 与社区 MIT 条件；当前只允许测试，正式分发需逐 voice 复核随包来源和 NOTICE，不承诺音质或真人身份权利
+- 来源: https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md；https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+
+## phonemis-english-frontends
+- 名称: Phonemis v2.1.0 英语 neural frontend（en-us / en-gb）与 dense 116 labels
+- 版本: Shusek00/kokoro-kmp-models@8026061b7671cccf9efb65498e95a0f2e09508e5；上游 IgorSwat/Phonemis@71eb1ce33bd586d38cbac037843b8539d7829c3b；两个 frontend 各 7,105,527 bytes；US SHA-256 479cd9d89819a60c4f8609dbb116ae5b362d46c0c592b97605968cbaef1e7bc6；GB SHA-256 065baba624db8391905e53c78706a12c5f4cba12a77e62a90900b2113bdb17e7
+- 许可证: Phonemis MIT；已核验 LICENSE 1,065 bytes，SHA-256 f09f9295f76d14fdac54f708716e3d30c712cecb7f7a26a2b23284e56a88231e；不引入 eSpeak/GPL、Misaki 或自动 tagger
+- 用途: 测试专用 1–20 ASCII 字母及内部 apostrophe 的单词转音素；en-us/en-gb 分别加载，CTC argmax→collapse→移除 blank
+- 数据流: 本地测试单词进入 input_ids，读取 logits；不联网、不读取 Room、Profile 或 Key
+- NOTICE 位置: 本条目、D:/kokoro-spike-assets/phonemis-audit/Phonemis-LICENSE.txt、固定 revision THIRD_PARTY_NOTICES.md；测试包附完整 MIT 版权与许可文本
+- 替代方案: 固定许可词典命中测试；系统 TTS
+- 商业分发结论: MIT 允许商业使用且必须保留版权/许可文本；本批仅外部/测试资产，正式接入须另行评审；转换来源必须保留而不能冒称上游官方 Android 包
+- 来源: https://huggingface.co/Shusek00/kokoro-kmp-models/tree/8026061b7671cccf9efb65498e95a0f2e09508e5；转换来源 ShinudaCommunity/kokoro-narrator-suvio-plugin@d16c577a516feac9ce0459bd615fd3a847a4334e
+
+## kokoro-spike-vocabulary
+- 名称: 固定 Kokoro v1.0 sparse vocabulary 配置
+- 版本: runtime/kokoro-v1.0-config.json，来自 Shusek00/kokoro-kmp-models@8026061b7671cccf9efb65498e95a0f2e09508e5；2,351 bytes；SHA-256 5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f
+- 许可证: Kokoro 上游配置 Apache-2.0；固定包第三方说明保留模型许可；不包含未核验的词典/tagger 资产
+- 用途: 测试专用音素到 Kokoro sparse token 的转换，BOS/EOS=0；与 Phonemis dense label ID 分离
+- 数据流: 本地固定 JSON 解析，不读取用户数据，不联网
+- NOTICE 位置: 本条目、固定 revision THIRD_PARTY_NOTICES.md、outputs/kokoro-spike-20261006/REPORT.md；测试包附 Apache-2.0 和来源说明
+- 替代方案: 系统 TTS；停止模型测试
+- 商业分发结论: 当前仅隔离测试；正式分发须保留模型 Apache-2.0、配置来源和完整随包 NOTICE 后另行批准
+- 来源: https://huggingface.co/Shusek00/kokoro-kmp-models/tree/8026061b7671cccf9efb65498e95a0f2e09508e5/runtime
+
 ## models
-- 名称: OCR、TTS、AI 与其他模型
-- 版本: 未引入
-- 许可证: 未引入/待许可核验
-- 用途: 本阶段不使用、不下载、不打包
-- 数据流: 未引入/不处理/不传输模型或用户数据
-- NOTICE 位置: 未打包；未来引入时须在本文件和发行 NOTICE 登记
+- 名称: OCR、TTS、AI 与其他模型的正式产品资源
+- 版本: 正式产品未引入；Kokoro Android Spike 测试资源按上方独立固定条目登记
+- 许可证: 正式产品待逐项核验；测试资源许可见 Kokoro/Phonemis 条目
+- 用途: 不将 Spike 模型打包进正式 debug/release APK；测试 APK 单独隔离
+- 数据流: 正式产品不处理此类本地模型；Spike 仅本地固定测试数据，不涉及用户数据库
+- NOTICE 位置: 正式产品未打包；Spike 测试通知见 app/src/androidTest/assets/kokoro-notices
 - 替代方案: 系统能力或不提供对应功能
 - 商业分发结论: 未引入/不打包，完成许可核验前禁止商业分发

@@ -1,0 +1,20 @@
+Kokoro v1.0 model and voices: hexgrad/Kokoro-82M, Apache-2.0.
+https://huggingface.co/hexgrad/Kokoro-82M
+Community INT8 conversion and NPZ voice packaging: thewh1teagle/kokoro-onnx,
+model-files-v1.0 release. Community code MIT does not relicense model/voices.
+https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+
+Phonemis: IgorSwat/Phonemis@71eb1ce33bd586d38cbac037843b8539d7829c3b, MIT.
+Prebuilt frontend and vocabulary package:
+Shusek00/kokoro-kmp-models@8026061b7671cccf9efb65498e95a0f2e09508e5.
+Converter provenance: ShinudaCommunity/kokoro-narrator-suvio-plugin@
+d16c577a516feac9ce0459bd615fd3a847a4334e.
+https://huggingface.co/Shusek00/kokoro-kmp-models/tree/8026061b7671cccf9efb65498e95a0f2e09508e5
+
+ONNX Runtime Android: com.microsoft.onnxruntime:onnxruntime-android:1.29.0, MIT.
+https://github.com/microsoft/onnxruntime/tree/v1.29.0
+
+The five binary/config assets are pinned by manifest.sha256. Complete license
+texts are shipped alongside this file. Production packaging was explicitly
+selected by the user on 2026-10-09; final release distribution still requires
+APK size, ABI, runtime-memory and license review before publishing.

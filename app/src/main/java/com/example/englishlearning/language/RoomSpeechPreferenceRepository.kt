@@ -44,11 +44,18 @@ class RoomSpeechPreferenceRepository(
         autoSpeakOnCardReady = autoSpeakOnCardReady,
     )
 
-    private fun SpeechPreferenceEntity.toDomain() = SpeechPreference(
-        preferenceId = preferenceId,
-        selectedEngine = PronunciationEngine.valueOf(selectedEngine),
-        openAiProfileId = openAiProfileId,
-        miMoProfileId = miMoProfileId,
-        autoSpeakOnCardReady = autoSpeakOnCardReady,
-    )
+    private fun SpeechPreferenceEntity.toDomain(): SpeechPreference {
+        val normalizedEngine = when (selectedEngine) {
+            "OpenAi" -> if (!miMoProfileId.isNullOrBlank()) PronunciationEngine.MiMo else PronunciationEngine.SystemTts
+            else -> runCatching { PronunciationEngine.valueOf(selectedEngine) }
+                .getOrDefault(PronunciationEngine.SystemTts)
+        }
+        return SpeechPreference(
+            preferenceId = preferenceId,
+            selectedEngine = normalizedEngine,
+            openAiProfileId = openAiProfileId,
+            miMoProfileId = miMoProfileId,
+            autoSpeakOnCardReady = autoSpeakOnCardReady,
+        )
+    }
 }

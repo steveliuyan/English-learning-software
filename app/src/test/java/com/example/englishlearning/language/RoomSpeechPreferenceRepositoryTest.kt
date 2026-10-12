@@ -60,6 +60,43 @@ class RoomSpeechPreferenceRepositoryTest {
     }
 
     @Test
+    fun `get normalizes legacy openai selection to mimo when mimo profile exists`() = runTest {
+        val database = mockk<AppDatabase>()
+        val dao = mockk<InternalSpeechPreferenceDao>()
+        every { database.internalSpeechPreferenceDao() } returns dao
+        coEvery { dao.find() } returns SpeechPreferenceEntity(
+            preferenceId = "device",
+            selectedEngine = "OpenAi",
+            openAiProfileId = "legacy-openai",
+            miMoProfileId = "mimo-profile",
+        )
+
+        val preference = RoomSpeechPreferenceRepository(database, Dispatchers.Unconfined).get().getOrThrow()
+
+        assertEquals(PronunciationEngine.MiMo, preference.selectedEngine)
+        assertEquals("legacy-openai", preference.openAiProfileId)
+        assertEquals("mimo-profile", preference.miMoProfileId)
+    }
+
+    @Test
+    fun `get normalizes legacy openai selection to system when mimo profile is absent`() = runTest {
+        val database = mockk<AppDatabase>()
+        val dao = mockk<InternalSpeechPreferenceDao>()
+        every { database.internalSpeechPreferenceDao() } returns dao
+        coEvery { dao.find() } returns SpeechPreferenceEntity(
+            preferenceId = "device",
+            selectedEngine = "OpenAi",
+            openAiProfileId = "legacy-openai",
+            miMoProfileId = null,
+        )
+
+        val preference = RoomSpeechPreferenceRepository(database, Dispatchers.Unconfined).get().getOrThrow()
+
+        assertEquals(PronunciationEngine.SystemTts, preference.selectedEngine)
+        assertEquals("legacy-openai", preference.openAiProfileId)
+    }
+
+    @Test
     fun `get round trips selected engine and profile ids`() = runTest {
         val database = mockk<AppDatabase>()
         val dao = mockk<InternalSpeechPreferenceDao>()

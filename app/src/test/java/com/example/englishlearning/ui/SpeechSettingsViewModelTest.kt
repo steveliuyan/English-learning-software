@@ -59,35 +59,16 @@ class SpeechSettingsViewModelTest {
             SpeechProfileCandidate::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
     }
 
-    /**
-     * OpenAI 引擎选项已从语音页移除：历史存储里选中 OpenAi 的用户在界面上按系统 TTS 呈现。
-     * 显示层回落不改写存储——偏好文件里仍保留 OpenAi，用户数据不被静默迁移。
-     */
-    @Test fun storedOpenAiSelectionFallsBackToSystemTtsForDisplay() = runTest(dispatcher) {
-        val preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "x"))
+    /** 历史 OpenAI 发音值由 Room repository 规范化；设置 ViewModel 只接收 System/MiMo。 */
+    @Test fun storedLegacySelectionIsDisplayedAsSystemTts() = runTest(dispatcher) {
+        val preferences = FakePreferences(SpeechPreference(selectedEngine = PronunciationEngine.SystemTts, openAiProfileId = "legacy"))
         val viewModel = viewModel(preferences = preferences)
 
         viewModel.load()
         advanceUntilIdle()
 
         assertEquals(PronunciationEngine.SystemTts, viewModel.state.value.selectedEngine)
-        // 存储不被改写：偏好仓库的值原样保留，也没有任何 save 调用。
-        assertEquals(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "x"), preferences.get().getOrThrow())
-        assertEquals(0, preferences.saved.size)
         assertEquals("系统 TTS", viewModel.state.value.engineStatuses().currentProvider)
-    }
-
-    @Test fun selectOpenAiSavesItsProfileIdAndKeepsMimoBinding() = runTest(dispatcher) {
-        val preferences = FakePreferences(SpeechPreference(miMoProfileId = "mimo"))
-        val viewModel = viewModel(profiles = RecordingProfiles(listOf(profile("openai", setOf(AiCapability.Speech)))), preferences = preferences)
-        viewModel.load()
-        advanceUntilIdle()
-
-        viewModel.select(PronunciationEngine.OpenAi, "openai")
-        advanceUntilIdle()
-
-        assertEquals(SpeechPreference(selectedEngine = PronunciationEngine.OpenAi, openAiProfileId = "openai", miMoProfileId = "mimo"), preferences.saved.single())
-        assertEquals(PronunciationEngine.OpenAi, viewModel.state.value.selectedEngine)
     }
 
     /** D1：切换引擎是读改写，自动发音开关不能被抹回默认值。 */

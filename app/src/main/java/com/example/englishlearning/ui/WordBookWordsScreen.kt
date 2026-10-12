@@ -4,6 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +20,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +35,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -35,10 +45,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.floor
 import kotlinx.coroutines.launch
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
@@ -62,14 +75,30 @@ fun WordBookWordsScreen(
     onFilter: (WordBookRecordStatus?) -> Unit,
     onRetry: () -> Unit,
     onOpenWord: (WordBookRecord) -> Unit,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val groups = state.groups
-    val listState = rememberLazyListState()
     val railScope = rememberCoroutineScope()
     // 字母 → 该组 sticky header 在 LazyColumn 里的 item 下标（1 个 header + N 行为一组）。
     val headerIndices = remember(groups) {
         var running = 0
         groups.associate { group -> group.letter to running.also { running += 1 + group.records.size } }
+    }
+    val currentLetter by remember(groups, headerIndices) {
+        derivedStateOf {
+            if (!listState.canScrollForward && listState.canScrollBackward) {
+                groups.lastOrNull()?.letter
+            } else {
+                val firstVisibleIndex = listState.firstVisibleItemIndex
+                groups
+                    .asReversed()
+                    .firstOrNull { group ->
+                        headerIndices[group.letter]?.let { it <= firstVisibleIndex } == true
+                    }
+                    ?.letter
+                    ?: groups.firstOrNull()?.letter
+            }
+        }
     }
     Column(
         modifier = Modifier
@@ -147,6 +176,7 @@ fun WordBookWordsScreen(
             if (!state.loading && state.error == null) {
                 WordBookWordsAlphabetRail(
                     availableLetters = groups.map { it.letter }.toSet(),
+                    currentLetter = currentLetter,
                     onLetter = { letter ->
                         // 点了没有单词的字母时跳到「字母序最近的下一组」，避免点了没反应。
                         val target = groups.firstOrNull { it.letter >= letter }?.letter
@@ -246,32 +276,77 @@ private fun WordBookWordsEmpty() {
 @Composable
 private fun WordBookWordsAlphabetRail(
     availableLetters: Set<String>,
+    currentLetter: String?,
     onLetter: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .width(20.dp)
-            .fillMaxHeight()
-            .testTag("wordbook_words_rail"),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ('A'..'Z').forEach { letter ->
-            val letterText = letter.toString()
-            val available = letterText in availableLetters
-            Text(
-                text = letterText,
-                modifier = Modifier
-                    .clickable(onClick = { onLetter(letterText) })
-                    .padding(vertical = 1.dp, horizontal = 2.dp)
-                    .testTag("wordbook_words_rail_$letterText")
-                    .semantics { contentDescription = "导航字母 $letterText" },
-                color = if (available) MintPrimaryDark else MintTextMuted.copy(alpha = 0.45f),
-                fontSize = 9.sp,
-                lineHeight = 10.sp,
-                textAlign = TextAlign.Center,
-            )
+    val latestOnLetter by rememberUpdatedState(onLetter)
+    BoxWithConstraints(modifier.width(24.dp).fillMaxHeight()) {
+        val density = LocalDensity.current
+        // 布局和手势共用整数像素槽高，避免小高度下逐槽取整产生累计定位误差。
+        val slotPixels = with(density) { floor(minOf(18.dp, maxHeight / 26).toPx()).coerceAtLeast(1f) }
+        val slotHeight = with(density) { slotPixels.toDp() }
+        val activeFontSize = with(density) {
+            // 压缩高度下按字形安全比例缩小，保留比普通字母更醒目的字号但不让字形越过行框。
+            minOf(16.sp.toPx(), (slotHeight.toPx() * 0.7f).coerceAtLeast(10.sp.toPx())).toSp()
+        }
+        val activeLineHeight = 16.sp
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .testTag("wordbook_words_rail")
+                .pointerInput(slotPixels) {
+                    fun navigate(y: Float) {
+                        val index = (y / slotPixels).toInt().coerceIn(0, 25)
+                        latestOnLetter(('A'.code + index).toChar().toString())
+                    }
+                    detectDragGestures(
+                        onDragStart = { navigate(it.y) },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            navigate(change.position.y)
+                        },
+                    )
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ('A'..'Z').forEach { letter ->
+                val letterText = letter.toString()
+                val available = letterText in availableLetters
+                val active = letterText == currentLetter
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(slotHeight).testTag("wordbook_words_rail_$letterText"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = letterText,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = { onLetter(letterText) })
+                            .then(if (active) Modifier.wrapContentHeight(unbounded = true) else Modifier)
+                            .padding(vertical = if (active) 0.dp else 1.dp, horizontal = 2.dp)
+                            .then(
+                                if (active) {
+                                    Modifier.testTag("wordbook_words_rail_active_$letterText")
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .semantics { contentDescription = "导航字母 $letterText" },
+                        color = when {
+                            active -> MintPrimary
+                            available -> MintPrimaryDark
+                            else -> MintTextMuted.copy(alpha = 0.45f)
+                        },
+                        fontSize = if (active) activeFontSize else 9.sp,
+                        lineHeight = if (active) activeLineHeight else 10.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        style = if (active) TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)) else TextStyle.Default,
+                    )
+                }
+            }
         }
     }
 }

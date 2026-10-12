@@ -71,11 +71,10 @@ fun SpeechSettingsUiState.engineStatuses(): SpeechEngineStatuses {
     val openAiStatus = status(openAiProfileId, AiProviderKind.OPENAI_COMPATIBLE)
     val miMoStatus = status(miMoProfileId, AiProviderKind.XIAOMI_MIMO)
     return SpeechEngineStatuses(
-        openAi = if (selectedEngine == PronunciationEngine.OpenAi) "当前供应商 · $openAiStatus" else openAiStatus,
+        openAi = openAiStatus,
         miMo = if (selectedEngine == PronunciationEngine.MiMo) "当前供应商 · $miMoStatus" else miMoStatus,
         currentProvider = when (selectedEngine) {
             PronunciationEngine.SystemTts -> "系统 TTS"
-            PronunciationEngine.OpenAi -> "OpenAI TTS"
             PronunciationEngine.MiMo -> "小米 MiMo"
         },
     )

@@ -43,24 +43,16 @@ data class SpeechSettingsUiState(
     /** 当前选中引擎可用的候选：协议不匹配的 Profile 不进列表，防止错绑后发出注定 404 的请求。 */
     fun candidatesForSelectedEngine(): List<SpeechProfileCandidate> = when (selectedEngine) {
         PronunciationEngine.SystemTts -> emptyList()
-        PronunciationEngine.OpenAi -> candidates.filter { it.providerKind == AiProviderKind.OPENAI_COMPATIBLE }
         PronunciationEngine.MiMo -> candidates.filter { it.providerKind == AiProviderKind.XIAOMI_MIMO }
     }
 
     /** 当前引擎绑定的候选；`null` = 未绑定或绑定失效。 */
     fun boundCandidateFor(engine: PronunciationEngine): SpeechProfileCandidate? {
         val id = when (engine) {
-            PronunciationEngine.OpenAi -> openAiProfileId
             PronunciationEngine.MiMo -> miMoProfileId
             PronunciationEngine.SystemTts -> return null
         } ?: return null
-        return candidates.firstOrNull { it.profileId == id && it.providerKind == kindOf(engine) }
-    }
-
-    private fun kindOf(engine: PronunciationEngine): AiProviderKind = when (engine) {
-        PronunciationEngine.OpenAi -> AiProviderKind.OPENAI_COMPATIBLE
-        PronunciationEngine.MiMo -> AiProviderKind.XIAOMI_MIMO
-        PronunciationEngine.SystemTts -> AiProviderKind.OPENAI_COMPATIBLE
+        return candidates.firstOrNull { it.profileId == id && it.providerKind == AiProviderKind.XIAOMI_MIMO }
     }
 }
 
@@ -81,7 +73,7 @@ class SpeechSettingsViewModel @Inject constructor(
         val current = _state.value
         val next = SpeechPreference(
             selectedEngine = engine,
-            openAiProfileId = if (engine == PronunciationEngine.OpenAi) profileId else current.openAiProfileId,
+            openAiProfileId = current.openAiProfileId,
             miMoProfileId = if (engine == PronunciationEngine.MiMo) profileId else current.miMoProfileId,
             // 引擎选择是读改写：不能把自动发音开关抹回默认值。
             autoSpeakOnCardReady = current.autoSpeakOnCardReady,
@@ -172,10 +164,8 @@ class SpeechSettingsViewModel @Inject constructor(
         val preference = preferences.get().getOrDefault(SpeechPreference())
         val speechProfiles = profiles.list().getOrDefault(emptyList()).filter { AiCapability.Speech in it.capabilities }
         _state.value = SpeechSettingsUiState(
-            // OpenAI 引擎选项已从语音页移除：历史存储选中 OpenAi 的用户在界面上按系统 TTS
-            // 呈现。只回落显示层，偏好文件里的原始选择原样保留，不被静默迁移。
-            selectedEngine = preference.selectedEngine.takeUnless { it == PronunciationEngine.OpenAi }
-                ?: PronunciationEngine.SystemTts,
+            // 历史 OpenAI 发音值已由 Room repository 规范化为 MiMo/System。
+            selectedEngine = preference.selectedEngine,
             openAiProfileId = preference.openAiProfileId,
             miMoProfileId = preference.miMoProfileId,
             autoSpeakOnCardReady = preference.autoSpeakOnCardReady,

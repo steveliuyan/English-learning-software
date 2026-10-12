@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "upstream": "IgorSwat/Phonemis@71eb1ce33bd586d38cbac037843b8539d7829c3b",
+  "license": "MIT",
+  "license_path": "D:/kokoro-spike-assets/phonemis-audit/Phonemis-LICENSE.txt",
+  "license_sha256": "f09f9295f76d14fdac54f708716e3d30c712cecb7f7a26a2b23284e56a88231e",
+  "source_files": {
+    "en-us": {
+      "source_file": "kmp-phonemizers-en-us-lexicon_full.json",
+      "source_path": "D:/kokoro-spike-assets/phonemis-audit/kmp-phonemizers-en-us-lexicon_full.json",
+      "bytes": 6254347,
+      "sha256": "ef0b19a0126455e4216fb08083c8b50f7e85f98f6055738129a89d2095e635d7",
+      "key_hashes": {
+        "record|VERB": "f0a93d8c00a3dfd3088b9fcf4fd042d5ecf867777e29f807793785a91d542c20",
+        "record": "e69f9fa98eb84ba4bf9f7fd02a9cfa11caa5076a9db632e42470349281e87ea6"
+      },
+      "vb_exact_key_present": false,
+      "vb_resolved_key": "record|VERB"
+    },
+    "en-gb": {
+      "source_file": "kmp-phonemizers-en-gb-lexicon_full.json",
+      "source_path": "D:/kokoro-spike-assets/phonemis-audit/kmp-phonemizers-en-gb-lexicon_full.json",
+      "bytes": 6664570,
+      "sha256": "52167ca536a93d56a02e8b1db29f572438cb7103737ef2c3f8dd9dbfc0b35e0a",
+      "key_hashes": {
+        "record|VERB": "cf2f9cdff69983e5498afdc13013665ad36a8f620ea800645a547ac54528430b",
+        "record": "0d2bf9dee0529ecb8539b16174dafa8b9e35bccfb34f0c6a5a35fea88f05b945"
+      },
+      "vb_exact_key_present": false,
+      "vb_resolved_key": "record|VERB"
+    }
+  },
+  "lookup_order": [
+    "record|VB",
+    "record|VERB",
+    "record"
+  ],
+  "entries": {
+    "en-us": {
+      "record|VERB": "\u0279\u0259k\u02c8\u0254\u0279d",
+      "record": "\u0279\u02c8\u025bk\u0259\u0279d"
+    },
+    "en-gb": {
+      "record|VERB": "\u0279\u026ak\u02c8\u0254\u02d0d",
+      "record": "\u0279\u02c8\u025bk\u0254\u02d0d"
+    }
+  }
+}

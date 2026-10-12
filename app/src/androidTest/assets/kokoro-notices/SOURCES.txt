@@ -1,0 +1,29 @@
+Kokoro Android single-word Spike; test-only, not production integration.
+
+Kokoro v1.0 model and voices: hexgrad/Kokoro-82M, Apache-2.0.
+https://huggingface.co/hexgrad/Kokoro-82M
+Community INT8 conversion and NPZ voice packaging: thewh1teagle/kokoro-onnx,
+model-files-v1.0 release. Community code MIT does not relicense model/voices.
+https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+This test implementation adapts tokens/style/speed and converts owned PCM to WAV;
+model and voice binary bytes are unchanged, checked by size/SHA-256 before use.
+
+Phonemis: IgorSwat/Phonemis@71eb1ce33bd586d38cbac037843b8539d7829c3b, MIT.
+Prebuilt frontend and vocabulary package:
+Shusek00/kokoro-kmp-models@8026061b7671cccf9efb65498e95a0f2e09508e5.
+Converter provenance: ShinudaCommunity/kokoro-narrator-suvio-plugin@
+d16c577a516feac9ce0459bd615fd3a847a4334e.
+https://huggingface.co/Shusek00/kokoro-kmp-models/tree/8026061b7671cccf9efb65498e95a0f2e09508e5
+Dense CTC labels are adapted from the fixed MIT Phonemis source; sparse Kokoro
+vocabulary remains separate. No eSpeak, GPL, Misaki, lexicon or tagger is bundled.
+The original KMP notice includes additional models not bundled in this Spike.
+
+ONNX Runtime Android: com.microsoft.onnxruntime:onnxruntime-android:1.29.0, MIT.
+https://github.com/microsoft/onnxruntime/tree/v1.29.0
+Full upstream ThirdPartyNotices is preserved as a conservative superset, not a
+claim that every listed library is linked into this Android CPU test package.
+
+Complete licenses: Apache-2.0.txt, Kokoro-fixed-LICENSE.txt, COMMUNITY-MIT.txt,
+Phonemis-LICENSE.txt, ORT-LICENSE.txt, ORT-ThirdPartyNotices.txt,
+KMP-THIRD-PARTY-NOTICES.txt.
+Final production redistribution and pronunciation quality remain unapproved.

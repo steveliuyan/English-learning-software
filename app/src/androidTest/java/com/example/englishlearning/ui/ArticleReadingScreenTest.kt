@@ -174,15 +174,24 @@ class ArticleReadingScreenTest {
     }
 
     @Test
-    fun pronunciationEntryCallsThePlaceholder() {
-        var pronunciationOpened = false
+    fun pronunciationEntrySendsArticleBodyToSentenceReader() {
+        var spoken: String? = null
         composeRule.setContent {
-            ArticleReadingScreen(state(article()), onBack = {}, onOpenCard = {}, onModeChange = {}, onToggleTranslation = {}, onOpenDictionaryPlaceholder = {}, onOpenPronunciationPlaceholder = { pronunciationOpened = true })
+            ArticleReadingScreen(
+                state(article()),
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+                onSpeakSentence = { spoken = it },
+            )
         }
 
         composeRule.onNodeWithTag("article_pronunciation").performClick()
 
-        org.junit.Assert.assertTrue(pronunciationOpened)
+        org.junit.Assert.assertEquals(article().englishText, spoken)
     }
 
     @Test

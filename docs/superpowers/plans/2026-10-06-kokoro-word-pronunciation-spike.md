@@ -115,6 +115,31 @@
 
 ---
 
+### Task 2.5: 外部桌面 CPU 契约预验证（2026-10-07）
+
+在 Task 3 之前，用 `outputs/kokoro-spike-20261006/` 下独立 Python 脚本与 unittest 验证已核验英语 lexicon -> Kokoro v1.0 vocab -> 社区 INT8 ONNX -> WAV。该脚本不进入 Android 编译，不写 Room，不改变 Gradle、路由或 APK 资源；依赖仅安装到已有隔离 Python venv。
+
+- 先 RED，再最小 GREEN，独立变异验证 asset hash、口音选择、边界 token、未知音素拒绝、voice 行选择、WAV 格式；恢复后重新运行。
+- 社区 NPZ voice pack 的形状是 `[510,1,256]`，上游 kokoro-onnx 0.4.9 使用 row `len(tokens)`；本 Spike 仅接受 1–509 个可识别音素，510 会越过该容器行边界。KMP raw voice 的 `count - 1` 约定不能套用在此容器。
+- 只测试固定 lexicon 命中，不宣称已实现完整 Phonemis 神经前端、词性 tagger 或未知词回退。`record` 仅测试 lexicon 默认名词读音；动词重音留待上下文策略。
+- CPU 使用固定 ONNX Runtime 1.29.0，生成两种口音的 schedule、record、apple，并核对非空、有限、非静音的 24 kHz 单声道 PCM16 WAV；记录加载/生成耗时与采样数，明确这些不是 Android 真机指标。
+- 图名称和 opset 差异仅是适配契约，不是不可兼容的证明；桌面实际运行结果决定这条局部路径是否成立。仍保持 NO_GO，直到 Task 3–5 全部通过。
+
+### Task 2.6: Phonemis 神经前端与显式词性桌面验证（2026-10-07）
+
+- 在 Task 2.5 的外部 Python 适配器/测试上增量实现，不改 Android/Gradle/正式资产。
+- 固定 Phonemis 上游 revision `71eb1ce33bd586d38cbac037843b8539d7829c3b` 的 nn/constants.h、neural_phonemizer.cpp 契约：英语 grapheme apostrophe=1、a–z=2–27；不添加 Kokoro BOS/EOS；输出 116 类，argmax 后先去连续重复、再去 blank=0，按连续 phone 标签映射为符号，再用 Kokoro vocab 编码。
+- 该单词探针只接受 trim/lower 后 1–20 个 ASCII 字母/内部 apostrophe，拒绝不支持字符、超长单词和句子，不能沿用上游静默跳过字符或擅自截断。全语言输入/长词分块另验。
+- 词典命中保持优先；显式 Penn tag 优先精确 `word|tag`，再查 NN*/VB*/JJ*/RB* 等父类 key，最后 default。没有 tag 时 record 使用既有 default；不硬编码 record 音素、不宣称自动 tagger 完成。
+- 测试先 RED，输入 dtype/shape/字符、CTC 顺序/标签/非法 logits、显式词性选择逐项独立变异，再恢复全量 GREEN。
+- 固定 en-us/en-gb frontend 大小/SHA-256 核验后，ORT 1.29 CPU 验证目标词强制 neural 与词典输出并列、未知词 workbuddy 的实际未命中回退、record 默认/显式 VERB；保存来源标记、耗时、WAV并独立回读。
+- 未知词可生成只证明链路运行，不证明发音正确；完整 HMM tagger/文本处理/Android/播放/性能仍为门禁，继续 NO_GO。
+- [x] 完成完整 116 类标签回归 fixture 与 `--mode frontend` 可复现入口，默认 mode 保持 lexicon。
+- [x] 检查 7 个固定资产和 runtime/graph 契约；非空输出目录拒绝，推理异常传播，全部配置成功后才写结果 JSON。
+- [x] 独立验证 repeat `[1,2]`、实际 voice/style/tokens、来源标记、session 构造前完整性拒绝；13 项 CLI 内存变异均触发断言，errors=0，前后源码 SHA-256 相同。
+- [x] 新鲜全量回归 45/45（`cli-closeout-green.log`，86.726 s）；`cli-20261007` 的 32 条真实 WAV 独立回读、16 组重复与上一轮 32 个摘要一致。此次续接只重跑测试/回读，没有重新推理。
+- [ ] 许可台账、最终分发 NOTICE、人工听感、Android/JVM 与真机验收；不从桌面结果推断通过。
+
 ### Task 3: 接入 ONNX Runtime 与 Kokoro Engine（Spike-only）
 
 **Files:**

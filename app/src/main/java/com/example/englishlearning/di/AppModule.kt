@@ -41,7 +41,6 @@ import com.example.englishlearning.learning.domain.FsrsReviewScheduler
 import com.example.englishlearning.language.RoomSpeechPreferenceRepository
 import com.example.englishlearning.language.SpeechPreferenceRepository
 import com.example.englishlearning.language.domain.MiMoPronunciationProviderFactory
-import com.example.englishlearning.language.domain.OpenAiPronunciationProviderFactory
 import com.example.englishlearning.language.domain.PronunciationAudioCache
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationRouter
@@ -50,7 +49,9 @@ import com.example.englishlearning.language.infrastructure.AndroidAudioPlayer
 import com.example.englishlearning.language.infrastructure.AudioPlayer
 import com.example.englishlearning.language.infrastructure.FilePronunciationAudioCache
 import com.example.englishlearning.language.infrastructure.MiMoPronunciationProvider
-import com.example.englishlearning.language.infrastructure.OpenAiCompatiblePronunciationProvider
+import com.example.englishlearning.language.infrastructure.KokoroAndroidEngine
+import com.example.englishlearning.language.infrastructure.KokoroEngine
+import com.example.englishlearning.language.infrastructure.KokoroPronunciationProvider
 import com.example.englishlearning.learning.RoomTodayPlanRepository
 import com.example.englishlearning.learning.LearningStatsRepository
 import com.example.englishlearning.learning.RoomLearningStatsRepository
@@ -178,30 +179,21 @@ object AppModule {
     }
 
     @Provides @Singleton
-    fun provideOpenAiPronunciationProviderFactory(
-        profiles: AiProfileRepository,
-        secrets: AiProfileSecretUseCase,
-        transport: AudioHttpTransport,
+    fun provideKokoroEngine(@ApplicationContext context: Context): KokoroEngine = KokoroAndroidEngine(context)
+
+    @Provides @Singleton
+    fun provideKokoroPronunciationProvider(
+        engine: KokoroEngine,
         player: AudioPlayer,
-    ): OpenAiPronunciationProviderFactory = OpenAiPronunciationProviderFactory { profileId ->
-        OpenAiCompatiblePronunciationProvider(
-            profileId = profileId,
-            voice = "alloy",
-            responseFormat = "mp3",
-            profiles = profiles,
-            secrets = secrets,
-            transport = transport,
-            player = player,
-        )
-    }
+    ): KokoroPronunciationProvider = KokoroPronunciationProvider(engine, player)
 
     @Provides @Singleton
     fun providePronunciationProvider(
+        kokoro: KokoroPronunciationProvider,
         system: AndroidTextToSpeechProvider,
         miMoFactory: MiMoPronunciationProviderFactory,
-        openAiFactory: OpenAiPronunciationProviderFactory,
         preferences: SpeechPreferenceRepository,
-    ): PronunciationProvider = PronunciationRouter(system, miMoFactory, openAiFactory, preferences)
+    ): PronunciationProvider = PronunciationRouter(kokoro, system, miMoFactory, preferences)
     @Provides @Singleton fun providePlanCardSource(content: WordCardSource, events: LearningEventRepository): PlanCardSource = StoredPlanCardSource(content, events)
     @Provides fun provideBuildWorksheetContentUseCase(plans: TodayPlanRepository, events: LearningEventRepository, content: WordCardSource): BuildWorksheetContentUseCase = BuildWorksheetContentUseCase(plans, events, content)
     @Provides fun provideWorksheetDocumentBuilder(): WorksheetDocumentBuilder = WorksheetDocumentBuilder()

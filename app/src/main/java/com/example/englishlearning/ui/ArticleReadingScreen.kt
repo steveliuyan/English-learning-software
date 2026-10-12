@@ -70,6 +70,7 @@ fun ArticleReadingScreen(
     onToggleTranslation: () -> Unit,
     onOpenDictionaryPlaceholder: () -> Unit,
     onOpenPronunciationPlaceholder: () -> Unit,
+    onSpeakSentence: (String) -> Unit = { onOpenPronunciationPlaceholder() },
     onOpenDictionary: (String) -> Unit = { onOpenDictionaryPlaceholder() },
     onSetLearnedMarks: (Boolean) -> Unit = {},
     onCompleteReading: () -> Unit = {},
@@ -96,7 +97,7 @@ fun ArticleReadingScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
             ) { Text("返回") }
             Button(
-                onClick = onOpenPronunciationPlaceholder,
+                onClick = { state?.let { onSpeakSentence(it.article.englishText) } },
                 modifier = Modifier.testTag("article_pronunciation"),
                 colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
             ) { Text("发音") }

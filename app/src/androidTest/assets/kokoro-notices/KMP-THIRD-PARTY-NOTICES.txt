@@ -1,0 +1,47 @@
+# Third-party notices
+
+This repository preserves Kokoro's licensing. Packaging, tensor conversion, and ONNX export do
+not replace or relicense upstream work.
+
+## Kokoro models and voices
+
+- Kokoro v1.0 model, configuration, and all 54 published voices:
+  [`hexgrad/Kokoro-82M`](https://huggingface.co/hexgrad/Kokoro-82M), revision
+  `f3ff3571791e39611d31c381e3a41a3af07b4987`.
+- Kokoro v1.1-zh model, configuration, 100 Mandarin voices, and 3 English voices:
+  [`hexgrad/Kokoro-82M-v1.1-zh`](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh),
+  revision `01e7505bd6a7a2ac4975463114c3a7650a9f7218`.
+- Polish and German fine-tuned checkpoints and speaker embeddings:
+  [`software-mansion/react-native-executorch-kokoro`](https://huggingface.co/software-mansion/react-native-executorch-kokoro),
+  revision `3744b57964eab7df6e8c48f0b84badb29e14df07`.
+- ONNX exporter runtime code: [`SuvioMedia/kokoro`](https://github.com/SuvioMedia/kokoro),
+  revision `8ee8ec3179c38990dd0564fb703c4deb68be58e9`.
+
+These materials and the resulting ONNX model files and raw speaker-style matrices are distributed
+under Apache License 2.0. The license text is available in [`LICENSE`](LICENSE) and
+[`third-party/kokoro/LICENSE`](third-party/kokoro/LICENSE).
+
+## Phonemis
+
+The neural phonemizer models for `de`, `en-gb`, `en-us`, `es`, `fr`, `hi`, `it`, `pl`, and `pt`,
+plus the English full lexicons and tagger models, come from
+[`IgorSwat/Phonemis`](https://github.com/IgorSwat/Phonemis), revision
+`71eb1ce33bd586d38cbac037843b8539d7829c3b`.
+
+For release `v2.1.0`, the nine neural weight containers are deterministically wrapped as ONNX
+graphs ahead of distribution. Exact source and output hashes, sizes, and converter provenance are
+recorded in [`sources/phonemis-onnx-v2.1.0.json`](sources/phonemis-onnx-v2.1.0.json).
+
+Phonemis is distributed under the MIT License. Its unchanged license text is available in
+[`third-party/phonemis/LICENSE`](third-party/phonemis/LICENSE). This separate MIT license applies
+to the Phonemis files and does not alter Kokoro's Apache-2.0 license.
+
+## Provenance
+
+Exact source paths, immutable revisions, original LFS hashes, converted artifact hashes, and sizes
+for all 157 upstream voices are recorded in
+[`sources/upstream-assets.json`](sources/upstream-assets.json). Additional checkpoint hashes are
+recorded in [`SOURCES.lock.json`](SOURCES.lock.json).
+
+No eSpeak binary, GPL component, Misaki package, Open JTalk dictionary, or UniDic dictionary is
+distributed in this repository.
