@@ -3,6 +3,7 @@ package com.example.englishlearning.reading
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.englishlearning.core.storage.AppDatabase
+import com.example.englishlearning.reading.domain.ArticleDisplayMode
 import com.example.englishlearning.reading.domain.ArticleLengthTier
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
@@ -69,5 +70,28 @@ class RoomReadingPreferenceRepositoryTest {
         val p2 = repository.getPreference("p2").getOrThrow()
         assertEquals(ArticleType.NEWS, p1.defaultArticleType)
         assertEquals(ArticleType.STORY, p2.defaultArticleType)
+    }
+
+    // F2-04：默认显示模式可设置。三个模式各自持久化，缺失时回退 ENGLISH_FIRST。
+    @Test
+    fun displayModeDefaultsToEnglishFirstWhenMissing() = runTest {
+        val pref = repository.getPreference("p1").getOrThrow()
+        assertEquals(ArticleDisplayMode.ENGLISH_FIRST, pref.displayMode)
+    }
+
+    @Test
+    fun displayModePersistsAcrossAllThreeModes() = runTest {
+        for (mode in ArticleDisplayMode.entries) {
+            repository.savePreference(ReadingPreference("p1", ArticleType.STORY, null, mode)).getOrThrow()
+            assertEquals(mode, repository.getPreference("p1").getOrThrow().displayMode)
+        }
+    }
+
+    @Test
+    fun displayModeOverwriteDropsBackToDefaultWhenNeverWrittenForNewProfile() = runTest {
+        // 新 profile 未写过任何偏好：显示模式必须是 ENGLISH_FIRST 而非其他档位。
+        val fresh = repository.getPreference("brand-new-profile").getOrThrow()
+        assertEquals(ArticleDisplayMode.ENGLISH_FIRST, fresh.displayMode)
+        assertEquals(true, fresh.showLearnedMarks)
     }
 }
