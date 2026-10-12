@@ -29,8 +29,8 @@ Android 英语背词应用：本地优先词书学习、FSRS 间隔复习、每�
 
 ## 四、下一阶段候选方向
 
-- **当前任务：F3-01 离线查词收口，任务书 `docs/handoff/2026-10-12-f3-01-closeout-task.md`，分支 `stage-3-f3-01-dictionary`**（阶段 2 收口已完成，见 `2026-10-12-stage-2-acceptance-record.md`）
-- 之后的候选顺序：F4-02 提醒 → F3-03 拍照 OCR → 备份接真实数据（阶段 4）
+- **当前任务：F4-03 备份导出接真实数据，任务书 `docs/handoff/2026-10-13-f4-03-backup-export-task.md`，分支 `stage-4-f4-03-backup-export`**（F4-02 本地提醒已完成，见 `2026-10-13-stage-4-f4-02-acceptance-record.md`）
+- 之后的候选顺序：F4-04 配对认证与恢复（依赖 F4-03）→ F3-03 拍照 OCR（需先做 ML Kit/Tesseract 许可核验）
 - 阶段 1 有两项真机人工走查待做（见 `2026-10-12-stage-1-acceptance-record.md`），不阻塞开发
 
 ## 五、用户偏好
