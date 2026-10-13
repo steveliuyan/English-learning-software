@@ -107,6 +107,8 @@ fun SettingsScreen(
     /** 备份导出入口：打开无认证 Salvage 包导出确认页（SAF 另存为）。 */
     onOpenBackupExport: () -> Unit = {},
     onOpenBackupRestore: () -> Unit = {},
+    /** 认证导出入口：旧设备系统认证 + 配对二维码 + 可选密码的受保护备份导出（F4-04）。 */
+    onOpenBackupPairingExport: () -> Unit = {},
     /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
     aiProfileSubtitle: String? = null,
     speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
@@ -271,6 +273,14 @@ fun SettingsScreen(
                 subtitle = "生成 `.elpbak` 文件（不含 API Key，暂不可用于认证恢复）",
                 tag = "settings_open_backup_export",
                 onClick = onOpenBackupExport,
+                badge = "⭕",
+                accent = DomainColors.Settings,
+            )
+            SettingsActionRow(
+                title = "认证导出（可用于新设备恢复）",
+                subtitle = "旧设备系统认证后生成配对码与受保护备份（F4-04）",
+                tag = "settings_open_backup_pairing_export",
+                onClick = onOpenBackupPairingExport,
                 badge = "⭕",
                 accent = DomainColors.Settings,
             )

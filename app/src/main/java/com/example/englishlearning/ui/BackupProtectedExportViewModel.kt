@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.backup.device.AndroidMigrationSigner
@@ -26,6 +27,9 @@ import kotlinx.coroutines.launch
  * 生成一次性挑战（MigrationChallengeIssuer 语义：单活、取代、台账不落 S）→ 显示二维码 →
  * 可选备份密码 → 受保护导出（签名 + Argon2id/AES-GCM）。密码错误固定类别；遗忘密码
  * 不可恢复必须在文案中如实说明。
+ *
+ * 落盘两段式（与 F4-03 同语义）：导出成功只在内存持有待写包并给出确定性文件名，
+ * 用户经 SAF 选中保存位置才真正写入；取消零写入；写入失败保留待写包允许换位置重试。
  */
 data class BackupProtectedExportUiState(
     val phase: ProtectedExportPhase = ProtectedExportPhase.Idle,
@@ -34,6 +38,8 @@ data class BackupProtectedExportUiState(
     val issuedAtEpochSeconds: Long = 0L,
     val expiresAtEpochSeconds: Long = 0L,
     val usePassword: Boolean = false,
+    val packageReady: Boolean = false,
+    val fileName: String? = null,
     val error: String? = null,
     val message: String? = null,
 )
@@ -43,6 +49,7 @@ enum class ProtectedExportPhase { Idle, Authenticating, Active, Exporting, Done 
 @HiltViewModel
 class BackupProtectedExportViewModel @Inject constructor(
     private val exporter: ProtectedExportExecutor,
+    private val destinationWriter: BackupDestinationWriter,
 ) : ViewModel() {
 
     private val mutable = MutableStateFlow(BackupProtectedExportUiState())
@@ -50,9 +57,19 @@ class BackupProtectedExportViewModel @Inject constructor(
 
     private var challenge: MigrationChallenge? = null
 
+    // 待写字节只在内存持有；新一轮导出/成功/取消后置空，保证不会写入陈旧包。
+    private var pending: ByteArray? = null
+
     /** 用户已通过系统认证（BiometricPrompt 成功回调）后调用。 */
     fun onAuthenticated() {
-        mutable.value = mutable.value.copy(phase = ProtectedExportPhase.Active, error = null)
+        // 新挑战取代旧会话：上一轮待写包绑定旧挑战，必须同步作废。
+        pending = null
+        mutable.value = mutable.value.copy(
+            phase = ProtectedExportPhase.Active,
+            error = null,
+            packageReady = false,
+            fileName = null,
+        )
         viewModelScope.launch {
             when (val outcome = exporter.issueChallenge()) {
                 is ProtectedExportExecutor.ChallengeOutcome.Issued -> {
@@ -91,19 +108,64 @@ class BackupProtectedExportViewModel @Inject constructor(
             mutable.value = mutable.value.copy(error = "密码需为 10–128 个字符。注意：密码遗忘则备份无法恢复。")
             return
         }
-        mutable.value = mutable.value.copy(busy = true, error = null, phase = ProtectedExportPhase.Exporting)
+        pending = null
+        mutable.value = mutable.value.copy(
+            busy = true,
+            error = null,
+            message = null,
+            phase = ProtectedExportPhase.Exporting,
+            packageReady = false,
+            fileName = null,
+        )
         viewModelScope.launch {
             when (val result = exporter.export(includeMediaAssets, active, if (usePassword()) password else null)) {
-                is BackupExportResult.Prepared -> mutable.value = mutable.value.copy(
-                    busy = false,
-                    phase = ProtectedExportPhase.Done,
-                    message = "受保护备份包已生成：共 ${result.recordCount} 条记录 · ${result.mediaCount} 个音频文件。" +
-                        "请在 30 分钟配对有效期内于新设备完成恢复；超期须重新配对导出。",
-                )
+                is BackupExportResult.Prepared -> {
+                    pending = result.bytes
+                    mutable.value = mutable.value.copy(
+                        busy = false,
+                        phase = ProtectedExportPhase.Done,
+                        packageReady = true,
+                        fileName = suggestedFileName(result.createdAtEpochMillis),
+                        message = "受保护备份包已生成：共 ${result.recordCount} 条记录 · ${result.mediaCount} 个音频文件。" +
+                            "请在 30 分钟配对有效期内于新设备完成恢复；超期须重新配对导出。",
+                    )
+                }
                 is BackupExportResult.Failed -> mutable.value = mutable.value.copy(
                     busy = false,
                     phase = ProtectedExportPhase.Active,
                     error = fixedMessage(result.reason),
+                )
+            }
+        }
+    }
+
+    /** SAF 位置回填：选中才落盘待写包；取消零写入并丢弃内存包；失败保留待写包允许重试。 */
+    fun onDocumentPicked(destination: Uri?) {
+        if (destination == null) {
+            pending = null
+            mutable.value = mutable.value.copy(
+                packageReady = false,
+                fileName = null,
+                message = "已取消导出，未写入任何文件。",
+            )
+            return
+        }
+        val bytes = pending ?: return // 尚未生成或已陈旧：拒绝写入缺失/过期的包。
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        viewModelScope.launch {
+            if (destinationWriter.write(destination, bytes)) {
+                pending = null
+                mutable.value = mutable.value.copy(
+                    busy = false,
+                    packageReady = false,
+                    fileName = null,
+                    message = "已导出受保护备份包，请在新设备 30 分钟配对有效期内完成恢复。",
+                    error = null,
+                )
+            } else {
+                mutable.value = mutable.value.copy(
+                    busy = false,
+                    error = "写入目标失败，请换一个位置重试。",
                 )
             }
         }

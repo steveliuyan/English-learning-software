@@ -58,7 +58,7 @@ fun BackupPairingExportScreen(
     val context = LocalContext.current
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        // SAF write handled by the production writer through pendingBytes
+        viewModel.onDocumentPicked(uri)
     }
 
     Column(
@@ -131,6 +131,15 @@ fun BackupPairingExportScreen(
 
             ProtectedExportPhase.Done -> {
                 state.message?.let { Text(it) }
+                if (state.packageReady) {
+                    state.fileName?.let { Text("文件名：$it", style = MaterialTheme.typography.bodySmall) }
+                    Button(
+                        onClick = { launcher.launch(state.fileName ?: "backup-protected.elpbak") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("backup_pairing_export_save"),
+                    ) { Text("选择保存位置并导出") }
+                }
             }
         }
 

@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 wordBookTransferViewModel = hiltViewModel<com.example.englishlearning.wordbook.WordBookTransferViewModel>(),
                 backupExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupExportViewModel>(),
                 backupRestoreViewModel = hiltViewModel<com.example.englishlearning.ui.BackupRestoreViewModel>(),
+                backupPairingExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupProtectedExportViewModel>(),
                 pronunciationProvider = pronunciationProvider,
                 refreshVocabularySearchIndex = refreshVocabularySearchIndex,
             )

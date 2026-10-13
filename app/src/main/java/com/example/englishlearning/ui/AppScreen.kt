@@ -143,6 +143,7 @@ fun AppScreen(
     wordBookTransferViewModel: com.example.englishlearning.wordbook.WordBookTransferViewModel? = null,
     backupExportViewModel: BackupExportViewModel? = null,
     backupRestoreViewModel: BackupRestoreViewModel? = null,
+    backupPairingExportViewModel: BackupProtectedExportViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -167,6 +168,7 @@ fun AppScreen(
             var showReminderSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupRestore by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showBackupPairingExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -330,7 +332,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
                 showWordQaCard != null
@@ -411,6 +413,7 @@ fun AppScreen(
             BackHandler(enabled = showReminderSettings) { showReminderSettings = false }
             BackHandler(enabled = showBackupExport) { showBackupExport = false }
             BackHandler(enabled = showBackupRestore) { showBackupRestore = false }
+            BackHandler(enabled = showBackupPairingExport) { showBackupPairingExport = false }
             BackHandler(enabled = showAiProfiles) {
                 showAiProfiles = false
                 speechSettingsViewModel?.load()
@@ -881,6 +884,12 @@ fun AppScreen(
                     onBack = { showBackupRestore = false },
                     viewModel = backupRestoreViewModel,
                 )
+            } else if (showBackupPairingExport) {
+                // F4-04：旧设备认证导出页；系统认证门控 + 配对二维码 + 可选密码 + SAF 落盘，页面内无跳过认证入口。
+                BackupPairingExportScreen(
+                    onBack = { showBackupPairingExport = false },
+                    viewModel = backupPairingExportViewModel,
+                )
             } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
                 // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
                 val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
@@ -1187,6 +1196,9 @@ fun AppScreen(
                                     },
                                     onOpenBackupRestore = {
                                         showBackupRestore = backupRestoreViewModel != null
+                                    },
+                                    onOpenBackupPairingExport = {
+                                        showBackupPairingExport = backupPairingExportViewModel != null
                                     },
                                     speechEngineStatuses = speechState.engineStatuses(),
                                     aiProfileSubtitle = aiProfiles?.let { ready ->
