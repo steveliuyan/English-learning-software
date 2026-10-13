@@ -499,8 +499,8 @@
 
 ## models
 - 名称: OCR、TTS、AI 与其他模型的正式产品资源
-- 版本: 正式产品未引入；Kokoro Android Spike 测试资源按上方独立固定条目登记
-- 许可证: 正式产品待逐项核验；测试资源许可见 Kokoro/Phonemis 条目
+- 版本: OCR 已批准引入（ML Kit bundled 随 APK、eng.traineddata 按需下载，见 mlkit-text-recognition 与 eng-traineddata-tessdata-fast 条目）；TTS 正式模型待阶段 3 F3-02 许可闭合；Kokoro Android Spike 测试资源按上方独立固定条目登记
+- 许可证: OCR 条目已逐项核验；其余待逐项核验；测试资源许可见 Kokoro/Phonemis 条目
 - 用途: 不将 Spike 模型打包进正式 debug/release APK；测试 APK 单独隔离
 - 数据流: 正式产品不处理此类本地模型；Spike 仅本地固定测试数据，不涉及用户数据库
 - NOTICE 位置: 正式产品未打包；Spike 测试通知见 app/src/androidTest/assets/kokoro-notices
@@ -606,3 +606,113 @@
 - NOTICE 位置: 本文件
 - 替代方案: ML Kit Barcode（GMS 依赖）
 - 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## mlkit-text-recognition
+- 名称: ML Kit Text Recognition v2 (com.google.mlkit:text-recognition)
+- 版本: 16.0.1（bundled 变体；传递链以 gradle.lockfile 为准）
+- 许可证: ML Kit Terms of Service（POM 声明 https://developers.google.com/ml-kit/terms，非开源许可；核验见 docs/decisions/2026-10-13-f3-03-ocr-provider-licenses.md）
+- 用途: F3-03 拍照 OCR 主路径，本地文字识别（拉丁语系）；模型随 APK 静态打包
+- 数据流: 图像识别全程在本机推理，输入图像与识别文本不发送 Google 服务器（ToS 保证）；但库可能联系 Google 服务器获取更新并发送性能 metrics（不含用户内容）——须在隐私政策与应用内披露
+- NOTICE 位置: 本文件、docs/decisions/2026-10-13-f3-03-ocr-provider-licenses.md；应用隐私政策含 ML Kit metrics 披露
+- 替代方案: Tesseract4Android 单引擎（决策文档方案 B）
+- 商业分发结论: 可商业分发（bundled 模型即设计为打进 APK）；禁止逆向工程或提取模型；须履行遥测披露义务；真机抓包核验外联（决策文档 T2）完成前不得标记已验证
+
+## mlkit-text-recognition-bundled-common
+- 名称: ML Kit Text Recognition bundled common (com.google.mlkit:text-recognition-bundled-common)
+- 版本: 17.0.0（由 mlkit-text-recognition 传递引入）
+- 许可证: ML Kit Terms of Service（同 mlkit-text-recognition 条目）
+- 用途: bundled 识别的共享层与端侧模型实现
+- 数据流: 同 mlkit-text-recognition 条目
+- NOTICE 位置: 本文件
+- 替代方案: 同 mlkit-text-recognition 条目
+- 商业分发结论: 同 mlkit-text-recognition 条目
+
+## mlkit-common
+- 名称: ML Kit Common (com.google.mlkit:common)
+- 版本: 18.11.0（传递依赖，以 gradle.lockfile 为准）
+- 许可证: ML Kit Terms of Service
+- 用途: ML Kit API 公共运行时
+- 数据流: 同 mlkit-text-recognition 条目
+- NOTICE 位置: 本文件
+- 替代方案: 无独立替代（ML Kit 必需）
+- 商业分发结论: 同 mlkit-text-recognition 条目
+
+## mlkit-vision-common
+- 名称: ML Kit Vision Common (com.google.mlkit:vision-common)
+- 版本: 17.3.0（传递依赖，以 gradle.lockfile 为准）
+- 许可证: ML Kit Terms of Service
+- 用途: ML Kit Vision API 公共层
+- 数据流: 同 mlkit-text-recognition 条目
+- NOTICE 位置: 本文件
+- 替代方案: 无独立替代（ML Kit 必需）
+- 商业分发结论: 同 mlkit-text-recognition 条目
+
+## play-services-mlkit-text-recognition
+- 名称: Play Services ML Kit Text Recognition (com.google.android.gms:play-services-mlkit-text-recognition 及 -common)
+- 版本: 19.0.1 / common 19.1.0（由 mlkit-text-recognition 传递引入的客户端 stub，非动态模型路径）
+- 许可证: ML Kit Terms of Service
+- 用途: bundled artifact 的传递依赖；运行时设备无 GMS 时不作为识别通路（模型在 APK 内），真机核验见决策文档 T2
+- 数据流: 同 mlkit-text-recognition 条目
+- NOTICE 位置: 本文件
+- 替代方案: 无法从 bundled artifact 排除而不偏离官方装配；整体替代为决策文档方案 B
+- 商业分发结论: 同 mlkit-text-recognition 条目
+
+## play-services-base
+- 名称: Google Play Services Base/Basement/Tasks (com.google.android.gms:play-services-base/play-services-basement/play-services-tasks)
+- 版本: 18.5.0 / 18.4.0 / 随链（以 gradle.lockfile 为准）
+- 许可证: Android Software Development Kit License（POM 声明 https://developer.android.com/studio/terms.html）
+- 用途: ML Kit 传递依赖的任务与连接基座
+- 数据流: 本机内存任务编排；不主动收集用户数据
+- NOTICE 位置: 本文件
+- 替代方案: 无独立替代（ML Kit 必需）
+- 商业分发结论: 可商业分发（Android SDK 条款允许集成进应用分发）
+
+## tesseract4android
+- 名称: Tesseract4Android (cz.adaptech.tesseract4android:tesseract4android)
+- 版本: 4.9.0（JitPack 分发；内嵌 Tesseract 5.5.1、Leptonica 1.85.0、libjpeg v9f、libpng 1.6.48）
+- 许可证: Apache-2.0（核验见 docs/decisions/2026-10-13-f3-03-ocr-provider-licenses.md §2）
+- 用途: F3-03 无 GMS/ML Kit 不可用时的本地 OCR 降级引擎
+- 数据流: 本机内存识别；图像与文本不上传；traineddata 由应用按需下载（见 eng-traineddata-tessdata-fast 条目）
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件；发布时随包保留 Apache-2.0 与内嵌组件许可文本
+- 替代方案: 自封装 JNI（维护成本高，决策文档记为后备）；tess-two 已归档不采用
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE；锁定版本并校验产物哈希（仅 JitPack 分发的供应链风险已在决策文档 T3 记录）
+
+## eng-traineddata-tessdata-fast
+- 名称: Tesseract 英文训练数据 eng.traineddata（tessdata_fast）
+- 版本: tesseract-ocr/tessdata_fast main 分支文件，4,113,088 bytes；实现期按决策文档锁定 commit 与 SHA-256
+- 许可证: Apache-2.0（仓库 LICENSE 与 README；无 CC 条款、无 ShareAlike、无非商业标注）
+- 用途: Tesseract4Android 降级引擎的英文识别模型；首次使用按需下载，不打进 APK，可删除
+- 数据流: 从固定 URL 下载至应用私有目录；下载不携带用户数据；识别在本机进行
+- NOTICE 位置: 应用内下载页展示许可名称与本文件；随包（下载缓存）保留许可文本
+- 替代方案: tessdata_best float 版（15.4 MB，精度更高、更慢更大）；不下载则 Tesseract 降级不可用
+- 商业分发结论: 可商业分发；分发时保留 Apache-2.0 许可与来源说明，禁止微调后冒充官方来源
+
+## tesseract-ocr
+- 名称: Tesseract OCR 引擎（Tesseract4Android 内嵌 native）
+- 版本: 5.5.1（随 tesseract4android 4.9.0）
+- 许可证: Apache-2.0
+- 用途: OCR 降级链的识别核心
+- 数据流: 本机内存处理；不联网
+- NOTICE 位置: 本文件、随包 Apache-2.0 许可文本
+- 替代方案: 见 tesseract4android 条目
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## leptonica
+- 名称: Leptonica 图像处理库（Tesseract4Android 内嵌 native）
+- 版本: 1.85.0（随 tesseract4android 4.9.0）
+- 许可证: BSD-2-Clause 式自定义许可（leptonica-license.txt 逐字核验，保留版权声明与免责即合规）
+- 用途: OCR 图像预处理
+- 数据流: 本机内存处理；不联网
+- NOTICE 位置: 本文件、随包保留版权两条款声明
+- 替代方案: 无独立替代（Tesseract 必需）
+- 商业分发结论: 可商业分发，保留版权与免责文本
+
+## libjpeg-libpng-ocr-chain
+- 名称: libjpeg v9f 与 libpng 1.6.48（Tesseract4Android 内嵌 native）
+- 版本: 随 tesseract4android 4.9.0
+- 许可证: IJG 许可证与 libpng 许可证（均为宽松许可）
+- 用途: OCR 链图像编解码
+- 数据流: 本机内存处理；不联网
+- NOTICE 位置: 本文件、随包保留许可文本
+- 替代方案: 无独立替代（Tesseract4Android 构建必需）
+- 商业分发结论: 可商业分发，保留各自许可文本
