@@ -5,6 +5,9 @@ import com.example.englishlearning.ai.domain.AiProvider
 import com.example.englishlearning.backup.domain.BackupProvider
 import com.example.englishlearning.core.export.LogicalSnapshot
 import com.example.englishlearning.core.export.MediaManifestItem
+import com.example.englishlearning.language.domain.OcrEngineKind
+import com.example.englishlearning.language.domain.OcrImage
+import com.example.englishlearning.language.domain.OcrOutcome
 import com.example.englishlearning.language.domain.OcrProvider
 import com.example.englishlearning.language.domain.OcrRegion
 import com.example.englishlearning.language.domain.OcrResult
@@ -13,6 +16,7 @@ import kotlin.reflect.KType
 import kotlin.reflect.full.memberFunctions
 import kotlin.reflect.full.memberProperties
 import kotlin.test.Test
+import kotlin.test.assertIs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -33,23 +37,25 @@ class ProviderContractTest {
     }
 
     @Test
-    fun `ocr result exposes text coordinates and confidence only`() {
-        val provider: OcrProvider = FakeOcrProvider(
-            OcrResult(
-                text = "word",
-                regions = listOf(OcrRegion(left = 1, top = 2, right = 3, bottom = 4, confidence = 0.9f)),
-            ),
-        )
+    fun `ocr result exposes text coordinates and confidence only`() =
+        kotlinx.coroutines.test.runTest {
+            val provider: OcrProvider = FakeOcrProvider(
+                OcrResult(
+                    text = "word",
+                    regions = listOf(OcrRegion(left = 1, top = 2, right = 3, bottom = 4, confidence = 0.9f)),
+                ),
+            )
 
-        val result = provider.recognize()
+            val outcome = provider.recognize(OcrImage(byteArrayOf(1)))
 
-        assertEquals("word", result.text)
-        assertEquals(0.9f, result.regions.single().confidence)
-        assertEquals(
-            setOf("left", "top", "right", "bottom", "confidence"),
-            OcrRegion::class.memberProperties.map { it.name }.toSet(),
-        )
-    }
+            assertIs<OcrOutcome.Success>(outcome)
+            assertEquals("word", outcome.result.text)
+            assertEquals(0.9f, outcome.result.regions.single().confidence)
+            assertEquals(
+                setOf("left", "top", "right", "bottom", "confidence"),
+                OcrRegion::class.memberProperties.map { it.name }.toSet(),
+            )
+        }
 
     @Test
     fun `backup provider accepts exact safe logical inputs and safe output`() {
@@ -131,5 +137,7 @@ private class FakeAiProvider(
 private class FakeOcrProvider(
     private val result: OcrResult,
 ) : OcrProvider {
-    override fun recognize(): OcrResult = result
+    override val kind: OcrEngineKind = OcrEngineKind.MlKit
+
+    override suspend fun recognize(image: OcrImage): OcrOutcome = OcrOutcome.Success(result, kind)
 }
