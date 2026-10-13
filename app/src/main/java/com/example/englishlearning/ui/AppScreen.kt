@@ -139,6 +139,7 @@ fun AppScreen(
     globalVocabularySearchViewModel: GlobalVocabularySearchViewModel? = null,
     refreshVocabularySearchIndex: com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase? = null,
     sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
+    photoTranslationViewModel: PhotoTranslationViewModel? = null,
     imageStudioViewModel: ImageStudioViewModel? = null,
     wordBookTransferViewModel: com.example.englishlearning.wordbook.WordBookTransferViewModel? = null,
     backupExportViewModel: BackupExportViewModel? = null,
@@ -900,6 +901,49 @@ fun AppScreen(
                     onConfirmOutbound = { sentenceAnalysisViewModel?.confirmOutbound(it) },
                     onBack = { selectedFeatureKey = null },
                 )
+            } else if (selectedFeature == AiFeature.PHOTO_TRANSLATION) {
+                // F3-03：拍照翻译。图片只进临时工作区（零残留由状态机保证）；翻译每次出站都确认。
+                val photoState = photoTranslationViewModel?.uiState?.collectAsState()?.value
+                    ?: PhotoTranslationUiState()
+                var photoSpeakMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
+                var photoSpeakRequest by remember { mutableStateOf(0L) }
+                var photoSpeakJob by remember { mutableStateOf<Job?>(null) }
+                PhotoTranslationScreen(
+                    state = photoState,
+                    onImageBytes = { bytes -> photoTranslationViewModel?.onImageBytes(bytes) },
+                    onOcrTextEdited = { text -> photoTranslationViewModel?.onOcrTextEdited(text) },
+                    onTranslate = { photoTranslationViewModel?.onTranslateTapped() },
+                    onConfirmOutbound = { confirmed -> photoTranslationViewModel?.onConfirmationResult(confirmed) },
+                    onRefreshModelStatus = { photoTranslationViewModel?.refreshModelStatus() },
+                    onInstallModel = { photoTranslationViewModel?.installModel() },
+                    onUninstallModel = { photoTranslationViewModel?.uninstallModel() },
+                    onOpenDictionary = { tapped ->
+                        selectedSearchCard = null
+                        searchPronunciationMessage = PronunciationStatus.Idle
+                        searchPronunciationRequest++
+                        searchPronunciationJob?.cancel()
+                        globalVocabularySearchViewModel?.setProfile(state.profile.id)
+                        globalVocabularySearchViewModel?.openSearch(tapped)
+                        showGlobalVocabularySearch = globalVocabularySearchViewModel != null
+                    },
+                    speakMessage = photoSpeakMessage.message(),
+                    onSpeak = { sentence ->
+                        val request = ++photoSpeakRequest
+                        photoSpeakJob?.cancel()
+                        photoSpeakMessage = PronunciationStatus.Playing
+                        photoSpeakJob = pronunciationScope.launch {
+                            val result = pronunciationStatus(pronunciationProvider?.speakSentence(sentence))
+                            if (request == photoSpeakRequest) {
+                                photoSpeakMessage = result
+                            }
+                        }
+                    },
+                    onBack = {
+                        photoSpeakJob?.cancel()
+                        photoTranslationViewModel?.reset()
+                        selectedFeatureKey = null
+                    },
+                )
             } else if (selectedFeature == AiFeature.IMAGE_STUDIO) {
                 val studioState = imageStudioViewModel?.uiState?.collectAsState()?.value
                     ?: ImageStudioUiState.Idle
@@ -1120,6 +1164,7 @@ fun AppScreen(
                                     selectedFeatureKey = it.key
                                     // 每次进入功能页都清掉上一句的分析结果与上一张的生图状态，防止旧结果串屏。
                                     if (it == AiFeature.SENTENCE_ANALYSIS) sentenceAnalysisViewModel?.reset()
+                                    if (it == AiFeature.PHOTO_TRANSLATION) photoTranslationViewModel?.reset()
                                     if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
                                 },
                                 onOpenWordList = { selectedTab = AppTab.LEARNING },

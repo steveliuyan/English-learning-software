@@ -56,11 +56,13 @@ class SearchEntryWiringTest {
 
     /** 入口只有一个实现，不允许界面层再各自写一份「设置查询词 + 搜索」。 */
     @Test
-    fun `both entries go through the same view model entry point`() {
+    fun `all entries go through the same view model entry point`() {
         val appScreen = appScreenSource()
         val calls = Regex("""openSearch\(""").findAll(appScreen).count()
 
-        assertEquals(2, calls, "查词入口的调用点数量变了（应为主页、阅读页各一处）：$calls")
+        // 三个合法入口：主页查词、阅读页点未知词、拍照翻译页点词（F3-03 要求选词查义）。
+        // 新增第四个入口前先确认它不是又复制了一份搜索接线。
+        assertEquals(3, calls, "查词入口的调用点数量变了（应为主页、阅读页、拍照翻译页各一处）：$calls")
     }
 
     /** 单元测试的工作目录是模块目录（app/），兼容直接给相对仓库路径的写法。 */

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
  */
 class AiFeatureTest {
     @Test
-    fun `the page shows exactly the six features, in order`() {
+    fun `the page shows exactly the seven features, in order`() {
         assertEquals(
             listOf(
                 AiFeature.WORD_PASSAGE,
@@ -21,12 +21,13 @@ class AiFeatureTest {
                 AiFeature.LISTENING,
                 AiFeature.COACH,
                 AiFeature.SENTENCE_ANALYSIS,
+                AiFeature.PHOTO_TRANSLATION,
                 AiFeature.IMAGE_STUDIO,
             ),
             AiFeature.entries.toList(),
         )
         assertEquals(
-            listOf("词文串学", "AI 短文填词", "单词随身听", "单词串讲", "长难句分析", "AI 生图"),
+            listOf("词文串学", "AI 短文填词", "单词随身听", "单词串讲", "长难句分析", "拍照翻译", "AI 生图"),
             AiFeature.entries.map { it.title },
         )
     }
@@ -63,9 +64,9 @@ class AiFeatureTest {
 
     @Test
     fun `only the features with real screens are marked as implemented`() {
-        // 长难句分析与 AI 生图已接通；其余功能仍未实现。接通新的功能时在这里同步集合。
+        // 长难句分析、拍照翻译与 AI 生图已接通；其余功能仍未实现。接通新的功能时在这里同步集合。
         assertEquals(
-            setOf(AiFeature.SENTENCE_ANALYSIS, AiFeature.IMAGE_STUDIO),
+            setOf(AiFeature.SENTENCE_ANALYSIS, AiFeature.PHOTO_TRANSLATION, AiFeature.IMAGE_STUDIO),
             AiFeature.entries.filter { it.implemented }.toSet(),
         )
     }

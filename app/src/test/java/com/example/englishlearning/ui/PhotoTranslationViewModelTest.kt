@@ -14,9 +14,12 @@ import com.example.englishlearning.ai.net.AiHttpResult
 import com.example.englishlearning.ai.net.AiHttpTransport
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
+import com.example.englishlearning.language.domain.EnglishOcrModelAssets
 import com.example.englishlearning.language.domain.OcrChainOutcome
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrImage
+import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
+import com.example.englishlearning.language.domain.OcrModelAssetStatus
 import com.example.englishlearning.language.domain.OcrOutcome
 import com.example.englishlearning.language.domain.OcrProvider
 import com.example.englishlearning.language.domain.OcrProviderChain
@@ -108,6 +111,7 @@ class PhotoTranslationViewModelTest {
     private fun viewModel(
         chain: OcrProviderChain,
         transport: RecordingTransport = RecordingTransport(),
+        modelAssets: FakeModelAssets = FakeModelAssets(),
     ): PhotoTranslationViewModel {
         Dispatchers.setMain(dispatcher)
         return PhotoTranslationViewModel(
@@ -119,7 +123,39 @@ class PhotoTranslationViewModelTest {
                     secrets = AiProfileSecretUseCase(FakeSecretStore()),
                     transport = transport,
                 ),
+            modelAssets = modelAssets,
         )
+    }
+
+    /** 可控的离线备用模型资产：状态、安装进度、安装结果与删除都可脚本化。 */
+    private class FakeModelAssets(
+        var status: OcrModelAssetStatus = OcrModelAssetStatus.NotInstalled,
+        var installOutcome: OcrModelAssetInstallOutcome =
+            OcrModelAssetInstallOutcome.Installed(4_113_088L),
+        var progressEmissions: List<Float> = emptyList(),
+    ) : EnglishOcrModelAssets {
+        var installCalls = 0
+        var uninstallCalls = 0
+
+        override suspend fun status(): OcrModelAssetStatus = status
+
+        override suspend fun install(
+            onProgress: (Float) -> Unit,
+        ): OcrModelAssetInstallOutcome {
+            installCalls += 1
+            progressEmissions.forEach { onProgress(it) }
+            status =
+                when (val outcome = installOutcome) {
+                    is OcrModelAssetInstallOutcome.Installed -> OcrModelAssetStatus.Installed(outcome.sizeBytes)
+                    else -> OcrModelAssetStatus.NotInstalled
+                }
+            return installOutcome
+        }
+
+        override suspend fun uninstall() {
+            uninstallCalls += 1
+            status = OcrModelAssetStatus.NotInstalled
+        }
     }
 
     private fun recognized(text: String, confidence: Float = 0.9f) =
@@ -291,6 +327,7 @@ class PhotoTranslationViewModelTest {
                         secrets = AiProfileSecretUseCase(FakeSecretStore()),
                         transport = RecordingTransport(),
                     ),
+                modelAssets = FakeModelAssets(),
             )
         vm.onImageBytes(byteArrayOf(1))
         testScheduler.advanceUntilIdle()
@@ -302,6 +339,65 @@ class PhotoTranslationViewModelTest {
             PhotoTranslationFailureCategory.NotConfigured(PhotoTranslationNotConfiguredReason.NoDefaultProfile),
             vm.uiState.value.translationIssue,
         )
+    }
+
+    @Test
+    fun modelStatusRefreshExposesWhatIsInstalled() = runTest(dispatcher) {
+        val assets = FakeModelAssets(status = OcrModelAssetStatus.Installed(4_113_088L))
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("x")))), modelAssets = assets)
+
+        vm.refreshModelStatus()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(OcrModelAssetStatus.Installed(4_113_088L), vm.uiState.value.modelStatus)
+    }
+
+    @Test
+    fun installingTheFallbackModelPublishesInstalledAndIgnoresDoubleTaps() = runTest(dispatcher) {
+        val assets =
+            FakeModelAssets(
+                installOutcome = OcrModelAssetInstallOutcome.Installed(4_113_088L),
+                progressEmissions = listOf(0.5f),
+            )
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("x")))), modelAssets = assets)
+
+        vm.installModel()
+        vm.installModel()
+        testScheduler.advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(OcrModelAssetStatus.Installed(4_113_088L), state.modelStatus)
+        assertNull(state.modelInstallProgress)
+        assertNull(state.modelIssue)
+        assertEquals(1, assets.installCalls)
+    }
+
+    @Test
+    fun failedInstallOrIntegrityMismatchIsReportedAndStatusStaysNotInstalled() = runTest(dispatcher) {
+        val assets = FakeModelAssets(installOutcome = OcrModelAssetInstallOutcome.IntegrityMismatch)
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("x")))), modelAssets = assets)
+
+        vm.installModel()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(OcrModelAssetInstallOutcome.IntegrityMismatch, vm.uiState.value.modelIssue)
+        assertEquals(OcrModelAssetStatus.NotInstalled, vm.uiState.value.modelStatus)
+    }
+
+    @Test
+    fun uninstallingTheModelReturnsToNotInstalled() = runTest(dispatcher) {
+        val assets =
+            FakeModelAssets(
+                status = OcrModelAssetStatus.Installed(4_113_088L),
+                installOutcome = OcrModelAssetInstallOutcome.Installed(4_113_088L),
+            )
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("x")))), modelAssets = assets)
+
+        vm.uninstallModel()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(OcrModelAssetStatus.NotInstalled, vm.uiState.value.modelStatus)
+        assertEquals(1, assets.uninstallCalls)
     }
 
     @Test

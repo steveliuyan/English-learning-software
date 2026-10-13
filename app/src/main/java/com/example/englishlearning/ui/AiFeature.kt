@@ -1,7 +1,7 @@
 package com.example.englishlearning.ui
 
 /**
- * 「AI 学」页上的四个功能入口。
+ * 「AI 学」页上的功能入口。
  *
  * 这是**产品目录**，不是能力清单：`implemented` 为 `false` 表示该功能的生成逻辑尚未接通，
  * 页面上必须如实标注，因此它必须与 [status] 的措辞保持一致——这条一致性由 `AiFeatureTest`
@@ -9,7 +9,7 @@ package com.example.englishlearning.ui
  * 立刻测试失败。
  *
  * @property key 稳定的短标识，用作 testTag 与路由参数，必须是 kebab-case。
- * @property glyph 列表左侧的单字标记。四个功能各用一字，避免引图标库。
+ * @property glyph 列表左侧的单字标记。各功能各用一字，避免引图标库。
  * @property title 卡片标题。
  * @property summary 一行说明，描述这个功能做什么。
  * @property status 面向用户的一句话当前状态，未实现时必须以「未实现」开头。
@@ -87,6 +87,19 @@ enum class AiFeature(
         dependencies = listOf(
             "默认文本 AI 服务：在设置里选好一套带密钥的模型",
             "出站确认：按域名确认一次，与文章生成同语义",
+        ),
+    ),
+    PHOTO_TRANSLATION(
+        key = "photo-translation",
+        glyph = "拍",
+        title = "拍照翻译",
+        summary = "拍一页英文或从相册选图，识别文字校对后再译成中文",
+        status = "已可用：拍照或从相册选图，识别文字可直接编辑，确认后交给 AI 翻译。",
+        implemented = true,
+        dependencies = listOf(
+            "相机权限：首次拍照时请求；拒绝后可改用相册选图",
+            "端侧识别：ML Kit 主路径，可安装约 4.1 MB 的 Tesseract 离线备用模型",
+            "文本 AI 服务：翻译走默认 Profile，图片不出设备，文本每次发送前逐次确认",
         ),
     ),
     IMAGE_STUDIO(

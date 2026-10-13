@@ -3,9 +3,12 @@ package com.example.englishlearning.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.language.domain.EnglishOcrModelAssets
 import com.example.englishlearning.language.domain.OcrChainOutcome
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrImage
+import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
+import com.example.englishlearning.language.domain.OcrModelAssetStatus
 import com.example.englishlearning.language.domain.OcrProviderChain
 import com.example.englishlearning.language.domain.TemporaryImageWorkspace
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
@@ -44,6 +47,10 @@ data class PhotoTranslationUiState(
     val translationIssue: PhotoTranslationFailureCategory? = null,
     /** 非空即弹出站确认框；每次翻译请求都要重新确认，确认前零字节出网（AC3-06）。 */
     val pendingConfirmationHost: String? = null,
+    /** Tesseract 离线备用模型的安装态（下载前展示大小与许可，可删除）。 */
+    val modelStatus: OcrModelAssetStatus? = null,
+    val modelInstallProgress: Float? = null,
+    val modelIssue: OcrModelAssetInstallOutcome? = null,
 )
 
 @HiltViewModel
@@ -51,12 +58,14 @@ class PhotoTranslationViewModel @Inject constructor(
     private val ocr: OcrProviderChain,
     private val workspace: TemporaryImageWorkspace,
     private val translate: PhotoTranslationUseCase,
+    private val modelAssets: EnglishOcrModelAssets,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PhotoTranslationUiState())
     val uiState: StateFlow<PhotoTranslationUiState> = _uiState
 
     private var captureJob: Job? = null
     private var translateJob: Job? = null
+    private var modelJob: Job? = null
 
     fun onImageBytes(
         bytes: ByteArray,
@@ -152,8 +161,74 @@ class PhotoTranslationViewModel @Inject constructor(
     fun reset() {
         captureJob?.cancel()
         translateJob?.cancel()
+        modelJob?.cancel()
         workspace.purgeAll()
         _uiState.value = PhotoTranslationUiState()
+    }
+
+    fun refreshModelStatus() {
+        modelJob =
+            viewModelScope.launch {
+                runCatching { modelAssets.status() }
+                    .onSuccess { status -> _uiState.update { it.copy(modelStatus = status) } }
+                    .onFailure { _uiState.update { it.copy(modelStatus = null) } }
+            }
+    }
+
+    fun installModel() {
+        // 同步置进度即互斥：连点第二次进来时进度已非空，直接返回，不会并发下载。
+        if (_uiState.value.modelInstallProgress != null) return
+        _uiState.update { it.copy(modelInstallProgress = 0f, modelIssue = null) }
+        modelJob =
+            viewModelScope.launch {
+                try {
+                    when (val outcome = modelAssets.install { progress ->
+                        _uiState.update { it.copy(modelInstallProgress = progress) }
+                    }) {
+                        is OcrModelAssetInstallOutcome.Installed ->
+                            _uiState.update {
+                                it.copy(
+                                    modelStatus = OcrModelAssetStatus.Installed(outcome.sizeBytes),
+                                    modelInstallProgress = null,
+                                    modelIssue = null,
+                                )
+                            }
+                        else ->
+                            _uiState.update {
+                                it.copy(
+                                    modelStatus = OcrModelAssetStatus.NotInstalled,
+                                    modelInstallProgress = null,
+                                    modelIssue = outcome,
+                                )
+                            }
+                    }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (failure: Throwable) {
+                    _uiState.update {
+                        it.copy(
+                            modelStatus = OcrModelAssetStatus.NotInstalled,
+                            modelInstallProgress = null,
+                            modelIssue = OcrModelAssetInstallOutcome.DownloadFailed(failure.message),
+                        )
+                    }
+                }
+            }
+    }
+
+    fun uninstallModel() {
+        modelJob?.cancel()
+        modelJob =
+            viewModelScope.launch {
+                runCatching { modelAssets.uninstall() }
+                _uiState.update {
+                    it.copy(
+                        modelStatus = modelAssets.status(),
+                        modelInstallProgress = null,
+                        modelIssue = null,
+                    )
+                }
+            }
     }
 
     override fun onCleared() {
