@@ -8,6 +8,7 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import com.example.englishlearning.language.domain.PronunciationAccent
 import java.io.File
+import java.io.InputStream
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import java.security.MessageDigest
@@ -38,7 +39,9 @@ class KokoroAndroidEngine(
     private val manifest: Map<String, KokoroAsset> = DEFAULT_MANIFEST,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : KokoroEngine {
-    private val assetRoot = AssetMaterializer(context.applicationContext, manifest)
+    private val assetRoot = KokoroAssetMaterializer(
+        File(context.applicationContext.cacheDir, ASSET_ROOT),
+    ) { path -> context.applicationContext.assets.open("$ASSET_ROOT/$path") }
     private val mutex = Mutex()
     @Volatile private var ready = false
     private var closed = false
@@ -63,7 +66,7 @@ class KokoroAndroidEngine(
             try {
                 check(!closed) { "Engine已关闭" }
                 if (!ready) {
-                    val paths = assetRoot.materialize()
+                    val paths = assetRoot.materialize(manifest)
                     val parsedVocab = KokoroFormats.vocab(paths.getValue("config").readText())
                     val parsedVoices = KokoroFormats.voices(paths.getValue("voices"))
                     val created = factory.create(paths) { partial += it }
@@ -156,23 +159,60 @@ class KokoroAndroidEngine(
     }
 }
 
-private class AssetMaterializer(
-    private val context: Context,
-    private val manifest: Map<String, KokoroAsset>,
+/**
+ * Kokoro 资产物化：幂等、流式校验、失败闭锁。
+ *
+ * 真机反馈（2026-10-13）：旧实现每次 prepare 全量重拷 + readBytes() 内存哈希 134MB，
+ * 是发音点击"没反应"的主要放大器。现在：
+ * - 目标文件已存在且大小匹配 → 直接复用，不读资产流、不重算哈希
+ *   （缓存文件在应用私有 cacheDir，损坏会在 ONNX 建会话时显式失败，不再逐次重哈希）。
+ * - 缺失或大小不符 → 拷贝到 .tmp，流式 SHA-256 校验通过后才 rename 落位；
+ *   任何失败删除临时文件，绝不留下半截资产覆盖旧副本。
+ */
+internal class KokoroAssetMaterializer(
+    private val root: File,
+    private val openAsset: (String) -> InputStream,
 ) {
-    private val root = File(context.cacheDir, "kokoro-production")
+    private companion object {
+        private const val HASH_CHUNK_BYTES = 64 * 1024
+    }
+    fun materialize(manifest: Map<String, KokoroAsset>): Map<String, File> =
+        manifest.mapValues { (_, spec) -> materializeOne(spec) }
 
-    fun materialize(): Map<String, File> {
-        val assets = context.assets
-        return manifest.mapValues { (_, spec) ->
-            val target = File(root, spec.relativePath)
-            target.parentFile?.mkdirs()
-            assets.open("kokoro-production/${spec.relativePath}").use { input -> target.outputStream().use { input.copyTo(it) } }
-            require(target.length() == spec.size) { "资产长度不匹配" }
-            val actual = MessageDigest.getInstance("SHA-256").digest(target.readBytes()).joinToString("") { "%02x".format(it) }
-            require(actual == spec.sha256) { "资产摘要不匹配" }
-            target
+    private fun materializeOne(spec: KokoroAsset): File {
+        val target = File(root, spec.relativePath)
+        if (target.isFile && target.length() == spec.size) return target
+        target.parentFile?.mkdirs()
+        val temporary = File(target.parentFile, "${target.name}.tmp")
+        try {
+            temporary.delete()
+            openAsset(spec.relativePath).use { input ->
+                temporary.outputStream().use { output -> input.copyTo(output) }
+            }
+            require(temporary.length() == spec.size) { "资产长度不匹配" }
+            require(sha256HexOf(temporary) == spec.sha256) { "资产摘要不匹配" }
+            if (!temporary.renameTo(target)) {
+                target.delete()
+                require(temporary.renameTo(target)) { "资产落盘失败" }
+            }
+        } catch (failure: Throwable) {
+            temporary.delete()
+            throw failure
         }
+        return target
+    }
+
+    private fun sha256HexOf(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(HASH_CHUNK_BYTES)
+            while (true) {
+                val read = input.read(buffer)
+                if (read == -1) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }
 

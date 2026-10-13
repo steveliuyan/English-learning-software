@@ -79,9 +79,19 @@ class WordAiQaViewModelTest {
     private class RecordingNotes : WordAiNoteRepository {
         val saved = mutableListOf<WordAiNote>()
         var failSave = false
+        var failDelete = false
+        var deletedNoteIds = mutableListOf<String>()
         override suspend fun save(note: WordAiNote): Result<Unit> =
             if (failSave) Result.failure(IllegalStateException("closed")) else Result.success(Unit).also { saved += note }
         override suspend fun list(profileId: String, lemma: String, wordBookId: String, cardId: String): Result<List<WordAiNote>> = Result.success(saved)
+        override suspend fun delete(profileId: String, noteId: String): Result<Unit> {
+            if (failDelete) return Result.failure(IllegalStateException("closed"))
+            val removed = saved.firstOrNull { it.profileId == profileId && it.noteId == noteId }
+                ?: return Result.failure(IllegalStateException("not found"))
+            saved -= removed
+            deletedNoteIds += noteId
+            return Result.success(Unit)
+        }
     }
 
     /** 构造真实用例 + 内存笔记库；transport/resolver 行为可由测试改写。 */
@@ -89,6 +99,7 @@ class WordAiQaViewModelTest {
         transport: RecordingTransport = RecordingTransport(),
         notes: RecordingNotes = RecordingNotes(),
         resolver: DefaultTextProfileResult = DefaultTextProfileResult.Selected(profile),
+        idFactory: WordNoteIdFactory = WordNoteIdFactory { "note-1" },
     ): Triple<WordAiQaViewModel, RecordingTransport, RecordingNotes> {
         val useCase = WordQaUseCase(
             defaultTextProfile = DefaultTextProfileResolver { resolver },
@@ -98,7 +109,7 @@ class WordAiQaViewModelTest {
         val viewModel = WordAiQaViewModel(
             ask = useCase,
             notes = notes,
-            noteIds = { "note-1" },
+            noteIds = idFactory,
             clock = com.example.englishlearning.core.time.FixedClockProvider(Instant.ofEpochMilli(1234L), java.time.ZoneOffset.UTC),
         )
         return Triple(viewModel, transport, notes)
@@ -296,6 +307,43 @@ class WordAiQaViewModelTest {
         // 重置后旧回答不能再被保存：pendingRequest 与 lastAnswer 都已清空。
         viewModel.saveNote()
         advanceUntilIdle()
+        assertEquals(1, notes.saved.size)
+    }
+
+    @Test
+    fun deleteNoteRemovesItFromStorageAndTheVisibleList() = runTest(dispatcher) {
+        val notes = RecordingNotes()
+        var sequence = 0
+        val (viewModel, _, _) = viewModel(notes = notes, idFactory = WordNoteIdFactory { "note-${++sequence}" })
+
+        viewModel.loadNotes("default", "apple", "book-a", "card-a")
+        viewModel.savePersonalNote("apple", "第一条笔记", "book-a", "card-a")
+        viewModel.savePersonalNote("apple", "第二条笔记", "book-a", "card-a")
+        advanceUntilIdle()
+        assertEquals(2, viewModel.savedNotes.value.size)
+
+        viewModel.deleteNote("note-1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("note-2"), viewModel.savedNotes.value.map { it.noteId })
+        assertEquals(listOf("note-1"), notes.deletedNoteIds)
+        // 删除必须真的落库，而不是只把条目从界面上藏起来。
+        assertEquals(listOf("note-2"), notes.list("default", "apple", "book-a", "card-a").getOrThrow().map { it.noteId })
+    }
+
+    @Test
+    fun failedDeleteKeepsTheNoteVisible() = runTest(dispatcher) {
+        val notes = RecordingNotes().apply { failDelete = true }
+        val (viewModel, _, _) = viewModel(notes = notes)
+
+        viewModel.loadNotes("default", "apple", "book-a", "card-a")
+        viewModel.savePersonalNote("apple", "第一条笔记", "book-a", "card-a")
+        advanceUntilIdle()
+
+        viewModel.deleteNote("note-1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("note-1"), viewModel.savedNotes.value.map { it.noteId })
         assertEquals(1, notes.saved.size)
     }
 }

@@ -733,6 +733,7 @@ class AppScreenTest {
         val notes = object : WordAiNoteRepository {
             override suspend fun save(note: WordAiNote) = Result.success(Unit)
             override suspend fun list(profileId: String, lemma: String, wordBookId: String, cardId: String) = Result.success(emptyList<WordAiNote>())
+            override suspend fun delete(profileId: String, noteId: String) = Result.success(Unit)
         }
         return WordAiQaViewModel(
             WordQaUseCase(DefaultTextProfileResolver { selection }, secrets, transport),

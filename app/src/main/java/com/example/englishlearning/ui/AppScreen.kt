@@ -454,7 +454,7 @@ fun AppScreen(
                             val cardSnapshot = card
                             val request = ++searchPronunciationRequest
                             searchPronunciationJob?.cancel()
-                            searchPronunciationMessage = PronunciationStatus.Idle
+                            searchPronunciationMessage = PronunciationStatus.Playing
                             searchPronunciationJob = pronunciationScope.launch {
                                 val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American))
                                 if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
@@ -466,7 +466,7 @@ fun AppScreen(
                             val cardSnapshot = card
                             val request = ++searchPronunciationRequest
                             searchPronunciationJob?.cancel()
-                            searchPronunciationMessage = PronunciationStatus.Idle
+                            searchPronunciationMessage = PronunciationStatus.Playing
                             searchPronunciationJob = pronunciationScope.launch {
                                 val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British))
                                 if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
@@ -477,6 +477,7 @@ fun AppScreen(
                         pronunciationStatus = searchPronunciationMessage,
                         notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
                         onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
+                        onDeleteNote = { wordQaViewModel?.deleteNote(it) },
                         personalNoteSaveStatus = personalNoteSaveStatus,
                         vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
                         onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
@@ -544,6 +545,7 @@ fun AppScreen(
                         onSpeak = {
                             val cardSnapshot = card
                             val request = ++learningRecordPronunciationRequest
+                            detailPronunciationMessage = PronunciationStatus.Playing
                             pronunciationScope.launch {
                                 val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American))
                                 if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
@@ -554,6 +556,7 @@ fun AppScreen(
                         onSpeakBritish = {
                             val cardSnapshot = card
                             val request = ++learningRecordPronunciationRequest
+                            detailPronunciationMessage = PronunciationStatus.Playing
                             pronunciationScope.launch {
                                 val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British))
                                 if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
@@ -564,6 +567,7 @@ fun AppScreen(
                         pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
                         notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
                         onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
+                        onDeleteNote = { wordQaViewModel?.deleteNote(it) },
                         personalNoteSaveStatus = personalNoteSaveStatus,
                         vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
                         onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },

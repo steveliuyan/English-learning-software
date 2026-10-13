@@ -116,6 +116,19 @@ class WordAiQaViewModel @Inject constructor(
         }
     }
 
+    /** 删除一条笔记：落库成功才从可见列表移除；失败或已换卡时列表原样保留。 */
+    fun deleteNote(noteId: String) {
+        val owner = profileId
+        if (owner.isBlank() || noteId.isBlank()) return
+        viewModelScope.launch {
+            notes.delete(owner, noteId).onSuccess {
+                if (profileId == owner) {
+                    _savedNotes.value = _savedNotes.value.filterNot { it.noteId == noteId }
+                }
+            }
+        }
+    }
+
     fun loadNotes(profileId: String, lemma: String, wordBookId: String = "", cardId: String = "") {
         val identityChanged = this.profileId != profileId ||
             this.wordBookId != wordBookId ||

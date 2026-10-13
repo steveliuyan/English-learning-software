@@ -27,6 +27,9 @@ interface WordAiNoteRepository {
 
     /** 指定 profile 与词的笔记，按创建时间降序；跨 profile 不可见。 */
     suspend fun list(profileId: String, lemma: String, wordBookId: String = "", cardId: String = ""): Result<List<WordAiNote>>
+
+    /** 删除单条笔记；只删除属于 [profileId] 的那条，其他情况视为成功空操作。 */
+    suspend fun delete(profileId: String, noteId: String): Result<Unit>
 }
 
 class RoomWordAiNoteRepository(
@@ -39,6 +42,10 @@ class RoomWordAiNoteRepository(
 
     override suspend fun list(profileId: String, lemma: String, wordBookId: String, cardId: String): Result<List<WordAiNote>> = runStorage {
         database.internalWordAiNoteDao().findForCard(profileId, wordBookId, cardId, lemma).map { it.toDomain() }
+    }
+
+    override suspend fun delete(profileId: String, noteId: String): Result<Unit> = runStorage {
+        database.internalWordAiNoteDao().deleteOne(profileId, noteId)
     }
 
     private suspend fun <T> runStorage(block: suspend () -> T): Result<T> = try {

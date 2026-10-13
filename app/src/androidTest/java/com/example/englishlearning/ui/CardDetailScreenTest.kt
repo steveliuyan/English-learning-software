@@ -410,6 +410,62 @@ class CardDetailScreenTest {
         assertTrue("派生词的英文应加粗", line.isBold(0 until "surfer".length))
     }
 
+    // ---------------------------------------------------------------- 我的笔记弹窗（2026-10-13 真机反馈）
+
+    /** 笔记不再内嵌词卡页：入口一行，查看/添加/删除全部收进弹窗。 */
+    @Test
+    fun notesAreHiddenBehindTheEntryAndManagedInADialog() {
+        var deleted: String? = null
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(),
+                onBack = {},
+                notes = listOf(wordNote("n1", "记住：able + ity")),
+                onSavePersonalNote = {},
+                onDeleteNote = { deleted = it },
+            )
+        }
+
+        composeRule.onNodeWithText("记住：able + ity").assertDoesNotExist()
+        composeRule.onNodeWithText("我的笔记（1）").assertExists()
+        composeRule.onNodeWithTag("card_detail_notes_entry").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("记住：able + ity").assertExists()
+        composeRule.onNodeWithTag("card_detail_personal_note_input").assertExists()
+        composeRule.onNodeWithTag("card_detail_note_delete_n1").performClick()
+        composeRule.waitForIdle()
+        assertEquals("n1", deleted)
+
+        composeRule.onNodeWithTag("card_detail_notes_dialog_close").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("记住：able + ity").assertDoesNotExist()
+    }
+
+    @Test
+    fun emptyNotesDialogInvitesTheFirstNoteWithoutCountNoise() {
+        composeRule.setContent {
+            CardDetailScreen(card = card(), onBack = {}, notes = emptyList(), onSavePersonalNote = {})
+        }
+
+        composeRule.onNodeWithText("我的笔记").assertExists()
+        composeRule.onNodeWithTag("card_detail_notes_entry").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("card_detail_notes_empty").assertExists()
+        composeRule.onNodeWithTag("card_detail_personal_note_input").assertExists()
+    }
+
+    private fun wordNote(noteId: String, answer: String) = WordAiNote(
+        noteId = noteId,
+        profileId = "default",
+        wordBookId = "cet4",
+        cardId = "placeholder:cet4:ability",
+        lemma = "ability",
+        kind = com.example.englishlearning.wordqa.WordQaKind.Personal,
+        answer = answer,
+        createdAtEpochMillis = 1L,
+    )
+
     private fun SemanticsNodeInteraction.annotatedText(): AnnotatedString =
         fetchSemanticsNode().config[SemanticsProperties.Text].first()
 

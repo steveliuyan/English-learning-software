@@ -278,6 +278,90 @@ class KokoroPronunciationProviderTest {
         )
     }
 
+    // ---------------------------------------------------------------- 合成音频缓存（2026-10-13 真机反馈：重复点击重新推理太慢）
+
+    @Test
+    fun `cached audio plays without touching the engine at all`() = runTest {
+        val engine = RecordingKokoroEngine()
+        val player = RecordingAudioPlayer()
+        val cache = FakeSynthAudioCache()
+        cache.stored["hello" to PronunciationAccent.American] = byteArrayOf(9, 8, 7)
+        val provider = KokoroPronunciationProvider(engine, player, cache)
+
+        assertEquals(PronunciationResult.Played, provider.speakWord("hello"))
+
+        assertEquals(0, engine.prepareCalls)
+        assertTrue(engine.texts.isEmpty())
+        assertEquals(listOf(byteArrayOf(9, 8, 7).toList()), player.played)
+    }
+
+    @Test
+    fun `successful synthesis is stored so the next tap skips inference`() = runTest {
+        val engine = RecordingKokoroEngine(audio = byteArrayOf(4, 5))
+        val player = RecordingAudioPlayer()
+        val cache = FakeSynthAudioCache()
+        val provider = KokoroPronunciationProvider(engine, player, cache)
+
+        assertEquals(PronunciationResult.Played, provider.speakWord("hello", PronunciationAccent.American))
+        assertEquals(PronunciationResult.Played, provider.speakWord("hello", PronunciationAccent.American))
+
+        assertEquals(listOf("hello"), engine.texts)
+        assertEquals(2, player.played.size)
+        assertEquals(listOf(byteArrayOf(4, 5).toList(), byteArrayOf(4, 5).toList()), player.played)
+    }
+
+    @Test
+    fun `cache is keyed by accent`() = runTest {
+        val engine = RecordingKokoroEngine(audio = byteArrayOf(1, 2))
+        val cache = FakeSynthAudioCache()
+        cache.stored["hello" to PronunciationAccent.American] = byteArrayOf(9)
+        val provider = KokoroPronunciationProvider(engine, RecordingAudioPlayer(), cache)
+
+        assertEquals(PronunciationResult.Played, provider.speakWord("hello", PronunciationAccent.British))
+
+        assertEquals(listOf("hello"), engine.texts)
+        assertEquals(PronunciationAccent.British, engine.accents.single())
+    }
+
+    @Test
+    fun `forced regeneration bypasses the cache and refreshes it`() = runTest {
+        val engine = RecordingKokoroEngine(audio = byteArrayOf(1, 2))
+        val cache = FakeSynthAudioCache()
+        val provider = KokoroPronunciationProvider(engine, RecordingAudioPlayer(), cache)
+
+        provider.speakWord("hello", PronunciationAccent.American)
+        provider.speakWord("hello", PronunciationAccent.American, forceRegenerate = true)
+
+        assertEquals(listOf("hello", "hello"), engine.texts)
+    }
+
+    @Test
+    fun `a failing cache read degrades to synthesis instead of failing playback`() = runTest {
+        val engine = RecordingKokoroEngine(audio = byteArrayOf(4, 5))
+        val player = RecordingAudioPlayer()
+        val cache = FakeSynthAudioCache().apply { throwOnRead = true }
+        val provider = KokoroPronunciationProvider(engine, player, cache)
+
+        assertEquals(PronunciationResult.Played, provider.speakWord("hello"))
+
+        assertEquals(listOf("hello"), engine.texts)
+        assertEquals(1, player.played.size)
+    }
+
+    private class FakeSynthAudioCache : SynthesizedAudioCache {
+        val stored = mutableMapOf<Pair<String, PronunciationAccent>, ByteArray>()
+        var throwOnRead = false
+
+        override suspend fun read(text: String, accent: PronunciationAccent): ByteArray? {
+            if (throwOnRead) throw IllegalStateException("cache read boom")
+            return stored[text to accent]?.copyOf()
+        }
+
+        override suspend fun write(text: String, accent: PronunciationAccent, wav: ByteArray) {
+            stored[text to accent] = wav.copyOf()
+        }
+    }
+
     private class RecordingKokoroEngine(
         private var ready: Boolean = true,
         private val audio: ByteArray = byteArrayOf(1, 2),

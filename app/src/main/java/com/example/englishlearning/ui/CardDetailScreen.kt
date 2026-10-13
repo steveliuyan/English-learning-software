@@ -90,6 +90,7 @@ fun CardDetailScreen(
     onAskAi: (() -> Unit)? = null,
     notes: List<WordAiNote> = emptyList(),
     onSavePersonalNote: ((String) -> Unit)? = null,
+    onDeleteNote: ((String) -> Unit)? = null,
     personalNoteSaveStatus: PersonalNoteSaveStatus = PersonalNoteSaveStatus.Idle,
     modifier: Modifier = Modifier,
 ) {
@@ -131,6 +132,7 @@ fun CardDetailScreen(
             onAskAi = onAskAi,
             notes = notes,
             onSavePersonalNote = onSavePersonalNote,
+            onDeleteNote = onDeleteNote,
             personalNoteSaveStatus = personalNoteSaveStatus,
         )
 
@@ -217,6 +219,7 @@ private fun WordHeroCard(
     onAskAi: (() -> Unit)?,
     notes: List<WordAiNote>,
     onSavePersonalNote: ((String) -> Unit)?,
+    onDeleteNote: ((String) -> Unit)?,
     personalNoteSaveStatus: PersonalNoteSaveStatus,
 ) {
     DetailCard {
@@ -283,13 +286,22 @@ private fun WordHeroCard(
         }
 
         if (notes.isNotEmpty() || onSavePersonalNote != null) {
-            DetailSection(title = "我的笔记", tag = "card_detail_notes") {
-                notes.forEach { note ->
-                    Text(note.answer, style = AppType.Body, modifier = Modifier.testTag("card_detail_note_${note.noteId}"))
-                }
-                onSavePersonalNote?.let { save ->
-                    PersonalNoteEditor(onSave = save, saveStatus = personalNoteSaveStatus)
-                }
+            // 真机反馈：笔记不该内嵌在词卡页里占地方——入口一行，查看/删除/添加都收进弹窗。
+            var showNotesDialog by remember { mutableStateOf(false) }
+            PillButton(
+                label = notesEntryLabel(notes.size),
+                description = "打开我的笔记",
+                onClick = { showNotesDialog = true },
+                modifier = Modifier.testTag("card_detail_notes_entry"),
+            )
+            if (showNotesDialog) {
+                PersonalNotesDialog(
+                    notes = notes,
+                    onSave = onSavePersonalNote,
+                    onDelete = onDeleteNote,
+                    saveStatus = personalNoteSaveStatus,
+                    onDismiss = { showNotesDialog = false },
+                )
             }
         }
 
@@ -370,6 +382,70 @@ private fun PersonalNoteEditor(
         else -> Unit
     }
 }
+
+/**
+ * 我的笔记弹窗：列表 + 逐条删除 + 添加，全部收在这一层；
+ * 词卡页只留一个入口按钮（真机反馈：笔记不应直接铺在单词页面里）。
+ */
+@Composable
+private fun PersonalNotesDialog(
+    notes: List<WordAiNote>,
+    onSave: ((String) -> Unit)?,
+    onDelete: ((String) -> Unit)?,
+    saveStatus: PersonalNoteSaveStatus,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("我的笔记", style = AppType.Title) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (notes.isEmpty()) {
+                    Text(
+                        text = "还没有笔记。可以记下记忆方法、易错点或例句。",
+                        style = AppType.Body,
+                        color = MintTextMuted,
+                        modifier = Modifier.testTag("card_detail_notes_empty"),
+                    )
+                }
+                notes.forEach { note ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("card_detail_note_${note.noteId}"),
+                    ) {
+                        Text(note.answer, style = AppType.Body)
+                        onDelete?.let { remove ->
+                            TextButton(
+                                onClick = { remove(note.noteId) },
+                                modifier = Modifier
+                                    .testTag("card_detail_note_delete_${note.noteId}")
+                                    .semantics { contentDescription = "删除这条笔记" },
+                            ) {
+                                Text("删除", color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+                onSave?.let { save ->
+                    PersonalNoteEditor(onSave = save, saveStatus = saveStatus)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("card_detail_notes_dialog_close")) {
+                Text("关闭", fontWeight = FontWeight.Bold)
+            }
+        },
+    )
+}
+
+/** 笔记入口标签：无笔记时不带括号噪声，有笔记显示条数。 */
+internal fun notesEntryLabel(count: Int): String =
+    if (count <= 0) "我的笔记" else "我的笔记（$count）"
 
 /**
  * 发音按钮：Material 风格喇叭（自绘，24dp）+ 口音标注字（美/英）。

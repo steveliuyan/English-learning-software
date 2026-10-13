@@ -79,4 +79,25 @@ class RoomWordAiNoteRepositoryTest {
 
         assertEquals(listOf("n2", "n3", "n1"), loaded.map { it.noteId })
     }
+
+    @Test
+    fun deleteRemovesOnlyTheOwnedNote() = runTest {
+        repository.save(note("n1", profileId = "default")).getOrThrow()
+        repository.save(note("n2", profileId = "someone-else")).getOrThrow()
+
+        repository.delete("default", "n1").getOrThrow()
+
+        assertEquals(emptyList<String>(), repository.list("default", "apple").getOrThrow().map { it.noteId })
+        // 别人的笔记不能被自己的删除请求带走。
+        assertEquals(listOf("n2"), repository.list("someone-else", "apple").getOrThrow().map { it.noteId })
+    }
+
+    @Test
+    fun deleteCannotReachAnotherProfilesNote() = runTest {
+        repository.save(note("n1", profileId = "someone-else")).getOrThrow()
+
+        repository.delete("default", "n1")
+
+        assertEquals(listOf("n1"), repository.list("someone-else", "apple").getOrThrow().map { it.noteId })
+    }
 }

@@ -185,7 +185,14 @@ object AppModule {
     fun provideKokoroPronunciationProvider(
         engine: KokoroEngine,
         player: AudioPlayer,
-    ): KokoroPronunciationProvider = KokoroPronunciationProvider(engine, player)
+        @ApplicationContext context: Context,
+    ): KokoroPronunciationProvider = KokoroPronunciationProvider(
+        engine,
+        player,
+        com.example.englishlearning.language.infrastructure.FileSynthesizedAudioCache(
+            java.io.File(context.filesDir, "kokoro-audio-cache"),
+        ),
+    )
 
     @Provides @Singleton
     fun providePronunciationProvider(

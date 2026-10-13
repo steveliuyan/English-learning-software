@@ -19,4 +19,8 @@ internal interface InternalWordAiNoteDao {
 
     @Query("DELETE FROM word_ai_notes WHERE wordBookId = :wordBookId")
     suspend fun deleteForWordBook(wordBookId: String)
+
+    // 按 profileId 收窄：删除请求只能带走自己的笔记，跨 profile 一律 0 行。
+    @Query("DELETE FROM word_ai_notes WHERE noteId = :noteId AND profileId = :profileId")
+    suspend fun deleteOne(profileId: String, noteId: String)
 }
