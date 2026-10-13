@@ -410,11 +410,11 @@ class CardDetailScreenTest {
         assertTrue("派生词的英文应加粗", line.isBold(0 until "surfer".length))
     }
 
-    // ---------------------------------------------------------------- 我的笔记弹窗（2026-10-13 真机反馈）
+    // ---------------------------------------------------------------- 我的笔记展示栏（2026-10-13 真机反馈两轮迭代）
 
-    /** 笔记不再内嵌词卡页：入口一行，查看/添加/删除全部收进弹窗。 */
+    /** 笔记直接展示在例句下方的「我的笔记」框里；添加/删除仍在弹窗内完成。 */
     @Test
-    fun notesAreHiddenBehindTheEntryAndManagedInADialog() {
+    fun notesAreDisplayedBelowTheExampleAndManagedInADialog() {
         var deleted: String? = null
         composeRule.setContent {
             CardDetailScreen(
@@ -426,12 +426,19 @@ class CardDetailScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("记住：able + ity").assertDoesNotExist()
-        composeRule.onNodeWithText("我的笔记（1）").assertExists()
-        composeRule.onNodeWithTag("card_detail_notes_entry").performClick()
+        // 不点任何东西就能看到笔记正文——这是用户第二轮反馈的核心诉求。
+        composeRule.onNodeWithText("记住：able + ity").assertExists()
+        composeRule.onNodeWithTag("card_detail_notes_section").assertExists()
+        // 顶部入口按钮已废弃：避免两个入口。
+        composeRule.onNodeWithTag("card_detail_notes_entry").assertDoesNotExist()
+        // 展示栏位于例句框下方（阅读顺序契约）。
+        val exampleTop = composeRule.onNodeWithTag("card_detail_example").fetchSemanticsNode().boundsInRoot.top
+        val notesTop = composeRule.onNodeWithTag("card_detail_notes_section").fetchSemanticsNode().boundsInRoot.top
+        assertTrue("我的笔记展示栏应在例句下方", notesTop > exampleTop)
+
+        composeRule.onNodeWithTag("card_detail_notes_manage").performClick()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("记住：able + ity").assertExists()
         composeRule.onNodeWithTag("card_detail_personal_note_input").assertExists()
         composeRule.onNodeWithTag("card_detail_note_delete_n1").performClick()
         composeRule.waitForIdle()
@@ -439,17 +446,16 @@ class CardDetailScreenTest {
 
         composeRule.onNodeWithTag("card_detail_notes_dialog_close").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("记住：able + ity").assertDoesNotExist()
     }
 
     @Test
-    fun emptyNotesDialogInvitesTheFirstNoteWithoutCountNoise() {
+    fun emptyNotesSectionStillInvitesTheFirstNoteThroughTheDialog() {
         composeRule.setContent {
             CardDetailScreen(card = card(), onBack = {}, notes = emptyList(), onSavePersonalNote = {})
         }
 
-        composeRule.onNodeWithText("我的笔记").assertExists()
-        composeRule.onNodeWithTag("card_detail_notes_entry").performClick()
+        composeRule.onNodeWithTag("card_detail_notes_section").assertExists()
+        composeRule.onNodeWithTag("card_detail_notes_manage").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("card_detail_notes_empty").assertExists()
         composeRule.onNodeWithTag("card_detail_personal_note_input").assertExists()

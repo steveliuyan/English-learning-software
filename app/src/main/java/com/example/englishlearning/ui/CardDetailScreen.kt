@@ -130,10 +130,6 @@ fun CardDetailScreen(
             vocabularyPresent = vocabularyPresent,
             onToggleVocabulary = onToggleVocabulary,
             onAskAi = onAskAi,
-            notes = notes,
-            onSavePersonalNote = onSavePersonalNote,
-            onDeleteNote = onDeleteNote,
-            personalNoteSaveStatus = personalNoteSaveStatus,
         )
 
         // 配图优先用词书包导入的真实文件（`imagePath`）；没有才回退到内置 drawable 映射。
@@ -179,6 +175,45 @@ fun CardDetailScreen(
             }
         }
 
+        // 我的笔记展示栏就在例句框下方（2026-10-13 真机反馈第二轮）：
+        // 打开词就能看到笔记内容；添加/删除仍收在弹窗里，页面不噪。
+        if (notes.isNotEmpty() || onSavePersonalNote != null) {
+            var showNotesDialog by remember { mutableStateOf(false) }
+            DetailSection(title = "我的笔记", tag = "card_detail_notes_section") {
+                if (notes.isEmpty()) {
+                    Text(
+                        text = "还没有笔记。点「添加 / 管理」记第一条。",
+                        style = AppType.Footnote,
+                    )
+                } else {
+                    notes.forEach { note ->
+                        Text(
+                            text = note.answer,
+                            style = AppType.Body,
+                            modifier = Modifier
+                                .testTag("card_detail_note_display_${note.noteId}")
+                                .semantics { contentDescription = "笔记 ${note.answer}" },
+                        )
+                    }
+                }
+                PillButton(
+                    label = "添加 / 管理",
+                    description = "管理我的笔记",
+                    onClick = { showNotesDialog = true },
+                    modifier = Modifier.testTag("card_detail_notes_manage"),
+                )
+            }
+            if (showNotesDialog) {
+                PersonalNotesDialog(
+                    notes = notes,
+                    onSave = onSavePersonalNote,
+                    onDelete = onDeleteNote,
+                    saveStatus = personalNoteSaveStatus,
+                    onDismiss = { showNotesDialog = false },
+                )
+            }
+        }
+
         if (card.derived.isNotEmpty()) {
             DetailSection(title = "派生词", tag = "card_detail_derived") {
                 card.derived.forEach { RelationLine(it.lemma, it.partOfSpeech, it.meaningZh) }
@@ -217,10 +252,6 @@ private fun WordHeroCard(
     vocabularyPresent: Boolean?,
     onToggleVocabulary: (() -> Unit)?,
     onAskAi: (() -> Unit)?,
-    notes: List<WordAiNote>,
-    onSavePersonalNote: ((String) -> Unit)?,
-    onDeleteNote: ((String) -> Unit)?,
-    personalNoteSaveStatus: PersonalNoteSaveStatus,
 ) {
     DetailCard {
         Text(
@@ -283,26 +314,6 @@ private fun WordHeroCard(
                     .testTag("card_detail_meaning")
                     .semantics { contentDescription = "释义 ${card.meaningZh}" },
             )
-        }
-
-        if (notes.isNotEmpty() || onSavePersonalNote != null) {
-            // 真机反馈：笔记不该内嵌在词卡页里占地方——入口一行，查看/删除/添加都收进弹窗。
-            var showNotesDialog by remember { mutableStateOf(false) }
-            PillButton(
-                label = notesEntryLabel(notes.size),
-                description = "打开我的笔记",
-                onClick = { showNotesDialog = true },
-                modifier = Modifier.testTag("card_detail_notes_entry"),
-            )
-            if (showNotesDialog) {
-                PersonalNotesDialog(
-                    notes = notes,
-                    onSave = onSavePersonalNote,
-                    onDelete = onDeleteNote,
-                    saveStatus = personalNoteSaveStatus,
-                    onDismiss = { showNotesDialog = false },
-                )
-            }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -385,7 +396,8 @@ private fun PersonalNoteEditor(
 
 /**
  * 我的笔记弹窗：列表 + 逐条删除 + 添加，全部收在这一层；
- * 词卡页只留一个入口按钮（真机反馈：笔记不应直接铺在单词页面里）。
+ * 由例句下方的展示栏「添加 / 管理」按钮打开（真机反馈两轮：笔记内容要在页面直接可见，
+ * 但增删集中在弹窗，页面不噪）。
  */
 @Composable
 private fun PersonalNotesDialog(
@@ -442,10 +454,6 @@ private fun PersonalNotesDialog(
         },
     )
 }
-
-/** 笔记入口标签：无笔记时不带括号噪声，有笔记显示条数。 */
-internal fun notesEntryLabel(count: Int): String =
-    if (count <= 0) "我的笔记" else "我的笔记（$count）"
 
 /**
  * 发音按钮：Material 风格喇叭（自绘，24dp）+ 口音标注字（美/英）。

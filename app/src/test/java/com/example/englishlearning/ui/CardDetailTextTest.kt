@@ -31,11 +31,4 @@ class CardDetailTextTest {
         assertNull(lemmaRangeIn("Nothing to see here.", "parent"))
         assertNull(lemmaRangeIn("Nothing to see here.", " "))
     }
-
-    @Test
-    fun `notes entry label stays plain without notes and counts with them`() {
-        // 入口按钮只在弹窗化改造后承载「我的笔记（N）」；无笔记时不带括号噪声。
-        assertEquals("我的笔记", notesEntryLabel(0))
-        assertEquals("我的笔记（3）", notesEntryLabel(3))
-    }
 }
