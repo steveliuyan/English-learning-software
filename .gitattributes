@@ -1,0 +1,5 @@
+# Kokoro 生产资源（模型/声音/配置/frontend）是字节敏感的二进制与清单核对对象：
+# KokoroProductionBoundaryTest 直接读取工作树文件并比对 manifest.sha256 里的 size 与哈希。
+# 必须禁止 Git 的换行归一化（core.autocrlf=true 会把其中的 JSON 从 LF 转成 CRLF，
+# 导致 checkout 后的字节与清单不符、门禁在全新克隆上失败）。
+app/src/main/assets/kokoro-production/** -text -diff
