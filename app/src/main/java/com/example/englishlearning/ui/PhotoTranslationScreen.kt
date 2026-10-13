@@ -100,6 +100,8 @@ fun PhotoTranslationScreen(
     onOpenDictionary: (String) -> Unit,
     speakMessage: String?,
     onSpeak: (String) -> Unit,
+    onSave: () -> Unit,
+    onDeleteSaved: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -303,6 +305,19 @@ fun PhotoTranslationScreen(
                 speakMessage = speakMessage,
                 onSpeak = onSpeak,
             )
+            SaveRow(
+                saved = state.lastSavedRecordId != null,
+                saveIssue = state.saveIssue,
+                onSave = onSave,
+            )
+        }
+
+        if (state.history.isNotEmpty()) {
+            SavedHistoryList(
+                records = state.history,
+                lastSavedRecordId = state.lastSavedRecordId,
+                onDelete = onDeleteSaved,
+            )
         }
 
         OfflineModelCard(
@@ -314,7 +329,7 @@ fun PhotoTranslationScreen(
         )
 
         Text(
-            "隐私说明：本机识别（ML Kit）可能向 Google 发送与图片、文字内容无关的性能指标；识别结果默认不保存。",
+            "隐私说明：本机识别（ML Kit）可能向 Google 发送与图片、文字内容无关的性能指标；识别结果与图片默认不保存，只有你点「保存到本机」才会留下记录。",
             style = MaterialTheme.typography.bodySmall,
             color = MintTextMuted,
             modifier = Modifier.testTag("photo_translation_privacy_note"),
@@ -472,6 +487,87 @@ private fun TranslationCompareCard(
                             onClick = { onOpenDictionary(word) },
                             modifier = Modifier.testTag("photo_translation_word_$index"),
                         ) { Text(word, fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 明确的保存动作：只在这一步把原图 + 文本 + 译文写入本机（AC3-05「图片默认不保存」）。 */
+@Composable
+private fun SaveRow(
+    saved: Boolean,
+    saveIssue: com.example.englishlearning.core.error.AppError?,
+    onSave: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedButton(
+            onClick = onSave,
+            enabled = !saved,
+            modifier = Modifier
+                .testTag("photo_translation_save_button")
+                .semantics { contentDescription = if (saved) "已保存到本机" else "保存到本机" },
+            shape = RoundedCornerShape(14.dp),
+        ) { Text(if (saved) "已保存" else "保存到本机", fontWeight = FontWeight.Bold) }
+        when {
+            saved -> Text("原图与译文已存到本机，可在备份中勾选导出。", style = MaterialTheme.typography.bodySmall, color = MintPrimaryDark)
+            saveIssue != null -> Text(
+                "保存失败：本机存储不可用，请重试。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MintPrimaryDark,
+                modifier = Modifier.testTag("photo_translation_save_issue"),
+            )
+        }
+    }
+}
+
+/** 已明确保存的历史：只读列表 + 逐条删除（删除会连带清掉保存的原图）。 */
+@Composable
+private fun SavedHistoryList(
+    records: List<com.example.englishlearning.phototranslation.SavedPhotoTranslation>,
+    lastSavedRecordId: String?,
+    onDelete: (String) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MintSurface),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
+            .testTag("photo_translation_history_card"),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("已保存的翻译", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+            records.take(3).forEach { record ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("photo_translation_history_${record.recordId}"),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        buildString {
+                            append(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+                                .format(java.util.Date(record.createdAtEpochMillis)))
+                            append(" · ")
+                            append(if (record.imageAssetId != null) "含原图" else "仅文本")
+                            if (record.recordId == lastSavedRecordId) append(" · 刚刚保存")
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MintTextMuted,
+                    )
+                    Text(record.sourceText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                    Text(record.translatedText, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, color = MintPrimaryDark)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = { onDelete(record.recordId) },
+                            modifier = Modifier.testTag("photo_translation_history_delete_${record.recordId}"),
+                        ) { Text("删除", color = MintPrimaryDark) }
                     }
                 }
             }

@@ -14,6 +14,8 @@ import com.example.englishlearning.ai.net.AiHttpResult
 import com.example.englishlearning.ai.net.AiHttpTransport
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
+import com.example.englishlearning.core.time.ClockProvider
+import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.language.domain.EnglishOcrModelAssets
 import com.example.englishlearning.language.domain.OcrChainOutcome
 import com.example.englishlearning.language.domain.OcrEngineKind
@@ -26,9 +28,11 @@ import com.example.englishlearning.language.domain.OcrProviderChain
 import com.example.englishlearning.language.domain.OcrRegion
 import com.example.englishlearning.language.domain.OcrResult
 import com.example.englishlearning.language.domain.TemporaryImageWorkspace
+import com.example.englishlearning.phototranslation.PhotoTranslationHistoryRepository
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
 import com.example.englishlearning.phototranslation.PhotoTranslationResult
 import com.example.englishlearning.phototranslation.PhotoTranslationUseCase
+import com.example.englishlearning.phototranslation.SavedPhotoTranslation
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -108,10 +112,46 @@ class PhotoTranslationViewModelTest {
         }
     }
 
+    /** 可记录的历史仓库假件：保存/列表/删除与原图存取全部只记不真写。 */
+    private class FakeHistory : PhotoTranslationHistoryRepository {
+        val saved = mutableListOf<SavedPhotoTranslation>()
+        val storedImages = mutableListOf<String>()
+        val removedImages = mutableListOf<String>()
+        var saveResult: Result<Unit> = Result.success(Unit)
+        var storeResult: Result<String> = Result.success("asset-1")
+        var deleteCalls = mutableListOf<Pair<String, String>>()
+
+        override suspend fun save(record: SavedPhotoTranslation): Result<Unit> {
+            saved += record
+            return saveResult
+        }
+
+        override suspend fun listRecent(profileId: String): Result<List<SavedPhotoTranslation>> =
+            Result.success(saved.filter { it.profileId == profileId }.sortedByDescending { it.createdAtEpochMillis })
+
+        override suspend fun delete(profileId: String, recordId: String): Result<Unit> {
+            deleteCalls += profileId to recordId
+            saved.removeAll { it.recordId == recordId && it.profileId == profileId }
+            return Result.success(Unit)
+        }
+
+        override suspend fun storeImage(bytes: ByteArray): Result<String> {
+            return storeResult.onSuccess { storedImages += it }
+        }
+
+        override suspend fun removeImage(assetId: String): Result<Unit> {
+            removedImages += assetId
+            return Result.success(Unit)
+        }
+    }
+
     private fun viewModel(
         chain: OcrProviderChain,
         transport: RecordingTransport = RecordingTransport(),
         modelAssets: FakeModelAssets = FakeModelAssets(),
+        history: PhotoTranslationHistoryRepository = FakeHistory(),
+        ids: WordNoteIdFactory = WordNoteIdFactory { "record-1" },
+        clock: ClockProvider = FixedClockProvider(java.time.Instant.ofEpochMilli(1_700_000_000_000L), java.time.ZoneOffset.UTC),
     ): PhotoTranslationViewModel {
         Dispatchers.setMain(dispatcher)
         return PhotoTranslationViewModel(
@@ -124,6 +164,9 @@ class PhotoTranslationViewModelTest {
                     transport = transport,
                 ),
             modelAssets = modelAssets,
+            history = history,
+            recordIds = ids,
+            clock = clock,
         )
     }
 
@@ -328,6 +371,9 @@ class PhotoTranslationViewModelTest {
                         transport = RecordingTransport(),
                     ),
                 modelAssets = FakeModelAssets(),
+                history = FakeHistory(),
+                recordIds = WordNoteIdFactory { "record-1" },
+                clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC),
             )
         vm.onImageBytes(byteArrayOf(1))
         testScheduler.advanceUntilIdle()
@@ -413,6 +459,156 @@ class PhotoTranslationViewModelTest {
 
         assertTrue(vm.uiState.value.ocrText == null)
         assertTrue(root.walkBottomUp().filter { it.isFile }.toList().isEmpty())
+    }
+
+    @Test
+    fun explicitSaveStoresImageTextAndTranslation() = runTest(dispatcher) {
+        val history = FakeHistory()
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), history = history)
+        vm.onImageBytes(byteArrayOf(1, 2, 3))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+
+        vm.saveCurrentTranslation("default")
+        testScheduler.advanceUntilIdle()
+
+        val record = history.saved.single()
+        assertEquals("record-1", record.recordId)
+        assertEquals("default", record.profileId)
+        assertEquals("Birds fly.", record.sourceText)
+        assertEquals("鸟儿会飞。", record.translatedText)
+        assertEquals(OcrEngineKind.MlKit, record.engine)
+        assertEquals("asset-1", record.imageAssetId)
+        assertEquals(1_700_000_000_000L, record.createdAtEpochMillis)
+        assertEquals(listOf("asset-1"), history.storedImages)
+        assertEquals(record.recordId, vm.uiState.value.lastSavedRecordId)
+    }
+
+    @Test
+    fun savingWithoutACaptureKeepsNoImage() = runTest(dispatcher) {
+        val history = FakeHistory()
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), history = history)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+        // 采集缓冲只服务「明确保存」；离开页面后一切清零。
+        vm.reset()
+        testScheduler.advanceUntilIdle()
+
+        vm.saveCurrentTranslation("default")
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(history.saved.isEmpty(), "reset 后无译文可存")
+        assertTrue(history.storedImages.isEmpty())
+    }
+
+    @Test
+    fun editedTextWithoutRecognitionIsStillSavableAndImageless() = runTest(dispatcher) {
+        val history = FakeHistory()
+        // 识别失败：没有 engine、没有可存原图缓冲之外语义，但用户手动编辑文本后翻译成功。
+        val chain = OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, OcrOutcome.RecognitionFailed("blurry"))))
+        val vm = viewModel(chain, history = history)
+        vm.onImageBytes(byteArrayOf(7))
+        testScheduler.advanceUntilIdle()
+
+        vm.onOcrTextEdited("Birds fly.")
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+
+        vm.saveCurrentTranslation("default")
+        testScheduler.advanceUntilIdle()
+
+        val record = history.saved.single()
+        assertNull(record.engine)
+        assertEquals("asset-1", record.imageAssetId, "识别失败的图片仍随明确保存留存")
+    }
+
+    @Test
+    fun saveFailureReportsTheIssueAndKeepsStateUsable() = runTest(dispatcher) {
+        val history =
+            FakeHistory().apply {
+                saveResult = Result.failure(com.example.englishlearning.core.storage.AppErrorException(com.example.englishlearning.core.error.AppError.StorageUnavailable))
+            }
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), history = history)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+
+        vm.saveCurrentTranslation("default")
+        testScheduler.advanceUntilIdle()
+
+        assertNull(vm.uiState.value.lastSavedRecordId)
+        assertIs(vm.uiState.value.saveIssue, com.example.englishlearning.core.error.AppError::class)
+        assertEquals("Birds fly." to "鸟儿会飞。", vm.uiState.value.translation, "保存失败不得清掉已有结果")
+    }
+
+    @Test
+    fun failedImageStorageAbortsTheSave() = runTest(dispatcher) {
+        val history =
+            FakeHistory().apply {
+                storeResult = Result.failure(com.example.englishlearning.core.storage.AppErrorException(com.example.englishlearning.core.error.AppError.StorageUnavailable))
+            }
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), history = history)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+
+        vm.saveCurrentTranslation("default")
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(history.saved.isEmpty(), "原图写入失败时不允许静默存成无图记录")
+        assertNull(vm.uiState.value.lastSavedRecordId)
+    }
+
+    @Test
+    fun saveIsNotPossibleBeforeTranslationSucceeds() = runTest(dispatcher) {
+        val history = FakeHistory()
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), history = history)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+
+        vm.saveCurrentTranslation("default")
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(history.saved.isEmpty())
+        assertTrue(history.storedImages.isEmpty(), "未确认翻译前谈不上保存，更不写图")
+    }
+
+    @Test
+    fun refreshHistoryListsRecordsAndDeleteRemovesOne() = runTest(dispatcher) {
+        val history = FakeHistory()
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), history = history)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+        vm.saveCurrentTranslation("default")
+        testScheduler.advanceUntilIdle()
+
+        vm.refreshHistory("default")
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.history.size)
+
+        vm.deleteSaved("default", "record-1")
+        testScheduler.advanceUntilIdle()
+        assertEquals(listOf("default" to "record-1"), history.deleteCalls)
+        assertTrue(vm.uiState.value.history.isEmpty())
     }
 
     private fun assertIs(

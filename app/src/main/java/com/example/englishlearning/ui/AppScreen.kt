@@ -908,6 +908,7 @@ fun AppScreen(
                 var photoSpeakMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
                 var photoSpeakRequest by remember { mutableStateOf(0L) }
                 var photoSpeakJob by remember { mutableStateOf<Job?>(null) }
+                LaunchedEffect(state.profile.id) { photoTranslationViewModel?.refreshHistory(state.profile.id) }
                 PhotoTranslationScreen(
                     state = photoState,
                     onImageBytes = { bytes -> photoTranslationViewModel?.onImageBytes(bytes) },
@@ -917,6 +918,8 @@ fun AppScreen(
                     onRefreshModelStatus = { photoTranslationViewModel?.refreshModelStatus() },
                     onInstallModel = { photoTranslationViewModel?.installModel() },
                     onUninstallModel = { photoTranslationViewModel?.uninstallModel() },
+                    onSave = { photoTranslationViewModel?.saveCurrentTranslation(state.profile.id) },
+                    onDeleteSaved = { recordId -> photoTranslationViewModel?.deleteSaved(state.profile.id, recordId) },
                     onOpenDictionary = { tapped ->
                         selectedSearchCard = null
                         searchPronunciationMessage = PronunciationStatus.Idle

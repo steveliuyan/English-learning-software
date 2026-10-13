@@ -3,6 +3,9 @@ package com.example.englishlearning.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.core.error.AppError
+import com.example.englishlearning.core.storage.AppErrorException
+import com.example.englishlearning.core.time.ClockProvider
 import com.example.englishlearning.language.domain.EnglishOcrModelAssets
 import com.example.englishlearning.language.domain.OcrChainOutcome
 import com.example.englishlearning.language.domain.OcrEngineKind
@@ -14,6 +17,9 @@ import com.example.englishlearning.language.domain.TemporaryImageWorkspace
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
 import com.example.englishlearning.phototranslation.PhotoTranslationResult
 import com.example.englishlearning.phototranslation.PhotoTranslationUseCase
+import com.example.englishlearning.phototranslation.PhotoTranslationHistoryRepository
+import com.example.englishlearning.phototranslation.RoomPhotoTranslationHistoryRepository
+import com.example.englishlearning.phototranslation.SavedPhotoTranslation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
@@ -51,6 +57,10 @@ data class PhotoTranslationUiState(
     val modelStatus: OcrModelAssetStatus? = null,
     val modelInstallProgress: Float? = null,
     val modelIssue: OcrModelAssetInstallOutcome? = null,
+    /** 已明确保存的历史（按创建时间降序）。 */
+    val history: List<SavedPhotoTranslation> = emptyList(),
+    val lastSavedRecordId: String? = null,
+    val saveIssue: AppError? = null,
 )
 
 @HiltViewModel
@@ -59,6 +69,9 @@ class PhotoTranslationViewModel @Inject constructor(
     private val workspace: TemporaryImageWorkspace,
     private val translate: PhotoTranslationUseCase,
     private val modelAssets: EnglishOcrModelAssets,
+    private val history: PhotoTranslationHistoryRepository,
+    private val recordIds: WordNoteIdFactory,
+    private val clock: ClockProvider,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PhotoTranslationUiState())
     val uiState: StateFlow<PhotoTranslationUiState> = _uiState
@@ -66,11 +79,19 @@ class PhotoTranslationViewModel @Inject constructor(
     private var captureJob: Job? = null
     private var translateJob: Job? = null
     private var modelJob: Job? = null
+    private var historyJob: Job? = null
+
+    /**
+     * 本次采集的原图字节只留在内存，唯一出口是用户「明确保存」（AC3-05）；
+     * reset/离开页面即释放，磁盘上从头到尾只有临时区，且任何出口零残留。
+     */
+    private var captureBytes: ByteArray? = null
 
     fun onImageBytes(
         bytes: ByteArray,
     ) {
         captureJob?.cancel()
+        captureBytes = bytes.copyOf()
         _uiState.update {
             it.copy(
                 busy = true,
@@ -81,6 +102,8 @@ class PhotoTranslationViewModel @Inject constructor(
                 translation = null,
                 translationIssue = null,
                 pendingConfirmationHost = null,
+                lastSavedRecordId = null,
+                saveIssue = null,
             )
         }
         captureJob =
@@ -162,8 +185,90 @@ class PhotoTranslationViewModel @Inject constructor(
         captureJob?.cancel()
         translateJob?.cancel()
         modelJob?.cancel()
+        historyJob?.cancel()
+        captureBytes = null
         workspace.purgeAll()
         _uiState.value = PhotoTranslationUiState()
+    }
+
+    /**
+     * 用户明确保存才写原图 +  OCR 文本 + 译文（AC3-05）。没有成功译文时是空操作；
+     * 原图写入失败失败关闭（不静默存成无图记录），记录落库失败则回滚已写入的资产。
+     */
+    fun saveCurrentTranslation(
+        profileId: String,
+    ) {
+        val state = _uiState.value
+        val translation = state.translation ?: return
+        if (state.lastSavedRecordId != null) return
+        historyJob?.cancel()
+        historyJob =
+            viewModelScope.launch {
+                try {
+                    val bytes = captureBytes
+                    val assetId: String? =
+                        if (bytes == null) {
+                            null
+                        } else {
+                            history.storeImage(bytes).getOrElse { failure ->
+                                _uiState.update { it.copy(saveIssue = storageError(failure)) }
+                                return@launch
+                            }
+                        }
+                    val record =
+                        SavedPhotoTranslation(
+                            recordId = recordIds.newId(),
+                            profileId = profileId,
+                            sourceText = translation.first,
+                            translatedText = translation.second,
+                            engine = state.engine,
+                            imageAssetId = assetId,
+                            createdAtEpochMillis = clock.instant().toEpochMilli(),
+                        )
+                    history.save(record)
+                        .onSuccess {
+                            _uiState.update {
+                                it.copy(
+                                    lastSavedRecordId = record.recordId,
+                                    saveIssue = null,
+                                    history = (listOf(record) + it.history).take(RoomPhotoTranslationHistoryRepository.LIST_LIMIT),
+                                )
+                            }
+                        }
+                        .onFailure { failure ->
+                            if (assetId != null) history.removeImage(assetId)
+                            _uiState.update { it.copy(saveIssue = storageError(failure)) }
+                        }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Throwable) {
+                    _uiState.update { it.copy(saveIssue = AppError.StorageUnavailable) }
+                }
+            }
+    }
+
+    fun refreshHistory(
+        profileId: String,
+    ) {
+        historyJob?.cancel()
+        historyJob =
+            viewModelScope.launch {
+                val records = history.listRecent(profileId).getOrNull() ?: return@launch
+                _uiState.update { it.copy(history = records) }
+            }
+    }
+
+    fun deleteSaved(
+        profileId: String,
+        recordId: String,
+    ) {
+        historyJob?.cancel()
+        historyJob =
+            viewModelScope.launch {
+                history.delete(profileId, recordId)
+                val records = history.listRecent(profileId).getOrNull() ?: return@launch
+                _uiState.update { it.copy(history = records) }
+            }
     }
 
     fun refreshModelStatus() {
@@ -279,6 +384,10 @@ class PhotoTranslationViewModel @Inject constructor(
                 }
             }
     }
+
+    private fun storageError(
+        failure: Throwable,
+    ): AppError = (failure as? AppErrorException)?.appError ?: AppError.StorageUnavailable
 
     private fun lowConfidenceLines(
         outcome: OcrChainOutcome.Recognized,
