@@ -536,3 +536,73 @@
 - NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
 - 替代方案: scrypt（BC 同库提供，决策文档记为未来算法串候选）、Android Keystore2 Argon2（仅 API 31+，违反 minSdk 26）
 - 商业分发结论: 可商业分发，保留 BC 许可文本
+
+## androidx-biometric
+- 名称: AndroidX Biometric (androidx.biometric:biometric)
+- 版本: 1.1.0
+- 许可证: Apache-2.0
+- 用途: F4-04 旧设备配对签发与导出前的用户认证（BIOMETRIC_STRONG/DEVICE_CREDENTIAL 兼容矩阵，docs/decisions/2026-10-13-f4-04-crypto-and-pairing-design.md §3.3/D1）；仅触发系统认证对话框，不处理学习数据
+- 数据流: 本地系统认证对话框；认证结果仅用于门控本地 Keystore 签名，不传输网络
+- NOTICE 位置: 本文件
+- 替代方案: 直接使用 android.hardware.biometrics 平台 API（兼容矩阵需自维护）
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-camera-core
+- 名称: AndroidX CameraX (androidx.camera:camera-core/camera-camera2/camera-lifecycle/camera-view 及传递依赖 camera-video 等，以 gradle.lockfile 为准)
+- 版本: 1.6.1
+- 许可证: Apache-2.0
+- 用途: F4-04 新设备实时扫码取景（无 GMS 取景方案，docs/decisions/2026-10-13-f4-04-crypto-and-pairing-design.md §7/D2）；仅取景解码，不拍摄存储任何照片
+- 数据流: 相机帧仅在本机内存中交由本地二维码解码；不保存、不传输
+- NOTICE 位置: 本文件
+- 替代方案: ML Kit Barcode/Google Code Scanner（引入 GMS 依赖，与本项目"无 GMS 降级"方向冲突）
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## zxing
+- 名称: ZXing Core (com.google.zxing:core)
+- 版本: 3.5.3
+- 许可证: Apache-2.0
+- 用途: F4-04 配对二维码本地解码（维护模式为已知妥协，理由见决策文档 §7/D1）；仅在本机内存中解码相机帧内的配对码
+- 数据流: 本地内存解码；不保存、不传输
+- NOTICE 位置: 本文件
+- 替代方案: ML Kit Barcode（GMS 依赖）、自研解码器（不可靠）
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-camera-camera2
+- 名称: AndroidX CameraX camera2 后端 (androidx.camera:camera-camera2)
+- 版本: 1.6.1
+- 许可证: Apache-2.0
+- 用途: F4-04 实时扫码取景的 CameraX camera2 后端实现（同 androidx-camera-core 条目）
+- 数据流: 本地相机帧，不保存、不传输
+- NOTICE 位置: 本文件
+- 替代方案: 无独立替代（CameraX 必需后端）
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-camera-lifecycle
+- 名称: AndroidX CameraX lifecycle 绑定 (androidx.camera:camera-lifecycle)
+- 版本: 1.6.1
+- 许可证: Apache-2.0
+- 用途: F4-04 实时扫码取景的生命周期绑定（同 androidx-camera-core 条目）
+- 数据流: 本地相机帧，不保存、不传输
+- NOTICE 位置: 本文件
+- 替代方案: 无独立替代（CameraX 必需组件）
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## androidx-camera-view
+- 名称: AndroidX CameraX PreviewView (androidx.camera:camera-view)
+- 版本: 1.6.1
+- 许可证: Apache-2.0
+- 用途: F4-04 扫码取景控件（同 androidx-camera-core 条目）
+- 数据流: 本地相机帧，不保存、不传输
+- NOTICE 位置: 本文件
+- 替代方案: 自绘 TextureView 绑定（维护成本高）
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## zxing-core
+- 名称: ZXing Core (com.google.zxing:core)
+- 版本: 3.5.3
+- 许可证: Apache-2.0
+- 用途: F4-04 配对二维码本地解码（同 zxing 条目）
+- 数据流: 本地内存解码；不保存、不传输
+- NOTICE 位置: 本文件
+- 替代方案: ML Kit Barcode（GMS 依赖）
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
