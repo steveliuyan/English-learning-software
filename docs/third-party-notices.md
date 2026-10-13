@@ -516,3 +516,23 @@
 - NOTICE 位置: 本条目；随包 Apache-2.0 许可文本由 AAR 内嵌 NOTICE 覆盖
 - 替代方案: AlarmManager（非精确 setAndAllowWhileIdle 亦可，但 WorkManager 提供重启恢复与约束）；不提供提醒
 - 商业分发结论: Apache-2.0，允许商业分发
+
+## google-tink
+- 名称: Google Tink Java (com.google.crypto.tink:tink 及传递依赖 gson/protobuf-javalite 等，以 gradle.lockfile 为准)
+- 版本: 1.21.0
+- 许可证: Apache-2.0
+- 用途: F4-04 备份包可选加密的 AES-256-GCM AEAD 原语（docs/decisions/2026-10-13-f4-04-crypto-and-pairing-design.md C4）；仅在设备内加解密用户自选导出的备份字节，不发起任何网络请求
+- 数据流: 本地内存中处理用户备份数据；密钥仅来自本地 Argon2id 派生与随机 DEK，不经网络
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: 平台 JCE AES/GCM 直用（误用面更大）、Hans Provider（KDF 面缺失）、XChaCha20-Poly1305 无 Tink Java 实现
+- 商业分发结论: 可商业分发，保留 Apache-2.0 许可证与 NOTICE
+
+## bouncy-castle-bcprov
+- 名称: Bouncy Castle bcprov-jdk18on (org.bouncycastle:bcprov-jdk18on)
+- 版本: 1.81
+- 许可证: BC 许可证（MIT/X11 类宽松许可，LICENSE 文本随库分发）
+- 用途: F4-04 Argon2id 内存硬 KDF（lightweight API Argon2BytesGenerator，不注册为 JCE Provider）（决策文档 C3）；仅本地密码派生，不联网
+- 数据流: 仅在设备内存处理用户备份密码派生输入（密码 CharArray 即用即清），不传输任何数据
+- NOTICE 位置: APK 的 META-INF/NOTICE 与本文件
+- 替代方案: scrypt（BC 同库提供，决策文档记为未来算法串候选）、Android Keystore2 Argon2（仅 API 31+，违反 minSdk 26）
+- 商业分发结论: 可商业分发，保留 BC 许可文本

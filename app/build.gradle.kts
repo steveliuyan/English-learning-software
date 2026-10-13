@@ -65,9 +65,16 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.androidx.security.crypto)
+    // security-crypto is kept for its registered ledger role, but its bundled legacy
+    // tink-android 1.8.0 duplicates classes from com.google.crypto.tink:tink 1.21.0 used
+    // by F4-04; exclude the old copy so a single maintained Tink version is on the classpath.
+    implementation(libs.androidx.security.crypto) {
+        exclude(group = "com.google.crypto.tink", module = "tink-android")
+    }
     implementation(libs.onnxruntime.android)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.tink)
+    implementation(libs.bouncy.castle.bcprov)
     implementation(libs.hilt.android)
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.compiler)
