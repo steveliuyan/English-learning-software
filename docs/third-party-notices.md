@@ -517,7 +517,7 @@
 - 替代方案: AlarmManager（非精确 setAndAllowWhileIdle 亦可，但 WorkManager 提供重启恢复与约束）；不提供提醒
 - 商业分发结论: Apache-2.0，允许商业分发
 
-## google-tink
+## tink
 - 名称: Google Tink Java (com.google.crypto.tink:tink 及传递依赖 gson/protobuf-javalite 等，以 gradle.lockfile 为准)
 - 版本: 1.21.0
 - 许可证: Apache-2.0
