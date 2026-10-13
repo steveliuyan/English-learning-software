@@ -81,6 +81,10 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.zxing.core)
+    // F3-03 photo OCR: ML Kit bundled is the primary local engine, Tesseract4Android the no-GMS fallback
+    // (approved in docs/decisions/2026-10-13-f3-03-ocr-provider-licenses.md option A).
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.tesseract4android)
     implementation(libs.hilt.android)
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.compiler)

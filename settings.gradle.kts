@@ -16,6 +16,8 @@ dependencyResolutionManagement {
         maven { url = uri("https://maven.aliyun.com/repository/public") }
         google()
         mavenCentral()
+        // F3-03: Tesseract4Android is only distributed via JitPack (docs/decisions/2026-10-13-f3-03-ocr-provider-licenses.md §5 T3)
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

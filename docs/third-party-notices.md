@@ -644,6 +644,16 @@
 - 用途: ML Kit Vision API 公共层
 - 数据流: 同 mlkit-text-recognition 条目
 - NOTICE 位置: 本文件
+- 替代方案: 不可独立替换
+
+## mlkit-vision-interfaces
+- 名称: ML Kit Vision Interfaces (com.google.mlkit:vision-interfaces)
+- 版本: 16.3.0（传递依赖，2026-10-13 由 gradle.lockfile 锁定核验后补登记）
+- 许可证: ML Kit Terms of Service
+- 用途: ML Kit Vision 输入输出接口定义层
+- 数据流: 同 mlkit-text-recognition 条目
+- NOTICE 位置: 本文件
+- 替代方案: 不可独立替换
 - 替代方案: 无独立替代（ML Kit 必需）
 - 商业分发结论: 同 mlkit-text-recognition 条目
 
