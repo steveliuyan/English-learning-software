@@ -33,6 +33,7 @@ private class FakeBackupDao : InternalBackupSourceDao {
     override suspend fun allReadingPreferences() = emptyList<com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity>()
     override suspend fun allSearchHistory() = emptyList<com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEntity>()
     override suspend fun allWordAiNotes() = emptyList<com.example.englishlearning.core.storage.entity.WordAiNoteEntity>()
+    override suspend fun allPhotoTranslations() = emptyList<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>()
     override suspend fun allAssetRecords() = assets
 }
 

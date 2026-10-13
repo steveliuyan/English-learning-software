@@ -73,5 +73,8 @@ internal interface InternalBackupRestoreDao {
     suspend fun insertWordAiNotes(rows: List<WordAiNoteEntity>)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPhotoTranslations(rows: List<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAssetRecords(rows: List<AssetRecordEntity>)
 }

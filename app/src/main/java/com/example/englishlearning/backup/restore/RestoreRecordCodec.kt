@@ -44,6 +44,7 @@ internal object RestoreRecordCodec {
         val readingPreferences: List<ReadingPreferenceRecord>,
         val searchHistory: List<SearchHistoryRecord>,
         val wordAiNotes: List<WordAiNoteRecord>,
+        val photoTranslations: List<com.example.englishlearning.backup.domain.PhotoTranslationRecordDto>,
         val assetRecords: List<AssetRecordDto>,
     ) {
         /** Plaintext record entries keyed by package path (`records/<type>/<id>.json`). */
@@ -96,6 +97,7 @@ internal object RestoreRecordCodec {
                     readingPreferences = decodeList<ReadingPreferenceRecord>(buckets["reading-preferences"]),
                     searchHistory = decodeList<SearchHistoryRecord>(buckets["search-history"]),
                     wordAiNotes = decodeList<WordAiNoteRecord>(buckets["word-ai-notes"]),
+                    photoTranslations = decodeList<com.example.englishlearning.backup.domain.PhotoTranslationRecordDto>(buckets["photo-translation-records"]),
                     assetRecords = decodeList<AssetRecordDto>(buckets["asset-records"]),
                 ),
             )
@@ -154,6 +156,7 @@ internal object RestoreContentValidator {
                 rows.searchHistory.all { it.profileId in profiles && (it.representativeWordBookId == null || it.representativeWordBookId in wordBooks) }
             },
             references { rows.wordAiNotes.all { it.profileId in profiles && it.wordBookId in wordBooks } },
+            references { rows.photoTranslations.all { it.profileId in profiles } },
         )
         return if (entityChecks.all { it }) Result.Valid else Result.Invalid(ContentFailure.EntityReference)
     }

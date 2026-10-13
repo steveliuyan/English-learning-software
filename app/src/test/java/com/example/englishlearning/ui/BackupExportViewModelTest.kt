@@ -77,6 +77,7 @@ class BackupExportViewModelTest {
         readingPreferences = emptyList(),
         searchHistory = emptyList(),
         wordAiNotes = emptyList(),
+        photoTranslations = emptyList(),
         assetRecords = listOf(AssetRecordEntity("asset-1", "aa", "assets/asset-1", 1L, 1L)),
     )
 

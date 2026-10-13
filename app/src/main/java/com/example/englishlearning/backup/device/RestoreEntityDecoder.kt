@@ -63,6 +63,7 @@ class RestoreEntityDecoder @Inject constructor() {
         val readingPreferences: List<ReadingPreferenceEntity>,
         val searchHistory: List<VocabularySearchHistoryEntity>,
         val wordAiNotes: List<WordAiNoteEntity>,
+        val photoTranslations: List<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>,
         val assetRecords: List<AssetRecordEntity>,
     )
 
@@ -137,6 +138,13 @@ class RestoreEntityDecoder @Inject constructor() {
             wordAiNotes = records("word-ai-notes").map {
                 json.decodeFromString<WordAiNoteRecord>(text(it)).let { d ->
                     WordAiNoteEntity(d.noteId, d.profileId, d.wordBookId, d.cardId, d.lemma, d.kind, d.answer, d.createdAtEpochMillis)
+                }
+            },
+            photoTranslations = records("photo-translation-records").map {
+                json.decodeFromString<com.example.englishlearning.backup.domain.PhotoTranslationRecordDto>(text(it)).let { d ->
+                    com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity(
+                        d.recordId, d.profileId, d.sourceText, d.translatedText, d.engine, d.imageAssetId, d.createdAtEpochMillis,
+                    )
                 }
             },
             assetRecords = records("asset-records").map {

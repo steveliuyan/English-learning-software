@@ -44,6 +44,7 @@ class BackupSnapshotBuilderTest {
         readingPreferences = emptyList(),
         searchHistory = emptyList(),
         wordAiNotes = emptyList(),
+        photoTranslations = emptyList(),
         assetRecords = emptyList(),
     )
 
@@ -69,6 +70,11 @@ class BackupSnapshotBuilderTest {
         readingPreferences = listOf(ReadingPreferenceEntity("p-1", "story", null, "bilingual", true)),
         searchHistory = listOf(VocabularySearchHistoryEntity("p-1", "hello world", "Hello World", 3, 60L, 65L, "wb-1", "card-1")),
         wordAiNotes = listOf(WordAiNoteEntity("note-1", "p-1", "wb-1", "card-1", "hello", "definition", "answer text", 50L)),
+        photoTranslations = listOf(
+            com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity(
+                "rec-1", "p-1", "Birds fly.", "鸟儿会飞。", "MlKit", "a-1", 45L,
+            ),
+        ),
         assetRecords = listOf(AssetRecordEntity("a-1", "cafe", "assets/a-1", 9L, 40L)),
     )
 
@@ -93,12 +99,13 @@ class BackupSnapshotBuilderTest {
             "records/reading-preferences/p-1.json",
             "records/today-plans/plan-1.json",
             "records/word-ai-notes/note-1.json",
+            "records/photo-translation-records/rec-1.json",
             "records/word-books/wb-1.json",
         )
         val compositeTypes = setOf("migration-audits", "search-history", "today-plan-tasks", "vocabulary-entries")
         val paths = records.map { it.path }.toSet()
 
-        assertEquals(16, records.size)
+        assertEquals(17, records.size)
         singleKeyPaths.forEach { assertTrue(it in paths, "missing $it") }
         compositeTypes.forEach { type ->
             val hashed = paths.filter { it.startsWith("records/$type/") }
@@ -182,6 +189,13 @@ class BackupSnapshotBuilderTest {
             keysOf("search-history"),
         )
         assertEquals(setOf("schemaVersion", "noteId", "profileId", "wordBookId", "cardId", "lemma", "kind", "answer", "createdAtEpochMillis"), keysOf("word-ai-notes"))
+        assertEquals(
+            setOf(
+                "schemaVersion", "recordId", "profileId", "sourceText", "translatedText", "engine",
+                "imageAssetId", "createdAtEpochMillis",
+            ),
+            keysOf("photo-translation-records"),
+        )
         assertEquals(setOf("schemaVersion", "id", "sha256", "byteSize", "createdAt"), keysOf("asset-records"))
     }
 
@@ -193,6 +207,34 @@ class BackupSnapshotBuilderTest {
 
         assertFalse(asset.jsonText().contains("relativePath"))
         assertFalse(asset.jsonText().contains("assets/a-1"))
+    }
+
+    @Test
+    fun `photo translation payload references only the asset id and never a private location`() {
+        val records = BackupSnapshotBuilder.buildRecords(sampleRows, includeMediaAssets = true)
+
+        val photo = records.first { it.path.startsWith("records/photo-translation-records/") }
+
+        assertTrue(photo.jsonText().contains("\"imageAssetId\":\"a-1\""))
+        assertFalse(photo.jsonText().contains("relativePath"))
+        assertFalse(photo.jsonText().contains("assets/"))
+    }
+
+    @Test
+    fun `a photo record saved without an image encodes imageAssetId as explicit null`() {
+        val rowsWithoutImage = sampleRows.copy(
+            photoTranslations = listOf(
+                com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity(
+                    "rec-2", "p-1", "Manual.", "手动。", "None", null, 45L,
+                ),
+            ),
+        )
+
+        val records = BackupSnapshotBuilder.buildRecords(rowsWithoutImage, includeMediaAssets = true)
+        val photo = records.first { it.path.startsWith("records/photo-translation-records/") }
+
+        assertTrue(photo.jsonText().contains("\"imageAssetId\":null"))
+        assertTrue(photo.jsonText().contains("\"engine\":\"None\""))
     }
 
     @Test
@@ -210,7 +252,8 @@ class BackupSnapshotBuilderTest {
         val withoutMedia = BackupSnapshotBuilder.buildRecords(sampleRows, includeMediaAssets = false)
 
         assertTrue(withoutMedia.none { it.path.contains("asset-records") })
-        assertEquals(15, withoutMedia.size)
+        assertTrue(withoutMedia.any { it.path.contains("photo-translation-records") }, "文本记录不受媒体开关影响")
+        assertEquals(16, withoutMedia.size)
     }
 
     @Test

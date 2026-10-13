@@ -56,6 +56,7 @@ data class BackupSourceRows(
     val readingPreferences: List<ReadingPreferenceEntity>,
     val searchHistory: List<VocabularySearchHistoryEntity>,
     val wordAiNotes: List<WordAiNoteEntity>,
+    val photoTranslations: List<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>,
     val assetRecords: List<AssetRecordEntity>,
 )
 
@@ -81,6 +82,7 @@ object BackupSnapshotBuilder {
         rows.readingPreferences.forEach { records += record("reading-preferences", singleId(it.profileId), ReadingPreferenceRecord(it)) }
         rows.searchHistory.forEach { records += record("search-history", compositeId(it.profileId, it.normalizedQuery), SearchHistoryRecord(it)) }
         rows.wordAiNotes.forEach { records += record("word-ai-notes", singleId(it.noteId), WordAiNoteRecord(it)) }
+        rows.photoTranslations.forEach { records += record("photo-translation-records", singleId(it.recordId), PhotoTranslationRecordDto(it)) }
         if (includeMediaAssets) {
             rows.assetRecords.forEach { records += record("asset-records", singleId(it.id), AssetRecordDto(it)) }
         }
@@ -353,6 +355,28 @@ internal data class WordAiNoteRecord(
     constructor(entity: WordAiNoteEntity) : this(
         noteId = entity.noteId, profileId = entity.profileId, wordBookId = entity.wordBookId, cardId = entity.cardId,
         lemma = entity.lemma, kind = entity.kind, answer = entity.answer, createdAtEpochMillis = entity.createdAtEpochMillis,
+    )
+}
+
+/**
+ * 拍照翻译记录的备份 DTO：只带 recordId/profileId/双语文本/引擎枚举名/原图资产 id 引用与时间。
+ * 原图字节本身走 `resources/<assetId>`（媒体开关），这里不出现任何设备路径。
+ */
+@Serializable
+internal data class PhotoTranslationRecordDto(
+    val schemaVersion: Int = 1,
+    val recordId: String,
+    val profileId: String,
+    val sourceText: String,
+    val translatedText: String,
+    val engine: String,
+    val imageAssetId: String?,
+    val createdAtEpochMillis: Long,
+) {
+    constructor(entity: com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity) : this(
+        recordId = entity.recordId, profileId = entity.profileId, sourceText = entity.sourceText,
+        translatedText = entity.translatedText, engine = entity.engine, imageAssetId = entity.imageAssetId,
+        createdAtEpochMillis = entity.createdAtEpochMillis,
     )
 }
 

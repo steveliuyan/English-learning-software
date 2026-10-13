@@ -50,6 +50,7 @@ class BackupExportMustNotIncludeCredentialsTest {
         com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity::class,
         com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEntity::class,
         com.example.englishlearning.core.storage.entity.WordAiNoteEntity::class,
+        com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity::class,
         AssetRecordEntity::class,
     )
 
@@ -86,6 +87,11 @@ class BackupExportMustNotIncludeCredentialsTest {
             readingPreferences = emptyList(),
             searchHistory = emptyList(),
             wordAiNotes = emptyList(),
+            photoTranslations = listOf(
+                com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity(
+                    "rec-1", "p-1", "Birds fly.", "鸟儿会飞。", "MlKit", "asset-1", 5L,
+                ),
+            ),
             assetRecords = listOf(AssetRecordEntity("asset-1", "aa", "assets/asset-1", 1L, 1L)),
         )
     }

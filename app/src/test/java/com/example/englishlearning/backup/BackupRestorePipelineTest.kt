@@ -71,6 +71,11 @@ class BackupRestorePipelineTest {
         readingPreferences = emptyList(),
         searchHistory = emptyList(),
         wordAiNotes = emptyList(),
+        photoTranslations = listOf(
+            com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity(
+                "rec-1", "p-1", "Birds fly.", "鸟儿会飞。", "MlKit", "asset-1", 1L,
+            ),
+        ),
         assetRecords = listOf(
             AssetRecordEntity("asset-1", resourceBytes.sha256(), "assets/asset-1", resourceBytes.size.toLong(), 1L),
         ),
@@ -258,7 +263,7 @@ class BackupRestorePipelineTest {
         val session = staged(protectedWrite(), workspace = workspace).first
 
         assertEquals("session-1", session.sessionId)
-        assertEquals(8, session.recordCount)
+        assertEquals(9, session.recordCount)
         assertEquals(1, session.mediaCount)
         assertEquals(issuedAt, session.pairingIssuedAtEpochSeconds)
         assertTrue(workspace.exists("session-1"))
@@ -393,6 +398,25 @@ class BackupRestorePipelineTest {
                 it.path,
                 if (it.type == "today-plan-tasks") {
                     it.jsonText().replace("\"planId\":\"plan-1\"", "\"planId\":\"plan-x\"").toByteArray(Charsets.UTF_8)
+                } else {
+                    it.jsonBytes
+                },
+            )
+        } + ProtectedZipBackupPackageWriter.Entry("resources/asset-1", resourceBytes)
+
+        val outcome = coordinator().prepare(protectedWrite(entriesOverride = entries), scannedCode(), null)
+
+        assertEquals(RestoreFailure.EntityReferenceInvalid, assertIs<RestoreOutcome.Failed>(outcome).reason)
+    }
+
+    @Test
+    fun `photo translation record referencing a missing profile is an entity reference failure`() {
+        val records = BackupSnapshotBuilder.buildRecords(rows, includeMediaAssets = true)
+        val entries = records.map {
+            ProtectedZipBackupPackageWriter.Entry(
+                it.path,
+                if (it.type == "photo-translation-records") {
+                    it.jsonText().replace("\"profileId\":\"p-1\"", "\"profileId\":\"ghost\"").toByteArray(Charsets.UTF_8)
                 } else {
                     it.jsonBytes
                 },

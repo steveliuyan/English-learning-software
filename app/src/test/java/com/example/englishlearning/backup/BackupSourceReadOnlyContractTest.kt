@@ -36,7 +36,7 @@ class BackupSourceReadOnlyContractTest {
         val daoSource = projectFile("src/main/java/com/example/englishlearning/backup/infrastructure/InternalBackupSourceDao.kt").readText()
 
         val queries = Regex("@Query\\(\"([^\"]+)\"\\)").findAll(daoSource).map { it.groupValues[1] }.toList()
-        assertEquals(16, queries.size, "one SELECT per whitelisted table")
+        assertEquals(17, queries.size, "one SELECT per whitelisted table")
         queries.forEach { query ->
             assertTrue(query.trim().startsWith("SELECT", ignoreCase = false), "query must be SELECT: $query")
         }
@@ -47,7 +47,7 @@ class BackupSourceReadOnlyContractTest {
                 "local_profiles", "learning_profiles", "learning_settings", "today_plans", "today_plan_tasks",
                 "learning_events", "card_review_states", "word_books", "vocabulary_entries",
                 "word_book_progress_migration_audits", "articles", "reading_completions", "reading_preferences",
-                "vocabulary_search_history", "word_ai_notes", "asset_records",
+                "vocabulary_search_history", "word_ai_notes", "photo_translation_records", "asset_records",
             ),
             tables,
         )

@@ -44,6 +44,7 @@ object BackupRecordTypes {
         "learning-profiles",
         "learning-settings",
         "migration-audits",
+        "photo-translation-records",
         "profiles",
         "reading-completions",
         "reading-preferences",

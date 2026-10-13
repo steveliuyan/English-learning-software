@@ -39,6 +39,7 @@ class BackupExportCoordinatorTest {
         readingPreferences = emptyList(),
         searchHistory = emptyList(),
         wordAiNotes = emptyList(),
+        photoTranslations = emptyList(),
         assetRecords = listOf(AssetRecordEntity("asset-1", "hash-1", "assets/asset-1", 3L, 40L)),
     )
 
