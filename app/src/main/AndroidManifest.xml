@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- F4-02 本地提醒：Android 13+ 运行时请求，拒绝后不重复弹窗（设置页提供系统设置入口）。 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- F4-04 新设备实时扫码（决策 D2）：仅相机取景解码配对码，不拍摄/不存储任何照片。
+         运行时请求由恢复页发起，拒绝后页面给出提示并可再次授权，无自动重弹。 -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".EnglishLearningApplication"

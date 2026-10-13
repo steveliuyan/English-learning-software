@@ -75,7 +75,15 @@ fun BackupRestoreScreen(
         }
         viewModel.onPackagePicked(uri, bytes)
     }
-    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        // 授权结果回来后刷新本地状态，让取景框立即出现/保持提示
+        hasCameraPermission = granted
+    }
 
     Column(
         modifier = Modifier
@@ -105,7 +113,8 @@ fun BackupRestoreScreen(
                         .fillMaxWidth()
                         .height(280.dp)
                         .testTag("backup_restore_scan_box"),
-                    onPermissionNeeded = { cameraPermission.launch(Manifest.permission.CAMERA) },
+                    hasPermission = hasCameraPermission,
+                    onRequestPermission = { cameraPermission.launch(Manifest.permission.CAMERA) },
                     onPayload = viewModel::onCodeScanned,
                 )
             }
@@ -170,28 +179,20 @@ fun BackupRestoreScreen(
 @Composable
 private fun QrScanBox(
     modifier: Modifier,
-    onPermissionNeeded: () -> Unit,
+    hasPermission: Boolean,
+    onRequestPermission: () -> Unit,
     onPayload: (String) -> Unit,
 ) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var hasPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED,
-        )
-    }
 
-    LaunchedEffect(Unit) {
-        if (!hasPermission) onPermissionNeeded()
+    LaunchedEffect(hasPermission) {
+        if (!hasPermission) onRequestPermission()
     }
 
     if (!hasPermission) {
         Column(modifier.padding(16.dp)) {
-            Text("需要相机权限才能扫描配对码。")
-            Button(onClick = {
-                onPermissionNeeded()
-                hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-            }) { Text("授权相机") }
+            Text("需要相机权限才能扫描配对码。若刚才拒绝过，请点下方按钮重新授权或在系统设置中开启。")
+            Button(onClick = onRequestPermission) { Text("授权相机") }
         }
         return
     }
