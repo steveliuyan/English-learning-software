@@ -1,5 +1,6 @@
 package com.example.englishlearning.backup.domain
 
+import com.example.englishlearning.backup.pairing.MigrationChallengePolicy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.intOrNull
@@ -19,6 +20,7 @@ class BackupPackageValidator(
     private val limits: PackageLimits = BackupPackageFormat.DefaultLimits,
     private val json: Json = Json,
 ) {
+    private val signatureVerifier = com.example.englishlearning.backup.pairing.JavaSecurityEcSignatureVerifier()
     fun validate(bytes: ByteArray): PackageValidationResult {
         val snapshot = bytes.copyOf()
         if (snapshot.size.toLong() > limits.maxArchiveBytes) return invalid(PackageValidationFailure.LimitExceeded)
@@ -27,6 +29,8 @@ class BackupPackageValidator(
         return try {
             ZipInputStream(ByteArrayInputStream(snapshot)).use { zip ->
                 var manifest: PackageManifest? = null
+                var manifestRawBytes: ByteArray? = null
+                var pairingRawBytes: ByteArray? = null
                 var earlyFailure: PackageValidationFailure? = null
                 val seen = mutableSetOf<String>()
                 val actual = linkedMapOf<String, PackageEntry>()
@@ -38,19 +42,23 @@ class BackupPackageValidator(
                     if (entry.isDirectory || !isAllowedPackagePath(path)) return invalid(PackageValidationFailure.InvalidPath)
                     val normalized = path.replace('\\', '/')
                     if (!seen.add(normalized)) return invalid(PackageValidationFailure.DuplicateEntry)
-                    if (path != "manifest.json" && actual.size >= limits.maxEntries) {
+                    if (path != "manifest.json" && path != BackupPackageFormat.PAIRING_ENTRY_PATH && actual.size >= limits.maxEntries) {
                         return invalid(PackageValidationFailure.LimitExceeded)
                     }
 
                     val digest = MessageDigest.getInstance("SHA-256")
-                    val content = if (path == "manifest.json") ByteArrayOutputStreamBounded(limits.maxEntryBytes) else null
+                    val content = if (path == "manifest.json" || path == BackupPackageFormat.PAIRING_ENTRY_PATH) {
+                        ByteArrayOutputStreamBounded(limits.maxEntryBytes)
+                    } else {
+                        null
+                    }
                     var size = 0L
                     while (true) {
                         val count = zip.read(buffer)
                         if (count < 0) break
                         size += count
                         if (size > limits.maxEntryBytes) return invalid(PackageValidationFailure.LimitExceeded)
-                        if (path != "manifest.json") {
+                        if (path != "manifest.json" && path != BackupPackageFormat.PAIRING_ENTRY_PATH) {
                             totalBytes += count
                             if (totalBytes > limits.maxTotalBytes) return invalid(PackageValidationFailure.LimitExceeded)
                         }
@@ -61,11 +69,12 @@ class BackupPackageValidator(
                     val sha = digest.digest().toHex()
                     if (path == "manifest.json") {
                         if (manifest != null) return invalid(PackageValidationFailure.DuplicateEntry)
+                        val rawManifest = content!!.toByteArray()
                         val manifestText = try {
                             Charsets.UTF_8.newDecoder()
                                 .onMalformedInput(CodingErrorAction.REPORT)
                                 .onUnmappableCharacter(CodingErrorAction.REPORT)
-                                .decode(ByteBuffer.wrap(content!!.toByteArray()))
+                                .decode(ByteBuffer.wrap(rawManifest))
                                 .toString()
                         } catch (_: CharacterCodingException) {
                             return invalid(PackageValidationFailure.InvalidManifest)
@@ -79,8 +88,10 @@ class BackupPackageValidator(
                         }
                         val declaredVersion = probe["formatVersion"]?.jsonPrimitive?.intOrNull
                             ?: return invalid(PackageValidationFailure.InvalidManifest)
-                        if (declaredVersion != BackupPackageFormat.CURRENT_VERSION) {
-                            // Fail closed on the declared version before trusting any v2 fields.
+                        if (declaredVersion != BackupPackageFormat.SALVAGE_VERSION &&
+                            declaredVersion != BackupPackageFormat.PAIRED_VERSION
+                        ) {
+                            // Fail closed on the declared version before trusting any v2/v3 fields.
                             earlyFailure = PackageValidationFailure.UnsupportedFormat
                             break
                         }
@@ -91,6 +102,10 @@ class BackupPackageValidator(
                         } catch (_: IllegalArgumentException) {
                             return invalid(PackageValidationFailure.InvalidManifest)
                         }
+                        manifestRawBytes = rawManifest
+                    } else if (path == BackupPackageFormat.PAIRING_ENTRY_PATH) {
+                        if (pairingRawBytes != null) return invalid(PackageValidationFailure.DuplicateEntry)
+                        pairingRawBytes = content!!.toByteArray()
                     } else {
                         actual[path] = PackageEntry(path, size, sha)
                         if (actual.size > limits.maxEntries) return invalid(PackageValidationFailure.LimitExceeded)
@@ -100,15 +115,35 @@ class BackupPackageValidator(
 
                 earlyFailure?.let { return invalid(it) }
                 val parsed = manifest ?: return invalid(PackageValidationFailure.InvalidManifest)
-                if (parsed.formatVersion != BackupPackageFormat.CURRENT_VERSION) return invalid(PackageValidationFailure.UnsupportedFormat)
-                if (parsed.entries.any { !isAllowedPackagePath(it.path) || it.path == "manifest.json" }) return invalid(PackageValidationFailure.InvalidPath)
+                val isSalvageV2 = parsed.formatVersion == BackupPackageFormat.SALVAGE_VERSION
+                if (!isSalvageV2 && parsed.formatVersion != BackupPackageFormat.PAIRED_VERSION) {
+                    return invalid(PackageValidationFailure.UnsupportedFormat)
+                }
+                if (parsed.entries.any {
+                        !isAllowedPackagePath(it.path) || it.path == "manifest.json" || it.path == BackupPackageFormat.PAIRING_ENTRY_PATH
+                    }
+                ) {
+                    return invalid(PackageValidationFailure.InvalidPath)
+                }
                 if (parsed.entries.map { it.path }.toSet().size != parsed.entries.size) return invalid(PackageValidationFailure.DuplicateEntry)
                 if (parsed.entries.size > limits.maxEntries) return invalid(PackageValidationFailure.LimitExceeded)
-                if (parsed.signatureStatus != BackupPackageFormat.SIGNATURE_STATUS ||
-                    parsed.authenticationStatus != BackupPackageFormat.AUTHENTICATION_STATUS ||
-                    parsed.encryptionStatus != BackupPackageFormat.ENCRYPTION_STATUS
-                ) {
-                    return invalid(PackageValidationFailure.InvalidManifest)
+                if (isSalvageV2) {
+                    if (pairingRawBytes != null) return invalid(PackageValidationFailure.InvalidPath)
+                    if (parsed.pairing != null || parsed.encryption != null) return invalid(PackageValidationFailure.InvalidManifest)
+                    if (parsed.signatureStatus != BackupPackageFormat.SIGNATURE_STATUS ||
+                        parsed.authenticationStatus != BackupPackageFormat.AUTHENTICATION_STATUS ||
+                        parsed.encryptionStatus != BackupPackageFormat.ENCRYPTION_STATUS
+                    ) {
+                        return invalid(PackageValidationFailure.InvalidManifest)
+                    }
+                } else {
+                    if (parsed.signatureStatus != BackupPackageFormat.SIGNATURE_STATUS_V3 ||
+                        parsed.authenticationStatus != BackupPackageFormat.AUTHENTICATION_STATUS_V3 ||
+                        (parsed.encryptionStatus != BackupPackageFormat.ENCRYPTION_STATUS_V3_NONE &&
+                            parsed.encryptionStatus != BackupPackageFormat.ENCRYPTION_STATUS_V3_AEAD)
+                    ) {
+                        return invalid(PackageValidationFailure.InvalidManifest)
+                    }
                 }
                 if (parsed.createdAtEpochMillis < 0L) return invalid(PackageValidationFailure.InvalidManifest)
                 if (parsed.scope.distinct().size != parsed.scope.size) return invalid(PackageValidationFailure.InvalidManifest)
@@ -129,6 +164,12 @@ class BackupPackageValidator(
                 val canonical = actual.values.sortedBy { it.path }
                     .joinToString("") { "${it.path}\t${it.byteSize}\t${it.sha256}\n" }.toByteArray(Charsets.UTF_8)
                 if (!parsed.payloadSha256.equals(canonical.sha256(), ignoreCase = true)) return invalid(PackageValidationFailure.IntegrityFailure)
+                if (!isSalvageV2) {
+                    when (val pairing = checkV3Pairing(parsed, pairingRawBytes, manifestRawBytes ?: ByteArray(0))) {
+                        is PairingGate.Failure -> return invalid(pairing.reason)
+                        PairingGate.Ok -> Unit
+                    }
+                }
                 if (!hasConsistentCentralDirectory(snapshot)) return invalid(PackageValidationFailure.InvalidArchive)
                 PackageValidationResult.Valid(parsed)
             }
@@ -139,6 +180,98 @@ class BackupPackageValidator(
         } catch (_: Exception) {
             invalid(PackageValidationFailure.InvalidArchive)
         }
+    }
+
+    /** v3 pairing block, `pairing.json` cross-check, pinned crypto parameters, and the ECDSA signature gate (§3.2/§6). */
+    private fun checkV3Pairing(parsed: PackageManifest, pairingRawBytes: ByteArray?, manifestBytes: ByteArray): PairingGate {
+        val block = parsed.pairing ?: return PairingGate.Failure(PackageValidationFailure.MissingPairingRecord)
+        if (block.signatureAlgId != BackupCryptoPolicy.SIGNATURE_ALG_ID ||
+            block.authenticationAlgId != BackupCryptoPolicy.AUTHENTICATION_ALG_ID ||
+            block.signatureAlgId != parsed.signatureStatus ||
+            block.authenticationAlgId != parsed.authenticationStatus
+        ) {
+            return PairingGate.Failure(PackageValidationFailure.UnsupportedCryptoParameters)
+        }
+        val spki = block.publicKeySpkiHex.decodeLowerHexOrNull() ?: return PairingGate.Failure(PackageValidationFailure.InvalidManifest)
+        val nonce = block.nonceHex.decodeLowerHexOrNull() ?: return PairingGate.Failure(PackageValidationFailure.InvalidManifest)
+        val commitment = block.secretCommitmentSha256Hex.decodeLowerHexOrNull() ?: return PairingGate.Failure(PackageValidationFailure.InvalidManifest)
+        if (spki.size !in MigrationChallengePolicy.MIN_PUBLIC_KEY_SPKI_BYTES..MigrationChallengePolicy.MAX_PUBLIC_KEY_SPKI_BYTES ||
+            nonce.size != MigrationChallengePolicy.NONCE_BYTES ||
+            commitment.size != 32 ||
+            block.issuedAtEpochSeconds <= 0L ||
+            block.expiresAtEpochSeconds - block.issuedAtEpochSeconds != MigrationChallengePolicy.CHALLENGE_TTL_SECONDS
+        ) {
+            return PairingGate.Failure(PackageValidationFailure.InvalidManifest)
+        }
+
+        if (parsed.encryptionStatus == BackupPackageFormat.ENCRYPTION_STATUS_V3_AEAD) {
+            val encryption = parsed.encryption ?: return PairingGate.Failure(PackageValidationFailure.InvalidManifest)
+            if (!matchesPinnedEncryption(encryption)) return PairingGate.Failure(PackageValidationFailure.UnsupportedCryptoParameters)
+            if (parsed.entries.any { it.byteSize < BackupCryptoPolicy.MIN_ENCRYPTED_ENTRY_BYTES }) {
+                return PairingGate.Failure(PackageValidationFailure.LengthMismatch)
+            }
+        } else if (parsed.encryption != null) {
+            return PairingGate.Failure(PackageValidationFailure.InvalidManifest)
+        }
+
+        val pairingFileBytes = pairingRawBytes ?: return PairingGate.Failure(PackageValidationFailure.MissingPairingRecord)
+        val pairingText = try {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(pairingFileBytes))
+                .toString()
+        } catch (_: CharacterCodingException) {
+            return PairingGate.Failure(PackageValidationFailure.PairingRecordMismatch)
+        }
+        val pairingEntry = try {
+            json.decodeFromString<PairingEntryDto>(pairingText)
+        } catch (_: Exception) {
+            return PairingGate.Failure(PackageValidationFailure.PairingRecordMismatch)
+        }
+        if (pairingEntry.publicKeySpkiHex != block.publicKeySpkiHex ||
+            pairingEntry.nonceHex != block.nonceHex ||
+            pairingEntry.issuedAtEpochSeconds != block.issuedAtEpochSeconds ||
+            pairingEntry.expiresAtEpochSeconds != block.expiresAtEpochSeconds ||
+            pairingEntry.secretCommitmentSha256Hex != block.secretCommitmentSha256Hex ||
+            pairingEntry.signatureAlgId != block.signatureAlgId ||
+            pairingEntry.authenticationAlgId != block.authenticationAlgId
+        ) {
+            return PairingGate.Failure(PackageValidationFailure.PairingRecordMismatch)
+        }
+        val derSignature = pairingEntry.derSignatureHex.decodeLowerHexOrNull()
+            ?: return PairingGate.Failure(PackageValidationFailure.PairingRecordMismatch)
+        if (derSignature.isEmpty() || derSignature.size > MAX_DER_SIGNATURE_BYTES) {
+            return PairingGate.Failure(PackageValidationFailure.PairingRecordMismatch)
+        }
+        val scope = BackupCryptoPolicy.SIGNATURE_SCOPE_PREFIX.toByteArray(Charsets.UTF_8) + manifestBytes
+        if (!signatureVerifier.verify(spki, scope, derSignature)) {
+            return PairingGate.Failure(PackageValidationFailure.SignatureInvalid)
+        }
+        return PairingGate.Ok
+    }
+
+    private fun matchesPinnedEncryption(encryption: ManifestEncryptionBlock): Boolean {
+        val salt = encryption.kdfSaltHex.decodeLowerHexOrNull() ?: return false
+        val wrapIv = encryption.dekWrapIvHex.decodeLowerHexOrNull() ?: return false
+        val wrappedDek = encryption.dekWrapCiphertextHex.decodeLowerHexOrNull() ?: return false
+        return encryption.kdfAlgId == BackupCryptoPolicy.KDF_ALG_ID &&
+            encryption.dekWrapAlgId == BackupCryptoPolicy.AEAD_ALG_ID &&
+            encryption.entryAlgId == BackupCryptoPolicy.AEAD_ALG_ID &&
+            salt.size == BackupCryptoPolicy.KDF_SALT_BYTES &&
+            wrapIv.size == BackupCryptoPolicy.AEAD_IV_BYTES &&
+            wrappedDek.size == BackupCryptoPolicy.WRAPPED_DEK_BYTES &&
+            encryption.kdfMemoryKiB == BackupCryptoPolicy.KDF_MEMORY_KIB &&
+            encryption.kdfIterations == BackupCryptoPolicy.KDF_ITERATIONS &&
+            encryption.kdfParallelism == BackupCryptoPolicy.KDF_PARALLELISM &&
+            encryption.kdfOutputBytes == BackupCryptoPolicy.KDF_OUTPUT_BYTES &&
+            encryption.entryIvBytes == BackupCryptoPolicy.AEAD_IV_BYTES &&
+            encryption.entryTagBytes == BackupCryptoPolicy.AEAD_TAG_BYTES
+    }
+
+    private sealed interface PairingGate {
+        data object Ok : PairingGate
+        data class Failure(val reason: PackageValidationFailure) : PairingGate
     }
 
     fun readEntries(bytes: ByteArray): PackageReadResult {
@@ -282,6 +415,11 @@ class BackupPackageValidator(
 
     private fun invalid(reason: PackageValidationFailure) = PackageValidationResult.Invalid(reason)
 
+    private companion object {
+        /** DER-encoded P-256 ECDSA signatures are at most 72 bytes; 128 is a generous structural cap. */
+        const val MAX_DER_SIGNATURE_BYTES = 128
+    }
+
     private class ByteArrayOutputStreamBounded(private val maximum: Long) {
         private val output = java.io.ByteArrayOutputStream()
         fun write(bytes: ByteArray, offset: Int, length: Int) {
@@ -301,6 +439,8 @@ class BackupPackageValidator(
         val encryptionStatus: String,
         val entries: List<EntryDto>,
         val payloadSha256: String,
+        val pairing: PairingBlockDto? = null,
+        val encryption: EncryptionBlockDto? = null,
     ) {
         fun toModel() = PackageManifest(
             formatVersion = formatVersion,
@@ -311,12 +451,78 @@ class BackupPackageValidator(
             encryptionStatus = encryptionStatus,
             entries = entries.map { it.toModel() },
             payloadSha256 = payloadSha256,
+            pairing = pairing?.toModel(),
+            encryption = encryption?.toModel(),
         )
     }
 
     @Serializable
     private data class EntryDto(val path: String, val byteSize: Long, val sha256: String) {
         fun toModel() = PackageEntry(path, byteSize, sha256)
+    }
+
+    @Serializable
+    private data class PairingBlockDto(
+        val publicKeySpkiHex: String,
+        val nonceHex: String,
+        val issuedAtEpochSeconds: Long,
+        val expiresAtEpochSeconds: Long,
+        val secretCommitmentSha256Hex: String,
+        val signatureAlgId: String,
+        val authenticationAlgId: String,
+    ) {
+        fun toModel() = ManifestPairingBlock(
+            publicKeySpkiHex,
+            nonceHex,
+            issuedAtEpochSeconds,
+            expiresAtEpochSeconds,
+            secretCommitmentSha256Hex,
+            signatureAlgId,
+            authenticationAlgId,
+        )
+    }
+
+    @Serializable
+    private data class PairingEntryDto(
+        val publicKeySpkiHex: String,
+        val nonceHex: String,
+        val issuedAtEpochSeconds: Long,
+        val expiresAtEpochSeconds: Long,
+        val secretCommitmentSha256Hex: String,
+        val signatureAlgId: String,
+        val authenticationAlgId: String,
+        val derSignatureHex: String,
+    )
+
+    @Serializable
+    private data class EncryptionBlockDto(
+        val kdfAlgId: String,
+        val kdfSaltHex: String,
+        val kdfMemoryKiB: Int,
+        val kdfIterations: Int,
+        val kdfParallelism: Int,
+        val kdfOutputBytes: Int,
+        val dekWrapAlgId: String,
+        val dekWrapIvHex: String,
+        val dekWrapCiphertextHex: String,
+        val entryAlgId: String,
+        val entryIvBytes: Int,
+        val entryTagBytes: Int,
+    ) {
+        fun toModel() = ManifestEncryptionBlock(
+            kdfAlgId,
+            kdfSaltHex,
+            kdfMemoryKiB,
+            kdfIterations,
+            kdfParallelism,
+            kdfOutputBytes,
+            dekWrapAlgId,
+            dekWrapIvHex,
+            dekWrapCiphertextHex,
+            entryAlgId,
+            entryIvBytes,
+            entryTagBytes,
+        )
     }
 }
 

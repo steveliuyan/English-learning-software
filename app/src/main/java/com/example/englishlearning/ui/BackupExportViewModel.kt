@@ -130,6 +130,8 @@ class BackupExportViewModel @Inject constructor(
         BackupExportFailure.ArchiveRejected,
         BackupExportFailure.DestinationFailure,
         BackupExportFailure.Cancelled,
+        BackupExportFailure.PasswordRejected,
+        BackupExportFailure.CryptoUnavailable,
         -> "备份包生成失败，请重试或联系支持。"
     }
 }

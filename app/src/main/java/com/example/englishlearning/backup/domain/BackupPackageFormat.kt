@@ -1,13 +1,30 @@
 package com.example.englishlearning.backup.domain
 
 object BackupPackageFormat {
-    const val CURRENT_VERSION: Int = 2
+    /** Highest format this build understands; the validator dispatches per declared version. */
+    const val CURRENT_VERSION: Int = 3
 
-    /** Honest protection status of v2 packages; F4-04 must replace these before restore is possible. */
+    /** F4-03 salvage packages stay pinned at version 2; the writer must never drift this. */
+    const val SALVAGE_VERSION: Int = 2
+
+    /** Paired, signed (and optionally encrypted) packages introduced by F4-04. */
+    const val PAIRED_VERSION: Int = 3
+
+    /** Honest protection status of v2 salvage packages; the v2 validator branch keeps matching these exactly. */
     const val SIGNATURE_STATUS: String = "not-protected"
     const val AUTHENTICATION_STATUS: String = "not-supported"
     const val ENCRYPTION_STATUS: String = "none"
+
+    /** v3 exact status whitelist (decision doc §6); any other value fails closed. */
+    const val SIGNATURE_STATUS_V3: String = "ecdsa-p256-sha256"
+    const val AUTHENTICATION_STATUS_V3: String = "paired-migration-v1"
+    const val ENCRYPTION_STATUS_V3_NONE: String = "none"
+    const val ENCRYPTION_STATUS_V3_AEAD: String = "aes-256-gcm/argon2id-v1"
+
     const val MEDIA_SCOPE_TOKEN: String = "media"
+
+    /** Structural pairing entry required in v3 packages, exempt from `entries` and payload digests. */
+    const val PAIRING_ENTRY_PATH: String = "pairing.json"
 
     val DefaultLimits = PackageLimits(
         maxArchiveBytes = BackupPackageLimits.MAX_ARCHIVE_BYTES,
@@ -63,6 +80,33 @@ data class PackageEntry(
     val sha256: String,
 )
 
+/** v3 manifest `pairing` block: everything the signature covers except the signature itself. */
+data class ManifestPairingBlock(
+    val publicKeySpkiHex: String,
+    val nonceHex: String,
+    val issuedAtEpochSeconds: Long,
+    val expiresAtEpochSeconds: Long,
+    val secretCommitmentSha256Hex: String,
+    val signatureAlgId: String,
+    val authenticationAlgId: String,
+)
+
+/** v3 manifest `encryption` block; pinned Argon2id parameters and the wrapped DEK (decision doc §4/§5). */
+data class ManifestEncryptionBlock(
+    val kdfAlgId: String,
+    val kdfSaltHex: String,
+    val kdfMemoryKiB: Int,
+    val kdfIterations: Int,
+    val kdfParallelism: Int,
+    val kdfOutputBytes: Int,
+    val dekWrapAlgId: String,
+    val dekWrapIvHex: String,
+    val dekWrapCiphertextHex: String,
+    val entryAlgId: String,
+    val entryIvBytes: Int,
+    val entryTagBytes: Int,
+)
+
 data class PackageManifest(
     val formatVersion: Int,
     val createdAtEpochMillis: Long,
@@ -72,6 +116,8 @@ data class PackageManifest(
     val encryptionStatus: String,
     val entries: List<PackageEntry>,
     val payloadSha256: String,
+    val pairing: ManifestPairingBlock? = null,
+    val encryption: ManifestEncryptionBlock? = null,
 )
 
 fun recordPackagePath(type: String, stableId: String): String = "records/$type/$stableId.json"
@@ -100,6 +146,10 @@ sealed interface PackageValidationFailure {
     data object LimitExceeded : PackageValidationFailure
     data object LengthMismatch : PackageValidationFailure
     data object IntegrityFailure : PackageValidationFailure
+    data object MissingPairingRecord : PackageValidationFailure
+    data object PairingRecordMismatch : PackageValidationFailure
+    data object SignatureInvalid : PackageValidationFailure
+    data object UnsupportedCryptoParameters : PackageValidationFailure
 }
 
 sealed interface PackageValidationResult {
@@ -109,6 +159,7 @@ sealed interface PackageValidationResult {
 
 internal fun isAllowedPackagePath(path: String): Boolean {
     if (path == "manifest.json") return true
+    if (path == BackupPackageFormat.PAIRING_ENTRY_PATH) return true
     if (path.startsWith("records/") && path.endsWith(".json")) {
         val segments = path.removePrefix("records/").removeSuffix(".json").split('/')
         return segments.size == 2 && BackupRecordTypes.isValidType(segments[0]) && isSafeId(segments[1])

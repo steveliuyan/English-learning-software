@@ -42,6 +42,8 @@ enum class BackupExportFailure {
     ArchiveRejected,
     Cancelled,
     DestinationFailure,
+    PasswordRejected,
+    CryptoUnavailable,
 }
 
 sealed interface BackupExportResult {
@@ -66,7 +68,63 @@ class BackupExportCoordinator(
     private val packager: PackagePackager,
     private val clock: () -> Long,
 ) {
+    private class Collected(
+        val entries: List<PackagerEntry>,
+        val recordCount: Int,
+        val mediaCount: Int,
+        val uncompressedBytes: Long,
+    )
+
     suspend fun prepare(includeMediaAssets: Boolean): BackupExportResult {
+        val collected = collectEntries(includeMediaAssets)
+        if (collected is CollectOutcome.Failed) return collected.result
+        val data = (collected as CollectOutcome.Ok).value
+        val createdAt = clock()
+        return when (val packaging = packager.write(data.entries, createdAt)) {
+            is PackagePackagingOutcome.Written -> BackupExportResult.Prepared(
+                bytes = packaging.bytes,
+                createdAtEpochMillis = createdAt,
+                recordCount = data.recordCount,
+                mediaCount = data.mediaCount,
+                uncompressedBytes = data.uncompressedBytes,
+            )
+            is PackagePackagingOutcome.Invalid -> BackupExportResult.Failed(packaging.reason.toExportFailure())
+        }
+    }
+
+    /**
+     * Protected v3 export: same read-only snapshot, but packaged with the migration pairing block,
+     * ECDSA signature and, when a backup password is supplied, Argon2id+AES-256-GCM protection.
+     * The v2 salvage path above is untouched.
+     */
+    suspend fun prepareProtected(
+        includeMediaAssets: Boolean,
+        packager: ProtectedPackagePackager,
+        protection: ProtectedPackagingSpec,
+    ): BackupExportResult {
+        val collected = collectEntries(includeMediaAssets)
+        if (collected is CollectOutcome.Failed) return collected.result
+        val data = (collected as CollectOutcome.Ok).value
+        val createdAt = clock()
+        return when (val packaging = packager.write(data.entries, createdAt, protection)) {
+            is ProtectedPackagePackagingOutcome.Written -> BackupExportResult.Prepared(
+                bytes = packaging.bytes,
+                createdAtEpochMillis = createdAt,
+                recordCount = data.recordCount,
+                mediaCount = data.mediaCount,
+                uncompressedBytes = data.uncompressedBytes,
+            )
+            is ProtectedPackagePackagingOutcome.Failed ->
+                BackupExportResult.Failed(packaging.reason.toExportFailure())
+        }
+    }
+
+    private sealed interface CollectOutcome {
+        data class Ok(val value: Collected) : CollectOutcome
+        data class Failed(val result: BackupExportResult.Failed) : CollectOutcome
+    }
+
+    private suspend fun collectEntries(includeMediaAssets: Boolean): CollectOutcome {
         val rows = rowReader.readAll()
         val records = BackupSnapshotBuilder.buildRecords(rows, includeMediaAssets)
         val entries = records.map { PackagerEntry(it.path, it.jsonBytes) }.toMutableList()
@@ -75,36 +133,42 @@ class BackupExportCoordinator(
 
         if (includeMediaAssets) {
             for (asset in rows.assetRecords.sortedBy { it.id }) {
-                if (!isSafePackageId(asset.id)) return BackupExportResult.Failed(BackupExportFailure.InvalidSnapshot)
+                if (!isSafePackageId(asset.id)) return CollectOutcome.Failed(BackupExportResult.Failed(BackupExportFailure.InvalidSnapshot))
                 when (val outcome = mediaGateway.load(asset)) {
                     is BackupMediaOutcome.Loaded -> {
                         entries += PackagerEntry(mediaPackagePath(asset.id), outcome.bytes)
                         mediaCount += 1
                         mediaBytes += outcome.bytes.size.toLong()
                     }
-                    BackupMediaOutcome.Missing -> return BackupExportResult.Failed(BackupExportFailure.ResourceUnavailable)
-                    BackupMediaOutcome.Mismatch -> return BackupExportResult.Failed(BackupExportFailure.IntegrityFailure)
+                    BackupMediaOutcome.Missing -> return CollectOutcome.Failed(BackupExportResult.Failed(BackupExportFailure.ResourceUnavailable))
+                    BackupMediaOutcome.Mismatch -> return CollectOutcome.Failed(BackupExportResult.Failed(BackupExportFailure.IntegrityFailure))
                 }
             }
         }
-
-        val createdAt = clock()
         val recordBytes = records.sumOf { it.jsonBytes.size.toLong() }
-        return when (val packaging = packager.write(entries, createdAt)) {
-            is PackagePackagingOutcome.Written -> BackupExportResult.Prepared(
-                bytes = packaging.bytes,
-                createdAtEpochMillis = createdAt,
+        return CollectOutcome.Ok(
+            Collected(
+                entries = entries,
                 recordCount = records.size,
                 mediaCount = mediaCount,
                 uncompressedBytes = recordBytes + mediaBytes,
-            )
-            is PackagePackagingOutcome.Invalid -> BackupExportResult.Failed(packaging.reason.toExportFailure())
-        }
+            ),
+        )
     }
 
     private fun PackageValidationFailure.toExportFailure(): BackupExportFailure = when (this) {
         PackageValidationFailure.LimitExceeded -> BackupExportFailure.LimitExceeded
         PackageValidationFailure.IntegrityFailure -> BackupExportFailure.IntegrityFailure
+        PackageValidationFailure.SignatureInvalid -> BackupExportFailure.IntegrityFailure
         else -> BackupExportFailure.ArchiveRejected
+    }
+
+    private fun ProtectedPackageWriteFailure.toExportFailure(): BackupExportFailure = when (this) {
+        ProtectedPackageWriteFailure.PasswordRejected -> BackupExportFailure.PasswordRejected
+        is ProtectedPackageWriteFailure.RejectedByValidator -> reason.toExportFailure()
+        ProtectedPackageWriteFailure.SigningKeyUnavailable,
+        ProtectedPackageWriteFailure.CryptoPortsMissing,
+        ProtectedPackageWriteFailure.CryptoOperationFailed,
+        -> BackupExportFailure.CryptoUnavailable
     }
 }

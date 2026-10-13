@@ -42,7 +42,7 @@ class ZipBackupPackageWriter(
         val scope = derivePackageScope(descriptors.map { it.path })
         val manifest = buildString {
             append("{\"formatVersion\":")
-            append(BackupPackageFormat.CURRENT_VERSION)
+            append(BackupPackageFormat.SALVAGE_VERSION)
             append(",\"createdAtEpochMillis\":")
             append(createdAtEpochMillis)
             append(",\"scope\":[")
