@@ -1,6 +1,7 @@
 package com.example.englishlearning.di
 
 import android.content.Context
+import java.io.File
 import com.example.englishlearning.export.WorksheetPdfRenderer
 import com.example.englishlearning.export.WorksheetPdfWriter
 import androidx.room.Room
@@ -285,4 +286,66 @@ object AppModule {
     @Provides @Singleton
     fun provideBackupDestinationWriter(writer: com.example.englishlearning.backup.infrastructure.ContentResolverBackupDestinationWriter): com.example.englishlearning.ui.BackupDestinationWriter =
         writer
+
+    // ---- F4-04 认证恢复（决策文档 §9 端口绑定） ----
+
+    @Provides @Singleton
+    fun provideBackupRestoreCoordinator(
+        @ApplicationContext context: Context,
+        database: com.example.englishlearning.core.storage.AppDatabase,
+        indexRefresh: com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase,
+        reminderScheduler: com.example.englishlearning.notification.ReminderScheduler,
+        aiProfiles: com.example.englishlearning.ai.AiProfileRepository,
+        aiSecrets: com.example.englishlearning.ai.AiProfileSecretUseCase,
+    ): com.example.englishlearning.backup.restore.BackupRestoreCoordinator =
+        com.example.englishlearning.backup.restore.BackupRestoreCoordinator(
+            validator = com.example.englishlearning.backup.domain.BackupPackageValidator(),
+            pairingVerifier = com.example.englishlearning.backup.pairing.PairedMigrationChallengeVerifier(
+                com.example.englishlearning.backup.pairing.JavaSecurityEcSignatureVerifier(),
+            ),
+            kdf = com.example.englishlearning.backup.infrastructure.BouncyCastleArgon2idKdf(),
+            aead = com.example.englishlearning.backup.infrastructure.TinkAes256GcmAead(),
+            spaceChecker = com.example.englishlearning.backup.device.AndroidRestoreSpaceChecker(context),
+            staging = com.example.englishlearning.backup.infrastructure.FileRestoreStagingWorkspace(
+                File(context.cacheDir, "restore-scratch"),
+            ),
+            commitGateway = com.example.englishlearning.backup.restore.SnapshotSwapRestoreCommitGateway(
+                rollbackRoot = File(context.filesDir, "rollback"),
+                scratchRoot = File(context.cacheDir, "restore-scratch"),
+                targets = com.example.englishlearning.backup.device.RoomRestoreDataWriter.swapTargets(context),
+                database = com.example.englishlearning.backup.device.RoomFormalDataHandle(database),
+                writer = com.example.englishlearning.backup.device.RoomRestoreDataWriter(
+                    context,
+                    com.example.englishlearning.backup.device.RestoreEntityDecoder(),
+                ),
+                postActions = com.example.englishlearning.backup.device.AndroidPostRestoreActions(
+                    context,
+                    indexRefresh,
+                    reminderScheduler,
+                    aiProfiles,
+                    aiSecrets,
+                ),
+                clockMillis = { System.currentTimeMillis() },
+            ),
+            sessionIdProvider = { java.util.UUID.randomUUID().toString() },
+            clock = { System.currentTimeMillis() / 1000 },
+        )
+
+    @Provides @Singleton
+    fun provideProtectedExportExecutor(
+        delegate: com.example.englishlearning.backup.domain.BackupExportCoordinator,
+    ): com.example.englishlearning.ui.ProtectedExportExecutor =
+        com.example.englishlearning.ui.ProtectedExportExecutor(
+            signerFactory = { com.example.englishlearning.backup.device.AndroidMigrationSigner() },
+            keySpki = {
+                if (com.example.englishlearning.backup.device.AndroidMigrationKey.ensureKey()) {
+                    com.example.englishlearning.backup.device.AndroidMigrationKey.publicKeySpki()
+                } else {
+                    null
+                }
+            },
+            delegate = delegate,
+            entropy = com.example.englishlearning.backup.infrastructure.SecureRandomBackupEntropy(),
+            clock = { System.currentTimeMillis() / 1000 },
+        )
 }

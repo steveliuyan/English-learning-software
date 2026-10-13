@@ -123,6 +123,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     internal abstract fun internalBackupSourceDao(): com.example.englishlearning.backup.infrastructure.InternalBackupSourceDao
 
+    internal abstract fun internalBackupRestoreDao(): com.example.englishlearning.backup.infrastructure.InternalBackupRestoreDao
+
     companion object {
         val MIGRATION_1_2: Migration =
             object : Migration(1, 2) {

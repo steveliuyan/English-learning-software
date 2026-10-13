@@ -37,11 +37,11 @@ class SnapshotSwapRestoreCommitGatewayTest {
     private class FakeWriter : RestoredDataWriter {
         var fail = false
 
-        override fun writeReplacement(session: StagedRestoreSession, workingDir: File): File? {
+        override fun writeReplacement(session: StagedRestoreSession, workingDir: File): Map<String, File>? {
             if (fail) return null
-            val dir = File(workingDir, "replacement").apply { mkdirs() }
+            val dir = File(workingDir, "db").apply { mkdirs() }
             File(dir, "english-learning.db").writeText("restored-db")
-            return dir
+            return mapOf("db" to dir)
         }
     }
 
@@ -70,6 +70,8 @@ class SnapshotSwapRestoreCommitGatewayTest {
         staged = StagedRestore(emptyList(), emptyList()),
     )
 
+    private val targets get() = listOf(SwapTarget("db", formalRoot))
+
     private fun gateway(
         database: FakeDatabase = FakeDatabase(),
         writer: FakeWriter = FakeWriter(),
@@ -78,7 +80,7 @@ class SnapshotSwapRestoreCommitGatewayTest {
     ): SnapshotSwapRestoreCommitGateway = SnapshotSwapRestoreCommitGateway(
         rollbackRoot = rollbackRoot,
         scratchRoot = scratchRoot,
-        formalRoot = formalRoot,
+        targets = targets,
         database = database,
         writer = writer,
         postActions = actions,
@@ -154,8 +156,8 @@ class SnapshotSwapRestoreCommitGatewayTest {
 
         gateway().commit(session())
 
-        val ledger = rollbackRoot.resolve("1700").resolve("rollback-ledger.txt").readText()
-        assertTrue("english-learning.db" in ledger && "assets/asset-1" in ledger)
+        val ledger = rollbackRoot.resolve("1700").resolve("db").resolve("rollback-ledger.txt").readText()
+        assertTrue("english-learning.db" in ledger)
     }
 
     @Test

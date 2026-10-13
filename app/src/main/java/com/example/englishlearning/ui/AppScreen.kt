@@ -142,6 +142,7 @@ fun AppScreen(
     imageStudioViewModel: ImageStudioViewModel? = null,
     wordBookTransferViewModel: com.example.englishlearning.wordbook.WordBookTransferViewModel? = null,
     backupExportViewModel: BackupExportViewModel? = null,
+    backupRestoreViewModel: BackupRestoreViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -165,6 +166,7 @@ fun AppScreen(
             var showSpeechSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showReminderSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showBackupRestore by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -328,7 +330,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
                 showWordQaCard != null
@@ -408,6 +410,7 @@ fun AppScreen(
             BackHandler(enabled = showSpeechSettings) { showSpeechSettings = false }
             BackHandler(enabled = showReminderSettings) { showReminderSettings = false }
             BackHandler(enabled = showBackupExport) { showBackupExport = false }
+            BackHandler(enabled = showBackupRestore) { showBackupRestore = false }
             BackHandler(enabled = showAiProfiles) {
                 showAiProfiles = false
                 speechSettingsViewModel?.load()
@@ -872,6 +875,12 @@ fun AppScreen(
                     onBack = { showBackupExport = false },
                     viewModel = backupExportViewModel,
                 )
+            } else if (showBackupRestore) {
+                // F4-04：新设备认证恢复页；扫码/密码/二次确认在页面内部处理，无旁路入口。
+                BackupRestoreScreen(
+                    onBack = { showBackupRestore = false },
+                    viewModel = backupRestoreViewModel,
+                )
             } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
                 // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
                 val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
@@ -1175,6 +1184,9 @@ fun AppScreen(
                                     },
                                     onOpenBackupExport = {
                                         showBackupExport = backupExportViewModel != null
+                                    },
+                                    onOpenBackupRestore = {
+                                        showBackupRestore = backupRestoreViewModel != null
                                     },
                                     speechEngineStatuses = speechState.engineStatuses(),
                                     aiProfileSubtitle = aiProfiles?.let { ready ->

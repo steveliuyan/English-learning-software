@@ -12,13 +12,19 @@ interface FormalDataHandle {
 }
 
 /**
- * Materializes a staged session into a complete replacement data directory:
- * Room database files plus `assets/` media. Device implementation writes through
- * Room DAOs; the directory it produces is exactly what replaces the formal root.
+ * One formal data tree that is replaced wholesale on restore (e.g. the Room
+ * databases directory, the private assets directory). The directory must exist.
+ */
+data class SwapTarget(val name: String, val formalDir: File)
+
+/**
+ * Materializes a staged session into complete replacement directories keyed by
+ * [SwapTarget.name] (e.g. `"db"` → directory holding the DB trio, `"assets"` →
+ * directory holding the media files). Device implementation writes through Room.
  */
 interface RestoredDataWriter {
-    /** Returns the directory containing the finished replacement, or null on failure. */
-    fun writeReplacement(session: StagedRestoreSession, workingDir: File): File?
+    /** Returns the replacement directory per target name, or null on failure. */
+    fun writeReplacement(session: StagedRestoreSession, workingDir: File): Map<String, File>?
 }
 
 /** Mandatory post-restore maintenance (§9.6); each returns false on failure. */
@@ -30,17 +36,17 @@ interface PostRestoreActions {
 }
 
 /**
- * Rollback point + atomic directory swap (decision doc §9.4–9.5):
- * 1) build the replacement in an isolated working dir; 2) close the DB; 3) snapshot the
- * formal root into `rollback/<timestamp>` with a digest ledger; 4) rename-exchange the
- * directories; 5) reopen + quick_check; 6) run the post-restore maintenance.
- * Any failure at or after the snapshot step restores the rollback point; the formal
- * root is byte-identical to before unless [RestoreCommitResult.Restored] is returned.
+ * Rollback point + atomic swap (decision doc §9.4–9.5), per target tree:
+ * 1) build replacements in an isolated working dir; 2) close the DB; 3) snapshot each
+ * formal tree into `rollback/<timestamp>/<name>` with a SHA-256 ledger; 4) rename-exchange;
+ * 5) reopen + quick_check; 6) run the post-restore maintenance.
+ * Any failure at or after the snapshot step restores every rollback snapshot; the formal
+ * trees are byte-identical to before unless [RestoreCommitResult.Restored] is returned.
  */
 class SnapshotSwapRestoreCommitGateway(
     private val rollbackRoot: File,
     private val scratchRoot: File,
-    private val formalRoot: File,
+    private val targets: List<SwapTarget>,
     private val database: FormalDataHandle,
     private val writer: RestoredDataWriter,
     private val postActions: PostRestoreActions,
@@ -49,26 +55,34 @@ class SnapshotSwapRestoreCommitGateway(
 
     override fun commit(session: StagedRestoreSession): RestoreCommitResult {
         val working = File(scratchRoot, "commit-${session.sessionId}").apply { mkdirs() }
-        val replacement = writer.writeReplacement(session, working)
+        val replacements = writer.writeReplacement(session, working)
             ?: return RestoreCommitResult.Failed(RestoreFailure.IntegrityFailure)
+        if (targets.any { !replacements.containsKey(it.name) }) {
+            working.deleteRecursively()
+            return RestoreCommitResult.Failed(RestoreFailure.IntegrityFailure)
+        }
 
         val rollback = File(rollbackRoot, clockMillis().toString())
         if (!database.checkpointAndClose()) {
             working.deleteRecursively()
             return RestoreCommitResult.Failed(RestoreFailure.IntegrityFailure)
         }
-        if (!snapshotFormalRoot(rollback)) {
+        if (!targets.all { snapshot(it, File(rollback, it.name)) }) {
             database.reopenAndQuickCheck()
             working.deleteRecursively()
             return RestoreCommitResult.Failed(RestoreFailure.IntegrityFailure)
         }
 
-        val aside = File(formalRoot.parentFile, formalRoot.name + "-aside-${session.sessionId}")
+        val asides = mutableMapOf<String, File>()
         var swapped = false
         var verified = false
         var restored = false
         try {
-            swapped = formalRoot.renameTo(aside) && replacement.renameTo(formalRoot)
+            swapped = targets.all { target ->
+                val aside = File(target.formalDir.parentFile, target.formalDir.name + "-aside-${session.sessionId}")
+                asides[target.name] = aside
+                target.formalDir.renameTo(aside) && replacements.getValue(target.name).renameTo(target.formalDir)
+            }
             verified = swapped && database.reopenAndQuickCheck()
             if (verified) {
                 restored = postActions.rebuildSearchIndex() &&
@@ -76,14 +90,14 @@ class SnapshotSwapRestoreCommitGateway(
                     postActions.eraseAiCredentials() &&
                     postActions.writeRestoreAudit(session)
                 if (restored) {
-                    aside.deleteRecursively()
+                    asides.values.forEach { it.deleteRecursively() }
                     return RestoreCommitResult.Restored
                 }
             }
         } finally {
             if (swapped && !restored) {
-                restoreRollback(rollback)
-                if (formalRoot.exists()) aside.deleteRecursively()
+                targets.forEach { target -> restoreRollback(File(rollback, target.name), target.formalDir) }
+                asides.values.forEach { if (it.exists()) it.deleteRecursively() }
             }
             working.deleteRecursively()
         }
@@ -91,29 +105,28 @@ class SnapshotSwapRestoreCommitGateway(
         return RestoreCommitResult.Failed(RestoreFailure.RollbackVerification)
     }
 
-    /** Copies the formal root and writes a SHA-256 ledger for each contained file. */
-    private fun snapshotFormalRoot(rollback: File): Boolean = try {
-        formalRoot.copyRecursively(rollback, overwrite = true)
-        val ledger = rollback.resolve(LEDGER_FILE)
-        val entries = rollback.walkTopDown().filter { it.isFile && it != ledger }
-            .sortedBy { it.relativeTo(rollback).invariantSeparatorsPath }
+    /** Copies the formal tree and writes a SHA-256 ledger for each contained file. */
+    private fun snapshot(target: SwapTarget, rollbackDir: File): Boolean = try {
+        target.formalDir.copyRecursively(rollbackDir, overwrite = true)
+        val ledger = rollbackDir.resolve(LEDGER_FILE)
+        val entries = rollbackDir.walkTopDown().filter { it.isFile && it != ledger }
+            .sortedBy { it.relativeTo(rollbackDir).invariantSeparatorsPath }
             .joinToString("\n") { file ->
                 val digest = java.security.MessageDigest.getInstance("SHA-256").digest(file.readBytes())
                     .joinToString("") { "%02x".format(it) }
-                "${file.relativeTo(rollback).invariantSeparatorsPath}\t$digest"
+                "${file.relativeTo(rollbackDir).invariantSeparatorsPath}\t$digest"
             }
         ledger.writeText(entries + "\n", Charsets.UTF_8)
         true
     } catch (_: Exception) {
-        rollback.deleteRecursively()
+        rollbackDir.deleteRecursively()
         false
     }
 
-    private fun restoreRollback(rollback: File): Boolean = try {
-        if (formalRoot.exists()) formalRoot.deleteRecursively()
-        rollback.copyRecursively(formalRoot, overwrite = true)
-        
-        database.reopenAndQuickCheck()
+    private fun restoreRollback(rollbackDir: File, formalDir: File): Boolean = try {
+        if (formalDir.exists()) formalDir.deleteRecursively()
+        rollbackDir.copyRecursively(formalDir, overwrite = true)
+        true
     } catch (_: Exception) {
         false
     }
