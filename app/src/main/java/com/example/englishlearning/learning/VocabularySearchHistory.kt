@@ -22,6 +22,13 @@ data class VocabularySearchHistory(
 interface VocabularySearchHistoryRepository {
     suspend fun list(profileId: String, limit: Int): RepositoryResult<List<VocabularySearchHistory>>
 
+    /**
+     * 当前档案的搜索历史**总行数**（不受 list 的 limit 影响）。
+     * 清空确认框要用它报真实级联条数：列表只展示最近 20 条，若确认框也按 20 报，
+     * 就是当着用户的面少报删除量。
+     */
+    suspend fun count(profileId: String): RepositoryResult<Int>
+
     suspend fun record(
         profileId: String,
         query: String,

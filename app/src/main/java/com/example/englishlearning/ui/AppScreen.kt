@@ -556,7 +556,7 @@ fun AppScreen(
                     onQueryChange = { globalSearch?.updateQuery(it) },
                     onSubmit = { globalSearch?.search() },
                     onRetry = { globalSearch?.retry() },
-                    onClearHistory = { globalSearch?.clearHistory() },
+                    onClearHistory = { globalSearch?.requestClearHistory() },
                     onOpenHistory = { query ->
                         globalSearch?.updateQuery(query)
                         globalSearch?.search()
@@ -567,6 +567,40 @@ fun AppScreen(
                     onSelect = { result -> globalSearch?.open(result) },
                     onBack = { showGlobalVocabularySearch = false },
                 )
+                // F4-01 Spec L18：清空搜索历史=不可逆操作，先报级联条数再二次确认；
+                // 「清空搜索历史」按钮只做 request，仓储 clear 只从「确认清空」进入。
+                val pendingClear = globalSearch?.pendingClear?.collectAsState()?.value
+                if (pendingClear != null) {
+                    AlertDialog(
+                        onDismissRequest = { globalSearch?.cancelClearHistory() },
+                        title = { Text("清空搜索历史？") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    if (pendingClear.recordCount != null) {
+                                        "将删除本机全部 ${pendingClear.recordCount} 条搜索记录。"
+                                    } else {
+                                        "将删除本机全部搜索记录（暂时读不到具体条数）。"
+                                    },
+                                )
+                                Text("收藏、文章与学习记录不受影响。", color = MintTextMuted)
+                                Text("清空不可撤销。", fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = { globalSearch?.clearHistory() },
+                                modifier = Modifier.testTag("search_history_clear_confirm"),
+                            ) { Text("确认清空") }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { globalSearch?.cancelClearHistory() },
+                                modifier = Modifier.testTag("search_history_clear_cancel"),
+                            ) { Text("取消") }
+                        },
+                    )
+                }
             } else if (selectedRelearnCard != null) {
                 val card = selectedRelearnCard!!
                 VocabularyRelearnScreen(

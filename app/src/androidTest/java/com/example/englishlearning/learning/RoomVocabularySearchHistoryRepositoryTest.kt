@@ -77,4 +77,23 @@ class RoomVocabularySearchHistoryRepositoryTest {
         assertTrue(((repository.list("profile-1", 20) as RepositoryResult.Success).value).isEmpty())
         assertEquals(1, (repository.list("profile-2", 20) as RepositoryResult.Success).value.size)
     }
+
+    /**
+     * 清空确认框报的是**真实总行数**：列表按 limit=20 展示，若确认框也按列表长度报，
+     * 第 21 条起就是当着用户的面少报删除量。这条把 count 与 list 的分工钉死。
+     */
+    @Test
+    fun countReportsAllRowsPerProfileBeyondTheDisplayLimit() = runBlocking {
+        val at = Instant.EPOCH
+        repeat(25) { index -> repository.record("profile-1", "word-$index", null, at.plusSeconds(index.toLong())) }
+        repository.record("profile-2", "other", null, at)
+
+        assertEquals(25, (repository.count("profile-1") as RepositoryResult.Success).value)
+        assertEquals(1, (repository.count("profile-2") as RepositoryResult.Success).value)
+        assertEquals(20, (repository.list("profile-1", 20) as RepositoryResult.Success).value.size)
+
+        repository.clear("profile-1")
+        assertEquals(0, (repository.count("profile-1") as RepositoryResult.Success).value)
+        assertEquals(1, (repository.count("profile-2") as RepositoryResult.Success).value)
+    }
 }

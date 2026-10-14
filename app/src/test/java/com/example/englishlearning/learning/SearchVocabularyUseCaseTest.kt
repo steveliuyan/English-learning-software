@@ -292,6 +292,9 @@ class SearchVocabularyUseCaseTest {
         override suspend fun list(profileId: String, limit: Int) =
             RepositoryResult.Success(emptyList<VocabularySearchHistory>())
 
+        override suspend fun count(profileId: String): RepositoryResult<Int> =
+            RepositoryResult.Success(0)
+
         override suspend fun record(
             profileId: String,
             query: String,

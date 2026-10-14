@@ -10,6 +10,9 @@ internal interface InternalVocabularySearchHistoryDao {
     @Query("SELECT * FROM vocabulary_search_history WHERE profileId = :profileId ORDER BY lastSearchedAtEpochMillis DESC LIMIT :limit")
     suspend fun list(profileId: String, limit: Int): List<VocabularySearchHistoryEntity>
 
+    @Query("SELECT COUNT(*) FROM vocabulary_search_history WHERE profileId = :profileId")
+    suspend fun countForProfile(profileId: String): Int
+
     @Query("SELECT * FROM vocabulary_search_history WHERE profileId = :profileId AND normalizedQuery = :normalizedQuery LIMIT 1")
     suspend fun find(profileId: String, normalizedQuery: String): VocabularySearchHistoryEntity?
 

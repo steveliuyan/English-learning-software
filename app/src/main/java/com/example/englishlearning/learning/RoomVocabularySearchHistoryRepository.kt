@@ -19,6 +19,9 @@ class RoomVocabularySearchHistoryRepository(
             database.internalVocabularySearchHistoryDao().list(profileId, limit.coerceAtLeast(0)).map { it.toVocabularySearchHistory() }
         }
 
+    override suspend fun count(profileId: String): RepositoryResult<Int> =
+        runStorage { database.internalVocabularySearchHistoryDao().countForProfile(profileId) }
+
     override suspend fun record(
         profileId: String,
         query: String,

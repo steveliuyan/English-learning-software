@@ -24,6 +24,7 @@ import java.time.ZoneOffset
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
@@ -190,6 +191,69 @@ class GlobalVocabularySearchViewModelTest {
         assertEquals(GlobalVocabularySearchUiState.Empty, vm.uiState.value)
         assertEquals(listOf("p1", "p1"), history.clearProfiles)
         assertEquals(listOf("two"), history.remainingFor("p2").map { it.normalizedQuery })
+    }
+
+    // ---- F4-01 Spec L18：清空搜索历史必须「级联条数 + 二次确认」 ----
+
+    /**
+     * 点「清空搜索历史」只是**打开确认框**：仓储 clear 必须零调用。
+     * 这条钉死的是不可逆操作的入口语义——确认框没点「确认清空」之前，一个字都不许删。
+     */
+    @Test
+    fun request_clear_history_previews_cascade_count_without_touching_storage() = runTest(dispatcher) {
+        val history = ObservableHistory(
+            entries = listOf(history("p1", "one", 1), history("p1", "two", 2), history("p2", "other", 1)),
+        )
+        val vm = viewModel(history = history)
+        vm.setProfile("p1")
+
+        vm.requestClearHistory()
+        advanceUntilIdle()
+
+        assertEquals(2, vm.pendingClear.value?.recordCount, "只数当前档案：p1 两条，别的档案不计入级联")
+        assertEquals(emptyList<String>(), history.clearProfiles)
+
+        vm.cancelClearHistory()
+        advanceUntilIdle()
+        assertNull(vm.pendingClear.value)
+        assertEquals(emptyList<String>(), history.clearProfiles)
+        assertEquals(2, history.remainingFor("p1").size, "取消后历史原样")
+    }
+
+    /** 确认路径沿用既有 clearHistory：成功后确认框收起，且只清当前档案。 */
+    @Test
+    fun confirm_clear_history_consumes_preview_and_clears_only_current_profile() = runTest(dispatcher) {
+        val history = ObservableHistory(entries = listOf(history("p1", "one", 1), history("p2", "other", 1)))
+        val vm = viewModel(history = history)
+        vm.setProfile("p1")
+        vm.requestClearHistory()
+        advanceUntilIdle()
+
+        vm.clearHistory()
+        advanceUntilIdle()
+
+        assertNull(vm.pendingClear.value)
+        assertEquals(listOf("p1"), history.clearProfiles)
+        assertEquals(GlobalVocabularySearchUiState.Empty, vm.uiState.value)
+    }
+
+    /**
+     * 级联条数**读不到**时不能把确认入口吞掉：用户依然要能二次确认清空，
+     * 只是文案退成「暂时读不到条数」。失败态吞掉按钮才是真缺陷。
+     */
+    @Test
+    fun unreadable_cascade_count_still_opens_double_confirmation_with_unknown_count() = runTest(dispatcher) {
+        val history = ObservableHistory(entries = listOf(history("p1", "one", 1)))
+        history.countFailure = true
+        val vm = viewModel(history = history)
+        vm.setProfile("p1")
+
+        vm.requestClearHistory()
+        advanceUntilIdle()
+
+        val pending = assertNotNull(vm.pendingClear.value, "条数失败也要开确认框，不能静默不响应")
+        assertNull(pending.recordCount)
+        assertEquals(emptyList<String>(), history.clearProfiles)
     }
 
     @Test
@@ -520,7 +584,12 @@ class GlobalVocabularySearchViewModelTest {
         val listProfiles = CopyOnWriteArrayList<String>()
         val clearProfiles = CopyOnWriteArrayList<String>()
         var clearFailure = false
+        var countFailure = false
         var recordCalls = 0
+        override suspend fun count(profileId: String): RepositoryResult<Int> {
+            if (countFailure) return RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
+            return RepositoryResult.Success(entries.count { it.profileId == profileId })
+        }
         override suspend fun list(profileId: String, limit: Int): RepositoryResult<List<VocabularySearchHistory>> {
             listProfiles += profileId
             return RepositoryResult.Success(entries.filter { it.profileId == profileId }.take(limit))

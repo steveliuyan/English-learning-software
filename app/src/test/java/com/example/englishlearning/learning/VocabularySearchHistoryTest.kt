@@ -104,6 +104,8 @@ class VocabularySearchHistoryTest {
     private class FailingVocabularySearchHistoryRepository : VocabularySearchHistoryRepository {
         override suspend fun list(profileId: String, limit: Int): RepositoryResult<List<VocabularySearchHistory>> = failure()
 
+        override suspend fun count(profileId: String): RepositoryResult<Int> = failure()
+
         override suspend fun record(
             profileId: String,
             query: String,
@@ -126,6 +128,9 @@ class VocabularySearchHistoryTest {
 
         override suspend fun list(profileId: String, limit: Int): RepositoryResult<List<VocabularySearchHistory>> =
             RepositoryResult.Success(rows.values.filter { it.profileId == profileId }.take(limit))
+
+        override suspend fun count(profileId: String): RepositoryResult<Int> =
+            RepositoryResult.Success(rows.values.count { it.profileId == profileId })
 
         override suspend fun record(
             profileId: String,

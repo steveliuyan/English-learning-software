@@ -51,6 +51,13 @@ data class GlobalVocabularySearchResultItem(
     val searchCountForDisplay: Int?,
 )
 
+/**
+ * F4-01 Spec L18：清空是不可逆操作，必须先给级联条数、再二次确认。
+ * [recordCount]=null 表示条数暂时读不到——确认框仍然打开（不能吞掉用户的确认入口），
+ * 文案退成「暂时读不到具体条数」。
+ */
+data class PendingSearchHistoryClear(val recordCount: Int?)
+
 @HiltViewModel
 class GlobalVocabularySearchViewModel @Inject constructor(
     private val searchVocabulary: SearchVocabularyOperator,
@@ -72,6 +79,10 @@ class GlobalVocabularySearchViewModel @Inject constructor(
      */
     private val _openedCard = MutableStateFlow<WordCard?>(null)
     val openedCard: StateFlow<WordCard?> = _openedCard
+
+    /** 「清空搜索历史」的二次确认状态；非空=确认框打开。见 [PendingSearchHistoryClear]。 */
+    private val _pendingClear = MutableStateFlow<PendingSearchHistoryClear?>(null)
+    val pendingClear: StateFlow<PendingSearchHistoryClear?> = _pendingClear
 
     private var profileId: String? = null
     private var showCount = true
@@ -97,6 +108,7 @@ class GlobalVocabularySearchViewModel @Inject constructor(
         lastHistory = emptyList()
         _query.value = ""
         _uiState.value = GlobalVocabularySearchUiState.Idle
+        _pendingClear.value = null
     }
 
     fun setShowCount(value: Boolean) {
@@ -185,10 +197,34 @@ class GlobalVocabularySearchViewModel @Inject constructor(
             else -> state
         }
 
+    /**
+     * 第一步：只**预览**级联条数并打开确认框，仓储 clear 零调用。
+     * 条数读不到时确认框照样打开（recordCount=null），不能让失败吞掉确认入口。
+     */
+    fun requestClearHistory() {
+        val id = profileId ?: return
+        _pendingClear.value = PendingSearchHistoryClear(null)
+        viewModelScope.launch {
+            val count = withContext(io) { historyRepository.count(id) }
+            // 用户可能已经取消或切了档案：只回填仍然挂着的、同档案的这一次请求。
+            if (_pendingClear.value != null && profileId == id) {
+                _pendingClear.value = (count as? RepositoryResult.Success)?.value
+                    ?.let(::PendingSearchHistoryClear)
+                    ?: PendingSearchHistoryClear(null)
+            }
+        }
+    }
+
+    /** 取消：确认框收起，历史零触碰。 */
+    fun cancelClearHistory() {
+        _pendingClear.value = null
+    }
+
     fun clearHistory() {
         val id = profileId ?: return
         val expected = ++generation
         job?.cancel()
+        _pendingClear.value = null
         _uiState.value = GlobalVocabularySearchUiState.ClearingHistory
         job = viewModelScope.launch {
             when (historyRepository.clear(id)) {
