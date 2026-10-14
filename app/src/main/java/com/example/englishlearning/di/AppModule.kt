@@ -102,10 +102,7 @@ import kotlinx.coroutines.Dispatchers
 object AppModule {
     @Provides @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "english-learning.db")
-            .addMigrations(*AppDatabase.MIGRATIONS)
-            .addCallback(AppDatabase.CONSTRAINT_CALLBACK)
-            .build()
+        AppDatabase.create(context, context.getDatabasePath("english-learning.db"))
     @Provides @Singleton fun provideSecretStore(@ApplicationContext context: Context): SecretStore = AndroidKeyStoreSecretStore(context)
     @Provides @Singleton fun provideClock(): ClockProvider = SystemClockProvider()
     @Provides @Named("io") fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
@@ -308,10 +305,12 @@ object AppModule {
     fun provideBackupRestoreCoordinator(
         @ApplicationContext context: Context,
         database: com.example.englishlearning.core.storage.AppDatabase,
-        indexRefresh: com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase,
-        reminderScheduler: com.example.englishlearning.notification.ReminderScheduler,
-        aiProfiles: com.example.englishlearning.ai.AiProfileRepository,
+        cards: WordCardSource,
+        bundledIds: com.example.englishlearning.learning.BundledWordBookIdSource,
+        importedIds: com.example.englishlearning.learning.ImportedWordBookIdSource,
+        clock: ClockProvider,
         aiSecrets: com.example.englishlearning.ai.AiProfileSecretUseCase,
+        @Named("io") io: CoroutineDispatcher,
     ): com.example.englishlearning.backup.restore.BackupRestoreCoordinator =
         com.example.englishlearning.backup.restore.BackupRestoreCoordinator(
             validator = com.example.englishlearning.backup.domain.BackupPackageValidator(),
@@ -333,18 +332,25 @@ object AppModule {
                     context,
                     com.example.englishlearning.backup.device.RestoreEntityDecoder(),
                 ),
+                // D-12：维护写入用临时新实例，不注入进程级 AppDatabase（close 后为僵尸）
                 postActions = com.example.englishlearning.backup.device.AndroidPostRestoreActions(
                     context,
-                    indexRefresh,
-                    reminderScheduler,
-                    aiProfiles,
+                    cards,
+                    bundledIds,
+                    importedIds,
+                    clock,
                     aiSecrets,
+                    io,
                 ),
                 clockMillis = { System.currentTimeMillis() },
             ),
             sessionIdProvider = { java.util.UUID.randomUUID().toString() },
             clock = { System.currentTimeMillis() / 1000 },
         )
+
+    @Provides @Singleton
+    fun provideProcessRestarter(restarter: com.example.englishlearning.backup.device.AndroidProcessRestarter):
+        com.example.englishlearning.backup.restore.ProcessRestarter = restarter
 
     @Provides @Singleton
     fun provideProtectedExportExecutor(

@@ -167,9 +167,23 @@ fun BackupRestoreScreen(
         }
         state.resultMessage?.let { Text(it, modifier = Modifier.testTag("backup_restore_result")) }
 
+        // AC4-07（D-12）：替换提交后本进程数据库访问已终止，唯一出路是重启应用。
+        if (state.appRestartRequired) {
+            Text(
+                "恢复流程已结束，本进程的数据访问到此为止——请重启应用后继续使用。",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.testTag("backup_restore_restart_notice"),
+            )
+            Button(
+                onClick = viewModel::restartNow,
+                modifier = Modifier.testTag("backup_restore_restart"),
+            ) { Text("立即重启应用") }
+        }
+
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = {
-            viewModel.cancel()
+            // 提交后不再 cancel 状态：重启提示必须留在界面上
+            if (!state.appRestartRequired) viewModel.cancel()
             onBack()
         }, modifier = Modifier.testTag("backup_restore_back")) { Text("返回") }
     }

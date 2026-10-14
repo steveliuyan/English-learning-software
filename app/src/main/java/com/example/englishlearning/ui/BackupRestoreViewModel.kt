@@ -8,6 +8,7 @@ import com.example.englishlearning.backup.pairing.MigrationCodeCodec
 import com.example.englishlearning.backup.pairing.MigrationCodeDecodeResult
 import com.example.englishlearning.backup.pairing.MigrationCodeFields
 import com.example.englishlearning.backup.restore.BackupRestoreCoordinator
+import com.example.englishlearning.backup.restore.ProcessRestarter
 import com.example.englishlearning.backup.restore.RestoreCommitResult
 import com.example.englishlearning.backup.restore.RestoreFailure
 import com.example.englishlearning.backup.restore.RestoreOutcome
@@ -34,6 +35,7 @@ data class BackupRestoreUiState(
     val passwordConsumed: Boolean = false,
     val errorMessage: String? = null,
     val resultMessage: String? = null,
+    val appRestartRequired: Boolean = false,
 )
 
 enum class BackupRestorePhase { Picking, Scanning, Password, Confirming, Restoring, Done }
@@ -41,6 +43,7 @@ enum class BackupRestorePhase { Picking, Scanning, Password, Confirming, Restori
 @HiltViewModel
 class BackupRestoreViewModel @Inject constructor(
     private val coordinator: BackupRestoreCoordinator,
+    private val processRestarter: ProcessRestarter,
 ) : ViewModel() {
 
     private val mutable = MutableStateFlow(BackupRestoreUiState())
@@ -101,7 +104,13 @@ class BackupRestoreViewModel @Inject constructor(
     /** Second confirmation: the user explicitly accepts "替换本机数据、不可合并". */
     fun onReplaceConfirmed() {
         val session = mutable.value.staged ?: return
-        mutable.value = mutable.value.copy(busy = true, phase = BackupRestorePhase.Restoring)
+        // D-12/AC4-07：提交一开始正式库即被 checkpointAndClose 关闭且永不复用，
+        // 无论成功还是回滚，本进程的数据访问都到此为止——必须重启应用。
+        mutable.value = mutable.value.copy(
+            busy = true,
+            phase = BackupRestorePhase.Restoring,
+            appRestartRequired = true,
+        )
         viewModelScope.launch {
             when (val result = coordinator.commit(session)) {
                 RestoreCommitResult.Restored -> mutable.value = mutable.value.copy(
@@ -112,6 +121,11 @@ class BackupRestoreViewModel @Inject constructor(
                 is RestoreCommitResult.Failed -> failWith(result.reason)
             }
         }
+    }
+
+    /** AC4-07：恢复提交阶段后唯一有效的下一步——重启应用拿到健康进程。 */
+    fun restartNow() {
+        if (mutable.value.appRestartRequired) processRestarter.relaunch()
     }
 
     fun cancel() {
@@ -152,12 +166,12 @@ class BackupRestoreViewModel @Inject constructor(
         RestoreFailure.ResourceRelationshipInvalid -> "备份包内的音频资源关系不完整，已拒绝恢复。"
         RestoreFailure.EntityReferenceInvalid -> "备份包内数据引用不完整，已拒绝恢复。"
         RestoreFailure.StorageInsufficient -> "设备存储空间不足，无法完成恢复。"
-        RestoreFailure.RollbackVerification -> "恢复后的数据校验失败，已自动回滚到恢复前状态。"
+        RestoreFailure.RollbackVerification -> "恢复后的数据校验失败，已自动回滚到恢复前状态。请重启应用后继续使用。"
     }
 
     private companion object {
         const val RESTORED_MESSAGE =
             "恢复完成：本机数据已替换为备份内容，搜索索引与提醒已重建，" +
-                "所有 AI Profile 的 API Key 已按安全策略删除，需重新填写。"
+                "所有 AI Profile 的 API Key 已按安全策略删除，需重新填写。请重启应用后继续使用。"
     }
 }

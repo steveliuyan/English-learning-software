@@ -30,9 +30,7 @@ class RoomRestoreDataWriter @Inject constructor(
         val stagedDb = File(dbDir, DATABASE_FILE_NAME)
         listOf(stagedDb, File(dbDir, "$DATABASE_FILE_NAME-wal"), File(dbDir, "$DATABASE_FILE_NAME-shm")).forEach { it.delete() }
 
-        val helper = androidx.room.Room.databaseBuilder(context, AppDatabase::class.java, stagedDb.absolutePath)
-            .addMigrations(*AppDatabase.MIGRATIONS)
-            .build()
+        val helper = AppDatabase.create(context, stagedDb)
         try {
             val rows = decoder.decode(session)
             runBlocking {

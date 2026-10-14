@@ -192,16 +192,12 @@ class DevicePairedRestoreE2ETest {
                 postActions = LoggingPostRestoreActions(
                     AndroidPostRestoreActions(
                         app,
-                        indexRefresh,
-                        WorkManagerReminderScheduler(
-                            app,
-                            RoomReminderPreferenceRepository(database, io),
-                            RoomTodayPlanRepository(database, io),
-                            RoomLearningEventRepository(database, io),
-                            clock,
-                        ),
-                        RoomAiProfileRepository(database, io),
+                        cards,
+                        BundledWordBookIdSource { bundledWordBookIds(metadataSource.read()) },
+                        ImportedWordBookIdSource { importedBookDirectories(File(app.filesDir, "wordbooks")).map { it.name }.toSet() },
+                        clock,
                         AiProfileSecretUseCase(com.example.englishlearning.core.security.AndroidKeyStoreSecretStore(app)),
+                        io,
                     ),
                     indexRefresh,
                     RoomLearningProfileRepository(database, io),
