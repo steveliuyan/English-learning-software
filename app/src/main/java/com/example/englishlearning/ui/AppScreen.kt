@@ -146,6 +146,7 @@ fun AppScreen(
     backupRestoreViewModel: BackupRestoreViewModel? = null,
     backupPairingExportViewModel: BackupProtectedExportViewModel? = null,
     favoritesViewModel: FavoritesViewModel? = null,
+    wrongWordsViewModel: WrongWordsViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -177,6 +178,8 @@ fun AppScreen(
             var selectedFavoriteCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             var favoritesPronunciationMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
             var favoritesPronunciationRequest by remember { mutableIntStateOf(0) }
+            // F4-01 决策⑤错词本：同级叠层；点词复用学习记录详情宿主（selectedLearningRecordCard）。
+            var showWrongWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             val wordBookWordsListState = key(state.profile.id, showWordBookWords) {
@@ -254,6 +257,9 @@ fun AppScreen(
                 ?: hashSetOf<String>()
             LaunchedEffect(state.profile.id, favoritesViewModel) {
                 favoritesViewModel?.load(state.profile.id)
+            }
+            LaunchedEffect(showWrongWords, state.profile.id) {
+                if (showWrongWords) wrongWordsViewModel?.load(state.profile.id)
             }
             val openedFavoriteCard = favoritesViewModel?.openedCard?.collectAsState()?.value
             LaunchedEffect(openedFavoriteCard, showFavorites) {
@@ -359,7 +365,7 @@ fun AppScreen(
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
-                showWordQaCard != null || showFavorites || selectedFavoriteCard != null
+                showWordQaCard != null || showFavorites || selectedFavoriteCard != null || showWrongWords
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -384,6 +390,8 @@ fun AppScreen(
                 favoritesPronunciationRequest++
                 favoritesPronunciationMessage = PronunciationStatus.Idle
             }
+            // 错词本复用学习记录详情宿主：详情打开时该处理器保持禁用，返回键先关详情。
+            BackHandler(enabled = showWrongWords && selectedLearningRecordCard == null) { showWrongWords = false }
             BackHandler(enabled = showGlobalVocabularySearch && selectedSearchCard == null) {
                 showGlobalVocabularySearch = false
             }
@@ -907,6 +915,11 @@ fun AppScreen(
                     } else {
                         null
                     },
+                    onOpenWrongWords = if (wrongWordsViewModel != null) {
+                        { showWrongWords = true }
+                    } else {
+                        null
+                    },
                 )
             } else if (showFavorites) {
                 FavoritesScreen(
@@ -914,6 +927,20 @@ fun AppScreen(
                     onBack = { showFavorites = false },
                     onOpenWord = { favoritesViewModel?.open(it) },
                     onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
+                )
+            } else if (showWrongWords) {
+                val wrongWordsState = wrongWordsViewModel?.uiState?.collectAsState()?.value
+                    ?: WrongWordsUiState.Loading
+                WrongWordsScreen(
+                    state = wrongWordsState,
+                    onBack = { showWrongWords = false },
+                    onOpenCard = {
+                        // 复用学习记录详情宿主：详情里笔记/收藏/重新学习全部现成。
+                        detailPronunciationMessage = PronunciationStatus.Idle
+                        learningRecordPronunciationRequest++
+                        detailSource = DetailSource.RECORDS
+                        selectedLearningRecordCard = it
+                    },
                 )
             } else if (showAiProfiles) {
                 val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }

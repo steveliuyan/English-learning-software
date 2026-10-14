@@ -53,6 +53,8 @@ fun CheckInScreen(
     onRetry: () -> Unit = {},
     // F4-01 决策⑦：打卡页是收藏页的唯一入口；ViewModel 未接线时入口整体不渲染。
     onOpenFavorites: (() -> Unit)? = null,
+    // F4-01 决策⑤：错词本入口与收藏并列，同样按接线与否显隐。
+    onOpenWrongWords: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(MintBackground).verticalScroll(rememberScrollState()).padding(20.dp).testTag("check_in_screen"),
@@ -62,6 +64,9 @@ fun CheckInScreen(
             Text("学习打卡", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.weight(1f))
             onOpenFavorites?.let { open ->
                 Text("我的收藏", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_favorites").semantics { contentDescription = "打开我的收藏" }.clickable(onClick = open).padding(10.dp))
+            }
+            onOpenWrongWords?.let { open ->
+                Text("错词本", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_wrong_words").semantics { contentDescription = "打开错词本" }.clickable(onClick = open).padding(10.dp))
             }
             Text("返回", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_back").semantics { contentDescription = "返回" }.clickable(onClick = onBack).padding(10.dp))
         }

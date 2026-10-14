@@ -41,6 +41,14 @@ internal data class CompletedCardRow(
     val cardId: String,
 )
 
+/** F4-01 决策⑤派生行：某 profile 下「最近一次学习事件反馈为 Again」的一张卡。 */
+internal data class WrongWordRow(
+    val cardId: String,
+    val wordBookId: String,
+    val lastFeedbackAtEpochMillis: Long,
+    val nextReviewAtEpochMillis: Long?,
+)
+
 @Dao
 internal interface InternalLearningStatsDao {
     @Query("SELECT COUNT(DISTINCT cardId) FROM learning_events WHERE profileId = :profileId AND occurredAtEpochMillis >= :fromEpochMillis AND occurredAtEpochMillis < :toExclusiveEpochMillis")
@@ -81,4 +89,25 @@ internal interface InternalLearningStatsDao {
     @Query("SELECT COUNT(*) FROM learning_events e JOIN today_plan_tasks t ON t.planId = e.planId " +
         "AND t.cardId = e.cardId AND t.taskKind = 'DUE' WHERE e.profileId = :profileId")
     suspend fun totalReviewEvents(profileId: String): Int
+
+    /**
+     * F4-01 决策⑤：错词 = 该 profile 下最近一次学习事件反馈为 Again 的卡（card_review_states 无
+     * profileId，不能承载按档案口径，故从只追加的 learning_events 派生）。
+     * 排序 COALESCE(card_review_states.nextReviewAtEpochMillis, 事件时间)：越急复习越靠前；
+     * GROUP BY 兜住同一毫秒双事件的退化（同卡同行，取一即可）。
+     *
+     * ORDER BY 必须重写子查询而不是引用别名：SQLite 只在「ORDER BY 裸名」时优先匹配结果别名，
+     * 嵌进 COALESCE 表达式就按源表列解析——`learning_events` 恰好有同名调度列，
+     * 真库 `RoomWrongWordsDerivationTest` 实测踩过（dog/big 顺序倒挂）。
+     */
+    @Query("SELECT e.cardId, e.wordBookId, e.occurredAtEpochMillis AS lastFeedbackAtEpochMillis, " +
+        "(SELECT MIN(s.nextReviewAtEpochMillis) FROM card_review_states s WHERE s.cardId = e.cardId) AS nextReviewAtEpochMillis " +
+        "FROM learning_events e " +
+        "WHERE e.profileId = :profileId AND e.feedback = 'Again' " +
+        "AND e.occurredAtEpochMillis = (SELECT MAX(l.occurredAtEpochMillis) FROM learning_events l " +
+        "WHERE l.profileId = e.profileId AND l.cardId = e.cardId) " +
+        "GROUP BY e.cardId " +
+        "ORDER BY COALESCE((SELECT MIN(s2.nextReviewAtEpochMillis) FROM card_review_states s2 WHERE s2.cardId = e.cardId), " +
+        "e.occurredAtEpochMillis) ASC")
+    suspend fun wrongWordRows(profileId: String): List<WrongWordRow>
 }

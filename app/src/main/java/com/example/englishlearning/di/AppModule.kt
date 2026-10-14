@@ -29,6 +29,8 @@ import com.example.englishlearning.learning.LearningRecordRepository
 import com.example.englishlearning.learning.RoomLearningRecordRepository
 import com.example.englishlearning.learning.FavoriteWordRepository
 import com.example.englishlearning.learning.RoomFavoriteWordRepository
+import com.example.englishlearning.learning.WrongWordsRepository
+import com.example.englishlearning.learning.RoomWrongWordsRepository
 import com.example.englishlearning.learning.RoomVocabularyRepository
 import com.example.englishlearning.learning.VocabularyRepository
 import com.example.englishlearning.learning.PlaceholderWordCardSource
@@ -135,6 +137,7 @@ object AppModule {
     @Provides @Singleton fun provideLearningEventRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): LearningEventRepository = RoomLearningEventRepository(database, dispatcher)
     @Provides @Singleton fun provideLearningRecordRepository(database: AppDatabase, cards: WordCardSource, clock: ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): LearningRecordRepository = RoomLearningRecordRepository(database, cards, clock, dispatcher)
     @Provides @Singleton fun provideFavoriteWordRepository(database: AppDatabase, clock: ClockProvider, @Named("io") dispatcher: CoroutineDispatcher): FavoriteWordRepository = RoomFavoriteWordRepository(database, clock, dispatcher)
+    @Provides @Singleton fun provideWrongWordsRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): WrongWordsRepository = RoomWrongWordsRepository(database, dispatcher)
     @Provides @Singleton fun provideVocabularyRepository(database: AppDatabase, @Named("io") dispatcher: CoroutineDispatcher): VocabularyRepository = RoomVocabularyRepository(database, dispatcher)
     @Provides @Singleton fun provideFsrsReviewScheduler(): FsrsReviewScheduler = FsrsReviewScheduler()
     @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider, scheduler: FsrsReviewScheduler): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock, scheduler = scheduler)
