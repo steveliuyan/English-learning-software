@@ -67,7 +67,8 @@ AndroidMigrationKey）本轮零触碰；报告与仓库不含任何密钥/挑战
 ## 附：推送核验
 
 `git ls-remote origin stage-qa-round-2-2026-10-14` →
-`de8c42d4e006cc4e4bc78fd8d29fee17e216a58a`（本简报提交；其下为实测提交 `0a526e2`、追回文档 `44307d5`）。
+`de8c42d4e006cc4e4bc78fd8d29fee17e216a58a`（本简报提交；其下为实测提交 `0a526e2`、追回文档 `44307d5`。
+最终分支 tip 含本行更新提交，以 ls-remote 实时输出为准）。
 
 ```
 你是 H:\EnglishLearningSoftware 的主对话。第二轮设备 QA 分对话已收工，交付在分支
