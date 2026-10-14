@@ -147,6 +147,7 @@ fun AppScreen(
     backupPairingExportViewModel: BackupProtectedExportViewModel? = null,
     favoritesViewModel: FavoritesViewModel? = null,
     wrongWordsViewModel: WrongWordsViewModel? = null,
+    articleVersionViewModel: ArticleVersionViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -329,6 +330,18 @@ fun AppScreen(
             val readingState: ReadingAccessUiState =
                 readingAccessViewModel?.uiState?.collectAsState()?.value ?: ReadingAccessUiState.Loading
             val readingTarget = readingAccessViewModel?.readingTarget?.collectAsState()?.value
+            // F4-01 决策 §8：删除某个文章版本成功后，按现参重放历史加载刷新列表；
+            // 计数只在「真删成功」时递增，拒删与失败都不该触发无谓重读。
+            val versionDeleteCount = articleVersionViewModel?.versionDeletions?.collectAsState()?.value ?: 0
+            LaunchedEffect(versionDeleteCount) {
+                if (versionDeleteCount > 0) {
+                    readingAccessViewModel?.load(
+                        profileId = state.profile.id,
+                        isUnlocked = todayReady?.isUnlocked == true,
+                        unlockReason = todayReady?.unlockReason ?: "今日计划尚未就绪",
+                    )
+                }
+            }
             // 任一来源产出文章都会设置 readingTarget：此时导入页让位给文章页，
             // 并把文章与词卡交给阅读页 ViewModel 渲染。
             LaunchedEffect(readingTarget) {
@@ -1111,11 +1124,42 @@ fun AppScreen(
             } else if (showReadingHistory && historyArticle == null) {
                 // 锁定态同样要给出历史：历史与解锁正交，未解锁只挡住「今天生成新文章」。
                 val history = readingState.historyOrEmpty
+                val versionState = articleVersionViewModel?.uiState?.collectAsState()?.value ?: ArticleVersionUiState()
                 ReadingHistoryScreen(
                     history = history,
                     onBack = { showReadingHistory = false },
                     onOpenArticle = { historyArticle = it },
+                    onRequestDeleteVersion = { articleVersionViewModel?.requestDelete(it) },
+                    notice = versionState.notice,
                 )
+                // F4-01 决策 §8：删除前二次确认，并明列级联影响条数；不点「确认删除」零写入。
+                val pendingDelete = versionState.pending
+                if (pendingDelete != null) {
+                    AlertDialog(
+                        onDismissRequest = { articleVersionViewModel?.cancelDelete() },
+                        title = { Text("删除这一版？") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("将删除《${pendingDelete.article.title}》第 ${pendingDelete.article.version} 版（${pendingDelete.article.localDate}）。")
+                                Text("级联影响：该版阅读完成记录 ${pendingDelete.impact.removedCompletionCount} 条将一并删除；同组剩余 ${pendingDelete.impact.remainingVersionCount} 个版本可读。")
+                                Text("删除不可撤销。", fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = { articleVersionViewModel?.confirmDelete() },
+                                enabled = !versionState.busy,
+                                modifier = Modifier.testTag("version_delete_confirm"),
+                            ) { Text("确认删除") }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { articleVersionViewModel?.cancelDelete() },
+                                modifier = Modifier.testTag("version_delete_cancel"),
+                            ) { Text("取消") }
+                        },
+                    )
+                }
             } else if (showArticleImport) {
                 val importState = (readingState as? ReadingAccessUiState.Ready)?.import ?: ImportUiState()
                 ArticleImportScreen(

@@ -8,6 +8,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishlearning.ui.AiProfileSettingsViewModel
 import com.example.englishlearning.ui.AppScreen
 import com.example.englishlearning.ui.ArticleReadingViewModel
+import com.example.englishlearning.ui.ArticleVersionViewModel
 import com.example.englishlearning.ui.CheckInViewModel
 import com.example.englishlearning.ui.FavoritesViewModel
 import com.example.englishlearning.ui.WrongWordsViewModel
@@ -57,6 +58,7 @@ class MainActivity : FragmentActivity() {
                 checkInViewModel = hiltViewModel<CheckInViewModel>(),
                 favoritesViewModel = hiltViewModel<FavoritesViewModel>(),
                 wrongWordsViewModel = hiltViewModel<WrongWordsViewModel>(),
+                articleVersionViewModel = hiltViewModel<ArticleVersionViewModel>(),
                 learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
                 wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),
                 vocabularyViewModel = hiltViewModel<VocabularyViewModel>(),
