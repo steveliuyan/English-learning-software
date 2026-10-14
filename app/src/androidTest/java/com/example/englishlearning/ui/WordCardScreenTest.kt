@@ -45,7 +45,7 @@ class WordCardScreenTest {
     }
 
     @Test
-    fun revealActionIsForwardedAndRevealedStateRendersMeaningAndInflections() {
+    fun revealActionIsForwardedOncePerTap() {
         var revealed = 0
         composeRule.setContent {
             WordCardScreen(state = ready(), onReveal = { revealed++ })
@@ -54,7 +54,10 @@ class WordCardScreenTest {
         composeRule.onNodeWithTag("word_card_reveal").performClick()
         composeRule.waitForIdle()
         assertEquals("the reveal button must forward exactly one action per tap", 1, revealed)
+    }
 
+    @Test
+    fun revealedStateRendersMeaningAndInflectionsAndHidesTheRevealButton() {
         composeRule.setContent {
             WordCardScreen(
                 state = ready(
