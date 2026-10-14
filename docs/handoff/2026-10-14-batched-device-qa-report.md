@@ -64,7 +64,7 @@
 ## 4. Git 状态
 
 - 分支：`stage-qa-batch-2026-10-14`（自 main tip `08cdd53` 切出，不动 main）。
-- 提交：本报告一件文档提交；推送状态与远端核验见报告末尾接续提示词前的收尾说明。
+- 报告主体提交：`36c675e`；本行为 push 核验补充提交。分支已推送 `origin/stage-qa-batch-2026-10-14`，`git ls-remote` 核验见文末附录说明。
 - 工作树除本报告外无遗留改动。
 
 ## 5. 未完成 / 遗留问题
@@ -92,6 +92,8 @@
 ---
 
 ## 附：可复制接续提示词（修 D-5）
+
+分支远端 tip 以 `git -c http.proxy=http://127.0.0.1:3067 -c https.proxy=http://127.0.0.1:3067 -c credential.interactive=false ls-remote origin stage-qa-batch-2026-10-14` 输出为准（本会话推送后核验通过）。
 
 ```
 你是 H:\EnglishLearningSoftware 的主对话。设备 QA 分支 stage-qa-batch-2026-10-14 报告
