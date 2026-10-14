@@ -299,6 +299,65 @@ class WordCardViewModelTest {
         assertEquals(WordCardUiState.Unavailable, harness.viewModel.uiState.value)
     }
 
+    @Test
+    fun `revealing the meaning alone records no event and keeps the card pending`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        val before = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
+        assertFalse(before.meaningRevealed, "a freshly shown card must start with the meaning hidden")
+
+        harness.viewModel.revealMeaning()
+        advanceUntilIdle()
+
+        val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
+        assertTrue(ready.meaningRevealed, "the reveal action must expose the meaning on the same card")
+        assertEquals("ability", ready.card.lemma)
+        assertEquals(0, ready.completedCount, "revealing is not a learning event and must not count as completion")
+        assertTrue(harness.events.events.isEmpty(), "revealing must append no learning event")
+    }
+
+    @Test
+    fun `advancing to the next card hides the meaning again`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+        harness.viewModel.revealMeaning()
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+
+        val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
+        assertEquals("achieve", ready.card.lemma)
+        assertFalse(ready.meaningRevealed, "each new card starts recall-first again")
+    }
+
+    @Test
+    fun `re-entering the flow hides the meaning of an unsubmitted card`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+        harness.viewModel.revealMeaning()
+        advanceUntilIdle()
+        assertTrue(assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value).meaningRevealed)
+
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
+        assertEquals("ability", ready.card.lemma)
+        assertFalse(ready.meaningRevealed, "leaving and re-entering an unsubmitted card resets it to recall-first")
+    }
+
+    @Test
+    fun `reveal is ignored outside the ready state`() = cardTest { harness ->
+        harness.planResult = TodayPlanResult.MissingLearningSetup
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.revealMeaning()
+        advanceUntilIdle()
+
+        assertEquals(WordCardUiState.MissingSetup, harness.viewModel.uiState.value)
+    }
+
     private fun cardTest(block: suspend TestScope.(Harness) -> Unit) =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))

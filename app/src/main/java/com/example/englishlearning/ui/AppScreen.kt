@@ -673,6 +673,7 @@ fun AppScreen(
                     WordCardScreen(
                         state = cardState,
                         onSubmit = wordCardViewModel::submit,
+                        onReveal = wordCardViewModel::revealMeaning,
                         onSpeak = { lemma ->
                             val request = ++wordCardPronunciationRequest
                             wordCardPronunciationMessage = PronunciationStatus.Playing.message()

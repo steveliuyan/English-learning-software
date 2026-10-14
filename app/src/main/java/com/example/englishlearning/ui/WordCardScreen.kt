@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -39,17 +40,20 @@ import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
 
 /**
- * Word card screen (spec F1-03).
+ * Word card screen (spec F1-03, recall-reveal-grade flow per decision 2026-10-14).
  *
- * Shows one plan card at a time with its lemma, IPA, part of speech and Chinese meaning;
- * the example sentence and inflections only appear when the content source provides them.
- * Exactly three fixed feedback actions are offered and there is deliberately no undo:
- * V1 must not let a submitted rating be silently replaced, or the schedule becomes ambiguous.
+ * The card front shows lemma, IPA and part of speech (plus the English example when the content
+ * source provides it, as a recall context clue); the Chinese meaning and inflections stay hidden
+ * until the user taps 显示释义. Grading with the meaning visible would measure recognition
+ * instead of recall and inflate FSRS intervals, so the reveal is an explicit action. The three
+ * fixed feedback actions stay available before and after reveal, and there is deliberately no
+ * undo: V1 must not let a submitted rating be silently replaced, or the schedule becomes ambiguous.
  */
 @Composable
 fun WordCardScreen(
     state: WordCardUiState,
     onSubmit: (CardFeedback) -> Unit = {},
+    onReveal: () -> Unit = {},
     onSpeak: (String) -> Unit = {},
     pronunciationMessage: String? = null,
     onRetry: () -> Unit = {},
@@ -196,14 +200,31 @@ fun WordCardScreen(
                                     .semantics { contentDescription = "词性 ${state.card.partOfSpeech}" },
                             )
                         }
-                        Text(
-                            text = state.card.meaningZh,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MintPrimaryDark,
-                            modifier = Modifier
-                                .testTag("word_card_meaning")
-                                .semantics { contentDescription = "释义 ${state.card.meaningZh}" },
-                        )
+                        if (state.meaningRevealed) {
+                            Text(
+                                text = state.card.meaningZh,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MintPrimaryDark,
+                                modifier = Modifier
+                                    .testTag("word_card_meaning")
+                                    .semantics { contentDescription = "释义 ${state.card.meaningZh}" },
+                            )
+                        } else {
+                            // Recall-first (F1-03): the meaning is only exposed by an explicit action.
+                            OutlinedButton(
+                                onClick = onReveal,
+                                enabled = !state.submitting,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("word_card_reveal")
+                                    .semantics { contentDescription = "显示释义" },
+                                shape = RoundedCornerShape(18.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = Color.Transparent,
+                                    contentColor = MintPrimaryDark,
+                                ),
+                            ) { Text("显示释义", fontWeight = FontWeight.Bold) }
+                        }
                         WordCardSpeakerButton(
                             lemma = state.card.lemma,
                             modifier = Modifier
@@ -220,7 +241,7 @@ fun WordCardScreen(
                                     .semantics { contentDescription = "例句 $example" },
                             )
                         }
-                        if (state.card.inflections.isNotEmpty()) {
+                        if (state.meaningRevealed && state.card.inflections.isNotEmpty()) {
                             val inflections = state.card.inflections.joinToString("、")
                             Text(
                                 text = "词形变化：$inflections",

@@ -38,6 +38,13 @@ sealed interface WordCardUiState {
         val isReview: Boolean = false,
         val taskCompletedCount: Int = 0,
         val taskTotal: Int = 0,
+        /**
+         * Recall-first flow (spec F1-03, decision 2026-10-14): the Chinese meaning and
+         * inflections stay hidden until the user explicitly reveals them. Revealing is not a
+         * learning event; every freshly emitted card starts hidden, so advancing or
+         * re-entering a session resets it.
+         */
+        val meaningRevealed: Boolean = false,
     ) : WordCardUiState
 
     /** Every card of the session has a recorded feedback; unlocking is F1-04's concern. */
@@ -93,9 +100,13 @@ class WordCardViewModel @Inject constructor(
     private var session: Session? = null
     private var pendingEventId: String? = null
 
+    /** Card whose meaning the user has explicitly revealed; at most one, and never a completed one. */
+    private var revealedCardId: String? = null
+
     fun load(profileId: String) {
         session = null
         pendingEventId = null
+        revealedCardId = null
         _detailCard.value = null
         _uiState.value = WordCardUiState.Loading
         viewModelScope.launch {
@@ -114,6 +125,19 @@ class WordCardViewModel @Inject constructor(
         if (current.phase != SessionPhase.REVIEW || current.reviewCardIds.any { it !in current.completed }) return
         current.phase = SessionPhase.NEW
         emit(current)
+    }
+
+    /**
+     * Explicit recall-first reveal (spec F1-03): exposes the hidden meaning on the visible card.
+     * Pure view state — no learning event is written, no completion changes, and a mid-submit
+     * or non-ready screen ignores it. Only the currently visible, unfinished card can hold the
+     * revealed flag; [load] clears it, and [emit] re-hides every other card.
+     */
+    fun revealMeaning() {
+        val ready = _uiState.value as? WordCardUiState.Ready ?: return
+        if (ready.submitting) return
+        revealedCardId = ready.card.cardId
+        _uiState.value = ready.copy(meaningRevealed = true)
     }
 
     fun submit(feedback: CardFeedback) {
@@ -269,6 +293,7 @@ class WordCardViewModel @Inject constructor(
                     isReview = current.phase == SessionPhase.REVIEW,
                     taskCompletedCount = phaseCards.count { it.cardId in current.completed },
                     taskTotal = phaseCards.size,
+                    meaningRevealed = card.cardId == revealedCardId,
                 )
             }
             current.phase == SessionPhase.REVIEW && current.newCardIds.isNotEmpty() -> {

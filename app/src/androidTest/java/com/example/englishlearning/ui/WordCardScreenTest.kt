@@ -27,7 +27,7 @@ class WordCardScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun readyRendersLemmaIpaPartOfSpeechAndMeaning() {
+    fun readyHidesMeaningAndInflectionsUntilTheRevealAction() {
         composeRule.setContent { WordCardScreen(state = ready()) }
 
         composeRule.onNodeWithTag("word_card_screen").assertExists()
@@ -37,9 +37,40 @@ class WordCardScreenTest {
         composeRule.onNodeWithText("əˈbɪləti").assertExists()
         composeRule.onNodeWithTag("word_card_part_of_speech").assertExists()
         composeRule.onNodeWithText("n.").assertExists()
+        composeRule.onNodeWithTag("word_card_progress").assertExists()
+        composeRule.onNodeWithTag("word_card_meaning").assertDoesNotExist()
+        composeRule.onNodeWithText("能力；才能").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_inflections").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_reveal").assertExists().assertHasClickAction()
+    }
+
+    @Test
+    fun revealActionIsForwardedAndRevealedStateRendersMeaningAndInflections() {
+        var revealed = 0
+        composeRule.setContent {
+            WordCardScreen(state = ready(), onReveal = { revealed++ })
+        }
+
+        composeRule.onNodeWithTag("word_card_reveal").performClick()
+        composeRule.waitForIdle()
+        assertEquals("the reveal button must forward exactly one action per tap", 1, revealed)
+
+        composeRule.setContent {
+            WordCardScreen(
+                state = ready(
+                    card(
+                        example = "She has the ability to explain ideas.",
+                        inflections = listOf("abilities"),
+                    ),
+                    meaningRevealed = true,
+                ),
+            )
+        }
         composeRule.onNodeWithTag("word_card_meaning").assertExists()
         composeRule.onNodeWithText("能力；才能").assertExists()
-        composeRule.onNodeWithTag("word_card_progress").assertExists()
+        composeRule.onNodeWithTag("word_card_inflections").assertExists()
+        composeRule.onNodeWithText("词形变化：abilities").assertExists()
+        composeRule.onNodeWithTag("word_card_reveal").assertDoesNotExist()
     }
 
     @Test
@@ -88,7 +119,7 @@ class WordCardScreenTest {
     }
 
     @Test
-    fun optionalExampleAndInflectionsAreRenderedWhenProvided() {
+    fun englishExampleStaysVisibleBeforeRevealAsRecallContext() {
         composeRule.setContent {
             WordCardScreen(
                 state = ready(card(example = "She has the ability to explain ideas.", inflections = listOf("abilities"))),
@@ -97,13 +128,14 @@ class WordCardScreenTest {
 
         composeRule.onNodeWithTag("word_card_example").assertExists()
         composeRule.onNodeWithText("She has the ability to explain ideas.").assertExists()
-        composeRule.onNodeWithTag("word_card_inflections").assertExists()
-        composeRule.onNodeWithText("词形变化：abilities").assertExists()
+        composeRule.onNodeWithTag("word_card_inflections").assertDoesNotExist()
     }
 
     @Test
     fun optionalExampleAndInflectionsAreAbsentWhenNotProvided() {
-        composeRule.setContent { WordCardScreen(state = ready(card(example = null, inflections = emptyList()))) }
+        composeRule.setContent {
+            WordCardScreen(state = ready(card(example = null, inflections = emptyList()), meaningRevealed = true))
+        }
 
         composeRule.onNodeWithTag("word_card_example").assertDoesNotExist()
         composeRule.onNodeWithTag("word_card_inflections").assertDoesNotExist()
@@ -176,6 +208,7 @@ class WordCardScreenTest {
         card: WordCard = card(),
         submitting: Boolean = false,
         message: String? = null,
+        meaningRevealed: Boolean = false,
     ) = WordCardUiState.Ready(
         card = card,
         position = 1,
@@ -183,6 +216,7 @@ class WordCardScreenTest {
         completedCount = 0,
         submitting = submitting,
         message = message,
+        meaningRevealed = meaningRevealed,
     )
 
     private fun card(
