@@ -110,4 +110,18 @@ internal interface InternalLearningStatsDao {
         "ORDER BY COALESCE((SELECT MIN(s2.nextReviewAtEpochMillis) FROM card_review_states s2 WHERE s2.cardId = e.cardId), " +
         "e.occurredAtEpochMillis) ASC")
     suspend fun wrongWordRows(profileId: String): List<WrongWordRow>
+
+    /**
+     * F4-01 Task10b 删除词书确认框的级联计数。三个口径各自对齐一条生产写路径：
+     * 词条按册（跨 profile）与 `deleteForWordBook` 同范围；学习事件与文章按 profile+册
+     * 数的是**保留面**——决策 §6 明文它们零触碰，条数进文案是为了让用户看见「删了什么、留了什么」。
+     */
+    @Query("SELECT COUNT(*) FROM vocabulary_entries WHERE wordBookId = :wordBookId")
+    suspend fun entriesForWordBook(wordBookId: String): Int
+
+    @Query("SELECT COUNT(*) FROM learning_events WHERE profileId = :profileId AND wordBookId = :wordBookId")
+    suspend fun eventsForWordBook(profileId: String, wordBookId: String): Int
+
+    @Query("SELECT COUNT(*) FROM articles WHERE profileId = :profileId AND activeWordBookId = :wordBookId")
+    suspend fun articlesForWordBook(profileId: String, wordBookId: String): Int
 }

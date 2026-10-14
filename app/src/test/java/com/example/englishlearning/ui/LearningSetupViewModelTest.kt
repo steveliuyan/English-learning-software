@@ -12,6 +12,8 @@ import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.learning.WordBookDeletionService
+import com.example.englishlearning.learning.WordBookDeletionPreview
+import com.example.englishlearning.learning.WordBookDeletionPreviewRepository
 import com.example.englishlearning.learning.WordBookProgress
 import com.example.englishlearning.learning.WordBookProgressMigrationCoordinator
 import com.example.englishlearning.learning.WordBookProgressMigrationService
@@ -299,6 +301,94 @@ class LearningSetupViewModelTest {
         assertEquals(listOf("cet4"), viewModel.uiState.value.wordBooks.map(WordBook::id))
     }
 
+    // ---- F4-01 Task10b：删除确认框的级联影响预览（保留面按决策 §6 计数） ----
+
+    @Test
+    fun `requestDelete fetches the cascade preview for the confirmation dialog`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("my-pack", "我的词书", "自定义", 1, "v1", "ngsl-nawl-1.2")
+        }
+        val previewRepository = FakeWordBookDeletionPreviewRepository(
+            Result.success(WordBookDeletionPreview(entryCount = 3, keptEventCount = 10, keptArticleCount = 2)),
+        )
+        val viewModel = setupViewModel(
+            repository,
+            bundledIds = emptySet(),
+            importedIds = setOf("my-pack"),
+            deletePreview = previewRepository,
+        )
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        viewModel.requestDelete(WordBook("my-pack", "我的词书", "自定义", 1, "v1", "ngsl-nawl-1.2"))
+        advanceUntilIdle()
+
+        assertEquals("my-pack", viewModel.uiState.value.pendingDelete?.id)
+        assertEquals(
+            WordBookDeletionPreview(entryCount = 3, keptEventCount = 10, keptArticleCount = 2),
+            viewModel.uiState.value.deletePreview,
+        )
+        assertEquals(listOf("default" to "my-pack"), previewRepository.calls)
+    }
+
+    @Test
+    fun `preview failure still opens the dialog without counts`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("my-pack", "我的词书", "自定义", 1, "v1", "ngsl-nawl-1.2")
+        }
+        val viewModel = setupViewModel(
+            repository,
+            bundledIds = emptySet(),
+            importedIds = setOf("my-pack"),
+            deletePreview = FakeWordBookDeletionPreviewRepository(Result.failure(IllegalStateException("storage"))),
+        )
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        viewModel.requestDelete(WordBook("my-pack", "我的词书", "自定义", 1, "v1", "ngsl-nawl-1.2"))
+        advanceUntilIdle()
+
+        // 二次确认不能因为读不出条数就消失——无条数版文案仍然要能确认/取消。
+        assertEquals("my-pack", viewModel.uiState.value.pendingDelete?.id)
+        assertEquals(null, viewModel.uiState.value.deletePreview)
+    }
+
+    @Test
+    fun `cancelDelete clears the pending preview too`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("my-pack", "我的词书", "自定义", 1, "v1", "ngsl-nawl-1.2")
+        }
+        val viewModel = setupViewModel(
+            repository,
+            bundledIds = emptySet(),
+            importedIds = setOf("my-pack"),
+            deletePreview = FakeWordBookDeletionPreviewRepository(
+                Result.success(WordBookDeletionPreview(1, 1, 1)),
+            ),
+        )
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        viewModel.requestDelete(WordBook("my-pack", "我的词书", "自定义", 1, "v1", "ngsl-nawl-1.2"))
+        advanceUntilIdle()
+        viewModel.cancelDelete()
+
+        assertEquals(null, viewModel.uiState.value.pendingDelete)
+        assertEquals(null, viewModel.uiState.value.deletePreview)
+    }
+
+    private class FakeWordBookDeletionPreviewRepository(
+        private val result: Result<WordBookDeletionPreview>,
+    ) : WordBookDeletionPreviewRepository {
+        val calls = mutableListOf<Pair<String, String>>()
+
+        override suspend fun preview(profileId: String, wordBookId: String): Result<WordBookDeletionPreview> {
+            calls += profileId to wordBookId
+            return result
+        }
+    }
+
+
     @Test
     fun `switching to a book with learned duplicates waits for confirmation before saving`() =
         runTest(dispatcher) {
@@ -453,6 +543,8 @@ class LearningSetupViewModelTest {
         importedIds: Set<String> = emptySet(),
         deletion: WordBookDeletionService? = null,
         migration: WordBookProgressMigrationCoordinator? = null,
+        deletePreview: WordBookDeletionPreviewRepository =
+            FakeWordBookDeletionPreviewRepository(Result.failure(IllegalStateException("unused"))),
     ) = LearningSetupViewModel(
         repository,
         seed(repository),
@@ -465,6 +557,7 @@ class LearningSetupViewModelTest {
         ImportedWordBookIdSource { importedIds },
         deletion ?: WordBookDeletionService(repository, java.io.File("")) { emptySet() },
         migration ?: WordBookProgressMigrationCoordinator(WordBookProgressMigrationService(cards, events)),
+        deletePreview = deletePreview,
     )
 
     private class FakeCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {

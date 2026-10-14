@@ -19,6 +19,8 @@ import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.SetupResult
 import com.example.englishlearning.learning.WordBook
+import com.example.englishlearning.learning.WordBookDeletionPreview
+import com.example.englishlearning.learning.WordBookDeletionPreviewRepository
 import com.example.englishlearning.learning.WordBookDeletionResult
 import com.example.englishlearning.learning.WordBookDeletionService
 import com.example.englishlearning.learning.WordBookProgress
@@ -57,6 +59,8 @@ data class LearningSetupUiState(
     val saving: Boolean = false,
     /** 待确认删除的导入册。 */
     val pendingDelete: WordBook? = null,
+    /** F4-01 Task10b：删除确认框的级联条数；null = 还没读到/读失败，对话框照常显示但不带数字。 */
+    val deletePreview: WordBookDeletionPreview? = null,
     val deleting: Boolean = false,
     /** 非空表示正在等待用户决定是否迁移重复词的复习状态。 */
     val pendingMigration: ProgressMigrationPreview? = null,
@@ -122,6 +126,12 @@ class LearningSetupViewModel @Inject constructor(
      * 可空是为了让既有单测不必构造整套索引依赖；生产装配点 [com.example.englishlearning.di.AppModule] 一定传入。
      */
     private val refreshIndex: RefreshVocabularySearchIndexUseCase? = null,
+    /**
+     * 删除确认框的级联计数预览（F4-01 Task10b，口径见决策 §6）。可空是为了让既有单测
+     * 不必构造计数依赖；生产装配点 [com.example.englishlearning.di.AppModule] 一定传入。
+     * 预览失败不阻断二次确认——只是少了数字，不是少了护栏。
+     */
+    private val deletePreview: WordBookDeletionPreviewRepository? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LearningSetupUiState())
     val uiState: StateFlow<LearningSetupUiState> = _uiState
@@ -314,11 +324,19 @@ class LearningSetupViewModel @Inject constructor(
 
     fun requestDelete(book: WordBook) {
         if (!_uiState.value.canDelete(book.id)) return
-        _uiState.value = _uiState.value.copy(pendingDelete = book)
+        // 对话框先出现（行为与加预览前一致），条数随后回填；读不出条数不影响二次确认本身。
+        _uiState.value = _uiState.value.copy(pendingDelete = book, deletePreview = null)
+        viewModelScope.launch {
+            val profileId = settingsProfileId ?: return@launch
+            val preview = this@LearningSetupViewModel.deletePreview?.preview(profileId, book.id)?.getOrNull()
+            if (_uiState.value.pendingDelete?.id == book.id) {
+                _uiState.value = _uiState.value.copy(deletePreview = preview)
+            }
+        }
     }
 
     fun cancelDelete() {
-        _uiState.value = _uiState.value.copy(pendingDelete = null)
+        _uiState.value = _uiState.value.copy(pendingDelete = null, deletePreview = null)
     }
 
     fun confirmDelete(profileId: String) {

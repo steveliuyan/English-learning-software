@@ -1576,11 +1576,31 @@ private fun LearningSetupScreen(
     }
 
     // 删除导入词书：删除前必须二次确认，内置册根本不会进入这里。
+    // 文案口径按 F4-01 决策 §6 反转：删的是词书内容与词条，学习历史与文章**保留**。
     state.pendingDelete?.let { book ->
         AlertDialog(
             onDismissRequest = viewModel::cancelDelete,
             title = { Text("删除《${book.displayName}》？") },
-            text = { Text("将删除这册导入词书的词卡文件，以及它在本机的学习记录、复习状态与生词记录。其他词书不受影响。") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val preview = state.deletePreview
+                    Text(
+                        if (preview != null) {
+                            "将删除这册导入词书的词卡文件与词条 ${preview.entryCount} 条。"
+                        } else {
+                            "将删除这册导入词书的词卡文件与全部词条内容。"
+                        },
+                    )
+                    Text(
+                        if (preview != null) {
+                            "学习历史与文章保留：该册学习记录 ${preview.keptEventCount} 条、文章 ${preview.keptArticleCount} 篇仍可翻阅（复习状态与生词笔记同保留）。"
+                        } else {
+                            "本机学习历史与文章保留，仍可翻阅；暂时读不到具体条数。"
+                        },
+                    )
+                    Text("其他词书不受影响。", color = MintTextMuted)
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.confirmDelete(profileId) },
