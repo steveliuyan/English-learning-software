@@ -6,7 +6,7 @@ package com.example.englishlearning.ai.domain
  * OpenAI 槽位时会对 `chat/completions` 端点发 `/audio/speech` 请求，必然 404。
  */
 enum class AiProviderKind {
-    /** OpenAI 兼容协议：`{endpoint}/audio/speech` + `Authorization: Bearer`。 */
+    /** OpenAI 兼容协议：`{endpoint}/audio/speech` + `Authorization: Bearer`。 */ // secret-scan-allowlist
     OPENAI_COMPATIBLE,
 
     /** 小米 MiMo 协议：`{endpoint}`（完整 chat/completions URL）+ `api-key` 头。 */
