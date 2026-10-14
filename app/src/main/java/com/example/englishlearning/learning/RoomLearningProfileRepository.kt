@@ -29,19 +29,24 @@ class RoomLearningProfileRepository(
     override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> =
         runStorage { database.internalWordBookDao().upsert(wordBook.toEntity()) }
 
+    /**
+     * F4-01 决策⑥：删词书 = 软删词书行 + 物理删词条与迁移审计，学习历史零触碰。
+     *
+     * 「删词书连带删 learning_events/card_review_states/today_plans/articles/
+     * reading_completions/word_ai_notes/asset_records」是对 AGENTS.md「词书各自维护
+     * 独立进度、切换不删除旧记录」的违反（原实现缺陷，androidTest
+     * RoomLearningProfileRepositoryTest.deleteWordBookSoftDeletesBookAndKeepsEveryLearningHistoryRow
+     * 在真库上钉死新语义）。事件日志与派生状态是本地学习的权威记录，词书只是内容源。
+     */
     override suspend fun deleteWordBook(profileId: String, wordBookId: String): RepositoryResult<Unit> =
         runStorage {
             database.withTransaction {
                 database.internalLearningProfileDao().isActiveWordBook(profileId, wordBookId).let { active ->
                     check(!active) { "cannot delete active word book" }
                 }
-                database.internalLearningEventDao().deleteEvents(wordBookId)
-                database.internalLearningEventDao().deleteReviewStates(wordBookId)
+                database.internalWordBookDao().markDeleted(wordBookId)
                 database.internalVocabularyEntryDao().deleteForWordBook(wordBookId)
                 database.internalWordBookProgressMigrationAuditDao().deleteForWordBook(wordBookId)
-                database.internalWordAiNoteDao().deleteForWordBook(wordBookId)
-                database.internalAssetDao().deleteForWordBook(wordBookId)
-                database.internalWordBookDao().deleteById(wordBookId)
             }
         }
 

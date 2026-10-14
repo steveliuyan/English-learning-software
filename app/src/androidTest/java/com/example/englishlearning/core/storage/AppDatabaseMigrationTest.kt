@@ -1005,4 +1005,57 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * v30 → v31：F4-01 决策⑥⑦——`word_books` 追加 `deleted` 软删标记（删词书不再
+     * 连带删学习历史），新表 `favorite_words` 承载收藏词。
+     *
+     * 迁移必须保老行：v30 的词书行迁移后原样存活、`deleted` 默认 0（老数据绝不能
+     * 被误标为已删）；列序尾追 `deleted` 与 Room 实体声明一致，由 schema 校验把关，
+     * 这里的 PRAGMA 断言是第二道闸。收藏表主键 (profileId, cardId) 给出
+     * INSERT OR IGNORE 幂等收藏语义。
+     */
+    @Test
+    fun migrateV30ToV31_addsSoftDeleteFlagAndFavoriteWordsTable() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 30).apply {
+            execSQL(
+                "INSERT INTO word_books (id, displayName, level, totalWords, dataVersion, sourceId) " +
+                    "VALUES ('cet4', '四级', '基础', 12, 'v1', 'ngsl-nawl-1.2')",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 31, true, AppDatabase.MIGRATION_30_31).apply {
+            query("SELECT displayName, deleted FROM word_books WHERE id = 'cet4'").use { cursor ->
+                assertTrue("加列迁移不得丢失既有词书行", cursor.moveToFirst())
+                assertEquals("四级", cursor.getString(0))
+                assertEquals("老数据必须默认未删", 0, cursor.getInt(1))
+            }
+            query("PRAGMA table_info(word_books)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(
+                    "deleted 必须尾追且列序与实体声明一致",
+                    listOf("id", "displayName", "level", "totalWords", "dataVersion", "sourceId", "deleted"),
+                    names,
+                )
+            }
+            assertTableExists("favorite_words")
+            query("PRAGMA table_info(favorite_words)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(
+                    "收藏表列序必须与实体声明一致",
+                    listOf("profileId", "cardId", "wordBookId", "lemma", "addedAtEpochMillis"),
+                    names,
+                )
+            }
+            execSQL("INSERT OR IGNORE INTO favorite_words (profileId, cardId, wordBookId, lemma, addedAtEpochMillis) VALUES ('default', 'cet4:cat', 'cet4', 'cat', 1)")
+            execSQL("INSERT OR IGNORE INTO favorite_words (profileId, cardId, wordBookId, lemma, addedAtEpochMillis) VALUES ('default', 'cet4:cat', 'cet4', 'cat', 2)")
+            query("SELECT COUNT(*) FROM favorite_words WHERE profileId = 'default' AND cardId = 'cet4:cat'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("同册同卡收藏必须幂等", 1, cursor.getInt(0))
+            }
+            close()
+        }
+    }
 }

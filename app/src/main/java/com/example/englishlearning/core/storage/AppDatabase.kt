@@ -28,6 +28,7 @@ import com.example.englishlearning.core.storage.entity.AiProfileEntity
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
+import com.example.englishlearning.core.storage.entity.FavoriteWordEntity
 import com.example.englishlearning.core.storage.entity.KeyAliasEntity
 import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
@@ -79,8 +80,9 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchGramEntit
         ReminderPreferenceEntity::class,
         com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity::class,
         MigrationPairingLedgerEntity::class,
+        FavoriteWordEntity::class,
     ],
-    version = 30,
+    version = 31,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -602,6 +604,24 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v30→v31：F4-01 决策⑥⑦（docs/decisions/2026-10-14-f4-01-history-stats-and-deletion-semantics.md）。
+         * `word_books` 尾追 `deleted` 软删标记（DEFAULT 0 保证老行一律视为未删），
+         * 新表 `favorite_words` 承载收藏词——建表 DDL 必须与 Room 依实体生成的
+         * 那条逐字一致，由 runMigrationsAndValidate 把关。学习历史各表零触碰。
+         */
+        val MIGRATION_30_31: Migration = object : Migration(30, 31) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `word_books` ADD COLUMN `deleted` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `favorite_words` (" +
+                        "`profileId` TEXT NOT NULL, `cardId` TEXT NOT NULL, `wordBookId` TEXT NOT NULL, " +
+                        "`lemma` TEXT NOT NULL, `addedAtEpochMillis` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`profileId`, `cardId`))",
+                )
+            }
+        }
+
+        /**
          * 统一 Schema 装配工厂：进程级单例、恢复提交的临时实例、RoomRestoreDataWriter
          * 换机新库共用同一迁移与回调，保证三处逐字节同构（D-12 决策，
          * docs/decisions/2026-10-14-restore-commit-temp-instance-and-restart.md）。
@@ -613,7 +633,7 @@ abstract class AppDatabase : RoomDatabase() {
                 .build()
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31)
 
         /**
          * 词条字串索引（FTS4 + 3-gram）的表名与建表 DDL。
