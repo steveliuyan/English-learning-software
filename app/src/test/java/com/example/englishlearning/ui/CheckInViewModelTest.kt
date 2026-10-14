@@ -79,14 +79,56 @@ class CheckInViewModelTest {
         Dispatchers.resetMain()
     }
 
+    @Test
+    fun `ready exposes cumulative totals streak and last seven days`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val stats = (1..30).map { day -> DailyLearningStats(LocalDate.of(2026, 9, day), 1, 0, 1, 2) }
+        val repository = FakeStats(Result.success(stats))
+        repository.totals = Result.success(com.example.englishlearning.learning.domain.LearningTotals(42, 17))
+        repository.streakResult = Result.success(5)
+        val vm = CheckInViewModel(repository, clock)
+        vm.load("p"); advanceUntilIdle()
+        val state = vm.uiState.value as CheckInUiState.Ready
+        assertEquals("累计学习 42 词 · 复习 17 次", state.totalsText)
+        assertEquals("连续学习 5 天", state.streakText)
+        assertEquals(7, state.recentDays.size)
+        assertEquals(date, state.recentDays.last().localDate)
+        assertEquals(date.minusDays(6), state.recentDays.first().localDate)
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `zero totals read as no learning records yet`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val repository = FakeStats(Result.success(emptyList()))
+        repository.totals = Result.success(com.example.englishlearning.learning.domain.LearningTotals(0, 0))
+        val vm = CheckInViewModel(repository, clock)
+        vm.load("p"); advanceUntilIdle()
+        assertEquals("暂无学习记录", (vm.uiState.value as CheckInUiState.Ready).totalsText)
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `totals failure makes the page unavailable`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val repository = FakeStats(Result.success(emptyList()))
+        repository.totals = Result.failure(IllegalStateException())
+        val vm = CheckInViewModel(repository, clock)
+        vm.load("p"); advanceUntilIdle()
+        assertEquals(CheckInUiState.Unavailable, vm.uiState.value)
+        Dispatchers.resetMain()
+    }
+
     private class FakeStats(private val result: Result<List<DailyLearningStats>>) : LearningStatsRepository {
+        var totals: Result<com.example.englishlearning.learning.domain.LearningTotals> =
+            Result.success(com.example.englishlearning.learning.domain.LearningTotals(0, 0))
+        var streakResult: Result<Int> = Result.success(0)
         override suspend fun today(profileId: String, localDate: LocalDate) = Result.failure<DailyLearningStats>(UnsupportedOperationException())
         override suspend fun range(profileId: String, from: LocalDate, to: LocalDate) = result
         override suspend fun historyRange(profileId: String, from: LocalDate, to: LocalDate) =
             Result.failure<kotlin.collections.List<com.example.englishlearning.learning.domain.DailyLearningHistory>>(NotImplementedError())
-        override suspend fun totals(profileId: String) =
-            Result.failure<com.example.englishlearning.learning.domain.LearningTotals>(NotImplementedError())
-        override suspend fun streak(profileId: String, today: LocalDate) = Result.failure<Int>(NotImplementedError())
+        override suspend fun totals(profileId: String) = totals
+        override suspend fun streak(profileId: String, today: LocalDate) = streakResult
     }
 
     private class ThrowingStats : LearningStatsRepository {
