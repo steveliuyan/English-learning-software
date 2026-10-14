@@ -40,6 +40,7 @@ class BackupExportCoordinatorTest {
         searchHistory = emptyList(),
         wordAiNotes = emptyList(),
         photoTranslations = emptyList(),
+        favorites = listOf(com.example.englishlearning.core.storage.entity.FavoriteWordEntity("p-1", "card-1", "wb-1", "cat", 95L)),
         assetRecords = listOf(AssetRecordEntity("asset-1", "hash-1", "assets/asset-1", 3L, 40L)),
     )
 
@@ -75,17 +76,18 @@ class BackupExportCoordinatorTest {
 
         val prepared = assertIs<BackupExportResult.Prepared>(result)
         assertEquals(createdAt, prepared.createdAtEpochMillis)
-        assertEquals(3, prepared.recordCount)
+        assertEquals(4, prepared.recordCount)
         assertEquals(1, prepared.mediaCount)
 
         val validator = BackupPackageValidator()
         val valid = assertIs<PackageValidationResult.Valid>(validator.validate(prepared.bytes))
-        assertEquals(listOf("asset-records", "media", "profiles", "word-books"), valid.manifest.scope)
+        assertEquals(listOf("asset-records", "favorites", "media", "profiles", "word-books"), valid.manifest.scope)
         assertEquals(createdAt, valid.manifest.createdAtEpochMillis)
         assertEquals("not-protected", valid.manifest.signatureStatus)
         val paths = valid.manifest.entries.map { it.path }.toSet()
         assertTrue("records/profiles/p-1.json" in paths)
         assertTrue("records/word-books/wb-1.json" in paths)
+        assertTrue(paths.any { it.startsWith("records/favorites/") }, "收藏走 records/favorites/<sha256>.json：$paths")
         assertTrue("resources/asset-1" in paths)
 
         val read = assertIs<PackageReadResult.Read>(validator.readEntries(prepared.bytes))
@@ -134,7 +136,7 @@ class BackupExportCoordinatorTest {
         assertEquals(0, prepared.mediaCount)
         val valid = assertIs<PackageValidationResult.Valid>(BackupPackageValidator().validate(prepared.bytes))
         assertTrue(valid.manifest.entries.none { it.path.startsWith("resources/") || it.path.contains("asset-records") })
-        assertEquals(listOf("profiles", "word-books"), valid.manifest.scope)
+        assertEquals(listOf("favorites", "profiles", "word-books"), valid.manifest.scope)
     }
 
     @Test

@@ -40,6 +40,7 @@ object BackupRecordTypes {
         "articles",
         "asset-records",
         "card-review-states",
+        "favorites",
         "learning-events",
         "learning-profiles",
         "learning-settings",

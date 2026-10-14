@@ -58,6 +58,9 @@ internal interface InternalBackupSourceDao {
     @Query("SELECT * FROM photo_translation_records")
     suspend fun allPhotoTranslations(): List<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>
 
+    @Query("SELECT * FROM favorite_words")
+    suspend fun allFavorites(): List<com.example.englishlearning.core.storage.entity.FavoriteWordEntity>
+
     @Query("SELECT * FROM asset_records")
     suspend fun allAssetRecords(): List<com.example.englishlearning.core.storage.entity.AssetRecordEntity>
 }

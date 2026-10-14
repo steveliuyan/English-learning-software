@@ -6,6 +6,7 @@ import com.example.englishlearning.backup.domain.BackupSourceRows
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
+import com.example.englishlearning.core.storage.entity.FavoriteWordEntity
 import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
@@ -45,6 +46,7 @@ class BackupSnapshotBuilderTest {
         searchHistory = emptyList(),
         wordAiNotes = emptyList(),
         photoTranslations = emptyList(),
+        favorites = emptyList(),
         assetRecords = emptyList(),
     )
 
@@ -75,6 +77,7 @@ class BackupSnapshotBuilderTest {
                 "rec-1", "p-1", "Birds fly.", "鸟儿会飞。", "MlKit", "a-1", 45L,
             ),
         ),
+        favorites = listOf(FavoriteWordEntity("p-1", "card-1", "wb-1", "cat", 95L)),
         assetRecords = listOf(AssetRecordEntity("a-1", "cafe", "assets/a-1", 9L, 40L)),
     )
 
@@ -102,10 +105,10 @@ class BackupSnapshotBuilderTest {
             "records/photo-translation-records/rec-1.json",
             "records/word-books/wb-1.json",
         )
-        val compositeTypes = setOf("migration-audits", "search-history", "today-plan-tasks", "vocabulary-entries")
+        val compositeTypes = setOf("favorites", "migration-audits", "search-history", "today-plan-tasks", "vocabulary-entries")
         val paths = records.map { it.path }.toSet()
 
-        assertEquals(17, records.size)
+        assertEquals(18, records.size)
         singleKeyPaths.forEach { assertTrue(it in paths, "missing $it") }
         compositeTypes.forEach { type ->
             val hashed = paths.filter { it.startsWith("records/$type/") }
@@ -190,6 +193,10 @@ class BackupSnapshotBuilderTest {
         )
         assertEquals(setOf("schemaVersion", "noteId", "profileId", "wordBookId", "cardId", "lemma", "kind", "answer", "createdAtEpochMillis"), keysOf("word-ai-notes"))
         assertEquals(
+            setOf("schemaVersion", "profileId", "cardId", "wordBookId", "lemma", "addedAtEpochMillis"),
+            keysOf("favorites"),
+        )
+        assertEquals(
             setOf(
                 "schemaVersion", "recordId", "profileId", "sourceText", "translatedText", "engine",
                 "imageAssetId", "createdAtEpochMillis",
@@ -253,7 +260,8 @@ class BackupSnapshotBuilderTest {
 
         assertTrue(withoutMedia.none { it.path.contains("asset-records") })
         assertTrue(withoutMedia.any { it.path.contains("photo-translation-records") }, "文本记录不受媒体开关影响")
-        assertEquals(16, withoutMedia.size)
+        assertTrue(withoutMedia.any { it.path.contains("favorites") }, "收藏不受媒体开关影响")
+        assertEquals(17, withoutMedia.size)
     }
 
     @Test

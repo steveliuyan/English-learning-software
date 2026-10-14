@@ -52,6 +52,7 @@ class RoomRestoreDataWriter @Inject constructor(
                     dao.insertSearchHistory(rows.searchHistory)
                     dao.insertWordAiNotes(rows.wordAiNotes)
                     dao.insertPhotoTranslations(rows.photoTranslations)
+                    dao.insertFavorites(rows.favorites)
                     dao.insertAssetRecords(rows.assetRecords)
                 }
                 helper.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }

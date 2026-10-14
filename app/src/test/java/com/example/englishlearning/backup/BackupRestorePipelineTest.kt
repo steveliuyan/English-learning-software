@@ -19,6 +19,7 @@ import com.example.englishlearning.backup.pairing.MigrationCodeFields
 import com.example.englishlearning.backup.pairing.PairedMigrationChallengeVerifier
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
+import com.example.englishlearning.core.storage.entity.FavoriteWordEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LocalProfileEntity
 import com.example.englishlearning.core.storage.entity.TodayPlanEntity
@@ -76,6 +77,7 @@ class BackupRestorePipelineTest {
                 "rec-1", "p-1", "Birds fly.", "鸟儿会飞。", "MlKit", "asset-1", 1L,
             ),
         ),
+        favorites = listOf(FavoriteWordEntity("p-1", "card-1", "wb-1", "cat", 1L)),
         assetRecords = listOf(
             AssetRecordEntity("asset-1", resourceBytes.sha256(), "assets/asset-1", resourceBytes.size.toLong(), 1L),
         ),
@@ -263,7 +265,7 @@ class BackupRestorePipelineTest {
         val session = staged(protectedWrite(), workspace = workspace).first
 
         assertEquals("session-1", session.sessionId)
-        assertEquals(9, session.recordCount)
+        assertEquals(10, session.recordCount)
         assertEquals(1, session.mediaCount)
         assertEquals(issuedAt, session.pairingIssuedAtEpochSeconds)
         assertTrue(workspace.exists("session-1"))
@@ -429,6 +431,25 @@ class BackupRestorePipelineTest {
     }
 
     @Test
+    fun `favorite referencing a missing profile is an entity reference failure`() {
+        val records = BackupSnapshotBuilder.buildRecords(rows, includeMediaAssets = true)
+        val entries = records.map {
+            ProtectedZipBackupPackageWriter.Entry(
+                it.path,
+                if (it.type == "favorites") {
+                    it.jsonText().replace("\"profileId\":\"p-1\"", "\"profileId\":\"ghost\"").toByteArray(Charsets.UTF_8)
+                } else {
+                    it.jsonBytes
+                },
+            )
+        } + ProtectedZipBackupPackageWriter.Entry("resources/asset-1", resourceBytes)
+
+        val outcome = coordinator().prepare(protectedWrite(entriesOverride = entries), scannedCode(), null)
+
+        assertEquals(RestoreFailure.EntityReferenceInvalid, assertIs<RestoreOutcome.Failed>(outcome).reason)
+    }
+
+    @Test
     fun `insufficient storage space rejects before any scratch write`() {
         val workspace = FakeWorkspace()
         val space = FakeSpaceChecker(hasRoom = false)
@@ -485,6 +506,7 @@ class BackupRestorePipelineTest {
         assertIs<RestoreRecordCodec.Result.Parsed>(decoded)
         assertEquals("p-1", decoded.rows.profiles.single().id)
         assertEquals("asset-1", decoded.rows.assetRecords.single().id)
+        assertEquals("cat", decoded.rows.favorites.single().lemma)
 
         val withUnknown = entries.toMutableMap()
         withUnknown["records/profiles/profile-1.json"] =

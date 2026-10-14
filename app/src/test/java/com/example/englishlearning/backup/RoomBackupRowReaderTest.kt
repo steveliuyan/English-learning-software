@@ -16,6 +16,7 @@ import kotlin.test.assertEquals
 private class FakeBackupDao : InternalBackupSourceDao {
     val profiles = listOf(LocalProfileEntity("p-1", "Me", 1L))
     val wordBooks = listOf(WordBookEntity("wb-1", "Core", "cet4", 1, "1", "src"))
+    val favorites = listOf(com.example.englishlearning.core.storage.entity.FavoriteWordEntity("p-1", "card-1", "wb-1", "cat", 5L))
     val assets = listOf(AssetRecordEntity("a-1", "aa", "assets/a-1", 1L, 1L))
 
     override suspend fun allProfiles() = profiles
@@ -34,6 +35,7 @@ private class FakeBackupDao : InternalBackupSourceDao {
     override suspend fun allSearchHistory() = emptyList<com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEntity>()
     override suspend fun allWordAiNotes() = emptyList<com.example.englishlearning.core.storage.entity.WordAiNoteEntity>()
     override suspend fun allPhotoTranslations() = emptyList<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>()
+    override suspend fun allFavorites() = favorites
     override suspend fun allAssetRecords() = assets
 }
 
@@ -50,6 +52,7 @@ class RoomBackupRowReaderTest {
 
         assertEquals(dao.profiles, rows.profiles)
         assertEquals(dao.wordBooks, rows.wordBooks)
+        assertEquals(dao.favorites, rows.favorites)
         assertEquals(dao.assets, rows.assetRecords)
         assertEquals(emptyList(), rows.articles)
         assertEquals(emptyList(), rows.learningEvents)

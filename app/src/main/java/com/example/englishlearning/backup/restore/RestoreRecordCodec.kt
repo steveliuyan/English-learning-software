@@ -3,6 +3,7 @@ package com.example.englishlearning.backup.restore
 import com.example.englishlearning.backup.domain.ArticleRecord
 import com.example.englishlearning.backup.domain.AssetRecordDto
 import com.example.englishlearning.backup.domain.CardReviewStateRecord
+import com.example.englishlearning.backup.domain.FavoriteWordRecord
 import com.example.englishlearning.backup.domain.LearningEventRecord
 import com.example.englishlearning.backup.domain.LearningProfileRecord
 import com.example.englishlearning.backup.domain.LearningSettingsRecord
@@ -45,6 +46,7 @@ internal object RestoreRecordCodec {
         val searchHistory: List<SearchHistoryRecord>,
         val wordAiNotes: List<WordAiNoteRecord>,
         val photoTranslations: List<com.example.englishlearning.backup.domain.PhotoTranslationRecordDto>,
+        val favorites: List<FavoriteWordRecord>,
         val assetRecords: List<AssetRecordDto>,
     ) {
         /** Plaintext record entries keyed by package path (`records/<type>/<id>.json`). */
@@ -98,6 +100,7 @@ internal object RestoreRecordCodec {
                     searchHistory = decodeList<SearchHistoryRecord>(buckets["search-history"]),
                     wordAiNotes = decodeList<WordAiNoteRecord>(buckets["word-ai-notes"]),
                     photoTranslations = decodeList<com.example.englishlearning.backup.domain.PhotoTranslationRecordDto>(buckets["photo-translation-records"]),
+                    favorites = decodeList<FavoriteWordRecord>(buckets["favorites"]),
                     assetRecords = decodeList<AssetRecordDto>(buckets["asset-records"]),
                 ),
             )
@@ -157,6 +160,7 @@ internal object RestoreContentValidator {
             },
             references { rows.wordAiNotes.all { it.profileId in profiles && it.wordBookId in wordBooks } },
             references { rows.photoTranslations.all { it.profileId in profiles } },
+            references { rows.favorites.all { it.profileId in profiles } },
         )
         return if (entityChecks.all { it }) Result.Valid else Result.Invalid(ContentFailure.EntityReference)
     }

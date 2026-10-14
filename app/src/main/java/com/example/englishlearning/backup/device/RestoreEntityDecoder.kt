@@ -3,6 +3,7 @@ package com.example.englishlearning.backup.device
 import com.example.englishlearning.backup.domain.ArticleRecord
 import com.example.englishlearning.backup.domain.AssetRecordDto
 import com.example.englishlearning.backup.domain.CardReviewStateRecord
+import com.example.englishlearning.backup.domain.FavoriteWordRecord
 import com.example.englishlearning.backup.domain.LearningEventRecord
 import com.example.englishlearning.backup.domain.LearningProfileRecord
 import com.example.englishlearning.backup.domain.LearningSettingsRecord
@@ -20,6 +21,7 @@ import com.example.englishlearning.backup.restore.StagedRestoreSession
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
+import com.example.englishlearning.core.storage.entity.FavoriteWordEntity
 import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
@@ -64,6 +66,7 @@ class RestoreEntityDecoder @Inject constructor() {
         val searchHistory: List<VocabularySearchHistoryEntity>,
         val wordAiNotes: List<WordAiNoteEntity>,
         val photoTranslations: List<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>,
+        val favorites: List<FavoriteWordEntity>,
         val assetRecords: List<AssetRecordEntity>,
     )
 
@@ -145,6 +148,11 @@ class RestoreEntityDecoder @Inject constructor() {
                     com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity(
                         d.recordId, d.profileId, d.sourceText, d.translatedText, d.engine, d.imageAssetId, d.createdAtEpochMillis,
                     )
+                }
+            },
+            favorites = records("favorites").map {
+                json.decodeFromString<FavoriteWordRecord>(text(it)).let { d ->
+                    FavoriteWordEntity(d.profileId, d.cardId, d.wordBookId, d.lemma, d.addedAtEpochMillis)
                 }
             },
             assetRecords = records("asset-records").map {

@@ -33,6 +33,7 @@ class RoomBackupRowReader(
             searchHistory = dao.allSearchHistory(),
             wordAiNotes = dao.allWordAiNotes(),
             photoTranslations = dao.allPhotoTranslations(),
+            favorites = dao.allFavorites(),
             assetRecords = dao.allAssetRecords(),
         )
     }

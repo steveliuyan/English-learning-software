@@ -74,6 +74,16 @@ class RoomFavoritesFlowTest {
             assertEquals(3, afterDeletion.size)
             assertTrue(afterDeletion.all { it.wordBookId == "imported" })
             assertEquals(listOf("big", "run", "cat"), afterDeletion.map { it.lemma })
+
+            // Task9：备份白名单第 18 条 SELECT 必须在真库（v31 建表）上读得到收藏行。
+            val snapshot = com.example.englishlearning.backup.infrastructure.RoomBackupRowReader(
+                database,
+                Dispatchers.Unconfined,
+            ).readAll()
+            assertEquals(
+                listOf("imported:cat", "imported:run", "imported:big"),
+                snapshot.favorites.sortedBy { it.addedAtEpochMillis }.map { it.cardId },
+            )
         } finally {
             if (database.isOpen) database.close()
             context.deleteDatabase(name)

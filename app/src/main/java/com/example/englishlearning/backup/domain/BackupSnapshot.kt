@@ -3,6 +3,7 @@ package com.example.englishlearning.backup.domain
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
+import com.example.englishlearning.core.storage.entity.FavoriteWordEntity
 import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
@@ -57,6 +58,7 @@ data class BackupSourceRows(
     val searchHistory: List<VocabularySearchHistoryEntity>,
     val wordAiNotes: List<WordAiNoteEntity>,
     val photoTranslations: List<com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity>,
+    val favorites: List<FavoriteWordEntity>,
     val assetRecords: List<AssetRecordEntity>,
 )
 
@@ -83,6 +85,7 @@ object BackupSnapshotBuilder {
         rows.searchHistory.forEach { records += record("search-history", compositeId(it.profileId, it.normalizedQuery), SearchHistoryRecord(it)) }
         rows.wordAiNotes.forEach { records += record("word-ai-notes", singleId(it.noteId), WordAiNoteRecord(it)) }
         rows.photoTranslations.forEach { records += record("photo-translation-records", singleId(it.recordId), PhotoTranslationRecordDto(it)) }
+        rows.favorites.forEach { records += record("favorites", compositeId(it.profileId, it.cardId), FavoriteWordRecord(it)) }
         if (includeMediaAssets) {
             rows.assetRecords.forEach { records += record("asset-records", singleId(it.id), AssetRecordDto(it)) }
         }
@@ -377,6 +380,25 @@ internal data class PhotoTranslationRecordDto(
         recordId = entity.recordId, profileId = entity.profileId, sourceText = entity.sourceText,
         translatedText = entity.translatedText, engine = entity.engine, imageAssetId = entity.imageAssetId,
         createdAtEpochMillis = entity.createdAtEpochMillis,
+    )
+}
+
+/**
+ * 收藏词备份 DTO（F4-01 决策⑦）：主键 (profileId, cardId) 是复合键，包内 stableId
+ * 走 sha256；wordBookId/lemma 随包携带，收藏不随词书软删消失，恢复后仍可直接展示。
+ */
+@Serializable
+internal data class FavoriteWordRecord(
+    val schemaVersion: Int = 1,
+    val profileId: String,
+    val cardId: String,
+    val wordBookId: String,
+    val lemma: String,
+    val addedAtEpochMillis: Long,
+) {
+    constructor(entity: FavoriteWordEntity) : this(
+        profileId = entity.profileId, cardId = entity.cardId, wordBookId = entity.wordBookId,
+        lemma = entity.lemma, addedAtEpochMillis = entity.addedAtEpochMillis,
     )
 }
 

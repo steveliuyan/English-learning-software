@@ -60,6 +60,7 @@ class BackupExportProtectedCoordinatorTest {
         searchHistory = emptyList(),
         wordAiNotes = emptyList(),
         photoTranslations = emptyList(),
+        favorites = emptyList(),
         assetRecords = emptyList(),
     )
 
@@ -81,6 +82,7 @@ class BackupExportProtectedCoordinatorTest {
             searchHistory = emptyList(),
             wordAiNotes = emptyList(),
             photoTranslations = emptyList(),
+            favorites = emptyList(),
             assetRecords = listOf(asset),
         )
     }
