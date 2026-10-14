@@ -42,7 +42,32 @@ tasks.register("verifyThirdPartyNotices") {
     }
 }
 
+tasks.register("verifyAcTraceabilityMatrix") {
+    group = "verification"
+    description = "AC5-01: every AC0..AC4 id in docs/specs/00-04 has an evidence row in the matrix."
+    val specFiles = fileTree("docs/specs").matching { include("0[0-4]-*.md") }
+    val matrixFile = layout.projectDirectory.file("docs/verification/ac-traceability-matrix.md")
+    inputs.files(specFiles)
+    inputs.file(matrixFile)
+    doLast {
+        val idRegex = Regex("""AC[0-4]-\d{2}""")
+        val required = specFiles.files.flatMap { idRegex.findAll(it.readText(Charsets.UTF_8)).map { m -> m.value } }.toSet()
+        val rows = matrixFile.asFile.readLines(Charsets.UTF_8)
+            .filter { it.startsWith("| AC") }
+            .map { line -> line.split('|').map { cell -> cell.trim() } }
+        val byId = rows.associate { cells -> cells[1] to cells.getOrElse(4) { "" } }
+        val errors = mutableListOf<String>()
+        (required - byId.keys).sorted().forEach { errors += "矩阵缺少行: $it" }
+        byId.forEach { (id, evidence) ->
+            if (evidence.isEmpty() || evidence == "（待填）") errors += "证据为空: $id"
+        }
+        (byId.keys - required).sorted().forEach { errors += "矩阵存在 specs 之外的行: $it" }
+        check(errors.isEmpty()) { errors.joinToString(separator = "\n") }
+        logger.lifecycle("AC matrix covered ${byId.size} ids with evidence.")
+    }
+}
+
 tasks.register("check") {
     group = "verification"
-    dependsOn("verifyThirdPartyNotices")
+    dependsOn("verifyThirdPartyNotices", "verifyAcTraceabilityMatrix")
 }
