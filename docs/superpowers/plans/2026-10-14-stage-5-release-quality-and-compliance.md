@@ -210,7 +210,7 @@ git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit -m "test(sta
 # scripts/secret-scan-selftest.sh
 set -eu
 TMP=$(mktemp -d)
-printf 'Authorization: Bearer abcdefghijklmnop\n' > "$TMP/dirty.txt"
+printf 'Authorization: Bearer abcdefghijklmnop\n' > "$TMP/dirty.txt"  # secret-scan-allowlist
 printf 'normal line\n' > "$TMP/clean.txt"
 if SECRET_SCAN_EXTRA_PATHS="$TMP/dirty.txt" bash "$(dirname "$0")/secret-scan.sh" >/dev/null 2>&1; then
   echo "FAIL: dirty input not caught"; exit 1
