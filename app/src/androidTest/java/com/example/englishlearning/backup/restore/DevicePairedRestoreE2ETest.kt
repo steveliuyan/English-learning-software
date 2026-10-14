@@ -23,11 +23,9 @@ import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.time.SystemClockProvider
 import com.example.englishlearning.learning.BundledWordBookIdSource
 import com.example.englishlearning.learning.ImportedWordBookIdSource
-import com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase
 import com.example.englishlearning.learning.RoomLearningEventRepository
 import com.example.englishlearning.learning.RoomLearningProfileRepository
 import com.example.englishlearning.learning.RoomTodayPlanRepository
-import com.example.englishlearning.learning.RoomVocabularySearchIndexRepository
 import com.example.englishlearning.learning.bundledWordBookIds
 import com.example.englishlearning.notification.RoomReminderPreferenceRepository
 import com.example.englishlearning.notification.WorkManagerReminderScheduler
@@ -64,79 +62,33 @@ class DevicePairedRestoreE2ETest {
 
     private class LoggingPostRestoreActions(
         private val delegate: PostRestoreActions,
-        private val indexRefresh: RefreshVocabularySearchIndexUseCase,
         private val profiles: RoomLearningProfileRepository,
-        private val cards: com.example.englishlearning.wordbook.CompositeWordCardSource,
-        private val index: RoomVocabularySearchIndexRepository,
-        private val bundledIds: BundledWordBookIdSource,
-        private val importedIds: ImportedWordBookIdSource,
         private val database: AppDatabase,
     ) : PostRestoreActions by delegate {
-        override fun rebuildSearchIndex(): Boolean = try {
-            kotlinx.coroutines.runBlocking {
-                try {
-                    val rows = database.internalWordBookDao().listAll()
-                    android.util.Log.i("QA-B1", "rawDao listAll ok rows=${rows.size} ids=${rows.map { it.id }}")
-                } catch (t: Throwable) {
-                    android.util.Log.e("QA-B1", "rawDao listAll threw: ${t}", t)
-                }
-                val all = when (val r = profiles.listWordBooks()) {
-                    is com.example.englishlearning.learning.RepositoryResult.Success -> r.value
-                    is com.example.englishlearning.learning.RepositoryResult.Failure -> {
-                        android.util.Log.e("QA-B1", "step listWordBooks=Failure(${r.error})")
-                        return@runBlocking false
+        // D-12 修复后真实维护走 delegate（临时实例）；下面的单例库探测仅作观察日志，
+        // 其失败是已知的 close() 取消语义，不再参与返回值判定。
+        override fun rebuildSearchIndex(): Boolean {
+            val real = delegate.rebuildSearchIndex()
+            android.util.Log.i("QA-B1", "delegate.rebuildSearchIndex=$real")
+            try {
+                kotlinx.coroutines.runBlocking {
+                    try {
+                        val rows = database.internalWordBookDao().listAll()
+                        android.util.Log.i("QA-B1", "rawDao listAll ok rows=${rows.size} ids=${rows.map { it.id }}")
+                    } catch (t: Throwable) {
+                        android.util.Log.e("QA-B1", "rawDao listAll threw: ${t}", t)
+                    }
+                    when (val r = profiles.listWordBooks()) {
+                        is com.example.englishlearning.learning.RepositoryResult.Success ->
+                            android.util.Log.i("QA-B1", "probe listWordBooks=${r.value.size}")
+                        is com.example.englishlearning.learning.RepositoryResult.Failure ->
+                            android.util.Log.e("QA-B1", "probe listWordBooks=Failure(${r.error})")
                     }
                 }
-                val b = bundledIds.ids()
-                val i = importedIds.ids()
-                val visible = com.example.englishlearning.learning.WordBookVisibility.visible(all, b, i)
-                android.util.Log.i(
-                    "QA-B1",
-                    "books all=${all.map { "${it.id}/${it.dataVersion}/${it.totalWords}" }} " +
-                        "bundled=${b.size} imported=${i.size} " +
-                        "visible=${visible.map { "${it.id}/${it.dataVersion}/${it.totalWords}" }}",
-                )
-                val versions = when (val r = index.indexedVersions()) {
-                    is com.example.englishlearning.learning.RepositoryResult.Success -> r.value
-                    is com.example.englishlearning.learning.RepositoryResult.Failure -> {
-                        android.util.Log.e("QA-B1", "step indexedVersions=Failure(${r.error})")
-                        return@runBlocking false
-                    }
-                }
-                android.util.Log.i("QA-B1", "indexedVersions=$versions")
-                for (book in visible) {
-                    if (versions[book.id] == book.dataVersion) continue
-                    val rawIds = cards.cardIds(book.id)
-                    val ids = rawIds.filterNot { it.startsWith("placeholder:") }
-                    android.util.Log.i(
-                        "QA-B1",
-                        "step book=${book.id} raw=${rawIds.size} ids=${ids.size} total=${book.totalWords}",
-                    )
-                    if (book.totalWords > 0 && ids.isEmpty()) {
-                        android.util.Log.e("QA-B1", "step emptyIdsForNonEmptyBook -> StorageUnavailable")
-                        return@runBlocking false
-                    }
-                    val content = cards.cards(ids).filter { it.wordBookId == book.id }
-                    android.util.Log.i("QA-B1", "step book=${book.id} content=${content.size} of ${ids.size}")
-                    if (content.size != ids.size) {
-                        android.util.Log.e("QA-B1", "step incompleteContent -> StorageUnavailable")
-                        return@runBlocking false
-                    }
-                }
-                when (val r = indexRefresh()) {
-                    is com.example.englishlearning.learning.RepositoryResult.Success -> {
-                        android.util.Log.i("QA-B1", "rebuildSearchIndex=Success(${r.value})")
-                        true
-                    }
-                    is com.example.englishlearning.learning.RepositoryResult.Failure -> {
-                        android.util.Log.e("QA-B1", "rebuildSearchIndex=Failure(${r.error})")
-                        false
-                    }
-                }
+            } catch (t: Throwable) {
+                android.util.Log.e("QA-B1", "probe threw", t)
             }
-        } catch (t: Throwable) {
-            android.util.Log.e("QA-B1", "rebuildSearchIndex threw", t)
-            false
+            return real
         }
 
         override fun rescheduleReminders(): Boolean =
@@ -169,13 +121,6 @@ class DevicePairedRestoreE2ETest {
                 io = io,
             ),
         )
-        val indexRefresh = RefreshVocabularySearchIndexUseCase(
-            RoomLearningProfileRepository(database, io),
-            cards,
-            RoomVocabularySearchIndexRepository(database, io),
-            BundledWordBookIdSource { bundledWordBookIds(metadataSource.read()) },
-            ImportedWordBookIdSource { importedBookDirectories(File(app.filesDir, "wordbooks")).map { it.name }.toSet() },
-        )
         return BackupRestoreCoordinator(
             validator = BackupPackageValidator(),
             pairingVerifier = PairedMigrationChallengeVerifier(JavaSecurityEcSignatureVerifier()),
@@ -199,12 +144,7 @@ class DevicePairedRestoreE2ETest {
                         AiProfileSecretUseCase(com.example.englishlearning.core.security.AndroidKeyStoreSecretStore(app)),
                         io,
                     ),
-                    indexRefresh,
                     RoomLearningProfileRepository(database, io),
-                    cards,
-                    RoomVocabularySearchIndexRepository(database, io),
-                    BundledWordBookIdSource { bundledWordBookIds(metadataSource.read()) },
-                    ImportedWordBookIdSource { importedBookDirectories(File(app.filesDir, "wordbooks")).map { it.name }.toSet() },
                     database,
                 ),
                 clockMillis = { System.currentTimeMillis() },
@@ -244,9 +184,11 @@ class DevicePairedRestoreE2ETest {
         val rollbacksAfter = rollbackRoot.listFiles()?.size ?: 0
         assertTrue("rollback point created", rollbacksAfter > rollbacksBefore)
         assertTrue("formal db present after swap", dbFile.length() > 0)
+        val newest = rollbackRoot.listFiles()!!.maxByOrNull { it.name.toLongOrNull() ?: Long.MIN_VALUE }!!
+        // 快照按 SwapTarget 分层：db 三件套在 rollback/<ts>/db/ 下。
         assertTrue(
             "rollback point keeps old db triple",
-            rollbackRoot.listFiles()!!.last().listFiles()!!.any { it.name == "english-learning.db" },
+            File(newest, "db").listFiles()?.any { it.name == "english-learning.db" } == true,
         )
     }
 

@@ -217,3 +217,28 @@ B1/B2/B3。git 网络命令一律加 -c http.proxy=http://127.0.0.1:3067 -c http
 - 计数：已验证 4（认证导出 e2e、prepare 全链、篡改拒绝、R3 冷启动×2 端）；新缺陷 6（D-7~D-12，其中 blocker 3）；blocked 4（B1 扫码环节（环境）、B3、B4、R4）。
 - 红线确认：`BackupCryptoPolicy` / `MigrationChallengePolicy` / `AndroidMigrationKey` 零改动；报告与仓库内无任何密钥/挑战明文；业务代码零改动（仅新增 androidTest 与文档）。
 - 遗留清理项：两台模拟器 `/data/local/tmp/qa-b1-*`、`pkg.zip` 为一次性 QA 数据（应用卸载不影响）；模拟器 A 字体已复原 1.0；A/B 均留有本轮 onboarding 演示档案，属 QA 环境正常状态。
+
+## R7 修复复验（主对话，2026-10-14，D-12 → D-10/D-11/D-9 → D-7/D-8）
+
+基线：分支 tip `08fc20b`（含 `29ca79e` D-12、`070be2a` D-10/D-11/D-9、`08fc20b` D-7/D-8）。
+
+- **A（emulator-5574）受保护导出全链 UI 走查通过**：滚动可达认证按钮 → BiometricPrompt（指纹）→
+  Active 页方形位图 QR（D-10）→ 页内滚动到「导出受保护备份包」（D-8）→ 导出 23 条 →
+  Done 页保留「选择保存位置并导出」与「显示配对码（需再次认证）」（D-11/D-9）→
+  SAF 落盘成功（文件名 `englishlearning-backup-20261014-123759.elpbak.zip`，SAF 按 MIME 追加 .zip）→
+  落盘后再认证再显示：**同一个挑战码**，zxing 从截图直接解码成功
+  （`ELPAIR1`，6 段，签发/过期时间戳齐全）。
+- **B（emulator-5576）connected E2E 通过**：真实包 + 真实挑战码推送 `/data/local/tmp` 后
+  `am instrument` 跑 `DevicePairedRestoreE2ETest`：**OK (2 tests)** ——
+  `commit is Restored`、回滚点含旧 DB 三件套（`rollback/<ts>/db/english-learning.db`）、
+  篡改包拒绝且正式 DB 逐字节不变。恢复后冷启动数据完好（词书/计划正常显示）。
+  这直接证明 D-12 生产修复（维护走 `withMaintenanceDatabase` 临时实例）在设备生效。
+- **复验中修掉的 3 个测试侧缺陷**（均在 androidTest，生产零改动）：
+  1. `LoggingPostRestoreActions.rebuildSearchIndex` 整体替换了 delegate，用已取消的单例库跑探测
+     DAO 并以其结果判定 commit 成败——D-12 修复后该路径必假，导致复验首跑 `RollbackVerification`
+     误报。改为：真实维护走 delegate，探测仅记日志不参与判定。
+  2. 回滚点断言用 `listFiles().last()`（字典序）会被历史 10 位时间戳目录干扰，改为按数值最大目录。
+  3. 断言路径错误：快照按 SwapTarget 分层，db 三件套在 `rollback/<ts>/db/` 下而非顶层。
+- 单测门禁：1322 全绿（≥ 基线 1304）。红线文件零触碰；报告与仓库不含密钥/挑战明文
+  （挑战码仅存 `.git/qa-scratch/`，不入库）。
+- 结论：D-7~D-12 全部设备复验通过；「旧设备导出 → 新设备认证恢复」端到端可达。
