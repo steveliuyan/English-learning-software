@@ -1092,7 +1092,19 @@ class AppScreenTest {
             override suspend fun allWords(wordBookId: String, now: java.time.Instant) =
                 RepositoryResult.Success(emptyList<WordBookRecord>())
         }
-        return LearningRecordsViewModel(repository, FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC))
+        val stats = object : com.example.englishlearning.learning.LearningStatsRepository {
+            override suspend fun today(profileId: String, localDate: java.time.LocalDate) =
+                Result.failure<com.example.englishlearning.learning.domain.DailyLearningStats>(UnsupportedOperationException())
+            override suspend fun range(profileId: String, from: java.time.LocalDate, to: java.time.LocalDate) =
+                Result.failure<List<com.example.englishlearning.learning.domain.DailyLearningStats>>(UnsupportedOperationException())
+            override suspend fun historyRange(profileId: String, from: java.time.LocalDate, to: java.time.LocalDate) =
+                Result.success(emptyList<com.example.englishlearning.learning.domain.DailyLearningHistory>())
+            override suspend fun totals(profileId: String) =
+                Result.failure<com.example.englishlearning.learning.domain.LearningTotals>(UnsupportedOperationException())
+            override suspend fun streak(profileId: String, today: java.time.LocalDate) =
+                Result.failure<Int>(UnsupportedOperationException())
+        }
+        return LearningRecordsViewModel(repository, stats, FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC))
     }
 
     @Composable

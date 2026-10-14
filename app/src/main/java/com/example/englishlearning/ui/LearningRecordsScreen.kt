@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
 import com.example.englishlearning.learning.domain.CardFeedback
+import com.example.englishlearning.learning.domain.DailyLearningHistory
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -111,7 +112,9 @@ fun LearningRecordsScreen(
                             item { EmptyState("还没有跨日期的学习记录", "learning_records_empty_history") }
                         } else {
                             state.history.forEach { group ->
-                                item(key = "date-${group.localDate}") { HistoryHeader(group) }
+                                item(key = "date-${group.localDate}") {
+                                    HistoryHeader(group, state.historyStats.firstOrNull { it.localDate == group.localDate })
+                                }
                                 items(group.records, key = { "history-${it.planId}-${it.cardId}" }) { row ->
                                     LearningRecordRow(row, onOpenRecord)
                                 }
@@ -164,16 +167,33 @@ private fun EmptyState(text: String, tag: String) {
 }
 
 @Composable
-private fun HistoryHeader(group: LearningHistoryGroup) {
-    Text(
-        text = "${group.localDate} · ${group.count} 词",
+private fun HistoryHeader(group: LearningHistoryGroup, stats: DailyLearningHistory?) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
+            .testTag("learning_records_history_header_${group.localDate}")
             .semantics { contentDescription = "学习日期 ${group.localDate}，${group.count} 词" },
-        color = MintPrimaryDark,
-        fontWeight = FontWeight.Bold,
-    )
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = "${group.localDate} · ${group.count} 词",
+            color = MintPrimaryDark,
+            fontWeight = FontWeight.Bold,
+        )
+        if (stats != null) {
+            // F4-01 详展行：册名 · 新词/复习完成数 · 解锁状态 · 文章生成与阅读状态（AC4-01）。
+            val article = when {
+                !stats.articleGenerated -> "文章未生成"
+                stats.articleRead -> "文章已生成·已读"
+                else -> "文章已生成·未读"
+            }
+            Text(
+                text = "${stats.activeWordBookName} · 新词 ${stats.newDone}/${stats.newTarget} · 复习 ${stats.dueDone}/${stats.dueTarget} · ${if (stats.unlocked) "已解锁" else "未解锁"} · $article",
+                color = MintTextMuted,
+            )
+        }
+    }
 }
 
 @Composable
