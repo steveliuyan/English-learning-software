@@ -55,5 +55,16 @@ class LearningStatsRepositoryContractTest {
                 .map { date -> profileStats[date] ?: DailyLearningStats(date, 0, 0, 0, 0) }
                 .toList())
         }
+
+        // F4-01 详展/累计/连续由 RoomLearningStatsRepositoryTest 与 connected 测试覆盖；
+        // 本契约测试只固化 range/today 语义，替身如实声明未实现。
+        override suspend fun historyRange(profileId: String, from: LocalDate, to: LocalDate) =
+            Result.failure<List<com.example.englishlearning.learning.domain.DailyLearningHistory>>(NotImplementedError())
+
+        override suspend fun totals(profileId: String) =
+            Result.failure<com.example.englishlearning.learning.domain.LearningTotals>(NotImplementedError())
+
+        override suspend fun streak(profileId: String, today: LocalDate) =
+            Result.failure<Int>(NotImplementedError())
     }
 }

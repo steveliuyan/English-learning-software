@@ -82,6 +82,11 @@ class CheckInViewModelTest {
     private class FakeStats(private val result: Result<List<DailyLearningStats>>) : LearningStatsRepository {
         override suspend fun today(profileId: String, localDate: LocalDate) = Result.failure<DailyLearningStats>(UnsupportedOperationException())
         override suspend fun range(profileId: String, from: LocalDate, to: LocalDate) = result
+        override suspend fun historyRange(profileId: String, from: LocalDate, to: LocalDate) =
+            Result.failure<kotlin.collections.List<com.example.englishlearning.learning.domain.DailyLearningHistory>>(NotImplementedError())
+        override suspend fun totals(profileId: String) =
+            Result.failure<com.example.englishlearning.learning.domain.LearningTotals>(NotImplementedError())
+        override suspend fun streak(profileId: String, today: LocalDate) = Result.failure<Int>(NotImplementedError())
     }
 
     private class ThrowingStats : LearningStatsRepository {
@@ -89,5 +94,10 @@ class CheckInViewModelTest {
         override suspend fun range(profileId: String, from: LocalDate, to: LocalDate): Result<List<DailyLearningStats>> {
             throw IllegalStateException("boom")
         }
+        override suspend fun historyRange(profileId: String, from: LocalDate, to: LocalDate) =
+            Result.failure<kotlin.collections.List<com.example.englishlearning.learning.domain.DailyLearningHistory>>(NotImplementedError())
+        override suspend fun totals(profileId: String) =
+            Result.failure<com.example.englishlearning.learning.domain.LearningTotals>(NotImplementedError())
+        override suspend fun streak(profileId: String, today: LocalDate) = Result.failure<Int>(NotImplementedError())
     }
 }
