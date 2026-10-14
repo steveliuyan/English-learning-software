@@ -645,6 +645,7 @@
 - 数据流: 同 mlkit-text-recognition 条目
 - NOTICE 位置: 本文件
 - 替代方案: 不可独立替换
+- 商业分发结论: 同 mlkit-text-recognition 条目
 
 ## mlkit-vision-interfaces
 - 名称: ML Kit Vision Interfaces (com.google.mlkit:vision-interfaces)

@@ -45,16 +45,20 @@ tasks.register("verifyThirdPartyNotices") {
 tasks.register("verifyAcTraceabilityMatrix") {
     group = "verification"
     description = "AC5-01: every AC0..AC4 id in docs/specs/00-04 has an evidence row in the matrix."
-    val specFiles = fileTree("docs/specs").matching { include("0[0-4]-*.md") }
+    val specFiles = fileTree("docs/specs").matching {
+        include("00-*.md", "01-*.md", "02-*.md", "03-*.md", "04-*.md")
+    }
     val matrixFile = layout.projectDirectory.file("docs/verification/ac-traceability-matrix.md")
     inputs.files(specFiles)
     inputs.file(matrixFile)
     doLast {
         val idRegex = Regex("""AC[0-4]-\d{2}""")
         val required = specFiles.files.flatMap { idRegex.findAll(it.readText(Charsets.UTF_8)).map { m -> m.value } }.toSet()
+        check(required.isNotEmpty()) { "No AC ids found in docs/specs/00-04 (spec glob broken?)." }
         val rows = matrixFile.asFile.readLines(Charsets.UTF_8)
             .filter { it.startsWith("| AC") }
             .map { line -> line.split('|').map { cell -> cell.trim() } }
+            .filter { cells -> cells.getOrElse(1) { "" }.matches(Regex("""AC[0-4]-\d{2}""")) }
         val byId = rows.associate { cells -> cells[1] to cells.getOrElse(4) { "" } }
         val errors = mutableListOf<String>()
         (required - byId.keys).sorted().forEach { errors += "矩阵缺少行: $it" }
