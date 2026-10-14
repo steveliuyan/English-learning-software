@@ -114,3 +114,33 @@ B1/B2/B3。git 网络命令一律加 -c http.proxy=http://127.0.0.1:3067 -c http
 - 已验证：A1（全量含补遗）、A4；部分验证：A2（SAF 层）、A3（可达+取消零写入层）。
 - blocked：A5、B1、B2、B3、B4、B5（拍板项）、C 组、T2（拍板项）。
 - 新缺陷：D-5 ×1（blocker）。
+
+---
+
+# 第二轮回归（2026-10-14，D-5 修复后）
+
+> 追回说明：上轮回归文档（提交 `1a493e0` / `43b4643`）因推送从未成功而丢失（本地对象库与远端均不存在；远端分支 `stage-qa-batch-2026-10-14` 内容止于 `fce2845`，已验证合入 main 后删除）。以下 §R1 各小节按第二轮任务书 §2 的分层表述重建当时记录；本会话第二轮实测结果在 §R2–§R4 单独标注验证层级，两类证据分开归属，不混写。
+
+## R1-a D-5 修复有效记录（引用 main 提交）
+
+- `734c7a3`：`MainActivity` 改继承 `androidx.fragment.app.FragmentActivity`，认证导出 BiometricPrompt 恢复可达；新增 `BiometricHostActivityContractTest` 点名守卫，单测 1302→1303。
+- `85da4fb`：契约测试推广为全仓矩阵（含 `as? FragmentActivity` 的全部屏幕 × Manifest 全部生产 Activity），矩阵唯一漏网宿主 `BrandLaunchActivity`（原 ComponentActivity）顺手改 FragmentActivity；单测 **1304 全绿**。
+- **D-6 裁决：误报，不重开**。全仓不存在 `BackupRestoreActivity`；BiometricPrompt 仅 `BackupPairingExportScreen.kt:82` 一处；恢复页是 composable `BackupRestoreScreen`（宿主 MainActivity，已 FragmentActivity），风险族被矩阵守卫钉死。
+
+## R1-b A2 认证导出 — 验证层级（重建自上轮丢失文档，主对话记录）
+
+- 模拟器（API 30 AVD，`adb emu ... finger touch 1` 模拟指纹）：BiometricPrompt 弹窗 → 认证 → 挑战 QR 签发 → SAF 保存，**端到端已验证**。
+- 真机 bf353dda：认证弹窗**可达已验证**；认证取消后**零写入已验证**。
+
+## R1-c A3 真机认证完成 — 环境限制（非产品缺陷）
+
+- 真机未录备用指纹/PIN、无设备内嵌指纹认证路径，真机上"认证完成"语义为**系统级不可行**；登记为「环境限制非产品缺陷」。模拟器 `finger touch` 手段可用，认证完成链路以模拟器证据为准。
+
+## R1-d 怪癖注记（本轮 QA 环境坑，后续会话沿用）
+
+- MIUI `am start` 抛 Binder 异常：改用 `monkey -p <pkg> -c android.intent.category.LAUNCHER 1` 启动。
+- `adb shell cat /sdcard/...` 的路径参数被 Git Bash 转成本地路径：改用 `adb pull`。
+- 模拟器 documentsui SAF 弹窗对 `adb input` 无响应（焦点停在 PickActivity），勿投入。
+- MIUI「显示备份密码」系统弹窗期间 `adb input` 非法。
+- MIUI u2000 会自动卸载 adb 安装的应用：装完立即测。
+- 同一 Compose 测试内两次 `setContent` 真机必炸：拆分测试。
