@@ -53,7 +53,7 @@ class BackupSourceReadOnlyContractTest {
         )
         val forbiddenTables = setOf(
             "ai_profiles", "ai_preferences", "key_aliases", "speech_preferences", "reminder_preferences",
-            "schema_meta", "vocabulary_search_index", "vocabulary_search_gram",
+            "schema_meta", "vocabulary_search_index", "vocabulary_search_gram", "migration_pairing_ledger",
         )
         assertTrue(tables.intersect(forbiddenTables).isEmpty())
     }

@@ -63,6 +63,7 @@ class BackupExportMustNotIncludeCredentialsTest {
         SchemaMetaEntity::class,
         VocabularySearchIndexEntity::class,
         VocabularySearchGramEntity::class,
+        com.example.englishlearning.core.storage.entity.MigrationPairingLedgerEntity::class,
     )
 
     private val forbiddenKeyNames = setOf(

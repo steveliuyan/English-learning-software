@@ -369,4 +369,16 @@ object AppModule {
             entropy = com.example.englishlearning.backup.infrastructure.SecureRandomBackupEntropy(),
             clock = { System.currentTimeMillis() / 1000 },
         )
+
+    /**
+     * AC4-05「已使用配对凭据被拒」消费台账：只持久化 nonce 的 SHA-256 摘要，
+     * 表 `migration_pairing_ledger` 不入备份包（新设备空台账起步）。注入到
+     * BackupProtectedExportViewModel，成功产包后登记、下次导出前先核验。
+     */
+    @Provides @Singleton
+    fun provideConsumedChallengeLedger(
+        database: AppDatabase,
+        @Named("io") dispatcher: CoroutineDispatcher,
+    ): com.example.englishlearning.backup.pairing.ConsumedChallengeLedger =
+        com.example.englishlearning.backup.infrastructure.RoomConsumedChallengeLedger(database, dispatcher)
 }

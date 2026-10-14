@@ -4,6 +4,7 @@ import kotlin.reflect.full.memberProperties
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -175,6 +176,51 @@ class MigrationChallengeIssuerTest {
                 if (value is ByteArray) assertTrue(!value.contentEquals(secretBytes))
             }
         }
+    }
+
+    @Test
+    fun `consuming the active challenge records one event and marks it used`() {
+        val source = issuer(FixedEntropy(mutableListOf(nonceBytes.copyOf(), secretBytes.copyOf())))
+        beginAndAuthenticate(source)
+        val issued = assertIs<PairingIssueResult.Issued>(source.completeAuthentication())
+        assertFalse(source.isChallengeConsumed(issued.challenge))
+
+        assertIs<PairingConsumeResult.Recorded>(source.consumeActiveChallenge())
+        assertTrue(source.isChallengeConsumed(issued.challenge))
+        assertIs<PairingPhase.Active>(source.phase(), "消费不撤销挑战：有效期内仍需重显配对码（AC4-08）")
+
+        assertIs<PairingConsumeResult.IgnoredAlreadyConsumed>(source.consumeActiveChallenge())
+        assertEquals(1, source.events().filterIsInstance<PairingLedgerEvent.Consumed>().size)
+        val consumed = source.events().filterIsInstance<PairingLedgerEvent.Consumed>().single()
+        assertEquals(nonceBytes.toHexString(), consumed.nonceHex)
+    }
+
+    @Test
+    fun `consume without an active challenge is ignored`() {
+        val source = issuer(FixedEntropy(mutableListOf(nonceBytes.copyOf(), secretBytes.copyOf())))
+        assertIs<PairingConsumeResult.IgnoredNothingActive>(source.consumeActiveChallenge())
+        beginAndAuthenticate(source)
+        assertIs<PairingConsumeResult.IgnoredNothingActive>(source.consumeActiveChallenge())
+    }
+
+    @Test
+    fun `a re-issued challenge is a fresh unconsumed nonce`() {
+        val source = issuer(
+            FixedEntropy(
+                mutableListOf(
+                    nonceBytes.copyOf(), secretBytes.copyOf(),
+                    nonceBytes.map { (it + 50).toByte() }.toByteArray(), secretBytes.copyOf(),
+                ),
+            ),
+        )
+        beginAndAuthenticate(source)
+        val first = assertIs<PairingIssueResult.Issued>(source.completeAuthentication())
+        assertIs<PairingConsumeResult.Recorded>(source.consumeActiveChallenge())
+
+        assertIs<PairingBeginResult.Started>(source.beginPairing())
+        val second = assertIs<PairingIssueResult.Issued>(source.completeAuthentication())
+        assertFalse(source.isChallengeConsumed(second.challenge), "新签发必须从未消费开始")
+        assertTrue(source.isChallengeConsumed(first.challenge), "旧 nonce 保持已消费")
     }
 
     private fun sha256Of(bytes: ByteArray): ByteArray =

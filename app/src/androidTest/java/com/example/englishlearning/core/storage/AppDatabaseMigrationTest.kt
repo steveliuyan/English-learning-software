@@ -967,4 +967,42 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * v29 → v30：AC4-05 已消费配对码台账（决策文档 §2.3 预留表落地）。
+     *
+     * 加表不改表：老库数据必须零触碰；新表只允许 `nonceHash`/`consumedAtEpochMillis`
+     * 两列——列名逐字核对是 MigrationTestHelper 之外的第二道闸，任何带 secret/nonce
+     * 明文字样的列都不该出现在这张表里；主键 + INSERT OR IGNORE 给出幂等登记语义。
+     */
+    @Test
+    fun migrateV29ToV30_createsConsumedPairingLedgerAndKeepsExistingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 29).apply {
+            execSQL("INSERT INTO local_profiles (id, displayName, createdAt) VALUES ('default', 'Ada', 1)")
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 30, true, AppDatabase.MIGRATION_29_30).apply {
+            query("SELECT displayName FROM local_profiles WHERE id = 'default'").use { cursor ->
+                assertTrue("加表迁移不得触碰既有行", cursor.moveToFirst())
+                assertEquals("Ada", cursor.getString(0))
+            }
+            assertTableExists("migration_pairing_ledger")
+            query("PRAGMA table_info(migration_pairing_ledger)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals("台账只存 nonce 摘要与消费时间，列序必须与实体声明一致",
+                    listOf("nonceHash", "consumedAtEpochMillis"), names)
+                assertFalse("列名不得携带 secret 字样", names.any { it.contains("secret", ignoreCase = true) })
+            }
+            // 主键去重给出幂等登记：重复消费同一 nonce 摘要不报错、不产生第二行。
+            execSQL("INSERT OR IGNORE INTO migration_pairing_ledger (nonceHash, consumedAtEpochMillis) VALUES ('ab', 1)")
+            execSQL("INSERT OR IGNORE INTO migration_pairing_ledger (nonceHash, consumedAtEpochMillis) VALUES ('ab', 2)")
+            query("SELECT COUNT(*) FROM migration_pairing_ledger WHERE nonceHash = 'ab'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
+            }
+            close()
+        }
+    }
 }

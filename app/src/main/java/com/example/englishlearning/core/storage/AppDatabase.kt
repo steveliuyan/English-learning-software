@@ -33,6 +33,7 @@ import com.example.englishlearning.core.storage.entity.LearningEventEntity
 import com.example.englishlearning.core.storage.entity.LearningProfileEntity
 import com.example.englishlearning.core.storage.entity.LearningSettingsEntity
 import com.example.englishlearning.core.storage.entity.LocalProfileEntity
+import com.example.englishlearning.core.storage.entity.MigrationPairingLedgerEntity
 import com.example.englishlearning.core.storage.entity.ReadingCompletionEntity
 import com.example.englishlearning.core.storage.entity.ReadingPreferenceEntity
 import com.example.englishlearning.core.storage.entity.SchemaMetaEntity
@@ -77,8 +78,9 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchGramEntit
         VocabularySearchGramEntity::class,
         ReminderPreferenceEntity::class,
         com.example.englishlearning.core.storage.entity.PhotoTranslationRecordEntity::class,
+        MigrationPairingLedgerEntity::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -123,6 +125,8 @@ abstract class AppDatabase : RoomDatabase() {
     internal abstract fun internalVocabularySearchIndexDao(): InternalVocabularySearchIndexDao
 
     internal abstract fun internalWordBookProgressMigrationAuditDao(): InternalWordBookProgressMigrationAuditDao
+
+    internal abstract fun internalMigrationPairingLedgerDao(): com.example.englishlearning.core.storage.dao.InternalMigrationPairingLedgerDao
 
     internal abstract fun internalBackupSourceDao(): com.example.englishlearning.backup.infrastructure.InternalBackupSourceDao
 
@@ -583,6 +587,21 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v29→v30：AC4-05 已消费配对码台账（决策文档 §2.3 预留表的落地）。
+         * 只存 nonce 的 SHA-256 摘要：加表不改表，老库数据零触碰；新设备恢复后从空台账开始
+         * （该表刻意不入备份包，见 BackupSourceReadOnlyContractTest 禁列表）。
+         */
+        val MIGRATION_29_30: Migration = object : Migration(29, 30) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `migration_pairing_ledger` (" +
+                        "`nonceHash` TEXT NOT NULL, `consumedAtEpochMillis` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`nonceHash`))",
+                )
+            }
+        }
+
+        /**
          * 统一 Schema 装配工厂：进程级单例、恢复提交的临时实例、RoomRestoreDataWriter
          * 换机新库共用同一迁移与回调，保证三处逐字节同构（D-12 决策，
          * docs/decisions/2026-10-14-restore-commit-temp-instance-and-restart.md）。
@@ -594,7 +613,7 @@ abstract class AppDatabase : RoomDatabase() {
                 .build()
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30)
 
         /**
          * 词条字串索引（FTS4 + 3-gram）的表名与建表 DDL。

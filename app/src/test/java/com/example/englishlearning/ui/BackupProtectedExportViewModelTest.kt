@@ -8,6 +8,9 @@ import com.example.englishlearning.backup.domain.BackupRowReader
 import com.example.englishlearning.backup.domain.BackupSecretEntropy
 import com.example.englishlearning.backup.domain.BackupSourceRows
 import com.example.englishlearning.backup.domain.MigrationSigner
+import com.example.englishlearning.backup.pairing.ConsumedChallengeLedger
+import com.example.englishlearning.backup.pairing.MigrationCodeCodec
+import com.example.englishlearning.backup.pairing.MigrationCodeDecodeResult
 import com.example.englishlearning.backup.infrastructure.ZipPackagePackager
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.LocalProfileEntity
@@ -29,6 +32,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -87,6 +91,24 @@ class BackupProtectedExportViewModelTest {
         }
     }
 
+    /** AC4-05 台账替身：记录被消费的 nonce；可预置已消费 nonce、模拟读/写故障。 */
+    private class FakeLedger : ConsumedChallengeLedger {
+        val consumed = mutableListOf<ByteArray>()
+        var seeded: List<ByteArray> = emptyList()
+        var markFails = false
+        var readFails = false
+
+        override suspend fun markConsumed(nonce: ByteArray) {
+            if (markFails) throw IllegalStateException("ledger write failed")
+            consumed += nonce.copyOf()
+        }
+
+        override suspend fun isConsumed(nonce: ByteArray): Boolean {
+            if (readFails) throw IllegalStateException("ledger read failed")
+            return (seeded + consumed).any { it.contentEquals(nonce) }
+        }
+    }
+
     private fun executor(): ProtectedExportExecutor = ProtectedExportExecutor(
         signerFactory = {
             MigrationSigner { scope ->
@@ -104,13 +126,18 @@ class BackupProtectedExportViewModelTest {
     )
 
     private lateinit var writer: FakeDestinationWriter
+    private lateinit var ledger: FakeLedger
     private lateinit var viewModel: BackupProtectedExportViewModel
+
+    /** FakeEntropy 下签发的 nonce 恒为 1..16（NONCE_BYTES=16）。 */
+    private val expectedNonce = ByteArray(16) { (it + 1).toByte() }
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         writer = FakeDestinationWriter()
-        viewModel = BackupProtectedExportViewModel(executor(), writer)
+        ledger = FakeLedger()
+        viewModel = BackupProtectedExportViewModel(executor(), writer, ledger)
     }
 
     @AfterEach
@@ -204,17 +231,116 @@ class BackupProtectedExportViewModelTest {
     }
 
     @Test
-    fun `starting a new export invalidates the previous pending package`() = runTest(dispatcher) {
+    fun `a second export attempt with a consumed pairing code is rejected and keeps the first package saveable`() = runTest(dispatcher) {
         exportReady()
         assertTrue(viewModel.state.value.packageReady)
 
         viewModel.exportProtected(includeMediaAssets = false, password = null)
-        // 新一轮生成尚未完成：旧待写字节必须已失效，此刻到达的 URI 不得落盘。
-        viewModel.onDocumentPicked(mockk())
         advanceUntilIdle()
 
-        assertEquals(0, writer.writeCalls)
-        assertTrue(viewModel.state.value.packageReady)
+        val error = assertNotNull(viewModel.state.value.error)
+        assertTrue(error.contains("已用于生成"), "必须诚实说明配对码已消费，实际：$error")
+        assertTrue(error.contains("重新"), "必须指引重新认证获取新配对码，实际：$error")
+        // 首个包仍属于这次已完成的签名，消费不撤销它：待写包不得被二次尝试清掉。
+        assertTrue(viewModel.state.value.packageReady, "被拒的二次尝试不得破坏已产出待写包")
+        assertEquals(1, ledger.consumed.size, "二次尝试不得再次签名或再次登记")
+
+        viewModel.onDocumentPicked(mockk())
+        advanceUntilIdle()
+        assertEquals(1, writer.writeCalls, "原待写包必须仍可落盘")
+    }
+
+    // ---- AC4-05：签发即消费（已使用配对码不得再签新包） ----
+
+    @Test
+    fun `producing a protected package consumes the pairing code in the ledger`() = runTest(dispatcher) {
+        exportReady()
+
+        val decoded = assertIs<MigrationCodeDecodeResult.Parsed>(
+            MigrationCodeCodec.decode(assertNotNull(viewModel.state.value.qrPayload)),
+        )
+        assertEquals(1, ledger.consumed.size, "成功产包必须恰好登记一次消费")
+        assertContentEquals(decoded.fields.nonce, ledger.consumed.single(), "登记的必须是本次签发的 nonce")
+        assertContentEquals(expectedNonce, ledger.consumed.single())
+    }
+
+    @Test
+    fun `a failed export does not consume the pairing code so the retry can still succeed`() = runTest(dispatcher) {
+        var signAllowed = false
+        val flipExecutor = ProtectedExportExecutor(
+            signerFactory = {
+                MigrationSigner { scope ->
+                    if (!signAllowed) null else {
+                        Signature.getInstance("SHA256withECDSA").run {
+                            initSign(key.private)
+                            update(scope)
+                            sign()
+                        }
+                    }
+                }
+            },
+            keySpki = { key.public.encoded },
+            delegate = BackupExportCoordinator(FakeRows(), FakeMedia(), ZipPackagePackager()) { createdAtMillis },
+            entropy = FakeEntropy(),
+            clock = { issuedAtSeconds },
+        )
+        val retryLedger = FakeLedger()
+        val vm = BackupProtectedExportViewModel(flipExecutor, writer, retryLedger)
+        vm.onAuthenticated()
+        advanceUntilIdle()
+
+        vm.exportProtected(includeMediaAssets = false, password = null)
+        advanceUntilIdle()
+        assertNotNull(vm.state.value.error, "D-9：签名不可用必须是可见错误")
+        assertEquals(0, retryLedger.consumed.size, "失败的导出不得消费配对码")
+
+        signAllowed = true
+        vm.exportProtected(includeMediaAssets = false, password = null)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.packageReady, "失败后重试必须仍可签名产包")
+        assertEquals(1, retryLedger.consumed.size)
+    }
+
+    @Test
+    fun `a pairing code already used in a previous session is refused before any signing`() = runTest(dispatcher) {
+        ledger.seeded = listOf(expectedNonce)
+
+        authenticate()
+        viewModel.exportProtected(includeMediaAssets = false, password = null)
+        advanceUntilIdle()
+
+        val error = assertNotNull(viewModel.state.value.error)
+        assertTrue(error.contains("已用于生成"), "台账命中必须给出消费文案，实际：$error")
+        assertFalse(viewModel.state.value.packageReady, "被拒的导出不得产出包")
+        assertEquals(0, ledger.consumed.size, "台账已命中的 nonce 不重复登记")
+    }
+
+    @Test
+    fun `ledger write failure after packaging voids the package and reports honestly`() = runTest(dispatcher) {
+        ledger.markFails = true
+
+        authenticate()
+        viewModel.exportProtected(includeMediaAssets = false, password = null)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertFalse(state.packageReady, "无法登记消费即无法保证一次性：包必须作废（fail-closed）")
+        viewModel.onDocumentPicked(mockk())
+        advanceUntilIdle()
+        assertEquals(0, writer.writeCalls, "作废的包不得被落盘")
+        assertNotNull(state.error)
+    }
+
+    @Test
+    fun `a consumed pairing code can still be revealed for the pending package`() = runTest(dispatcher) {
+        exportReady()
+        assertEquals(1, ledger.consumed.size)
+        val payload = viewModel.state.value.qrPayload
+
+        viewModel.onPairingRevealed()
+
+        assertTrue(viewModel.state.value.qrVisible, "AC4-08：重显是配对所需，不因消费而被拒")
+        assertEquals(payload, viewModel.state.value.qrPayload, "重显仍是同一配对码")
     }
 
     // ---- D-10/D-11/D-9（AC4-08）：显示门控与诚实文案 ----
@@ -272,7 +398,7 @@ class BackupProtectedExportViewModelTest {
             entropy = FakeEntropy(),
             clock = { issuedAtSeconds },
         )
-        val vm = BackupProtectedExportViewModel(failingExecutor, writer)
+        val vm = BackupProtectedExportViewModel(failingExecutor, writer, ledger)
         vm.onAuthenticated()
         advanceUntilIdle()
 

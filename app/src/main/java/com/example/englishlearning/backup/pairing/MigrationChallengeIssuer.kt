@@ -33,6 +33,9 @@ sealed interface PairingLedgerEvent {
     data class Superseded(val nonceHex: String, val reason: SupersededReason) : PairingLedgerEvent
 
     data class AuthenticationRejected(val reason: AuthenticationFailureReason) : PairingLedgerEvent
+
+    /** AC4-05：nonce 已被用于成功签发包；同一挑战不得再签新包，仅可重显（AC4-08）。 */
+    data class Consumed(val nonceHex: String) : PairingLedgerEvent
 }
 
 sealed interface PairingBeginResult {
@@ -56,6 +59,12 @@ sealed interface PairingAbandonResult {
     data object IgnoredNothingActive : PairingAbandonResult
 }
 
+sealed interface PairingConsumeResult {
+    data object Recorded : PairingConsumeResult
+    data object IgnoredNothingActive : PairingConsumeResult
+    data object IgnoredAlreadyConsumed : PairingConsumeResult
+}
+
 class MigrationChallengeIssuer(
     private val entropy: PairingEntropySource,
     private val clock: PairingClock,
@@ -63,6 +72,7 @@ class MigrationChallengeIssuer(
 ) {
     private var currentPhase: PairingPhase = PairingPhase.Idle
     private val ledger = mutableListOf<PairingLedgerEvent>()
+    private val consumedNonces = mutableSetOf<String>()
 
     fun phase(): PairingPhase = currentPhase
 
@@ -137,6 +147,23 @@ class MigrationChallengeIssuer(
         currentPhase = PairingPhase.Idle
         return PairingAbandonResult.Abandoned
     }
+
+    /**
+     * AC4-05: one successful package production consumes the active challenge. Consumption
+     * keeps the challenge active for reveal within its TTL (AC4-08) but closes it to any
+     * further signing; only a fresh authenticated pairing yields an unconsumed nonce.
+     */
+    fun consumeActiveChallenge(): PairingConsumeResult {
+        val active = currentPhase as? PairingPhase.Active ?: return PairingConsumeResult.IgnoredNothingActive
+        val nonceHex = active.challenge.nonce.toPairingHex()
+        if (nonceHex in consumedNonces) return PairingConsumeResult.IgnoredAlreadyConsumed
+        consumedNonces += nonceHex
+        ledger += PairingLedgerEvent.Consumed(nonceHex)
+        return PairingConsumeResult.Recorded
+    }
+
+    fun isChallengeConsumed(challenge: MigrationChallenge): Boolean =
+        challenge.nonce.toPairingHex() in consumedNonces
 
     private fun takeBytes(count: Int): ByteArray {
         val bytes = entropy.nextBytes(count)

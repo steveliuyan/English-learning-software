@@ -12,6 +12,7 @@ import com.example.englishlearning.backup.domain.ProtectedPackagingSpec
 import com.example.englishlearning.backup.infrastructure.BouncyCastleArgon2idKdf
 import com.example.englishlearning.backup.infrastructure.SecureRandomBackupEntropy
 import com.example.englishlearning.backup.infrastructure.TinkAes256GcmAead
+import com.example.englishlearning.backup.pairing.ConsumedChallengeLedger
 import com.example.englishlearning.backup.pairing.MigrationChallenge
 import com.example.englishlearning.backup.pairing.MigrationCodeCodec
 import com.example.englishlearning.backup.pairing.MigrationKeyOutcome
@@ -51,6 +52,7 @@ enum class ProtectedExportPhase { Idle, Authenticating, Active, Exporting, Done 
 class BackupProtectedExportViewModel @Inject constructor(
     private val exporter: ProtectedExportExecutor,
     private val destinationWriter: BackupDestinationWriter,
+    private val ledger: ConsumedChallengeLedger,
 ) : ViewModel() {
 
     private val mutable = MutableStateFlow(BackupProtectedExportUiState())
@@ -58,13 +60,18 @@ class BackupProtectedExportViewModel @Inject constructor(
 
     private var challenge: MigrationChallenge? = null
 
+    // AC4-05：本轮挑战是否已消费（成功产包）。持久判定仍以台账为准，此标记只为
+    // 在重复导出入口同步拒绝、不动已产出的待写包。
+    private var challengeConsumed = false
+
     // 待写字节只在内存持有；新一轮导出/成功/取消后置空，保证不会写入陈旧包。
     private var pending: ByteArray? = null
 
     /** 用户已通过系统认证（BiometricPrompt 成功回调）后调用。 */
     fun onAuthenticated() {
-        // 新挑战取代旧会话：上一轮待写包绑定旧挑战，必须同步作废。
+        // 新挑战取代旧会话：上一轮待写包绑定旧挑战，必须同步作废；消费标记随新挑战归零。
         pending = null
+        challengeConsumed = false
         mutable.value = mutable.value.copy(
             phase = ProtectedExportPhase.Active,
             error = null,
@@ -113,6 +120,11 @@ class BackupProtectedExportViewModel @Inject constructor(
             mutable.value = mutable.value.copy(error = "请先完成配对认证。")
             return
         }
+        if (challengeConsumed) {
+            // AC4-05：本会话已成功产过包——同步拒绝，不触碰待写包与界面其余状态。
+            mutable.value = mutable.value.copy(error = CONSUMED_ERROR)
+            return
+        }
         if (usePassword() && (password == null || !BackupCryptoPolicy.isPasswordShapeValid(password.size))) {
             password?.fill('\u0000')
             mutable.value = mutable.value.copy(error = "密码需为 10–128 个字符。注意：密码遗忘则备份无法恢复。")
@@ -128,8 +140,42 @@ class BackupProtectedExportViewModel @Inject constructor(
             fileName = null,
         )
         viewModelScope.launch {
+            // 台账优先：持久消费记录命中即拒绝，任何「已使用」配对码不得再签新包。
+            val consumptionState = runCatching { ledger.isConsumed(active.nonce) }
+            if (consumptionState.isFailure) {
+                mutable.value = mutable.value.copy(
+                    busy = false,
+                    phase = ProtectedExportPhase.Active,
+                    qrVisible = true,
+                    error = "无法核验配对码使用状态，已停止本次导出。请稍后重试。",
+                )
+                return@launch
+            }
+            if (consumptionState.getOrThrow()) {
+                challengeConsumed = true
+                mutable.value = mutable.value.copy(
+                    busy = false,
+                    phase = ProtectedExportPhase.Active,
+                    qrVisible = true,
+                    error = CONSUMED_ERROR,
+                )
+                return@launch
+            }
             when (val result = exporter.export(includeMediaAssets, active, if (usePassword()) password else null)) {
                 is BackupExportResult.Prepared -> {
+                    // 产包即消费：登记失败意味着一次性无法保证，包必须作废（fail-closed）。
+                    if (runCatching { ledger.markConsumed(active.nonce) }.isFailure) {
+                        pending = null
+                        mutable.value = mutable.value.copy(
+                            busy = false,
+                            phase = ProtectedExportPhase.Active,
+                            qrVisible = true,
+                            packageReady = false,
+                            error = "配对码使用状态登记失败，本次备份包已作废。请重新发起导出。",
+                        )
+                        return@launch
+                    }
+                    challengeConsumed = true
                     pending = result.bytes
                     mutable.value = mutable.value.copy(
                         busy = false,
@@ -205,6 +251,11 @@ class BackupProtectedExportViewModel @Inject constructor(
         BackupExportFailure.ResourceUnavailable -> "部分 AI 音频文件缺失，已停止导出。"
         BackupExportFailure.IntegrityFailure -> "数据完整性校验失败，已停止导出。"
         else -> "受保护备份包生成失败，请重试或联系支持。"
+    }
+
+    companion object {
+        internal const val CONSUMED_ERROR =
+            "该配对码已用于生成备份包，不可再次签名导出。请重新完成认证获取新配对码后再导出。"
     }
 }
 
