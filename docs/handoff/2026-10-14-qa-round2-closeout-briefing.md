@@ -63,3 +63,27 @@ AndroidMigrationKey）本轮零触碰；报告与仓库不含任何密钥/挑战
   A 字体已复原 1.0；B 的 `/data/local/tmp` 有一次性 QA 输入（过期码，可覆盖）。
 - 真机 bf353dda 数据未受影响（connected 测试从未在真机成功写入）。
 - 更多怪癖（PIN keyguard 解锁、Gboard 吞字、AOSP 相机劫持焦点、SAF D-pad 导航等）见报告 §R5。
+
+## 附：推送核验
+
+`git ls-remote origin stage-qa-round-2-2026-10-14` →
+`de8c42d4e006cc4e4bc78fd8d29fee17e216a58a`（本简报提交；其下为实测提交 `0a526e2`、追回文档 `44307d5`）。
+
+```
+你是 H:\EnglishLearningSoftware 的主对话。第二轮设备 QA 分对话已收工，交付在分支
+stage-qa-round-2-2026-10-14（远端 tip 以
+git -c http.proxy=http://127.0.0.1:3067 -c https.proxy=http://127.0.0.1:3067 -c credential.interactive=false ls-remote origin stage-qa-round-2-2026-10-14
+输出为准，最后核验值 de8c42d）。请：
+1) git fetch 后读 docs/handoff/2026-10-14-qa-round2-closeout-briefing.md（交接摘要）
+   与 2026-10-14-batched-device-qa-report.md §R2–R6（完整实测）。
+2) 裁决并按 TDD 修复三个 blocker，顺序 D-12 → D-10 → D-11（D-9 可并入 D-10/D-11 的
+   导出页改造；D-7/D-8 为 major 随后）。D-12 根因：Room 2.8.4 close() 取消
+   coroutineScope，swap 后 suspend DAO 必抛 JobCancellationException → commit 必回滚；
+   修法候选见简报 §5，checkpointAndClose 关库时序与回滚协议语义不得动，
+   BackupCryptoPolicy / MigrationChallengePolicy / AndroidMigrationKey 红线零触碰。
+3) 修复后用简报 §4 的 connected 测试复验（勿用 connectedDebugAndroidTest，
+   用 adb install -r + am instrument；30 分钟挑战过期需重新导出）。
+4) 范围变化先更新阶段 4 Spec，决策写 docs/decisions/；单测基线 1304 只增不减。
+提交身份 -c user.name=steveliuyan -c user.email=2021250388@qq.com。
+```
+
