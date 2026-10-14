@@ -3,3 +3,6 @@
 # 必须禁止 Git 的换行归一化（core.autocrlf=true 会把其中的 JSON 从 LF 转成 CRLF，
 # 导致 checkout 后的字节与清单不符、门禁在全新克隆上失败）。
 app/src/main/assets/kokoro-production/** -text -diff
+
+# Shell 脚本必须保持 LF：autocrlf=true 会把 .sh 转成 CRLF，bash 在 Windows 上会因行尾  报错或产生错误退出码。
+*.sh text eol=lf
