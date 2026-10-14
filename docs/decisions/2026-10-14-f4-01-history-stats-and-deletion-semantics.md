@@ -81,6 +81,26 @@ database.internalWordBookProgressMigrationAuditDao().deleteForWordBook(wordBookI
 - 理由：Spec L16「可管理文章版本」的最小有意义解释是「看得见、删得掉、删不空」；历史已解锁文章始终可重读要求每日至少存一版。
 - 备选被拒：任意删除（可能把某日删空，违反「历史文章可离线重读」）；版本激活（无字段支持，需要 schema 扩张与排序语义，超出 F4-01 范围）。
 
+### 9. 「删除全部学习数据」与「清空搜索历史」的口径（Task 10b-2/3）
+
+**决定（清空搜索历史）**：入口只做**预览**（真实总行数，`SELECT COUNT(*)`，不受列表 limit=20 影响）并打开确认框；只有确认框点「确认清空」才调用仓储 `clear`。条数读不到时确认框照样打开、文案退成「暂时读不到具体条数」——失败不能吞掉确认入口。
+
+**决定（删除全部学习数据）**：设置页新增「危险操作」入口，删除**当前档案的学习进度事实与派生态**，共五类：
+
+| 删除 | 表 | 口径 |
+|---|---|---|
+| 学习/复习记录 | `learning_events` WHERE profileId | 权威事件表，删后统计与错词本归零 |
+| 复习调度态 | `card_review_states` 全表 | 该表无 profileId 列；本机为单档案设备（`LocalProfileRepository.getDefault` 固定 `DEFAULT_ID`），全表清即当前档案清。它是可重建派生缓存，但事件同批删除后无可重建源=从零重学，正是该入口语义 |
+| 每日计划快照 | `today_plans` + 级联 `today_plan_tasks` WHERE profileId | 删后当日再进学习按 F1-02 重新生成不可变快照 |
+| 阅读完成记录 | `reading_completions` WHERE profileId | 「读过哪篇」是学习数据；**文章本体保留**（见下行） |
+| 进度迁移审计 | `word_book_progress_migration_audits` WHERE profileId | 审计对象（册间进度迁移）随进度一起失效 |
+
+**保留面**：`articles`（全部版本）、`favorite_words`、`vocabulary_entries` 与词书登记、`vocabulary_search_history`（独立入口清空）、全部设置与偏好、AI Profile/Key（本就不在 Room 业务表机密区之外——Key 在凭据区，此入口零触碰）、`asset_records` 与音频文件、`photo_translation_records`、`word_ai_notes`。确认框把删除条数与保留条数（文章 N 篇、收藏 M 条）一起列出，「不可撤销」加粗。
+
+- 理由：Spec L18 把「学习数据」列为可删对象并要求级联+二次确认；计划 Task 10 明确该入口「不含收藏/文章」——收藏与文章是用户内容资产（§6/§7 的保留面哲学），学习进度才是「学习数据」本体。
+- 备选被拒：连文章一起删（违反「历史文章始终可重读」的独立承诺，且用户没要求删内容）；连搜索历史一起删（两个清空各有入口、影响面分开报数更诚实）；软删可恢复（AGENTS.md 无回收站承诺，双确认+「不可撤销」文案即契约）。
+
+
 ## 影响
 
 - 数据层：Room v30→v31（`word_books.deleted` 列 + `favorite_words` 表），`31.json` 入库；`favorite_words` 加入备份导出白名单（源查询 17→18 条），`migration_pairing_ledger` 维持禁入。

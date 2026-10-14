@@ -25,6 +25,20 @@ internal interface InternalTodayPlanDao {
     @Query("DELETE FROM today_plans WHERE profileId = :profileId AND localDate = :localDate")
     suspend fun deletePlan(profileId: String, localDate: String)
 
+    // ---- F4-01 决策 §9：计划快照（含任务行）按档案计入「删除全部学习数据」 ----
+
+    @Query("SELECT COUNT(*) FROM today_plans WHERE profileId = :profileId")
+    suspend fun countForProfile(profileId: String): Int
+
+    /** 任务行没有 profileId 列，必须经 planId 子查询级联删；先删任务再删计划本体。 */
+    @Query(
+        "DELETE FROM today_plan_tasks WHERE planId IN (SELECT planId FROM today_plans WHERE profileId = :profileId)",
+    )
+    suspend fun deleteTasksForProfile(profileId: String)
+
+    @Query("DELETE FROM today_plans WHERE profileId = :profileId")
+    suspend fun deleteForProfile(profileId: String)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertPlan(plan: TodayPlanEntity)
 

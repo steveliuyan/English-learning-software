@@ -63,6 +63,25 @@ internal interface InternalLearningEventDao {
     @Query("DELETE FROM learning_events WHERE wordBookId = :wordBookId")
     suspend fun deleteEvents(wordBookId: String)
 
+    // ---- F4-01 决策 §9「删除全部学习数据」：按档案清事实，调度态整表清 ----
+
+    @Query("SELECT COUNT(*) FROM learning_events WHERE profileId = :profileId")
+    suspend fun countEventsForProfile(profileId: String): Int
+
+    @Query("DELETE FROM learning_events WHERE profileId = :profileId")
+    suspend fun deleteEventsForProfile(profileId: String)
+
+    /**
+     * 调度态整表数/整表清：`card_review_states` 没有 profileId 列，本机是单档案设备
+     * （`LocalProfileRepository.getDefault` 固定 DEFAULT_ID），整表清即当前档案清。
+     * 口径由 `RoomLearningDataDeletionTest` 钉死，改成 JOIN 词书要先过决策文档。
+     */
+    @Query("SELECT COUNT(*) FROM card_review_states")
+    suspend fun countAllReviewStates(): Int
+
+    @Query("DELETE FROM card_review_states")
+    suspend fun deleteAllReviewStates()
+
     @Query("SELECT COUNT(*) FROM learning_events WHERE planId = :planId AND cardId = :cardId")
     suspend fun countEventsForCard(planId: String, cardId: String): Int
 

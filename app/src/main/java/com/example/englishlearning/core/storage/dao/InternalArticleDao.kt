@@ -51,6 +51,10 @@ internal interface InternalArticleDao {
         lengthTier: String,
     ): Int
 
+    /** 保留面计数：「删除全部学习数据」确认框要明说保住了几篇文章（决策 §9）。 */
+    @Query("SELECT COUNT(*) FROM articles WHERE profileId = :profileId")
+    suspend fun countForProfile(profileId: String): Int
+
     @Query("SELECT COUNT(*) FROM reading_completions WHERE articleId = :articleId")
     suspend fun countCompletionsForArticle(articleId: String): Int
 

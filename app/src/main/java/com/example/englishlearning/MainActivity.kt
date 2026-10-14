@@ -17,6 +17,7 @@ import com.example.englishlearning.ui.ImageStudioViewModel
 import com.example.englishlearning.ui.ReminderSettingsViewModel
 import com.example.englishlearning.ui.LearningSetupViewModel
 import com.example.englishlearning.ui.LearningRecordsViewModel
+import com.example.englishlearning.ui.LearningDataDeletionViewModel
 import com.example.englishlearning.ui.WordBookWordsViewModel
 import com.example.englishlearning.ui.AppViewModel
 import com.example.englishlearning.ui.ReadingAccessViewModel
@@ -59,6 +60,7 @@ class MainActivity : FragmentActivity() {
                 favoritesViewModel = hiltViewModel<FavoritesViewModel>(),
                 wrongWordsViewModel = hiltViewModel<WrongWordsViewModel>(),
                 articleVersionViewModel = hiltViewModel<ArticleVersionViewModel>(),
+                learningDataDeletionViewModel = hiltViewModel<LearningDataDeletionViewModel>(),
                 learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
                 wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),
                 vocabularyViewModel = hiltViewModel<VocabularyViewModel>(),

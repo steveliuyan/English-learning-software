@@ -23,4 +23,8 @@ internal interface InternalFavoriteWordDao {
             "ORDER BY addedAtEpochMillis DESC, cardId ASC",
     )
     suspend fun listForProfile(profileId: String): List<FavoriteWordEntity>
+
+    /** 保留面计数：「删除全部学习数据」确认框要明说保住了几条收藏（决策 §9）。 */
+    @Query("SELECT COUNT(*) FROM favorite_words WHERE profileId = :profileId")
+    suspend fun countForProfile(profileId: String): Int
 }

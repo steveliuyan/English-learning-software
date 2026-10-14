@@ -25,5 +25,6 @@ object DomainColors {
     val Review = DomainAccent(Color(0xFFFF9F0A), Color(0xFFAB5700))     // 复习
     val Library = DomainAccent(Color(0xFFBF5AF2), Color(0xFF8E34B8))    // 词库
     val Reading = DomainAccent(Color(0xFFFF375F), Color(0xFFC81E46))    // 阅读
+    val Danger = DomainAccent(Color(0xFFFF3B30), Color(0xFFB30000))      // 不可撤销的破坏性操作
     val Settings = DomainAccent(Color(0xFF8E8E93), Color(0xFF48484A))   // 设置/中性
 }

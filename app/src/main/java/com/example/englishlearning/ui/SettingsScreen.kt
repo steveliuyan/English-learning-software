@@ -122,6 +122,10 @@ fun SettingsScreen(
     transferBusy: Boolean = false,
     /** 导入/导出的一句结果提示，`null` 时不占位。 */
     transferMessage: String? = null,
+    /** 危险操作入口（F4-01 决策 §9）：打开「删除全部学习数据」的级联预览+二次确认框。 */
+    onDeleteAllLearningData: () -> Unit = {},
+    /** 「删除全部学习数据」的一句结果回执（删除成功或预览读取失败），`null` 时不占位。 */
+    deleteAllLearningDataNotice: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -292,6 +296,31 @@ fun SettingsScreen(
                 badge = "⭕",
                 accent = DomainColors.Settings,
             )
+        }
+
+        // F4-01 决策 §9：删除全部学习数据是全机唯一会清空学习事实的入口。Spec 04 L18
+        // 要求级联影响+二次确认——确认框在 AppScreen 宿主，本行只发 request。
+        // 文案讲清保留面（文章与收藏不删）与不可撤销。
+        SettingsGroup(title = "危险操作", tag = "settings_group_danger") {
+            SettingsActionRow(
+                title = "删除全部学习数据",
+                subtitle = "清空学习记录、复习调度、每日计划与阅读完成；文章与收藏保留",
+                tag = "settings_delete_all_learning_data",
+                onClick = onDeleteAllLearningData,
+                badge = "⚠",
+                accent = DomainColors.Danger,
+            )
+            deleteAllLearningDataNotice?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MintPrimaryDark,
+                    modifier = Modifier
+                        .padding(vertical = 6.dp)
+                        .testTag("settings_delete_all_learning_data_notice")
+                        .semantics { contentDescription = message },
+                )
+            }
         }
     }
 }

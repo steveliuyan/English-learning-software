@@ -16,4 +16,12 @@ internal interface InternalWordBookProgressMigrationAuditDao {
 
     @Query("DELETE FROM word_book_progress_migration_audits WHERE sourceBookId = :wordBookId OR targetBookId = :wordBookId")
     suspend fun deleteForWordBook(wordBookId: String)
+
+    // ---- F4-01 决策 §9：迁移审计随进度一起清（审计对象已不存在） ----
+
+    @Query("SELECT COUNT(*) FROM word_book_progress_migration_audits WHERE profileId = :profileId")
+    suspend fun countForProfile(profileId: String): Int
+
+    @Query("DELETE FROM word_book_progress_migration_audits WHERE profileId = :profileId")
+    suspend fun deleteForProfile(profileId: String)
 }

@@ -148,6 +148,7 @@ fun AppScreen(
     favoritesViewModel: FavoritesViewModel? = null,
     wrongWordsViewModel: WrongWordsViewModel? = null,
     articleVersionViewModel: ArticleVersionViewModel? = null,
+    learningDataDeletionViewModel: LearningDataDeletionViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -340,6 +341,21 @@ fun AppScreen(
                         isUnlocked = todayReady?.isUnlocked == true,
                         unlockReason = todayReady?.unlockReason ?: "今日计划尚未就绪",
                     )
+                }
+            }
+            // F4-01 决策 §9：删除全部学习数据成功后重放各可见宿主的加载（今日页必刷，
+            // 打卡/学习记录/错词只刷已打开的）。文章与收藏保留面不动，不重放。
+            val learningDataDeletionUi = learningDataDeletionViewModel?.uiState?.collectAsState()?.value
+                ?: LearningDataDeletionUiState()
+            val learningDataDeleteCount = learningDataDeletionViewModel?.dataDeletions?.collectAsState()?.value ?: 0
+            LaunchedEffect(learningDataDeleteCount) {
+                if (learningDataDeleteCount > 0) {
+                    todayPlanViewModel.load(state.profile.id)
+                    if (showCheckIn) checkInViewModel?.load(state.profile.id)
+                    if (showLearningRecords) {
+                        learningRecordsViewModel?.load(state.profile.id, todayReady?.planId, todayReady?.activeWordBookId)
+                    }
+                    if (showWrongWords) wrongWordsViewModel?.load(state.profile.id)
                 }
             }
             // 任一来源产出文章都会设置 readingTarget：此时导入页让位给文章页，
@@ -1484,7 +1500,48 @@ fun AppScreen(
                                     importedBookCount = transferState?.books?.size ?: 0,
                                     transferBusy = transferState?.busy == true,
                                     transferMessage = transferState?.message,
+                                    onDeleteAllLearningData = {
+                                        learningDataDeletionViewModel?.requestDelete(state.profile.id)
+                                    },
+                                    deleteAllLearningDataNotice = learningDataDeletionUi.notice,
                                 )
+                                // F4-01 Spec 04 L18：删除全部学习数据先报级联条数、再二次确认；
+                                // 「删除全部学习数据」入口只做 request，仓储删除只从「确认删除」进入。
+                                val pendingWipe = learningDataDeletionUi.pending
+                                if (pendingWipe != null) {
+                                    AlertDialog(
+                                        onDismissRequest = { learningDataDeletionViewModel?.cancelDelete() },
+                                        title = { Text("删除全部学习数据？") },
+                                        text = {
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(
+                                                    "将删除学习记录 ${pendingWipe.eventCount} 条、复习调度 " +
+                                                        "${pendingWipe.reviewStateCount} 条、每日计划 ${pendingWipe.planCount} 天、" +
+                                                        "阅读完成 ${pendingWipe.completionCount} 条、迁移审计 ${pendingWipe.migrationAuditCount} 条。",
+                                                )
+                                                Text(
+                                                    "文章 ${pendingWipe.keptArticleCount} 篇与收藏 ${pendingWipe.keptFavoriteCount} 条保留；" +
+                                                        "词书、搜索历史与设置不受影响。",
+                                                    color = MintTextMuted,
+                                                )
+                                                Text("删除不可撤销。", fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+                                            }
+                                        },
+                                        confirmButton = {
+                                            Button(
+                                                onClick = { learningDataDeletionViewModel?.confirmDelete(state.profile.id) },
+                                                enabled = !learningDataDeletionUi.busy,
+                                                modifier = Modifier.testTag("delete_all_learning_data_confirm"),
+                                            ) { Text("确认删除") }
+                                        },
+                                        dismissButton = {
+                                            TextButton(
+                                                onClick = { learningDataDeletionViewModel?.cancelDelete() },
+                                                modifier = Modifier.testTag("delete_all_learning_data_cancel"),
+                                            ) { Text("取消") }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
