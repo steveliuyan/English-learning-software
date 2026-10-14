@@ -15,6 +15,7 @@
 - 为每项阶段验收标准建立可追踪测试：单元测试、数据库迁移测试、集成测试、设备/UI 测试或明确的手工验证脚本。
 - 重点负向测试：重复反馈、跨日/时区、断网、AI 错误、AI Key 脱敏、缓存篡改、图片未确认上传、备份认证失败和导入原子性。
 - 建立发布前检查：静态检查、单元测试、UI 测试、依赖漏洞检查、许可检查、APK/AAB 构建与签名验证。
+- 门禁聚合任务（已落地）：root `checkReleaseReadiness` = `verifyThirdPartyNotices` + `verifyAcTraceabilityMatrix`（docs/verification/ac-traceability-matrix.md，51 条 AC 证据行非空）+ `:app:testDebugUnitTest` + `scripts/secret-scan.sh`（自测：`scripts/secret-scan-selftest.sh`）。SP-E 将把 release 构建与签名验证挂入同一任务。
 
 ### F5-02 性能与可靠性
 

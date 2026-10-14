@@ -71,6 +71,17 @@ tasks.register("verifyAcTraceabilityMatrix") {
     }
 }
 
+tasks.register("checkReleaseReadiness") {
+    group = "verification"
+    description = "Stage-5 F5-01 release gate: notices + AC matrix + unit tests + secret scan."
+    dependsOn("verifyThirdPartyNotices", "verifyAcTraceabilityMatrix", ":app:testDebugUnitTest")
+    doLast {
+        val rc = providers.exec { commandLine("bash", "scripts/secret-scan.sh") }.result.get()
+        check(rc.exitValue == 0) { "secret-scan 命中：见上方输出（AC5-05 发布阻断）" }
+        logger.lifecycle("checkReleaseReadiness: notices, AC matrix, unit tests and secret scan all green.")
+    }
+}
+
 tasks.register("check") {
     group = "verification"
     dependsOn("verifyThirdPartyNotices", "verifyAcTraceabilityMatrix")
