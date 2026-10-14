@@ -1,7 +1,10 @@
 package com.example.englishlearning.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,6 +90,9 @@ import com.example.englishlearning.ui.theme.MintTint
  * - **OCR ≠ 翻译**：识别问题（不可用/失败）与翻译问题（未配置/AI 失败）分卡片、分文案，
  *   永不混排（AC3-04）。
  */
+internal const val CAMERA_DENIED_NOTICE =
+    "相机权限被拒绝。可改用相册选图；如需拍照，请在系统设置中为本应用开启相机权限后返回重试。"
+
 @Composable
 fun PhotoTranslationScreen(
     state: PhotoTranslationUiState,
@@ -116,7 +122,7 @@ fun PhotoTranslationScreen(
     }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasCameraPermission = granted
-        captureNotice = if (!granted) "相机权限被拒绝。可改用相册选图，或点下方按钮重新授权。" else null
+        captureNotice = if (!granted) CAMERA_DENIED_NOTICE else null
         showCamera = granted
     }
     val galleryPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -198,6 +204,20 @@ fun PhotoTranslationScreen(
         }
         captureNotice?.let { message ->
             Text(message, color = MintTextMuted, modifier = Modifier.testTag("photo_translation_permission_hint"))
+        }
+        if (captureNotice == CAMERA_DENIED_NOTICE) {
+            // D-1：提示必须兑现它承诺的出口——跳转系统设置为本应用开启相机权限。
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("photo_translation_permission_settings"),
+                shape = RoundedCornerShape(16.dp),
+            ) { Text("去系统设置开启相机权限") }
         }
 
         if (showCamera && hasCameraPermission) {

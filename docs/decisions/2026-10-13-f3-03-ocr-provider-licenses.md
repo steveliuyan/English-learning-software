@@ -1,6 +1,6 @@
 # 2026-10-13 F3-03 OCR Provider 许可核验决策
 
-**状态：已批准——用户 2026-10-13 选择方案 A（ML Kit bundled 主路径 + Tesseract4Android 降级 + L2 遥测披露义务）。实现不得偏离本文确定的 artifact、版本与许可结论；L2 隐私披露文案与 T2 真机抓包核验仍为实现期待办。**
+**状态：已批准——用户 2026-10-13 选择方案 A（ML Kit bundled 主路径 + Tesseract4Android 降级 + L2 遥测披露义务）。实现不得偏离本文确定的 artifact、版本与许可结论；L2 隐私披露已落文案，T2 真机核验结果与口径更新见 §5.1（内容级解密与 B5 端到端留待补做）。**
 
 依据 AGENTS.md「未通过许可核验的词书、词典、音频或模型不得打包、下载或发布」与 `docs/handoff/2026-10-13-f3-03-photo-ocr-task.md` 第 1 节硬前置。核验渠道与访问日期见第 6 节，全部为一手来源（Maven POM、仓库 LICENSE、官方条款页、GitHub API）。
 
@@ -109,6 +109,13 @@
 - T1：新增依赖后按红线三任务一次 `--write-locks`；台账逐 artifact 补录版本与哈希。
 - T2：**真机（bf353dda）核验口径**：(a) bundled ML Kit 在禁用/无 GMS 环境下的初始化与识别结果；(b) 抓包确认 ML Kit 联系 Google 服务器的实际时机与内容（验证 ToS 第 3 条 metrics 描述），据此定稿隐私披露文案；(c) 无 GMS + ML Kit 不可用时自动走 Tesseract 并产出结果；(d) 双不可用时显示固定「OCR 不可用」类别而非翻译失败（AC3-04）。上述完成前，AC3-04 验收记录不得标"已验证"。
 - T3：Tesseract4Android 仅存在于 JitPack（不在 Maven Central）——gradle 需增加 `maven { url 'https://jitpack.io' }` 仓库；锁定版本 4.9.0，并在台账记录来源 URL 与校验方式。
+
+### 5.1 真机核验补记（2026-10-14，设备 M2102J2SC / API 33 / 带 GMS；详见 `docs/handoff/2026-10-14-stage-3-device-qa-report.md`）
+
+- **依赖树证据**：`text-recognition:16.0.1` 同时带入 `play-services-mlkit-text-recognition:19.0.1`（GMS 路径）与 `text-recognition-bundled-common:17.0.0`（bundled 路径，AAR 内含约 11 MB `libmlkit_google_ocr_pipeline.so`，tflite 引擎直接打进 APK）。实测 `pm disable-user com.google.android.gms` 后 OCR 仍本机识别成功（logcat 可见 `tflite_model_pooled_runner` 加载模型）——**L3 结论获得设备级证实：bundled 构建下"无 GMS"不会导致 ML Kit 不可用**。
+- 由此，T2(c)「无 GMS 自动落 Tesseract」在 bundled 构建上**真机不可达**（该分支只在 ML Kit 初始化异常时才可能触发）；T2(d) `OcrUnavailable` 双不可用信号真机不可构造（bundled so 不可卸载），由 JVM `OcrProviderChainTest` 5 条链测试覆盖。T2(a) 已验证。
+- T2(b) 抓包推进到**隧道级 + 流量级**：OCR 全程 uid 级 netstats 零增量、确认门拒绝零出网、确认后逐条 CONNECT；**内容级解密未完成**（用户 CA 信任链未能核验），剩余方法与结论见 QA 报告 §4-C3。观察到的 `play.googleapis.com` CONNECT 与 OCR/翻译操作时间窗不相关（系统级）。隐私披露文案与实测不冲突，披露保留。
+- **口径更新**：T2(a)(c)(d) 按上述证据关闭；T2(b) 内容级与 AC3-05 B5 端到端（保存→历史→备份）留待有真实 AI Profile / 可解密环境时补做。AC3-04 验收记录以「真机已验证（可达部分）+ bundled 依赖事实 + JVM 覆盖」为限，不夸大。
 
 ## 6. 核验来源（访问日期 2026-10-13，均为一手页面/文件/API）
 
