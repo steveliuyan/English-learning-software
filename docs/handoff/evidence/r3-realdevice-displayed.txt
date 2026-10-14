@@ -1,0 +1,2 @@
+10-14 17:20:25.719  1933  2065 I ActivityTaskManager: Displayed com.example.englishlearning/.launch.BrandLaunchActivity: +910ms
+10-14 17:20:27.119  1933  2065 I ActivityTaskManager: Displayed com.example.englishlearning/.MainActivity: +201ms

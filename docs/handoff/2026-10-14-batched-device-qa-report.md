@@ -144,3 +144,76 @@ B1/B2/B3。git 网络命令一律加 -c http.proxy=http://127.0.0.1:3067 -c http
 - MIUI「显示备份密码」系统弹窗期间 `adb input` 非法。
 - MIUI u2000 会自动卸载 adb 安装的应用：装完立即测。
 - 同一 Compose 测试内两次 `setContent` 真机必炸：拆分测试。
+
+---
+
+# 第二轮 B 组回归实测（2026-10-14，本 QA 分对话，基线 main tip `37d8c92`）
+
+## R2-a 认证导出复验（模拟器 A，API 30）— 已验证
+
+- D-5 修复后完整链路真机复验通过：设置 → 认证导出 → 「开始（需系统认证）」→ BiometricPrompt（指纹/PIN 降级均可）→ 挑战 QR 签发 → 「导出受保护备份包」→ 23 条记录生成 → SAF 保存到 Download（`englishlearning-backup-20261014-105751.elpbak.zip`，11102 字节）。
+- Keystore 认证窗口仅 30s：认证→点导出必须在窗口内完成；超时后签名失败仅显示「加密组件不可用，已停止导出。」（误导性，见 D-9）。本轮采用"认证→dump→导出 <10s"紧凑节奏稳定通过。
+
+## R2-b B1 扫码配对 — 扫码环节环境 blocked；恢复判定逻辑经 connected 测试验证
+
+- 双模拟器实时扫码不可行的两条独立证据：
+  1. **D-10（blocker）**：配对码 QR 以文本块（█/空格，7.sp）渲染，截屏喂给应用同款 zxing 解码器返回 NO_QR_FOUND；把同一矩阵改渲染为方形 PNG 后解码成功且 payload 完整（ELPAIR1 六段）。即渲染破坏、payload 有效。
+  2. 模拟器 virtualscene 摄像头对 v11（61×61）QR 纹理分辨率不足，ML Kit 无法检出（环境限制，非产品缺陷）。
+- 按任务书许可改走 connected 测试路线：`app/src/androidTest/.../DevicePairedRestoreE2ETest.kt`（QA 专用，输入经 `/data/local/tmp` 推送，不入库），逐类复刻 AppModule 生产装配，用**真实导出包 + 真实挑战码**驱动：
+  - **prepare 全链已验证**：结构校验 → 配对绑定（包↔码常量时间比对）→ ECDSA 验签 → 30 分钟有效期 → 23 条记录隔离暂存成功。
+  - **篡改拒绝已验证**：翻转包中部一字节 → prepare Failed 且正式 DB SHA-256 逐字节不变（test2 通过）。
+- 挑战明文与含 QR 截图一律不入库（`r2-qr-active-screen.png`、`r2-check-state.png` 留本地，qa-scratch 全部在 `.git/` 内）。
+
+## R2-c B2 替换恢复 — 发现新缺陷 D-12（blocker），恢复提交在进程内结构性不可能成功
+
+- connected 测试实测：swap 目录交换、回滚点创建（`files/rollback/<ts>` 含旧 DB 三件套）、`reopenAndQuickCheck=true` 全部通过；随后 `postActions.rebuildSearchIndex` 立即失败 → 网关回滚 → `Failed(RollbackVerification)`。
+- 测试侧装饰器定位根因（生产代码零改动）：swap 后首个 suspend DAO 调用抛
+  `kotlinx.coroutines.JobCancellationException: Job was cancelled; job=SupervisorJobImpl{Cancelled}`。
+  机制：Room 2.8.4 的 `RoomDatabase.coroutineScope` 在 `close()`（`RoomFormalDataHandle.checkpointAndClose`）时取消，`openHelper.writableDatabase` 重开底层连接但**不重建该 scope**，此后同一实例上所有 suspend DAO 调用必抛 → `runStorage` 映射为 `StorageUnavailable` → postActions 失败 → 按设计回滚。
+- 影响：生产路径同一 Hilt 单例 `AppDatabase` 贯穿恢复流程，**认证恢复在任何设备上都无法完成**（回滚机制本身工作正常：失败后正式数据完好）。
+- 建议修法（留主对话裁决，红线零触碰）：交换成功后重建 RoomDatabase 实例供 postActions 使用；或 postActions 改用非 suspend（blocking）DAO；或恢复提交放独立进程/子流程后重启。任一修法落地后本测试可直接复跑验收（断言 `commit is Restored`）。
+- 回滚语义附带观察（非缺陷）：commit 失败回滚后应用数据完好可续用，本轮多次失败后 B 仍正常。
+
+## R2-d D-7~D-11 缺陷登记（本轮认证导出/配对链路）
+
+| ID | 级别 | 现象 | 证据 |
+|---|---|---|---|
+| D-7 | major | `AndroidMigrationKey.ensureKey()` 失败走 `onAuthenticationRejected()`，Idle 按钮静默无反馈（error=null、无 Toast） | BackupPairingExportScreen.kt:86-90 + 真机复现（截图 `r2-export-keyfail.png`，无 QR 内容） |
+| D-8 | major | Active 页 Column 不可滚动：61 行 QR 文本块把密码勾选/导出按钮挤出屏幕（1080x1920 默认字体），违反 AGENTS「小屏可达」约束 | 真机观察；本轮靠临时 font_scale=0.5 才见控件（已复原 1.0） |
+| D-9 | major | 30s Keystore 认证窗口与流程不匹配：Active 页无重新认证入口，超窗后导出报「加密组件不可用」（误导）；密码分支同窗口约束 | 本轮两次失败 + 紧凑节奏成功对照；错误文案 BackupProtectedExportViewModel.kt:180 |
+| D-10 | **blocker** | 文本块 QR 不可被 zxing 解码（宽高比失真），新设备永远扫不了 | 截屏解码 NO_QR_FOUND vs 同矩阵方形 PNG 解码成功（payload 一致） |
+| D-11 | **blocker** | 流程死锁：挑战码只在导出前显示，Done 后不再显示；而恢复要求先选包再扫码，验证器又强制包↔码一一绑定 → 真实世界 happy path 不可达 | 代码走查（两 VM 状态机）+ 设备复现 |
+| D-12 | **blocker** | 见 R2-c：Room close() 后 suspend DAO 全灭 → 认证恢复 commit 必回滚 | connected 测试 + logcat QA-B1 标签堆栈 |
+
+- D-9 的"密码分支必炸"候选已排除：早前失败同为超窗，窗口内导出成功。
+- D-6 维持误报裁决，未重开。
+
+## R2-e B3 / B4
+
+- **B3（API 26–29 BiometricPrompt 降级）— blocked**：本机仅 android-30 镜像可用，android-26 镜像未证实存在（`xtool-s04-api26` AVD 有 ini 无系统镜像），30 分钟预算内放弃搭建；且 D-12 会使 commit 段在低版本同样失败，优先级让位于 D-10/D-11/D-12 修复。
+- **B4（Salvage 包拒绝，可选项）— 未投入**：SAF 选择器怪癖 + 预算约束；真机侧同类取消零写入已有 R1 记录（§3.2/3.3）。
+
+## R3 闪屏宿主冷启动复核 — 已验证（真机 + 模拟器）
+
+- 真机 bf353dda：`Displayed .launch.BrandLaunchActivity +910ms` → `Displayed .MainActivity +201ms`，无白屏/崩溃，FragmentActivity 改造未破坏闪屏链路。
+- 模拟器 API 30：`+2s656ms → +380ms` 同样正常。证据：`docs/handoff/evidence/r3-*`（不含 QR/密钥）。
+
+## R4 A5 mitm 复核 — blocked
+
+- 无证据表明用户已删除真机 mitm CA；按任务书不自行装卸证书，维持 blocked，待用户确认 CA 状态另开轮次。
+
+## R5 QA 环境怪癖补充（本轮新增，后续会话沿用）
+
+- `connectedDebugAndroidTest` 会**在所有已连接设备**上跑（务必 `ANDROID_SERIAL=emulator-5576` 锁机），且跑完**卸载应用清空数据**——重跑前必须重新 onboarding；改用 `adb install -r` + `am instrument -w -e class <FQCN#method> <testpkg>/androidx.test.runner.AndroidJUnitRunner` 可保留数据反复跑。
+- 模拟器息屏后 `input text/keyevent` 全部吞掉且 uiautomator 显示旧值：先 `KEYCODE_WAKEUP` + `dismiss-keyguard`；带 PIN 的 keyguard 用 keyevent 8..13+66 解锁（`input text` 无效）。
+- Gboard 偶发吞字（`input text` 无效果）：`am force-stop com.google.android.inputmethod.latin` 后恢复。
+- AOSP 相机弹窗「要记住照片拍摄地点吗」会劫持焦点：`am force-stop com.android.camera2`。
+- 词书 onboarding 页内层列表与外层页面滚动竞争：先 BACK 收起 IME（一次，两次会退出页面），在列表区外滑动外层；B 屏高 1920，y>1800 的 swipe 落入导航条无效。
+- onboarding 名称字段在 A/B 布局 bounds 不同（键盘收起后移位），点击前必须重新 dump。
+
+## R6 Git 状态与计数（第二轮）
+
+- 分支 `stage-qa-round-2-2026-10-14`（自 `37d8c92`），不动 main；本文件与 connected 测试提交于该分支，`git ls-remote` 核验输出见提交后记录。
+- 计数：已验证 4（认证导出 e2e、prepare 全链、篡改拒绝、R3 冷启动×2 端）；新缺陷 6（D-7~D-12，其中 blocker 3）；blocked 4（B1 扫码环节（环境）、B3、B4、R4）。
+- 红线确认：`BackupCryptoPolicy` / `MigrationChallengePolicy` / `AndroidMigrationKey` 零改动；报告与仓库内无任何密钥/挑战明文；业务代码零改动（仅新增 androidTest 与文档）。
+- 遗留清理项：两台模拟器 `/data/local/tmp/qa-b1-*`、`pkg.zip` 为一次性 QA 数据（应用卸载不影响）；模拟器 A 字体已复原 1.0；A/B 均留有本轮 onboarding 演示档案，属 QA 环境正常状态。
