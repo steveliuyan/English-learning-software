@@ -2,9 +2,9 @@ package com.example.englishlearning.launch
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -21,7 +21,11 @@ import com.example.englishlearning.MainActivity
 import com.example.englishlearning.R
 import kotlinx.coroutines.delay
 
-class BrandLaunchActivity : ComponentActivity() {
+// 宿主矩阵守卫（D-5 推广，BiometricHostActivityContractTest）：Manifest 声明的每个生产 Activity
+// 都必须是 FragmentActivity 的后代。本类今天只是闪屏并转发 MainActivity，但一旦有屏幕被挂到这里，
+// `context as? FragmentActivity`（BiometricPrompt 宿主）在 ComponentActivity 下会静默为 null。
+// FragmentActivity 是 ComponentActivity 子类，installSplashScreen/setContent 行为不变。
+class BrandLaunchActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
