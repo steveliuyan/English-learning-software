@@ -130,6 +130,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     internal abstract fun internalMigrationPairingLedgerDao(): com.example.englishlearning.core.storage.dao.InternalMigrationPairingLedgerDao
 
+    internal abstract fun internalFavoriteWordDao(): com.example.englishlearning.core.storage.dao.InternalFavoriteWordDao
+
     internal abstract fun internalBackupSourceDao(): com.example.englishlearning.backup.infrastructure.InternalBackupSourceDao
 
     internal abstract fun internalBackupRestoreDao(): com.example.englishlearning.backup.infrastructure.InternalBackupRestoreDao

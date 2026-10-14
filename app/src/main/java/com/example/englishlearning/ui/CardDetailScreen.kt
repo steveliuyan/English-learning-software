@@ -84,6 +84,9 @@ fun CardDetailScreen(
     onNext: (() -> Unit)? = null,
     vocabularyPresent: Boolean? = null,
     onToggleVocabulary: (() -> Unit)? = null,
+    // F4-01 决策⑦收藏开关：与生词本开关同款——宿主给足「状态+回调」才出现，UI 不触存储。
+    favoritePresent: Boolean? = null,
+    onToggleFavorite: (() -> Unit)? = null,
     // 安全边界：详情页只收无字段的发音状态枚举，固定文案由本屏映射——
     // 任意字符串（含潜在敏感内容）无法从调用方塞进详情页。
     pronunciationStatus: PronunciationStatus = PronunciationStatus.Idle,
@@ -129,6 +132,8 @@ fun CardDetailScreen(
             onNext = onNext,
             vocabularyPresent = vocabularyPresent,
             onToggleVocabulary = onToggleVocabulary,
+            favoritePresent = favoritePresent,
+            onToggleFavorite = onToggleFavorite,
             onAskAi = onAskAi,
         )
 
@@ -251,6 +256,8 @@ private fun WordHeroCard(
     onNext: (() -> Unit)?,
     vocabularyPresent: Boolean?,
     onToggleVocabulary: (() -> Unit)?,
+    favoritePresent: Boolean?,
+    onToggleFavorite: (() -> Unit)?,
     onAskAi: (() -> Unit)?,
 ) {
     DetailCard {
@@ -317,6 +324,14 @@ private fun WordHeroCard(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (favoritePresent != null && onToggleFavorite != null) {
+                PillButton(
+                    label = if (favoritePresent) "★ 已收藏" else "☆ 收藏",
+                    description = if (favoritePresent) "取消收藏 ${card.lemma}" else "收藏 ${card.lemma}",
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.testTag("card_detail_favorite_toggle"),
+                )
+            }
             if (vocabularyPresent != null && onToggleVocabulary != null) {
                 PillButton(
                     label = if (vocabularyPresent) "移出生词本" else "加入生词本",

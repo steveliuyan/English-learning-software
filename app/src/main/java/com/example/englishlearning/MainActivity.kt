@@ -9,6 +9,7 @@ import com.example.englishlearning.ui.AiProfileSettingsViewModel
 import com.example.englishlearning.ui.AppScreen
 import com.example.englishlearning.ui.ArticleReadingViewModel
 import com.example.englishlearning.ui.CheckInViewModel
+import com.example.englishlearning.ui.FavoritesViewModel
 import com.example.englishlearning.ui.GlobalVocabularySearchViewModel
 import com.example.englishlearning.ui.ImageStudioViewModel
 import com.example.englishlearning.ui.ReminderSettingsViewModel
@@ -53,6 +54,7 @@ class MainActivity : FragmentActivity() {
                 speechSettingsViewModel = hiltViewModel<SpeechSettingsViewModel>(),
                 reminderSettingsViewModel = hiltViewModel<ReminderSettingsViewModel>(),
                 checkInViewModel = hiltViewModel<CheckInViewModel>(),
+                favoritesViewModel = hiltViewModel<FavoritesViewModel>(),
                 learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
                 wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),
                 vocabularyViewModel = hiltViewModel<VocabularyViewModel>(),

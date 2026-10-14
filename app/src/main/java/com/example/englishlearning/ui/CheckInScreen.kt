@@ -51,6 +51,8 @@ fun CheckInScreen(
     state: CheckInUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit = {},
+    // F4-01 决策⑦：打卡页是收藏页的唯一入口；ViewModel 未接线时入口整体不渲染。
+    onOpenFavorites: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(MintBackground).verticalScroll(rememberScrollState()).padding(20.dp).testTag("check_in_screen"),
@@ -58,6 +60,9 @@ fun CheckInScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("学习打卡", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.weight(1f))
+            onOpenFavorites?.let { open ->
+                Text("我的收藏", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_favorites").semantics { contentDescription = "打开我的收藏" }.clickable(onClick = open).padding(10.dp))
+            }
             Text("返回", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_back").semantics { contentDescription = "返回" }.clickable(onClick = onBack).padding(10.dp))
         }
         when (state) {

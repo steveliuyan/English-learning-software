@@ -145,6 +145,7 @@ fun AppScreen(
     backupExportViewModel: BackupExportViewModel? = null,
     backupRestoreViewModel: BackupRestoreViewModel? = null,
     backupPairingExportViewModel: BackupProtectedExportViewModel? = null,
+    favoritesViewModel: FavoritesViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -171,6 +172,11 @@ fun AppScreen(
             var showBackupRestore by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupPairingExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // F4-01 决策⑦收藏：列表是 CheckIn 同级的叠层；详情是一次性回源结果的本地覆盖层。
+            var showFavorites by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var selectedFavoriteCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
+            var favoritesPronunciationMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
+            var favoritesPronunciationRequest by remember { mutableIntStateOf(0) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             val wordBookWordsListState = key(state.profile.id, showWordBookWords) {
@@ -240,6 +246,23 @@ fun AppScreen(
                 searchPronunciationJob?.cancel()
                 detailSource = DetailSource.GLOBAL_SEARCH
                 selectedSearchCard = opened
+            }
+            // F4-01 决策⑦：收藏集合在档案就绪时加载一次，星标状态由它派生；
+            // 收藏页点词 → ViewModel 回源 → 一次性事件交给详情（与全量查词同一模式）。
+            val favoritesState = favoritesViewModel?.uiState?.collectAsState()?.value
+            val favoriteIds = (favoritesState as? FavoritesUiState.Ready)?.words?.mapTo(HashSet()) { it.cardId }
+                ?: hashSetOf<String>()
+            LaunchedEffect(state.profile.id, favoritesViewModel) {
+                favoritesViewModel?.load(state.profile.id)
+            }
+            val openedFavoriteCard = favoritesViewModel?.openedCard?.collectAsState()?.value
+            LaunchedEffect(openedFavoriteCard, showFavorites) {
+                val opened = openedFavoriteCard ?: return@LaunchedEffect
+                favoritesViewModel?.consumeOpenedCard()
+                if (!showFavorites) return@LaunchedEffect
+                favoritesPronunciationRequest++
+                favoritesPronunciationMessage = PronunciationStatus.Idle
+                selectedFavoriteCard = opened
             }
             val vocabularyCards = (vocabularyState as? VocabularyUiState.Ready)?.items?.mapNotNull { it.card }.orEmpty()
             val recordCards = when (learningRecordsState.selectedTab) {
@@ -336,7 +359,7 @@ fun AppScreen(
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
-                showWordQaCard != null
+                showWordQaCard != null || showFavorites || selectedFavoriteCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -354,6 +377,13 @@ fun AppScreen(
                 learningRecordsViewModel?.clearDetail()
             }
             BackHandler(enabled = selectedSearchCard != null) { closeSearchDetail() }
+            // F4-01 收藏：详情声明在列表之后（后声明者优先），返回键先关详情再退列表。
+            BackHandler(enabled = showFavorites && selectedFavoriteCard == null) { showFavorites = false }
+            BackHandler(enabled = selectedFavoriteCard != null) {
+                selectedFavoriteCard = null
+                favoritesPronunciationRequest++
+                favoritesPronunciationMessage = PronunciationStatus.Idle
+            }
             BackHandler(enabled = showGlobalVocabularySearch && selectedSearchCard == null) {
                 showGlobalVocabularySearch = false
             }
@@ -379,13 +409,17 @@ fun AppScreen(
             LaunchedEffect(selectedTab, state.profile.id) {
                 if (selectedTab == AppTab.LEARNING) vocabularyViewModel?.load(state.profile.id)
             }
-            LaunchedEffect(selectedSearchCard, selectedLearningRecordCard, selectedArticleCard) {
+            LaunchedEffect(selectedSearchCard, selectedLearningRecordCard, selectedArticleCard, selectedFavoriteCard) {
                 wordQaViewModel?.reset()
                 selectedSearchCard?.let {
                     vocabularyViewModel?.loadMembership(state.profile.id, it)
                     wordQaViewModel?.loadNotes(state.profile.id, it.lemma, it.wordBookId, it.cardId)
                 }
                 selectedLearningRecordCard?.let {
+                    vocabularyViewModel?.loadMembership(state.profile.id, it)
+                    wordQaViewModel?.loadNotes(state.profile.id, it.lemma, it.wordBookId, it.cardId)
+                }
+                selectedFavoriteCard?.let {
                     vocabularyViewModel?.loadMembership(state.profile.id, it)
                     wordQaViewModel?.loadNotes(state.profile.id, it.lemma, it.wordBookId, it.cardId)
                 }
@@ -488,6 +522,8 @@ fun AppScreen(
                         personalNoteSaveStatus = personalNoteSaveStatus,
                         vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
                         onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
+                        favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
+                        onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
                         onAskAi = null,
                     )
                 }
@@ -578,6 +614,57 @@ fun AppScreen(
                         personalNoteSaveStatus = personalNoteSaveStatus,
                         vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
                         onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
+                        favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
+                        onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
+                    )
+                }
+            } else if (selectedFavoriteCard != null) {
+                val card = selectedFavoriteCard
+                if (card != null) {
+                    // 收藏详情与学习记录详情同一 UI-only 模式：发音只由用户点击触发；
+                    // 请求序号 + 卡引用双重守卫，防止跨页竞态把旧结果写进当前状态。
+                    CardDetailScreen(
+                        card = card,
+                        onRelearn = {
+                            selectedRelearnCard = card
+                            vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
+                        },
+                        onBack = {
+                            selectedFavoriteCard = null
+                            favoritesPronunciationMessage = PronunciationStatus.Idle
+                            favoritesPronunciationRequest++
+                        },
+                        onSpeak = {
+                            val cardSnapshot = card
+                            val request = ++favoritesPronunciationRequest
+                            favoritesPronunciationMessage = PronunciationStatus.Playing
+                            pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American))
+                                if (request == favoritesPronunciationRequest && selectedFavoriteCard === cardSnapshot) {
+                                    favoritesPronunciationMessage = result
+                                }
+                            }
+                        },
+                        onSpeakBritish = {
+                            val cardSnapshot = card
+                            val request = ++favoritesPronunciationRequest
+                            favoritesPronunciationMessage = PronunciationStatus.Playing
+                            pronunciationScope.launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British))
+                                if (request == favoritesPronunciationRequest && selectedFavoriteCard === cardSnapshot) {
+                                    favoritesPronunciationMessage = result
+                                }
+                            }
+                        },
+                        pronunciationStatus = favoritesPronunciationMessage,
+                        notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                        onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
+                        onDeleteNote = { wordQaViewModel?.deleteNote(it) },
+                        personalNoteSaveStatus = personalNoteSaveStatus,
+                        vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
+                        onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
+                        favoritePresent = true,
+                        onToggleFavorite = { favoritesViewModel?.toggle(card.cardId, card.wordBookId, card.lemma) },
                     )
                 }
             } else if (showVocabularyRelearn) {
@@ -734,6 +821,8 @@ fun AppScreen(
                                 }
                             },
                             pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                            favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
+                            onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
                             onAskAi = {
                                 // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
                                 showWordQaCard = card
@@ -813,6 +902,18 @@ fun AppScreen(
                     state = checkInState,
                     onBack = { showCheckIn = false },
                     onRetry = { checkInViewModel?.load(state.profile.id) },
+                    onOpenFavorites = if (favoritesViewModel != null) {
+                        { showFavorites = true }
+                    } else {
+                        null
+                    },
+                )
+            } else if (showFavorites) {
+                FavoritesScreen(
+                    state = favoritesState ?: FavoritesUiState.Loading,
+                    onBack = { showFavorites = false },
+                    onOpenWord = { favoritesViewModel?.open(it) },
+                    onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
                 )
             } else if (showAiProfiles) {
                 val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
@@ -1079,6 +1180,8 @@ fun AppScreen(
                                 }
                             },
                             pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                            favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
+                            onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
                             onAskAi = {
                                 // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
                                 showWordQaCard = card
