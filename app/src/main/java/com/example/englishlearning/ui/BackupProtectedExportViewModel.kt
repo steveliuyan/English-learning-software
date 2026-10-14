@@ -35,6 +35,7 @@ data class BackupProtectedExportUiState(
     val phase: ProtectedExportPhase = ProtectedExportPhase.Idle,
     val busy: Boolean = false,
     val qrPayload: String? = null,
+    val qrVisible: Boolean = false,
     val issuedAtEpochSeconds: Long = 0L,
     val expiresAtEpochSeconds: Long = 0L,
     val usePassword: Boolean = false,
@@ -69,6 +70,7 @@ class BackupProtectedExportViewModel @Inject constructor(
             error = null,
             packageReady = false,
             fileName = null,
+            qrVisible = true,
         )
         viewModelScope.launch {
             when (val outcome = exporter.issueChallenge()) {
@@ -125,6 +127,7 @@ class BackupProtectedExportViewModel @Inject constructor(
                         busy = false,
                         phase = ProtectedExportPhase.Done,
                         packageReady = true,
+                        qrVisible = false,
                         fileName = suggestedFileName(result.createdAtEpochMillis),
                         message = "受保护备份包已生成：共 ${result.recordCount} 条记录 · ${result.mediaCount} 个音频文件。" +
                             "请在 30 分钟配对有效期内于新设备完成恢复；超期须重新配对导出。",
@@ -133,6 +136,7 @@ class BackupProtectedExportViewModel @Inject constructor(
                 is BackupExportResult.Failed -> mutable.value = mutable.value.copy(
                     busy = false,
                     phase = ProtectedExportPhase.Active,
+                    qrVisible = true,
                     error = fixedMessage(result.reason),
                 )
             }
@@ -146,6 +150,7 @@ class BackupProtectedExportViewModel @Inject constructor(
             mutable.value = mutable.value.copy(
                 packageReady = false,
                 fileName = null,
+                qrVisible = false,
                 message = "已取消导出，未写入任何文件。",
             )
             return
@@ -158,6 +163,7 @@ class BackupProtectedExportViewModel @Inject constructor(
                 mutable.value = mutable.value.copy(
                     busy = false,
                     packageReady = false,
+                    qrVisible = false,
                     fileName = null,
                     message = "已导出受保护备份包，请在新设备 30 分钟配对有效期内完成恢复。",
                     error = null,
@@ -171,13 +177,23 @@ class BackupProtectedExportViewModel @Inject constructor(
         }
     }
 
+    /**
+     * D-11（AC4-08）：Done 阶段经再次系统认证后重显**同一**配对码——不重发、不延长
+     * 有效期；仅在挑战已签发时生效。
+     */
+    fun onPairingRevealed() {
+        if (challenge == null) return
+        mutable.value = mutable.value.copy(qrVisible = true, error = null)
+    }
+
     fun passwordShapeValid(length: Int): Boolean = BackupCryptoPolicy.isPasswordShapeValid(length)
 
     private fun usePassword(): Boolean = mutable.value.usePassword
 
     private fun fixedMessage(reason: BackupExportFailure): String = when (reason) {
         BackupExportFailure.PasswordRejected -> "密码不符合要求，已停止导出。"
-        BackupExportFailure.CryptoUnavailable -> "加密组件不可用，已停止导出。"
+        BackupExportFailure.CryptoUnavailable ->
+            "签名不可用：系统认证窗口（30 秒）可能已过期或签名密钥不可用。请重新点击导出并完成认证；若持续失败，请检查锁屏/生物识别设置。"
         BackupExportFailure.ResourceUnavailable -> "部分 AI 音频文件缺失，已停止导出。"
         BackupExportFailure.IntegrityFailure -> "数据完整性校验失败，已停止导出。"
         else -> "受保护备份包生成失败，请重试或联系支持。"

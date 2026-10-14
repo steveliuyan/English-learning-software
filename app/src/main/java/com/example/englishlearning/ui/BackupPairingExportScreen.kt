@@ -4,9 +4,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -79,12 +83,11 @@ fun BackupPairingExportScreen(
         when (state.phase) {
             ProtectedExportPhase.Idle -> Button(
                 onClick = {
-                    val activity = context as? FragmentActivity
-                    if (activity == null) {
-                        return@Button
-                    }
                     if (AndroidMigrationKey.ensureKey()) {
-                        showBiometricPrompt(activity, viewModel)
+                        runWithMigrationAuth(
+                            context,
+                            onRejected = { viewModel.onAuthenticationRejected() },
+                        ) { viewModel.onAuthenticated() }
                     } else {
                         viewModel.onAuthenticationRejected()
                     }
@@ -95,9 +98,11 @@ fun BackupPairingExportScreen(
             ProtectedExportPhase.Authenticating -> CircularProgressIndicator()
 
             ProtectedExportPhase.Active -> {
-                state.qrPayload?.let { payload ->
-                    QrCodeDisplay(payload)
-                    Text("请在新设备上打开“从旧设备恢复”并实时扫描此码。", style = MaterialTheme.typography.bodySmall)
+                if (state.qrVisible) {
+                    state.qrPayload?.let { payload ->
+                        QrCodeDisplay(payload)
+                        Text("请在新设备上打开“从旧设备恢复”并实时扫描此码。", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
                 var usePassword by remember { mutableStateOf(false) }
                 androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
@@ -121,7 +126,11 @@ fun BackupPairingExportScreen(
                 Button(
                     onClick = {
                         val chars = if (usePassword) password.toCharArray() else null
-                        viewModel.exportProtected(includeMediaAssets = true, password = chars)
+                        // D-9：签名密钥的 30 秒认证窗口——认证必须紧邻导出动作，成功回调内立即签名
+                        runWithMigrationAuth(
+                            context,
+                            onRejected = { viewModel.onAuthenticationRejected() },
+                        ) { viewModel.exportProtected(includeMediaAssets = true, password = chars) }
                     },
                     modifier = Modifier.testTag("backup_pairing_export_export"),
                 ) { Text("导出受保护备份包") }
@@ -140,6 +149,29 @@ fun BackupPairingExportScreen(
                             .testTag("backup_pairing_export_save"),
                     ) { Text("选择保存位置并导出") }
                 }
+                // D-11（AC4-08）：包落盘后至配对有效期内，经再次认证重显同一配对码
+                state.qrPayload?.let { payload ->
+                    if (state.qrVisible) {
+                        QrCodeDisplay(payload)
+                        Text(
+                            "以上配对码为本次会话签发的同一个码，签发后 30 分钟内有效；请在新设备实时扫描完成配对。",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        Button(
+                            onClick = {
+                                runWithMigrationAuth(
+                                    context,
+                                    // 重显被拒：仅保持隐藏，不作废本次配对会话
+                                    onRejected = { },
+                                ) { viewModel.onPairingRevealed() }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("backup_pairing_export_reveal_qr"),
+                        ) { Text("显示配对码（需再次认证）") }
+                    }
+                }
             }
         }
 
@@ -151,7 +183,11 @@ fun BackupPairingExportScreen(
     }
 }
 
-private fun showBiometricPrompt(activity: FragmentActivity, viewModel: BackupProtectedExportViewModel) {
+private fun showBiometricPrompt(
+    activity: FragmentActivity,
+    onSuccess: () -> Unit,
+    onRejected: () -> Unit,
+) {
     val manager = BiometricManager.from(activity)
     val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
     val prompt = BiometricPrompt(
@@ -159,11 +195,11 @@ private fun showBiometricPrompt(activity: FragmentActivity, viewModel: BackupPro
         ContextCompat.getMainExecutor(activity),
         object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                viewModel.onAuthenticated()
+                onSuccess()
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                viewModel.onAuthenticationRejected()
+                onRejected()
             }
         },
     )
@@ -175,7 +211,21 @@ private fun showBiometricPrompt(activity: FragmentActivity, viewModel: BackupPro
     prompt.authenticate(info)
 }
 
-/** QR matrix via the already-registered zxing-core dependency, rendered as text blocks. */
+/** D-9：每次敏感动作（签发、导出签名、重显配对码）各自要求一次系统认证。 */
+private fun runWithMigrationAuth(
+    context: android.content.Context,
+    onRejected: () -> Unit,
+    onSuccess: () -> Unit,
+) {
+    val activity = context as? FragmentActivity
+    if (activity == null) {
+        onRejected()
+        return
+    }
+    showBiometricPrompt(activity, onSuccess = onSuccess, onRejected = onRejected)
+}
+
+/** QR matrix via the already-registered zxing-core dependency, drawn as a square pixel grid (D-10). */
 @Composable
 private fun QrCodeDisplay(payload: String) {
     val matrix = remember(payload) {
@@ -192,13 +242,29 @@ private fun QrCodeDisplay(payload: String) {
         Text("二维码生成失败（配对码过长）。")
         return
     }
-    val text = remember(matrix) {
-        buildString {
-            for (y in 0 until matrix.height) {
-                for (x in 0 until matrix.width) append(if (matrix.get(x, y)) '█' else '　')
-                append('\n')
+    val modules = matrix.width + QR_QUIET_MODULES * 2
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .testTag("backup_pairing_export_qr"),
+    ) {
+        val moduleSize = size.minDimension / modules
+        drawRect(QrBackgroundColor)
+        for (y in 0 until matrix.height) {
+            for (x in 0 until matrix.width) {
+                if (matrix.get(x, y)) {
+                    drawRect(
+                        QrForegroundColor,
+                        Offset((x + QR_QUIET_MODULES) * moduleSize, (y + QR_QUIET_MODULES) * moduleSize),
+                        Size(moduleSize, moduleSize),
+                    )
+                }
             }
         }
     }
-    Text(text, fontSize = 7.sp, modifier = Modifier.testTag("backup_pairing_export_qr"))
 }
+
+private const val QR_QUIET_MODULES = 4
+private val QrBackgroundColor = androidx.compose.ui.graphics.Color.White
+private val QrForegroundColor = androidx.compose.ui.graphics.Color.Black

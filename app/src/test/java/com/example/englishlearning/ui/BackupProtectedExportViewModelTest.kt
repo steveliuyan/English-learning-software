@@ -216,4 +216,62 @@ class BackupProtectedExportViewModelTest {
         assertEquals(0, writer.writeCalls)
         assertTrue(viewModel.state.value.packageReady)
     }
+
+    // ---- D-10/D-11/D-9（AC4-08）：显示门控与诚实文案 ----
+
+    @Test
+    fun `authenticated session shows the pairing qr`() = runTest(dispatcher) {
+        authenticate()
+
+        assertTrue(viewModel.state.value.qrVisible, "Active 阶段签发即认证过，配对码应可见")
+    }
+
+    @Test
+    fun `export completion hides the qr until re-authenticated reveal`() = runTest(dispatcher) {
+        exportReady()
+
+        assertFalse(viewModel.state.value.qrVisible, "Done 阶段不得常驻显示挑战码")
+        val before = viewModel.state.value.qrPayload
+        viewModel.onPairingRevealed()
+        assertTrue(viewModel.state.value.qrVisible, "再次认证成功后重显同一配对码")
+        assertEquals(before, viewModel.state.value.qrPayload, "重显不得重发新挑战")
+    }
+
+    @Test
+    fun `saving the package to a destination keeps the qr hidden`() = runTest(dispatcher) {
+        exportReady()
+        viewModel.onDocumentPicked(mockk())
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.qrVisible)
+    }
+
+    @Test
+    fun `reveal without an issued challenge does nothing`() = runTest(dispatcher) {
+        viewModel.onPairingRevealed()
+
+        assertFalse(viewModel.state.value.qrVisible)
+        assertNull(viewModel.state.value.qrPayload)
+    }
+
+    @Test
+    fun `signing unavailability is reported as an authentication-window honest message`() = runTest(dispatcher) {
+        val failingExecutor = ProtectedExportExecutor(
+            signerFactory = { MigrationSigner { null } },
+            keySpki = { key.public.encoded },
+            delegate = BackupExportCoordinator(FakeRows(), FakeMedia(), ZipPackagePackager()) { createdAtMillis },
+            entropy = FakeEntropy(),
+            clock = { issuedAtSeconds },
+        )
+        val vm = BackupProtectedExportViewModel(failingExecutor, writer)
+        vm.onAuthenticated()
+        advanceUntilIdle()
+
+        vm.exportProtected(includeMediaAssets = false, password = null)
+        advanceUntilIdle()
+
+        val error = assertNotNull(vm.state.value.error)
+        assertTrue(error.contains("认证"), "签名失败必须诚实提示认证窗口原因，实际：$error")
+        assertEquals(ProtectedExportPhase.Active, vm.state.value.phase, "失败回到 Active，重新认证入口即导出按钮")
+    }
 }
