@@ -94,6 +94,14 @@ class BackupProtectedExportViewModel @Inject constructor(
         mutable.value = mutable.value.copy(phase = ProtectedExportPhase.Idle, error = null)
     }
 
+    /** D-7：迁移签名密钥不可用（无安全锁屏或 Keystore 故障）必须是可见错误，不得静默。 */
+    fun onMigrationKeyUnavailable() {
+        mutable.value = mutable.value.copy(
+            phase = ProtectedExportPhase.Idle,
+            error = "无法创建迁移签名密钥：设备未设置安全锁屏或 Keystore 不可用。请先在系统设置中启用锁屏与生物识别，再重新发起导出。",
+        )
+    }
+
     fun setUsePassword(use: Boolean) {
         mutable.value = mutable.value.copy(usePassword = use)
     }

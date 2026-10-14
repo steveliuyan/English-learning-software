@@ -255,6 +255,15 @@ class BackupProtectedExportViewModelTest {
     }
 
     @Test
+    fun `migration key unavailability surfaces a visible honest error`() = runTest(dispatcher) {
+        viewModel.onMigrationKeyUnavailable()
+
+        val error = assertNotNull(viewModel.state.value.error)
+        assertTrue(error.contains("锁屏"), "必须指引用户启用安全锁屏，实际：$error")
+        assertEquals(ProtectedExportPhase.Idle, viewModel.state.value.phase)
+    }
+
+    @Test
     fun `signing unavailability is reported as an authentication-window honest message`() = runTest(dispatcher) {
         val failingExecutor = ProtectedExportExecutor(
             signerFactory = { MigrationSigner { null } },

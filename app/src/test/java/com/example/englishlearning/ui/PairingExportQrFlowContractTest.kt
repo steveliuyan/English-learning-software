@@ -59,6 +59,19 @@ class PairingExportQrFlowContractTest {
         )
     }
 
+    @Test
+    fun `key generation failure is surfaced honestly and the screen scrolls on small displays`() {
+        assertTrue(
+            screen.contains("onMigrationKeyUnavailable"),
+            "D-7：ensureKey 失败必须走可见错误路径，不得静默回到 Idle",
+        )
+        assertTrue(
+            viewModel.contains("fun onMigrationKeyUnavailable") && viewModel.contains("锁屏"),
+            "D-7：ViewModel 必须提供诚实的密钥不可用错误",
+        )
+        assertTrue(screen.contains("verticalScroll"), "D-8：导出页必须可纵向滚动（小屏/大字体）")
+    }
+
     private fun mainSource(name: String): String =
         listOf(File("src/main/java/com/example/englishlearning/ui/$name"), File("app/src/main/java/com/example/englishlearning/ui/$name"))
             .firstOrNull { it.exists() }
