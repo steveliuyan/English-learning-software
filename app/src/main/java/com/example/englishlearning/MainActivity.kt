@@ -1,9 +1,9 @@
 package com.example.englishlearning
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.englishlearning.ui.AiProfileSettingsViewModel
 import com.example.englishlearning.ui.AppScreen
@@ -30,7 +30,11 @@ import javax.inject.Inject
 import com.example.englishlearning.language.domain.PronunciationProvider
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+// D-5 修复（2026-10-14 设备 QA）：必须是 FragmentActivity——BackupPairingExportScreen 的
+// BiometricPrompt 宿主经 `context as? FragmentActivity` 获取，ComponentActivity 下该 cast 恒 null，
+// 认证按钮静默失效。FragmentActivity 本身是 ComponentActivity 子类，setContent/Hilt 均兼容。
+// 回归守卫：BiometricHostActivityContractTest。
+class MainActivity : FragmentActivity() {
     @Inject lateinit var pronunciationProvider: PronunciationProvider
     @Inject lateinit var refreshVocabularySearchIndex: com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase
     override fun onCreate(savedInstanceState: Bundle?) {
