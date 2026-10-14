@@ -35,7 +35,7 @@
 
 ## 4. Git 状态
 
-- 分支 `stage-5-f4-01-daily-history-and-collections`，代码 tip `50eee91`，本报告与文档更新随后一次提交。
+- 分支 `stage-5-f4-01-daily-history-and-collections`，代码 tip `50eee91`，文档收口提交 `75b4bcf`。推送后 `ls-remote` 实测远端 tip = `75b4bcf61bc150f56acc01706df8839d499a111c`，与本地 HEAD 一致，备份成立（其后的报告修订提交只动本节，不再另记）。
 - 工作区在每次提交前 `git status` 复核：仅本功能文件，无临时产物、无密钥类文件混入；逐文件 `git add`。
 - 推送后远端 tip 以 `ls-remote` 实测核验值为准（推送命令与核验结果在会话收口回复中给出；未核验不宣称备份完成）。
 
