@@ -59,13 +59,13 @@ class WordBookWordsScreenTest {
                 onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
             )
         }
-        composeRule.onNodeWithContentDescription("wordbook_words_screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_screen").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_letter_A").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_letter_B").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_letter_#").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_apple").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_banana").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_苹果").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_row_apple").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_row_banana").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_row_苹果").assertIsDisplayed()
     }
 
     /** D2 验收：右侧 A–Z 快速导航栏 26 个字母常驻，每个都可点击。 */
@@ -387,12 +387,12 @@ class WordBookWordsScreenTest {
             WordBookWordsScreen(state = WordBookWordsUiState(words = words), onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {})
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_a1").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_row_a1").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_rail_Z").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_letter_Z").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_z1").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_a1").assertDoesNotExist()
+        composeRule.onNodeWithTag("wordbook_words_row_z1").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_row_a1").assertDoesNotExist()
     }
 
     /** 状态筛选沿用原「全部单词」的语义，只是换到了独立页：计数 + 本地过滤。 */
@@ -416,14 +416,14 @@ class WordBookWordsScreenTest {
                 onOpenWord = {},
             )
         }
-        composeRule.onNodeWithContentDescription("全部 4").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("未学 2").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("待复习 1").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_banana").assertIsDisplayed()
+        composeRule.onNodeWithText("全部 4").assertIsDisplayed()
+        composeRule.onNodeWithText("未学 2").assertIsDisplayed()
+        composeRule.onNodeWithText("待复习 1").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_row_banana").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_filter_unlearned").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_banana").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("wordbook_words_row_apple").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_row_banana").assertDoesNotExist()
+        composeRule.onNodeWithTag("wordbook_words_row_apple").assertIsDisplayed()
     }
 
     private fun word(

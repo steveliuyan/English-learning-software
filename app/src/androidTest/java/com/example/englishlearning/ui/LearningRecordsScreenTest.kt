@@ -3,8 +3,8 @@ package com.example.englishlearning.ui
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.LearningRecord
@@ -22,7 +22,7 @@ class LearningRecordsScreenTest {
     @Test
     fun twoTabsAreRendered() {
         composeRule.setContent { LearningRecordsScreen(LearningRecordsUiState(), {}, {}, {}, {}) }
-        composeRule.onNodeWithContentDescription("learning_records_screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("learning_records_screen").assertIsDisplayed()
         composeRule.onNodeWithText("今日已学").assertIsDisplayed()
         composeRule.onNodeWithText("历史记录").assertIsDisplayed()
         composeRule.onNodeWithText("全部单词").assertDoesNotExist()
@@ -32,7 +32,7 @@ class LearningRecordsScreenTest {
     fun missingRecordIsVisibleButNotClickable() {
         val row = LearningRecord.missing("book:parent", CardFeedback.Fuzzy, Instant.EPOCH, LocalDate.of(2026, 9, 30), "plan-1")
         composeRule.setContent { LearningRecordsScreen(LearningRecordsUiState(today = listOf(row)), {}, {}, {}, {}) }
-        composeRule.onNodeWithContentDescription("learning_record_missing_parent").assertIsDisplayed()
-        composeRule.onAllNodesWithContentDescription("learning_record_row_parent").assertCountEquals(0)
+        composeRule.onNodeWithTag("learning_record_missing_parent").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("learning_record_row_parent").assertCountEquals(0)
     }
 }

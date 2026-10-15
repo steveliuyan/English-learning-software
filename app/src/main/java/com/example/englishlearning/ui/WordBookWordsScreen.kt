@@ -104,8 +104,7 @@ fun WordBookWordsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MintBackground)
-            .testTag("wordbook_words_screen")
-            .semantics { contentDescription = "wordbook_words_screen" },
+            .testTag("wordbook_words_screen"),
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Text(
@@ -114,7 +113,7 @@ fun WordBookWordsScreen(
                     .clickable(onClick = onBack)
                     .padding(8.dp)
                     .testTag("wordbook_words_back")
-                    .semantics { contentDescription = "wordbook_words_back" },
+                    .semantics { contentDescription = "返回" },
                 color = MintPrimaryDark,
                 fontWeight = FontWeight.Bold,
             )
@@ -211,8 +210,7 @@ private fun WordBookWordsFilterBar(state: WordBookWordsUiState, onFilter: (WordB
                 selected = state.filter == filter,
                 onClick = { onFilter(filter) },
                 modifier = Modifier
-                    .testTag(filter.testTag())
-                    .semantics { contentDescription = "${filter.label()} $count" },
+                    .testTag(filter.testTag()),
                 label = { Text("${filter.label()} $count") },
             )
         }
@@ -244,8 +242,7 @@ private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) ->
         modifier = Modifier
             .fillMaxWidth()
             .then(if (enabled) Modifier.clickable(onClick = { onOpenRow(row) }) else Modifier)
-            .testTag("wordbook_words_row_$safeId")
-            .semantics { contentDescription = "wordbook_words_row_$safeId" },
+            .testTag("wordbook_words_row_$safeId"),
         colors = CardDefaults.cardColors(containerColor = if (enabled) MintSurface else MintTint.copy(alpha = 0.55f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) MintOutline else MintOutline.copy(alpha = 0.65f)),
     ) {

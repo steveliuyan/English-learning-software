@@ -55,8 +55,7 @@ fun LearningRecordsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MintBackground)
-            .testTag("learning_records_screen")
-            .semantics { contentDescription = "learning_records_screen" },
+            .testTag("learning_records_screen"),
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
             Text(
@@ -65,7 +64,7 @@ fun LearningRecordsScreen(
                     .clickable(onClick = onBack)
                     .padding(8.dp)
                     .testTag("learning_records_back")
-                    .semantics { contentDescription = "learning_records_back" },
+                    .semantics { contentDescription = "返回" },
                 color = MintPrimaryDark,
                 fontWeight = FontWeight.Bold,
             )
@@ -226,11 +225,7 @@ private fun RecordRow(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .testTag(tag)
-            .semantics {
-                // 保留既有稳定 contentDescription；中文释义、反馈和原因同时作为可见语义文本。
-                contentDescription = tag
-            },
+            .testTag(tag),
         colors = CardDefaults.cardColors(containerColor = if (enabled) MintSurface else MintTint.copy(alpha = 0.55f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) MintOutline else MintOutline.copy(alpha = 0.65f)),
     ) {
