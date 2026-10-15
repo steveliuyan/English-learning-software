@@ -71,6 +71,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.example.englishlearning.export.WorksheetShareLauncher
@@ -1968,7 +1969,8 @@ private fun WordBookCard(
         // 看起来像报错态（真机像素取证：边缘为 #B3261E，即 M3 的 colorScheme.error）。
         // 想靠「是否正在拖动」来按需显示这层底也不可行——SwipeToDismissBoxState.progress
         // 在锚点相同的静止态返回非 0 值，判断不出拖动与否。
-        // 选中态因此只用底色、描边、「已选」标签和单选钮表达，这些已经足够醒目。
+        // 选中态因此用底色、描边、「已选」标签和单选钮表达（视觉层），并由下方 Row 的
+        // stateDescription 把已选/未选播报给读屏（F5-03 决策 §4），两套通道互不替代。
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, borderColor, RoundedCornerShape(18.dp))
@@ -1981,7 +1983,10 @@ private fun WordBookCard(
                 .fillMaxWidth()
                 .heightIn(min = 72.dp)
                 .padding(horizontal = 14.dp, vertical = 12.dp)
-                .semantics { contentDescription = "选择词书 ${book.displayName}" },
+                .semantics {
+                    contentDescription = "选择词书 ${book.displayName}"
+                    stateDescription = if (selected) "已选" else "未选"
+                },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RadioButton(
@@ -2118,7 +2123,7 @@ private fun DailyTargetCard(target: Int, onTargetChange: (Int) -> Unit) {
                     activeTrackColor = MintPrimary,
                     inactiveTrackColor = Color(0xFFCDEFE1),
                 ),
-                modifier = Modifier.fillMaxWidth().padding(top = 14.dp).semantics { contentDescription = "每日新词目标" },
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp).semantics { contentDescription = "每日新词目标，当前 ${displayedTarget} 词" },
             )
             Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("1", style = MaterialTheme.typography.labelSmall, color = MintTextMuted)

@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.notices.ThirdPartyNotice
@@ -119,7 +120,10 @@ private fun NoticeCard(notice: ThirdPartyNotice) {
             .padding(14.dp)
             .testTag("license_entry-${notice.id}")
             .clickable { expanded = !expanded }
-            .semantics { contentDescription = title },
+            .semantics {
+                contentDescription = title
+                stateDescription = if (expanded) "已展开" else "已收起"
+            },
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)

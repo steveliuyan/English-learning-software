@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.reading.domain.Article
@@ -88,7 +89,10 @@ fun ReadingHistoryScreen(
                         onClick = { expanded = !expanded },
                         colors = CardDefaults.cardColors(containerColor = MintSurface),
                         shape = RoundedCornerShape(18.dp),
-                        modifier = Modifier.fillMaxWidth().testTag("reading_history_group_$key"),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("reading_history_group_$key")
+                            .semantics { stateDescription = if (expanded) "已展开" else "已收起" },
                     ) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(newest.title, fontWeight = FontWeight.Bold, color = MintPrimaryDark)

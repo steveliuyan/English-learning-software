@@ -27,8 +27,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppPalette
@@ -75,7 +78,11 @@ private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) 
             .height(64.dp)
             .testTag("app_tab_${tab.name.lowercase()}")
             .clickable { onSelect(tab) }
-            .semantics { contentDescription = tab.contentDescription },
+            .semantics {
+                contentDescription = tab.contentDescription
+                role = Role.Tab
+                stateDescription = if (selected) "已选中" else "未选中"
+            },
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
