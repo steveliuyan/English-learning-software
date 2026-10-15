@@ -12,7 +12,7 @@ status=0
 
 if [ "${SECRET_SCAN_SKIP_TRACKED:-}" != "1" ]; then
   # 1) git 跟踪文件
-  if hits=$(git grep -nIE "$PATTERN" -- ':!scripts/secret-scan*' | grep -v 'secret-scan-allowlist'); then
+  if hits=$(git grep -nIE "$PATTERN" -- ':!scripts/secret-scan*' ':!scripts/apk-secret-scan*' | grep -v 'secret-scan-allowlist'); then
     echo "$hits"
     echo "SECRET SCAN HIT (tracked files)"; status=1
   fi

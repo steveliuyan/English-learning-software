@@ -588,7 +588,7 @@ buildTypes {
 
 - [ ] **Step 2: 写 apk 扫描脚本自测（先红）**
 
-`scripts/apk-secret-scan-selftest.sh`：用 python/zip 造两个假 APK——坏包（assets/leak.txt 内嵌 `sk-abcdefghijklmnopqrstuvwx` 与 `ELPAIR1|Zm9vYmFyMTIzNDU2Nzg5MA`；含 `payload.keystore`）、净包（正常 entries）；断言坏包 exit 1、净包 exit 0；先跑它证明 `apk-secret-scan.sh` 尚不存在（红）。
+`scripts/apk-secret-scan-selftest.sh`：用 python/zip 造两个假 APK——坏包（assets/leak.txt 内嵌 24 位 `sk-` 假 key 与 `ELPAIR1|` 前缀假挑战码，样例串刻意不落文档以免触发自扫；含 `payload.keystore`）、净包（正常 entries）；断言坏包 exit 1、净包 exit 0；先跑它证明 `apk-secret-scan.sh` 尚不存在（红）。
 
 `scripts/apk-secret-scan.sh`（入参=apk 路径）三项检查：
 1. `unzip -l "$APK"` 列表匹配 `\.jks$|\.keystore$|\.p12$|local\.properties|\.env$` → 命中 exit 1；

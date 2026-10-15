@@ -71,10 +71,24 @@ tasks.register("verifyAcTraceabilityMatrix") {
     }
 }
 
+val verifyReleaseArtifact = tasks.register("verifyReleaseArtifact") {
+    group = "verification"
+    description = "F5-01: release APK builds and carries no secrets (AC5-05 release-build scan)."
+    dependsOn(":app:assembleRelease")
+    doLast {
+        val outDir = project(":app").layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        val apk = outDir.listFiles()?.firstOrNull { it.name.endsWith(".apk") }
+        check(apk != null) { "assembleRelease 未产出 APK" }
+        val rc = providers.exec { commandLine("bash", "scripts/apk-secret-scan.sh", apk.absolutePath) }.result.get()
+        check(rc.exitValue == 0) { "APK 密钥扫描命中：见上方输出（AC5-05 发布阻断）" }
+        logger.lifecycle("verifyReleaseArtifact: ${apk.name} scanned clean (signature check pending release keystore).")
+    }
+}
+
 tasks.register("checkReleaseReadiness") {
     group = "verification"
-    description = "Stage-5 F5-01 release gate: notices + AC matrix + unit tests + secret scan."
-    dependsOn("verifyThirdPartyNotices", "verifyAcTraceabilityMatrix", ":app:testDebugUnitTest")
+    description = "Stage-5 F5-01 release gate: notices + AC matrix + unit tests + secret scans + release artifact."
+    dependsOn("verifyThirdPartyNotices", "verifyAcTraceabilityMatrix", ":app:testDebugUnitTest", verifyReleaseArtifact)
     doLast {
         val rc = providers.exec { commandLine("bash", "scripts/secret-scan.sh") }.result.get()
         check(rc.exitValue == 0) { "secret-scan 命中：见上方输出（AC5-05 发布阻断）" }

@@ -1,3 +1,7 @@
+// Gradle Kotlin DSL 顶层的 `java` 是注入的 JavaPluginExtension，会遮蔽 java 包名，
+// 因此必须 import 后用简名 Properties()。
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -20,6 +24,19 @@ val syncThirdPartyNoticesAsset = tasks.register<Copy>("syncThirdPartyNoticesAsse
     into(noticesAssetsDir)
 }
 
+// SP-E 决策 §3 (docs/decisions/2026-10-15-sp-cde-licenses-page-release-build-and-qa-batch.md):
+// release signing material lives ONLY in the developer's local.properties / keystore on disk —
+// never in git. Without the four RELEASE_* keys the release build still succeeds but ships
+// unsigned, and the gate says so instead of pretending the signature was verified.
+val releaseProps = Properties().apply {
+    val localProperties = rootProject.file("local.properties")
+    if (localProperties.exists()) localProperties.inputStream().use { load(it) }
+}
+val releaseStoreFile = releaseProps.getProperty("RELEASE_STORE_FILE")
+if (releaseStoreFile == null) {
+    logger.lifecycle("release keystore 未配置（local.properties 缺 RELEASE_STORE_FILE）：release 产物将未签名，验签 TODO-USER")
+}
+
 android {
     namespace = "com.example.englishlearning"
     compileSdk = 36
@@ -36,6 +53,27 @@ android {
     buildFeatures {
         compose = true
         buildConfig = false
+    }
+
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("releaseLocal") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = releaseProps.getProperty("RELEASE_STORE_PASSWORD", "")
+                keyAlias = releaseProps.getProperty("RELEASE_KEY_ALIAS", "")
+                keyPassword = releaseProps.getProperty("RELEASE_KEY_PASSWORD", "")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            // 决策 §2: R8/资源压缩本轮不启用——keep 规则需专项真机验证，另开小轮逐库打开。
+            isMinifyEnabled = false
+            if (releaseStoreFile != null) {
+                signingConfig = signingConfigs.getByName("releaseLocal")
+            }
+        }
     }
 
     compileOptions {
