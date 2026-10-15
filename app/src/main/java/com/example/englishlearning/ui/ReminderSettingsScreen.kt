@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalTime
 import androidx.compose.runtime.LaunchedEffect
+import com.example.englishlearning.ui.theme.AppPalette
 
 /**
  * F4-02 提醒设置页：开关 + 时间选择。默认关闭；开启时由宿主请求
@@ -59,7 +60,7 @@ fun ReminderSettingsScreen(
             Text("加载中…", modifier = Modifier.testTag("reminder_settings_loading"))
             return@Column
         }
-        state.error?.let { Text(it, color = androidx.compose.ui.graphics.Color.Red, modifier = Modifier.testTag("reminder_settings_error")) }
+        state.error?.let { Text(it, color = AppPalette.ErrorText, modifier = Modifier.testTag("reminder_settings_error")) }
 
         Row(
             modifier = Modifier

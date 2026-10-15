@@ -18,10 +18,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.englishlearning.ui.theme.AppPalette
 
 /**
  * F4-03 备份导出确认页（接线级，不做视觉打磨）。
@@ -96,8 +96,8 @@ fun BackupExportScreen(
             ) { Text("生成备份包") }
         }
 
-        state.error?.let { Text(it, color = Color.Red, modifier = Modifier.testTag("backup_export_error")) }
-        state.message?.let { Text(it, color = Color(0xFF1B5E20), modifier = Modifier.testTag("backup_export_message")) }
+        state.error?.let { Text(it, color = AppPalette.ErrorText, modifier = Modifier.testTag("backup_export_error")) }
+        state.message?.let { Text(it, color = AppPalette.SuccessText, modifier = Modifier.testTag("backup_export_message")) }
     }
 }
 

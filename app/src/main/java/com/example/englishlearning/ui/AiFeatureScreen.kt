@@ -26,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -84,7 +83,7 @@ fun AiFeatureScreen(
                 modifier = Modifier.size(44.dp).background(AiFeatureGradient, RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(feature.glyph, fontWeight = FontWeight.Bold, color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(feature.glyph, fontWeight = FontWeight.Bold, color = AppPalette.OnMintPrimary, style = MaterialTheme.typography.titleLarge)
             }
             Column(Modifier.padding(start = 14.dp)) {
                 Text(

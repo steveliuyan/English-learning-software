@@ -14,6 +14,11 @@ object AppPalette {
     /** 浅薄荷主色容器上的文字色：与 MintPrimary 约 4.6:1（AA 正文），替代「白字压浅底」。 */
     val OnMintPrimary = Color(0xFF174C44)
 
+    /** 错误状态文字（= DomainColors.Danger.deep，白底 ≥7:1），替代裸 `Color.Red`（≈3.7:1 且不可主题化）。 */
+    val ErrorText = Color(0xFFB30000)
+    /** 成功/提示状态文字（深绿，白底 ≥7:1）。 */
+    val SuccessText = Color(0xFF1B5E20)
+
     /** 玻璃面板填充与高光描边。 */
     val GlassFill = Color(0xCCFFFFFF)
     val GlassHighlight = Color(0x59FFFFFF)
