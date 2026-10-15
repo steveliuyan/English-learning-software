@@ -100,7 +100,7 @@ class AppScreenTest {
     fun profileCreationControlsHaveSemanticLabelsAndShowReady() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlanViewModel(), wordCardViewModel = wordCardFixtureViewModel()) }
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
@@ -130,7 +130,7 @@ class AppScreenTest {
     fun blankNameDisablesCreateAndDoesNotReloadTodayPlan() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         var invocations = 0
         val todayPlan = TodayPlanViewModel(
             { invocations++; TodayPlanResult.MissingLearningSetup },
@@ -146,7 +146,7 @@ class AppScreenTest {
     fun savingSetupReloadsTodayPlan() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         var invocations = 0
         val todayPlan = TodayPlanViewModel(
             { invocations++; TodayPlanResult.MissingLearningSetup },
@@ -1123,7 +1123,7 @@ class AppScreenTest {
     ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         AppScreen(
             viewModel = vm,
             learningSetupViewModel = setupViewModel(),
@@ -1155,7 +1155,7 @@ class AppScreenTest {
     fun readyPlanEntryReopensSetupAndSavingReturnsToTodayPlan() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         var invocations = 0
         val todayPlan = TodayPlanViewModel({ invocations++; readyPlanResult() }, FakeLearningProfileRepository())
         composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlan, wordCardViewModel = wordCardFixtureViewModel()) }
@@ -1180,7 +1180,7 @@ class AppScreenTest {
     fun optionalSetupCanBeCancelledBackToTodayPlanWithoutReloading() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         var invocations = 0
         val todayPlan = TodayPlanViewModel({ invocations++; readyPlanResult() }, FakeLearningProfileRepository())
         composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlan, wordCardViewModel = wordCardFixtureViewModel()) }
@@ -1201,7 +1201,7 @@ class AppScreenTest {
     fun mandatorySetupOffersNoCancelEntry() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         composeRule.setContent { AppScreen(viewModel = vm, learningSetupViewModel = setupViewModel(), todayPlanViewModel = todayPlanViewModel(), wordCardViewModel = wordCardFixtureViewModel()) }
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
@@ -1214,7 +1214,7 @@ class AppScreenTest {
     fun startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         val todayPlan = TodayPlanViewModel({ placeholderCardPlan() }, FakeLearningProfileRepository())
         composeRule.setContent {
             AppScreen(
@@ -1247,7 +1247,7 @@ class AppScreenTest {
     fun returningFromLearningReloadsTodayPlan() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         var invocations = 0
         val todayPlan = TodayPlanViewModel({ invocations++; placeholderCardPlan() }, FakeLearningProfileRepository())
         composeRule.setContent {

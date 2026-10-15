@@ -35,20 +35,20 @@ class AppViewModelFailureTest {
     }
 
     @Test fun `repository read failure becomes safe error`() = runTest(dispatcher) {
-        val vm = AppViewModel(FailingRepository(read = true), CreateLocalProfileUseCase(FailingRepository(), clock))
+        val vm = AppViewModel(FailingRepository(read = true), CreateLocalProfileUseCase(FailingRepository(), clock), HealthyDatabaseStartupProbe)
         advanceUntilIdle()
         assertEquals(AppUiState.Error(AppError.StorageUnavailable), vm.uiState.value)
     }
     @Test fun `known app error is preserved`() = runTest(dispatcher) {
         val repo = FailingRepository(saveError = AppError.StorageInsufficient(10))
-        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock))
+        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock), HealthyDatabaseStartupProbe)
         vm.createProfile("valid")
         advanceUntilIdle()
         assertEquals(AppUiState.Error(AppError.StorageInsufficient(10)), vm.uiState.value)
     }
     @Test fun `repository save failure becomes safe error`() = runTest(dispatcher) {
         val repo = FailingRepository(save = true)
-        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock))
+        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock), HealthyDatabaseStartupProbe)
         vm.createProfile("valid")
         advanceUntilIdle()
         assertEquals(AppUiState.Error(AppError.StorageUnavailable), vm.uiState.value)

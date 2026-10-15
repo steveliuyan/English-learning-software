@@ -42,7 +42,7 @@ class AppViewModelStateSerializationTest {
     fun `late not-found reload does not overwrite createProfile success`() = runTest(dispatcher) {
         val repository = gatedStaleReadRepository()
         // Construction triggers `init { reload() }`, which blocks inside getDefault().
-        val viewModel = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val viewModel = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), HealthyDatabaseStartupProbe)
 
         // Queue the newer action, then drain: reload parks on the gate, so createProfile is
         // serialized behind it. Its success must still win once the stale read eventually lands.

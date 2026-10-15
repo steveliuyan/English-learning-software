@@ -51,7 +51,7 @@ class SetupScreenScreenshotTest {
     fun setupScreenRendersAndExportsPng() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
-        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock))
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
         composeRule.setContent {
             AppScreen(
                 viewModel = vm,

@@ -39,10 +39,10 @@ class AppViewModelTest {
     fun `create profile persists and reloads without network`() = runTest(dispatcher) {
         val repo = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)
-        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock))
+        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock), HealthyDatabaseStartupProbe)
         vm.createProfile("本地学习者")
         advanceUntilIdle()
-        val reloaded = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock))
+        val reloaded = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock), HealthyDatabaseStartupProbe)
         advanceUntilIdle()
         assertEquals(AppUiState.Ready(com.example.englishlearning.profile.LocalProfile("default", "本地学习者", Instant.EPOCH)), reloaded.uiState.value)
     }
@@ -52,7 +52,7 @@ class AppViewModelTest {
         val input = "   "
         val repo = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)
-        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock))
+        val vm = AppViewModel(repo, CreateLocalProfileUseCase(repo, clock), HealthyDatabaseStartupProbe)
         vm.createProfile(input)
         advanceUntilIdle()
         val state = vm.uiState.value

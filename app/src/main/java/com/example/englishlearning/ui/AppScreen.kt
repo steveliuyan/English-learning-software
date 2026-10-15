@@ -152,6 +152,8 @@ fun AppScreen(
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
+    // CompositionLocal 只能在组合期读取，recreate 用 Activity 引用需在 when 之前取出。
+    val activityForRecreate = LocalContext.current as? android.app.Activity
     when (val state = viewModel.uiState.collectAsState().value) {
         AppUiState.Loading -> BrandLaunchSurface()
         AppUiState.NeedsProfile -> ProfileCreationScreen(
@@ -1548,6 +1550,15 @@ fun AppScreen(
                 }
             }
         }
+        is AppUiState.NeedsRecovery -> RecoveryScreen(
+            reason = state.reason,
+            // SP-B 决策 §3 v1：重试 = 探针清错误态并重开一次 + activity.recreate() 重建视图树；
+            // ViewModel 与 @Singleton 探针跨 recreate 保留，失败会再次落回 NeedsRecovery，不吞原因。
+            onRetry = {
+                viewModel.retryDatabaseStartup()
+                activityForRecreate?.recreate()
+            },
+        )
         is AppUiState.Error -> ErrorScreen(onRetry = { viewModel.reload() })
     }
 }

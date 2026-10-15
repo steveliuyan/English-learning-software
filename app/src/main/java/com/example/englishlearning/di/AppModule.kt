@@ -18,6 +18,9 @@ import com.example.englishlearning.ai.net.AudioHttpTransport
 import com.example.englishlearning.ai.net.UrlConnectionAiHttpTransport
 import com.example.englishlearning.ai.net.UrlConnectionAudioHttpTransport
 import com.example.englishlearning.core.storage.AppDatabase
+import com.example.englishlearning.core.storage.DatabaseStartup
+import com.example.englishlearning.core.storage.DatabaseStartupProbe
+import com.example.englishlearning.core.storage.RoomDatabaseStartupProbe
 import com.example.englishlearning.core.security.AndroidKeyStoreSecretStore
 import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.core.time.ClockProvider
@@ -105,8 +108,23 @@ import kotlinx.coroutines.Dispatchers
 @InstallIn(SingletonComponent::class)
 object AppModule {
     @Provides @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        AppDatabase.create(context, context.getDatabasePath("english-learning.db"))
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+        startupProbe: RoomDatabaseStartupProbe,
+    ): AppDatabase {
+        // SP-B 决策 §3：迁移/打开失败不再崩进程——把安全短句原因记进启动探针，UI 呈现
+        // NeedsRecovery；这里退回「未打开」的惰性实例（Room .build() 本身零副作用），
+        // 失败路径绝不删文件、绝不 destructive fallback。
+        val opened = DatabaseStartup.open(context)
+        startupProbe.record(opened.exceptionOrNull())
+        return opened.getOrElse {
+            AppDatabase.create(context, context.getDatabasePath(DatabaseStartup.DATABASE_NAME))
+        }
+    }
+
+    /** 接口绑定走 @Provides 透传具体单例：AppViewModel 依赖端口，provideDatabase 依赖实现，无构造环。 */
+    @Provides @Singleton
+    fun provideDatabaseStartupProbe(impl: RoomDatabaseStartupProbe): DatabaseStartupProbe = impl
     @Provides @Singleton fun provideSecretStore(@ApplicationContext context: Context): SecretStore = AndroidKeyStoreSecretStore(context)
     @Provides @Singleton fun provideClock(): ClockProvider = SystemClockProvider()
     @Provides @Named("io") fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
