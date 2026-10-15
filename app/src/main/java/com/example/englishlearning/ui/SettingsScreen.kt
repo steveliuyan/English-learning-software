@@ -126,6 +126,8 @@ fun SettingsScreen(
     onDeleteAllLearningData: () -> Unit = {},
     /** 「删除全部学习数据」的一句结果回执（删除成功或预览读取失败），`null` 时不占位。 */
     deleteAllLearningDataNotice: String? = null,
+    /** F5-04「关于与开源许可」入口（AC5-04）：必须是真实可达页面，不许做假入口。 */
+    onOpenLicenses: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -224,6 +226,14 @@ fun SettingsScreen(
                 title = "昵称与头像",
                 subtitle = "后续版本：支持更换昵称与自定义头像",
                 tag = "settings_pending_profile",
+            )
+            SettingsActionRow(
+                title = "关于与开源许可",
+                subtitle = "第三方组件、许可证与隐私说明",
+                tag = "settings_open_licenses",
+                onClick = onOpenLicenses,
+                badge = "ℹ",
+                accent = DomainColors.Settings,
             )
         }
 

@@ -176,6 +176,7 @@ fun AppScreen(
             var showBackupExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupRestore by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupPairingExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showLicenses by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // F4-01 决策⑦收藏：列表是 CheckIn 同级的叠层；详情是一次性回源结果的本地覆盖层。
             var showFavorites by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -1085,6 +1086,16 @@ fun AppScreen(
                     onBack = { showBackupPairingExport = false },
                     viewModel = backupPairingExportViewModel,
                 )
+            } else if (showLicenses) {
+                // F5-04：许可台账页。数据源=构建期从 docs/third-party-notices.md 同步的 assets；
+                // 读不到传空串，页面如实显示「许可台账暂不可读」，零假台账零假入口。
+                val licensesContext = LocalContext.current
+                val noticesMarkdown = remember {
+                    runCatching {
+                        licensesContext.assets.open("third-party-notices.md").bufferedReader().use { it.readText() }
+                    }.getOrDefault("")
+                }
+                LicensesScreen(markdown = noticesMarkdown, onBack = { showLicenses = false })
             } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
                 // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
                 val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
@@ -1475,6 +1486,7 @@ fun AppScreen(
                                     onOpenBackupPairingExport = {
                                         showBackupPairingExport = backupPairingExportViewModel != null
                                     },
+                                    onOpenLicenses = { showLicenses = true },
                                     speechEngineStatuses = speechState.engineStatuses(),
                                     aiProfileSubtitle = aiProfiles?.let { ready ->
                                         if (ready.items.isEmpty()) {
