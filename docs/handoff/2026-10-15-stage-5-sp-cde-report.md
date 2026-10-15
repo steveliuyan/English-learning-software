@@ -60,6 +60,9 @@ SP-D（F5-04 应用内「关于与开源许可」页+台账终审+v0.0.1 发布�
 - 远端：本收口提交后立即经代理 127.0.0.1:3067 推送本分支，`ls-remote origin` 核验值=本地 HEAD 哈希（一致才算备份完成；
   推送与核验结果在会话回复中同步给出）。
 - 工作区：收口提交后干净；未混入密钥、`local.properties`、QA 临时产物（secret-scan exit 0 佐证）。
+- 拍板补记（2026-10-15 用户「可以按你推荐的来」）：本分支 **FF 合入 main**；合入并 ls-remote 核验后删除本地+远端的
+  `stage-5-sp-b-performance-and-reliability`、`stage-5-sp-cde-licenses-release-and-accessibility` 与本地三个已并入 main 的
+  `fix/*` 分支。QA 第三轮直接在 main 上按任务书走查。
 
 ## 5. 未完成 / 遗留问题
 
