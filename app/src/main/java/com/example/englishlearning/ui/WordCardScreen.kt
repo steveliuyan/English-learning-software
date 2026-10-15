@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.CardFeedback
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -92,7 +93,7 @@ fun WordCardScreen(
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.testTag("word_card_retry").semantics { contentDescription = "重试" },
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                 ) { Text("重试") }
             }
 
@@ -121,7 +122,7 @@ fun WordCardScreen(
                         .testTag("word_card_start_new_phase")
                         .semantics { contentDescription = "开始学习新增词" },
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                 ) { Text("开始学习新增词", fontWeight = FontWeight.Bold) }
                 BackToPlanButton(onBackToPlan)
             }
@@ -320,7 +321,7 @@ private fun BackToPlanButton(onBackToPlan: () -> Unit) {
             .testTag("word_card_back_to_plan")
             .semantics { contentDescription = "返回今日计划" },
         shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
     ) { Text("返回今日计划", fontWeight = FontWeight.Bold) }
 }
 

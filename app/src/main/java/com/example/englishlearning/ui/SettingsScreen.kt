@@ -392,7 +392,7 @@ private fun SettingsActionRow(
     ) {
         if (domainStyled) {
             Box(
-                modifier = Modifier.size(32.dp).background(accent.base, AppShape.Button),
+                modifier = Modifier.size(32.dp).background(accent.deep, AppShape.Button),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(badge, style = AppType.Label, color = Color.White, textAlign = TextAlign.Center)

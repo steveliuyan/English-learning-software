@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
@@ -154,7 +155,7 @@ fun AiFeatureScreen(
                         .testTag("ai_feature_open_settings")
                         .semantics { contentDescription = "去配置 AI 服务" },
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                 ) { Text("去配置 AI 服务", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenLearning,

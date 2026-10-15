@@ -11,6 +11,9 @@ object AppPalette {
     val Separator = Color(0xFFE5E5EA)
     val Scrim = Color(0x66000000)
 
+    /** 浅薄荷主色容器上的文字色：与 MintPrimary 约 4.6:1（AA 正文），替代「白字压浅底」。 */
+    val OnMintPrimary = Color(0xFF174C44)
+
     /** 玻璃面板填充与高光描边。 */
     val GlassFill = Color(0xCCFFFFFF)
     val GlassHighlight = Color(0x59FFFFFF)

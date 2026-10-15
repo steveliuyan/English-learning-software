@@ -32,7 +32,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -41,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.SearchVocabularyResult
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -140,7 +140,7 @@ fun GlobalVocabularySearchScreen(
                 // 用户清空输入后就回不到最近搜索，只能退出页面从主页重进——文案承诺的能力
                 // 必须真的能触发。所以这里不设 `enabled`，只是把文案切成对应的动作。
                 modifier = Modifier.fillMaxWidth().height(48.dp).testTag("global_search_submit"),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                 shape = RoundedCornerShape(14.dp),
             ) { Text(if (trimmedQuery.isEmpty()) "查看最近搜索" else "全量搜索") }
 

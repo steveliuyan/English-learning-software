@@ -19,13 +19,13 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.reading.ImportRejection
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -111,7 +111,7 @@ fun ArticleImportScreen(
             enabled = !state.submitting,
             modifier = Modifier.fillMaxWidth().height(54.dp).testTag("import_submit").semantics { contentDescription = "导入并阅读" },
             shape = RoundedCornerShape(18.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
         ) { Text("导入并阅读", fontWeight = FontWeight.Bold) }
     }
 }

@@ -29,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -42,6 +41,7 @@ import com.example.englishlearning.imagegen.ImageStudioNotConfiguredReason
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
@@ -113,7 +113,7 @@ fun ImageStudioScreen(
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MintPrimary,
-                contentColor = Color.White,
+                contentColor = AppPalette.OnMintPrimary,
                 disabledContainerColor = MintTint,
                 disabledContentColor = MintPrimaryDark,
             ),
@@ -171,7 +171,7 @@ private fun PromptCard(prompt: String, onGenerateImage: () -> Unit) {
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = Color.White,
+            contentColor = AppPalette.OnMintPrimary,
         ),
     ) { Text("生成图片", fontWeight = FontWeight.Bold) }
     Text(

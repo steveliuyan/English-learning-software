@@ -25,7 +25,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -35,6 +34,7 @@ import com.example.englishlearning.ai.AiFailureUiText
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
@@ -107,7 +107,7 @@ fun WordAiQaScreen(
             },
             enabled = personalNote.isNotBlank(),
             modifier = Modifier.fillMaxWidth().testTag("word_qa_save_personal_note"),
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
         ) { Text("保存我的笔记") }
 
         if (savedNotes.isNotEmpty()) {
@@ -162,7 +162,7 @@ private fun QuestionChip(kind: WordQaKind, enabled: Boolean, onAsk: (WordQaKind)
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = Color.White,
+            contentColor = AppPalette.OnMintPrimary,
             disabledContainerColor = MintTint,
             disabledContentColor = MintPrimaryDark,
         ),
@@ -209,7 +209,7 @@ private fun AnsweredContent(
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = Color.White,
+            contentColor = AppPalette.OnMintPrimary,
             disabledContainerColor = MintTint,
             disabledContentColor = MintPrimaryDark,
         ),

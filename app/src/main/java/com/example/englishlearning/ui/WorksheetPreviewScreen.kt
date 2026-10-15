@@ -37,6 +37,7 @@ import com.example.englishlearning.export.WorksheetPreviewRenderer
 import com.example.englishlearning.learning.worksheet.WorksheetDirection
 import com.example.englishlearning.learning.worksheet.WorksheetPage
 import com.example.englishlearning.learning.worksheet.WorksheetTemplate
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -133,7 +134,7 @@ fun WorksheetPreviewScreen(
                 modifier = Modifier.weight(1f).height(52.dp).testTag("worksheet_export_action"),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MintPrimary,
-                    contentColor = Color.White,
+                    contentColor = AppPalette.OnMintPrimary,
                     disabledContainerColor = MintSurface,
                     disabledContentColor = MintTextMuted,
                 ),

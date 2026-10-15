@@ -41,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -55,6 +54,7 @@ import kotlin.math.floor
 import kotlinx.coroutines.launch
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -150,7 +150,7 @@ fun WordBookWordsScreen(
                         modifier = Modifier
                             .testTag("wordbook_words_retry")
                             .semantics { contentDescription = "重试读取词书单词" },
-                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                     ) { Text("重试") }
                 }
                 else -> LazyColumn(

@@ -20,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -38,6 +37,7 @@ import com.example.englishlearning.reading.domain.ReadingPreference
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
@@ -203,7 +203,7 @@ private fun ReadyContent(
                     .testTag("reading_open_today")
                     .semantics { contentDescription = "阅读今天的文章" },
                 shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
             ) { Text("阅读今天的文章", fontWeight = FontWeight.Bold) }
             Button(
                 onClick = onRegenerate,
@@ -259,7 +259,7 @@ private fun NotConfiguredBanner(reason: NotConfiguredReason, onOpenAiSettings: (
             Button(
                 onClick = onOpenAiSettings,
                 modifier = Modifier.testTag("generation_failure_action"),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
             ) { Text("去配置", fontWeight = FontWeight.Bold) }
         }
     }
@@ -278,7 +278,7 @@ private fun GenerationFailureBanner(failure: AiFailure, onOpenAiSettings: () -> 
                 Button(
                     onClick = onOpenAiSettings,
                     modifier = Modifier.testTag("generation_failure_action"),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                 ) { Text(UserAction.ConfigureProfile.label, fontWeight = FontWeight.Bold) }
             }
         }
@@ -402,7 +402,7 @@ private fun TypeButton(type: ArticleType, enabled: Boolean, onSelectType: (Artic
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = Color.White,
+            contentColor = AppPalette.OnMintPrimary,
             disabledContainerColor = MintTint,
             disabledContentColor = MintPrimaryDark,
         ),

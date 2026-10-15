@@ -59,7 +59,7 @@ fun PillButton(
     val usesBrandGradient = accent == DomainColors.AiSpeech
     val contentColor = when {
         !enabled -> AppPalette.TextSecondary
-        style == PillStyle.Primary && usesBrandGradient -> Color(0xFF174C44)
+        style == PillStyle.Primary && usesBrandGradient -> AppPalette.OnMintPrimary
         style == PillStyle.Primary -> Color.White
         else -> accent.deep
     }

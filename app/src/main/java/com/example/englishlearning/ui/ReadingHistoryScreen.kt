@@ -21,13 +21,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.reading.domain.Article
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -111,7 +111,7 @@ fun ReadingHistoryScreen(
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Button(
                                             onClick = { onOpenArticle(article) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                                             modifier = Modifier.testTag("reading_version_reread_${article.articleId}"),
                                         ) { Text("重读") }
                                         TextButton(

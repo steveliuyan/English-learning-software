@@ -77,6 +77,7 @@ import com.example.englishlearning.export.WorksheetShareLauncher
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintLight
 import com.example.englishlearning.ui.theme.AppleMintMiddle
@@ -1666,7 +1667,7 @@ internal fun ErrorScreen(onRetry: () -> Unit) {
         Button(
             onClick = onRetry,
             modifier = Modifier.semantics { contentDescription = "返回重新填写" },
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
         ) {
             Text("返回重新填写")
         }

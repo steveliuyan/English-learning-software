@@ -49,7 +49,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -69,6 +68,7 @@ import com.example.englishlearning.phototranslation.PhotoTranslationNotConfigure
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
@@ -182,7 +182,7 @@ fun PhotoTranslationScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MintPrimary,
-                    contentColor = Color.White,
+                    contentColor = AppPalette.OnMintPrimary,
                     disabledContainerColor = MintSurface,
                     disabledContentColor = MintTextMuted,
                 ),
@@ -298,7 +298,7 @@ fun PhotoTranslationScreen(
                 shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MintPrimary,
-                    contentColor = Color.White,
+                    contentColor = AppPalette.OnMintPrimary,
                     disabledContainerColor = MintTint,
                     disabledContentColor = MintPrimaryDark,
                 ),
@@ -428,7 +428,7 @@ private fun CameraCaptureBox(
                 enabled = visible,
                 modifier = Modifier.testTag("photo_translation_shutter_button"),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
             ) { Text("快门 · 拍照", fontWeight = FontWeight.Bold) }
         }
     }
@@ -626,7 +626,7 @@ private fun OfflineModelCard(
                         enabled = progress == null,
                         modifier = Modifier.testTag("photo_translation_model_install"),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                     ) { Text(if (progress == null) "下载模型（约 4.1 MB）" else "下载中…", fontWeight = FontWeight.Bold) }
                 }
                 is OcrModelAssetStatus.Installed -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
