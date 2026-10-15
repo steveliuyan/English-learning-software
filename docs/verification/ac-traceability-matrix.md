@@ -56,3 +56,11 @@
 | AC4-06 | 受保护备份在旧设备不可用或密码遗忘时不可恢复；UI 不提供跳过认证或强制导入入口… | 自动化 | ui.RestoreNoBypassContractTest（KDoc AC4-06）; pairing.MigrationChallengeIssuerTest; f4-04验收记录 §4 |
 | AC4-07 | 进入替换提交阶段后（无论恢复成功还是失败已回滚），旧进程内对正式数据库的复用不再… | 自动化+设备 | backup.device.BackupCloseSemanticsContractTest（AC4-07 重启约束）; ui.BackupRestoreViewModelTest; SnapshotSwapRestoreCommitGatewayTest; androidTest backup.device.RoomFormalDataHandleCloseSemanticsTest; batched-device-qa-report §R7 |
 | AC4-08 | 旧设备导出页的配对 QR 可被标准解码器（如 zxing）从屏幕截图解码，内容与… | 自动化+设备 | ui.PairingExportQrFlowContractTest（AC4-08）; ui.BackupProtectedExportViewModelTest; pairing.MigrationCodeCodecTest; batched-device-qa-report §R7（方形 QR zxing 直解+重显同码） |
+
+## 阶段 5 AC（校验器范围外，人工追踪）
+
+> `verifyAcTraceabilityMatrix` 只校验 specs 00–4 的 `AC[0-4]-\d{2}`；本节 AC5-xx 行不被其匹配，作为阶段 5 自身证据的人工追踪台账（口径同 AC5-01：每行证据非空）。
+
+| AC | 摘要 | 验证方式 | 证据 |
+|---|---|---|---|
+| AC5-02 | 六项性能目标按最低支持口径实测并有阈值台账；AI/网络操作可取消、超时、不阻塞 UI 且失败不重复生成学习事件/损坏文章版本；迁移失败呈现为可恢复错误。 | 自动化+设备 | reading.RoomArticleVersionRaceTest（真库 8 路并发零撞 UNIQUE）; androidTest perf.PerfSixMetricsInstrumentedTest（6/6 达标，阈值=中位数×2，docs/verification/perf-baseline-2026-10.md）; androidTest perf.OfflineCorePathsInstrumentedTest（离线四链+AI 不可达→Failed(NetworkUnavailable) 零写入）; reading.GenerateArticleUseCaseTest#rethrowsCancellationWithoutStoring/#mapsNetworkFailureToNetworkUnavailable; learning.SubmitCardFeedbackUseCaseTest（重放零重复）; ui.AppViewModelRecoveryTest + androidTest core.storage.MigrationFailureRecoveryTest + androidTest ui.RecoveryScreenTest（迁移失败→NeedsRecovery 可恢复呈现，禁 destructive fallback）; docs/verification/ac5-02-offline-script.md（飞行模式手工六条链路）; 语义与阈值口径见 docs/decisions/2026-10-15-sp-b-performance-and-reliability-semantics.md |
