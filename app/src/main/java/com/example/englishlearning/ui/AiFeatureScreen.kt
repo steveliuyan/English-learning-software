@@ -197,7 +197,9 @@ private fun StatusPill(implemented: Boolean) {
             text = label,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = if (implemented) Color.White else MintPrimaryDark,
+            // 「可用」档底是 MintPrimary（≈2.1:1 白字违规），「未实现」档底是浅 MintTint；
+            // 两档文字统一深字，底色按裁决保持不变。
+            color = if (implemented) AppPalette.OnMintPrimary else MintPrimaryDark,
         )
     }
 }

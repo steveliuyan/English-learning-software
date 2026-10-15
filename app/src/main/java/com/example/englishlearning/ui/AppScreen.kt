@@ -1645,7 +1645,8 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
-                contentColor = Color.White,
+                // AppleMintGradient 是浅薄荷渐变，白字 ≈1.29–2.40:1；按禁令2 同口径改深字 token。
+                contentColor = AppPalette.OnMintPrimary,
                 disabledContainerColor = MintTint,
                 disabledContentColor = MintTextMuted,
             ),
@@ -1853,7 +1854,8 @@ private fun LearningSetupScreen(
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
-                contentColor = Color.White,
+                // 同上：品牌渐变底用深字 token，不沿用白字（≥4.5:1 口径见 GlassButton）。
+                contentColor = AppPalette.OnMintPrimary,
             ),
         ) {
             Text(if (state.saving) "保存中…" else "保存并开始学习", fontWeight = FontWeight.Bold)

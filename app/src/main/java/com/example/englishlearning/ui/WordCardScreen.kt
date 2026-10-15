@@ -291,7 +291,8 @@ private fun FeedbackButton(
     onSubmit: (CardFeedback) -> Unit,
 ) {
     val container = if (feedback == CardFeedback.Known) MintPrimary else MintSurface
-    val content = if (feedback == CardFeedback.Known) Color.White else MintPrimaryDark
+    // 「认识」档是浅薄荷底，白字只有 ≈2.1:1（决策 §3 禁令2），统一改深字 token。
+    val content = if (feedback == CardFeedback.Known) AppPalette.OnMintPrimary else MintPrimaryDark
     Button(
         onClick = { onSubmit(feedback) },
         enabled = !state.submitting,

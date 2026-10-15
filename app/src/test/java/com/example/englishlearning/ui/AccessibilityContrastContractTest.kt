@@ -9,14 +9,28 @@ import kotlin.test.assertTrue
  * F5-03 源码契约（决策 §3 禁令2）：禁「浅薄荷 MintPrimary 容器 + 白字」主 CTA 组合
  * （白字压浅薄荷实测 ≈2.1:1，远低于 AA 4.5:1，TalkBack 用户同样受害于低对比）。
  * 同一次 buttonColors 调用内 containerColor = MintPrimary 与 contentColor = Color.White
- * 共存即违规；修复色统一 AppPalette.OnMintPrimary（≈4.6:1，与 PillButton 品牌渐变深字同源）。
+ * 共存即违规（决策原文是「同调用内共存」，与两参数的书写顺序无关）；
+ * 修复色统一 AppPalette.OnMintPrimary（≈4.6:1，与 PillButton 品牌渐变深字同源）。
  *
  * 口径边界（有意为之，勿“顺手加严”）：
- *  - 只锁决策点名的这一形状（MintPrimary 容器 + Color.White 文字）；
- *    MintSurface+MintPrimaryDark、DomainColors.*.deep+白字、渐变上 Color.Transparent 容器
- *    与只写 containerColor 的调用都是现存的合法组合，必须不误伤。
- *  - 沿用禁令1 判定面：认 buttonColors 调用内的字面量形状；变量容器（如 WordCardScreen 的
- *    container/content 局部变量）不在契约匹配面内，由修复任务逐点保证。
+ *  - 只锁决策点名的这一形状（MintPrimary 容器 + Color.White 文字）；MintSurface+MintPrimaryDark、
+ *    DomainColors.*.deep+白字、MintPrimaryDark+白字（≈15:1）与只写 containerColor 的调用都是
+ *    现存的正确配比，必须不误伤——容器 token 名因此要求**完整匹配**（后面不得紧跟字母），
+ *    否则 `containerColor = MintPrimary` 会前缀匹配到 MintPrimaryDark 造成误判。
+ *  - Color.Transparent 容器 + 白字「不被判违规」只是匹配面结论，**不是对渐变的安全背书**：
+ *    透明容器的实际底色来自 Modifier.background(brush/…) 或父级容器，源码正则无从计算对比度，
+ *    因此「浅渐变 + 白字」（最坏 ≈1.29:1）在这里抓不住。仍走这条路子的站点
+ *    （GlassButton 品牌渐变、AiFeatureScreen 头部 glyph 徽标）归 Task 12 的 connected 清单，
+ *    用设备侧截图/取色取证；本契约只保证「不因看不准而误伤」，不背书任何渐变组合。
+ *  - 沿用禁令1 判定面：认 buttonColors 调用内的字面量形状。
+ *
+ * 已知漏判面（无法用源码正则可靠闭合，故记录口径而非做脆弱重写）：
+ *  - 变量容器 / 变量文字色（如 WordCardScreen FeedbackButton 的 container、content 局部变量）
+ *    不在判定面内，由修复任务逐点保证；
+ *  - `[^)]` 会在任意**嵌套右括号**处停住，所以
+ *    `containerColor = MintPrimary.copy(alpha = .5f), contentColor = Color.White`
+ *    或参数里内联 `if (implemented) MintPrimary else MintTint` 这类写法会静默漏判。
+ *    新增此类站点时优先改成本契约可判的字面量形状，否则依赖设备侧证据兜底。
  *
  * 结构沿用 AccessibilityLabelContractTest 样板（scanUiSources 守卫 + 规则纯函数 +
  * 合成用例证明规则形状 + 真实文件用例证明当前零违规）；本类是 Task 3
@@ -32,11 +46,15 @@ class AccessibilityContrastContractTest {
 
     /**
      * 禁令2 的匹配面：同一次 buttonColors 调用（参数内不含 `)`）里
-     * containerColor = MintPrimary 与 contentColor = Color.White 共存。
+     * containerColor = MintPrimary 与 contentColor = Color.White 共存——两个方向各一条交替式，
+     * 反参数序写法同样判违规，不接受「换个书写顺序就绕过契约」。
+     * `(?![A-Za-z])` 让 MintPrimary 必须是完整 token 名，不前缀匹配 MintPrimaryDark（深底白字 ≈15:1 合法）。
      * Kotlin Regex 的 `[^)]` 默认跨行，多行参数写法同样被抓住。
      */
-    private val lowContrastCombo =
-        Regex("""buttonColors\([^)]*containerColor = MintPrimary[^)]*contentColor = Color\.White[^)]*\)""")
+    private val lowContrastCombo = Regex(
+        """buttonColors\([^)]*containerColor = MintPrimary(?![A-Za-z])[^)]*contentColor = Color\.White[^)]*\)""" +
+            """|buttonColors\([^)]*contentColor = Color\.White[^)]*containerColor = MintPrimary(?![A-Za-z])[^)]*\)"""
+    )
 
     /** 禁令2 纯函数：源码文本 → 低对比 buttonColors 调用 offender 列表（折叠空白便于阅读）。 */
     private fun lowContrastOffenders(source: String): List<String> =
@@ -106,6 +124,11 @@ class AccessibilityContrastContractTest {
             "colors = ButtonDefaults.buttonColors(\n    containerColor = MintPrimary,\n    contentColor = Color.White,\n),",
             // 多行 + 附带 disabled 参数（修复前 ImageStudioScreen:114-119 等）
             "colors = ButtonDefaults.buttonColors(\n    containerColor = MintPrimary,\n    contentColor = Color.White,\n    disabledContainerColor = MintTint,\n),",
+            // 反参数序（决策 §3 禁令2 的口径是「同调用内共存」，与书写顺序无关）：
+            // contentColor 在前的写法必须同样判违规，否则改个顺序就绕过契约。
+            "colors = ButtonDefaults.buttonColors(contentColor = Color.White, containerColor = MintPrimary),",
+            // 反参数序 + 多行形状
+            "colors = ButtonDefaults.buttonColors(\n    contentColor = Color.White,\n    containerColor = MintPrimary,\n),",
         )
         cases.forEach { snippet ->
             val offenders = lowContrastOffenders(snippet)
@@ -127,7 +150,14 @@ class AccessibilityContrastContractTest {
             "colors = ButtonDefaults.buttonColors(containerColor = MintPrimary),",
             // TodayPlanScreen:156 等 —— 浅底深字族
             "colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),",
-            // AppScreen:1645/1853 —— 渐变底 + 透明容器承载白字
+            // 深字容器族：MintPrimaryDark（0xFF1C1C1E）+ 白字 ≈15:1 是正确配比，
+            // 规则必须把 `MintPrimary` 当作完整 token 名，不得前缀匹配到 MintPrimaryDark。
+            "colors = ButtonDefaults.buttonColors(containerColor = MintPrimaryDark, contentColor = Color.White),",
+            "colors = ButtonDefaults.buttonColors(contentColor = Color.White, containerColor = MintPrimaryDark),",
+            // 透明容器承载白字（GlassButton 品牌渐变等自绘底实况）：
+            // 底色来自 Modifier.background(brush/…)，源码正则无从计算对比度——
+            // 「不误伤」只说明匹配面判不了，**不代表渐变 + 白字是安全配比**；
+            // 这类站点的对比度归 Task 12 connected 清单做设备侧取证。
             "colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),",
             // CheckInScreen:77 / TodayPlanScreen:90 —— 域色 deep 底白字（≥4.1:1）
             "colors = ButtonDefaults.buttonColors(containerColor = DomainColors.Review.deep, contentColor = Color.White),",
