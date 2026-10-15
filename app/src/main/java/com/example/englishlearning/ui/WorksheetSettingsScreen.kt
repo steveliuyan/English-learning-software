@@ -273,6 +273,7 @@ private fun OptionSwitchRow(
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                modifier = Modifier.semantics { contentDescription = title },
                 colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary),
             )
         }

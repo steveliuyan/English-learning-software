@@ -17,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -81,7 +83,7 @@ fun ReminderSettingsScreen(
                 onCheckedChange = { checked ->
                     if (checked) onEnableRequested() else viewModel.setEnabled(false)
                 },
-                modifier = Modifier.testTag("reminder_enabled_switch"),
+                modifier = Modifier.testTag("reminder_enabled_switch").semantics { contentDescription = "开启学习提醒" },
             )
         }
 

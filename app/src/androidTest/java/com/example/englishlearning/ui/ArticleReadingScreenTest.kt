@@ -1,6 +1,7 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -350,6 +351,17 @@ class ArticleReadingScreenTest {
 
         composeRule.onNodeWithTag("article_marks_switch").performClick()
         org.junit.Assert.assertEquals(false, reported)
+    }
+
+    @Test
+    fun marksSwitchExposesChineseLabel() {
+        // F5-03 决策 §4 行为轨：TalkBack 读到的必须是人话，不是「开/关」（契约轨见 AccessibilitySwitchLabelContractTest）。
+        composeRule.setContent {
+            ArticleReadingScreen(state(article()), onBack = {}, onOpenCard = {}, onModeChange = {}, onToggleTranslation = {}, onOpenDictionaryPlaceholder = {}, onOpenPronunciationPlaceholder = {})
+        }
+
+        composeRule.onNodeWithTag("article_marks_switch")
+            .assertContentDescriptionContains("标记已背的词", substring = true)
     }
 
     @Test

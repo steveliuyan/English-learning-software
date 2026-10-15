@@ -19,6 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.englishlearning.ui.theme.AppPalette
@@ -76,7 +78,7 @@ fun BackupExportScreen(
             Switch(
                 checked = state.includeAudio,
                 onCheckedChange = { viewModel.setIncludeAudio(it) },
-                modifier = Modifier.testTag("backup_export_audio_switch"),
+                modifier = Modifier.testTag("backup_export_audio_switch").semantics { contentDescription = "包含 AI 音频文件" },
             )
         }
 
