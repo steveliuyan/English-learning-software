@@ -9,6 +9,17 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+// F5-04 决策 §1: the in-app license page renders the SAME ledger the release gate validates.
+// Single source of truth = docs/third-party-notices.md, copied into assets at build time;
+// LedgerAssetSyncTest fails if this wiring stops working.
+val noticesAssetsDir = layout.buildDirectory.dir("generated/noticesAssets")
+val syncThirdPartyNoticesAsset = tasks.register<Copy>("syncThirdPartyNoticesAsset") {
+    group = "verification"
+    description = "Copies docs/third-party-notices.md into debug/release assets."
+    from(rootProject.layout.projectDirectory.file("docs/third-party-notices.md"))
+    into(noticesAssetsDir)
+}
+
 android {
     namespace = "com.example.englishlearning"
     compileSdk = 36
@@ -37,6 +48,7 @@ android {
     }
 
     sourceSets {
+        getByName("main").assets.srcDir(noticesAssetsDir)
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
         getByName("test").java.srcDir("src/kokoroSpike/kotlin")
         getByName("androidTest").java.srcDir("src/kokoroSpike/kotlin")
@@ -52,6 +64,8 @@ android {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
+
+tasks.named("preBuild") { dependsOn(syncThirdPartyNoticesAsset) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
