@@ -1,5 +1,7 @@
 package com.example.englishlearning.reading
 
+import android.database.sqlite.SQLiteConstraintException
+import androidx.room.withTransaction
 import com.example.englishlearning.core.storage.AppDatabase
 import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.storage.AppErrorException
@@ -24,22 +26,47 @@ class RoomArticleRepository(
     private val database: AppDatabase,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ArticleRepository {
+    private companion object {
+        /** 事务外旧数据 UNIQUE 碰撞的有界重试上限（SP-B 决策：≤3，仍失败即报错）。 */
+        const val MAX_VERSION_INSERT_ATTEMPTS = 3
+    }
+
     override suspend fun saveNewVersion(article: Article): Result<Article> = runStorage {
         require(article.title.isNotBlank()) { "Article title must not be blank" }
         require(isSafePlainText(article.title)) { "Article title contains unsupported markup" }
         require(isSafePlainText(article.englishText)) { "Article text contains unsupported markup" }
         require(isSafePlainText(article.chineseText)) { "Article translation contains unsupported markup" }
-        val dao = database.internalArticleDao()
-        val nextVersion = (dao.maxVersion(
-            article.profileId,
-            article.localDate,
-            article.activeWordBookId,
-            article.articleType.name,
-            article.lengthTier.name,
-        ) ?: 0) + 1
-        val saved = article.copy(version = nextVersion)
-        dao.insert(saved.toEntity())
-        saved
+        insertNextVersion(article)
+    }
+
+    /**
+     * SP-B 决策「saveNewVersion 并发竞态」：读 maxVersion 与 insert 收进同一事务——
+     * Room 把事务串到单线程写器，并发的两路生成不再算出同一个 version 撞
+     * index_articles_reuse_key。UNIQUE 仍有界重试（≤3）兜住事务提交间隙的旧碰撞，
+     * 仍失败交由 [runStorage] 映射 StorageUnavailable，不静默丢文。
+     */
+    private suspend fun insertNextVersion(article: Article): Article {
+        var attempt = 0
+        while (true) {
+            attempt++
+            try {
+                return database.withTransaction {
+                    val dao = database.internalArticleDao()
+                    val nextVersion = (dao.maxVersion(
+                        article.profileId,
+                        article.localDate,
+                        article.activeWordBookId,
+                        article.articleType.name,
+                        article.lengthTier.name,
+                    ) ?: 0) + 1
+                    val saved = article.copy(version = nextVersion)
+                    dao.insert(saved.toEntity())
+                    saved
+                }
+            } catch (constraint: SQLiteConstraintException) {
+                if (attempt >= MAX_VERSION_INSERT_ATTEMPTS) throw constraint
+            }
+        }
     }
 
     override suspend fun findLatest(
