@@ -28,7 +28,7 @@
 ## 4. Git 状态
 
 - 分支：`stage-5-sp-b-performance-and-reliability`，本地 tip `d189403`（提交链 a729614 → 4aa7a0f → d91f3b6 → 8b1e44e → d189403，基线 main `dca576e`）。
-- 远端：推送后以 `ls-remote` 核验，远端 tip 哈希=本地 HEAD（见推送记录，代理 127.0.0.1:3067 本弧不可用，走 `-c http.proxy= -c https.proxy=` 直连）。
+- 远端：已推送并 `ls-remote` 核验，远端 tip `f3a27b71eecac77fb6617e6adbac6095c44f575f` = 本地 HEAD（本分支为 GitHub 新分支）。直连 push 遇 Connection reset（本弧直连不通），改走本机代理 127.0.0.1:3067 成功。
 - 工作区：收口报告提交后干净；未混入密钥/QA 临时产物。
 
 ## 5. 未完成 / 遗留问题
