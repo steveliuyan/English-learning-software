@@ -107,10 +107,13 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
 - 底部导航 `TabSlot` 与学习记录 `Tab`：`role = Role.Tab` + `stateDescription` 选中态。
 - 展开组件（许可 NoticeCard、阅读历史版本组）：`stateDescription = 已展开/已收起`。
 - Slider：contentDescription 动态带上当前值（「每日新词目标，当前 N 词」）。
-- liveRegion：词卡 `submitting`/发音状态文字与**阅读页发音状态文字**一律挂在**常驻容器**上
+- liveRegion：词卡 `submitting`/发音状态文字、**阅读页发音状态文字**与**词卡详情页发音状态文字**一律挂在**常驻容器**上
   （Task 6 判例：live region 必须一直存在于组合中、靠子节点进出触发播报；把 `liveRegion`
   配在随文案进出组合的瞬时节点上，节点不存在时没有任何东西可宣告，等于没配。
   早期草稿的「瞬时节点 + 尽力而为」口径作废，改按容器形状统一实现，瞬时子节点自身不得再带 `liveRegion`）。
+  详情页一项由 Task 9 修复轮复评补入（N-4：`CardDetailScreen` 的状态文字是三种详情宿主共用的瞬时 `Text`，
+  与阅读页同形同病；容器 tag 用 `card_detail_status_live_region`，`card_detail_pronunciation_message`
+  仍留在瞬时子节点上，与阅读页同一套断言形状）。
   代价=容器空态时外层 `spacedBy` 会多出已知间距（归 UI 重设计轮）；真机 TalkBack 播报仍归设备 QA 取证。
 - 揭晓焦点：释义由隐藏→可见的**转变**时 `FocusRequester.requestFocus()`（初始即已揭晓不抢焦点），
   全仓首个焦点顺序改动，`runCatching` 防未挂载异常。
