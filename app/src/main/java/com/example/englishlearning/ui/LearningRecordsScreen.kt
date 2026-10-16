@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.LearningHistoryGroup
@@ -87,7 +88,13 @@ fun LearningRecordsScreen(
                     onClick = { onSelectTab(tab) },
                     modifier = Modifier
                         .testTag(tab.testTag())
-                        .semantics { contentDescription = label; role = Role.Tab },
+                        .semantics {
+                            contentDescription = label
+                            role = Role.Tab
+                            // 决策 §4（终审 I-1）：与 AppBottomBar.TabSlot 同形，选中态必须进播报，
+                            // 不能只靠 M3 selectable 的 Selected 布尔属性代偿。
+                            stateDescription = if (state.selectedTab == tab) "已选中" else "未选中"
+                        },
                     text = { Text(label) },
                 )
             }
