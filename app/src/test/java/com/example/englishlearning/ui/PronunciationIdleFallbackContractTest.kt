@@ -30,8 +30,8 @@ import kotlin.test.assertTrue
  *    （与本仓库禁令 1/3 与 Switch 标签契约同款已知债，统一处置见
  *     `docs/verification/f5-03-accessibility-hardening-2026-10.md` §1.1），本契约的匹配对象是
  *     纯字面量 `else -> PronunciationStatus.Idle`，与含 `//` 的 URL 同行概率极低，但形状仍成立；
- *  - 文件级子串匹配只锁「该字面形状」：写成 `else -> { PronunciationStatus.Idle }` 或
- *    `else -> val idle = PronunciationStatus.Idle` 等等价形态不在匹配面内——与禁令族同一口径，
+ *  - 文件级子串匹配只锁「该字面形状」：写成 `else -> PronunciationStatus.Idle.also { … }`、
+ *    或把 `else ->` 与 `PronunciationStatus.Idle` 拆成两行的等价形态不在匹配面内——与禁令族同一口径，
  *     由 connected 三处状态持有者用例与代码评审兜住，此处不做 AST 解析；
  *  - 锚点计数下限（5）是有意的刚性：删减播控宿主必须显式改本契约，新增宿主不报错。
  */
