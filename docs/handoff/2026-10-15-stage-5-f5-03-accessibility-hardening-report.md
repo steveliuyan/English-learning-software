@@ -14,7 +14,7 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 
 ## 3. 验证记录
 
-### 3.1 JVM 单测增量对账（1396 → 1467，只增不减）
+### 3.1 JVM 单测增量对账（1396 → 1467 → 1471，只增不减）
 
 | 任务 | 基线变化 | 说明 |
 |---|---|---|
@@ -31,10 +31,14 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 | T10 | 1467/0 | 48dp 全在 connected 与 main 布局（+0） |
 | T11 | 1467/0 | 动态字体新增 connected 护栏（+0） |
 | T12（本次） | 1467/0 | 无 JVM 改动；既有红修复只触 androidTest |
+| 终审批 1 | 1467/0 | I-A1/I-A2 两条护栏走 connected（+0） |
+| 终审批 2 | 1467 → **1471** | 新增 JVM 源码闸 `PronunciationIdleFallbackContractTest` +4（含「目录缺失必报错」「空扫必报错」「must-flag/must-not-flag」合成反例）；I-1/M-5/M-7 走 connected 与文档（+0） |
 
 **本次门禁**：`:app:assembleDebug :app:testDebugUnitTest --no-daemon --no-build-cache` → `BUILD SUCCESSFUL in 16s`（exit 0，无 FAILED/`e:`）。python 逐份累加 `testDebugUnitTest/*.xml`：203 suites，**tests=1467 / failures=0 / errors=0 / skipped=0**，收口那次 XML maxMtime=2026-10-16T22:31:53（任务 UP-TO-DATE，取持久化 XML 计数，1467 基线成立；该指针后续被更晚的全量跑重写，totals 不变，终审复核记为 23:18）。矩阵 + 许可门禁 `BUILD SUCCESSFUL in 12s`；`secret-scan exit=0`。三条命令原文与末行详见验收记录 §8。
 
 **终审修复轮复跑（2026-10-17，I-A1/I-A2 生产码 + 2 条 connected 护栏落地后）**：`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin --no-daemon --no-build-cache` → `BUILD SUCCESSFUL in 1m 26s`；python 累加 = **203 suites / 1467 / 0 / 0 / 0**（JVM 基线只增不减成立，新增两条走 connected 故 +0），XML maxMtime=2026-10-17T00:29:22；`verifyAcTraceabilityMatrix verifyThirdPartyNotices --rerun-tasks` → `AC matrix covered 51 ids with evidence.` + `BUILD SUCCESSFUL`（exit 0）。受影响 connected 类逐类实跑（`emulator-5574`）：`SpeechSettingsScreenTest` `OK (13 tests)`、`WordBookSwipeRowTest` `OK (2 tests)`、`AppScreenTest` 双跑 `OK (45 tests)`×2（back/导航族 flaky 未复现，基线对照法，未放宽任何断言）。
+
+**终审批 2 + 窄复评复跑（2026-10-17，`fc68cbf`/`aac801d` 落地后，controller 独立跑）**：`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin verifyAcTraceabilityMatrix --no-daemon --no-build-cache --rerun-tasks` → `AC matrix covered 51 ids with evidence.` + `BUILD SUCCESSFUL in 3m 48s`；python 逐份累加 = **204 suites / tests 1471 / failures 0 / errors 0 / skipped 0**，XML maxMtime=2026-10-17T01:00:46；`bash scripts/secret-scan.sh` exit 0。受影响 connected 类逐类实跑（`emulator-5574`，`adb install -r` + `am instrument`）：`LearningRecordsScreenTest` `OK (4 tests)`（I-1 先红「读不到选中态描述」后绿）、`AppScreenTest` `OK (45 tests)`。**窄复评**（区间 `df881e9..48fb073`，7 提交 / 121KB，报告 `.superpowers/sdd/…/final-fix-recheck-report.md`）＝ Critical 0 / Important 0 / Minor 2，裁定「终审 7 条 Important + M-1/M-5/M-7 全部关闭、无需回实现轮」；六条红线（滑动删除两步确认、五处 `else` 不落 `Idle`、删除行零断言削弱、零密钥、改动面仅限点名文件、「代码侧完成」未升格）逐条未破；决策 §4 两处编辑独立核实为**加严**。两条 Minor 已就地改：报告 §2 的节数计数改为「不复述会漂移的计数」、connected 类名与站点号由「按序对读」改为**逐站配对**（验证文档 §5 与矩阵 AC5-03 行）。
 
 ### 3.2 connected 全清单（21 类 / 266 例，全绿）
 
@@ -50,8 +54,8 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
   - 收口前置：`908eeed`（connected 三处既有红测试侧修复）
   - 收口批（Task 12）：`258e2ca`（矩阵 AC5-03 升级 + 新建验证文档 + 本报告 + QA 任务书增补，父 `908eeed`）→ `df881e9`（§4 远端 tip 补填）
 - **远端备份口径（终审 C 的 IM-1 订正）**：本节**不再写死任何「当前 HEAD」哈希**——把文档自身所在提交的哈希写进正文会在落笔那一刻就被下一笔提交推翻（旧文本记 `258e2ca` 为 HEAD 并宣称「ls-remote 与 `rev-parse HEAD` 逐字符相同」，而写下时 HEAD 已是 `df881e9`，自相矛盾）。**唯一口径**：`git rev-parse HEAD` 与 `git ls-remote origin stage-5-f5-03-accessibility-hardening` 逐字符相同即异地备份成立，由 controller 在每次推送后核验并只更新「最近核验值」。
-- **最近核验值**：`df881e9ea65b295b28a280b15ab0f3f81e12d370`（`main..HEAD` = **33** 个提交；核验时间 2026-10-17，代理 `127.0.0.1:3067` + `-c credential.interactive=false`，第一次推送返回 `b25f9be..258e2ca`、补填笔随后推送）。
-- **终审与本轮修复**：三片终审（A 生产码 / B 测试 / C 文档）已完成，Critical 0；本轮为终审后**唯一修复轮**，落 I-A1（语速播报）+ I-A2（customActions 挂载节点）与文档面 IM-1…IM-5，修复提交见矩阵 AC5-03 行与 `docs/verification/f5-03-accessibility-hardening-2026-10.md` §7.3；**推送仍由 controller 执行，本代理不推送**。
+- **最近核验值**：`48fb073028c13e7fb3a0ad0936f300c2bb4306f9` == 当时 `git rev-parse HEAD`（2026-10-17 由 controller 推送后 `ls-remote` 逐字符核验。**提交数请现算** `git rev-list --count main..HEAD`，本文件不复述会漂移的计数。**本值天然落后**——写完这行后又会有文档提交落笔，所以它只作历史核验记录，不作「当前远端 tip」读；判定异地备份的唯一口径永远是推完后 `git rev-parse HEAD` == `git ls-remote origin <branch>`）。
+- **终审与修复轮**：整分支终审共四份报告（三片 A 生产码 / B 测试 / C 文档 + 一份独立整分支报告），合计 **Critical 0 / Important 7 / Minor 20**。Important 全部由**两枚修复批**关闭：批 1（`f9e4abd` + `11a71ef`）落 I-A1（语速播报当前档位）+ I-A2（customActions 移到与 `clickable` 同节点）与文档面 IM-1…IM-5；批 2（`fc68cbf` `aac801d` `9e55533` `112428e` `48fb073`）落 I-1（学习记录 Tab `stateDescription`）+ M-1（新 JVM 源码闸锁死五处播控 `else` 不落 `Idle`）+ M-5/M-7。修复后**一次窄复评**覆盖两批 diff（`df881e9..48fb073`）＝ **Critical 0 / Important 0 / Minor 2**，裁定「终审发现全部关闭、无需回实现轮」；两条 Minor（节数计数漂移、connected 类名与站点号按序对读会错配）已由本节与验证文档 §5、矩阵 AC5-03 行就地改掉。修复提交逐条见矩阵 AC5-03 行与 `docs/verification/f5-03-accessibility-hardening-2026-10.md` §5/§7.3/§8；**推送一律由 controller 执行**。
 - 未提交遗留文件：无（本阶段台账目录 `.superpowers/sdd/2026-10-15-stage-5-accessibility-hardening/` 命中 `.gitignore:10`，本区间 `git log --diff-filter=A` 对其零新增；注意仓库内仍有 6 个更早阶段**已跟踪**的 `.superpowers/**` 文件，gitignore 不取消既有跟踪，故不能笼统说「`.superpowers/` 都被忽略」）。
 
 ## 5. 未完成 / 遗留问题
@@ -61,7 +65,7 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 - **深色 / 硬编码色 token 化**、**`ClickableText` 逐词读屏**、**对比度 `AiSpeech.deep≈4.1:1` 临界** → UI 重设计轮（决策显式移交）。
 - **字母栏真 48dp**：Rail 显式豁免（现命中区 ≈24×13dp，纵向未铺满整槽），48dp 目标 = 轨道可滚动/分页/减常驻数的信息架构级改动 → UI 重设计轮（先改 Spec）。
 - **liveRegion `spacedBy` 幽灵间距**（常驻容器空态多给一份间距）→ UI 重设计轮版面重排。
-- **`AccessibilityContractSources` 抽公共 fixture**：本轮为不碰 T6 类复制了 helper（`stripComments`+扫描守卫已第 5 份副本），归终审一次修批。
+- **契约 helper 未抽公共 fixture**：为不碰 T6 既有类，每个源码扫描契约自带一份 `stripComments` + 扫描守卫，终审批 2 新增的 `PronunciationIdleFallbackContractTest` 是同款副本（份数请现算：`grep -rln 'fun .*stripComments' app/src/test`）。终审裁定「登记、不改实现」（M-2）→ 归下一轮测试面清理批；风险是守卫形状在各副本间漂移。
 - **L-T11-4 / D-8｜Favorites / WrongWords 零设备取证**：两屏无 connected UI 测试类，`weight(1f)` 头部只有编译级保证（纯静态改动）。**同一缺口也覆盖 48dp 触控站点 8**（`FavoritesScreen.kt:78` / `WrongWordsScreen.kt:70` 的 `.defaultMinSize(48.dp)` 无 connected 断言，`task-10-report.md` §站点8）→ 与「7/8 达成」的计数一并归 UI 重设计轮 + QA 第三轮。
 - **L-T11-1**：`fontScale=2.0` CheckIn 标题被 `weight(1f)` 压到 78.48dp 换 4 行（可达不美观），结构性修法归 UI 重设计轮。
 - **L4 / I-1 no-op**：详情页 liveRegion 容器「删容器必红」RED 留痕未跑，收口=静态闭合；3 处 `fillMaxWidth().horizontalScroll()` 为版面 no-op（护栏不钉存在性，不得写「头部溢出已由 T11 收口」）；`LicensesScreen.kt:62` 裸 `horizontalScroll` 禁止统一成带 `fillMaxWidth` 形状（D-4/Ruling T11-B）。

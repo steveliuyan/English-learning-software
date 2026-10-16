@@ -208,6 +208,8 @@ bash scripts/secret-scan.sh
 
 **单测计数（python 逐份累加 `app/build/test-results/testDebugUnitTest/*.xml`）**：203 suites，**tests=1467 / failures=0 / errors=0 / skipped=0**。收口那次（`258e2ca` 前）的 XML maxMtime=2026-10-16T22:31:53 是 T11 收口复跑产物，T12 因输入未变走 UP-TO-DATE；终审复核时被 23:18 的又一次全量跑重写（totals 不变）。**终审修复轮（2026-10-17）复跑**：`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin --no-daemon --no-build-cache` → `BUILD SUCCESSFUL in 1m 26s`，同一份 python 累加 = **203 suites / 1467 / 0 / 0 / 0**，XML maxMtime=**2026-10-17T00:29:22**；`verifyAcTraceabilityMatrix verifyThirdPartyNotices --rerun-tasks` → `AC matrix covered 51 ids with evidence.` + `BUILD SUCCESSFUL`（exit 0）。本轮新增的 2 条护栏都是 connected（androidTest），**JVM 计数按「只增不减」保持 1467**。
 
+**终审批 2 复跑（2026-10-17，`--rerun-tasks`，controller 独立执行）**：四任务 → `AC matrix covered 51 ids with evidence.` + `BUILD SUCCESSFUL in 3m 48s`；python 累加 = **204 suites / 1471 / 0 / 0 / 0**，XML maxMtime=**2026-10-17T01:00:46**（+4 全来自新 JVM 源码闸 `PronunciationIdleFallbackContractTest`）；`bash scripts/secret-scan.sh` exit 0。connected（`emulator-5574`）：`LearningRecordsScreenTest` `OK (4 tests)`、`AppScreenTest` `OK (45 tests)`。窄复评（`df881e9..48fb073`）Critical 0 / Important 0 / Minor 2，裁定终审发现全部关闭；两条 Minor 属本文件 §5 与矩阵 AC5-03 行的「类名按序对读会错配站点」+ 报告 §2 的节数漂移计数，均已就地改为逐站配对 / 不复述计数。
+
 ## 9. 设备侧 TODO-USER 清单（归 QA 第三轮 + 里程碑真机安装）
 
 - **TalkBack 六链关键流程**（选词书 / 开始学习 / 三档反馈 / 完成状态 / 历史文章 / 数据管理入口）+ 词卡「显示释义」揭晓按钮焦点顺序遗留专项。
@@ -227,7 +229,7 @@ bash scripts/secret-scan.sh
 - **深色 / 硬编码色 token 化**、**`ClickableText` 逐词读屏**、**对比度 `AiSpeech.deep≈4.1:1` 临界** → UI 重设计轮（决策 §1/§3/§5 显式移交）。
 - **字母栏真 48dp** → UI 重设计轮（轨道可滚动/分页/减常驻数，信息架构级）。
 - **`spacedBy` 幽灵间距**（liveRegion 常驻容器代价）→ UI 重设计轮版面重排。
-- **`AccessibilityContractSources` 抽公共 fixture**（本轮为不碰 T6 类复制了 helper，`stripComments`+扫描守卫已第 5 份副本）→ 终审一次修批。
+- **契约 helper 未抽公共 fixture**：为不碰 T6 既有类，每个源码扫描契约各带一份 `stripComments` + 扫描守卫，终审批 2 的 `PronunciationIdleFallbackContractTest` 是同款副本（份数现算：`grep -rln 'fun .*stripComments' app/src/test`）。终审裁定「登记、不改实现」（M-2）→ 归下一轮测试面清理批；风险=守卫形状在各副本间漂移。
 - **已知债 M-B1 / M-B2（契约匹配面）**：禁令 1a/2 的正则只锁「恰一个空格 + 同行」形状，压缩空格/换行赋值/`+=` 可逃逸；`stripComments` 的 `//.*` 会吞掉同行 URL 字符串后半段，且禁令 1/2/3 三个类的同款缺陷此前未登记 → 全部写进 §1.1「契约测试匹配面局限」，相关测试 KDoc 的「待整支终审统一处理」承诺改为指向该小节；统一修 `stripComments` 或补登 KDoc 归下次契约面改动，本轮不改判定逻辑。
 - **已知债 M-A2（退出路径不停发声）**：`exitLearning` 与阅读页三条收口只清 UI 三元组、不 `stopPlayback()`，返回后朗读可能继续 → BASE 既有行为，**本分支不改**，进 QA 第三轮设备清单（§9）与播控重设计轮候选。
 - **L-T11-4 / D-8｜Favorites / WrongWords 零设备取证**：两屏至今无 connected UI 测试类，两处 `weight(1f)` 头部只有编译级保证（Task 10 M-8 对 L2 的升级措辞=纯静态改动、零设备取证）。**同一缺口也覆盖 48dp 触控站点 8**（`FavoritesScreen.kt:78` / `WrongWordsScreen.kt:70` 的 `.defaultMinSize(48.dp)` 无 connected 断言，`task-10-report.md` §站点8）→ 与触控计数一并归 UI 重设计轮 + QA 第三轮。
