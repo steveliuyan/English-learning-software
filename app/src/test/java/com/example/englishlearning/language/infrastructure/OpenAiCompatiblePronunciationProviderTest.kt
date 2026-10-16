@@ -113,6 +113,20 @@ class OpenAiCompatiblePronunciationProviderTest {
         assertTrue(transport.request == null)
     }
 
+    @Test
+    fun `playback controls delegate to the audio player`() {
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
+
+        val provider = provider(player = player)
+        assertTrue(provider.pausePlayback())
+        assertTrue(provider.resumePlayback())
+        provider.stopPlayback()
+
+        assertEquals(1, player.pauseCount)
+        assertEquals(1, player.resumeCount)
+        assertEquals(1, player.stopCount)
+    }
+
     private fun provider(
         transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1))),
         store: FakeSecretStore = FakeSecretStore("secret".toCharArray()),
@@ -130,11 +144,17 @@ class OpenAiCompatiblePronunciationProviderTest {
     private class RecordingAudioPlayer(private val outcome: AudioPlaybackResult) : AudioPlayer {
         var bytes: ByteArray? = null
         var format: String? = null
+        var pauseCount = 0
+        var resumeCount = 0
+        var stopCount = 0
         override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult {
             this.bytes = bytes.copyOf()
             this.format = format
             return outcome
         }
+        override fun pauseCurrentPlayback(): Boolean { pauseCount++; return true }
+        override fun resumeCurrentPlayback(): Boolean { resumeCount++; return true }
+        override fun stopCurrentPlayback() { stopCount++ }
     }
 
     private class FakeProfileRepository(private val profile: AiProfile) : AiProfileRepository {

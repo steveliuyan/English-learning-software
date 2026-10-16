@@ -4,6 +4,7 @@ import com.example.englishlearning.language.domain.PronunciationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class AndroidTextToSpeechProviderTest {
     @Test
@@ -59,15 +60,29 @@ class AndroidTextToSpeechProviderTest {
         assertEquals(1, engine.releaseCount)
     }
 
+    @Test
+    fun `pause resume and stop delegate to engine`() {
+        val engine = FakeEngine(initialized = true)
+        val provider = AndroidTextToSpeechProvider(engine)
+
+        assertTrue(provider.pausePlayback()); assertEquals(1, engine.pauseCount)
+        assertTrue(provider.resumePlayback()); assertEquals(1, engine.resumeCount)
+        provider.stopPlayback(); assertEquals(1, engine.stopCount)
+    }
+
     private class FakeEngine(private val initialized: Boolean) : TextToSpeechEngine {
         val spoken = mutableListOf<String>()
         var locale: java.util.Locale? = null
         var stopCount = 0
         var releaseCount = 0
+        var pauseCount = 0
+        var resumeCount = 0
 
         override fun isInitialized(): Boolean = initialized
         override fun setLanguage(locale: java.util.Locale): Boolean { this.locale = locale; return initialized }
         override fun speak(text: String): Boolean { spoken += text; return initialized }
+        override fun pause(): Boolean { pauseCount++; return true }
+        override fun resume(): Boolean { resumeCount++; return true }
         override fun stop() { stopCount++ }
         override fun release() { releaseCount++ }
     }

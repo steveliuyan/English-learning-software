@@ -11,6 +11,8 @@ internal interface TextToSpeechEngine {
     fun isInitialized(): Boolean
     fun setLanguage(locale: Locale): Boolean
     fun speak(text: String): Boolean
+    fun pause(): Boolean
+    fun resume(): Boolean
     fun stop()
     fun release()
 }
@@ -24,6 +26,18 @@ private class AndroidTextToSpeechEngine(context: Context) : TextToSpeechEngine {
     override fun isInitialized(): Boolean = ready
     override fun setLanguage(locale: Locale): Boolean = textToSpeech.setLanguage(locale) != TextToSpeech.LANG_NOT_SUPPORTED
     override fun speak(text: String): Boolean = textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "english-learning") == TextToSpeech.SUCCESS
+
+    /**
+     * 框架限制（实测 compileSdk 34/35/36 的 `android.jar` 与编译错误共同取证）：
+     * `android.speech.tts.TextToSpeech` 只有 `speak/stop/isSpeaking`，**没有公开的 `pause()`/`resume()`**，
+     * 所以系统 TTS 只能如实报告「暂停/继续不支持」，停止仍可用。
+     * 需要逐句暂停的语境由 `MediaPlayer` 路径（Kokoro 词发音、MiMo/在线 TTS 句子）承担；
+     * 将来若改用 `synthesizeToFile()` + `MediaPlayer` 播系统 TTS，播控就落回 [AudioPlayer] 一侧，
+     * 这两个方法的签名无需变化。
+     */
+    override fun pause(): Boolean = false
+    override fun resume(): Boolean = false
+
     override fun stop() { textToSpeech.stop() }
     override fun release() { textToSpeech.shutdown() }
 }
@@ -41,6 +55,15 @@ class AndroidTextToSpeechProvider internal constructor(
         if (!engine.setLanguage(Locale.ENGLISH)) return PronunciationResult.Unavailable("english locale unavailable")
         return if (engine.speak(text)) PronunciationResult.Played else PronunciationResult.Failed()
     }
+
+    /**
+     * 播控三件套委托给引擎；系统 TTS 的 `pause/resume` 只有引擎点头才算成功。
+     * [stopPlayback] 走引擎 `stop()`，与既有公开 [stop]（供页面主动打断）是同一引擎调用，
+     * 保留两个入口是为了不破坏既有调用点。
+     */
+    override fun pausePlayback(): Boolean = engine.pause()
+    override fun resumePlayback(): Boolean = engine.resume()
+    override fun stopPlayback() { engine.stop() }
 
     fun stop() = engine.stop()
     fun release() = engine.release()

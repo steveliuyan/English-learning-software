@@ -32,4 +32,9 @@ class PronunciationStatusTest {
         assertEquals(PronunciationStatus.Unavailable, pronunciationStatus(null))
         assertNull(PronunciationStatus.Idle.message())
     }
+
+    @Test
+    fun pausedStatusHasFixedChineseMessage() {
+        assertEquals("已暂停播放，再次点按可继续。", PronunciationStatus.Paused.message())
+    }
 }

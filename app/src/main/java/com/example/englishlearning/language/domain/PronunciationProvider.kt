@@ -4,6 +4,15 @@ package com.example.englishlearning.language.domain
 interface PronunciationProvider {
     fun capabilities(): Set<PronunciationCapability>
 
+    /** 暂停当前发声会话；不支持或无会话时 false（决策 §2）。 */
+    fun pausePlayback(): Boolean = false
+
+    /** 继续已暂停的会话；不支持或无会话时 false。 */
+    fun resumePlayback(): Boolean = false
+
+    /** 结束当前会话；默认实现为空操作（未播放时安全无副作用）。 */
+    fun stopPlayback() { }
+
     suspend fun speak(text: String): PronunciationResult
 
     suspend fun speakWord(

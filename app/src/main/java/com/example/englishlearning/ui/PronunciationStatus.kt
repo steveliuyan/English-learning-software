@@ -5,6 +5,7 @@ import com.example.englishlearning.language.domain.PronunciationResult
 enum class PronunciationStatus {
     Idle,
     Playing,
+    Paused,
     Played,
     Unavailable,
     Failed,
@@ -14,6 +15,7 @@ fun PronunciationStatus.message(): String? =
     when (this) {
         PronunciationStatus.Idle -> null
         PronunciationStatus.Playing -> "正在播放发音…"
+        PronunciationStatus.Paused -> "已暂停播放，再次点按可继续。"
         PronunciationStatus.Played -> "发音已播放。"
         PronunciationStatus.Unavailable -> "当前语音不可用，请检查语音设置。"
         PronunciationStatus.Failed -> "发音播放失败，请重试。"

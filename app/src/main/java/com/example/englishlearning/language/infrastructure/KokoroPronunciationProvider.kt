@@ -92,4 +92,9 @@ class KokoroPronunciationProvider(
             bytes.fill(0)
         }
     }
+
+    /** 播控直传给播放层：会话是否真的存在由 [AudioPlayer] 自己判定（决策 §2）。 */
+    override fun pausePlayback(): Boolean = player.pauseCurrentPlayback()
+    override fun resumePlayback(): Boolean = player.resumeCurrentPlayback()
+    override fun stopPlayback() { player.stopCurrentPlayback() }
 }
