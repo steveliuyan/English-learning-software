@@ -45,7 +45,9 @@ class AndroidAudioPlayer(private val context: Context) : AudioPlayer {
             }
             try {
                 player.setDataSource(ByteArrayMediaDataSource(bytes))
-                player.setOnPreparedListener { mp -> preparing = null; active = mp; mp.start() }
+                // 身份守卫：迟到的 prepared 回调（来自已被抢占/收口的旧播放器）不得抹掉新会话的 preparing 句柄，
+                // 否则新播放器再也找不到、不会被 release。与 finish()/invokeOnCancellation 的 `=== player` 风格一致。
+                player.setOnPreparedListener { mp -> if (preparing === mp) preparing = null; active = mp; mp.start() }
                 player.setOnCompletionListener { finish(AudioPlaybackResult.Played) }
                 player.setOnErrorListener { _, _, _ -> finish(AudioPlaybackResult.Failed); true }
                 player.prepareAsync()

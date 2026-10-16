@@ -45,6 +45,9 @@ class PronunciationRouterControlsTest {
         val router = router(FakeProvider("kokoro"), FakeProvider("system"))
         assertFalse(router.pausePlayback())
         assertFalse(router.resumePlayback())
+        // 无活动会话时 stop 必须是安全空操作：不抛异常，也不因此建立会话（决策 §2）。
+        router.stopPlayback()
+        assertFalse(router.pausePlayback())
     }
 
     @Test
@@ -98,6 +101,35 @@ class PronunciationRouterControlsTest {
         // 降级后控制必须落在真正出声的 system，而不是悬空的 MiMo 实例。
         assertEquals(1, system.pauseCount)
         assertEquals(0, mimo.pauseCount)
+    }
+
+    @Test
+    fun `mimo success that plays keeps controls on the mimo instance`() = runTest {
+        val mimo = FakeProvider("mimo", result = PronunciationResult.Played)
+        val system = FakeProvider("system")
+        val router = PronunciationRouter(
+            kokoroProvider = FakeProvider("kokoro"),
+            systemProvider = system,
+            miMoFactory = MiMoPronunciationProviderFactory { mimo },
+            preferences = FakePrefRepo(
+                SpeechPreference(selectedEngine = PronunciationEngine.MiMo, miMoProfileId = "mimo-profile"),
+            ),
+        )
+
+        // 远程真的出声：会话句柄必须是 MiMoFactory 造出的这个实例，三个控制都不得漏到 system。
+        assertEquals(PronunciationResult.Played, router.speakSentence("An example sentence"))
+        assertTrue(router.pausePlayback())
+        assertEquals(1, mimo.pauseCount)
+        assertEquals(0, system.pauseCount)
+        assertTrue(router.resumePlayback())
+        assertEquals(1, mimo.resumeCount)
+        assertEquals(0, system.resumeCount)
+        router.stopPlayback()
+        assertEquals(1, mimo.stopCount)
+        assertEquals(0, system.stopCount)
+        // stop 之后会话清空，同一批控件不得继续命中那个已出声的 MiMo 实例。
+        assertFalse(router.pausePlayback())
+        assertEquals(1, mimo.pauseCount)
     }
 
     @Test

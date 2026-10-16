@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -127,6 +128,21 @@ class OpenAiCompatiblePronunciationProviderTest {
         assertEquals(1, player.stopCount)
     }
 
+    @Test
+    fun `player reporting unsupported playback makes controls report unsupported`() {
+        // 播放器（无活动会话或不支持播控）说 false，provider 必须原样透传，不得自行乐观返回 true。
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played, pauseResult = false, resumeResult = false)
+
+        val provider = provider(player = player)
+        assertFalse(provider.pausePlayback())
+        assertFalse(provider.resumePlayback())
+        provider.stopPlayback()
+
+        assertEquals(1, player.pauseCount)
+        assertEquals(1, player.resumeCount)
+        assertEquals(1, player.stopCount)
+    }
+
     private fun provider(
         transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1))),
         store: FakeSecretStore = FakeSecretStore("secret".toCharArray()),
@@ -141,7 +157,11 @@ class OpenAiCompatiblePronunciationProviderTest {
         player = player,
     )
 
-    private class RecordingAudioPlayer(private val outcome: AudioPlaybackResult) : AudioPlayer {
+    private class RecordingAudioPlayer(
+        private val outcome: AudioPlaybackResult,
+        private val pauseResult: Boolean = true,
+        private val resumeResult: Boolean = true,
+    ) : AudioPlayer {
         var bytes: ByteArray? = null
         var format: String? = null
         var pauseCount = 0
@@ -152,8 +172,8 @@ class OpenAiCompatiblePronunciationProviderTest {
             this.format = format
             return outcome
         }
-        override fun pauseCurrentPlayback(): Boolean { pauseCount++; return true }
-        override fun resumeCurrentPlayback(): Boolean { resumeCount++; return true }
+        override fun pauseCurrentPlayback(): Boolean { pauseCount++; return pauseResult }
+        override fun resumeCurrentPlayback(): Boolean { resumeCount++; return resumeResult }
         override fun stopCurrentPlayback() { stopCount++ }
     }
 
