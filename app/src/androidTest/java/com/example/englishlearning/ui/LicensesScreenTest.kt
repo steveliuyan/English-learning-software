@@ -67,7 +67,8 @@ class LicensesScreenTest {
 
     /**
      * F5-03 / Task 10（B2 文字链）：许可页「‹」返回的触控目标必须 ≥48dp 见方。
-     * 现状只有 `headlineSmall` 的一个字（实测约 20×34dp），是本页唯一的返回路径。
+     * 现状只有 `headlineSmall` 的一个字（emulator-5574 RED 原文 32.0dp，原先记录的 20×34dp 为目测值、已废弃），
+     * 是本页唯一的返回路径。
      *
      * 返回链在根 Column 的首行（**不在滚动容器内**，滚动的是下方台账列表），节点常驻视口，
      * 所以这里不需要 `performScrollTo()` 锚点——用 `assertIsDisplayed()` 钉住矩形未被裁剪后，

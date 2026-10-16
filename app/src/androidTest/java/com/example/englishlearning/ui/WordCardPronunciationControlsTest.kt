@@ -26,7 +26,10 @@ import org.junit.runner.RunWith
  *  3. 系统 TTS 语境（`pauseResumeSupported = false`）下**只呈现「停止」**：
  *     平台事实是 `android.speech.tts.TextToSpeech` 没有公开 `pause()/resume()`，
  *     引擎侧恒返回 false（决策 §2 Task 7 取证 + controller 裁决 B2）。若呈现条件只看返回值，
- *     点「暂停」会落 `else -> Idle` 让整组消失，而朗读仍在继续、用户连可用的「停止」都失去。
+ *     系统 TTS 下（恒 false）整组播控会不呈现，连始终可用的「停止」也一起消失，而朗读仍在继续。
+ *     （M-1 订正：旧措辞写「点「暂停」会落 `else -> Idle` 让整组消失」——`else -> Idle` 已被决策 §2
+ *     「播控失败的状态机口径」废除，五处宿主现均为 `else -> 原状态`，失败时保持原状态、整组与「停止」
+ *     照常可达；准确口径如上，见 AppScreen.kt 的 N-3 注释与决策 §2。）
  *
  * 防假绿口径：呈现/消失用 `assertIsDisplayed()` 与 `assertDoesNotExist()` 断真实组合，
  * 委托次数用调用计数（不是「节点存在」这种恒真断言）；暂停态文案另断

@@ -415,8 +415,8 @@ private fun WordCardSpeakerButton(lemma: String, modifier: Modifier = Modifier) 
             .background(MintTint, RoundedCornerShape(50))
             .padding(6.dp)
             // F5-03 / Task 10：20dp 喇叭 + 6dp padding 只有 ~32dp 见方，读屏/粗手指都够不到
-            // 48dp 下限（connected RED 实测 32.38dp 高）。本修饰符只在父级约束允许的范围内扩边界，
-            // 内容尺寸与视觉不动，命中区随节点边界一起变大。
+            // 48dp 下限（connected RED 实测 32.38dp 高）。`minimumInteractiveComponentSize()` 加在
+            // `padding` **内侧**，药片底色块随节点一起放大（≈60dp），字形尺寸不变。
             .minimumInteractiveComponentSize()
             .semantics { contentDescription = "播放 $lemma 发音" },
     ) {

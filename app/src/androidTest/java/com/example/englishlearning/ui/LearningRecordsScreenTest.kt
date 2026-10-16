@@ -43,7 +43,7 @@ class LearningRecordsScreenTest {
 
     /**
      * F5-03 / Task 10（B2 文字链）：学习记录页「← 返回」的触控目标必须 ≥48dp 见方。
-     * 现状只有 `padding(8.dp)`（实测约 48×36dp，高度不达标）。
+     * 现状只有 `padding(8.dp)`（emulator-5574 RED 原文：高 32.380955dp，不足 48dp 下限）。
      *
      * 返回链在根 Column 的首行，不在滚动容器内（记录列表才是滚动区），节点常驻视口，
      * 因此不需要 `performScrollTo()` 锚点；brief 口径与 `getUnclippedBoundsInRoot` 口径各跑一遍。

@@ -551,7 +551,8 @@ private fun AccentSpeakerButton(
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp)
             // F5-03 / Task 10：美/英喇叭原本只有 ~36dp 高（connected RED 实测 36.19dp），
-            // 补到 48dp 触控下限；只扩节点边界，字形与标注字尺寸不变。
+            // 补到 48dp 触控下限。`minimumInteractiveComponentSize()` 加在 `padding` **内侧**，
+            // 药片底色块随节点一起放大（≈60dp），字形与标注字尺寸不变。
             .minimumInteractiveComponentSize()
             .testTag(tag)
             .semantics { contentDescription = accentDescription },

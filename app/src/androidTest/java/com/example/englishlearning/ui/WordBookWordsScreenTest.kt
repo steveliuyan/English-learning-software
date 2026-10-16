@@ -462,11 +462,12 @@ class WordBookWordsScreenTest {
      *  - 结论：18dp 间距下任何 >18dp 的方形目标必然重叠，26×48dp=1248dp 也远超屏高，
      *    本屏 48dp **结构性不可达**，真要达标得重做轨道（归 UI 重设计轮）。
      *
-     * 因此本用例钉三条可证伪的契约：命中区落在整槽之内、覆盖槽中心（点任意一处都能选中该字母）、
-     * 且与下一个字母的命中区不重叠——把上面那条 48dp 修饰符加回来，第 2、3 条立刻红（伪修证伪器）。
+     * 因此本用例钉三条可证伪的契约：命中区**落在整槽之内并覆盖槽心**（现 ≈24×13dp，槽 24×18dp，
+     * 纵向未铺满；点槽心能选中该字母）、且与下一个字母的命中区不重叠——
+     * 把上面那条 48dp 修饰符加回来，第 2、3 条立刻红（伪修证伪器）。
      */
     @Test
-    fun railLetterTouchTargetFillsItsSlotWithoutOverlappingTheNextLetter() {
+    fun railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre() {
         showAlphabet()
 
         val slot = composeRule.onNodeWithTag("wordbook_words_rail_F").getUnclippedBoundsInRoot()
@@ -480,7 +481,7 @@ class WordBookWordsScreenTest {
         val slotCenterX = (slot.left + slot.right) / 2f
         val slotCenterY = (slot.top + slot.bottom) / 2f
         assertTrue(
-            "F 的命中区应覆盖整槽中心（点槽内任意一点都该选中 F），slot=$slot hit=$hit",
+            "F 的命中区应覆盖整槽槽心（点槽心能选中 F），slot=$slot hit=$hit",
             hit.left <= slotCenterX && slotCenterX <= hit.right &&
                 hit.top <= slotCenterY && slotCenterY <= hit.bottom,
         )

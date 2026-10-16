@@ -330,8 +330,9 @@ private fun WordBookWordsAlphabetRail(
                             // `WordBookWordsScreenTest.tappingTheActualRailSlotUsesTheLetterClickAction` 直接红
                             // （active_F 不再显示）。18dp 间距下任何 >18dp 的方形目标都必然重叠，
                             // 26×48dp=1248dp 也远超屏高，故本屏 48dp 结构性不可达；
-                            // 命中区仍必须铺满整槽（同文件 railLetterTouchTargetFillsItsSlotWithoutOverlapping 钉住），
-                            // 真正的 48dp 需要轨道重设计（归 UI 重设计轮，见报告 §遗留）。
+                            // 命中区必须**落在整槽之内并覆盖槽心**（当前 ≈24×13dp，槽 24×18dp，纵向未铺满；
+                            // 护栏见同文件 railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre），
+                            // 48dp 在本屏结构性不可达，豁免见决策 §5 注记，真正的 48dp 归 UI 重设计轮（见报告 §遗留）。
                             .then(if (active) Modifier.wrapContentHeight(unbounded = true) else Modifier)
                             .padding(vertical = if (active) 0.dp else 1.dp, horizontal = 2.dp)
                             .then(

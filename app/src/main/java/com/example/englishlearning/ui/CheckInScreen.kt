@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,7 +63,13 @@ fun CheckInScreen(
         modifier = Modifier.fillMaxSize().background(MintBackground).verticalScroll(rememberScrollState()).padding(20.dp).testTag("check_in_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        // F5-03 / Task 11（§E.2，Task 10 评审 I-4）：头部 Row 补横向滚动，把「三条 48dp 文字链在大字号下
+        // 超出屏宽、尾部不可达」变成可滚可达。修饰符顺序必须是 fillMaxWidth() 在前、horizontalScroll 在后：
+        // 设备实测（emulator-5574，fontScale=2.0）该顺序下头部几何与加滚动前逐位相同
+        // （标题 DpRect(20.190475..98.666664)），即正常档零视觉变化；反过来写
+        // horizontalScroll().fillMaxWidth() 会让标题的 weight(1f) 在无界约束下塌成 0 宽
+        // （实测 DpRect(left=right=20.190475)），属回归，已排除。
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             // F5-03 / Task 10：三条文字链原来只有 padding(10.dp)（实测 36.19dp 高，不足 48dp 触控下限），
             // 一律在 clickable 之前补 defaultMinSize(48.dp)；padding 与 testTag/semantics 链保持原样。
             Text("学习打卡", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.weight(1f))

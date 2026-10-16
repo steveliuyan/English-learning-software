@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
@@ -60,7 +61,9 @@ fun FavoritesScreen(
             .testTag("favorites_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        // F5-03 / Task 11（§E.2，Task 10 评审 I-4）：头部 Row 补横向滚动，使大字号下超出屏宽的
+        // 返回链仍可滚进视口；顺序照 CheckInScreen.kt（fillMaxWidth 在前，几何零变化，取证见该处注释）。
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             Text(
                 "我的收藏",
                 style = MaterialTheme.typography.headlineSmall,
