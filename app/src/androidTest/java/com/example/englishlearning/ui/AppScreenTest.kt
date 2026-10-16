@@ -327,6 +327,37 @@ class AppScreenTest {
         composeRule.onNodeWithText("待接入").assertDoesNotExist()
     }
 
+    /**
+     * M6（Task 9 必须项）：语音设置页的语速行**不是静默失效**。
+     *
+     * 为什么断在 AppScreen 这一层而不是只断 `SpeechSettingsScreen`：
+     * `SpeechSettingsScreen` 与 `AppScreen` 两侧的 `onCycleSpeechRate` 都带默认空 lambda
+     * （`AppScreen.kt` 里那一行 `onCycleSpeechRate = { speechSettingsViewModel?.cycleSpeechRate() }`
+     * 被整条删掉，屏级用例照旧全绿，用户点语速却永远不变）。本用例走真实宿主，
+     * 断言因此落在这条接线上：删掉它本用例必须红（Task 9 报告的删行探针即以此取证）。
+     *
+     * 「恰好一次点按前进一档」同时钉住两件事：值来自持久化偏好（初始 1x，不是写死的字符串）、
+     * 一次点按只提交一次循环（若宿主或屏幕重复派发，会直接跳到 1.5x）。
+     * 四档循环口径 {0.75x, 1.0x, 1.25x, 1.5x} 见决策 2026-10-15 §2。
+     */
+    @Test
+    fun speechRateRowOnTheHostedSpeechPageCyclesOneStepPerPress() {
+        val fixture = speechFixture()
+        composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
+        composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+
+        // 未合并树：当前倍速文本在可点击 Row 内会被语义合并（与 speech_auto_speak_state 同一口径）。
+        // 滚动只作用在可点击 Row 上（未合并子节点不带滚动语义）。
+        composeRule.onNodeWithTag("speech_rate_toggle").performScrollTo()
+        composeRule.onNodeWithTag("speech_rate_value", useUnmergedTree = true).assertTextEquals("1x")
+        composeRule.onNodeWithTag("speech_rate_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("speech_rate_value", useUnmergedTree = true).assertTextEquals("1.25x")
+    }
+
     @Test
     fun aiProfilesOpenedFromSpeechReturnToSpeechWithRefreshedCandidates() {
         val fixture = speechFixture()

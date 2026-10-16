@@ -67,6 +67,14 @@ fun WordCardScreen(
     onReveal: () -> Unit = {},
     onSpeak: (String) -> Unit = {},
     pronunciationMessage: String? = null,
+    // F3-02 四控：呈现条件由宿主给的状态决定，动作一律回调出去（UI 不碰播放器）。
+    pronunciationStatus: PronunciationStatus = PronunciationStatus.Idle,
+    onPauseResume: () -> Unit = {},
+    onStopPronunciation: () -> Unit = {},
+    // 决策 §2（Task 7 取证 / Task 9 裁决 B2）：系统 TTS 无公开 pause()/resume()，
+    // 因此「暂停/继续」只能由宿主的**引擎选择**决定呈现，不能靠 pausePlayback() 的返回值
+    // （返回值决定会让系统 TTS 下点暂停落到 Idle，按钮组消失而朗读继续）。
+    pauseResumeSupported: Boolean = false,
     onRetry: () -> Unit = {},
     onStartNewPhase: () -> Unit = {},
     onBackToPlan: () -> Unit = {},
@@ -260,6 +268,36 @@ fun WordCardScreen(
                                 .testTag("word_card_speak")
                                 .clickable { onSpeak(state.card.lemma) },
                         )
+                        // F3-02 播控组：只在 Playing / Paused 窗口呈现（决策 §2）。
+                        // 重播 = 再点上面那个喇叭（系统 TTS 走 QUEUE_FLUSH 天然打断，音频路径重走播放）。
+                        // 这一组**必须在 word_card_status_live_region 容器之外**：容器只装瞬时状态文字
+                        // （T6 修好的常驻播报区，WordCardRevealFocusTest 断它的子节点集合），
+                        // 把按钮塞进去会让读屏把按钮念成状态变化的一部分。
+                        val speakingOrPaused =
+                            pronunciationStatus == PronunciationStatus.Playing ||
+                            pronunciationStatus == PronunciationStatus.Paused
+                        if (speakingOrPaused) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (pauseResumeSupported) {
+                                    OutlinedButton(
+                                        onClick = onPauseResume,
+                                        modifier = Modifier
+                                            .testTag("word_card_pronunciation_toggle")
+                                            .semantics { contentDescription = if (pronunciationStatus == PronunciationStatus.Paused) "继续播放发音" else "暂停发音" },
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MintPrimaryDark),
+                                    ) { Text(if (pronunciationStatus == PronunciationStatus.Paused) "继续" else "暂停") }
+                                }
+                                OutlinedButton(
+                                    onClick = onStopPronunciation,
+                                    modifier = Modifier
+                                        .testTag("word_card_pronunciation_stop")
+                                        .semantics { contentDescription = "停止播放发音" },
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MintPrimaryDark),
+                                ) { Text("停止") }
+                            }
+                        }
                         state.card.example?.let { example ->
                             Text(
                                 text = example,

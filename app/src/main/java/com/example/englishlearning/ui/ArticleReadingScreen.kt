@@ -28,7 +28,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -73,6 +75,12 @@ fun ArticleReadingScreen(
     onOpenDictionaryPlaceholder: () -> Unit,
     onOpenPronunciationPlaceholder: () -> Unit,
     onSpeakSentence: (String) -> Unit = { onOpenPronunciationPlaceholder() },
+    // F3-02 四控（裁决 B2）：状态与文案由宿主给，暂停/继续的呈现只看引擎选择、不看 provider 返回值。
+    pronunciationMessage: String? = null,
+    pronunciationStatus: PronunciationStatus = PronunciationStatus.Idle,
+    pauseResumeSupported: Boolean = false,
+    onPauseResume: () -> Unit = {},
+    onStopPronunciation: () -> Unit = {},
     onOpenDictionary: (String) -> Unit = { onOpenDictionaryPlaceholder() },
     onSetLearnedMarks: (Boolean) -> Unit = {},
     onCompleteReading: () -> Unit = {},
@@ -103,6 +111,38 @@ fun ArticleReadingScreen(
                 modifier = Modifier.testTag("article_pronunciation"),
                 colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
             ) { Text("发音") }
+        }
+        // F3-02 整篇朗读的状态文字 + 播控组（决策 §2：暂停/继续只在 Playing/Paused 窗口呈现，
+        // 且呈现条件按「选中引擎 ≠ SystemTts」收窄；停止在系统 TTS 下同样可用，照常给）。
+        // 发音按钮再点即重播（系统 TTS QUEUE_FLUSH / 音频路径重走播放），不另设重播按钮。
+        pronunciationMessage?.let { message ->
+            Text(
+                text = message,
+                color = MintTextMuted,
+                modifier = Modifier
+                    .testTag("article_pronunciation_message")
+                    .semantics { contentDescription = message; liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        val speakingOrPaused =
+            pronunciationStatus == PronunciationStatus.Playing || pronunciationStatus == PronunciationStatus.Paused
+        if (speakingOrPaused) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (pauseResumeSupported) {
+                    Button(
+                        onClick = onPauseResume,
+                        modifier = Modifier.testTag("article_pronunciation_toggle").semantics {
+                            contentDescription = if (pronunciationStatus == PronunciationStatus.Paused) "继续播放发音" else "暂停发音"
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
+                    ) { Text(if (pronunciationStatus == PronunciationStatus.Paused) "继续" else "暂停") }
+                }
+                Button(
+                    onClick = onStopPronunciation,
+                    modifier = Modifier.testTag("article_pronunciation_stop").semantics { contentDescription = "停止播放发音" },
+                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
+                ) { Text("停止") }
+            }
         }
 
         val current = state

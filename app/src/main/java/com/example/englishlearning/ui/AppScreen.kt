@@ -51,6 +51,7 @@ import androidx.compose.runtime.key
 import kotlinx.coroutines.Job
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.englishlearning.language.domain.PronunciationAccent
+import com.example.englishlearning.language.domain.PronunciationEngine
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
 import kotlinx.coroutines.launch
@@ -295,6 +296,12 @@ fun AppScreen(
             var selectedArticleCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             var wordCardPronunciationMessage by remember { mutableStateOf<String?>(null) }
             var wordCardPronunciationRequest by remember { mutableIntStateOf(0) }
+            // F3-02 四控：词卡/阅读页各持一份「状态 + 文案 + 代次」。状态与文案同源
+            // （文案 = status.message()），播控组按状态呈现，代次用来把迟到的 Played 挡在 Idle 呈现之外（裁决 B3）。
+            var wordCardPronunciationStatus by remember { mutableStateOf(PronunciationStatus.Idle) }
+            var articlePronunciationMessage by remember { mutableStateOf<String?>(null) }
+            var articlePronunciationStatus by remember { mutableStateOf(PronunciationStatus.Idle) }
+            var articlePronunciationRequest by remember { mutableIntStateOf(0) }
             // 详情页只持有无字段状态枚举（安全边界），文案映射在 CardDetailScreen 内完成。
             var detailPronunciationMessage by remember { mutableStateOf<PronunciationStatus?>(null) }
             var detailPronunciationRequest by remember { mutableIntStateOf(0) }
@@ -312,6 +319,13 @@ fun AppScreen(
             LaunchedEffect(state.profile.id) { speechSettingsViewModel?.load() }
             val aiProfiles = aiProfileViewModel?.listState?.collectAsState()?.value as? AiProfileListUiState.Ready
             val speechState = speechSettingsViewModel?.state?.collectAsState()?.value ?: SpeechSettingsUiState()
+            // 裁决 B2（决策 §2，Task 7 取证）：`android.speech.tts.TextToSpeech` 没有公开 pause()/resume()，
+            // 引擎侧恒返回 false。因此「暂停/继续」按钮的呈现条件只能是**选中引擎 ≠ SystemTts**，
+            // 在 UI 侧一次算好传给三处屏；若改成看 pausePlayback() 返回值，系统 TTS 下点暂停会落
+            // `else -> Idle` 让整组消失，而朗读仍在继续、用户连可用的「停止」都失去。
+            // 词路径的 activeProvider 恒为 Kokoro（PronunciationRouter.kt:54），故系统 Tts 下这里偏保守，
+            // 属决策 §2 已登记的收窄口径，本任务不放宽。
+            val pauseResumeSupported = speechState.selectedEngine != PronunciationEngine.SystemTts
             val aiConfigured = aiProfiles?.items?.any { it.hasKey } == true
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val wordQaUiState = wordQaViewModel?.uiState?.collectAsState()?.value ?: WordAiQaUiState.Idle
@@ -686,6 +700,25 @@ fun AppScreen(
                             }
                         },
                         pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                        pronunciationControlsEnabled = true,
+                        pauseResumeSupported = pauseResumeSupported,
+                        // 暂停/继续**不**自增代次：暂停不改变这一次发声的归属（裁决 B3）。
+                        onPauseResume = {
+                            val held = detailPronunciationMessage
+                            val next = when {
+                                held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                else -> PronunciationStatus.Idle
+                            }
+                            detailPronunciationMessage = next
+                        },
+                        // 停止：先自增**本宿主发声结果所用的**代次（这里是 learningRecordPronunciationRequest，
+                        // 详情三宿主各用自己的守卫计数器），再 stopPlayback()，然后直接置空闲（裁决 B3）。
+                        onStopPronunciation = {
+                            learningRecordPronunciationRequest++
+                            pronunciationProvider?.stopPlayback()
+                            detailPronunciationMessage = PronunciationStatus.Idle
+                        },
                         notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
                         onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
                         onDeleteNote = { wordQaViewModel?.deleteNote(it) },
@@ -829,10 +862,14 @@ fun AppScreen(
                         val card = (cardState as? WordCardUiState.Ready)?.card ?: return@LaunchedEffect
                         if (!autoSpeakOnCardReady) return@LaunchedEffect
                         val request = ++wordCardPronunciationRequest
+                        wordCardPronunciationStatus = PronunciationStatus.Playing
                         wordCardPronunciationMessage = PronunciationStatus.Playing.message()
-                        val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma)).message()
+                        // 状态与文案同源于一个局部 val：链式 .message() 会让「呈现的文案」与
+                        // 「播控组的呈现状态」两次求值，两者一旦分叉按钮组就和文字说不上话。
+                        val resultStatus = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma))
                         if (request == wordCardPronunciationRequest) {
-                            wordCardPronunciationMessage = result
+                            wordCardPronunciationStatus = resultStatus
+                            wordCardPronunciationMessage = resultStatus.message()
                         }
                     }
                     WordCardScreen(
@@ -841,15 +878,36 @@ fun AppScreen(
                         onReveal = wordCardViewModel::revealMeaning,
                         onSpeak = { lemma ->
                             val request = ++wordCardPronunciationRequest
+                            wordCardPronunciationStatus = PronunciationStatus.Playing
                             wordCardPronunciationMessage = PronunciationStatus.Playing.message()
                             pronunciationScope.launch {
-                                val result = pronunciationStatus(pronunciationProvider?.speakWord(lemma)).message()
+                                val resultStatus = pronunciationStatus(pronunciationProvider?.speakWord(lemma))
                                 if (request == wordCardPronunciationRequest) {
-                                    wordCardPronunciationMessage = result
+                                    wordCardPronunciationStatus = resultStatus
+                                    wordCardPronunciationMessage = resultStatus.message()
                                 }
                             }
                         },
                         pronunciationMessage = wordCardPronunciationMessage,
+                        pronunciationStatus = wordCardPronunciationStatus,
+                        pauseResumeSupported = pauseResumeSupported,
+                        onPauseResume = {
+                            val next = when {
+                                wordCardPronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                wordCardPronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                else -> PronunciationStatus.Idle
+                            }
+                            wordCardPronunciationStatus = next
+                            wordCardPronunciationMessage = next.message()
+                        },
+                        // 裁决 B3：先自增代次再 stopPlayback()——播放器层把用户主动停止以 Played 收口，
+                        // 迟到的 Played 会被代次挡掉，不会覆盖这里的 Idle 呈现；也禁止另立「已停止」文案。
+                        onStopPronunciation = {
+                            wordCardPronunciationRequest++
+                            pronunciationProvider?.stopPlayback()
+                            wordCardPronunciationStatus = PronunciationStatus.Idle
+                            wordCardPronunciationMessage = null
+                        },
                         onRetry = { wordCardViewModel.load(state.profile.id) },
                         onStartNewPhase = wordCardViewModel::startNewPhase,
                         onBackToPlan = exitLearning,
@@ -899,6 +957,25 @@ fun AppScreen(
                                 }
                             },
                             pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                            pronunciationControlsEnabled = true,
+                            pauseResumeSupported = pauseResumeSupported,
+                            // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
+                            onPauseResume = {
+                                val held = detailPronunciationMessage
+                                val next = when {
+                                    held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                    held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                    else -> PronunciationStatus.Idle
+                                }
+                                detailPronunciationMessage = next
+                            },
+                            // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
+                            // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
+                            onStopPronunciation = {
+                                detailPronunciationRequest++
+                                pronunciationProvider?.stopPlayback()
+                                detailPronunciationMessage = PronunciationStatus.Idle
+                            },
                             favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
                             onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
                             onAskAi = {
@@ -1266,10 +1343,37 @@ fun AppScreen(
                             showGlobalVocabularySearch = globalVocabularySearchViewModel != null
                         },
                         onOpenPronunciationPlaceholder = {},
+                        // F3-02：整篇朗读从 fire-and-forget 升级为「有状态、可播控」——
+                        // 请求前置 Playing、回来后按代次校验写回结果（旧的即发即忘连文案都不给）。
                         onSpeakSentence = { sentence ->
+                            val request = ++articlePronunciationRequest
+                            articlePronunciationStatus = PronunciationStatus.Playing
+                            articlePronunciationMessage = PronunciationStatus.Playing.message()
                             pronunciationScope.launch {
-                                pronunciationProvider?.speakSentence(sentence)
+                                val result = pronunciationStatus(pronunciationProvider?.speakSentence(sentence))
+                                if (request == articlePronunciationRequest) {
+                                    articlePronunciationStatus = result
+                                    articlePronunciationMessage = result.message()
+                                }
                             }
+                        },
+                        pronunciationMessage = articlePronunciationMessage,
+                        pronunciationStatus = articlePronunciationStatus,
+                        pauseResumeSupported = pauseResumeSupported,
+                        onPauseResume = {
+                            val next = when {
+                                articlePronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                articlePronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                else -> PronunciationStatus.Idle
+                            }
+                            articlePronunciationStatus = next
+                            articlePronunciationMessage = next.message()
+                        },
+                        onStopPronunciation = {
+                            articlePronunciationRequest++
+                            pronunciationProvider?.stopPlayback()
+                            articlePronunciationStatus = PronunciationStatus.Idle
+                            articlePronunciationMessage = null
                         },
                         onSetLearnedMarks = { articleReadingViewModel?.setLearnedMarks(it) },
                         onCompleteReading = { articleReadingViewModel?.completeReading() },
@@ -1319,6 +1423,25 @@ fun AppScreen(
                                 }
                             },
                             pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                            pronunciationControlsEnabled = true,
+                            pauseResumeSupported = pauseResumeSupported,
+                            // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
+                            onPauseResume = {
+                                val held = detailPronunciationMessage
+                                val next = when {
+                                    held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                    held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                    else -> PronunciationStatus.Idle
+                                }
+                                detailPronunciationMessage = next
+                            },
+                            // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
+                            // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
+                            onStopPronunciation = {
+                                detailPronunciationRequest++
+                                pronunciationProvider?.stopPlayback()
+                                detailPronunciationMessage = PronunciationStatus.Idle
+                            },
                             favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
                             onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
                             onAskAi = {

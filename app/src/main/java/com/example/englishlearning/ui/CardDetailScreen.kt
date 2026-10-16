@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -90,6 +92,14 @@ fun CardDetailScreen(
     // 安全边界：详情页只收无字段的发音状态枚举，固定文案由本屏映射——
     // 任意字符串（含潜在敏感内容）无法从调用方塞进详情页。
     pronunciationStatus: PronunciationStatus = PronunciationStatus.Idle,
+    // F3-02 四控：详情页是「一份 UI、五种宿主」，播控组只给学习流详情 / 记录详情 / 阅读详情三处
+    // （决策 §2：收藏浮层与查词/搜索卡是一次性浏览发音，不加控件组）。宿主显式点头才渲染，
+    // 否则默认空 lambda 的「停止」会变成点了没反应的死按钮。
+    pronunciationControlsEnabled: Boolean = false,
+    // 裁决 B2：暂停/继续的呈现条件只看宿主的引擎选择，不看 pausePlayback() 返回值。
+    pauseResumeSupported: Boolean = false,
+    onPauseResume: () -> Unit = {},
+    onStopPronunciation: () -> Unit = {},
     onAskAi: (() -> Unit)? = null,
     notes: List<WordAiNote> = emptyList(),
     onSavePersonalNote: ((String) -> Unit)? = null,
@@ -126,6 +136,10 @@ fun CardDetailScreen(
         WordHeroCard(
             card = card,
             pronunciationStatus = pronunciationStatus,
+            pronunciationControlsEnabled = pronunciationControlsEnabled,
+            pauseResumeSupported = pauseResumeSupported,
+            onPauseResume = onPauseResume,
+            onStopPronunciation = onStopPronunciation,
             onSpeak = onSpeak,
             onSpeakBritish = onSpeakBritish,
             onRelearn = onRelearn,
@@ -250,6 +264,10 @@ fun CardDetailScreen(
 private fun WordHeroCard(
     card: WordCard,
     pronunciationStatus: PronunciationStatus,
+    pronunciationControlsEnabled: Boolean,
+    pauseResumeSupported: Boolean,
+    onPauseResume: () -> Unit,
+    onStopPronunciation: () -> Unit,
     onSpeak: () -> Unit,
     onSpeakBritish: (() -> Unit)?,
     onRelearn: (() -> Unit)?,
@@ -303,6 +321,33 @@ private fun WordHeroCard(
                     .testTag("card_detail_pronunciation_message")
                     .semantics { contentDescription = message },
             )
+        }
+        // F3-02 播控组（与词卡同款 OutlinedButton 形态、同一呈现窗口 Playing/Paused）：
+        // 只出现在宿主点头的三处详情（学习流 / 记录 / 阅读），收藏浮层与搜索卡详情保持纯浏览。
+        val speakingOrPaused =
+            pronunciationStatus == PronunciationStatus.Playing ||
+            pronunciationStatus == PronunciationStatus.Paused
+        if (pronunciationControlsEnabled && speakingOrPaused) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (pauseResumeSupported) {
+                    OutlinedButton(
+                        onClick = onPauseResume,
+                        modifier = Modifier
+                            .testTag("card_detail_pronunciation_toggle")
+                            .semantics { contentDescription = if (pronunciationStatus == PronunciationStatus.Paused) "继续播放发音" else "暂停发音" },
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MintPrimaryDark),
+                    ) { Text(if (pronunciationStatus == PronunciationStatus.Paused) "继续" else "暂停") }
+                }
+                OutlinedButton(
+                    onClick = onStopPronunciation,
+                    modifier = Modifier
+                        .testTag("card_detail_pronunciation_stop")
+                        .semantics { contentDescription = "停止播放发音" },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MintPrimaryDark),
+                ) { Text("停止") }
+            }
         }
 
         // 有多词性释义时逐条列出（替代原先顶部那一行重复的首条释义）；占位词卡只有一条。
