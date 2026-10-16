@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.wordqa.WordQaKind
 import com.example.englishlearning.wordqa.WordQaNotConfiguredReason
@@ -55,7 +56,7 @@ class WordAiQaScreenTest {
 
         composeRule.onNodeWithTag("word_qa_answer").assertExists()
         composeRule.onNodeWithText("I ate an apple.").assertExists()
-        composeRule.onNodeWithTag("word_qa_save_note").assertExists().performClick()
+        composeRule.onNodeWithTag("word_qa_save_note").performScrollTo().assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(1, saved)
     }

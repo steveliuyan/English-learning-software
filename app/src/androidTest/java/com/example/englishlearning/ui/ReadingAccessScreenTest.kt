@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ai.AiFailure
@@ -76,7 +77,7 @@ class ReadingAccessScreenTest {
         composeRule.onNodeWithTag("reading_type_science").assertExists().performClick()
         composeRule.onNodeWithTag("reading_type_workplace").assertExists()
         composeRule.onNodeWithTag("reading_preference").assertExists()
-        composeRule.onNodeWithTag("reading_history_entry").assertExists().performClick()
+        composeRule.onNodeWithTag("reading_history_entry").performScrollTo().assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(ArticleType.SCIENCE, selected)
         assertEquals(1, historyOpened)
