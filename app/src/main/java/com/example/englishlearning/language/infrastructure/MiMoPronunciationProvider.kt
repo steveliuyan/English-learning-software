@@ -40,6 +40,14 @@ class MiMoPronunciationProvider(
         text: String,
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
+    ): PronunciationResult = speak(text, accent, forceRegenerate, 1.0f)
+
+    /** 带倍率的发声（F3-02 四控之速）：rate 只进播放，不进请求体与缓存键（决策 §2）。 */
+    override suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        rate: Float,
     ): PronunciationResult {
         if (text.isBlank()) return PronunciationResult.Unavailable("blank text")
         val profile = profiles.find(profileId).getOrNull() ?: return PronunciationResult.Unavailable("profile unavailable")
@@ -62,7 +70,7 @@ class MiMoPronunciationProvider(
         if (!forceRegenerate) {
             cache?.get(cacheKey)?.let { cached ->
                 return try {
-                    if (player.play(cached, MiMoTtsRequestBuilder.AUDIO_FORMAT) is AudioPlaybackResult.Played) {
+                    if (player.play(cached, MiMoTtsRequestBuilder.AUDIO_FORMAT, rate) is AudioPlaybackResult.Played) {
                         PronunciationResult.Played
                     } else {
                         PronunciationResult.Failed()
@@ -90,7 +98,7 @@ class MiMoPronunciationProvider(
                     val wav = MiMoTtsResponseParser.extractWav(response.body)
                     if (wav == null || wav.isEmpty()) {
                         PronunciationResult.Failed()
-                    } else if (player.play(wav, MiMoTtsRequestBuilder.AUDIO_FORMAT) is AudioPlaybackResult.Played) {
+                    } else if (player.play(wav, MiMoTtsRequestBuilder.AUDIO_FORMAT, rate) is AudioPlaybackResult.Played) {
                         cache?.put(cacheKey, wav)
                         PronunciationResult.Played
                     } else {

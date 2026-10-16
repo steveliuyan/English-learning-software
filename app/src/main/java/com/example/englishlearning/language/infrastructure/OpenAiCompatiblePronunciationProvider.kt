@@ -7,6 +7,7 @@ import com.example.englishlearning.ai.net.AudioHttpRequest
 import com.example.englishlearning.ai.net.AudioHttpResult
 import com.example.englishlearning.ai.net.AudioHttpTransport
 import com.example.englishlearning.ai.net.TtsRequestBuilder
+import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
@@ -23,7 +24,17 @@ class OpenAiCompatiblePronunciationProvider(
 ) : PronunciationProvider {
     override fun capabilities(): Set<PronunciationCapability> = setOf(PronunciationCapability.RemoteAudio)
 
-    override suspend fun speak(text: String): PronunciationResult {
+    override suspend fun speak(text: String): PronunciationResult = speakInternal(text, 1.0f)
+
+    /** 带倍率的发声（F3-02 四控之速）：rate 只进播放，不改请求体（决策 §2）。 */
+    override suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        rate: Float,
+    ): PronunciationResult = speakInternal(text, rate)
+
+    private suspend fun speakInternal(text: String, rate: Float): PronunciationResult {
         if (text.isBlank()) return PronunciationResult.Unavailable("blank text")
         val profile = profiles.find(profileId).getOrNull() ?: return PronunciationResult.Unavailable("profile unavailable")
         if (profile.providerKind != AiProviderKind.OPENAI_COMPATIBLE) {
@@ -49,7 +60,7 @@ class OpenAiCompatiblePronunciationProvider(
             when (response) {
                 is AudioHttpResult.Success -> try {
                     if (response.body.isEmpty()) PronunciationResult.Failed()
-                    else if (player.play(response.body, responseFormat) is AudioPlaybackResult.Played) PronunciationResult.Played
+                    else if (player.play(response.body, responseFormat, rate) is AudioPlaybackResult.Played) PronunciationResult.Played
                     else PronunciationResult.Failed()
                 } finally {
                     response.body.fill(0)

@@ -82,7 +82,7 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchGramEntit
         MigrationPairingLedgerEntity::class,
         FavoriteWordEntity::class,
     ],
-    version = 31,
+    version = 32,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -624,6 +624,18 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v31→v32：F3-02 语速偏好（决策 2026-10-15 §2「语速=播放侧变速」）。
+         * 照 v27 `autoSpeakOnCardReady` 加列先例：列名隐式驼峰（Room 默认列名=字段名，
+         * 任务书缺陷 #9 已裁决，蛇形会让 runMigrationsAndValidate 因缺列失败），
+         * `REAL NOT NULL DEFAULT 1.0` 让历史行回填倍速 1.0。禁 destructive。
+         */
+        val MIGRATION_31_32: Migration = object : Migration(31, 32) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `speech_preferences` ADD COLUMN `speechRate` REAL NOT NULL DEFAULT 1.0")
+            }
+        }
+
+        /**
          * 统一 Schema 装配工厂：进程级单例、恢复提交的临时实例、RoomRestoreDataWriter
          * 换机新库共用同一迁移与回调，保证三处逐字节同构（D-12 决策，
          * docs/decisions/2026-10-14-restore-commit-temp-instance-and-restart.md）。
@@ -635,7 +647,7 @@ abstract class AppDatabase : RoomDatabase() {
                 .build()
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32)
 
         /**
          * 词条字串索引（FTS4 + 3-gram）的表名与建表 DDL。

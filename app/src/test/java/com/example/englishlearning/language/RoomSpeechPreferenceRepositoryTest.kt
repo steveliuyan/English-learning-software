@@ -162,4 +162,41 @@ class RoomSpeechPreferenceRepositoryTest {
 
         assertEquals(false, preference.autoSpeakOnCardReady)
     }
+
+    /** F3-02（决策 §2）：语速读写两侧 clamp 到 0.5–2.0；合法值原样落盘。 */
+    @Test
+    fun `save persists and clamps the speech rate`() = runTest {
+        val database = mockk<AppDatabase>()
+        val dao = mockk<InternalSpeechPreferenceDao>()
+        every { database.internalSpeechPreferenceDao() } returns dao
+        val upserts = mutableListOf<SpeechPreferenceEntity>()
+        coEvery { dao.upsert(capture(upserts)) } returns Unit
+        val repository = RoomSpeechPreferenceRepository(database, Dispatchers.Unconfined)
+
+        repository.save(SpeechPreference(speechRate = 1.25f)).getOrThrow()
+        repository.save(SpeechPreference(speechRate = 9.0f)).getOrThrow()
+
+        assertEquals(1.25f, upserts.first().speechRate)
+        assertEquals(2.0f, upserts.last().speechRate)
+    }
+
+    /** 库里的越界历史值读回来必须被 clamp，不能把异常倍速带进播放链。 */
+    @Test
+    fun `get clamps a stored speech rate into the supported range`() = runTest {
+        val database = mockk<AppDatabase>()
+        val dao = mockk<InternalSpeechPreferenceDao>()
+        every { database.internalSpeechPreferenceDao() } returns dao
+        coEvery { dao.find() } returns SpeechPreferenceEntity(
+            preferenceId = "device",
+            selectedEngine = "SystemTts",
+            openAiProfileId = null,
+            miMoProfileId = null,
+            autoSpeakOnCardReady = true,
+            speechRate = 0.1f,
+        )
+
+        val preference = RoomSpeechPreferenceRepository(database, Dispatchers.Unconfined).get().getOrThrow()
+
+        assertEquals(0.5f, preference.speechRate)
+    }
 }

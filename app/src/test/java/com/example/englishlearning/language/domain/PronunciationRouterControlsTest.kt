@@ -143,4 +143,64 @@ class PronunciationRouterControlsTest {
         assertFalse(bare.resumePlayback())
         bare.stopPlayback()
     }
+
+    @Test
+    fun `sentence and word playback pass persisted rate to the engine`() = runTest {
+        class RateCapturingProvider : PronunciationProvider {
+            var lastRate: Float? = null
+            override fun capabilities(): Set<PronunciationCapability> = emptySet()
+            override suspend fun speak(text: String): PronunciationResult = PronunciationResult.Played
+            override suspend fun speak(
+                text: String,
+                accent: PronunciationAccent,
+                forceRegenerate: Boolean,
+                rate: Float,
+            ): PronunciationResult { lastRate = rate; return PronunciationResult.Played }
+        }
+        val system = RateCapturingProvider()
+        val kokoro = RateCapturingProvider()
+        val router = PronunciationRouter(
+            kokoro, system,
+            MiMoPronunciationProviderFactory { error("unused") },
+            FakePrefRepo(SpeechPreference(selectedEngine = PronunciationEngine.SystemTts, speechRate = 1.25f)),
+        )
+        router.speakSentence("sentence")
+        assertEquals(1.25f, system.lastRate)
+        router.speakWord("word", PronunciationAccent.American)
+        assertEquals(1.25f, kokoro.lastRate)
+    }
+
+    @Test
+    fun `mimo routing passes the persisted rate to the remote and the fallback system`() = runTest {
+        // 决策 §2：语速是播放侧变速，Router 的每个出声调用点（MiMo 远程、降级 system）都必须带上持久化语速。
+        class RateCapturingProvider(private val result: PronunciationResult) : PronunciationProvider {
+            var lastRate: Float? = null
+            override fun capabilities(): Set<PronunciationCapability> = emptySet()
+            override suspend fun speak(text: String): PronunciationResult = result
+            override suspend fun speak(
+                text: String,
+                accent: PronunciationAccent,
+                forceRegenerate: Boolean,
+                rate: Float,
+            ): PronunciationResult { lastRate = rate; return result }
+        }
+        val mimo = RateCapturingProvider(PronunciationResult.Unavailable("offline"))
+        val system = RateCapturingProvider(PronunciationResult.Played)
+        val router = PronunciationRouter(
+            RateCapturingProvider(PronunciationResult.Played),
+            system,
+            MiMoPronunciationProviderFactory { mimo },
+            FakePrefRepo(
+                SpeechPreference(
+                    selectedEngine = PronunciationEngine.MiMo,
+                    miMoProfileId = "mimo-profile",
+                    speechRate = 0.75f,
+                ),
+            ),
+        )
+
+        assertEquals(PronunciationResult.Played, router.speakSentence("sentence"))
+        assertEquals(0.75f, mimo.lastRate)
+        assertEquals(0.75f, system.lastRate)
+    }
 }

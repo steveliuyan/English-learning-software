@@ -71,7 +71,7 @@ class KokoroPronunciationProviderTest {
         val engine = RecordingKokoroEngine()
         var cancelPlayback = true
         val player = object : AudioPlayer {
-            override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult {
+            override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult {
                 if (cancelPlayback) throw kotlinx.coroutines.CancellationException("cancel playback")
                 return AudioPlaybackResult.Played
             }
@@ -405,7 +405,7 @@ class KokoroPronunciationProviderTest {
         val played = mutableListOf<List<Byte>>()
         val formats = mutableListOf<String>()
 
-        override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult {
+        override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult {
             played += bytes.toList()
             formats += format
             return outcome

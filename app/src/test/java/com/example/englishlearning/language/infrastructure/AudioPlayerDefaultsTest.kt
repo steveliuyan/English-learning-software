@@ -16,7 +16,7 @@ class AudioPlayerDefaultsTest {
     @Test
     fun `audio player implementing only play gets unsupported controls`() {
         val bare = object : AudioPlayer {
-            override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult = AudioPlaybackResult.Played
+            override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult = AudioPlaybackResult.Played
         }
 
         assertFalse(bare.pauseCurrentPlayback())
@@ -27,7 +27,7 @@ class AudioPlayerDefaultsTest {
     @Test
     fun `unsupported controls stay unsupported when called repeatedly`() {
         val bare = object : AudioPlayer {
-            override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult = AudioPlaybackResult.Failed
+            override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult = AudioPlaybackResult.Failed
         }
 
         // 默认实现不持有任何状态：反复调用结果稳定，stop 依旧空操作。

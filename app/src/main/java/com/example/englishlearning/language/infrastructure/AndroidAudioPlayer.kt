@@ -27,7 +27,7 @@ class AndroidAudioPlayer(private val context: Context) : AudioPlayer {
     private var pending: CancellableContinuation<AudioPlaybackResult>? = null
     private var preparing: MediaPlayer? = null
 
-    override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult =
+    override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult =
         suspendCancellableCoroutine { continuation ->
             // 抢占收口：下面的赋值会无条件覆盖 active/preparing/pending。若上一段仍在暂停且从未结束，
             // 旧续程就不再被任何字段引用（stop 也找不到它），旧 speak 会永久悬挂、旧 MediaPlayer 永不 release。
@@ -48,7 +48,16 @@ class AndroidAudioPlayer(private val context: Context) : AudioPlayer {
                 // 身份守卫：迟到的 prepared 回调（来自已被抢占/收口的旧播放器）必须整体丢弃，不能只抹 preparing——
                 // 否则 `active = mp; mp.start()` 会用一个已 release 的死句柄顶替当前会话（新播放器反被漏掉、永不释放）并在主线程抛异常。
                 // 守卫成立即意味着这就是当前会话，与 finish()/invokeOnCancellation 的 `=== player` 风格一致。
-                player.setOnPreparedListener { mp -> if (preparing === mp) { preparing = null; active = mp; mp.start() } }
+                // 变速只在 rate≠1 时应用，且在 start() 之前、身份守卫之内（迟到的回调整行作废，不给死句柄设速）。
+                // runCatching 兜底：个别机型/状态对 setPlaybackParams 抛 IllegalStateException，变速失败宁可原速出声也不吞掉播放。
+                player.setOnPreparedListener { mp ->
+                    if (preparing === mp) {
+                        preparing = null
+                        active = mp
+                        if (rate != 1f) runCatching { mp.playbackParams = mp.playbackParams.setSpeed(rate) }
+                        mp.start()
+                    }
+                }
                 player.setOnCompletionListener { finish(AudioPlaybackResult.Played) }
                 player.setOnErrorListener { _, _, _ -> finish(AudioPlaybackResult.Failed); true }
                 player.prepareAsync()

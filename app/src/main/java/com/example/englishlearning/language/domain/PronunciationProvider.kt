@@ -15,11 +15,16 @@ interface PronunciationProvider {
 
     suspend fun speak(text: String): PronunciationResult
 
+    /**
+     * 单词发音（F3-02 四控之速：`rate` 为播放侧变速倍率，决策 §2）。
+     * 三参版与四参版在 Kotlin 里默认值签名冲突，按任务书裁决合并为单一声明，调用点零改动。
+     */
     suspend fun speakWord(
         text: String,
         accent: PronunciationAccent = PronunciationAccent.American,
         forceRegenerate: Boolean = false,
-    ): PronunciationResult = speak(text, accent, forceRegenerate)
+        rate: Float = 1.0f,
+    ): PronunciationResult = speak(text, accent, forceRegenerate, rate)
 
     suspend fun speakSentence(
         text: String,
@@ -34,6 +39,14 @@ interface PronunciationProvider {
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
     ): PronunciationResult = speak(text, accent)
+
+    /** 带播放倍率的发声；默认实现忽略 rate 委托三参版（决策 §2：变速在播放侧，生成参数不变）。 */
+    suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        rate: Float,
+    ): PronunciationResult = speak(text, accent, forceRegenerate)
 }
 
 sealed interface PronunciationResult {

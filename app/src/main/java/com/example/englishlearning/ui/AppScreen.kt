@@ -1044,6 +1044,7 @@ fun AppScreen(
                     onToggleAutoSpeakOnCardReady = { enabled ->
                         speechSettingsViewModel?.setAutoSpeakOnCardReady(enabled)
                     },
+                    onCycleSpeechRate = { speechSettingsViewModel?.cycleSpeechRate() },
                     onBack = { showSpeechSettings = false },
                 )
             } else if (showReminderSettings) {

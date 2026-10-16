@@ -53,7 +53,7 @@ class SpeechSettingsViewModelTest {
         assertEquals(PronunciationEngine.SystemTts, state.selectedEngine)
         assertEquals(listOf("openai", "mimo"), state.candidates.map { it.profileId })
         assertEquals(listOf(SpeechProfileStatus.Available, SpeechProfileStatus.MissingKey), state.candidates.map { it.status })
-        assertEquals(setOf("selectedEngine", "openAiProfileId", "miMoProfileId", "autoSpeakOnCardReady", "candidates", "message", "previewMessage"),
+        assertEquals(setOf("selectedEngine", "openAiProfileId", "miMoProfileId", "autoSpeakOnCardReady", "speechRate", "candidates", "message", "previewMessage"),
             SpeechSettingsUiState::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
         assertEquals(setOf("profileId", "displayName", "status", "providerKind"),
             SpeechProfileCandidate::class.java.declaredFields.filterNot { it.isSynthetic || java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet())
@@ -122,6 +122,90 @@ class SpeechSettingsViewModelTest {
 
         assertEquals(true, viewModel.state.value.autoSpeakOnCardReady)
         assertTrue(viewModel.state.value.message != null)
+    }
+
+    /** F3-02（决策 §2）：四档循环 0.75 → 1.0 → 1.25 → 1.5 → 0.75，落盘并反映到状态。 */
+    @Test fun cycleSpeechRateAdvancesStepAndPersists() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+        assertEquals(1.0f, viewModel.state.value.speechRate)
+
+        viewModel.cycleSpeechRate()
+        advanceUntilIdle()
+
+        assertEquals(1.25f, viewModel.state.value.speechRate)
+        assertEquals(1.25f, preferences.saved.single().speechRate)
+
+        viewModel.cycleSpeechRate()
+        advanceUntilIdle()
+        assertEquals(1.5f, viewModel.state.value.speechRate)
+        assertEquals(1.5f, preferences.saved.last().speechRate)
+    }
+
+    /** 最快档再点一次回到最慢档（循环语义，档位表外值按就近档位推进）。 */
+    @Test fun cycleSpeechRateWrapsFromFastestToSlowest() = runTest(dispatcher) {
+        val preferences = FakePreferences(SpeechPreference(speechRate = 1.5f))
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.cycleSpeechRate()
+        advanceUntilIdle()
+
+        assertEquals(0.75f, viewModel.state.value.speechRate)
+        assertEquals(0.75f, preferences.saved.single().speechRate)
+    }
+
+    /** 存储失败：状态与档位不变，只报存储错误。 */
+    @Test fun failedSpeechRateCycleKeepsStateAndReportsStorageError() = runTest(dispatcher) {
+        val preferences = FakePreferences(failSave = true)
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.cycleSpeechRate()
+        advanceUntilIdle()
+
+        assertEquals(1.0f, viewModel.state.value.speechRate)
+        assertTrue(viewModel.state.value.message != null)
+    }
+
+    /**
+     * 决策 §2 读改写口径（`:78` 历史坑同款防线）：select 用当前 UI 状态手工构造偏好，
+     * 必须显式带上已存的 speechRate——存过 1.25x 之后换引擎不得把它复位。
+     */
+    @Test fun selectKeepsThePersistedSpeechRate() = runTest(dispatcher) {
+        val preferences = FakePreferences(SpeechPreference(speechRate = 1.25f, miMoProfileId = "mimo"))
+        val viewModel = viewModel(
+            profiles = RecordingProfiles(listOf(profile("mimo", setOf(AiCapability.Speech), AiProviderKind.XIAOMI_MIMO))),
+            preferences = preferences,
+        )
+        viewModel.load()
+        advanceUntilIdle()
+        assertEquals(1.25f, viewModel.state.value.speechRate)
+
+        viewModel.select(PronunciationEngine.MiMo, "mimo")
+        advanceUntilIdle()
+
+        assertEquals(1.25f, preferences.saved.last().speechRate)
+        assertEquals(1.25f, viewModel.state.value.speechRate)
+    }
+
+    /** 决策 §2 读改写口径：一键建 MiMo 预设同样不得把已存语速静默复位。 */
+    @Test fun addMiMoPresetKeepsThePersistedSpeechRate() = runTest(dispatcher) {
+        val profiles = RecordingProfiles(emptyList())
+        val preferences = FakePreferences(SpeechPreference(speechRate = 1.25f))
+        val viewModel = viewModel(profiles = profiles, preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.addMiMoPreset()
+        advanceUntilIdle()
+
+        assertEquals(1.25f, preferences.saved.single().speechRate)
+        assertEquals(1.25f, viewModel.state.value.speechRate)
     }
 
     @Test fun failedSaveRetainsThePreviousUiSelection() = runTest(dispatcher) {

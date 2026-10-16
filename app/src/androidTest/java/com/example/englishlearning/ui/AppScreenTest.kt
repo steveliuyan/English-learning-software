@@ -337,13 +337,15 @@ class AppScreenTest {
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
         // 候选配置现在是折叠二级菜单：先展开再操作。
-        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
+        // v32 语速行让本页变高，折叠按钮会落在视口外：performClick 前必须 performScrollTo，
+        // 否则点击命中别处、展开态不变（与本页其它 scroll+click 用例同一写法）。
+        composeRule.onNodeWithTag("speech_toggle_candidates").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys += "mimo"
         composeRule.onNodeWithContentDescription("返回上一层").performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
-        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
+        composeRule.onNodeWithTag("speech_toggle_candidates").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_profile_mimo").performScrollTo()
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
@@ -380,7 +382,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
-        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
+        composeRule.onNodeWithTag("speech_toggle_candidates").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_profile_mimo").performScrollTo()
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
@@ -388,7 +390,7 @@ class AppScreenTest {
         fixture.keys.clear()
         pressSystemBack()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
-        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
+        composeRule.onNodeWithTag("speech_toggle_candidates").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_profile_mimo").performScrollTo()
         composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
@@ -976,6 +978,7 @@ class AppScreenTest {
             text: String,
             accent: com.example.englishlearning.language.domain.PronunciationAccent,
             forceRegenerate: Boolean,
+            rate: Float,
         ): PronunciationResult {
             spokenTexts += text
             wordCalls += Triple(text, accent, forceRegenerate)

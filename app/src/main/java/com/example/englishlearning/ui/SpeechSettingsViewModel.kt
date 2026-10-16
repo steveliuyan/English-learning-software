@@ -35,6 +35,8 @@ data class SpeechSettingsUiState(
     val miMoProfileId: String? = null,
     /** 学习流词卡就绪自动朗读一次；关闭后仅用户点击触发（D1）。 */
     val autoSpeakOnCardReady: Boolean = true,
+    /** 播放侧变速倍率（F3-02 四控之速，决策 2026-10-15 §2）；UI 只暴露 0.75/1.0/1.25/1.5 四档。 */
+    val speechRate: Float = 1.0f,
     val candidates: List<SpeechProfileCandidate> = emptyList(),
     val message: String? = null,
     /** 试听结果反馈；与选择操作的 message 分开，互不覆盖。 */
@@ -77,6 +79,8 @@ class SpeechSettingsViewModel @Inject constructor(
             miMoProfileId = if (engine == PronunciationEngine.MiMo) profileId else current.miMoProfileId,
             // 引擎选择是读改写：不能把自动发音开关抹回默认值。
             autoSpeakOnCardReady = current.autoSpeakOnCardReady,
+            // v32 同类防线（决策 §6）：语速同理，缺这一行会把已保存的倍率抹回 1.0。
+            speechRate = current.speechRate,
         )
         if (preferences.save(next).isSuccess) {
             _state.value = current.copy(
@@ -96,6 +100,23 @@ class SpeechSettingsViewModel @Inject constructor(
         val next = stored.copy(autoSpeakOnCardReady = enabled)
         if (preferences.save(next).isSuccess) {
             _state.value = _state.value.copy(autoSpeakOnCardReady = enabled, message = null)
+        } else {
+            _state.value = _state.value.copy(message = STORAGE_FAILED_MESSAGE)
+        }
+    }
+
+    /**
+     * 语速四档循环（决策 §2）：0.75x → 1.0x → 1.25x → 1.5x → 0.75x。
+     * 起点以**存储值**为准（不信任 UI 快照），非标准值先就近吸附再进下一档；
+     * 保存失败保持原状态并报告存储错误——与 setAutoSpeakOnCardReady 同一口径。
+     */
+    fun cycleSpeechRate() = viewModelScope.launch {
+        val steps = listOf(0.75f, 1.0f, 1.25f, 1.5f)
+        val stored = preferences.get().getOrDefault(SpeechPreference())
+        val nearest = steps.indices.minByOrNull { i -> kotlin.math.abs(steps[i] - stored.speechRate) } ?: 1
+        val next = steps[(nearest + 1) % steps.size]
+        if (preferences.save(stored.copy(speechRate = next)).isSuccess) {
+            _state.value = _state.value.copy(speechRate = next, message = null)
         } else {
             _state.value = _state.value.copy(message = STORAGE_FAILED_MESSAGE)
         }
@@ -127,6 +148,8 @@ class SpeechSettingsViewModel @Inject constructor(
             openAiProfileId = _state.value.openAiProfileId,
             miMoProfileId = profileId,
             autoSpeakOnCardReady = _state.value.autoSpeakOnCardReady,
+            // v32 同类防线（决策 §6）：预设绑定同样不得把已保存的倍率抹回 1.0。
+            speechRate = _state.value.speechRate,
         )
         if (preferences.save(next).isFailure) {
             _state.value = _state.value.copy(message = STORAGE_FAILED_MESSAGE)
@@ -169,6 +192,7 @@ class SpeechSettingsViewModel @Inject constructor(
             openAiProfileId = preference.openAiProfileId,
             miMoProfileId = preference.miMoProfileId,
             autoSpeakOnCardReady = preference.autoSpeakOnCardReady,
+            speechRate = preference.speechRate,
             candidates = speechProfiles.map { it.toCandidate() },
             message = message,
         )

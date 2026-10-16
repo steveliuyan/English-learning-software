@@ -70,6 +70,14 @@ class AndroidTextToSpeechProviderTest {
         provider.stopPlayback(); assertEquals(1, engine.stopCount)
     }
 
+    @Test
+    fun `rate overrides applied before speak`() {
+        val engine = FakeEngine(initialized = true)
+        val provider = AndroidTextToSpeechProvider(engine)
+        kotlinx.coroutines.test.runTest { provider.speak("hello", com.example.englishlearning.language.domain.PronunciationAccent.American, false, 1.5f) }
+        assertEquals(1.5f, engine.lastRate)
+    }
+
     private class FakeEngine(private val initialized: Boolean) : TextToSpeechEngine {
         val spoken = mutableListOf<String>()
         var locale: java.util.Locale? = null
@@ -77,10 +85,12 @@ class AndroidTextToSpeechProviderTest {
         var releaseCount = 0
         var pauseCount = 0
         var resumeCount = 0
+        var lastRate: Float? = null
 
         override fun isInitialized(): Boolean = initialized
         override fun setLanguage(locale: java.util.Locale): Boolean { this.locale = locale; return initialized }
         override fun speak(text: String): Boolean { spoken += text; return initialized }
+        override fun setSpeechRate(rate: Float): Boolean { lastRate = rate; return true }
         override fun pause(): Boolean { pauseCount++; return true }
         override fun resume(): Boolean { resumeCount++; return true }
         override fun stop() { stopCount++ }

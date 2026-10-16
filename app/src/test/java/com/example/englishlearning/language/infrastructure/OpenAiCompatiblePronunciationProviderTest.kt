@@ -15,6 +15,7 @@ import com.example.englishlearning.language.domain.PronunciationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -143,6 +144,26 @@ class OpenAiCompatiblePronunciationProviderTest {
         assertEquals(1, player.stopCount)
     }
 
+    @Test
+    fun `the rate parameter reaches the audio player without changing the request body`() = runTest {
+        // 决策 §2：变速只在播放侧；发送给服务的请求参数逐字不变。
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
+        val transport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1, 2)))
+        val provider = provider(transport = transport, player = player)
+
+        assertIs<PronunciationResult.Played>(
+            provider.speak("hello", com.example.englishlearning.language.domain.PronunciationAccent.American, false, 1.5f),
+        )
+        assertEquals(1.5f, player.lastRate)
+        assertTrue(transport.request!!.body.decodeToString().contains("\"voice\":\"alloy\""))
+
+        // 反向闸：同一文本在默认倍率（3 参）下的请求体必须逐字节相同——rate 一旦进请求体即红。
+        val baselineTransport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1, 2)))
+        provider(transport = baselineTransport, player = RecordingAudioPlayer(AudioPlaybackResult.Played))
+            .speak("hello", com.example.englishlearning.language.domain.PronunciationAccent.American, false)
+        assertContentEquals(baselineTransport.request!!.body.copyOf(), transport.request!!.body.copyOf())
+    }
+
     private fun provider(
         transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(byteArrayOf(1))),
         store: FakeSecretStore = FakeSecretStore("secret".toCharArray()),
@@ -164,12 +185,14 @@ class OpenAiCompatiblePronunciationProviderTest {
     ) : AudioPlayer {
         var bytes: ByteArray? = null
         var format: String? = null
+        var lastRate: Float? = null
         var pauseCount = 0
         var resumeCount = 0
         var stopCount = 0
-        override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult {
+        override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult {
             this.bytes = bytes.copyOf()
             this.format = format
+            this.lastRate = rate
             return outcome
         }
         override fun pauseCurrentPlayback(): Boolean { pauseCount++; return pauseResult }

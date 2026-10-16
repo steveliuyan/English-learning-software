@@ -116,7 +116,9 @@ class PronunciationRouterTest {
 
         assertEquals(PronunciationResult.Played, result)
         assertEquals(listOf("hello:British"), system.accentCalls)
-        assertEquals(emptyList<Boolean>(), system.forceRegenerateCalls)
+        // v32 变速接线后 SystemTts 出声点改走 4 参 speak（rate 透传），记录落点从 2 参上移到 3 参重写；
+        // 语义不变：调用方的 forceRegenerate=true 依旧被丢弃，落引擎的仍是 false。
+        assertEquals(listOf(false), system.forceRegenerateCalls)
     }
 
     @Test

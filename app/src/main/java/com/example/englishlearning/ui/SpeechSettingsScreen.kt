@@ -53,6 +53,7 @@ fun SpeechSettingsScreen(
     onAddMiMoPreset: () -> Unit,
     onPreview: (String) -> Unit,
     onToggleAutoSpeakOnCardReady: (Boolean) -> Unit = {},
+    onCycleSpeechRate: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     Column(
@@ -103,6 +104,28 @@ fun SpeechSettingsScreen(
             Text(
                 if (state.autoSpeakOnCardReady) "开" else "关",
                 modifier = Modifier.testTag("speech_auto_speak_state"),
+                style = AppType.Label,
+                color = DomainColors.AiSpeech.deep,
+            )
+        }
+
+        // 语速（F3-02 四控之速）：播放侧变速，不重新生成音频（决策 §2）。
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCycleSpeechRate() }
+                .padding(vertical = 10.dp)
+                .testTag("speech_rate_toggle")
+                .semantics { contentDescription = "发音语速" },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("发音语速", style = AppType.Title)
+                Text("只调整本机播放速度，不会重新生成音频；对系统朗读与已缓存发音均生效。", style = AppType.Footnote)
+            }
+            Text(
+                if (state.speechRate == 1f) "1x" else "${state.speechRate}x",
+                modifier = Modifier.testTag("speech_rate_value"),
                 style = AppType.Label,
                 color = DomainColors.AiSpeech.deep,
             )

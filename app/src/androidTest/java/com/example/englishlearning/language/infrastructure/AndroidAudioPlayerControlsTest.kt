@@ -103,6 +103,39 @@ class AndroidAudioPlayerControlsTest {
         }
     }
 
+    /**
+     * 变速参数（F3-02 播放侧变速）的设备侧冒烟取证：非默认倍速**不得**打断真实 `MediaPlayer` 的
+     * prepared→start 链路——`playbackParams.setSpeed` 若用错时序/对象，会抛异常走 `Failed`，
+     * 会话永远 pause 不到 true（本用例超时即红）。变速后的暂停/继续仍可用一并断言。
+     */
+    @Test
+    fun playAtNonDefaultRateStillStartsAndStaysControllable() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val player = AndroidAudioPlayer(context)
+        // 12 秒音频 @1.25x ≈ 9.6 秒墙钟：给「异步暂停收敛 → 继续 → 再暂停」留出窗口，
+        // 否则会话可能在轮询期间自然播完，pause/resume 双双变 false 而误报。
+        val playback = async { player.play(sineWav(seconds = 12), "wav", 1.25f) }
+        try {
+            withTimeout(PREPARE_TIMEOUT_MS) {
+                while (!player.pauseCurrentPlayback()) delay(POLL_INTERVAL_MS)
+            }
+            // 设备实测取证（首轮 connected 原文 `FAILURES!!!` 即此竞态，非实现缺陷）：
+            // 变速会话下 `MediaPlayer.pause()` 是异步收敛的，紧随其后的一次 `resumeCurrentPlayback()`
+            // 可能因 `isPlaying` 仍为 true 而如实返回 false（此刻确实「没有在暂停，无需继续」）。
+            // 因此按本文件既有口径轮询到接管成功——轮询到超时即红，证伪力不降；
+            // 再补一次「仍可暂停」，证明继续真的接管了这个变速会话。
+            withTimeout(RESUME_TIMEOUT_MS) {
+                while (!player.resumeCurrentPlayback()) delay(POLL_INTERVAL_MS)
+            }
+            withTimeout(RESUME_TIMEOUT_MS) {
+                while (!player.pauseCurrentPlayback()) delay(POLL_INTERVAL_MS)
+            }
+            println("ANDROID_AUDIO_PLAYER rate=1.25 controllable=ok")
+        } finally {
+            playback.cancel()
+        }
+    }
+
     /** 生成 PCM16 单声道正弦 WAV：必须足够长，才能在真实播放中被暂停与停止。 */
     private fun sineWav(seconds: Int, sampleRate: Int = 16_000): ByteArray {
         val sampleCount = sampleRate * seconds

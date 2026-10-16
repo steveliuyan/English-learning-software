@@ -23,6 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MiMoPronunciationProviderTest {
@@ -257,6 +258,39 @@ class MiMoPronunciationProviderTest {
         assertEquals(1, player.stopCount)
     }
 
+    @Test fun `the rate parameter reaches the audio player without changing the request or cache key`() = runTest {
+        // 决策 §2：AI 请求参数不变、缓存键不纳入 rate；rate 只落到 play 一侧。
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
+        val transport = RecordingTransport(AudioHttpResult.Success(responseBody.copyOf()))
+
+        assertIs<PronunciationResult.Played>(provider(transport, player = player).speak("hello", PronunciationAccent.American, false, 1.5f))
+        assertEquals(1.5f, player.lastRate)
+
+        // 反向闸（请求体）：同一文本在默认倍率下的请求体必须逐字节相同——rate 一旦进请求体即红。
+        val baselineTransport = RecordingTransport(AudioHttpResult.Success(responseBody.copyOf()))
+        provider(baselineTransport, player = RecordingAudioPlayer(AudioPlaybackResult.Played))
+            .speak("hello", PronunciationAccent.American, false)
+        assertContentEquals(baselineTransport.request!!.body.copyOf(), transport.request!!.body.copyOf())
+    }
+
+    @Test fun `cache hit plays at the requested rate too`() = runTest {
+        val cache = com.example.englishlearning.language.domain.InMemoryPronunciationAudioCache()
+        val key = com.example.englishlearning.language.domain.PronunciationCacheKey(
+            "schedule", PronunciationAccent.American, "XIAOMI_MIMO", profile.model, "Mia",
+        )
+        cache.put(key, byteArrayOf(8, 9))
+        val player = RecordingAudioPlayer(AudioPlaybackResult.Played)
+        // 反向闸（缓存键）：条目按「不含 rate」的键预置，传输层一旦被封装成必失败仍出声，
+        // 就说明缓存命中生效——rate 若被写进 PronunciationCacheKey，这次调用会未命中并触网即红。
+        val transport = RecordingTransport(AudioHttpResult.NetworkUnavailable)
+
+        assertIs<PronunciationResult.Played>(
+            provider(transport, player = player, cache = cache).speak("schedule", PronunciationAccent.American, false, 0.75f),
+        )
+        assertEquals(0.75f, player.lastRate)
+        assertNull(transport.request)
+    }
+
     private fun provider(
         transport: AudioHttpTransport = RecordingTransport(AudioHttpResult.Success(responseBody.copyOf())),
         secretStore: SecretStore = FakeSecretStore("secret".toCharArray()),
@@ -280,12 +314,14 @@ class MiMoPronunciationProviderTest {
     ) : AudioPlayer {
         var bytes: ByteArray? = null
         var format: String? = null
+        var lastRate: Float? = null
         var pauseCount = 0
         var resumeCount = 0
         var stopCount = 0
-        override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult {
+        override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult {
             this.bytes = bytes.copyOf()
             this.format = format
+            this.lastRate = rate
             return outcome
         }
         override fun pauseCurrentPlayback(): Boolean { pauseCount++; return pauseResult }

@@ -1058,4 +1058,38 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * v31 → v32：F3-02 语速偏好（决策 §2「语速=播放侧变速」）。照 v27 `autoSpeakOnCardReady`
+     * 加列先例：列名隐式驼峰 `speechRate`（Room 默认列名=字段名，蛇形会让 runMigrationsAndValidate
+     * 因缺列失败——任务书缺陷 #9 的裁决），`REAL NOT NULL DEFAULT 1.0` 给历史行回填倍速 1.0。
+     */
+    @Test
+    fun migrateV31ToV32_addsSpeechRateColumnWithBackfillWithoutLosingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 31).apply {
+            execSQL(
+                "INSERT INTO speech_preferences (preferenceId, selectedEngine, openAiProfileId, miMoProfileId, autoSpeakOnCardReady) " +
+                    "VALUES ('device', 'SystemTts', NULL, NULL, 1)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 32, true, AppDatabase.MIGRATION_31_32).apply {
+            query("SELECT autoSpeakOnCardReady, speechRate FROM speech_preferences WHERE preferenceId = 'device'").use { cursor ->
+                assertTrue("the v31 preference row must survive", cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
+                assertEquals(1.0f, cursor.getFloat(1), 0.0001f)
+            }
+            // 列序尾追 speechRate，与实体声明一致（PRAGMA 是 schema 校验之外的第二道闸）。
+            query("PRAGMA table_info(speech_preferences)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(
+                    listOf("preferenceId", "selectedEngine", "openAiProfileId", "miMoProfileId", "autoSpeakOnCardReady", "speechRate"),
+                    names,
+                )
+            }
+            close()
+        }
+    }
 }

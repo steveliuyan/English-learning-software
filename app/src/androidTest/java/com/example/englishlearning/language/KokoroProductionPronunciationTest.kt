@@ -241,16 +241,16 @@ class KokoroProductionPronunciationTest {
         var firstPlayback = true
         var cancelledAudio: ByteArray? = null
         val player = object : AudioPlayer {
-            override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult = coroutineScope {
+            override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult = coroutineScope {
                 if (firstPlayback) {
                     firstPlayback = false
                     cancelledAudio = bytes
                     // UNDISPATCHED 保证 MediaPlayer 已设置并开始异步准备后才通知测试取消。
-                    val playback = async(start = CoroutineStart.UNDISPATCHED) { androidPlayer.play(bytes, format) }
+                    val playback = async(start = CoroutineStart.UNDISPATCHED) { androidPlayer.play(bytes, format, rate) }
                     playbackStarted.complete(Unit)
                     playback.await()
                 } else {
-                    androidPlayer.play(bytes, format)
+                    androidPlayer.play(bytes, format, rate)
                 }
             }
         }
@@ -292,7 +292,7 @@ class KokoroProductionPronunciationTest {
     private class CapturingAudioPlayer(private val result: AudioPlaybackResult) : AudioPlayer {
         var received: ByteArray? = null
 
-        override suspend fun play(bytes: ByteArray, format: String): AudioPlaybackResult {
+        override suspend fun play(bytes: ByteArray, format: String, rate: Float): AudioPlaybackResult {
             received = bytes
             return result
         }

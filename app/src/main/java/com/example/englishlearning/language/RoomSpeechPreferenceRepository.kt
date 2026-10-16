@@ -42,6 +42,7 @@ class RoomSpeechPreferenceRepository(
         openAiProfileId = openAiProfileId,
         miMoProfileId = miMoProfileId,
         autoSpeakOnCardReady = autoSpeakOnCardReady,
+        speechRate = speechRate.coerceIn(0.5f, 2.0f),
     )
 
     private fun SpeechPreferenceEntity.toDomain(): SpeechPreference {
@@ -56,6 +57,7 @@ class RoomSpeechPreferenceRepository(
             openAiProfileId = openAiProfileId,
             miMoProfileId = miMoProfileId,
             autoSpeakOnCardReady = autoSpeakOnCardReady,
+            speechRate = speechRate.coerceIn(0.5f, 2.0f),
         )
     }
 }
