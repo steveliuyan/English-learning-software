@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -148,7 +149,7 @@ fun TodayPlanScreen(
                     onClick = onOpenSetup,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
+                        .heightIn(min = 54.dp)
                         .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
                         .testTag("today_plan_open_setup_entry")
                         .semantics { contentDescription = "调整词书与目标" },
@@ -198,7 +199,7 @@ fun TodayPlanScreen(
                 PillButton(
                     text = learningAction,
                     onClick = onStartLearning,
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                     testTag = "today_plan_start_learning",
                     contentDescription = learningAction,
                 )
@@ -207,7 +208,7 @@ fun TodayPlanScreen(
                     enabled = state.isUnlocked,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(46.dp)
+                        .heightIn(min = 48.dp)
                         .testTag("today_plan_open_reading")
                         .semantics { contentDescription = "阅读文章" },
                     shape = RoundedCornerShape(16.dp),
@@ -231,7 +232,7 @@ fun TodayPlanScreen(
                     onClick = onOpenLearningTools,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .heightIn(min = 50.dp)
                         .testTag("today_plan_learning_tools")
                         .semantics { contentDescription = "学习工具与设置" },
                     colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
@@ -240,7 +241,7 @@ fun TodayPlanScreen(
                     onClick = onOpenCheckIn,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .heightIn(min = 50.dp)
                         .testTag("today_plan_open_check_in")
                         .semantics { contentDescription = "查看打卡与成就" },
                     colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = Color(0xFF795B36)),
@@ -249,7 +250,7 @@ fun TodayPlanScreen(
                     onClick = onOpenLearningRecords,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .heightIn(min = 50.dp)
                         .testTag("today_plan_open_learning_records")
                         .semantics { contentDescription = "学习记录" },
                     colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = MintPrimaryDark),
@@ -258,14 +259,14 @@ fun TodayPlanScreen(
                     onClick = onOpenWordBookWords,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .heightIn(min = 50.dp)
                         .testTag("today_plan_open_wordbook_words")
                         .semantics { contentDescription = "词书单词" },
                     colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = MintPrimaryDark),
                 ) { Text("词书单词", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenVocabulary,
-                    modifier = Modifier.fillMaxWidth().height(50.dp).testTag("today_plan_open_vocabulary")
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).testTag("today_plan_open_vocabulary")
                         .semantics {
                             contentDescription = if (vocabularyCount == null) {
                                 "生词本"

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -102,7 +103,7 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
             Text(state.totalsText, color = MintPrimaryDark, modifier = Modifier.testTag("check_in_totals_text"))
             Text(state.streakText, color = MintTextMuted, modifier = Modifier.testTag("check_in_streak_text"))
             if (state.recentDays.isNotEmpty()) {
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp).height(88.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 88.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                     state.recentDays.forEachIndexed { index, day ->
                         val ratio = day.completionRatio
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -117,7 +118,7 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
     Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_week_chart")) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("本周学习", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Row(Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 120.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 state.week.take(7).forEachIndexed { index, day ->
                     val ratio = if (day.targetTaskCount > 0) (day.completedTaskCount.toFloat() / day.targetTaskCount).coerceIn(0f, 1f) else 0f
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -160,13 +161,13 @@ private fun MonthCalendar(days: List<DailyLearningStats>) {
             val cells = List(offset) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
             cells.chunked(7).forEach { week ->
                 Row(Modifier.fillMaxWidth()) { week.forEach { date ->
-                    Box(Modifier.weight(1f).height(34.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.weight(1f).heightIn(min = 34.dp), contentAlignment = Alignment.Center) {
                         if (date != null) {
                             val done = (byDate[date]?.completedTaskCount ?: 0) > 0
                             Text(date.dayOfMonth.toString(), color = if (done) DomainColors.Review.deep else MintTextMuted, fontWeight = if (done) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.semantics { contentDescription = if (done) "$date 已完成" else date.toString() })
                         }
                     }
-                }; repeat(7 - week.size) { Box(Modifier.weight(1f).height(34.dp)) } }
+                }; repeat(7 - week.size) { Box(Modifier.weight(1f).heightIn(min = 34.dp)) } }
             }
         }
     }

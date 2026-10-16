@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -81,7 +81,7 @@ fun WordAiQaScreen(
             onClick = onBack,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .heightIn(min = 50.dp)
                 .testTag("word_qa_back")
                 .semantics { contentDescription = "返回上一层" },
             shape = RoundedCornerShape(18.dp),
@@ -156,7 +156,7 @@ private fun QuestionChip(kind: WordQaKind, enabled: Boolean, onAsk: (WordQaKind)
         enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .testTag("word_qa_chip_${kind.name}")
             .semantics { contentDescription = "${kind.label}（问 AI）" },
         shape = RoundedCornerShape(18.dp),
@@ -203,7 +203,7 @@ private fun AnsweredContent(
         enabled = !saved,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .testTag("word_qa_save_note")
             .semantics { contentDescription = "保存为笔记" },
         shape = RoundedCornerShape(18.dp),

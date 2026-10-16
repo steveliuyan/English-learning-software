@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -150,7 +151,7 @@ fun AiFeatureScreen(
                     onClick = onOpenSettings,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                         .testTag("ai_feature_open_settings")
                         .semantics { contentDescription = "去配置 AI 服务" },
                     shape = RoundedCornerShape(14.dp),
@@ -160,7 +161,7 @@ fun AiFeatureScreen(
                     onClick = onOpenLearning,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .heightIn(min = 48.dp)
                         .border(1.dp, MintOutline, RoundedCornerShape(14.dp))
                         .testTag("ai_feature_open_learning")
                         .semantics { contentDescription = "回到今日学习" },

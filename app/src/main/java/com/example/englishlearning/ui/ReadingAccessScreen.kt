@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.ai.UserAction
@@ -199,7 +200,7 @@ private fun ReadyContent(
                 onClick = onOpenTodayArticle,
                 modifier = Modifier
                     .weight(1f)
-                    .height(54.dp)
+                    .heightIn(min = 54.dp)
                     .testTag("reading_open_today")
                     .semantics { contentDescription = "阅读今天的文章" },
                 shape = RoundedCornerShape(18.dp),
@@ -209,7 +210,7 @@ private fun ReadyContent(
                 onClick = onRegenerate,
                 modifier = Modifier
                     .weight(1f)
-                    .height(54.dp)
+                    .heightIn(min = 54.dp)
                     .testTag("reading_regenerate")
                     .semantics { contentDescription = "换一篇" },
                 shape = RoundedCornerShape(18.dp),
@@ -354,7 +355,7 @@ private fun FeedSection(feed: FeedUiState, onFetchFeedItem: (FeedItem) -> Unit) 
                         .semantics { contentDescription = "阅读外刊文章 ${item.title}" },
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                ) { Text(item.title, maxLines = 2) }
+                ) { Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis) }
             }
         }
     }
@@ -373,7 +374,7 @@ private val FetchFailure.label: String
 private fun SourceEntryButton(title: String, tag: String, description: String, onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(54.dp).testTag(tag).semantics { contentDescription = description },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag(tag).semantics { contentDescription = description },
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
     ) { Text(title, fontWeight = FontWeight.Bold) }
@@ -398,7 +399,7 @@ private fun TypeButton(type: ArticleType, enabled: Boolean, onSelectType: (Artic
     Button(
         onClick = { onSelectType(type) },
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(54.dp).testTag("reading_type_${type.name.lowercase()}").semantics { contentDescription = "${type.label}文章" },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag("reading_type_${type.name.lowercase()}").semantics { contentDescription = "${type.label}文章" },
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
@@ -413,7 +414,7 @@ private fun TypeButton(type: ArticleType, enabled: Boolean, onSelectType: (Artic
 private fun HistoryButton(onOpenHistory: () -> Unit, historyCount: Int? = null) {
     Button(
         onClick = onOpenHistory,
-        modifier = Modifier.fillMaxWidth().height(54.dp).border(1.dp, MintOutline, RoundedCornerShape(18.dp)).testTag("reading_history_entry").semantics { contentDescription = "本地阅读历史" },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).border(1.dp, MintOutline, RoundedCornerShape(18.dp)).testTag("reading_history_entry").semantics { contentDescription = "本地阅读历史" },
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
     ) { Text(if (historyCount == null) "查看本地阅读历史" else "查看本地阅读历史（$historyCount）", fontWeight = FontWeight.Bold) }

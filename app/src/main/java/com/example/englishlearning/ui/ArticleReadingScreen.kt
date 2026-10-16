@@ -1,12 +1,13 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -219,7 +220,11 @@ fun ArticleReadingScreen(
 
         SourceHeader(current.article)
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // F5-03 / Task 11：三个模式 chip 在特大字号下会超出屏宽，横向可滚动避免裁切。
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ModeChip("英文优先", ArticleDisplayMode.ENGLISH_FIRST, "article_mode_english_first", current.mode, onModeChange)
             ModeChip("双语", ArticleDisplayMode.BILINGUAL, "article_mode_bilingual", current.mode, onModeChange)
             ModeChip("全文对照", ArticleDisplayMode.FULL_TRANSLATION, "article_mode_full_translation", current.mode, onModeChange)
@@ -274,7 +279,7 @@ fun ArticleReadingScreen(
         Button(
             onClick = onCompleteReading,
             enabled = !current.completed,
-            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("article_complete_reading"),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("article_complete_reading"),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (current.completed) MintSurface else MintPrimary,
                 contentColor = MintPrimaryDark,
@@ -283,7 +288,8 @@ fun ArticleReadingScreen(
 
         if (current.uncoveredLemmas.isNotEmpty()) {
             Text("未覆盖词", fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.testTag("article_uncovered"))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // F5-03 / Task 11：未覆盖词 chip 数量不定，横向排布在动态字体下必然溢出 → 改 FlowRow 换行。
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 current.uncoveredLemmas.forEach { lemma ->
                     val card = current.cards.firstOrNull { it.lemma == lemma || it.cardId == lemma }
                     AssistChip(

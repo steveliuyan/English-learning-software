@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -109,7 +109,7 @@ fun ArticleImportScreen(
         Button(
             onClick = onImport,
             enabled = !state.submitting,
-            modifier = Modifier.fillMaxWidth().height(54.dp).testTag("import_submit").semantics { contentDescription = "导入并阅读" },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag("import_submit").semantics { contentDescription = "导入并阅读" },
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
         ) { Text("导入并阅读", fontWeight = FontWeight.Bold) }
