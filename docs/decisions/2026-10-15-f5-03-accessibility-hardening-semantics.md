@@ -46,6 +46,20 @@ F5-03 的深色与 TalkBack 条款在 AC 矩阵与验证文档中如实标注「
 - **已接受限制**：系统 TTS 的 `Played` 是「提交成功」粒度（引擎无逐句完成回调接入），
   暂停按钮仅在 Playing/Paused 窗口呈现；TTS 播完后暂停不可达属引擎限制，
   真机 TalkBack 表现归设备 QA 第三轮取证。
+- **平台事实与暂停按钮呈现（Task 7 取证，Task 9 消费）**：
+  `android.speech.tts.TextToSpeech` 在 compileSdk 34/35/36 的 `android.jar` 中**没有公开 `pause()/resume()`**
+  （只有 `stop()`；javap + 编译错误双向取证），因此 `AndroidTextToSpeechEngine.pause()/resume()` 如实返回 `false`。
+  由此修正 §2 早先「靠返回值自然降级」的隐含假设：**UI 不得只依赖 `pausePlayback()` 返回值决定按钮呈现**——
+  按计划的状态机，系统 TTS 下点「暂停」会落 `else → Idle`，按钮组随之消失，而朗读仍在继续且用户失去可用的「停止」。
+  裁决=词卡/详情/阅读页三处的**暂停-继续按钮以「选中引擎 ≠ SystemTts」为呈现条件**（能力判断走 UI 侧引擎选择，
+  非 provider 返回值）；系统 TTS 下只呈现「停止」。若后续把系统 TTS 改为 `synthesizeToFile()` + `MediaPlayer` 播放，
+  播控落回 `AudioPlayer` 一侧，届时解除该呈现条件即可，接口签名不变。
+  该呈现收窄已登记 QA 第三轮（TalkBack 下「只有停止按钮」的可理解性）。
+- **一次会话句柄约定（Task 7 修复的既有缺陷）**：`AndroidAudioPlayer` 只跟踪一个当前会话，
+  新的 `play()` 在安装新句柄前必须先用与「用户停止」同一口径的 `retireCurrentSession()` 收口旧会话
+  （旧续程以 `Played` 立即返回、旧 `MediaPlayer` 立即 release）。
+  否则「暂停中播放下一句」会让上一次的 `speak()` 永久挂起（学习流卡在 Playing）并泄漏上一个播放器。
+  该保护只有设备可证（JVM 无法加载 `MediaPlayer`），取证在 connected `AndroidAudioPlayerControlsTest`。
 - 四控 UI 落点 = 学习流词卡、词卡详情、阅读页三处（`PronunciationControls` 形态的暂停/继续+停止
   按钮组随状态呈现；重播=原喇叭/发音按钮再点）。收藏浮层/查词浮点等一次性浏览发音不加控件组，
   Provider 边界已统一暴露能力即满足 F3-02 首条。
@@ -92,9 +106,12 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
 
 ### 6. 测试与门禁口径
 
-- 门禁仍是 JVM 单测全绿（基线 1396 只增不减）；契约/Router/Provider/状态/VM 全部 JVM TDD 先红。
+- 门禁仍是 JVM 单测全绿（基线只增不减；计划写下时为 1396，Task 1–7 落地后实测 **1445**，以每任务实测值为准）；
+  契约/Router/Provider/状态/VM 全部 JVM TDD 先红。
 - Compose 语义断言进 androidTest（connected），按 `android-connected-qa-loop` 的
-  `adb install -r` + `am instrument` 在 emulator-5576 实跑（禁 connectedDebugAndroidTest）；
+  `adb install -r` + `am instrument` 实跑（禁 connectedDebugAndroidTest）；
+  **设备口径更正**：计划原文写的 `emulator-5576` 本机当前没起，实际一律锁 `ANDROID_SERIAL=emulator-5574`
+  （API 30）。真机 `bf353dda` 只做 `adb install -r` 供用户手工走查，**绝不在真机跑 `am instrument`**。
   `AppScreenTest` 已知 8 个 back/导航族 flaky 以基线对照法判定，不当回归。
 - Room v31→v32 迁移测试加进 `AppDatabaseMigrationTest`（androidTest，带旧行回填断言）。
 - 收口时矩阵 AC5-03 行升级为「代码侧完成 + connected 语义断言 + 设备走查待 QA 第三轮」口径，
