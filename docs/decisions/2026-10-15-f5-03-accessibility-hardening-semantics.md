@@ -62,6 +62,14 @@ F5-03 的深色与 TalkBack 条款在 AC 矩阵与验证文档中如实标注「
   非 provider 返回值）；系统 TTS 下只呈现「停止」。若后续把系统 TTS 改为 `synthesizeToFile()` + `MediaPlayer` 播放，
   播控落回 `AudioPlayer` 一侧，届时解除该呈现条件即可，接口签名不变。
   该呈现收窄已登记 QA 第三轮（TalkBack 下「只有停止按钮」的可理解性）。
+- **播控失败的状态机口径（Task 9 评审后裁决）**：`onPauseResume` 在「暂停/继续未被引擎接受」时
+  **保持原状态不变**（仍 `Playing` 就继续显示 `Playing`，仍 `Paused` 就继续显示 `Paused`），
+  **不得**落到 `Idle`——落 `Idle` 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失，
+  与上一条「停止始终可达」的立论相悖。计划原文五处 `else -> PronunciationStatus.Idle` 按本条修正；
+  「停止」按钮的呈现条件因此只取决于 `Playing || Paused`，与暂停是否可用无关。
+  已知限制（同条裁决登记）：词形发音恒走 Kokoro（`activeProvider` 与选中引擎无关），
+  故「选中引擎 ≠ SystemTts」这一呈现条件会让系统 TTS 用户在词卡上看不到本可工作的暂停——
+  按字面执行、代价可接受，留待将来引入 provider 能力探测时解除。
 - **一次会话句柄约定（Task 7 修复的既有缺陷）**：`AndroidAudioPlayer` 只跟踪一个当前会话，
   新的 `play()` 在安装新句柄前必须先用与「用户停止」同一口径的 `retireCurrentSession()` 收口旧会话
   （旧续程以 `Played` 立即返回、旧 `MediaPlayer` 立即 release）。
@@ -99,8 +107,11 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
 - 底部导航 `TabSlot` 与学习记录 `Tab`：`role = Role.Tab` + `stateDescription` 选中态。
 - 展开组件（许可 NoticeCard、阅读历史版本组）：`stateDescription = 已展开/已收起`。
 - Slider：contentDescription 动态带上当前值（「每日新词目标，当前 N 词」）。
-- liveRegion：词卡 `submitting`/发音状态文字、阅读页发音状态文字节点加
-  `liveRegion = LiveRegionMode.Polite`（节点仅在状态存在时组合，属尽力而为；真机播报归设备 QA 取证）。
+- liveRegion：词卡 `submitting`/发音状态文字与**阅读页发音状态文字**一律挂在**常驻容器**上
+  （Task 6 判例：live region 必须一直存在于组合中、靠子节点进出触发播报；把 `liveRegion`
+  配在随文案进出组合的瞬时节点上，节点不存在时没有任何东西可宣告，等于没配。
+  早期草稿的「瞬时节点 + 尽力而为」口径作废，改按容器形状统一实现，瞬时子节点自身不得再带 `liveRegion`）。
+  代价=容器空态时外层 `spacedBy` 会多出已知间距（归 UI 重设计轮）；真机 TalkBack 播报仍归设备 QA 取证。
 - 揭晓焦点：释义由隐藏→可见的**转变**时 `FocusRequester.requestFocus()`（初始即已揭晓不抢焦点），
   全仓首个焦点顺序改动，`runCatching` 防未挂载异常。
 
