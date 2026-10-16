@@ -7,7 +7,7 @@
 ## 0. 结论口径（红线，不得越界）
 
 - **AC5-03 = 代码侧完成 + connected 语义断言；设备 TalkBack 走查归 `docs/handoff/2026-10-15-qa-round3-task.md` 第三轮任务书。设备轮未完成前，本文档与矩阵一律不得宣称「AC5-03 全绿 / 已验证」。**
-- 触控：8 个站点中**代码侧 7 站达成 48dp**、真正**有 connected 尺寸断言且全绿的只有 6 站**（站点 1/2/3/5/6/7）；第 4 站词书字母 Rail 显式豁免（命中区 ≈24×13dp，纵向未铺满整槽；代偿=整槽内命中 + 整轨拖动）；第 8 站 Favorites/WrongWords 返回链**只作代码级 `.defaultMinSize`，两屏无 connected 测试类、零设备取证**（`L-T11-4 / D-8`）。**禁止**读作「触控全部达标」「7 站均有设备级断言」或「命中区铺满整槽」。
+- 触控：8 个站点中**代码侧 7 站达成 48dp**、真正**有 connected 尺寸断言且全绿的只有 6 站**（站点 1/2/3/5/6/7，类名逐站配对见 §5）；第 4 站词书字母 Rail 显式豁免（命中区 ≈24×13dp，纵向未铺满整槽；代偿=整槽内命中 + 整轨拖动）；第 8 站 Favorites/WrongWords 返回链**只作代码级 `.defaultMinSize`，两屏无 connected 测试类、零设备取证**（`L-T11-4 / D-8`）。**禁止**读作「触控全部达标」「7 站均有设备级断言」或「命中区铺满整槽」。
 - 动态字体：护栏钉「不为 0 宽 + 链接可达 + 高度有下限」，**不宣称「大字号不破版」**；三处 `fillMaxWidth().horizontalScroll()` 取证为版面 no-op，**禁止**读作「头部溢出已由 T11 修复」。
 - liveRegion 容器反证（Task 10 M-6「删容器必红」RED 留痕）**未跑**，收口口径=**静态闭合**（评审 §③ 已封掉四种伪修形状），本文档如实写「未跑反证、静态闭合」，不写「已 RED 取证」。
 
@@ -79,7 +79,7 @@
 
 ## 5. 触控 48dp 批（决策 §5，Task 10）
 
-**代码侧 7/8 站点达成 48dp；connected 尺寸断言只覆盖其中 6 站**：`42a43ae`（48dp 8 站点）→ `1ad0cdd`（N-4 详情页容器）→ `d62c36b`（N-1/N-2/N-3）。connected 尺寸断言 6 类全绿（对应站点 1/2/3/5/6/7）：`CardDetailScreenTest` / `WordCardScreenTest` / `WordBookWordsScreenTest` / `CheckInScreenTest` / `LearningRecordsScreenTest` / `LicensesScreenTest`。六站点走过「main 文件整批退回 `0c014cb` 观察 RED 32.0–36.19dp → checkout 还原转绿」。
+**代码侧 7/8 站点达成 48dp；connected 尺寸断言只覆盖其中 6 站**：`42a43ae`（48dp 8 站点）→ `1ad0cdd`（N-4 详情页容器）→ `d62c36b`（N-1/N-2/N-3）。connected 尺寸断言 6 类全绿；**类名与站点号逐站配对（按 `task-10-report.md` §1–§8 的站点账，勿按本句罗列顺序逐位对读）**：站点 1 WordCard 喇叭 → `WordCardScreenTest`、站点 2 CardDetail 喇叭 → `CardDetailScreenTest`、站点 3 WordBookWords 返回链 → `WordBookWordsScreenTest`、站点 5 LearningRecords 返回链 → `LearningRecordsScreenTest`、站点 6 Licenses `‹` → `LicensesScreenTest`、站点 7 CheckIn 三链接 → `CheckInScreenTest`。站点 4（字母 Rail，显式豁免）与站点 8（Favorites/WrongWords，零取证）不在此集合。六站点走过「main 文件整批退回 `0c014cb` 观察 RED 32.0–36.19dp → checkout 还原转绿」。
 
 **站点 8 的缺口必须单独记账（终审 C 的 IM-2）**：站点 8 = Favorites / WrongWords 返回链
 （`FavoritesScreen.kt:78` / `WrongWordsScreen.kt:70`）本轮**只加代码级 `.defaultMinSize(48.dp)`**，

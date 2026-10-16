@@ -7,7 +7,7 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 ## 2. 完成了什么
 
 - 改写 `docs/verification/ac-traceability-matrix.md` AC5-03 行为「代码侧完成」明细：语义批五个 JVM 契约类、四控接口与 UI、触控/动态字体批提交哈希、connected 21 类 266 例结果、字母栏 7/8 达成 + Rail 显式豁免口径；设备走查红线**按原意保留并收紧**（矩阵原文「待设备轮执行，未验证前不得升级为「已验证」」→ 现文「待设备轮执行，未完成不得宣称 AC5-03 全绿」；限制句位置与语义不变，非逐字照抄）；改后 `verifyAcTraceabilityMatrix` 复跑仍绿。
-- 新建 `docs/verification/f5-03-accessibility-hardening-2026-10.md`（§0–§10 共 11 个主节 + 5 个二级节）：三禁令契约、四控语义与限制、liveRegion 三容器与 `spacedBy` 代价、Canvas/固定高保留清单、普查盲区账、connected 全清单逐类命令与末行、门禁三条命令原文与末行、设备侧 TODO-USER、交下来的账。
+- 新建 `docs/verification/f5-03-accessibility-hardening-2026-10.md`（§0–§10 主节 + §1.1/§6.1–6.3/§7.1–7.3 二级节；节数会随补记变化，不复述计数）：三禁令契约、四控语义与限制、liveRegion 三容器与 `spacedBy` 代价、Canvas/固定高保留清单、普查盲区账、connected 全清单逐类命令与末行、门禁三条命令原文与末行、设备侧 TODO-USER、交下来的账。
 - 本工作报告（按 `docs/handoff/REPORT-TEMPLATE.md` 七节）。
 - 增补 `docs/handoff/2026-10-15-qa-round3-task.md` §3：把 F5-03 攒下的设备项追加进去（只增不改原有条目）。
 - 生产码 / 测试码零改动；改动面仅上述四个文档文件。
