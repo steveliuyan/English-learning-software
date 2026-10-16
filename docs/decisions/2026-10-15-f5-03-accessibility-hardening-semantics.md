@@ -122,6 +122,17 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
 
 - 48dp：小触控件加 `Modifier.minimumInteractiveComponentSize()`（发音喇叭两处、字母栏）；
   文字链接「‹/← 返回/返回」加 `defaultMinSize(48.dp)`；TodayPlan 46dp 按钮并入高度改造。
+  - **字母栏豁免注记（Task 10 实现后回写，评审 I-2）**：本条「字母栏加 `minimumInteractiveComponentSize()`」
+    **未实施**，属算术不可达而非漏改——词书字母 Rail 常驻 26 槽、`slotPixels = min(18dp, maxHeight/26)`，
+    26×48dp=1248dp 超屏高，且相邻 48dp 方形目标必然重叠、会抢走相邻字母的 tap
+    （实测：加该修饰符后既有用例 `tappingTheActualRailSlotUsesTheLetterClickAction` 转红）。
+    代偿口径=命中区**覆盖槽心、不越出整槽、不与相邻字母重叠**（护栏
+    `WordBookWordsScreenTest.railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre`），
+    整轨拖动（`pointerInput`）为等效输入路径；
+    **注意现状命中区 ≈24×13dp（槽 24×18dp），纵向并未铺满整槽**——该站本轮**零行为改动**，
+    护栏钉的是既有性质、只防退化不推改善，不得读成「已按整槽收口」。
+    真正 48dp 需让轨道可滚动/分页/减少常驻数，属信息架构级改动 → **归 UI 重设计轮**（先改 Spec 再实施）。
+    矩阵登记口径见 `docs/verification/f5-03-accessibility-hardening-2026-10.md` 的触控节。
 - 动态字体：按钮/卡片容器固定 `height(N.dp)` → `heightIn(min = N.dp)`（逐点清单见计划 Task 11）；
   Canvas 图表保留固定高（绘制几何），但日历单元 `height(34.dp)` → `heightIn(min = 34.dp)`；
   chip 行加 `horizontalScroll`；`maxLines` 处补 `overflow = TextOverflow.Ellipsis`。
