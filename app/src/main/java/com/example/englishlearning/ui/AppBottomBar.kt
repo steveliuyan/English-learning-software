@@ -46,7 +46,8 @@ import com.example.englishlearning.ui.theme.MintSurface
  * 图标用 [Canvas] 自绘而不是引图标库：项目开启了 `dependencyLocking`，为四个字形引入
  * material-icons-extended 会连带改动锁文件，代价远大于收益。
  *
- * 高度固定 64dp 内容区，再叠 [navigationBarsPadding]，保证三大金刚键/手势条不压住文字。
+ * 内容区高度**下限** 64dp（F5-03 Task 11：`heightIn(min = 64.dp)`，大字号下可增高不裁字），
+ * 再叠 [navigationBarsPadding]，保证三大金刚键/手势条不压住文字。
  */
 @Composable
 fun AppBottomBar(

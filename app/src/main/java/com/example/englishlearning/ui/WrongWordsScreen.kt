@@ -53,8 +53,10 @@ fun WrongWordsScreen(
             .testTag("wrong_words_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // F5-03 / Task 11（§E.2，Task 10 评审 I-4）：头部 Row 补横向滚动，使大字号下超出屏宽的
-        // 返回链仍可滚进视口；顺序照 CheckInScreen.kt（fillMaxWidth 在前，几何零变化，取证见该处注释）。
+        // F5-03 / Task 11（§E.2，Task 10 评审 I-4）：头部 Row 带 `fillMaxWidth()` 在前的 `horizontalScroll`。
+        // 取证（Task 11 评审 I-1）：该顺序**不产生滚动范围**，本轮未据此宣称「返回链可滚进视口」已成立；
+        // 留着它只钉住修饰符顺序（反序会把 weight(1f) 标题挤成 0 宽）。真实修法归 UI 重设计轮（L-T11-1），
+        // 逐位取证见 CheckInScreen.kt 的同处注释。
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             Text(
                 "错词本",

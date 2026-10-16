@@ -63,12 +63,14 @@ fun CheckInScreen(
         modifier = Modifier.fillMaxSize().background(MintBackground).verticalScroll(rememberScrollState()).padding(20.dp).testTag("check_in_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // F5-03 / Task 11（§E.2，Task 10 评审 I-4）：头部 Row 补横向滚动，把「三条 48dp 文字链在大字号下
-        // 超出屏宽、尾部不可达」变成可滚可达。修饰符顺序必须是 fillMaxWidth() 在前、horizontalScroll 在后：
-        // 设备实测（emulator-5574，fontScale=2.0）该顺序下头部几何与加滚动前逐位相同
-        // （标题 DpRect(20.190475..98.666664)），即正常档零视觉变化；反过来写
-        // horizontalScroll().fillMaxWidth() 会让标题的 weight(1f) 在无界约束下塌成 0 宽
-        // （实测 DpRect(left=right=20.190475)），属回归，已排除。
+        // F5-03 / Task 11（§E.2，Task 10 评审 I-4；Task 11 评审 I-1 订正本注释口径）：
+        // 本 Row 保留 `fillMaxWidth()` 在前的 `horizontalScroll`，但**取证表明该顺序不产生滚动范围**——
+        // 加/不加滚动时头部边界逐位相同（标题 DpRect(20.190475..98.666664)，emulator-5574 fontScale=2.0），
+        // 摘掉滚动后三条链仍可达（P4 实测仍绿），即「可滚可达」的效果本轮**没有取得**，不得据此认为溢出已收口。
+        // 留着它只为钉住**修饰符顺序**：反写成 horizontalScroll().fillMaxWidth() 会让标题的 weight(1f)
+        // 在无界约束下塌成 0 宽（实测 DpRect(left=right=20.190475)，P3 必红），属回归。
+        // 真实的大字号症状是标题被 weight(1f) 压到 78.48dp 换行，`horizontalScroll` 修不了它 → 归 UI 重设计轮（L-T11-1）。
+        // 护栏见 `CheckInScreenTest` 的 fontScale=2.0 用例（该护栏不钉本修饰符的存在性）。
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             // F5-03 / Task 10：三条文字链原来只有 padding(10.dp)（实测 36.19dp 高，不足 48dp 触控下限），
             // 一律在 clickable 之前补 defaultMinSize(48.dp)；padding 与 testTag/semantics 链保持原样。
