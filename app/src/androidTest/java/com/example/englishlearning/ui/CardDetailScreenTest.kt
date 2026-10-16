@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.text.AnnotatedString
 import kotlin.jvm.functions.Function1
 import androidx.compose.ui.text.font.FontWeight
@@ -288,6 +289,8 @@ class CardDetailScreenTest {
             Function0::class.java,
             Function1::class.java,
             Boolean::class.javaObjectType,
+            // 原始/装箱 Boolean 均为无障碍呈现开关（播控组是否渲染、暂停是否可用），不承载任何业务实体。
+            Boolean::class.javaPrimitiveType,
             List::class.java,
             WordAiNote::class.java,
             PronunciationStatus::class.java,
@@ -432,6 +435,12 @@ class CardDetailScreenTest {
         // 顶部入口按钮已废弃：避免两个入口。
         composeRule.onNodeWithTag("card_detail_notes_entry").assertDoesNotExist()
         // 展示栏位于例句框下方（阅读顺序契约）。
+        // I-7（Task 9 评审）：本分支无障碍批改动后页面整体高于一屏，笔记栏落在首屏外时
+        // boundsInRoot 会被滚动容器裁剪成空矩形（top 归 0），位置比较即失真。按 T8 先例
+        // （SpeechSettingsScreenTest:424 补 performScrollTo 锚点）先把目标滚入首屏再比较，
+        // 断言本身一字未削弱。
+        composeRule.onNodeWithTag("card_detail_notes_section").performScrollTo()
+        composeRule.waitForIdle()
         val exampleTop = composeRule.onNodeWithTag("card_detail_example").fetchSemanticsNode().boundsInRoot.top
         val notesTop = composeRule.onNodeWithTag("card_detail_notes_section").fetchSemanticsNode().boundsInRoot.top
         assertTrue("我的笔记展示栏应在例句下方", notesTop > exampleTop)
@@ -455,7 +464,9 @@ class CardDetailScreenTest {
         }
 
         composeRule.onNodeWithTag("card_detail_notes_section").assertExists()
-        composeRule.onNodeWithTag("card_detail_notes_manage").performClick()
+        // I-7 同上（T8 先例锚点）：屏外节点的 performClick 会落到空矩形的中心（屏幕左上角），
+        // 弹窗根本不会被打开——先滚入首屏再点。
+        composeRule.onNodeWithTag("card_detail_notes_manage").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("card_detail_notes_empty").assertExists()
         composeRule.onNodeWithTag("card_detail_personal_note_input").assertExists()

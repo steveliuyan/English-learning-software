@@ -112,18 +112,37 @@ fun ArticleReadingScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
             ) { Text("发音") }
         }
-        // F3-02 整篇朗读的状态文字 + 播控组（决策 §2：暂停/继续只在 Playing/Paused 窗口呈现，
-        // 且呈现条件按「选中引擎 ≠ SystemTts」收窄；停止在系统 TTS 下同样可用，照常给）。
-        // 发音按钮再点即重播（系统 TTS QUEUE_FLUSH / 音频路径重走播放），不另设重播按钮。
-        pronunciationMessage?.let { message ->
-            Text(
-                text = message,
-                color = MintTextMuted,
-                modifier = Modifier
-                    .testTag("article_pronunciation_message")
-                    .semantics { contentDescription = message; liveRegion = LiveRegionMode.Polite },
-            )
+        // F3-02 整篇朗读的状态文字与播控组**必须**位于空态早退之后（Task 9 评审 I-2）：
+        // 空态（「正在加载…」）不得组合出消息文字与播控行。发音按钮再点即重播
+        // （系统 TTS QUEUE_FLUSH / 音频路径重走播放），不另设重播按钮。
+        val current = state
+        if (current == null) {
+            Text("正在加载…", color = MintTextMuted)
+            return@Column
         }
+
+        // F5-03 决策 §4（Task 9 修复轮 I-4，controller 裁决）：live region 必须常驻，
+        // 靠子节点进出触发播报（Task 6 判例 WordCardScreen.word_card_status_live_region）。
+        // ①tag `article_pronunciation_message` 留在瞬时 Text 上（tag 口径不动，既有引用不破）；
+        // ②liveRegion 只在容器上，瞬时子节点不得再带；③播控 Row 保持在容器之外（B1 口径）。
+        // 已知代价：容器空态仍占外层 spacedBy 一份幽灵间距——归 UI 重设计轮，不改本轮外层布局。
+        Column(
+            modifier = Modifier
+                .testTag("article_status_live_region")
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            pronunciationMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = MintTextMuted,
+                    modifier = Modifier
+                        .testTag("article_pronunciation_message")
+                        .semantics { contentDescription = message },
+                )
+            }
+        }
+        // 决策 §2：暂停/继续只在 Playing/Paused 窗口呈现，呈现条件按「选中引擎 ≠ SystemTts」收窄
+        // （裁决 B2）；停止在系统 TTS 下同样可用，照常给。
         val speakingOrPaused =
             pronunciationStatus == PronunciationStatus.Playing || pronunciationStatus == PronunciationStatus.Paused
         if (speakingOrPaused) {
@@ -143,12 +162,6 @@ fun ArticleReadingScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
                 ) { Text("停止") }
             }
-        }
-
-        val current = state
-        if (current == null) {
-            Text("正在加载…", color = MintTextMuted)
-            return@Column
         }
 
         // F3-01B：进文覆盖词弹窗——每篇文章首次打开显示一次。coveredLemmas 是文章自带

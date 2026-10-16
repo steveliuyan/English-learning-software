@@ -3,7 +3,9 @@ package com.example.englishlearning.ui
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -83,6 +85,11 @@ class WordCardPronunciationControlsTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("word_card_pronunciation_toggle").assertIsDisplayed()
         composeRule.onNodeWithTag("word_card_pronunciation_stop").assertIsDisplayed()
+        // M-1（B1 口径的证伪力）：播控组必须**在** liveRegion 常驻容器**之外**——Playing 且无瞬时
+        // 文案时容器仍空。若有人把按钮组挪进 `word_card_status_live_region`，读屏会把「暂停/停止」
+        // 念成状态播报的一部分，这里的孩子数即红。（此前只在 Idle 态借 WordCardRevealFocusTest:88
+        // 背书，但 Idle 下按钮组根本不组合，证伪力为零。）
+        composeRule.onNodeWithTag("word_card_status_live_region").onChildren().assertCountEquals(0)
 
         // 暂停：委托恰好一次，宿主把状态改成 Paused 后按钮文案翻成「继续播放发音」。
         composeRule.onNodeWithTag("word_card_pronunciation_toggle").performClick()

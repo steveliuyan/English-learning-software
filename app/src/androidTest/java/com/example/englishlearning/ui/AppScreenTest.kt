@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import android.view.KeyEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -336,8 +337,10 @@ class AppScreenTest {
      * 被整条删掉，屏级用例照旧全绿，用户点语速却永远不变）。本用例走真实宿主，
      * 断言因此落在这条接线上：删掉它本用例必须红（Task 9 报告的删行探针即以此取证）。
      *
-     * 「恰好一次点按前进一档」同时钉住两件事：值来自持久化偏好（初始 1x，不是写死的字符串）、
-     * 一次点按只提交一次循环（若宿主或屏幕重复派发，会直接跳到 1.5x）。
+     * 「恰好一次点按前进一档」钉的是宿主接线：`AppScreen` 把 `onCycleSpeechRate` 接到
+     * `viewModel::cycleSpeechRate`，且每次一点只前进一步（持久化本身由
+     * `SpeechSettingsViewModelTest` 覆盖——本 fixture 的偏好仓储 `save` 是空实现，不能在这里
+     * 声称「值来自持久化偏好」）。若宿主或屏幕重复派发，会直接跳到 1.5x。
      * 四档循环口径 {0.75x, 1.0x, 1.25x, 1.5x} 见决策 2026-10-15 §2。
      */
     @Test
@@ -655,6 +658,264 @@ class AppScreenTest {
         }
         assertEquals(listOf("apple"), provider.spokenTexts)
         composeRule.onNodeWithText("private endpoint", substring = true).assertDoesNotExist()
+    }
+
+    // ------------------------------------------------------ Task 9 修复轮 1：发音清场与失败保持（I-1/I-2/I-3/I-5/I-6）
+
+    /**
+     * I-1：退出学习流（exitLearning）必须清零词卡发音状态。
+     * 复现路径：点喇叭播一个挂起音 → 返回今日计划 → 再点「开始学习」。
+     * 旧形状里 exitLearning 只清 message 不清 status（仍 Playing），新卡会立刻长出「暂停/停止」行、
+     * 但文案节点不出现（message 已 null）——读屏用户听到的是上一张卡的状态语义。
+     * 备注：Ready 首卡没有「返回今日计划」按钮（WordCardScreen 只在 NoCards/ReviewCompleted/AllDone
+     * 给该按钮），退出走系统返回 → BackHandler(showLearning) → 同一个 exitLearning，路径等价。
+     */
+    @Test
+    fun leavingAndReenteringLearningClearsTheWordCardPronunciationState() {
+        val provider = HangingPronunciationProvider()
+        val speech = speechFixture(autoSpeakOnCardReady = false)
+        composeRule.setContent {
+            readyAppScreen(pronunciationProvider = provider, speechSettingsViewModel = speech.speech)
+        }
+        createProfile()
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_speak").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_pronunciation_stop").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_pronunciation_toggle").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_pronunciation_stop").assertDoesNotExist()
+        composeRule.onNodeWithText("正在播放发音…").assertDoesNotExist()
+        provider.release()
+    }
+
+    /**
+     * I-2：阅读页三元组（message/status/request）在**任何**退出路径都必须清场。
+     * 三条路径逐一验证：①屏内「返回」按钮（onBack）；②系统返回退今日文章
+     * （BackHandler readingTarget → closeArticle）；③系统返回退历史旧版（BackHandler historyArticle）。
+     * 旧形状里三条全不清：重进文章（或另一篇）立刻长出上一次的播控行与文案，且代次不自增还挡不住
+     * 迟到的 Played。每轮清场后重进都断三个 tag 不存在。
+     */
+    @Test
+    fun leavingTheArticleThroughEveryExitPathClearsItsPronunciationPresentation() {
+        val provider = HangingPronunciationProvider()
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                pronunciationProvider = provider,
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_open_today").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 轮 1：屏内「返回」按钮退出。
+        openTodayArticle()
+        speakArticleAndAwaitControls()
+        composeRule.onNodeWithText("返回").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        openTodayArticle()
+        assertNoArticlePronunciationNodes()
+
+        // 轮 2：系统返回键退今日文章（BackHandler :493 closeArticle 分支）。
+        speakArticleAndAwaitControls()
+        pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        openTodayArticle()
+        assertNoArticlePronunciationNodes()
+
+        // 轮 3：先退出仍开着的文章，再走历史旧版（historyArticle）用系统返回退出
+        // （BackHandler :489 分支）。
+        pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("reading_history_entry").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_history_item_a1").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("reading_history_item_a1").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        speakArticleAndAwaitControls()
+        pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_history_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("reading_history_item_a1").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        assertNoArticlePronunciationNodes()
+        provider.release()
+    }
+
+    /** 今日文章入口：开文章并关掉进文覆盖词弹窗（弹窗每次进组合都会重弹，见 rememberSaveable 口径）。 */
+    private fun openTodayArticle() {
+        composeRule.onNodeWithTag("reading_open_today").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+    }
+
+    /** 点「发音」朗读整篇（挂起 provider 钉住 Playing），直到瞬时消息节点出现。 */
+    private fun speakArticleAndAwaitControls() {
+        composeRule.onNodeWithTag("article_pronunciation").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_pronunciation_message").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun assertNoArticlePronunciationNodes() {
+        composeRule.onNodeWithTag("article_pronunciation_message").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_pronunciation_toggle").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_pronunciation_stop").assertDoesNotExist()
+    }
+
+    /**
+     * I-3：系统返回键关闭阅读生词详情时必须清**共享详情状态**（detailPronunciation*）。
+     * 屏内 onBack/onNext 与记录宿主都清了，唯独 BackHandler(selectedArticleCard) 漏了。
+     * 「另一处详情」选学习流宿主：记录/词书宿主打开详情时会顺手复位（掩盖缺陷），
+     * 学习流详情则是纯消费者——旧形状下它会把上一词残留的 Playing 原样端出来。
+     */
+    @Test
+    fun systemBackClosingAReadingWordDetailClearsTheSharedDetailPronunciationState() {
+        val provider = HangingPronunciationProvider()
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                pronunciationProvider = provider,
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        openReadingWordDetail()
+        composeRule.onNodeWithContentDescription("播放 apple 发音").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_pronunciation_message").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 系统返回键关详情（BackHandler :494——本轮修复的收口点）。
+        pressSystemBack()
+        composeRule.onNodeWithTag("card_detail_screen").assertDoesNotExist()
+
+        // 退文章 → 今日计划 → 进学习流，提交一张卡打开「下一处详情」（学习流宿主）。
+        pressSystemBack()
+        composeRule.onNodeWithTag("app_tab_learning").performClick()
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_feedback_fuzzy").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_feedback_fuzzy").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("card_detail_pronunciation_toggle").assertDoesNotExist()
+        composeRule.onNodeWithTag("card_detail_pronunciation_stop").assertDoesNotExist()
+        composeRule.onNodeWithTag("card_detail_pronunciation_message").assertDoesNotExist()
+        provider.release()
+    }
+
+    /**
+     * I-5（决策 §2「播控失败的状态机口径」）：暂停未被引擎接受（pausePlayback() 返回 false，
+     * 即系统 TTS 无公开 pause()/resume() 的平台事实）时状态必须**保持 Playing**——
+     * 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失，与「停止始终可达」相悖。
+     * 走真实宿主（AppScreen 词卡 onPauseResume）：旧形状 `else -> Idle` 下本用例必红。
+     * 说明：brief 曾允许「组件级 harness 复刻 when」，但 harness 复刻对 AppScreen 真实代码恒绿、
+     * 不具证伪力，按「必须 RED」的硬口径上收为宿主级用例。
+     */
+    @Test
+    fun aPauseRejectedByTheEngineKeepsPlayingSoStopStaysReachable() {
+        val provider = HangingPronunciationProvider()
+        val speech = speechFixture(autoSpeakOnCardReady = false)
+        composeRule.setContent {
+            readyAppScreen(pronunciationProvider = provider, speechSettingsViewModel = speech.speech)
+        }
+        createProfile()
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_speak").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_pronunciation_toggle").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 点暂停：provider.pausePlayback() 返回 false（未被引擎接受）→ 状态保持 Playing。
+        composeRule.onNodeWithTag("word_card_pronunciation_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("word_card_pronunciation_stop").assertIsDisplayed()
+        composeRule.onNodeWithTag("word_card_pronunciation_toggle").assertIsDisplayed()
+        composeRule.onNodeWithText("正在播放发音…").assertIsDisplayed()
+        provider.release()
+    }
+
+    /**
+     * I-6 宿主级接线钉：详情三宿主的 `pronunciationControlsEnabled = true` 之一（记录详情）+
+     * 停止收口。Playing 下播控组存在（MiMo 引擎 → 暂停可用），点停止后整组与文案离开组合、
+     * provider.stopPlayback 恰调用一次。
+     */
+    @Test
+    fun hostedRecordDetailShowsControlsWhilePlayingAndStopClosesTheGroup() {
+        val provider = HangingPronunciationProvider()
+        val speech = speechFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                pronunciationProvider = provider,
+                speechSettingsViewModel = speech.speech,
+                learningRecordsViewModel = learningRecordsViewModelWithAbilityRecord(),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithContentDescription("学习记录").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("learning_record_row_ability").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("learning_record_row_ability").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_pronunciation_stop").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("card_detail_pronunciation_toggle").assertIsDisplayed()
+        composeRule.onNodeWithText("正在播放发音…").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("card_detail_pronunciation_stop").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, provider.stopCalls)
+        composeRule.onNodeWithTag("card_detail_pronunciation_toggle").assertDoesNotExist()
+        composeRule.onNodeWithTag("card_detail_pronunciation_stop").assertDoesNotExist()
+        composeRule.onNodeWithTag("card_detail_pronunciation_message").assertDoesNotExist()
+        provider.release()
     }
 
     @Test
@@ -1023,6 +1284,39 @@ class AppScreenTest {
         ): PronunciationResult {
             sentenceCalls += Triple(text, accent, forceRegenerate)
             return result
+        }
+    }
+
+    /**
+     * 可控挂起发音 provider：`speak*` 一路挂到 `release()` 为止——设备用例用它把呈现状态钉在
+     * Playing（speak 前置），从而能在「仍在播」窗口里断清场与失败保持；迟到结果即使 release
+     * 也被各宿主的代次/引用守卫挡住，不会污染断言。
+     * `pausePlayback()/resumePlayback()` 恒返回 false——正是决策 §2 记录的平台事实
+     * （`android.speech.tts.TextToSpeech` 无公开 pause()/resume()，引擎未接受）；
+     * `stopPlayback()` 计数，供宿主级停止收口用例断恰好一次。
+     */
+    private class HangingPronunciationProvider : PronunciationProvider {
+        private val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var stopCalls = 0
+            private set
+
+        override fun capabilities() = setOf(PronunciationCapability.RemoteAudio)
+
+        override suspend fun speak(text: String): PronunciationResult {
+            gate.await()
+            return PronunciationResult.Played
+        }
+
+        override fun pausePlayback(): Boolean = false
+
+        override fun resumePlayback(): Boolean = false
+
+        override fun stopPlayback() {
+            stopCalls++
+        }
+
+        fun release() {
+            gate.complete(Unit)
         }
     }
 

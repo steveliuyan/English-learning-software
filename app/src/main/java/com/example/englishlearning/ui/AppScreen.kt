@@ -302,6 +302,14 @@ fun AppScreen(
             var articlePronunciationMessage by remember { mutableStateOf<String?>(null) }
             var articlePronunciationStatus by remember { mutableStateOf(PronunciationStatus.Idle) }
             var articlePronunciationRequest by remember { mutableIntStateOf(0) }
+            // Task 9 修复轮 I-2：阅读页三元组的唯一清场收口。三条退出路径（屏内 onBack、
+            // BackHandler(readingTarget→closeArticle)、BackHandler(historyArticle)）都必须调用它；
+            // 代次自增在清场时发生，挡住迟到的 Played 覆盖下一次进文的 Idle 呈现。
+            val clearArticlePronunciation: () -> Unit = {
+                articlePronunciationMessage = null
+                articlePronunciationStatus = PronunciationStatus.Idle
+                articlePronunciationRequest++
+            }
             // 详情页只持有无字段状态枚举（安全边界），文案映射在 CardDetailScreen 内完成。
             var detailPronunciationMessage by remember { mutableStateOf<PronunciationStatus?>(null) }
             var detailPronunciationRequest by remember { mutableIntStateOf(0) }
@@ -405,6 +413,10 @@ fun AppScreen(
             val exitLearning: () -> Unit = {
                 wordCardPronunciationRequest++
                 wordCardPronunciationMessage = null
+                // I-1（Task 9 评审）：状态必须与文案成对清零——其余写入点全是 status+message 成对写。
+                // 漏清会让重进学习时新词卡顶着上一张卡的 Playing 长出「暂停/停止」行而文案节点不出现，
+                // 读屏用户听到的是别张卡的状态语义。
+                wordCardPronunciationStatus = PronunciationStatus.Idle
                 showLearning = false
                 todayPlanViewModel.load(state.profile.id)
             }
@@ -486,12 +498,26 @@ fun AppScreen(
                 }
             }
             // 历史旧版叠在历史列表之上：返回先关文章回列表，再按一次才退历史。
-            BackHandler(enabled = historyArticle != null && !showGlobalVocabularySearch && selectedSearchCard == null) { historyArticle = null }
+            // 退出必须清阅读发音三元组（I-2 收口③），否则重进任何文章顶着旧状态。
+            BackHandler(enabled = historyArticle != null && !showGlobalVocabularySearch && selectedSearchCard == null) {
+                clearArticlePronunciation()
+                historyArticle = null
+            }
             // 阅读来源的层级从浅到深：导入页 → 文章页 → 点词的词卡详情。
             // 声明顺序即优先级（后声明者先拿返回键），别随手重排。
             BackHandler(enabled = showArticleImport && !showGlobalVocabularySearch && selectedSearchCard == null) { showArticleImport = false }
-            BackHandler(enabled = readingTarget != null && !showGlobalVocabularySearch && selectedSearchCard == null) { readingAccessViewModel?.closeArticle() }
-            BackHandler(enabled = selectedArticleCard != null && !showGlobalVocabularySearch && selectedSearchCard == null) { selectedArticleCard = null }
+            BackHandler(enabled = readingTarget != null && !showGlobalVocabularySearch && selectedSearchCard == null) {
+                clearArticlePronunciation()
+                readingAccessViewModel?.closeArticle()
+            }
+            // I-3（Task 9 评审）：系统返回键关阅读生词详情时必须与屏内 onBack（及 :429-434 记录宿主）
+            // 同形地清共享详情状态——该详情宿主用的就是 detailPronunciation* 两个字段，
+            // 漏清会让下一处「纯消费」宿主（学习流详情）顶着旧 Playing 长出假播控行。
+            BackHandler(enabled = selectedArticleCard != null && !showGlobalVocabularySearch && selectedSearchCard == null) {
+                selectedArticleCard = null
+                detailPronunciationMessage = PronunciationStatus.Idle
+                detailPronunciationRequest++
+            }
             // 词 AI 问答是最内层覆盖层：最后声明，返回键先关它，再按才轮到详情页与文章页。
             BackHandler(enabled = showWordQaCard != null) { showWordQaCard = null }
             // 设置页先声明、预览页后声明：两者同时为真时（从设置页点进预览）返回键要先关预览。
@@ -708,7 +734,9 @@ fun AppScreen(
                             val next = when {
                                 held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
                                 held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                else -> PronunciationStatus.Idle
+                                // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                else -> held
                             }
                             detailPronunciationMessage = next
                         },
@@ -895,7 +923,9 @@ fun AppScreen(
                             val next = when {
                                 wordCardPronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
                                 wordCardPronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                else -> PronunciationStatus.Idle
+                                // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                else -> wordCardPronunciationStatus
                             }
                             wordCardPronunciationStatus = next
                             wordCardPronunciationMessage = next.message()
@@ -965,7 +995,9 @@ fun AppScreen(
                                 val next = when {
                                     held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
                                     held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                    else -> PronunciationStatus.Idle
+                                    // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                    // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                    else -> held
                                 }
                                 detailPronunciationMessage = next
                             },
@@ -1322,6 +1354,8 @@ fun AppScreen(
                     ArticleReadingScreen(
                         state = articleState,
                         onBack = {
+                            // I-2 收口①：屏内「返回」与两条 BackHandler 走同一清场闭包。
+                            clearArticlePronunciation()
                             if (fromHistory) historyArticle = null else readingAccessViewModel?.closeArticle()
                         },
                         onOpenCard = {
@@ -1364,7 +1398,9 @@ fun AppScreen(
                             val next = when {
                                 articlePronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
                                 articlePronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                else -> PronunciationStatus.Idle
+                                // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                else -> articlePronunciationStatus
                             }
                             articlePronunciationStatus = next
                             articlePronunciationMessage = next.message()
@@ -1431,7 +1467,9 @@ fun AppScreen(
                                 val next = when {
                                     held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
                                     held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                    else -> PronunciationStatus.Idle
+                                    // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                    // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                    else -> held
                                 }
                                 detailPronunciationMessage = next
                             },
