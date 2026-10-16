@@ -290,28 +290,31 @@ fun WordCardScreen(
                         modifier = Modifier.testTag("word_card_message").semantics { contentDescription = it },
                     )
                 }
-                if (state.submitting) {
-                    // 瞬时状态：只在这句话出现/消失时播报一次（Polite），不打断用户当前朗读。
-                    Text(
-                        "正在保存…",
-                        color = MintTextMuted,
-                        modifier = Modifier
-                            .testTag("word_card_submitting")
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                }
-                pronunciationMessage?.let { message ->
-                    Text(
-                        text = message,
-                        color = MintTextMuted,
-                        modifier = Modifier
-                            .testTag("word_card_pronunciation_message")
-                            // 同上：发音排队/播放/失败提示都是不打断当前朗读的瞬时状态。
-                            .semantics {
-                                contentDescription = message
-                                liveRegion = LiveRegionMode.Polite
-                            },
-                    )
+                // F5-03：live region 必须是常驻容器——瞬时消息作为子节点进出组合，容器本身留在树里，
+                // 否则 TalkBack 没有可监听的区域（决策 §4 要求「不打断当前朗读的瞬时播报」）。
+                // 代价：外层 Column 的 spacedBy(14.dp) 会在无消息时也给容器留一份间距，本屏归 UI 重设计轮改版。
+                Column(
+                    modifier = Modifier
+                        .testTag("word_card_status_live_region")
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    if (state.submitting) {
+                        Text(
+                            "正在保存…",
+                            color = MintTextMuted,
+                            modifier = Modifier.testTag("word_card_submitting"),
+                        )
+                    }
+                    pronunciationMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = MintTextMuted,
+                            modifier = Modifier
+                                .testTag("word_card_pronunciation_message")
+                                .semantics { contentDescription = message },
+                        )
+                    }
                 }
                 FeedbackButton(state, CardFeedback.Unknown, "不认识", "word_card_feedback_unknown", onSubmit)
                 FeedbackButton(state, CardFeedback.Fuzzy, "模糊", "word_card_feedback_fuzzy", onSubmit)
