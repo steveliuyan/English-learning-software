@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -61,14 +62,16 @@ fun CheckInScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            // F5-03 / Task 10：三条文字链原来只有 padding(10.dp)（实测 36.19dp 高，不足 48dp 触控下限），
+            // 一律在 clickable 之前补 defaultMinSize(48.dp)；padding 与 testTag/semantics 链保持原样。
             Text("学习打卡", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.weight(1f))
             onOpenFavorites?.let { open ->
-                Text("我的收藏", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_favorites").semantics { contentDescription = "打开我的收藏" }.clickable(onClick = open).padding(10.dp))
+                Text("我的收藏", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_favorites").semantics { contentDescription = "打开我的收藏" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
             }
             onOpenWrongWords?.let { open ->
-                Text("错词本", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_wrong_words").semantics { contentDescription = "打开错词本" }.clickable(onClick = open).padding(10.dp))
+                Text("错词本", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_wrong_words").semantics { contentDescription = "打开错词本" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
             }
-            Text("返回", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_back").semantics { contentDescription = "返回" }.clickable(onClick = onBack).padding(10.dp))
+            Text("返回", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_back").semantics { contentDescription = "返回" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onBack).padding(10.dp))
         }
         when (state) {
             CheckInUiState.Loading -> Text("正在读取打卡记录…", color = MintTextMuted)

@@ -1,15 +1,21 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.domain.CardFeedback
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -89,6 +95,33 @@ class WordCardScreenTest {
         composeRule.waitForIdle()
 
         assertEquals("ability", spoken)
+    }
+
+    /**
+     * F5-03 / Task 10（B1 图标按钮）：词卡发音喇叭的触控目标必须 ≥48dp 见方。
+     *
+     * 两条口径（dispatch-notes §B）：brief 的 `assertHeightIsAtLeast/assertWidthIsAtLeast` 读裁剪后的
+     * boundsInRoot——本屏根容器是 `fillMaxSize` 的 Column，**没有滚动祖先**（`performScrollTo()` 在这里
+     * 会自己报错），所以改用 `assertIsDisplayed()` 先钉住「节点确实在视口内、矩形未被裁剪」，再跑尺寸断言；
+     * 另用 `getUnclippedBoundsInRoot` 断真实尺寸（同 `CardDetailScreenTest.backSharesTheTitleRowWithAFullTouchTarget` 先例）。
+     */
+    @Test
+    fun speakerButtonMeetsTheMinimumTouchTarget() {
+        composeRule.setContent { WordCardScreen(state = ready(), onSpeak = {}) }
+
+        composeRule.onNodeWithTag("word_card_speak").assertIsDisplayed()
+        composeRule.onNodeWithTag("word_card_speak").assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag("word_card_speak").assertWidthIsAtLeast(48.dp)
+
+        val bounds = composeRule.onNodeWithTag("word_card_speak").getUnclippedBoundsInRoot()
+        assertTrue(
+            "word_card_speak 的触控目标应至少 48dp 高，实际=$bounds",
+            bounds.bottom - bounds.top >= 48.dp,
+        )
+        assertTrue(
+            "word_card_speak 的触控目标应至少 48dp 宽，实际=$bounds",
+            bounds.right - bounds.left >= 48.dp,
+        )
     }
 
     @Test

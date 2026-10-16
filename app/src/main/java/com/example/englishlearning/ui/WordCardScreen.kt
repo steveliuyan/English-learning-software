@@ -20,6 +20,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -413,6 +414,10 @@ private fun WordCardSpeakerButton(lemma: String, modifier: Modifier = Modifier) 
         modifier = modifier
             .background(MintTint, RoundedCornerShape(50))
             .padding(6.dp)
+            // F5-03 / Task 10：20dp 喇叭 + 6dp padding 只有 ~32dp 见方，读屏/粗手指都够不到
+            // 48dp 下限（connected RED 实测 32.38dp 高）。本修饰符只在父级约束允许的范围内扩边界，
+            // 内容尺寸与视觉不动，命中区随节点边界一起变大。
+            .minimumInteractiveComponentSize()
             .semantics { contentDescription = "播放 $lemma 发音" },
     ) {
         DetailSpeakerIcon()

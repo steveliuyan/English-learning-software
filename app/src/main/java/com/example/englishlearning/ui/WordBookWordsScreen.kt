@@ -13,6 +13,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -110,6 +111,7 @@ fun WordBookWordsScreen(
             Text(
                 text = "← 返回",
                 modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                     .clickable(onClick = onBack)
                     .padding(8.dp)
                     .testTag("wordbook_words_back")
@@ -321,6 +323,15 @@ private fun WordBookWordsAlphabetRail(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable(onClick = { onLetter(letterText) })
+                            // F5-03 / Task 10 取证后决定：字母栏**不加** minimumInteractiveComponentSize()。
+                            // 设备实测（emulator-5574）：加上后字母命中区确实扩到 ≥48dp（尺寸断言转绿），
+                            // 但 26 个槽的间距只有 slotPixels≈18dp，48dp 目标两两重叠，
+                            // 点 F 槽被后画的相邻字母抢走 —— 既有 connected 用例
+                            // `WordBookWordsScreenTest.tappingTheActualRailSlotUsesTheLetterClickAction` 直接红
+                            // （active_F 不再显示）。18dp 间距下任何 >18dp 的方形目标都必然重叠，
+                            // 26×48dp=1248dp 也远超屏高，故本屏 48dp 结构性不可达；
+                            // 命中区仍必须铺满整槽（同文件 railLetterTouchTargetFillsItsSlotWithoutOverlapping 钉住），
+                            // 真正的 48dp 需要轨道重设计（归 UI 重设计轮，见报告 §遗留）。
                             .then(if (active) Modifier.wrapContentHeight(unbounded = true) else Modifier)
                             .padding(vertical = if (active) 0.dp else 1.dp, horizontal = 2.dp)
                             .then(

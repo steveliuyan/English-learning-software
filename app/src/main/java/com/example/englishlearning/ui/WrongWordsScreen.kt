@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,6 +67,7 @@ fun WrongWordsScreen(
                 modifier = Modifier
                     .testTag("wrong_words_back")
                     .semantics { contentDescription = "返回" }
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                     .clickable(onClick = onBack)
                     .padding(10.dp),
             )

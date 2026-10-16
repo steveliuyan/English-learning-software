@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -373,6 +375,46 @@ class CardDetailScreenTest {
         val speak = composeRule.onNodeWithContentDescription("播放 ability 发音").getUnclippedBoundsInRoot()
         val ipaCenter = (ipa.top + ipa.bottom) / 2
         assertTrue("发音按钮应紧跟音标", speak.top <= ipaCenter && ipaCenter <= speak.bottom)
+    }
+
+    /**
+     * F5-03 / Task 10（B1 图标按钮）：详情页美/英两个发音喇叭的触控目标必须 ≥48dp 见方。
+     *
+     * 两条口径都跑（dispatch-notes §B）：
+     *  1. brief 的 `assertHeightIsAtLeast` / `assertWidthIsAtLeast` 读的是**裁剪后** boundsInRoot，
+     *     所以断言前先 `performScrollTo()` 把节点滚进首屏——屏外节点会被滚动容器裁剪成 0×0（假红），
+     *     本分支 T9 修复轮已在 :442 / :470 两例为同一问题补过锚点；
+     *  2. 关键站点另用 `getUnclippedBoundsInRoot` 断真实尺寸，与同文件
+     *     `backSharesTheTitleRowWithAFullTouchTarget` 的既有先例同形，不受外层裁剪影响。
+     *
+     * 与 brief 字面的一处偏离（编译取证）：composeBom 2025.12.00 → ui-test 1.10.0 里
+     * `assertHeightIsAtLeast` / `assertWidthIsAtLeast` 直接收 `Dp`
+     * （javap：`assertHeightIsAtLeast-3ABfNKs(SemanticsNodeInteraction, float)`），
+     * `androidx.compose.ui.unit` 并不存在 brief 写的 `Dp.minHeight()/minWidth()`（编译报 Unresolved reference），
+     * 故写成 `assertHeightIsAtLeast(48.dp)`。断言强度一字未减。
+     */
+    @Test
+    fun accentSpeakerButtonsMeetTheMinimumTouchTarget() {
+        composeRule.setContent {
+            CardDetailScreen(card = card(), onBack = {}, onSpeak = {}, onSpeakBritish = {})
+        }
+
+        listOf("card_detail_speak", "card_detail_speak_british").forEach { tag ->
+            composeRule.onNodeWithTag(tag).performScrollTo()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag(tag).assertHeightIsAtLeast(48.dp)
+            composeRule.onNodeWithTag(tag).assertWidthIsAtLeast(48.dp)
+
+            val bounds = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+            assertTrue(
+                "$tag 的触控目标应至少 48dp 高，实际=$bounds",
+                bounds.bottom - bounds.top >= 48.dp,
+            )
+            assertTrue(
+                "$tag 的触控目标应至少 48dp 宽，实际=$bounds",
+                bounds.right - bounds.left >= 48.dp,
+            )
+        }
     }
 
     /** 配图是理解词义的主要辅助，紧跟单词卡，而不是滑到最底才看到。 */

@@ -6,6 +6,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.DomainColors
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertTextContains
@@ -91,6 +96,39 @@ class CheckInScreenTest {
         composeRule.setContent { CheckInScreen(CheckInUiState.Loading, onBack = { backs++ }) }
         composeRule.onNodeWithTag("check_in_back").assertHasClickAction().performClick()
         assertEquals(1, backs)
+    }
+
+    /**
+     * F5-03 / Task 10（B2 文字链）：打卡页头部三条文字链（我的收藏 / 错词本 / 返回）
+     * 的触控目标必须 ≥48dp 见方——它们只有 `padding(10.dp)`，实测高约 40dp，不达标准。
+     *
+     * 双口径（dispatch-notes §B）：brief 的 `assertHeightIsAtLeast/assertWidthIsAtLeast`（读裁剪后矩形，
+     * 故先 `performScrollTo()` + `assertIsDisplayed()` 确认在视口内）与既有先例的
+     * `getUnclippedBoundsInRoot`（断真实尺寸）各跑一遍。
+     */
+    @Test fun headerTextLinksMeetTheMinimumTouchTarget() {
+        composeRule.setContent {
+            CheckInScreen(
+                state = CheckInUiState.Loading,
+                onBack = {},
+                onOpenFavorites = {},
+                onOpenWrongWords = {},
+            )
+        }
+        listOf("check_in_open_favorites", "check_in_open_wrong_words", "check_in_back").forEach { tag ->
+            assertMinTouchTarget(tag)
+        }
+    }
+
+    private fun assertMinTouchTarget(tag: String) {
+        composeRule.onNodeWithTag(tag).performScrollTo()
+        composeRule.onNodeWithTag(tag).assertIsDisplayed()
+        composeRule.onNodeWithTag(tag).assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag(tag).assertWidthIsAtLeast(48.dp)
+
+        val bounds = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+        assertTrue("$tag 的触控目标应至少 48dp 高，实际=$bounds", bounds.bottom - bounds.top >= 48.dp)
+        assertTrue("$tag 的触控目标应至少 48dp 宽，实际=$bounds", bounds.right - bounds.left >= 48.dp)
     }
 
     @Test fun zero_target_shows_zero_percent() {

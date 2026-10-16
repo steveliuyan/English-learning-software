@@ -13,8 +13,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
@@ -424,6 +428,71 @@ class WordBookWordsScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_row_banana").assertDoesNotExist()
         composeRule.onNodeWithTag("wordbook_words_row_apple").assertIsDisplayed()
+    }
+
+    /**
+     * F5-03 / Task 10（B2 文字链）：词书单词页「← 返回」的触控目标必须 ≥48dp 见方
+     * （现状只有 `padding(8.dp)`）。返回链在根 Column 首行、不在滚动容器内，无需 performScrollTo。
+     */
+    @Test
+    fun backLinkMeetsTheMinimumTouchTarget() {
+        composeRule.setContent {
+            WordBookWordsScreen(
+                state = WordBookWordsUiState(words = listOf(word("book:apple", "apple"))),
+                onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
+            )
+        }
+        composeRule.onNodeWithTag("wordbook_words_back").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_back").assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag("wordbook_words_back").assertWidthIsAtLeast(48.dp)
+
+        val bounds = composeRule.onNodeWithTag("wordbook_words_back").getUnclippedBoundsInRoot()
+        assertTrue("wordbook_words_back 的触控目标应至少 48dp 高，实际=$bounds", bounds.bottom - bounds.top >= 48.dp)
+        assertTrue("wordbook_words_back 的触控目标应至少 48dp 宽，实际=$bounds", bounds.right - bounds.left >= 48.dp)
+    }
+
+    /**
+     * F5-03 / Task 10（B3 字母栏）：这里钉住的是**本屏能真正成立**的触控契约，不是 48dp 见方。
+     *
+     * 取证过程（详见 task-10 报告）：
+     *  - RED：按 brief 口径先写「字母 F 的命中区 ≥48dp 见方」，设备实测 12.95dp 高 → 红（真实缺口）；
+     *  - 按 brief 加上 `minimumInteractiveComponentSize()` 后尺寸断言转绿，但既有行为用例
+     *    `tappingTheActualRailSlotUsesTheLetterClickAction` 立刻转红：26 个字母的槽间距只有
+     *    slotPixels≈18dp，48dp 目标两两重叠，点 F 被后画的相邻字母抢走命中。
+     *  - 结论：18dp 间距下任何 >18dp 的方形目标必然重叠，26×48dp=1248dp 也远超屏高，
+     *    本屏 48dp **结构性不可达**，真要达标得重做轨道（归 UI 重设计轮）。
+     *
+     * 因此本用例钉三条可证伪的契约：命中区落在整槽之内、覆盖槽中心（点任意一处都能选中该字母）、
+     * 且与下一个字母的命中区不重叠——把上面那条 48dp 修饰符加回来，第 2、3 条立刻红（伪修证伪器）。
+     */
+    @Test
+    fun railLetterTouchTargetFillsItsSlotWithoutOverlappingTheNextLetter() {
+        showAlphabet()
+
+        val slot = composeRule.onNodeWithTag("wordbook_words_rail_F").getUnclippedBoundsInRoot()
+        val letter = composeRule.onNodeWithContentDescription("导航字母 F")
+        letter.assertHasClickAction()
+        letter.assertIsDisplayed()
+        val hit = letter.getUnclippedBoundsInRoot()
+        val next = composeRule.onNodeWithContentDescription("导航字母 G").getUnclippedBoundsInRoot()
+        val tolerance = 0.5.dp
+
+        val slotCenterX = (slot.left + slot.right) / 2f
+        val slotCenterY = (slot.top + slot.bottom) / 2f
+        assertTrue(
+            "F 的命中区应覆盖整槽中心（点槽内任意一点都该选中 F），slot=$slot hit=$hit",
+            hit.left <= slotCenterX && slotCenterX <= hit.right &&
+                hit.top <= slotCenterY && slotCenterY <= hit.bottom,
+        )
+        assertTrue(
+            "F 的命中区不得越出整槽去抢相邻字母，slot=$slot hit=$hit",
+            hit.left >= slot.left - tolerance && hit.right <= slot.right + tolerance &&
+                hit.top >= slot.top - tolerance && hit.bottom <= slot.bottom + tolerance,
+        )
+        assertTrue(
+            "相邻字母的命中区不得重叠（重叠会让点 F 落到后画的字母），F=$hit G=$next",
+            hit.bottom <= next.top + tolerance,
+        )
     }
 
     private fun word(

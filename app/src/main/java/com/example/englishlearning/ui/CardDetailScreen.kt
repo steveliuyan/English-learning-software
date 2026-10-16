@@ -28,6 +28,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -535,6 +536,9 @@ private fun AccentSpeakerButton(
             .background(MintTint)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp)
+            // F5-03 / Task 10：美/英喇叭原本只有 ~36dp 高（connected RED 实测 36.19dp），
+            // 补到 48dp 触控下限；只扩节点边界，字形与标注字尺寸不变。
+            .minimumInteractiveComponentSize()
             .testTag(tag)
             .semantics { contentDescription = accentDescription },
         verticalAlignment = Alignment.CenterVertically,
