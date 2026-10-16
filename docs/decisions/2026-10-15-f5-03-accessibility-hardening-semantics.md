@@ -38,10 +38,17 @@ F5-03 的深色与 TalkBack 条款在 AC 矩阵与验证文档中如实标注「
   **`PronunciationCacheKey` 不纳入 rate**。spec 03 :30「缓存键为规范化文本、语音参数与模型版本」中
   的「语音参数」按「生成侧参数」解释：providerId/model/voice/accent/规范化文本 已在键内；
   本地变速不产生新资产。此为对口径的澄清而非偏离，记录于此。
-- 语速持久化：`speech_preferences` 加列 `speech_rate REAL NOT NULL DEFAULT 1.0`，
+- 语速持久化：`speech_preferences` 加列 `speechRate REAL NOT NULL DEFAULT 1.0`
+  （列名按本表既有惯例取驼峰，与 v27 `autoSpeakOnCardReady` 及全库 `ADD COLUMN` 先例一致；
+  早期草稿写过 `speech_rate`，Task 8 派发前订正——Room 默认列名即字段名，蛇形名会迫使实体加
+  `@ColumnInfo(name=...)` 并成为该表唯一的异构列），
   **Room v31→v32 非破坏迁移**（照 v27 `autoSpeakOnCardReady` 加列先例：`@ColumnInfo(defaultValue)` +
   `ALTER TABLE ADD COLUMN`，禁 destructive）。读写两侧 clamp 到 0.5–2.0；
   UI 为四档循环按钮 {0.75x, 1.0x, 1.25x, 1.5x}，落点语音设置页（与「学习时自动发音」同族 Row）。
+- **读改写口径（Task 8 派发前取证并固化）**：`SpeechSettingsViewModel` 的 `select()` 与 `addMiMoPreset()`
+  是用**当前 UI 状态**手工构造 `SpeechPreference(...)`（不是读 stored 后 copy），
+  因此偏好每加一个字段都必须同时补：这两处显式带上现值、`reload()` 把 stored 映射进 `SpeechSettingsUiState`。
+  否则用户换引擎/建预设会把新字段静默复位（`:78` 的既有注释正是同一坑的历史教训）。
 - `PronunciationStatus` 新增 `Paused`（文案「已暂停播放，再次点按可继续。」）。
 - **已接受限制**：系统 TTS 的 `Played` 是「提交成功」粒度（引擎无逐句完成回调接入），
   暂停按钮仅在 Playing/Paused 窗口呈现；TTS 播完后暂停不可达属引擎限制，
@@ -109,7 +116,7 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
 
 ### 6. 测试与门禁口径
 
-- 门禁仍是 JVM 单测全绿（基线只增不减；计划写下时为 1396，Task 1–7 落地后实测 **1445**，以每任务实测值为准）；
+- 门禁仍是 JVM 单测全绿（基线只增不减；计划写下时为 1396，Task 1–7 全部落地后实测 **1450**，以每任务实测值为准）；
   契约/Router/Provider/状态/VM 全部 JVM TDD 先红。
 - Compose 语义断言进 androidTest（connected），按 `android-connected-qa-loop` 的
   `adb install -r` + `am instrument` 实跑（禁 connectedDebugAndroidTest）；
