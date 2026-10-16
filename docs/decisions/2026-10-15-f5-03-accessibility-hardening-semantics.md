@@ -60,6 +60,9 @@ F5-03 的深色与 TalkBack 条款在 AC 矩阵与验证文档中如实标注「
   （旧续程以 `Played` 立即返回、旧 `MediaPlayer` 立即 release）。
   否则「暂停中播放下一句」会让上一次的 `speak()` 永久挂起（学习流卡在 Playing）并泄漏上一个播放器。
   该保护只有设备可证（JVM 无法加载 `MediaPlayer`），取证在 connected `AndroidAudioPlayerControlsTest`。
+  同一身份守卫必须覆盖 `onPrepared` 的**整个回调体**（`preparing = null; active = mp; mp.start()`）：
+  迟到的 prepared 回调一律整体丢弃，否则旧播放器会把已 release 的死句柄顶替进 `active` 并在主线程抛 `IllegalStateException`；
+  该时序在 JVM 与设备上均不可稳定取证，归代码审查约束。
 - 四控 UI 落点 = 学习流词卡、词卡详情、阅读页三处（`PronunciationControls` 形态的暂停/继续+停止
   按钮组随状态呈现；重播=原喇叭/发音按钮再点）。收藏浮层/查词浮点等一次性浏览发音不加控件组，
   Provider 边界已统一暴露能力即满足 F3-02 首条。
