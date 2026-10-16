@@ -41,13 +41,17 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 ## 4. Git 状态
 
 - 分支：`stage-5-f5-03-accessibility-hardening`（基线 main tip `4b3f1a6`）。
-- 提交链（`main..HEAD`，31 个，`a67dd67`→`908eeed`）关键里程碑：
+- 提交链（`main..HEAD`，32 个，`a67dd67`→`258e2ca`）关键里程碑：
   - 语义/契约批：`a67dd67`（决策+计划）、`1dc49e4`+`f488dda`（T1）、`339d3da`+`c710c38`（T2）、`f2d8875`（T3）、`a51333f`（T4）、`02c4ba7`（T5）、`0567b2a`+`803ed97`（T6）
   - 四控/语速批：`3aa125a`→`d7a8c8e`→`7589416`→`71ab095`（T7）、`a054c3e`→`3c4dcd7`→`fdbf4b4`（T8）、`46ae7e9`→`a87b817`→`022a3d2`→`84cac40`→`0c014cb`（T9）
   - 触控/字体批：`42a43ae`→`1ad0cdd`→`d62c36b`（T10）、`a422039`→`83bac4e`→`26440b1`→`c3b3097`→`b25f9be`（T11）
   - 收口前置：`908eeed`（connected 三处既有红测试侧修复）
-- **待推 HEAD**：`908eeed6060139136f23edde08c19ff898ad7a4a`；本次将新增一个收口文档提交（矩阵 + 验收记录 + 报告 + QA 任务书增补）置于其上。
-- **是否已推送 GitHub**：本代理**未推送**（任务书规定推送由 controller 执行）。分支未配 upstream（`git rev-parse @{u}` → fatal）。台账记录最近核验的远端 tip=`c3b3097`；`b25f9be`、`908eeed` 及本收口提交待 controller 按 `android-repo-session-handoff` §4.3/§4.4（代理 127.0.0.1:3067 + `-c credential.interactive=false`）推送后**按 `ls-remote` 补填**「远端 tip == 本地 HEAD」作为备份完成凭据。
+- **HEAD（收口提交）**：`258e2ca9feb586c661fb9e79202acb49a6432938`（父 `908eeed`）——矩阵 AC5-03 行升级 + 新增验证文档 + 本报告 + QA 第三轮任务书增补。
+- **是否已推送 GitHub**：已推送并核验。controller 于本机以代理 `127.0.0.1:3067` + `-c credential.interactive=false` 执行
+  `git push origin stage-5-f5-03-accessibility-hardening`，远端返回 `b25f9be..258e2ca`；
+  随后 `git ls-remote origin stage-5-f5-03-accessibility-hardening` = `258e2ca9feb586c661fb9e79202acb49a6432938`，
+  与 `git rev-parse HEAD` **逐字符相同** → 异地备份成立（`main..HEAD` 全 32 个提交在远端）。
+  本报告 §4 的补填由 controller 在推送后完成，属文档面追加提交，不改代码与取证。
 - 未提交遗留文件：无（`.superpowers/` 被 gitignore；工作树收尾 `git status --porcelain` 为空）。
 
 ## 5. 未完成 / 遗留问题
