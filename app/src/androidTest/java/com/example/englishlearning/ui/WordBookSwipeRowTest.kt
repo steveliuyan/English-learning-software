@@ -3,11 +3,15 @@ package com.example.englishlearning.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.WordBook
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -64,5 +68,53 @@ class WordBookSwipeRowTest {
         return kotlin.math.abs(channel(16)) <= 10 &&
             kotlin.math.abs(channel(8)) <= 10 &&
             kotlin.math.abs(channel(0)) <= 10
+    }
+
+    /**
+     * I-A2（终审 A §2）：「删除词书」自定义动作必须挂在**被 TalkBack 聚焦的那个可点击节点**上。
+     *
+     * 原形状把 `customActions` 声明在 `SwipeToDismissBox` 的外层 modifier 上（那一层只有 testTag、
+     * 不可点击）；语义合并方向是「子 → 承载 merged 节点的父」，父节点属性不会流入子节点，
+     * 而焦点落在内层 `WordBookCard` 的 `clickable(onSelect)` 合并节点上——动作在真实无障碍树里
+     * 并不伴随任何可聚焦目标。connected 语义树能查到 ≠ 真机焦点序列可达，这里按「同节点」钉死。
+     *
+     * 外层 `wordbook_swipe_*` 标签必须原地保留：上面那条红底护栏按它 `captureToImage()`，
+     * 标签挪走等于把护栏改成捕获错误区域。
+     */
+    @Test
+    fun deleteWordBookCustomActionIsRegisteredOnTheClickableNode() {
+        val book = WordBook("imported-book", "导入的词书", "自定义", 100, "v1", "user-provided-xlsx")
+        var deleted = 0
+        composeRule.setContent {
+            SwipableWordBookCard(
+                book = book,
+                selected = false,
+                progress = null,
+                onSelect = {},
+                onDelete = { deleted++ },
+            )
+        }
+
+        val nodes = composeRule.onAllNodes(clickableWithDeleteAction()).fetchSemanticsNodes()
+        assertEquals(
+            "「删除词书」自定义动作必须与 click 动作挂在同一个可聚焦节点上，命中节点数=${nodes.size}",
+            1,
+            nodes.size,
+        )
+
+        val action = nodes.single().config.getOrNull(SemanticsActions.CustomActions)
+            ?.single { it.label == "删除词书" }
+            ?: error("可点击节点上没有「删除词书」自定义动作")
+        // 动作执行走与滑动 confirmValueChange 同一个 onDelete（「滑不删、弹确认」两步确认红线不变）。
+        assertEquals(true, action.action())
+        assertEquals(1, deleted)
+
+        // 红底护栏依赖的外层标签不得被挪走。
+        composeRule.onNodeWithTag("wordbook_swipe_imported-book").assertExists()
+    }
+
+    private fun clickableWithDeleteAction() = SemanticsMatcher("可点击且带「删除词书」自定义动作") { node ->
+        node.config.getOrNull(SemanticsActions.OnClick) != null &&
+            node.config.getOrNull(SemanticsActions.CustomActions)?.any { it.label == "删除词书" } == true
     }
 }

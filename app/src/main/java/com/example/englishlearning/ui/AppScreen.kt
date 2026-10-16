@@ -2095,24 +2095,14 @@ internal fun SwipableWordBookCard(
         // 用户要的是「往左滑」露出删除键：条目向左滑，操作区从右侧露出。
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
-        modifier = Modifier
-            .testTag("wordbook_swipe_${book.id}")
-            .semantics {
-                // 滑动是视觉手势，TalkBack 念不到也做不出来：把「删除词书」登记为无障碍自定义动作，
-                // 与滑动 confirmValueChange 走同一个 onDelete（只弹确认框，两步确认红线不变）。
-                onDelete?.let { triggerDelete ->
-                    customActions = listOf(
-                        CustomAccessibilityAction(
-                            label = "删除词书",
-                            // Boolean 返回值语义是「动作是否已执行」：确认框弹出来了就算执行。
-                            action = {
-                                triggerDelete()
-                                true
-                            },
-                        ),
-                    )
-                }
-            },
+        // 外层只留 testTag：WordBookSwipeRowTest 按它 captureToImage 断言「静止时不露红底」，
+        // 标签挪走等于把那条护栏改成捕获错误区域。
+        //
+        // customActions 刻意**不**挂这一层（终审 A 的 I-A2）：语义合并方向是「子节点流入承载
+        // merged 的那个节点」，父节点属性不会下发给内层 `WordBookCard` 的 clickable 合并节点，
+        // 而 TalkBack 真正聚焦的正是后者——动作声明在这里等于读屏用户拿不到无手势替代路径。
+        // 故把动作搬到 WordBookCard 里与 clickable 同一节点。
+        modifier = Modifier.testTag("wordbook_swipe_${book.id}"),
         backgroundContent = {
             // 这层红底一直在内容之下，靠上面那张卡**正好铺满整行**把它完全盖住；
             // WordBookCard 里因此刻意不缩放（见那边的注释）。
@@ -2127,7 +2117,7 @@ internal fun SwipableWordBookCard(
             }
         },
     ) {
-        WordBookCard(book, selected, progress, onSelect)
+        WordBookCard(book, selected, progress, onSelect, onDelete)
     }
 }
 
@@ -2137,6 +2127,7 @@ private fun WordBookCard(
     selected: Boolean,
     progress: com.example.englishlearning.learning.WordBookProgress?,
     onSelect: () -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     val cardColor by animateColorAsState(
         targetValue = if (selected) MintTint else MintSurface,
@@ -2161,7 +2152,24 @@ private fun WordBookCard(
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, borderColor, RoundedCornerShape(18.dp))
-            .clickable(onClick = onSelect),
+            .clickable(onClick = onSelect)
+            .semantics {
+                // 滑动是视觉手势，TalkBack 念不到也做不出来：把「删除词书」登记为无障碍自定义动作。
+                // 挂在**这个**节点上——它与 clickable 同节点、是 TalkBack 实际聚焦的合并节点（I-A2）；
+                // 动作与滑动 confirmValueChange 走同一个 onDelete（只弹确认框，两步确认红线不变）。
+                onDelete?.let { triggerDelete ->
+                    customActions = listOf(
+                        CustomAccessibilityAction(
+                            label = "删除词书",
+                            // Boolean 返回值语义是「动作是否已执行」：确认框弹出来了就算执行。
+                            action = {
+                                triggerDelete()
+                                true
+                            },
+                        ),
+                    )
+                }
+            },
         colors = CardDefaults.cardColors(containerColor = cardColor),
         shape = RoundedCornerShape(18.dp),
     ) {

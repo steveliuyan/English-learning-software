@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertTextEquals
@@ -304,4 +306,60 @@ class SpeechSettingsScreenTest {
         composeRule.onNodeWithTag("speech_auto_speak_toggle").performClick()
         assertEquals(false, toggled)
     }
+
+    /**
+     * I-A1（终审 A §2）：语速行**自身**的无障碍描述必须携带当前档位值。
+     *
+     * 该行是 `clickable` 合并节点，`contentDescription` 会盖掉子节点文字；档位文字
+     * （`1x`→`1.25x`…）只在兄弟 `Text` 里、且本行不在任何 liveRegion 常驻容器内。
+     * 描述若是静态「发音语速」，读屏用户点完一次就不知道当前倍率——正是决策 §4 给
+     * Slider 立下的「描述动态带上当前值」口径（`AppScreen` 的「每日新词目标，当前 N 词」）
+     * 在本轮新增循环按钮上的漏配。这里钉两件事：切换前后描述都含当前档位、`stateDescription` 等于档位。
+     */
+    @Test
+    fun speechRateRowAnnouncesTheCurrentRateThroughItsOwnSemantics() {
+        val steps = listOf(0.75f, 1f, 1.25f, 1.5f)
+        var cycled = 0
+        composeRule.setContent {
+            // 档位必须存进 Compose 状态：本页是无状态屏幕，state 由外部驱动，
+            // 裸 var 不触发重组（本页 autoSpeak/profileSelection 用例同写法）。
+            var index by remember { mutableStateOf(1) }
+            SpeechSettingsScreen(
+                state = SpeechSettingsUiState(speechRate = steps[index]),
+                onSelect = { _, _ -> },
+                onOpenAiProfiles = {},
+                onAddMiMoPreset = {},
+                onPreview = {},
+                onCycleSpeechRate = { index = (index + 1) % steps.size; cycled++ },
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("speech_rate_toggle").performScrollTo()
+        assertEquals(listOf("发音语速，当前 1x"), contentDescriptionsOfRateRow())
+        assertEquals("1x", stateDescriptionOfRateRow())
+
+        composeRule.onNodeWithTag("speech_rate_toggle").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, cycled)
+        // 点击后档位文字在兄弟 Text 里，读屏拿不到——描述与状态必须自己把它带出来。
+        composeRule.onNodeWithTag("speech_rate_value", useUnmergedTree = true).assertTextEquals("1.25x")
+        assertEquals(listOf("发音语速，当前 1.25x"), contentDescriptionsOfRateRow())
+        assertEquals("1.25x", stateDescriptionOfRateRow())
+
+        composeRule.onNodeWithTag("speech_rate_toggle").performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf("发音语速，当前 1.5x"), contentDescriptionsOfRateRow())
+        assertEquals("1.5x", stateDescriptionOfRateRow())
+    }
+
+    private fun contentDescriptionsOfRateRow(): List<String> =
+        composeRule.onNodeWithTag("speech_rate_toggle")
+            .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)
+            ?: emptyList()
+
+    private fun stateDescriptionOfRateRow(): String =
+        composeRule.onNodeWithTag("speech_rate_toggle")
+            .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
+            ?: ""
 }

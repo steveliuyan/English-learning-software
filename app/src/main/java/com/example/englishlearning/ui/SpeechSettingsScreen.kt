@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.language.domain.PronunciationEngine
@@ -110,13 +111,22 @@ fun SpeechSettingsScreen(
         }
 
         // 语速（F3-02 四控之速）：播放侧变速，不重新生成音频（决策 §2）。
+        //
+        // 这一行是 `clickable` 合并节点，contentDescription 会盖掉子节点文字，而档位文字只在兄弟
+        // Text 里、本行又不属于任何 liveRegion 常驻容器——描述若写成静态「发音语速」，读屏用户
+        // 点完一次就不知道当前倍率。按决策 §4 给 Slider 立下的口径（「描述动态带上当前值」），
+        // 描述与 stateDescription 都携带当前档位（I-A1）。
+        val speechRateLabel = if (state.speechRate == 1f) "1x" else "${state.speechRate}x"
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onCycleSpeechRate() }
                 .padding(vertical = 10.dp)
                 .testTag("speech_rate_toggle")
-                .semantics { contentDescription = "发音语速" },
+                .semantics {
+                    contentDescription = "发音语速，当前 $speechRateLabel"
+                    stateDescription = speechRateLabel
+                },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -124,7 +134,7 @@ fun SpeechSettingsScreen(
                 Text("只调整本机播放速度，不会重新生成音频；对系统朗读与已缓存发音均生效。", style = AppType.Footnote)
             }
             Text(
-                if (state.speechRate == 1f) "1x" else "${state.speechRate}x",
+                speechRateLabel,
                 modifier = Modifier.testTag("speech_rate_value"),
                 style = AppType.Label,
                 color = DomainColors.AiSpeech.deep,
