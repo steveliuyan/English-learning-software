@@ -42,8 +42,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -314,14 +316,26 @@ private fun WordHeroCard(
                 )
             }
         }
-        pronunciationStatus.message()?.let { message ->
-            Text(
-                text = message,
-                style = AppType.Footnote,
-                modifier = Modifier
-                    .testTag("card_detail_pronunciation_message")
-                    .semantics { contentDescription = message },
-            )
+        // F5-03 决策 §4（Task 10 携带的 T9 复评 N-4，口径同阅读页 `article_status_live_region`）：
+        // 发音状态文字必须由**常驻 live region 容器**承载，靠子节点进出触发播报
+        // （Task 6 判例 WordCardScreen.word_card_status_live_region）。
+        // ①tag `card_detail_pronunciation_message` 留在瞬时 Text 上（既有引用不破）；
+        // ②liveRegion 只在容器上，瞬时子节点不得再带；③播控 Row 保持在容器之外（B1 口径）。
+        // 已知代价：容器空态仍占外层 spacedBy 一份幽灵间距——与阅读页同形同代价，归 UI 重设计轮。
+        Column(
+            modifier = Modifier
+                .testTag("card_detail_status_live_region")
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            pronunciationStatus.message()?.let { message ->
+                Text(
+                    text = message,
+                    style = AppType.Footnote,
+                    modifier = Modifier
+                        .testTag("card_detail_pronunciation_message")
+                        .semantics { contentDescription = message },
+                )
+            }
         }
         // F3-02 播控组（与词卡同款 OutlinedButton 形态、同一呈现窗口 Playing/Paused）：
         // 只出现在宿主点头的三处详情（学习流 / 记录 / 阅读），收藏浮层与搜索卡详情保持纯浏览。
