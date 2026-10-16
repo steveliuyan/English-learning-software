@@ -6,8 +6,8 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 
 ## 2. 完成了什么
 
-- 改写 `docs/verification/ac-traceability-matrix.md` AC5-03 行为「代码侧完成」明细：语义批五个 JVM 契约类、四控接口与 UI、触控/动态字体批提交哈希、connected 21 类 266 例结果、字母栏 7/8 达成 + Rail 显式豁免口径；设备走查红线（归 QA 第三轮、未完成不得宣称全绿）逐字保留；改后 `verifyAcTraceabilityMatrix` 复跑仍绿。
-- 新建 `docs/verification/f5-03-accessibility-hardening-2026-10.md`（10 节）：三禁令契约、四控语义与限制、liveRegion 三容器与 `spacedBy` 代价、Canvas/固定高保留清单、普查盲区账、connected 全清单逐类命令与末行、门禁三条命令原文与末行、设备侧 TODO-USER、交下来的账。
+- 改写 `docs/verification/ac-traceability-matrix.md` AC5-03 行为「代码侧完成」明细：语义批五个 JVM 契约类、四控接口与 UI、触控/动态字体批提交哈希、connected 21 类 266 例结果、字母栏 7/8 达成 + Rail 显式豁免口径；设备走查红线**按原意保留并收紧**（矩阵原文「待设备轮执行，未验证前不得升级为「已验证」」→ 现文「待设备轮执行，未完成不得宣称 AC5-03 全绿」；限制句位置与语义不变，非逐字照抄）；改后 `verifyAcTraceabilityMatrix` 复跑仍绿。
+- 新建 `docs/verification/f5-03-accessibility-hardening-2026-10.md`（§0–§10 共 11 个主节 + 5 个二级节）：三禁令契约、四控语义与限制、liveRegion 三容器与 `spacedBy` 代价、Canvas/固定高保留清单、普查盲区账、connected 全清单逐类命令与末行、门禁三条命令原文与末行、设备侧 TODO-USER、交下来的账。
 - 本工作报告（按 `docs/handoff/REPORT-TEMPLATE.md` 七节）。
 - 增补 `docs/handoff/2026-10-15-qa-round3-task.md` §3：把 F5-03 攒下的设备项追加进去（只增不改原有条目）。
 - 生产码 / 测试码零改动；改动面仅上述四个文档文件。
@@ -32,7 +32,9 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 | T11 | 1467/0 | 动态字体新增 connected 护栏（+0） |
 | T12（本次） | 1467/0 | 无 JVM 改动；既有红修复只触 androidTest |
 
-**本次门禁**：`:app:assembleDebug :app:testDebugUnitTest --no-daemon --no-build-cache` → `BUILD SUCCESSFUL in 16s`（exit 0，无 FAILED/`e:`）。python 逐份累加 `testDebugUnitTest/*.xml`：203 suites，**tests=1467 / failures=0 / errors=0 / skipped=0**，XML maxMtime=2026-10-16T22:31:53（任务 UP-TO-DATE，取持久化 XML 计数，1467 基线成立）。矩阵 + 许可门禁 `BUILD SUCCESSFUL in 12s`；`secret-scan exit=0`。三条命令原文与末行详见验收记录 §8。
+**本次门禁**：`:app:assembleDebug :app:testDebugUnitTest --no-daemon --no-build-cache` → `BUILD SUCCESSFUL in 16s`（exit 0，无 FAILED/`e:`）。python 逐份累加 `testDebugUnitTest/*.xml`：203 suites，**tests=1467 / failures=0 / errors=0 / skipped=0**，收口那次 XML maxMtime=2026-10-16T22:31:53（任务 UP-TO-DATE，取持久化 XML 计数，1467 基线成立；该指针后续被更晚的全量跑重写，totals 不变，终审复核记为 23:18）。矩阵 + 许可门禁 `BUILD SUCCESSFUL in 12s`；`secret-scan exit=0`。三条命令原文与末行详见验收记录 §8。
+
+**终审修复轮复跑（2026-10-17，I-A1/I-A2 生产码 + 2 条 connected 护栏落地后）**：`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin --no-daemon --no-build-cache` → `BUILD SUCCESSFUL in 1m 26s`；python 累加 = **203 suites / 1467 / 0 / 0 / 0**（JVM 基线只增不减成立，新增两条走 connected 故 +0），XML maxMtime=2026-10-17T00:29:22；`verifyAcTraceabilityMatrix verifyThirdPartyNotices --rerun-tasks` → `AC matrix covered 51 ids with evidence.` + `BUILD SUCCESSFUL`（exit 0）。受影响 connected 类逐类实跑（`emulator-5574`）：`SpeechSettingsScreenTest` `OK (13 tests)`、`WordBookSwipeRowTest` `OK (2 tests)`、`AppScreenTest` 双跑 `OK (45 tests)`×2（back/导航族 flaky 未复现，基线对照法，未放宽任何断言）。
 
 ### 3.2 connected 全清单（21 类 / 266 例，全绿）
 
@@ -41,18 +43,16 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 ## 4. Git 状态
 
 - 分支：`stage-5-f5-03-accessibility-hardening`（基线 main tip `4b3f1a6`）。
-- 提交链（`main..HEAD`，32 个，`a67dd67`→`258e2ca`）关键里程碑：
+- 提交链（`main..HEAD`，`a67dd67` 起）关键里程碑：
   - 语义/契约批：`a67dd67`（决策+计划）、`1dc49e4`+`f488dda`（T1）、`339d3da`+`c710c38`（T2）、`f2d8875`（T3）、`a51333f`（T4）、`02c4ba7`（T5）、`0567b2a`+`803ed97`（T6）
   - 四控/语速批：`3aa125a`→`d7a8c8e`→`7589416`→`71ab095`（T7）、`a054c3e`→`3c4dcd7`→`fdbf4b4`（T8）、`46ae7e9`→`a87b817`→`022a3d2`→`84cac40`→`0c014cb`（T9）
   - 触控/字体批：`42a43ae`→`1ad0cdd`→`d62c36b`（T10）、`a422039`→`83bac4e`→`26440b1`→`c3b3097`→`b25f9be`（T11）
   - 收口前置：`908eeed`（connected 三处既有红测试侧修复）
-- **HEAD（收口提交）**：`258e2ca9feb586c661fb9e79202acb49a6432938`（父 `908eeed`）——矩阵 AC5-03 行升级 + 新增验证文档 + 本报告 + QA 第三轮任务书增补。
-- **是否已推送 GitHub**：已推送并核验。controller 于本机以代理 `127.0.0.1:3067` + `-c credential.interactive=false` 执行
-  `git push origin stage-5-f5-03-accessibility-hardening`，远端返回 `b25f9be..258e2ca`；
-  随后 `git ls-remote origin stage-5-f5-03-accessibility-hardening` = `258e2ca9feb586c661fb9e79202acb49a6432938`，
-  与 `git rev-parse HEAD` **逐字符相同** → 异地备份成立（`main..HEAD` 全 32 个提交在远端）。
-  本报告 §4 的补填由 controller 在推送后完成，属文档面追加提交，不改代码与取证。
-- 未提交遗留文件：无（`.superpowers/` 被 gitignore；工作树收尾 `git status --porcelain` 为空）。
+  - 收口批（Task 12）：`258e2ca`（矩阵 AC5-03 升级 + 新建验证文档 + 本报告 + QA 任务书增补，父 `908eeed`）→ `df881e9`（§4 远端 tip 补填）
+- **远端备份口径（终审 C 的 IM-1 订正）**：本节**不再写死任何「当前 HEAD」哈希**——把文档自身所在提交的哈希写进正文会在落笔那一刻就被下一笔提交推翻（旧文本记 `258e2ca` 为 HEAD 并宣称「ls-remote 与 `rev-parse HEAD` 逐字符相同」，而写下时 HEAD 已是 `df881e9`，自相矛盾）。**唯一口径**：`git rev-parse HEAD` 与 `git ls-remote origin stage-5-f5-03-accessibility-hardening` 逐字符相同即异地备份成立，由 controller 在每次推送后核验并只更新「最近核验值」。
+- **最近核验值**：`df881e9ea65b295b28a280b15ab0f3f81e12d370`（`main..HEAD` = **33** 个提交；核验时间 2026-10-17，代理 `127.0.0.1:3067` + `-c credential.interactive=false`，第一次推送返回 `b25f9be..258e2ca`、补填笔随后推送）。
+- **终审与本轮修复**：三片终审（A 生产码 / B 测试 / C 文档）已完成，Critical 0；本轮为终审后**唯一修复轮**，落 I-A1（语速播报）+ I-A2（customActions 挂载节点）与文档面 IM-1…IM-5，修复提交见矩阵 AC5-03 行与 `docs/verification/f5-03-accessibility-hardening-2026-10.md` §7.3；**推送仍由 controller 执行，本代理不推送**。
+- 未提交遗留文件：无（本阶段台账目录 `.superpowers/sdd/2026-10-15-stage-5-accessibility-hardening/` 命中 `.gitignore:10`，本区间 `git log --diff-filter=A` 对其零新增；注意仓库内仍有 6 个更早阶段**已跟踪**的 `.superpowers/**` 文件，gitignore 不取消既有跟踪，故不能笼统说「`.superpowers/` 都被忽略」）。
 
 ## 5. 未完成 / 遗留问题
 
@@ -62,10 +62,12 @@ Task 12 收口：跑剩余门禁、把矩阵 AC5-03 升级为「代码侧完成�
 - **字母栏真 48dp**：Rail 显式豁免（现命中区 ≈24×13dp，纵向未铺满整槽），48dp 目标 = 轨道可滚动/分页/减常驻数的信息架构级改动 → UI 重设计轮（先改 Spec）。
 - **liveRegion `spacedBy` 幽灵间距**（常驻容器空态多给一份间距）→ UI 重设计轮版面重排。
 - **`AccessibilityContractSources` 抽公共 fixture**：本轮为不碰 T6 类复制了 helper（`stripComments`+扫描守卫已第 5 份副本），归终审一次修批。
-- **Favorites / WrongWords 零设备取证**：两屏无 connected UI 测试类，`weight(1f)` 头部只有编译级保证（纯静态改动）。
+- **L-T11-4 / D-8｜Favorites / WrongWords 零设备取证**：两屏无 connected UI 测试类，`weight(1f)` 头部只有编译级保证（纯静态改动）。**同一缺口也覆盖 48dp 触控站点 8**（`FavoritesScreen.kt:78` / `WrongWordsScreen.kt:70` 的 `.defaultMinSize(48.dp)` 无 connected 断言，`task-10-report.md` §站点8）→ 与「7/8 达成」的计数一并归 UI 重设计轮 + QA 第三轮。
 - **L-T11-1**：`fontScale=2.0` CheckIn 标题被 `weight(1f)` 压到 78.48dp 换 4 行（可达不美观），结构性修法归 UI 重设计轮。
 - **L4 / I-1 no-op**：详情页 liveRegion 容器「删容器必红」RED 留痕未跑，收口=静态闭合；3 处 `fillMaxWidth().horizontalScroll()` 为版面 no-op（护栏不钉存在性，不得写「头部溢出已由 T11 收口」）；`LicensesScreen.kt:62` 裸 `horizontalScroll` 禁止统一成带 `fillMaxWidth` 形状（D-4/Ruling T11-B）。
 - **L8**：`WordCardPronunciationControlsTest.kt:26-29` 过期注释（不影响断言）。
+- **L9 / D-9**：喇叭药片 `minimumInteractiveComponentSize` 加在 padding 内侧、随节点放大到 ≈60dp → 词卡/音标行打架与头部大字号溢出风险，归 QA 第三轮设备取证（验证文档 §9/§10；派发 §F 要求报告 §5 含 L7/L8/L9 三条，本条为补记）。
+- **已知债 M-B1 / M-B2 / M-A2（终审后修复轮登记，本轮不改实现）**：契约正则只锁精确空格与同行形状（`+=`/换行赋值/压缩空格可逃逸）、`stripComments` 的 `//.*` 吞同行 URL 后半段（禁令 1/2/3 三类同款缺陷）→ 验证文档 §1.1「契约测试匹配面局限」；`exitLearning` 与阅读页三条收口只清 UI 三元组、不 `stopPlayback()`（BASE 既有行为）→ QA 第三轮设备清单 + 播控重设计轮候选。
 - **AppScreenTest flaky**：已知 back/导航族 8 flaky，基线对照法判定、不改断言，本轮双跑未触发。
 - **合 main 请示**：是否 FF 合 main 听用户拍板（惯例：验收后合）；里程碑真机安装（`adb -s bf353dda install -r app-debug.apk`）由 controller 执行、装完提示用户尽快试用（MIUI 会自动卸载 adb 装的应用）。
 

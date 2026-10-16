@@ -35,7 +35,9 @@ import kotlin.test.assertTrue
  *    （同一行）一并抹掉——如 `url = "https://example.com"` 所在行若同时携带 testTag 锚点或
  *    contentDescription，该行后半段对规则不可见，offender 会**静默逃逸**。禁令1（Task 1）与
  *    禁令3（Task 3）的 stripComments 同款缺陷尚未在各自 KDoc 记录，本条按控制者裁决先记于此，
- *    整支终审时统一修复；新增站点不要把锚点/标签写到含 `//` 字面量的同一行即可规避；
+ *    统一口径与处置归口见 `docs/verification/f5-03-accessibility-hardening-2026-10.md`
+ *    §1.1「契约测试匹配面局限」（账号=已知债 M-B2，本轮不改判定逻辑）；
+ *    新增站点不要把锚点/标签写到含 `//` 字面量的同一行即可规避；
  *  - 窗口判定是「锚点之后文本里出现 contentDescription 字样」而非 AST 级配对：锚点后 80 字符内
  *    恰好出现**别的**组件的 contentDescription 会误放行未加标签的开关（漏判）；反之标签合法但
  *    书写距离超窗（如插入长 lambda）会误判违规（过判）——误伤时优先紧凑书写，勿放宽窗口；

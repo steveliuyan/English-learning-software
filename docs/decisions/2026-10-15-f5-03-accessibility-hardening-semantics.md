@@ -104,9 +104,19 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
 - 词书卡选中态：Row 语义 `stateDescription = 已选/未选`（contentDescription 保留中文动作文案）。
 - 滑动删除：`SwipeToDismissBox` 语义 `customActions(label = "删除词书")` 直接触发 `onDelete`
   （手势语义不变、confirmValueChange 恒 false 的「滑不删、弹确认」红线不动——为 TalkBack 提供无手势替代路径）。
+  - **终审 I-A2 订正（2026-10-17 修复轮，提交 `f9e4abd`）**：本条原文只说「`SwipeToDismissBox` 语义」，
+    实现据此挂在容器**外层** modifier（只有 testTag、不可点击）；语义合并方向是子节点流入承载 merged
+    的节点，父属性不下发给内层 `WordBookCard` 的 `clickable` 合并节点（= TalkBack 实际聚焦处），
+    动作等于读屏拿不到。**口径修正为**：`customActions` 必须与承载 `clickable` 的合并节点**同节点**声明，
+    容器外层只保留 `testTag`（红底像素护栏依赖它）；connected 护栏钉「同节点命中数恰为 1」，
+    真机可达仍归设备 QA 第三轮。
 - 底部导航 `TabSlot` 与学习记录 `Tab`：`role = Role.Tab` + `stateDescription` 选中态。
 - 展开组件（许可 NoticeCard、阅读历史版本组）：`stateDescription = 已展开/已收起`。
 - Slider：contentDescription 动态带上当前值（「每日新词目标，当前 N 词」）。
+  - **终审 I-A1 推广（2026-10-17 修复轮，提交 `f9e4abd`）**：同一口径适用于**任何点击即改档的合并节点**，
+    不止 Slider——语音设置页「发音语速」循环按钮原写静态 `contentDescription = "发音语速"`，
+    档位文字在兄弟 `Text` 里、该行又不属于 liveRegion 常驻容器 → 切换后读屏无从得知倍率。
+    现固定为「`发音语速，当前 ${档位}`」并另带 `stateDescription = 当前档位`。
 - liveRegion：词卡 `submitting`/发音状态文字、**阅读页发音状态文字**与**词卡详情页发音状态文字**一律挂在**常驻容器**上
   （Task 6 判例：live region 必须一直存在于组合中、靠子节点进出触发播报；把 `liveRegion`
   配在随文案进出组合的瞬时节点上，节点不存在时没有任何东西可宣告，等于没配。

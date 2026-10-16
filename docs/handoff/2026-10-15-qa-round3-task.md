@@ -3,8 +3,11 @@
 > 交接对象：独立设备 QA 分对话。本任务书自包含，执行前仍须读 `AGENTS.md`、
 > `docs/specs/05-release-quality-and-compliance.md`（F5-03/AC5-03）与
 > `android-connected-qa-loop` skill。基线分支：
-> `stage-5-sp-cde-licenses-release-and-accessibility`（SP-C/D/E 收口后按惯例听用户拍板 FF 合 main；
-> 若届时已合 main，直接在 main 上走查，产物提交按仓库交接惯例）。
+> **`stage-5-f5-03-accessibility-hardening`**（§3 的「阶段 5 F5-03 收口攒批」10+ 项**只存在于该分支**，
+> 切到 `stage-5-sp-cde-licenses-release-and-accessibility` 或已 FF 的旧 main 上，四控、`heightIn` 底栏、
+> `fontScale=2.0` 护栏、字母栏 Rail 护栏、含字徽标改造都**不在树上**，等于无从取证）。
+> SP-C/D/E 原有项仍按 `stage-5-sp-cde-licenses-release-and-accessibility`（或届时已 FF 的 main）走查；
+> F5-03 批执行前先 `git rev-parse --abbrev-ref HEAD` 自证分支。
 
 ## 0. 总纪律（违反任何一条=本轮结果作废）
 
@@ -52,7 +55,9 @@
 - **I-8 四控真出声冒烟**：真机验「暂停→静音、继续→复播、停止→文案回空闲」。connected 断言只证委托发生，TTS 侧只能报「已请求」，无法自动化证明真出声。
 - **系统 TTS 下「只有停止」的可理解性**：暂停/继续按钮呈现条件=选中引擎 ≠ SystemTts（决策 §2），TalkBack 下系统 TTS 用户只见「停止」是否会困惑；词卡路径 `pauseResumeSupported` 偏保守（系统 TTS 用户看不到本可工作的暂停）。
 - **真机 1.25x→1.0x 降速取证**：系统 TTS 变速目前只有 JVM 序列证据，真机需确认切回常速真的降速（`fdbf4b4` 修的就是「切回不降速」）。
-- **滑动删除 `customActions(label="删除词书")` 可达性**：Compose 测试框架无断言 customAction 可达性的 API（禁伪造断言），需 TalkBack 下走查该动作是否可触发且仍只弹二次确认、不真删。
+- **滑动删除 `customActions(label="删除词书")` 可达性（终审 I-A2，必查）**：本轮已把该动作从 `SwipeToDismissBox` 外层**移到与 `clickable` 同一节点**（TalkBack 实际聚焦的合并节点），并加了 connected 护栏断言「同节点命中数恰为 1」；但 Compose 测试框架无「焦点序列可见」API。真机 TalkBack 下**聚焦词书条目**时，动作列表里是否真的出现「删除词书」、触发后是否仍只弹二次确认不真删。
+- **语速切换播报（终审 I-A1，必查）**：语音设置页「发音语速」行已把当前档位写进 `contentDescription`（「发音语速，当前 1.25x」）与 `stateDescription`；点按循环后 TalkBack 是否**播报这一变化**（合并节点描述更新是否被朗读属引擎行为，无自动化 API）。顺带核对档位文字与播报值一致。
+- **退出路径不停发声（终审 M-A2，BASE 既有行为、本分支未改）**：学习流 `exitLearning` 与阅读页三条收口只清 UI 三元组、不调 `stopPlayback()` → 返回计划页/文章列表后朗读可能继续而控件已随屏消失。取证现象并记录，处置归播控重设计轮候选。
 - **揭晓焦点播报**：词卡「显示释义」由隐藏→可见时 `FocusRequester.requestFocus()` 是否真落地、朗读不含答案（全仓首个焦点顺序改动，`runCatching` 防崩）。
 - **动态字体顶档不破版**：逐档走查，**必须含 `fontScale = 3.0` 与真机 MIUI 字体档**（connected 护栏只覆盖 2.0 档；几何推演 3.0 档三条 48dp 链会吃满约 370.6dp 内容宽、标题可能已 <48dp，HEAD 代码在该档会让护栏变红）——含本轮改过的底栏与 CheckIn 图表。
 - **放大药片打架**：喇叭药片 `minimumInteractiveComponentSize` 在 padding 内侧、随节点放大到 ≈60dp，取证在词卡/音标行是否与相邻控件打架。
