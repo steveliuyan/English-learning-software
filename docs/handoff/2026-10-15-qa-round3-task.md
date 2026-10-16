@@ -64,6 +64,8 @@
 - **两处含字徽标顶档**：`AiFeatureScreen.kt:84 size(44.dp)`、`SettingsScreen.kt:395 size(32.dp)` 在 fontScale 顶档字形顶出底块的破版证据（归重设计轮）。
 - **深色走查**：F5-03 侧 Compose 深色完全未落地（见 §2 深色全页面走查、D-2 复测），token 化归 UI 重设计轮，此处仅登记设备现状。
 - **字母栏触控实际可达性**：词书字母 Rail 现命中区 ≈24×13dp（纵向未铺满整槽，代偿=整槽内命中 + 整轨拖动），真手指下的可命中率取证（48dp 目标归重设计轮）。
+- **三屏零测试引用族扩到三屏（终审 M-5，2026-10-17 第二批修复轮追加）**：原预登记的 `FavoritesScreen`、`WrongWordsScreen`（`.defaultMinSize(48.dp)` + no-op `horizontalScroll`）之外，**新增第三屏 `WorksheetPreviewScreen`**。已用 `git diff 4b3f1a6..HEAD -- …/WorksheetPreviewScreen.kt` 核实：本轮改的**不只是注释**——底部两枚按钮 `Modifier.weight(1f).height(52.dp)` → `weight(1f).heightIn(min = 52.dp)`（现 `:128`/`:134`，大字号下按钮可自行长高，是真实排版行为变化）、导出按钮 `contentColor = Color.White` → `AppPalette.OnMintPrimary`（现 `:137`，对比度修复）。全仓 `grep -rln "WorksheetPreviewScreen\|FavoritesScreen\|WrongWordsScreen" app/src/androidTest app/src/test` **命中 0 个文件**，故这三处的 48dp/对比度宣称目前只有源码与静态契约支撑（AC5-03 的「7/8 站点」口径不含这三屏，不阻塞合 main）。
+  设备清单（三屏各一条高度断言 + 一次取色核对）：① 三屏各补一条 connected `assertHeightIsAtLeast(48.dp)`（收藏/错词取 `.defaultMinSize(48.dp)` 那条链，工作表预览取两枚按钮行）并实跑登记 `OK (n tests)`；② 三屏各做一次取色核对（工作表预览导出按钮重点核 `AppPalette.OnMintPrimary` 落在 `MintPrimary` 底上的实际读数，含深色/顶档）；③ `fontScale` 顶档下工作表预览底部按钮行长高不破版留影。
 
 ## 4. 证据与出口
 
