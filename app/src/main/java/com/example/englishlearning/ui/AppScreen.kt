@@ -67,7 +67,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -1925,7 +1927,24 @@ internal fun SwipableWordBookCard(
         // 用户要的是「往左滑」露出删除键：条目向左滑，操作区从右侧露出。
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
-        modifier = Modifier.testTag("wordbook_swipe_${book.id}"),
+        modifier = Modifier
+            .testTag("wordbook_swipe_${book.id}")
+            .semantics {
+                // 滑动是视觉手势，TalkBack 念不到也做不出来：把「删除词书」登记为无障碍自定义动作，
+                // 与滑动 confirmValueChange 走同一个 onDelete（只弹确认框，两步确认红线不变）。
+                onDelete?.let { triggerDelete ->
+                    customActions = listOf(
+                        CustomAccessibilityAction(
+                            label = "删除词书",
+                            // Boolean 返回值语义是「动作是否已执行」：确认框弹出来了就算执行。
+                            action = {
+                                triggerDelete()
+                                true
+                            },
+                        ),
+                    )
+                }
+            },
         backgroundContent = {
             // 这层红底一直在内容之下，靠上面那张卡**正好铺满整行**把它完全盖住；
             // WordBookCard 里因此刻意不缩放（见那边的注释）。

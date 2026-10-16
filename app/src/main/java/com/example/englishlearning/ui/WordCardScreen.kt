@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,10 +23,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -144,6 +154,19 @@ fun WordCardScreen(
             }
 
             is WordCardUiState.Ready -> {
+                // F5-03 焦点迁移：释义节点是随 meaningRevealed 翻真才进组合的新节点，
+                // 不主动把焦点移过去，「显示释义」按钮离开组合后焦点就落空（设备 RED 实测：
+                // 揭晓后获焦节点集合为空），读屏/键盘用户要从卡片顶部重新念，跳过刚揭晓的释义。
+                // wasRevealed 用来区分「本次揭晓」与「重进组合时已是揭晓态」，后者不抢焦点。
+                val meaningFocusRequester = remember { FocusRequester() }
+                var wasRevealed by remember { mutableStateOf(state.meaningRevealed) }
+                LaunchedEffect(state.meaningRevealed) {
+                    if (state.meaningRevealed && !wasRevealed) {
+                        // 释义节点可能已随提交/切卡离开组合：丢焦点不是学习流程的失败，禁止让它崩。
+                        runCatching { meaningFocusRequester.requestFocus() }
+                    }
+                    wasRevealed = state.meaningRevealed
+                }
                 Text(
                     text = "第 ${state.position} / ${state.total} 张",
                     style = MaterialTheme.typography.bodySmall,
@@ -206,7 +229,12 @@ fun WordCardScreen(
                                 text = state.card.meaningZh,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MintPrimaryDark,
+                                // focusable() 不是可选项：SemanticsProperties.Focused（TalkBack 播报
+                                // 焦点、测试的 isFocused() 都读它）只由 FocusableNode 写入，光挂
+                                // focusRequester 的纯文本节点拿到焦点也不进语义树，等于假通过。
                                 modifier = Modifier
+                                    .focusRequester(meaningFocusRequester)
+                                    .focusable()
                                     .testTag("word_card_meaning")
                                     .semantics { contentDescription = "释义 ${state.card.meaningZh}" },
                             )
@@ -263,7 +291,14 @@ fun WordCardScreen(
                     )
                 }
                 if (state.submitting) {
-                    Text("正在保存…", color = MintTextMuted, modifier = Modifier.testTag("word_card_submitting"))
+                    // 瞬时状态：只在这句话出现/消失时播报一次（Polite），不打断用户当前朗读。
+                    Text(
+                        "正在保存…",
+                        color = MintTextMuted,
+                        modifier = Modifier
+                            .testTag("word_card_submitting")
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                    )
                 }
                 pronunciationMessage?.let { message ->
                     Text(
@@ -271,7 +306,11 @@ fun WordCardScreen(
                         color = MintTextMuted,
                         modifier = Modifier
                             .testTag("word_card_pronunciation_message")
-                            .semantics { contentDescription = message },
+                            // 同上：发音排队/播放/失败提示都是不打断当前朗读的瞬时状态。
+                            .semantics {
+                                contentDescription = message
+                                liveRegion = LiveRegionMode.Polite
+                            },
                     )
                 }
                 FeedbackButton(state, CardFeedback.Unknown, "不认识", "word_card_feedback_unknown", onSubmit)

@@ -9,7 +9,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.domain.CardFeedback
-import com.example.englishlearning.learning.domain.WordCard
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -206,33 +205,4 @@ class WordCardScreenTest {
         composeRule.onNodeWithTag("word_card_no_cards").assertExists()
         composeRule.onNodeWithContentDescription("返回今日计划").assertExists()
     }
-
-    private fun ready(
-        card: WordCard = card(),
-        submitting: Boolean = false,
-        message: String? = null,
-        meaningRevealed: Boolean = false,
-    ) = WordCardUiState.Ready(
-        card = card,
-        position = 1,
-        total = 3,
-        completedCount = 0,
-        submitting = submitting,
-        message = message,
-        meaningRevealed = meaningRevealed,
-    )
-
-    private fun card(
-        example: String? = "She has the ability to explain complex ideas simply.",
-        inflections: List<String> = emptyList(),
-    ) = WordCard(
-        cardId = "placeholder:cet4:ability",
-        wordBookId = "cet4",
-        lemma = "ability",
-        ipa = "əˈbɪləti",
-        partOfSpeech = "n.",
-        meaningZh = "能力；才能",
-        example = example,
-        inflections = inflections,
-    )
 }
