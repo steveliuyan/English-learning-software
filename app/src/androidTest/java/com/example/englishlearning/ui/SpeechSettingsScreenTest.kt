@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -28,7 +29,9 @@ class SpeechSettingsScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     private fun expandCandidates() {
-        composeRule.onNodeWithTag("speech_toggle_candidates").performClick()
+        // v32 语速 Row 把本页抬高，折叠按钮会落在视口外：performClick 前必须 performScrollTo，
+        // 否则点击命中别处、展开态不变（与 AppScreenTest 本页族同一写法、同一理由）。
+        composeRule.onNodeWithTag("speech_toggle_candidates").performScrollTo().performClick()
         composeRule.waitForIdle()
     }
 
@@ -54,12 +57,12 @@ class SpeechSettingsScreenTest {
         // 待接入厂商默认收进折叠区：一级语音页主体不再被 6 行死占位淹没。
         composeRule.onNodeWithTag("speech_zipvoice").assertDoesNotExist()
         composeRule.onNodeWithTag("speech_pending_azure").assertDoesNotExist()
-        composeRule.onNodeWithTag("speech_more_providers").assertHasClickAction().performClick()
+        composeRule.onNodeWithTag("speech_more_providers").assertHasClickAction().performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_zipvoice").assertExists().assertHasNoClickAction()
         listOf("azure", "volcengine", "tencent", "bailian", "minimax").forEach {
             composeRule.onNodeWithTag("speech_pending_$it").assertExists().assertHasNoClickAction()
         }
-        composeRule.onNodeWithTag("speech_more_providers").performClick()
+        composeRule.onNodeWithTag("speech_more_providers").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_pending_azure").assertDoesNotExist()
     }
 
@@ -118,7 +121,7 @@ class SpeechSettingsScreenTest {
         }
 
         expandCandidates()
-        composeRule.onNodeWithContentDescription("选择 新配置").performClick()
+        composeRule.onNodeWithContentDescription("选择 新配置").performScrollTo().performClick()
         composeRule.waitForIdle()
 
         assertEquals(PronunciationEngine.MiMo to "other", selected)
@@ -152,7 +155,7 @@ class SpeechSettingsScreenTest {
         composeRule.onNodeWithTag("speech_bound_profile_other", useUnmergedTree = true).assertDoesNotExist()
         // 点击即收起（屏幕拿不到保存结果，失败与否都收起）；保存失败时状态不变，
         // 重新展开后旧绑定标记必须还留在「原配置」上。
-        composeRule.onNodeWithContentDescription("选择 新配置").performClick()
+        composeRule.onNodeWithContentDescription("选择 新配置").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_profile_bound").assertDoesNotExist()
         expandCandidates()
         composeRule.onNodeWithTag("speech_bound_profile_bound", useUnmergedTree = true).assertExists()
@@ -205,7 +208,7 @@ class SpeechSettingsScreenTest {
 
         composeRule.onNodeWithContentDescription("选择 小米 MiMo").performClick()
         expandCandidates()
-        composeRule.onNodeWithContentDescription("选择 MiMo 语音").performClick()
+        composeRule.onNodeWithContentDescription("选择 MiMo 语音").performScrollTo().performClick()
         assertEquals(PronunciationEngine.MiMo to "mimo", selected)
     }
 
@@ -237,7 +240,7 @@ class SpeechSettingsScreenTest {
         composeRule.onNodeWithTag("speech_add_mimo_preset").assertExists()
         // 协议不匹配的候选不得出现在 MiMo 的候选列表里。
         composeRule.onNodeWithTag("speech_profile_openai").assertDoesNotExist()
-        composeRule.onNodeWithTag("speech_add_mimo_preset").performClick()
+        composeRule.onNodeWithTag("speech_add_mimo_preset").performScrollTo().performClick()
         assertTrue(presetRequested)
     }
 

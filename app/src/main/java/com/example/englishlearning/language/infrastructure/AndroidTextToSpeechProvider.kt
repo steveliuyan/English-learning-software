@@ -62,7 +62,11 @@ class AndroidTextToSpeechProvider internal constructor(
     }
 
     /**
-     * 播放侧变速（决策 §2）：rate ≠ 1 时先落引擎语速再出声。
+     * 播放侧变速（决策 §2）：**每次**发声前都无条件落引擎语速，含 `1.0f` 的复位。
+     * 本 provider 是 Hilt `@Singleton`，而 `TextToSpeech.setSpeechRate` 是对共享引擎的**进程粘性**设置
+     * （不是逐句参数），所以「切回常速」必须显式写回 1.0f；加 `rate != 1.0f` 守卫会让引擎停在
+     * 最后一次的非 1 倍速直到进程重启，属失效而非优化（取证见 JVM 用例
+     * `returning to normal rate still resets the engine speed`）。
      * `setSpeechRate` 失败不阻断朗读——系统仍会以自身默认速度播出，
      * 变速只是体验增强项，不值得为它把整次朗读判失败。
      */
@@ -72,7 +76,7 @@ class AndroidTextToSpeechProvider internal constructor(
         forceRegenerate: Boolean,
         rate: Float,
     ): PronunciationResult {
-        if (rate != 1.0f) engine.setSpeechRate(rate)
+        engine.setSpeechRate(rate)
         return speak(text)
     }
 
