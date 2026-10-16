@@ -15,6 +15,11 @@
 
 - 分支：`stage-5-f5-03-accessibility-hardening`（自 main tip `4b3f1a6`，本计划+决策为首提交，后续任务逐提交）。
 - 门禁 = JVM 单测全绿且基线只增不减（当前 **1396**）。detekt/ktlint 存量债不属门禁（2026-09-19 基线裁决）。
+  - **基线订正（终审 M-7 批，2026-10-17，追加不改原文）**：上方 1396 是本计划首提交时的基线，仅作历史留痕；
+    实际随本轮推进至 **1467**（第一批终审修复轮收口时），本批（第二批/最后一批修复轮）再加
+    `PronunciationIdleFallbackContractTest` 的 4 条 JVM 源码契约 → **1471**。后续阶段的「只增不减」以最新登记数为准，
+    计数口径=逐份累加 `app/build/test-results/testDebugUnitTest/*.xml` 的 `tests` 属性，并核对 XML mtime
+    晚于最后一次生产码改动（UP-TO-DATE 的旧结果不得当新鲜证据）。
 - 门禁命令（顺序不可颠倒，Kokoro 边界测试读 APK 产物）：
   ```bash
   GRADLE="C:/Users/steveliuyan/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle.bat"
@@ -23,6 +28,9 @@
   ```
 - TDD：每个任务先写失败测试并观察 RED（记录失败原因），再最小实现转 GREEN。UI-only 修复按任务指定改用「JVM 契约断言」或「connected 语义断言」承担红绿证据。
 - Compose/Room connected 验证只用 `adb install -r` + `am instrument`（`android-connected-qa-loop` skill；**禁 connectedDebugAndroidTest，会清空设备数据**）；一律 `export ANDROID_SERIAL=emulator-5576`。
+  - **设备锚点订正（终审 M-7 批，2026-10-17，追加不改原文）**：本轮 connected 取证实际全部跑在 **`emulator-5574`**（上方
+    `emulator-5576` 是派发时的设想值，未成为事实；真机 `bf353dda` 禁止用于本轮自动化取证）。后续任何「逐类 `am instrument`」
+    步骤按 `emulator-5574` 执行，其余纪律不变（只允许 `adb install -r` + `am instrument -e class <FQCN>`）。
 - 红线：不删库、不 `fallbackToDestructiveMigration`；滑动删除 `confirmValueChange` 恒 false 语义不动；API Key/密钥面零接触；不新增依赖/账号/云同步/订阅。
 - 提交带身份参数、逐个 `git add`、禁 `--amend`/`--no-verify`：
   ```bash
@@ -1233,12 +1241,21 @@ if (pronunciationStatus == PronunciationStatus.Playing || pronunciationStatus ==
 
 词卡（:292-293 区域）：`wordCardPronunciationMessage` 旁加 `var wordCardPronunciationStatus by remember { mutableStateOf(PronunciationStatus.Idle) }`。自动发音 LaunchedEffect（:826-835）与 `onSpeak`（:838-849）里每次赋值 message 的同时赋 `wordCardPronunciationStatus`（请求前 `Playing`，回来后 `result`——为此把 `pronunciationStatus(...)` 结果存局部 val 再分别取 `.message()` 与状态，替换现有链式 `.message()`）。`WordCardScreen(` 调用点补：
 
+> **失效标记（终审 M-7，2026-10-17 第二批修复轮补）**：本步骤代码块字面 `else -> PronunciationStatus.Idle`
+> 已被 `docs/decisions/2026-10-15-f5-03-accessibility-hardening-semantics.md` §2 作废——五处 `onPauseResume`
+> 宿主的 `else` 分支一律**保持原状态**（`else -> held` / `else -> 当前状态变量`），不得落 `Idle`：
+> 落 `Idle` 会让整组播控（含唯一可用的「停止」）在朗读仍在继续时消失。防回归由
+> `app/src/test/java/com/example/englishlearning/ui/PronunciationIdleFallbackContractTest.kt` 锁
+> `AppScreen.kt` 剥注释后不得出现该字面形状。照本节正文实现前请先按本标记改写。
+
 ```kotlin
 pronunciationStatus = wordCardPronunciationStatus,
 onPauseResume = {
     val next = when {
         wordCardPronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
         wordCardPronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+        // 本行字面已被 docs/decisions/2026-10-15-f5-03-accessibility-hardening-semantics.md §2 作废：
+        // 五处 else 一律保持原状态（else -> held / 当前状态变量），不得落 PronunciationStatus.Idle。
         else -> PronunciationStatus.Idle
     }
     wordCardPronunciationStatus = next
