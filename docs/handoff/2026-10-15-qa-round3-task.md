@@ -45,6 +45,21 @@
 - **T2**：ML Kit 内容级抓包核验——`TODO-USER`，等用户 CA/可解密环境；用户已拍板项不擅自投入。
 - **AppScreenTest 8 个 back/导航族 flaky**：记录复现条件（设备、步进方式、是否 TalkBack/字体缩放开着），有基线对照证据（SP-B 报告 §3），**不改断言**、只归因登记。
 
+### 阶段 5 F5-03 收口攒批（Task 12 追加，只增不改上方条目）
+
+来源：`docs/verification/f5-03-accessibility-hardening-2026-10.md` §9、`docs/decisions/2026-10-15-f5-03-accessibility-hardening-semantics.md` §2/§4/§6。均为代码侧完成但缺设备取证项：
+
+- **I-8 四控真出声冒烟**：真机验「暂停→静音、继续→复播、停止→文案回空闲」。connected 断言只证委托发生，TTS 侧只能报「已请求」，无法自动化证明真出声。
+- **系统 TTS 下「只有停止」的可理解性**：暂停/继续按钮呈现条件=选中引擎 ≠ SystemTts（决策 §2），TalkBack 下系统 TTS 用户只见「停止」是否会困惑；词卡路径 `pauseResumeSupported` 偏保守（系统 TTS 用户看不到本可工作的暂停）。
+- **真机 1.25x→1.0x 降速取证**：系统 TTS 变速目前只有 JVM 序列证据，真机需确认切回常速真的降速（`fdbf4b4` 修的就是「切回不降速」）。
+- **滑动删除 `customActions(label="删除词书")` 可达性**：Compose 测试框架无断言 customAction 可达性的 API（禁伪造断言），需 TalkBack 下走查该动作是否可触发且仍只弹二次确认、不真删。
+- **揭晓焦点播报**：词卡「显示释义」由隐藏→可见时 `FocusRequester.requestFocus()` 是否真落地、朗读不含答案（全仓首个焦点顺序改动，`runCatching` 防崩）。
+- **动态字体顶档不破版**：逐档走查，**必须含 `fontScale = 3.0` 与真机 MIUI 字体档**（connected 护栏只覆盖 2.0 档；几何推演 3.0 档三条 48dp 链会吃满约 370.6dp 内容宽、标题可能已 <48dp，HEAD 代码在该档会让护栏变红）——含本轮改过的底栏与 CheckIn 图表。
+- **放大药片打架**：喇叭药片 `minimumInteractiveComponentSize` 在 padding 内侧、随节点放大到 ≈60dp，取证在词卡/音标行是否与相邻控件打架。
+- **两处含字徽标顶档**：`AiFeatureScreen.kt:84 size(44.dp)`、`SettingsScreen.kt:395 size(32.dp)` 在 fontScale 顶档字形顶出底块的破版证据（归重设计轮）。
+- **深色走查**：F5-03 侧 Compose 深色完全未落地（见 §2 深色全页面走查、D-2 复测），token 化归 UI 重设计轮，此处仅登记设备现状。
+- **字母栏触控实际可达性**：词书字母 Rail 现命中区 ≈24×13dp（纵向未铺满整槽，代偿=整槽内命中 + 整轨拖动），真手指下的可命中率取证（48dp 目标归重设计轮）。
+
 ## 4. 证据与出口
 
 - connected 测试需要跑时用 `android-connected-qa-loop` §1 序列（`assembleDebug`+`assembleDebugAndroidTest`→`install -r`→`am instrument -e class <FQCN>#<method>`）。
