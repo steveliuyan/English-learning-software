@@ -1810,7 +1810,7 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
             enabled = canCreate,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .heightIn(min = 54.dp)
                 .background(AppleMintGradient, RoundedCornerShape(18.dp))
                 .semantics { contentDescription = "创建资料" },
             shape = RoundedCornerShape(18.dp),
@@ -2019,7 +2019,7 @@ private fun LearningSetupScreen(
             enabled = !state.saving && !state.deleting,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .heightIn(min = 54.dp)
                 .background(AppleMintGradient, RoundedCornerShape(18.dp))
                 .semantics { contentDescription = "保存学习设置" },
             shape = RoundedCornerShape(18.dp),

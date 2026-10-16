@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,13 +125,13 @@ fun WorksheetPreviewScreen(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = onBack,
-                modifier = Modifier.weight(1f).height(52.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
             ) { Text("返回修改") }
             Button(
                 onClick = onExport,
                 enabled = !rendering && renderedFile != null,
-                modifier = Modifier.weight(1f).height(52.dp).testTag("worksheet_export_action"),
+                modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("worksheet_export_action"),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MintPrimary,
                     contentColor = AppPalette.OnMintPrimary,

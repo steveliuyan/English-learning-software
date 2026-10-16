@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -107,7 +107,7 @@ fun ImageStudioScreen(
             enabled = !busy && subject.isNotBlank(),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .heightIn(min = 54.dp)
                 .testTag("image_studio_generate_prompt")
                 .semantics { contentDescription = "生成画面描述" },
             shape = RoundedCornerShape(18.dp),
@@ -165,7 +165,7 @@ private fun PromptCard(prompt: String, onGenerateImage: () -> Unit) {
         onClick = onGenerateImage,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .testTag("image_studio_generate_image")
             .semantics { contentDescription = "生成图片" },
         shape = RoundedCornerShape(18.dp),

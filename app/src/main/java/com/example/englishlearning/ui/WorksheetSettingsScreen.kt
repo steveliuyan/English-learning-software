@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -179,7 +180,7 @@ fun WorksheetSettingsScreen(
         Button(
             onClick = onPreview,
             enabled = canPreview,
-            modifier = Modifier.fillMaxWidth().height(54.dp).testTag("worksheet_preview_action"),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag("worksheet_preview_action"),
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MintPrimary,

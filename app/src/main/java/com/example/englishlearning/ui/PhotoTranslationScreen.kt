@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -176,7 +177,7 @@ fun PhotoTranslationScreen(
                 enabled = !state.busy,
                 modifier = Modifier
                     .weight(1f)
-                    .height(50.dp)
+                    .heightIn(min = 50.dp)
                     .testTag("photo_translation_camera_button")
                     .semantics { contentDescription = "拍照" },
                 shape = RoundedCornerShape(16.dp),
@@ -196,7 +197,7 @@ fun PhotoTranslationScreen(
                 enabled = !state.busy,
                 modifier = Modifier
                     .weight(1f)
-                    .height(50.dp)
+                    .heightIn(min = 50.dp)
                     .testTag("photo_translation_gallery_button")
                     .semantics { contentDescription = "从相册选图" },
                 shape = RoundedCornerShape(16.dp),
@@ -292,7 +293,7 @@ fun PhotoTranslationScreen(
                 enabled = !state.busy && state.ocrText.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
+                    .heightIn(min = 54.dp)
                     .testTag("photo_translation_translate_button")
                     .semantics { contentDescription = "翻译文本" },
                 shape = RoundedCornerShape(18.dp),

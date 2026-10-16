@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -137,7 +137,7 @@ fun WordCardScreen(
                     onClick = onStartNewPhase,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
+                        .heightIn(min = 54.dp)
                         .testTag("word_card_start_new_phase")
                         .semantics { contentDescription = "开始学习新增词" },
                     shape = RoundedCornerShape(18.dp),
@@ -379,7 +379,7 @@ private fun FeedbackButton(
         enabled = !state.submitting,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .border(1.dp, if (feedback == CardFeedback.Known) MintPrimary else MintOutline, RoundedCornerShape(18.dp))
             .testTag(tag)
             .semantics { contentDescription = label },
@@ -399,7 +399,7 @@ private fun BackToPlanButton(onBackToPlan: () -> Unit) {
         onClick = onBackToPlan,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .testTag("word_card_back_to_plan")
             .semantics { contentDescription = "返回今日计划" },
         shape = RoundedCornerShape(18.dp),

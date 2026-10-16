@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -258,7 +259,7 @@ private fun AiNavigationCard(todayWordCount: Int?, dueWordCount: Int?, onOpenWor
                             onClick = onOpenWordList,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(46.dp),
+                                .heightIn(min = 48.dp),
                             testTag = "ai_learning_nav_detail",
                             contentDescription = "查看详情",
                         )

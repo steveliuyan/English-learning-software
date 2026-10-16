@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -139,7 +140,7 @@ fun GlobalVocabularySearchScreen(
                 // 空输入时**也必须可用**：页面提示写着「空输入会显示最近搜索」，按钮一禁用，
                 // 用户清空输入后就回不到最近搜索，只能退出页面从主页重进——文案承诺的能力
                 // 必须真的能触发。所以这里不设 `enabled`，只是把文案切成对应的动作。
-                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("global_search_submit"),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("global_search_submit"),
                 colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
                 shape = RoundedCornerShape(14.dp),
             ) { Text(if (trimmedQuery.isEmpty()) "查看最近搜索" else "全量搜索") }
