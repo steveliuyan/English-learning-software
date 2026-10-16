@@ -329,8 +329,14 @@ fun AppScreen(
             val speechState = speechSettingsViewModel?.state?.collectAsState()?.value ?: SpeechSettingsUiState()
             // 裁决 B2（决策 §2，Task 7 取证）：`android.speech.tts.TextToSpeech` 没有公开 pause()/resume()，
             // 引擎侧恒返回 false。因此「暂停/继续」按钮的呈现条件只能是**选中引擎 ≠ SystemTts**，
-            // 在 UI 侧一次算好传给三处屏；若改成看 pausePlayback() 返回值，系统 TTS 下点暂停会落
-            // `else -> Idle` 让整组消失，而朗读仍在继续、用户连可用的「停止」都失去。
+            // 在 UI 侧一次算好传给三处屏。
+            // N-3（Task 10 携带的 T9 复评 Minor，纯注释订正）：本段旧措辞写「若改成看 pausePlayback()
+            // 返回值，系统 TTS 下点暂停会落 `else -> Idle` 让整组消失」——`else -> Idle` 已被决策 §2
+            // 「播控失败的状态机口径」废除，五处宿主（记录详情 / 词卡 / 收藏详情 / 阅读整篇 / 阅读点词详情）
+            // 现均为 `else -> 原状态`，即失败时**保持原状态、整组与「停止」照常可达**。
+            // 准确口径是：正因 `else` 保持原状态，「呈现条件」与「pausePlayback() 返回值」解耦才成立；
+            // 若把呈现条件改按返回值，系统 TTS 下（恒 false）播控组会整组不呈现，连始终可用的「停止」也一起消失；
+            // 若把失败分支写成落 Idle，则朗读仍在继续时「停止」同样会被收掉（N-1 的两处新例即钉此性质）。
             // 词路径的 activeProvider 恒为 Kokoro（PronunciationRouter.kt:54），故系统 Tts 下这里偏保守，
             // 属决策 §2 已登记的收窄口径，本任务不放宽。
             val pauseResumeSupported = speechState.selectedEngine != PronunciationEngine.SystemTts

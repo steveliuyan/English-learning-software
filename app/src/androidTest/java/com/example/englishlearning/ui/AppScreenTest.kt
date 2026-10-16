@@ -878,6 +878,80 @@ class AppScreenTest {
     }
 
     /**
+     * N-1（T9 复评 Minor）：I-5 的「暂停被拒 → 保持原状态」在决策 §2 下有**五处**宿主
+     * （记录详情 / 词卡 / 收藏详情 / 阅读整篇 / 阅读点词详情，均写作 `else -> 原状态`），
+     * 修复轮只钉了词卡宿主一处。本例把**阅读整篇宿主**与下一例的**阅读点词详情宿主**补上，
+     * 形状与 I-5 完全一致：恒返回 false 的挂起 provider + 真实宿主导航 + 点暂停后断
+     * 「停止/暂停仍 `assertIsDisplayed()`」且状态文案仍是「正在播放发音…」
+     * （落 Paused 会变「已暂停播放…」，落 Idle 则整组与文案一起消失）。
+     * 宿主行号不写死（派发实测锚点已随注释漂移，一律以 grep `else -> ` 为准）。
+     * 证伪口径（伪修反证，报告 §N-1）：把整篇宿主的 `else -> articlePronunciationStatus` 改成
+     * `else -> PronunciationStatus.Idle` 后本例必红——失败信息即「整组消失」。
+     */
+    @Test
+    fun anArticlePauseRejectedByTheEngineKeepsPlayingSoStopStaysReachable() {
+        val provider = HangingPronunciationProvider()
+        val reading = readingFixture()
+        val speech = speechFixture(autoSpeakOnCardReady = false)
+        composeRule.setContent {
+            readyAppScreen(
+                pronunciationProvider = provider,
+                speechSettingsViewModel = speech.speech,
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_open_today").fetchSemanticsNodes().isNotEmpty()
+        }
+        openTodayArticle()
+        speakArticleAndAwaitControls()
+
+        composeRule.onNodeWithTag("article_pronunciation_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("article_pronunciation_toggle").assertIsDisplayed()
+        composeRule.onNodeWithTag("article_pronunciation_stop").assertIsDisplayed()
+        composeRule.onNodeWithText("正在播放发音…").assertIsDisplayed()
+        provider.release()
+    }
+
+    /**
+     * N-1 第二处：阅读页点词详情宿主（`AppScreen.kt:1472` `else -> held`）。
+     * 走真实导航（今日文章 → 关覆盖窗 → 点正文词 → 详情喇叭），点暂停后播控组与 Playing 文案都必须在；
+     * 该宿主与整篇宿主**不共用状态变量**（详情用 `detailPronunciationMessage`），故必须单独钉。
+     */
+    @Test
+    fun aReadingWordDetailPauseRejectedByTheEngineKeepsPlayingSoStopStaysReachable() {
+        val provider = HangingPronunciationProvider()
+        val reading = readingFixture()
+        val speech = speechFixture(autoSpeakOnCardReady = false)
+        composeRule.setContent {
+            readyAppScreen(
+                pronunciationProvider = provider,
+                speechSettingsViewModel = speech.speech,
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        openReadingWordDetail()
+        composeRule.onNodeWithContentDescription("播放 apple 发音").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_pronunciation_toggle").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("card_detail_pronunciation_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("card_detail_pronunciation_toggle").assertIsDisplayed()
+        composeRule.onNodeWithTag("card_detail_pronunciation_stop").assertIsDisplayed()
+        composeRule.onNodeWithText("正在播放发音…").assertIsDisplayed()
+        provider.release()
+    }
+
+    /**
      * I-6 宿主级接线钉：详情三宿主的 `pronunciationControlsEnabled = true` 之一（记录详情）+
      * 停止收口。Playing 下播控组存在（MiMo 引擎 → 暂停可用），点停止后整组与文案离开组合、
      * provider.stopPlayback 恰调用一次。

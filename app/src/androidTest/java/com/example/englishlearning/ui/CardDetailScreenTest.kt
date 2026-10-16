@@ -478,14 +478,21 @@ class CardDetailScreenTest {
         composeRule.onNodeWithTag("card_detail_notes_entry").assertDoesNotExist()
         // 展示栏位于例句框下方（阅读顺序契约）。
         // I-7（Task 9 评审）：本分支无障碍批改动后页面整体高于一屏，笔记栏落在首屏外时
-        // boundsInRoot 会被滚动容器裁剪成空矩形（top 归 0），位置比较即失真。按 T8 先例
-        // （SpeechSettingsScreenTest:424 补 performScrollTo 锚点）先把目标滚入首屏再比较，
-        // 断言本身一字未削弱。
+        // boundsInRoot 会被滚动容器裁剪成空矩形（top 归 0），位置比较即失真——补 performScrollTo 锚点。
+        // N-2（Task 10 携带的 T9 复评 Minor）：复评指出「两个节点都被滚进同一可视区后，
+        // 裁剪坐标的比较可能退化为恒真」（滚到位后 top 差值只反映视口排布，不再反映文档顺序）。
+        // 现改用 `getUnclippedBoundsInRoot`（同文件 `illustrationComesBeforeTheExample` 的既有先例口径）：
+        // 它给出未裁剪的根坐标，值随真实文档顺序而变，与是否在首屏无关；同时把比较收紧为
+        // 「笔记顶边在例句文本底边之下」，比原来的 top>top 更强。performScrollTo 保留（点击类断言仍需锚点）。
+        // 证伪力：伪修反证把笔记栏移到例句上方后本例必红，见报告 §N-2。
         composeRule.onNodeWithTag("card_detail_notes_section").performScrollTo()
         composeRule.waitForIdle()
-        val exampleTop = composeRule.onNodeWithTag("card_detail_example").fetchSemanticsNode().boundsInRoot.top
-        val notesTop = composeRule.onNodeWithTag("card_detail_notes_section").fetchSemanticsNode().boundsInRoot.top
-        assertTrue("我的笔记展示栏应在例句下方", notesTop > exampleTop)
+        val exampleBounds = composeRule.onNodeWithTag("card_detail_example").getUnclippedBoundsInRoot()
+        val notesBounds = composeRule.onNodeWithTag("card_detail_notes_section").getUnclippedBoundsInRoot()
+        assertTrue(
+            "我的笔记展示栏应在例句下方，实际 example=$exampleBounds notes=$notesBounds",
+            notesBounds.top > exampleBounds.bottom,
+        )
 
         composeRule.onNodeWithTag("card_detail_notes_manage").performClick()
         composeRule.waitForIdle()
