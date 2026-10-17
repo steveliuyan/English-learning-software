@@ -136,6 +136,9 @@
    （三案对照与选型理由见 [`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`](../../decisions/2026-10-18-ui-redesign-icon-duotone.md)）。
    因此**不复制 Material Symbols 的路径数据**，只以它的 24dp 网格、2px 视觉重量与 Outlined 无填充风格作度量基准，
    逐枚自行绘制矢量路径并内嵌为 `ImageVector` 常量，集中写入 `ui/components/AppIcons.kt`（约 30 枚上下，每枚两层）。
+   括注的「约 30 枚上下，每枚两层」为写作时估计，已由 2026-10-18 裁决取代：枚数与两层豁免以
+   [`docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`](../../decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md)
+   的 33 枚清单与 5 枚豁免表为准（§9 AC-R-05b 同口径）。
    落选的 A（单色描边 + `deep` 实底，直接内嵌上游路径）与 C（48dp 图块 + 实心图形 + 高光条 + 投影）
    仍可在 `docs/design/2026-10-17-ui-redesign-mockups.html` §6.2 复核；C 被否的决定性原因是
    行内 17dp 实心图形不可用，等于要维护两族字形。
@@ -275,4 +278,7 @@
 4. Material Symbols 台账条目描述的是「内嵌路径数据的改作」，若上游字形版本更新，需同步台账「版本」字段。
 5. **图标呈现选型已定**：用户在 2026-10-18 选定 B 案（双色层次 + 渐变容器），§4 已按此定稿，
    选型过程与许可影响见 `docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`。
-   仍待用户在批 1 开工前确认的是：约 30 枚的逐枚清单（批 1 第一个任务即产出该清单并钉进 `AppIcons.kt` 顶部注释）。
+   原「约 30 枚的逐枚清单仍待用户在批 1 开工前确认（批 1 第一个任务即产出该清单并钉进 `AppIcons.kt` 顶部注释）」
+   一项已于同日钉定：33 枚逐枚清单与 5 枚两层豁免表见
+   [`docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`](../../decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md)，
+   本条以该文档为准。

@@ -101,10 +101,22 @@
 
 ## 影响
 
-- spec §2.1 硬规则段、§9 AC-R-03、§9 AC-R-05b 已按本文同步修订；
-  `docs/design/visual-style-guide.md` §2.3 与 §12 各补一行同口径。该文档 §2.2 表中
-  `OnMintForeground`「浅薄荷底与品牌渐变专用（≈4.6:1）」与 `OnBrandDeep`「唯一替代」两行的旧措辞
-  自本文起被裁决 3 覆盖，批 1 Task 2 校准 token 时同步改写。
+- spec §2.1 硬规则段、§9 AC-R-03、§9 AC-R-05b 已按本文同步修订；spec §4.1 与 §10 第 5 条的陈旧枚数口径
+  （「约 30 枚上下，每枚两层」「约 30 枚的逐枚清单……仍待确认」）已就地补指向，以本文钉定的 33 枚清单与
+  5 枚豁免表为准。`docs/design/visual-style-guide.md` §2.3 与 §12 各补一行同口径。
+- 该文档另有**四行**陈旧措辞自本文起被覆盖，全部列入批 1 Task 2（token 校准）的 token 表重写范围；本文只钉口径，
+  不在此改写原句：
+  1. §2.2 表内 `OnMintForeground`「浅薄荷底与品牌渐变上的前景文字/图标专用色（实测对比 ≈4.6:1）」行——
+     按裁决 3 收窄为只用于浅薄荷底，品牌渐变上的文字不再取该色（Task 2 重写）。
+  2. §2.2 表内 `OnBrandDeep`「渐变上需要更深字重时的唯一替代」行——按裁决 3 改为品牌渐变上文字的**标准**取色，
+     不再是「唯一替代」（Task 2 重写）。
+  3. §2.2 表内 `MintTextFaint #7A9088`「时间戳、脚注一类可省略信息」行——与裁决 1 冲突：时间戳与脚注是正文前景，
+     不得再由该令牌承载，这类文字改用 `text-2`（同表 `MintTextMuted #4E756A` 行，且受裁决 2 的可压底限制）；
+     `MintTextFaint` 只留 ≥24sp 大数字/装饰与纯图标描边（同属 Task 2 的 token 表重写范围）。
+  4. §2.2 段末硬规则句「前景文字与实底容器上的图标一律走 `OnMintForeground #174C44`」——与裁决 3 冲突：
+     品牌渐变上的文字改取 `on-brand #04241C`，该句的「一律」自本文起不再成立，须改写成分底表述
+     （浅薄荷底上的文字与实底容器上的图标走 `OnMintForeground`，品牌渐变上的文字走 `on-brand`；
+     同属 Task 2 的 token 表重写范围）。
 - 下游钉值关系：Task 2 `DesignTokenContractTest` 的允许/禁配表来自裁决 1/2/3；
   Task 6 `StrokeOnlyIcons` 与 `AppIconsStructureContractTest` 来自裁决 4 与上表；
   Task 7 `IconBadge` 的 `allowsInEntryContainer` 来自裁决 4 的「≥40dp 入口容器」半句；
