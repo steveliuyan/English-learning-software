@@ -35,13 +35,13 @@ private fun TextStyle.neutralForTheme(): TextStyle = copy(color = Color.Unspecif
  *
  * 可见变化（核验落点：批 1 收口真机清单，Task 10）：
  * 1. 字号/字重换档：`titleLarge` 22→24sp Bold、`titleMedium` 14→17sp SemiBold、`bodySmall` 12→13sp、
- *    `labelLarge` 14→12sp Medium、`titleSmall` 14→15sp；除 `AppType.*` 直读点外，全部
- *    `MaterialTheme.typography.*` 读点（评审期实测 206 处，该计数只作当轮证据、不随重构维护）跟着换档。
+ *    `labelLarge` 14→12sp Medium、`titleSmall` 14→15sp；除 `AppType.*` 直读点外，
+ *    全部 `MaterialTheme.typography.*` 读点跟着换档。
  * 2. 库内每角色行高消失：六档不写 `lineHeight`，去色装配后行高回落到字体度量默认值，正文观感会变紧。
  *    本轮不擅自新增 15 个 `lineHeight` 取值（spec §2.2 只钉六档）；若真机核验判「太紧」，
  *    由批 2 任务在装配点加 `lineHeight` 并把取值写进 spec，不许在此静塞。
  * 3. 全部 M3 控件的默认色从 material3 库默认（紫色系）换成薄荷装配值：这既是目的也是可见改动，
- *    `colorScheme` 的 16 处直读点同样受影响。
+ *    全部 `MaterialTheme.colorScheme.*` 直读点同样受影响。
  */
 @Composable
 fun appTypography(): Typography {

@@ -75,10 +75,11 @@ fun MintGlassTheme(
  *
  * `onErrorContainer` 是唯一按模式分叉的取值：`errorFill` 在浅套是深红、在深套是浅红，字形极性
  * 相反，所以浅套取 `text1`、深套取 `background`。M3 的 `outline` 槽是**控件边界**（OutlinedButton
- * 描边、Switch 未选中态描边…），受 WCAG 1.4.11 非文本 3:1 约束，故取 `text2`（浅套压 surface 5.15 /
- * 压最暗容器 tint3 4.10；深套压 surface 7.54 / 压 tint3 5.55，由契约按 WCAG 相对亮度当场复算）；
- * `AppColorSet.outline`（浅 `#ADE7D2`、深 `#2E4238`，压 surface 仅 1.39 / 1.55）保持装饰性细线，
- * 只由新组件直读，不进 M3 槽。`outlineVariant = set.outlineSoft` 的理由（Divider 等装饰线）不变。
+ * 描边、Switch 未选中态描边…），受 WCAG 1.4.11 非文本 3:1 约束，故取 `text2`——它在浅套压
+ * `surface` / `background` / 三种 tint 容器全部 ≥4.10、深套全部 ≥5.55，取值由契约的 `boundaryRoles`
+ * 用例按 WCAG 相对亮度压**生产装配实参**当场复算；`AppColorSet.outline` 是装饰性细线，压各自套的
+ * `surface` 只有 1.39（浅）/ 1.55（深），只由新组件直读，不进 M3 槽。`outlineVariant = set.outlineSoft`
+ * 的理由（Divider 等装饰线）不变。
  */
 @Composable
 fun appColorScheme(dark: Boolean): ColorScheme {

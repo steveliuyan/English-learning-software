@@ -185,6 +185,7 @@ class MaterialThemeAssemblyContractTest {
         "outline" to "background",
         "outline" to "primaryContainer",
         "outline" to "surfaceVariant",
+        "outline" to "secondaryContainer",
         "outline" to "surfaceContainerHigh",
         "outline" to "tertiaryContainer",
     )
