@@ -112,7 +112,10 @@ class MaterialThemeAssemblyContractTest {
         "inverseSurface" to "set.text1",
         "inverseOnSurface" to "set.surface",
         "inversePrimary" to "set.tint",
-        "outline" to "set.outline",
+        // I-1 裁决：M3 的 outline 槽是控件边界（OutlinedButton 描边、Switch 未选中态描边…），
+        // 受 WCAG 1.4.11 非文本 3:1 约束，取 text2；装饰性细线 set.outline 只由新组件直读，不进 M3 槽
+        // （下限复算见 boundaryRoles 用例，压生产装配实参，非仅本表）。
+        "outline" to "set.text2",
         "outlineVariant" to "set.outlineSoft",
         "surfaceContainerLowest" to "set.surface",
         "surfaceContainerLow" to "set.surface",
@@ -136,10 +139,11 @@ class MaterialThemeAssemblyContractTest {
     /**
      * 装配点引入的字形对容器配对，全部按正文族下限 4.5:1 复算（左列字形压右列容器；
      * 后几组是同一批容器色在「字形直接压底」用法下的对偶，如 TextButton 取 `primary` 作字色）。
-     * `outline` / `outlineVariant` 故意不在表内：它们是 spec §2.1 的装饰性细线（卡片描边、
-     * 分隔线），不承担非文本信息；非文本 3:1 下限走域色 `deep` 容器那条路径（spec §2.1
-     * 「域色容器上的字形对比」段，由组件任务落地）。M3 组件内部的轨道/拇指配对不在 JVM 侧
-     * 可验证范围，留给真机核验。
+     * `outline` / `outlineVariant` 故意不在本表：M3 `outline` 槽是非文本边界（控件描边），其
+     * 3:1 下限由下面 `boundaryRoles` 用例按 WCAG 1.4.11 单独当场复算；`outlineVariant` 取
+     * `outlineSoft`，只作 Divider 等装饰细线、不承担非文本信息（域色 `deep` 容器的非文本下限走
+     * spec §2.1「域色容器上的字形对比」段，由组件任务落地）。M3 组件内部的轨道/拇指配对不在
+     * JVM 侧可验证范围，留给真机核验。
      */
     private val textPairRoles: List<Pair<String, String>> = listOf(
         "onPrimary" to "primary",
@@ -168,6 +172,21 @@ class MaterialThemeAssemblyContractTest {
         "onSurface" to "surfaceContainerHighest",
         "onSurface" to "surfaceBright",
         "onSurface" to "surfaceDim",
+    )
+
+    /**
+     * 非文本边界角色（左列）压其实际所在容器角色（右列）：I-1 裁决把 `colorScheme.outline` 从
+     * `set.outline` 换到 `set.text2`，因为 M3 把该槽用作控件边界（OutlinedButton 描边、Switch
+     * 未选中态描边…），受 WCAG 1.4.11 的 3:1 下限约束。复算对象是**生产装配实参**而不是本表——
+     * 钉住「谁把 set.outline 塞回 M3 槽」这个动作本身。
+     */
+    private val boundaryRoles: List<Pair<String, String>> = listOf(
+        "outline" to "surface",
+        "outline" to "background",
+        "outline" to "primaryContainer",
+        "outline" to "surfaceVariant",
+        "outline" to "surfaceContainerHigh",
+        "outline" to "tertiaryContainer",
     )
 
     // ---------- 读取与守卫 ----------
@@ -377,13 +396,16 @@ class MaterialThemeAssemblyContractTest {
             setContentRoot.containsMatchIn(body),
             "MainActivity 内容根必须是 MintGlassTheme，否则 CompositionLocal 无提供者，Mint* 会取到默认浅套"
         )
+        // M-3：原先这里还有一条对 `import …theme.ThemeMode` 的字面 import 断言，已删——Task 5 会把
+        // `themeMode = ThemeMode.System` 换成 `themeMode = rememberAppThemeMode()`，该 import 届时可能消失，
+        // 字面断言会假红。下面的实参名守卫保留，接线形状契约不变：Task 5 必须是
+        // `MintGlassTheme(themeMode = rememberAppThemeMode()) { AppScreen(...) }`——实参名保留、值换成回读表达式。
         assertTrue(
             Regex("""MintGlassTheme\(\s*themeMode\s*=""").containsMatchIn(body),
             "MintGlassTheme 必须显式接 themeMode 实参（Task 5 把它换成 rememberAppThemeMode()）"
         )
         listOf(
             "import com.example.englishlearning.ui.theme.MintGlassTheme",
-            "import com.example.englishlearning.ui.theme.ThemeMode",
         ).forEach { fqcn ->
             assertTrue(
                 Regex("""^${Regex.escape(fqcn)}$""", RegexOption.MULTILINE).containsMatchIn(body),
@@ -549,6 +571,34 @@ class MaterialThemeAssemblyContractTest {
         assertTrue(r < 4.5, "合成负例失效：深套浅墨压 error-fill 实测 %.2f:1 竟已过正文阈值（公式或阈值错了）".format(r))
     }
 
+    @Test
+    fun `boundary roles assembled into the color scheme keep the non-text 3 to 1 floor`() {
+        val body = functionText(mintGlassThemeText(), "appColorScheme")
+        listOf(false to "浅套", true to "深套").forEach { (dark, schemeName) ->
+            val set = if (dark) AppColorDark else AppColorLight
+            val args = namedArgs(parenBlock(body, if (dark) darkSchemeCall else lightSchemeCall))
+            boundaryRoles.forEach { (boundaryRole, containerRole) ->
+                val boundaryExpr = args[boundaryRole] ?: error("$schemeName 装配缺 $boundaryRole 实参")
+                val containerExpr = args[containerRole] ?: error("$schemeName 装配缺 $containerRole 实参")
+                assertAtLeast(
+                    "$schemeName colorScheme.$boundaryRole($boundaryExpr) 压 $containerRole($containerExpr)" +
+                        "（M3 控件边界，WCAG 1.4.11 非文本下限）",
+                    fieldOf(set, fieldsOf(boundaryExpr).single()),
+                    fieldOf(set, fieldsOf(containerExpr).single()),
+                    3.0,
+                )
+            }
+        }
+        // 反空转 + 裁决理由钉死：装饰细线压 surface 远低于 3.0——它一旦回到 M3 槽，上面的复算必红。
+        val decorative = ratio(AppColorLight.outline, AppColorLight.surface)
+        assertTrue(
+            decorative < 3.0,
+            "合成负例失效：装饰性细线 AppColorSet.outline（浅 #ADE7D2）压 surface 实测 %.2f:1 竟过了 3.0 下限" +
+                "（亮度公式或阈值错了）。本用例存在的理由：装饰性细线 AppColorSet.outline 不得进 " +
+                "colorScheme.outline——M3 把它用作控件边界，OutlinedButton 会掉到 1.39:1".format(decorative)
+        )
+    }
+
     // ---------- 用例：CompositionLocal 提供者（翻色链路 + 域色完整性） ----------
 
     @Test
@@ -559,14 +609,64 @@ class MaterialThemeAssemblyContractTest {
             Regex("""LocalAppColors provides set""") to "LocalAppColors provides set",
             Regex("""LocalDomainColors provides domains""") to "LocalDomainColors provides domains",
             Regex("""LocalIsDark provides dark""") to "LocalIsDark provides dark",
+            Regex("""LocalContentColor provides set\.text1""") to "LocalContentColor provides set.text1",
         ).forEach { (regex, label) ->
             assertTrue(regex.containsMatchIn(body), "CompositionLocalProvider 缺 $label：Mint* 会取到默认浅套")
         }
-        assertEquals(
-            1,
-            countMatches(text, Regex("""CompositionLocalProvider\(""")),
-            "提供者必须只有一处：第二处能在子树里换掉 token 集，装配点就失去唯一性",
+        // I-3：根内容墨必须比 MaterialTheme( 更内层。content 作 MaterialTheme 具名实参时 provider 在外层，
+        // material3 若自带（或日后自供）LocalContentColor，会在其 content 里重新提供并盖掉我们的值。
+        val materialThemePos = materialThemeCallInAssembly.find(body)?.range?.first
+            ?: error("MintGlassTheme 函数体缺 MaterialTheme( 调用：根内容墨的位置比较失去左端点")
+        val contentInkPos = contentInkProvide.find(body)?.range?.first
+            ?: error("MintGlassTheme 函数体缺 LocalContentColor provides：子树里未指定 color 的 Text 停在默认黑（深套黑压黑）")
+        assertTrue(
+            contentInkPos > materialThemePos,
+            "LocalContentColor provides 必须发生在 MaterialTheme( 之后（实际偏移 MaterialTheme=$materialThemePos、" +
+                "provider=$contentInkPos）：provider 在装配调用外层时，material3 若自带 LocalContentColor 会把我们的值盖掉"
         )
+        // 位置比较机制的合成正/负片段：同一段文本只挪 provider 相对位置，规则必须判得开。
+        assertTrue(
+            contentInkInsideMaterialTheme(
+                // 前置空格不是装饰：materialThemeCallInAssembly 要求 `MaterialTheme(` 前有空白/左大括号，
+                // 片段若从字符串开头起锚就测的是「找不到锚点」而不是位置比较。
+                " { MaterialTheme(colorScheme = s) { CompositionLocalProvider(LocalContentColor provides set.text1) { } } }"
+            ),
+            "合成正片段失效：内层 provider 被位置比较判成不合格"
+        )
+        assertTrue(
+            !contentInkInsideMaterialTheme(
+                "CompositionLocalProvider(LocalContentColor provides set.text1) { MaterialTheme(colorScheme = s) { } }"
+            ),
+            "合成负片段失效：外层 provider 被位置比较放行"
+        )
+        // M-1：与 appColorScheme 内同款，两处都钉住，防止有人把 set 拆成两份第二真值。
+        assertTrue(
+            Regex("""val set = if \(dark\) AppColorDark else AppColorLight""").containsMatchIn(body),
+            "MintGlassTheme 函数体必须由 val set = if (dark) AppColorDark else AppColorLight 取 token 集：" +
+                "appColorScheme 内已有同款，两处都钉住才防得住第二真值拆分"
+        )
+        assertEquals(
+            2,
+            countMatches(text, Regex("""CompositionLocalProvider\(""")),
+            "装配文件内 CompositionLocalProvider 应恰好两处（外层三 Local + 内层 LocalContentColor）：" +
+                "第三处能在子树里换掉 token 集，装配点就失去唯一性",
+        )
+        // M-2：仓库级唯一性——per-file 计数挡不住第二个文件在子树里换掉 token 集。
+        val mainSources = scanMainSources()
+        listOf(
+            Regex("""LocalAppColors\s+provides""") to "LocalAppColors provides",
+            Regex("""LocalDomainColors\s+provides""") to "LocalDomainColors provides",
+            Regex("""LocalIsDark\s+provides""") to "LocalIsDark provides",
+            contentInkProvide to "LocalContentColor provides",
+        ).forEach { (regex, label) ->
+            val hits = mainSources.flatMap { file -> regex.findAll(stripComments(file.readText())).map { file.name } }.toList()
+            assertEquals(
+                listOf(MINT_GLASS_THEME_NAME),
+                hits,
+                "$label 在整个 src/main/java 必须恰好命中一次且位于 $MINT_GLASS_THEME_NAME，实际命中：$hits" +
+                    "（第二处提供者能在子树里换掉 token 集）",
+            )
+        }
         assertTrue(
             Regex("""val domains = if \(dark\) DomainDark else DomainLight""").containsMatchIn(body),
             "域色必须整张 DomainLight/DomainDark 提供：给子集会让 appDomain() 与 MintPrimary 的 " +
@@ -584,10 +684,10 @@ class MaterialThemeAssemblyContractTest {
                 "colorScheme" to "appColorScheme(dark)",
                 "typography" to "appTypography()",
                 "shapes" to "AppShapes",
-                "content" to "content",
             ),
             args,
-            "MaterialTheme( 的实参必须是 appColorScheme(dark) / appTypography() / AppShapes / content",
+            "MaterialTheme( 的具名实参只能是 colorScheme / typography / shapes 三项：content 必须包在内层 " +
+                "LocalContentColor provider 里（尾随 lambda），否则 material3 若自带 LocalContentColor 会把我们的值盖掉",
         )
     }
 
@@ -657,6 +757,16 @@ class MaterialThemeAssemblyContractTest {
 
     /** 装配点内部那一次调用：前面必须是空白或左大括号，排除 `fun MintGlassTheme(` 之类同后缀名字。 */
     private val materialThemeCallInAssembly = Regex("""[\s{]MaterialTheme\(""")
+
+    /** 根内容墨提供点（I-3）：只认 `LocalContentColor provides`，注释在进入匹配前已被 stripComments 剥除。 */
+    private val contentInkProvide = Regex("""LocalContentColor\s+provides""")
+
+    /** 位置比较机制本体：provider 偏移必须大于 MaterialTheme( 偏移；任一锚点缺失判不合格。 */
+    private fun contentInkInsideMaterialTheme(fragment: String): Boolean {
+        val theme = materialThemeCallInAssembly.find(fragment)?.range?.first ?: return false
+        val ink = contentInkProvide.find(fragment)?.range?.first ?: return false
+        return ink > theme
+    }
 
     private val typographyCall = Regex("""[\s{]Typography\(""")
 

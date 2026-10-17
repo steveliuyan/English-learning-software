@@ -3,6 +3,7 @@ package com.example.englishlearning.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
@@ -13,7 +14,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 全站唯一的 `MaterialTheme` 装配点，同时是 [LocalAppColors] / [LocalDomainColors] / [LocalIsDark]
- * 的唯一提供者。
+ * 的唯一提供者，并在 `MaterialTheme` 之内把 [LocalContentColor] 显式提供为当前套的 `text1`（根内容墨）。
  *
  * 存在理由：本仓库此前没有任何 `MaterialTheme(...)` 调用，遍布 `ui/` 的
  * `MaterialTheme.typography.*` 与 `MaterialTheme.colorScheme.*` 读点直接吃 material3 默认值，
@@ -43,8 +44,15 @@ fun MintGlassTheme(
             colorScheme = appColorScheme(dark),
             typography = appTypography(),
             shapes = AppShapes,
-            content = content,
-        )
+        ) {
+            // 根内容墨：AppScreen 有三处 `Modifier.fillMaxSize().background(MintBackground)` 直接当页底，
+            // 底下未指定 color 的 Text 走的是 LocalContentColor 默认值（Color.Black），
+            // 浅套下近似 text1 看不出来，深套下就是黑压黑。这里显式给出当前主题的中性主墨，
+            // 位置必须在 MaterialTheme 之内——material3 若自己也提供 LocalContentColor，外层会被它盖掉。
+            // 本仓库解析到的 LocalContentColor 来自 androidx.compose.material3（foundation-android 1.10.0
+            // 的 classes.jar 无此符号，现场核验过），import 跟着可解析的那一支走。
+            CompositionLocalProvider(LocalContentColor provides set.text1, content = content)
+        }
     }
 }
 
@@ -66,8 +74,11 @@ fun MintGlassTheme(
  * 各功能域一律走 [appDomain] 直读，避免 M3 角色表和域色表长出第二套真值。
  *
  * `onErrorContainer` 是唯一按模式分叉的取值：`errorFill` 在浅套是深红、在深套是浅红，字形极性
- * 相反，所以浅套取 `text1`、深套取 `background`。`outline` / `outlineVariant` 是装饰性细线，
- * 不承担非文本信息，非文本 3:1 下限走 spec §2.1「域色容器上的字形对比」那条 `deep` 容器的路。
+ * 相反，所以浅套取 `text1`、深套取 `background`。M3 的 `outline` 槽是**控件边界**（OutlinedButton
+ * 描边、Switch 未选中态描边…），受 WCAG 1.4.11 非文本 3:1 约束，故取 `text2`（浅套压 surface 5.15 /
+ * 压最暗容器 tint3 4.10；深套压 surface 7.54 / 压 tint3 5.55，由契约按 WCAG 相对亮度当场复算）；
+ * `AppColorSet.outline`（浅 `#ADE7D2`、深 `#2E4238`，压 surface 仅 1.39 / 1.55）保持装饰性细线，
+ * 只由新组件直读，不进 M3 槽。`outlineVariant = set.outlineSoft` 的理由（Divider 等装饰线）不变。
  */
 @Composable
 fun appColorScheme(dark: Boolean): ColorScheme {
@@ -100,7 +111,7 @@ fun appColorScheme(dark: Boolean): ColorScheme {
             inverseSurface = set.text1,
             inverseOnSurface = set.surface,
             inversePrimary = set.tint,
-            outline = set.outline,
+            outline = set.text2,
             outlineVariant = set.outlineSoft,
             surfaceContainerLowest = set.surface,
             surfaceContainerLow = set.surface,
@@ -138,7 +149,7 @@ fun appColorScheme(dark: Boolean): ColorScheme {
             inverseSurface = set.text1,
             inverseOnSurface = set.surface,
             inversePrimary = set.tint,
-            outline = set.outline,
+            outline = set.text2,
             outlineVariant = set.outlineSoft,
             surfaceContainerLowest = set.surface,
             surfaceContainerLow = set.surface,
