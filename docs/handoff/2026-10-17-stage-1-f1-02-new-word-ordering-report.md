@@ -67,13 +67,14 @@
 
 ## 4. Git 状态
 
-- 分支 `stage-1-f1-02-new-word-ordering`，本地 10 个提交：
+- 分支 `stage-1-f1-02-new-word-ordering`，功能与文档提交链：
   `96e868a` 决策/Spec/矩阵 → `bd25a04` 口径修订 → `bde900e` 交错序实现与接线 → `5e93fd8`/`da4bf25` Task2 复审批 →
   `9e86457` 词书页渐进发布 → `ec472bd`/`190d223` Task3 评审批与复审批 → `2fe4c16` 终审批修复批 →
-  `116cb9d` 验收记录。
-- 已推送 GitHub 并核验：`git ls-remote origin stage-1-f1-02-new-word-ordering` =
-  `116cb9d0814fea997a8bf4b1940966b2a4a101a4`，与 `git rev-parse HEAD` 逐字一致（远端为新分支，
-  创建 PR 链接由 push 输出给出）。
+  `116cb9d` 验收记录 → 本报告及其收口提交（即推送后 HEAD）。
+- 已推送 GitHub 并核验：本报告的收口提交即推送后 HEAD，
+  `git ls-remote origin stage-1-f1-02-new-word-ordering` 与 `git rev-parse HEAD` 逐字一致才算备份完成
+  （具体哈希在会话回复中同步给出，不写进文档以免自漂移）。
+- 远端此前已核验的功能末端：验收记录提交 `116cb9d`（推送后 `ls-remote` 与本地 HEAD 一致）。
 - `main` 仍为 `045c316`，**本分支未合入 main**，等用户拍板。
 - 工作树干净（`.superpowers/sdd/…` 工作区与 `.worktrees/` 均在 ignore 内，不入库）。
   报告与验收记录同批入库，无未提交的遗留文件。
