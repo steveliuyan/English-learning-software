@@ -11,17 +11,18 @@ import androidx.compose.ui.graphics.Color
  * ## 七个中性令牌：组合期读取（Task 3，深色生效的主切换）
  *
  * 它们不再是 `= AppPalette.X` 的静态值，而是 `@Composable @ReadOnlyComposable get()` 读取
- * Task 2 的 `LocalAppColors` / `LocalDomainColors`。因此**调用文件一个都不用改**：中性令牌的读点
- * 全部落在组合期内（column-0 非 import 读点实测 0 处），把令牌改成组合期 getter 后，800 余处
- * `Mint*` 读点原地获得深色能力；`MintTint` 原先的裸 hex `Color(0xFFDDF7E8)` 也顺手消失，
- * 改成读 `tint`（浅套取值本就相同）。深浅两套的实际取值由 `AppColors.kt` 的
- * `AppColorLight` / `AppColorDark` 决定，切换点由 Task 4 的装配注入，本文件不再持有中性 hex。
+ * Task 2 的 `LocalAppColors` / `LocalDomainColors`。中性令牌读点全在组合期内，自动获得深色取值；
+ * 组合期之外的读取（`Canvas` 的 `DrawScope` lambda、`graphicsLayer`/`Painter` lambda、
+ * 返回 `Color` 的非组合辅助函数）需就地提读，口径见计划 Task 3 Step 4。`MintTint` 原先的裸 hex
+ * `Color(0xFFDDF7E8)` 也顺手消失，改成读 `tint`（浅套取值本就相同）。深浅两套的实际取值由
+ * `AppColors.kt` 的 `AppColorLight` / `AppColorDark` 决定，切换点由 Task 4 的装配注入，
+ * 本文件不再持有中性 hex。
  *
  * ## 四个 `AppleMint*` 品牌令牌：保持静态
  *
- * 三处**顶层** `Brush.linearGradient` 在组合期之外求值，读不了组合期 getter：
- * `ui/AiFeatureScreen.kt:47`（`AiFeatureGradient`）、`ui/AiLearningScreen.kt:56`（`AiHeaderGradient`）、
- * `ui/AppScreen.kt:100`（`AppleMintGradient`）。把品牌令牌改成 `@Composable get()` 会让这三处
+ * 三处**顶层** `Brush.linearGradient` 在组合期之外求值，读不了组合期 getter，按持有渐变的符号名指代：
+ * `AiFeatureGradient`、`AiHeaderGradient`、`AppleMintGradient`（不写 `文件:行号`——行号随改动漂移，
+ * 注释却看起来仍然权威；符号名可直接 grep）。把品牌令牌改成 `@Composable get()` 会让这三处
  * 当场编译不过。另外按 spec §2.1「品牌渐变保持现状不动」与决策 2026-10-18 裁决 3，
  * 品牌渐变浅深两套同三段、模式不变（渐变上的文字统一取 `onBrand` #04241C），静态本身也是正确语义。
  *

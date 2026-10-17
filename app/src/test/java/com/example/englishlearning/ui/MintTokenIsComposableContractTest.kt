@@ -11,8 +11,10 @@ import kotlin.test.assertTrue
  * `@Composable @ReadOnlyComposable get() = Local…` 形状组合期读取 Task 2 的 CompositionLocal，
  * **四个 `AppleMint*` 品牌令牌**必须保持 `= Color(0x…)` 静态。
  *
- * 为什么形状本身就是契约：全站中性令牌的读点全在组合期内（column-0 非 import 读点实测 0 处，
- * 见 task-3 报告），所以把令牌改成组合期 getter 不需要改任何调用文件；但反过来，只要有一个令牌
+ * 为什么形状本身就是契约：中性令牌的读点全在组合期内，改成组合期 getter 后原地获得深色取值；
+ * 组合期之外的读取（`Canvas` 的 `DrawScope` lambda、`graphicsLayer`/`Painter` lambda、返回 `Color`
+ * 的非组合辅助函数）在调用点就地提读，口径见计划
+ * `docs/superpowers/plans/2026-10-17-ui-redesign.md` 的 Task 3（Step 4）。但反过来，只要有一个令牌
  * 退回静态 `= Color(…)`，它在深色模式下会静默保持浅值——编译照样通过、单测照样绿，深色能力凭空
  * 少一个 token。故此处逐成员钉「读哪个字段」，不只钉「读某个字段」——尤其
  * `MintOutline → outlineSoft`（命名陷阱：名字像 spec 的 `outline #ADE7D2`，值却是分隔线；
@@ -55,6 +57,17 @@ class MintTokenIsComposableContractTest {
         "AppleMintEnd" to "0xFF35B9B5",
         "AppleMintLight" to "0xFFD9FFF0",
     )
+
+    /**
+     * 组合期之外求值品牌渐变的三处顶层 `Brush.linearGradient` 的**持有符号名**。
+     * KDoc 按符号名指代而非 `文件:行号`：行号随改动漂移、漂移后注释仍看似权威，符号名则可 grep 定位。
+     */
+    private val brandGradientSiteSymbols: List<String> =
+        listOf("AiFeatureGradient", "AiHeaderGradient", "AppleMintGradient")
+
+    /** [text] 是否把品牌渐变的三处站点按符号名点名（最后一个用例的断言本体，负片段要用它判红）。 */
+    private fun brandGradientSitesNamed(text: String): Boolean =
+        text.contains("Brush.linearGradient") && brandGradientSiteSymbols.all { text.contains(it) }
 
     // ---------- 形状规则 ----------
 
@@ -330,21 +343,48 @@ class MintTokenIsComposableContractTest {
 
     /**
      * 唯一直接断言注释文本的用例（Step 3 的交付物就是注释）：用未剥注释的原文，
-     * 其余用例一律先过 stripComments。钉住必须留下的事实：中性令牌组合期读取后调用文件为零、
-     * AppleMint* 保持静态的三处顶层 Brush 站点、MintOutline → outlineSoft 命名陷阱与
-     * `outline` 不建 Mint 别名的处置。
+     * 其余用例一律先过 stripComments。钉住必须留下的事实：中性令牌组合期读取与组合期之外站点
+     * 就地提读的作用域口径、`AppleMint*` 保持静态的品牌渐变理由（三处顶层 `Brush.linearGradient`
+     * 的持有符号名——按符号名指代，不钉 `文件:行号`，行号会随改动漂移而注释看上去仍然权威）、
+     * `MintOutline → outlineSoft` 命名陷阱与 `outline` 不建 Mint 别名的处置。
+     * 本用例**不**钉「调用文件零改动」：Task 3 同时把组合期之外的读点提进了组合期，改了调用文件。
      */
     @Test
-    fun `kdoc records the zero call site rewrite and why brand tokens stay static`() {
+    fun `kdoc records the composition-scope rule and the brand gradient rationale`() {
         val raw = uiFiles().single { it.name == "MintPalette.kt" }.readText()
+
+        // 组合期作用域口径（MintPalette 文件头 + 计划 Task 3 Step 4）。
         listOf(
-            "Brush.linearGradient",
-            "ui/AiFeatureScreen.kt:47",
-            "ui/AiLearningScreen.kt:56",
-            "ui/AppScreen.kt:100",
-            "outlineSoft",
-            "appColors().outline",
+            "@Composable @ReadOnlyComposable get()",
+            "DrawScope",
+            "graphicsLayer",
+            "Painter",
+            "非组合辅助函数",
+            "Task 3 Step 4",
         ).forEach { fact ->
+            assertTrue(raw.contains(fact), "MintPalette.kt 的 KDoc 必须写明组合期作用域口径（Step 3）：$fact")
+        }
+
+        // 品牌渐变保持静态的理由：三处顶层 Brush 站点必须按符号名逐个点名。
+        assertTrue(
+            brandGradientSitesNamed(raw),
+            "KDoc 必须点出 Brush.linearGradient 与三个持有渐变的符号名 $brandGradientSiteSymbols；实际原文：\n$raw"
+        )
+        // 旧写法（只有 `文件:行号`、没有符号名）必须判红——证明上面的断言真的要求符号名。
+        val oldFileLineProse =
+            "三处**顶层** `Brush.linearGradient` 在组合期之外求值：`ui/AiFeatureScreen.kt:47`、" +
+                "`ui/AiLearningScreen.kt:56`、`ui/AppScreen.kt:100`。"
+        assertTrue(
+            !brandGradientSitesNamed(oldFileLineProse),
+            "断言被 `文件:行号` 形式的旧写法满足了（说明它没在要求符号名）：$oldFileLineProse"
+        )
+        assertTrue(
+            !Regex("""\.kt:\d""").containsMatchIn(raw),
+            "KDoc 里不得残留 `文件:行号` 指代（行号会漂移，注释却仍看似权威）：应改为符号名"
+        )
+
+        // 命名陷阱与新组件描边取值的处置。
+        listOf("outlineSoft", "appColors().outline").forEach { fact ->
             assertTrue(raw.contains(fact), "MintPalette.kt 的 KDoc 必须写明这条事实（Step 3）：$fact")
         }
     }
