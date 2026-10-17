@@ -32,6 +32,11 @@
 | AC1-20 | 词卡正面在揭晓前不显示中文释义与词形变化，只显示单词、IPA、词性（及有资源时的… | 自动化+设备 | ui.WordCardViewModelTest#advancing/re-entering hides meaning; wordcard-reveal-acceptance-record §3（真机 38/38） |
 | AC1-21 | 只点击「显示释义」而不提交反馈时，学习事件表不新增记录，当日「新增 x/y、复习… | 自动化 | ui.WordCardViewModelTest#revealing records no event and keeps card pending |
 | AC1-22 | 新增词卡与到期复习卡均按相同的回忆-揭晓-评分流程运行；揭晓前后三档评分按钮均可… | 自动化+设备 | ui.WordCardViewModelTest#three tiers forwarded as fixed ratings; wordcard-reveal-acceptance-record（真机 38/38）; batched-device-qa-report §3.1 |
+| AC1-23 | 同一词书连续两次求新词取词顺序逐位相同，且输出是输入的置换（不丢不重不增）。 | 自动化 | learning.NewWordOrderingTest#order is deterministic across calls and a permutation of input; 决策 2026-10-17 |
+| AC1-24 | 取词顺序不等于词书原始顺序；同前 3 字母两词位置差 ≥ 前缀组数减 1。 | 自动化 | learning.NewWordOrderingTest#order differs from the given order and spaces shared-prefix entries |
+| AC1-25 | 剔除已学词后剩余词相对次序不变（完整顺序的子序列）；剩余不足返回全部，… | 自动化 | learning.StoredPlanCardSourceTest#new cards are the interleaved order minus reviewed ones as a subsequence/#short word book returns every remaining card and a zero target returns none |
+| AC1-26 | 词书选取页 load() 后第一帧即加载态；册列表先于全部进度可见，进度逐册回填。 | 自动化 | ui.LearningSetupViewModelTest#load marks loading on the first frame/#book list publishes before progress and backfills per book |
+| AC1-27 | 词书读取失败仍显示既有错误文案且不残留半份列表；refreshIndex 未注入时… | 自动化 | ui.LearningSetupViewModelTest#storage failure shows the load error without a half-filled list/#index refresh is optional and does not gate the list |
 | AC2-01 | 严格模式未满足 TodayPlan 解锁条件时，文章生成入口不可用并显示新增/复… | 自动化 | ui.ReadingAccessViewModelTest#lockedProfile…/strictLocked…; androidTest ui.ReadingAccessScreenTest#lockedState…; docs/verification/f2-03-04/README.md |
 | AC2-02 | AI 生成成功后文章含标题、英文、中文翻译、派生高亮与未覆盖词；文本不执行脚本或… | 自动化 | reading.GenerateArticleUseCaseTest; reading.ArticleHighlightPolicyTest; androidTest ui.ArticleReadingScreenTest#scriptTextIsRenderedAsPlainText |
 | AC2-03 | 同日同类型同长度重复进入复用同一文章；用户触发换一篇后生成新版本，旧版本仍可读。 | 自动化 | ui.ArticleReadingViewModelTest#reusesTheStoredArticle…/#regeneratingSavesANewVersion…；阶段2验收记录 |
