@@ -31,7 +31,7 @@ package com.example.englishlearning.ui.components
  *   4. `Close` — 对话框、搜索框与浮层关闭键｜豁免（描边only）
  *   5. `Check` — 完成与成功回显对勾（`InlineNoticeKind.Success` 行）｜豁免（描边only）
  *   6. `Search` — 查词入口与全局搜索框（§6.1「查词」；词汇域三入口）｜两层
- *   7. `Book` — 底导「学习」tab 合上的书，现状形状（Task 17）｜两层
+ *   7. `Book` — 底导「学习」tab 的合上的书（Task 17 接入；造型系本轮自绘，与现状 tab 的合书意象同义）｜两层
  *   8. `BookOpen` — 摊开的书，词书/阅读页头（§6.1「词书」双页形）｜两层
  *   9. `List` — 列表与任务条目行（今日计划入口行组、词表行）｜两层
  *   10. `Bookmark` — 收藏（§6.1「收藏」；「我的词」收藏段）｜两层

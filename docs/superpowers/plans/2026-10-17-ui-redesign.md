@@ -628,7 +628,7 @@ internal val MintBackground: Color
   - `val AppIcon.spec: AppIconSpec`（`AppIcons.all: Map<AppIcon, AppIconSpec>` 的读取扩展）
   - `val StrokeOnlyIcons: Set<AppIcon>` = `setOf(Back, ChevronRight, ChevronDown, Close, Check)`
 
-  **枚数核对**：枚举 33 条目 = 33 枚字形，符合 spec §4.1「约 30 枚上下」。`Book`（合上的书，底导「学习」tab 现状形状）与 `BookOpen`（摊开的书，阅读/词书页头）是两枚不同字形，都保留。若执行时认为其中一枚冗余，删枚举条目属范围变化，先改 Task 1 决策文档的清单再删，不得静默改数。
+  **枚数核对**：枚举 33 条目 = 33 枚字形，符合 spec §4.1「约 30 枚上下」。`Book`（合上的书，底导「学习」tab 的替代品；造型系本轮自绘，只借现状 tab 的合书意象）与 `BookOpen`（摊开的书，阅读/词书页头）是两枚不同字形，都保留。若执行时认为其中一枚冗余，删枚举条目属范围变化，先改 Task 1 决策文档的清单再删，不得静默改数。
 
 - [ ] **Step 1: 写结构契约测试（失败）**
 
