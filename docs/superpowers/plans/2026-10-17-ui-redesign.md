@@ -622,7 +622,8 @@ internal val MintBackground: Color
 **Interfaces:**
 - Consumes: Task 1 决策文档的 33 枚清单与 5 枚两层豁免表。
 - Produces:
-  - `data class AppIconSpec(val name: String, val strokePaths: List<String>, val fillPaths: List<String>, val fillAlpha: Float = 0.30f)`（路径为 24×24 画布的 SVG path data 字符串；圆形填充用 `CircleFill(cx, cy, r)` 标记串，由 Task 7 的渲染器解释）
+  - `data class AppIconSpec(val name: String, val strokePaths: List<String>, val fillPaths: List<String>)`（路径为 24×24 画布的 SVG path data 字符串；圆形填充用 `CircleFill(cx, cy, r)` 标记串，由 Task 7 的渲染器解释）
+  - `object DuotoneFillAlpha { const val Light = 0.42f; const val Dark = 0.30f; fun forTheme(isDark: Boolean): Float }`（执行期修正：计划原文把 `fillAlpha: Float = 0.30f` 挂在 `AppIconSpec` 上，既无出处又拿深色档当两档通用值。透明度是**主题属性**而非字形属性——逐枚写一份就是第二套真值——故从字形数据里移出，两个取值以决策文档为唯一权威：`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`）
   - `enum class AppIcon { Back, ChevronRight, ChevronDown, Close, Check, Search, Book, BookOpen, List, Bookmark, Star, Clock, Chart, Spark, Speaker, Play, Pause, Stop, Mic, Translate, Camera, Image, Document, Newspaper, Gear, Person, Info, Bell, Shield, Warning, Trash, Upload, Download }`
   - `val AppIcon.spec: AppIconSpec`（`AppIcons.all: Map<AppIcon, AppIconSpec>` 的读取扩展）
   - `val StrokeOnlyIcons: Set<AppIcon>` = `setOf(Back, ChevronRight, ChevronDown, Close, Check)`
@@ -716,7 +717,7 @@ internal val MintBackground: Color
 - Produces:
   - `@Composable fun appImageVector(icon: AppIcon, tint: Color, strokeScale: Float = 1f): ImageVector`（`remember(icon, tint, strokeScale)` 缓存；`vector { group { path(pathData = …, fill/stroke) } }`；`CircleFill(...)` 串解释为 `addPath(...)` 圆形或 `path("M…a…")`）
   - `@Composable fun AppGlyph(icon: AppIcon, tint: Color, size: Dp, modifier: Modifier = Modifier)`（`Image` 渲染，`contentDescription = null`——装饰性由调用方语义承载）
-  - `@Composable fun EntryIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier)`：40dp 容器，渐变 `linearGradient(listOf(mix(deep, base, 0.35f), deep))`，白色两层字形，`inset 0 0 0 1px rgba(255,255,255,.26)` 用 `BorderStroke(1.dp, AppPalette.GlassHighlight)` 等价实现，圆角 `AppShape.icon`（12dp）
+  - `@Composable fun EntryIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier)`：40dp 容器，渐变 `linearGradient(listOf(mix(deep, base, 0.35f), deep))`，白色两层字形（填充层不透明度取 `DuotoneFillAlpha.forTheme(isDark)`），`inset 0 0 0 1px rgba(255,255,255,.26)` 用 `BorderStroke(1.dp, AppPalette.GlassHighlight)` 等价实现，圆角 `AppShape.Icon`（12dp）——控制者裁决：计划原文写的小写 `AppShape.icon` 是笔误，`AppShape` 里没有这一枚，本任务在 `AppShape` 补 `val Icon: Shape = RoundedCornerShape(12.dp)` 并用它（12dp 值来自视觉稿 §4 栅格的图标容器圆角，与 `AppShapes.extraSmall` 同值但语义不同，故不复用）。
   - `@Composable fun InlineIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier)`：30dp 容器 `tint` 底 + 17dp 单层域色 `deep` 描边字形（填充层不显示）
   - `fun gradientStartForDomain(deep: Color, base: Color): Color = mix(deep, base, 0.35f)`（纯函数，颜色数学可直接单测）
 
@@ -761,12 +762,12 @@ internal val MintBackground: Color
 
 - [ ] **Step 3: 实现 `AppIcon.kt`**
 
-  `vector { }` DSL 组装：`group` 内先画填充层（`fillBrush = SolidColor(tint.copy(alpha = spec.fillAlpha))`）再画骨架层（`stroke = Stroke(width = 2f * densityScale, cap = Round, join = Round, brush = SolidColor(tint))`）。`CircleFill(cx, cy, r)` 串解析成圆形 path。所有尺寸走 24dp `defaultWidth/defaultHeight`，实际缩放交给 `Image`。
+  `vector { }` DSL 组装：`group` 内先画填充层（`fillBrush = SolidColor(tint.copy(alpha = DuotoneFillAlpha.forTheme(isDark)))`，`isDark` 取 `LocalIsDark`；计划原文写的 `spec.fillAlpha` 已由 Task 6 执行期修正移除，透明度不再挂在字形上）再画骨架层（`stroke = Stroke(width = 2f * densityScale, cap = Round, join = Round, brush = SolidColor(tint))`）。`CircleFill(cx, cy, r)` 串解析成圆形 path。所有尺寸走 24dp `defaultWidth/defaultHeight`，实际缩放交给 `Image`。
   注释写明为什么运行时组装而不是直接内嵌静态 `ImageVector`：颜色必须来自 `LocalAppColors`/域色，静态 val 会把主题化挡在门外（与 Task 3 同一理由）。
 
 - [ ] **Step 4: 实现 `IconBadge.kt`**
 
-  两种呈现按 Interfaces 的几何。`Modifier.semantics` 不留内容描述（装饰性），容器 `Box(Modifier.size(40.dp).clip(RoundedCornerShape(AppShape.icon)).background(brush).border(1.dp, AppPalette.GlassHighlight, …))`。
+  两种呈现按 Interfaces 的几何。`Modifier.semantics` 不留内容描述（装饰性），容器 `Box(Modifier.size(40.dp).clip(AppShape.Icon).background(brush).border(1.dp, AppPalette.GlassHighlight, AppShape.Icon))`（原文的 `RoundedCornerShape(AppShape.icon)` 是双重笔误：`AppShape` 里没有小写 `icon`，且 `AppShape.Icon` 本身就是 `Shape`，不能再包一层）。
   **豁免表强制**：`EntryIconBadge` 开头
   ```kotlin
   require(icon !in StrokeOnlyIcons) { "$icon 属两层豁免表，只作行内/尾部指示，不得进入 ≥40dp 入口容器" }
@@ -1011,6 +1012,7 @@ internal val MintBackground: Color
 - Create: `app/src/main/java/com/example/englishlearning/ui/components/WordRow.kt`
 - Create: `app/src/main/java/com/example/englishlearning/ui/components/SpeakerButton.kt`
 - Create: `app/src/test/java/com/example/englishlearning/ui/SharedComponentUniquenessRatchetTest.kt`（承接 Task 8 Step 4）
+- Create: `app/src/androidTest/java/com/example/englishlearning/ui/IconGalleryRenderTest.kt`（Step 4b，批 1 里新字形唯一的呈现处）
 - Create: `docs/verification/ui-redesign-2026-10.md`
 - Modify: `docs/third-party-notices.md`（`app-authored-ui-icons` 条目的「用途/使用位置」补 `AppIcons.kt` 实际路径）
 
@@ -1048,7 +1050,16 @@ internal val MintBackground: Color
   - AC-R-07/10/11/12 → 「批 2/批 3 逐屏补」，状态列写「未开始」
   禁写会自漂移的计数（§Global Constraints #16）。
 
-- [ ] **Step 5: 批 1 门禁 + 里程碑装真机手工看图标**
+- [ ] **Step 4b: 图标一览 androidTest（批 1 唯一能看到新字形的地方）**
+
+  控制者裁决（修本计划一处真缺陷）：Step 5 标题写「装真机手工看图标」，但批 1 不把底导/业务屏换成 `AppGlyph`（那在批 2/批 3），真机上看到的仍是旧 Canvas 字形——里程碑日无图标可看。补一步：
+  - Create: `app/src/androidTest/java/com/example/englishlearning/ui/IconGalleryRenderTest.kt`
+  - 一个方法内**只允许一次 `setContent`**（真机两次必崩的既有约束），渲染 33 枚的三视图：`AppGlyph` 单层描边 24dp、`EntryIconBadge`（40dp 渐变容器 + 两层，豁免表 5 枚按 Task 7 的 `allowsInEntryContainer` 跳过）、`InlineIconBadge`（30dp 底 + 17dp 单层）。
+  - 每视图 `captureToImage().asAndroidBitmap()` 后写入应用外部缓存目录，用 `adb pull` 取回本地临时目录目视（**图片一律不入库**，与 QR 证据同红线）；断言只放机器可判的两条：非空像素占比 > 0（防空绘制）与浅色/深色两轮都能出图（`AppThemePreferences.write(...Dark)` 后 `waitUntil` 重绘，用完复原 `System`）。
+  - 只跑 `emulator-5574`（`am instrument`，禁 `connectedDebugAndroidTest`），禁真机。
+  - 目视核验清单（写进 `docs/verification/ui-redesign-2026-10.md` 的 AC-R-05b 行，缺项不得放行）：① `Spark` 伴星补回 `-.9-2.2` 后是四芒而非带竖直尖刺的坏形；② `Book`（合上）与 `BookOpen`（摊开）在 24dp 下可区分，且 `Book` 的左半填充与 `BookOpen` 的左页填充不会让人读成同一枚；③ `Camera` 镜头环（r=3.2）在 17dp 行内不与机身墨迹糊成一团；④ `Trash` 桶身填充与骨架的 0.2dp 同心差、`Spark`/`Download` 笔画端点出 4–20 安全区后在容器内不裁；⑤ 豁免 5 枚（Back/Chevron×2/Close/Check）在 17dp 与 24dp 下均可辨；⑥ 深色档填充层（`DuotoneFillAlpha.Dark`）在深底容器上仍读得出层次。
+
+- [ ] **Step 5: 批 1 门禁 + 里程碑装真机手工看主题与排印**
 
   ```bash
   "$GRADLE" :app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin verifyThirdPartyNotices --offline --no-daemon --no-build-cache 2>&1 | grep -E 'FAILED|^e:|BUILD|tests completed' ; exit ${PIPESTATUS[0]}
@@ -1056,7 +1067,7 @@ internal val MintBackground: Color
   git diff --name-only main..HEAD | grep -c lockfile   # 期望 0：依赖锁零变化
   ANDROID_SERIAL=bf353dda adb install -r app/build/outputs/apk/debug/app-debug.apk
   ```
-  Expected: 全绿；基线 ≥1499 且 0 失败；lockfile 未改；真机装上后**手工试用**（真机只 `install -r`，绝不 `am instrument`）。批 1 时页头/入口行尚未接入业务屏，真机可看的是底导与设置页既有形状 + 主题三态（此时设置页尚无主题开关，Task 19 接入）——把「图标在真机上的第一印象」列为本步人工核验项并记进报告。
+  Expected: 全绿；基线 ≥1499 且 0 失败；lockfile 未改；真机装上后**手工试用**（真机只 `install -r`，绝不 `am instrument`）。批 1 时页头/入口行尚未接入业务屏，真机可看的是底导与设置页既有形状 + 主题三态（此时设置页尚无主题开关，Task 19 接入）。**图标不在本步真机核验范围**（新字形尚未接进任何业务屏），图标的第一印象归 Step 4b 的模拟器截图与清单；真机上第一次看到新图标是批 2 收口（Task 18 Step 1）。
 
   本步的人工核验清单（Task 3/4 复评遗留的三项「只有真机能判」的风险，逐条写进报告，缺项不得放行）：
   1. **行高**：六档 `AppType` 不写 `lineHeight`，装配后 M3 每角色的库内行高消失，正文变紧。判「太紧」即触发批 2 在装配点补 `lineHeight`，并先把取值写进 spec §2.2（不得只改代码）。
