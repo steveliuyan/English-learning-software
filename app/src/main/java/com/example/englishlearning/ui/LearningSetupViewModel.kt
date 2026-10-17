@@ -64,6 +64,13 @@ data class LearningSetupUiState(
     val deleting: Boolean = false,
     /** 非空表示正在等待用户决定是否迁移重复词的复习状态。 */
     val pendingMigration: ProgressMigrationPreview? = null,
+    /**
+     * 册列表尚未到位。默认 `true`：这一屏是先出骨架再填内容，而不是先空一下再整列蹦出来
+     * （spec F1-01，决策 2026-10-17）。
+     */
+    val wordBooksLoading: Boolean = true,
+    /** 逐册进度尚未算完；`false` 之前每本册显示「进度计算中」。 */
+    val progressLoading: Boolean = true,
 ) {
     fun canDelete(bookId: String): Boolean = bookId in importedBookIds
 
@@ -141,14 +148,18 @@ class LearningSetupViewModel @Inject constructor(
 
     fun load(profileId: String) {
         settingsProfileId = profileId
+        // 同步置加载态：组合完成的第一帧就有骨架可看，而不是「卡一下、然后整列蹦出来」（spec F1-01）。
+        _uiState.value = _uiState.value.copy(wordBooksLoading = true, progressLoading = true, message = null)
         viewModelScope.launch {
             seedWordBooks()
-            // 种子写入只登记元数据；索引在这里补建/收敛，之后查词走索引而不解析词书包。
-            refreshIndex?.invoke()
             val wordBooksResult = repository.listWordBooks()
             val profileResult = repository.current(profileId)
             if (wordBooksResult is RepositoryResult.Failure || profileResult is RepositoryResult.Failure) {
-                _uiState.value = LearningSetupUiState(message = "暂时无法加载学习设置")
+                _uiState.value = LearningSetupUiState(
+                    message = "暂时无法加载学习设置",
+                    wordBooksLoading = false,
+                    progressLoading = false,
+                )
                 return@launch
             }
             val bundled = bundledIds.ids()
@@ -159,24 +170,18 @@ class LearningSetupViewModel @Inject constructor(
                 importedIds = imported,
             )
             val profile = (profileResult as RepositoryResult.Success).value
-            val progress = wordBooks.associate { book ->
-                val ids = cards.cardIds(book.id)
-                val reviewed = when (val result = events.reviewedCardIds(book.id)) {
-                    is RepositoryResult.Success -> result.value
-                    is RepositoryResult.Failure -> emptyList()
-                }
-                book.id to WordBookProgress.calculate(book.totalWords, ids, reviewed)
-            }
             val settings =
                 when (val result = getSettings(profileId)) {
                     is LearningSettingsRepositoryResult.Success -> result.value
                     LearningSettingsRepositoryResult.StorageUnavailable -> LearningSettings.defaults(profileId)
                 }
             val activeId = profile?.activeWordBookId?.takeIf { id -> wordBooks.any { it.id == id } }
+            // 第一段发布：册先到、进度还空着。进度要逐册解析词书包（cet4 有 4308 张卡），
+            // 让它挡在列表前面就是把最慢的一步放到了用户最先等的位置。
             _uiState.value =
                 LearningSetupUiState(
                     wordBooks = wordBooks,
-                    progressByBook = progress,
+                    progressByBook = emptyMap(),
                     importedBookIds = imported.filterTo(mutableSetOf()) { it in wordBooks.map(WordBook::id) },
                     selectedWordBookId = activeId ?: wordBooks.firstOrNull()?.id,
                     dailyNewTarget = profile?.dailyNewTarget ?: LearningSetupUiState.DEFAULT_DAILY_TARGET,
@@ -186,8 +191,30 @@ class LearningSetupViewModel @Inject constructor(
                     openDetailOnFuzzy = settings.openDetailOnFuzzy,
                     openDetailOnForgotten = settings.openDetailOnForgotten,
                     showVocabularySearchCount = settings.showVocabularySearchCount,
+                    wordBooksLoading = false,
+                    progressLoading = true,
                 )
+            // 第二段：逐册回填，每算完一册就发布一次，用户看到的是进度条一本本长出来。
+            val progress = LinkedHashMap<String, WordBookProgress>()
+            wordBooks.forEach { book ->
+                progress[book.id] = progressOf(book)
+                _uiState.value = _uiState.value.copy(progressByBook = LinkedHashMap(progress))
+            }
+            _uiState.value = _uiState.value.copy(progressLoading = false)
+            // 种子写入只登记元数据；索引在这里补建/收敛，之后查词走索引而不解析词书包。
+            // 放在回填之后：它服务的是查词，不该挡学习设置的首帧（`dataVersion` 未变时本身几乎不花钱）。
+            refreshIndex?.invoke()
         }
+    }
+
+    /** 单册进度：读不到已学词时按 0 计，但册本身照常列出——列表的可见性优先于统计精度。 */
+    private suspend fun progressOf(book: WordBook): WordBookProgress {
+        val ids = cards.cardIds(book.id)
+        val reviewed = when (val result = events.reviewedCardIds(book.id)) {
+            is RepositoryResult.Success -> result.value
+            is RepositoryResult.Failure -> emptyList()
+        }
+        return WordBookProgress.calculate(book.totalWords, ids, reviewed)
     }
 
     fun selectWordBook(wordBookId: String) {

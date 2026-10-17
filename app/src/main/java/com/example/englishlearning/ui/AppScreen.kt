@@ -1971,6 +1971,12 @@ private fun LearningSetupScreen(
             color = MintTextMuted,
             modifier = Modifier.padding(bottom = 2.dp),
         )
+        // 册列表还在读盘时先立三行同尺寸骨架，让这一屏的第一帧就不是空的：
+        // 用户投诉的是「打开选取词书先卡一下，然后整列突然蹦出来」（spec F1-01，决策 2026-10-17）。
+        // 只在列表为空时占位——删除词书后的重载不得把已有列表顶掉闪一次。
+        if (state.wordBooksLoading && state.wordBooks.isEmpty()) {
+            repeat(WORD_BOOK_PLACEHOLDER_ROWS) { row -> WordBookListPlaceholder(row) }
+        }
         state.wordBooks.forEach { book ->
             key(book.id) {
                 SwipableWordBookCard(
@@ -2063,6 +2069,59 @@ private fun SetupIntroductionCard() {
             )
         }
     }
+}
+
+/** 首帧骨架的行数：够填满「选择词书」下方一屏，又不至于让真实列表到位后滚动位置大幅跳动。 */
+private const val WORD_BOOK_PLACEHOLDER_ROWS = 3
+
+/**
+ * 词书列表首帧骨架：与真实卡片同圆角、同最小行高的空壳。
+ *
+ * 刻意只有色块、没有任何文案和数字：占位行手里还没有数据，向 TalkBack 播报「已学 0 词 / 共 0 词」
+ * 这种假数字比什么都不念更糟（spec F1-01 无障碍口径）。行距交给外层 Column 的 spacedBy，
+ * 所以这里不额外加 padding，骨架与真卡片替换时版面不跳。
+ */
+@Composable
+private fun WordBookListPlaceholder(row: Int) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("wordbook_placeholder_$row"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MintSurface),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(MintOutline.copy(alpha = 0.30f), RoundedCornerShape(percent = 50)),
+            )
+            Column(
+                modifier = Modifier.padding(start = 14.dp).weight(1f),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                PlaceholderBar(fraction = 0.45f)
+                PlaceholderBar(fraction = 0.22f)
+                PlaceholderBar(fraction = 0.7f)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderBar(fraction: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(fraction)
+            .height(12.dp)
+            .background(MintOutline.copy(alpha = 0.22f), RoundedCornerShape(6.dp)),
+    )
 }
 
 /**

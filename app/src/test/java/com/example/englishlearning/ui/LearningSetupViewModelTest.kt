@@ -3,13 +3,17 @@ package com.example.englishlearning.ui
 import com.example.englishlearning.learning.GetLearningSettingsUseCase
 import com.example.englishlearning.learning.LearningProfile
 import com.example.englishlearning.learning.LearningProfileRepository
+import com.example.englishlearning.learning.LearningProfileRepositoryError
 import com.example.englishlearning.learning.LearningSettings
 import com.example.englishlearning.learning.LearningSettingsRepository
 import com.example.englishlearning.learning.LearningSettingsRepositoryResult
+import com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase
 import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
+import com.example.englishlearning.learning.VocabularySearchIndexEntry
+import com.example.englishlearning.learning.VocabularySearchIndexRepository
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.learning.WordBookDeletionService
 import com.example.englishlearning.learning.WordBookDeletionPreview
@@ -28,11 +32,13 @@ import com.example.englishlearning.learning.domain.WordCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -377,6 +383,159 @@ class LearningSetupViewModelTest {
         assertEquals(null, viewModel.uiState.value.deletePreview)
     }
 
+    // ---- F1-01 渐进发布：进入「选取词书」不得出现「卡一下然后整列蹦出来」 ----
+
+    @Test
+    fun `load marks loading on the first frame`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 1, "v1", "ngsl-nawl-1.2")
+        }
+        val viewModel = setupViewModel(repository)
+        viewModel.load("default")
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.wordBooksLoading)
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+
+        // 再次进入该页：一帧都不推进，界面也必须已经处于加载态。
+        viewModel.load("default")
+
+        assertEquals(true, viewModel.uiState.value.wordBooksLoading)
+        assertEquals(true, viewModel.uiState.value.progressLoading)
+    }
+
+    @Test
+    fun `book list publishes before progress and backfills per book`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 3, "v1", "ngsl-nawl-1.2")
+            books += WordBook("cet6", "大学英语六级", "CET-6", 2, "v1", "ngsl-nawl-1.2")
+        }
+        val cards =
+            GatingCards(
+                mapOf(
+                    "cet4" to listOf("cet4:a", "cet4:b", "cet4:c"),
+                    "cet6" to listOf("cet6:x", "cet6:y"),
+                ),
+            )
+        val viewModel = setupViewModel(repository, cards, FakeEvents(setOf("cet4:a")))
+
+        viewModel.load("default")
+        runCurrent()
+
+        assertEquals(listOf("cet4", "cet6"), viewModel.uiState.value.wordBooks.map(WordBook::id))
+        assertEquals(emptyMap(), viewModel.uiState.value.progressByBook)
+        assertEquals(false, viewModel.uiState.value.wordBooksLoading)
+        assertEquals(true, viewModel.uiState.value.progressLoading)
+
+        cards.gates.getValue("cet4").complete(Unit)
+        runCurrent()
+        assertEquals(setOf("cet4"), viewModel.uiState.value.progressByBook.keys)
+        assertEquals(true, viewModel.uiState.value.progressLoading)
+
+        cards.gates.getValue("cet6").complete(Unit)
+        runCurrent()
+        assertEquals(setOf("cet4", "cet6"), viewModel.uiState.value.progressByBook.keys)
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+        assertEquals(WordBookProgress(learned = 1, total = 3), viewModel.uiState.value.progressByBook["cet4"])
+    }
+
+    @Test
+    fun `storage failure shows the load error without a half-filled list`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 3, "v1", "ngsl-nawl-1.2")
+            failBookList = true
+        }
+        val viewModel = setupViewModel(repository)
+
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        assertEquals("暂时无法加载学习设置", viewModel.uiState.value.message)
+        assertEquals(emptyList<String>(), viewModel.uiState.value.wordBooks.map(WordBook::id))
+        assertEquals(emptyMap(), viewModel.uiState.value.progressByBook)
+        assertEquals(false, viewModel.uiState.value.wordBooksLoading)
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+    }
+
+    @Test
+    fun `index refresh is optional and does not gate the list`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 0, "v1", "ngsl-nawl-1.2")
+        }
+
+        // 没注入索引刷新（既有单测与旧装配点的默认）时，列表与进度照常发布。
+        val withoutIndex = setupViewModel(repository)
+        withoutIndex.load("default")
+        advanceUntilIdle()
+        assertEquals(listOf("cet4"), withoutIndex.uiState.value.wordBooks.map(WordBook::id))
+        assertEquals(false, withoutIndex.uiState.value.progressLoading)
+
+        val index = CountingIndex()
+        // 进度回填被门住的那段时间里，索引刷新一次都不许被读到：它排在回填之后。
+        val cards = GatingCards(mapOf("cet4" to listOf("cet4:a")))
+        val withIndex =
+            setupViewModel(
+                repository,
+                cards,
+                refreshIndex =
+                    RefreshVocabularySearchIndexUseCase(
+                        repository,
+                        EmptyCards,
+                        index,
+                        BundledWordBookIdSource { setOf("cet4") },
+                        ImportedWordBookIdSource { emptySet() },
+                    ),
+            )
+
+        withIndex.load("default")
+        runCurrent()
+
+        assertEquals(listOf("cet4"), withIndex.uiState.value.wordBooks.map(WordBook::id))
+        assertEquals(true, withIndex.uiState.value.progressLoading)
+        assertEquals(0, index.versionReads, "索引收敛不得挡在列表首帧前面")
+
+        cards.gates.getValue("cet4").complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, index.versionReads)
+        assertEquals(WordBookProgress(learned = 0, total = 0), withIndex.uiState.value.progressByBook["cet4"])
+    }
+
+    private class GatingCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
+        val gates: Map<String, CompletableDeferred<Unit>> = idsByBook.keys.associateWith { CompletableDeferred() }
+
+        override suspend fun cardIds(wordBookId: String): List<String> {
+            gates.getValue(wordBookId).await()
+            return idsByBook.getValue(wordBookId)
+        }
+
+        override suspend fun cards(cardIds: List<String>) = emptyList<WordCard>()
+    }
+
+    private class CountingIndex : VocabularySearchIndexRepository {
+        var versionReads = 0
+
+        override suspend fun replaceWordBook(
+            wordBookId: String,
+            wordBookName: String,
+            dataVersion: String,
+            cards: List<WordCard>,
+        ) = RepositoryResult.Success(Unit)
+
+        override suspend fun deleteWordBook(wordBookId: String) = RepositoryResult.Success(Unit)
+
+        override suspend fun search(
+            normalizedQuery: String,
+            limit: Int,
+        ) = RepositoryResult.Success(emptyList<VocabularySearchIndexEntry>())
+
+        override suspend fun indexedVersions(): RepositoryResult<Map<String, String>> {
+            versionReads += 1
+            return RepositoryResult.Success(mapOf("cet4" to "v1"))
+        }
+
+        override suspend fun deleteMissing(keepWordBookIds: Collection<String>) = RepositoryResult.Success(Unit)
+    }
+
     private class FakeWordBookDeletionPreviewRepository(
         private val result: Result<WordBookDeletionPreview>,
     ) : WordBookDeletionPreviewRepository {
@@ -545,6 +704,7 @@ class LearningSetupViewModelTest {
         migration: WordBookProgressMigrationCoordinator? = null,
         deletePreview: WordBookDeletionPreviewRepository =
             FakeWordBookDeletionPreviewRepository(Result.failure(IllegalStateException("unused"))),
+        refreshIndex: RefreshVocabularySearchIndexUseCase? = null,
     ) = LearningSetupViewModel(
         repository,
         seed(repository),
@@ -558,6 +718,7 @@ class LearningSetupViewModelTest {
         deletion ?: WordBookDeletionService(repository, java.io.File("")) { emptySet() },
         migration ?: WordBookProgressMigrationCoordinator(WordBookProgressMigrationService(cards, events)),
         deletePreview = deletePreview,
+        refreshIndex = refreshIndex,
     )
 
     private class FakeCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
@@ -627,6 +788,9 @@ class LearningSetupViewModelTest {
         val books = mutableListOf<WordBook>()
         val deleted = mutableListOf<String>()
 
+        /** 让册列表读取失败：加载路径必须报错而不是端出一份空列表。 */
+        var failBookList = false
+
         override suspend fun current(profileId: String) = RepositoryResult.Success(profile)
 
         override suspend fun save(profile: LearningProfile): RepositoryResult<Unit> {
@@ -634,7 +798,12 @@ class LearningSetupViewModelTest {
             return RepositoryResult.Success(Unit)
         }
 
-        override suspend fun listWordBooks() = RepositoryResult.Success(books)
+        override suspend fun listWordBooks(): RepositoryResult<List<WordBook>> =
+            if (failBookList) {
+                RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
+            } else {
+                RepositoryResult.Success(books)
+            }
 
         override suspend fun findWordBook(id: String) =
             RepositoryResult.Success(books.find { it.id == id })
