@@ -2,7 +2,7 @@
 
 > **For agentic workers**: REQUIRED SUB-SKILL: 用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 逐任务实施本计划。步骤用 checkbox（`- [ ]`）跟踪。
 
-**Goal:** 把 33 屏「不统一、太乱、有些页面不该出现这些东西」的体验问题，一次解决到可发布水位——统一设计系统（浅/深两套 token + 装配点）+ 九个共享组件 + 32 枚 B 案双色层次图标 + 每屏只承担自己的职责。
+**Goal:** 把 33 屏「不统一、太乱、有些页面不该出现这些东西」的体验问题，一次解决到可发布水位——统一设计系统（浅/深两套 token + 装配点）+ 九个共享组件 + 33 枚 B 案双色层次图标 + 每屏只承担自己的职责。
 
 **Architecture:** 三批串行。批 1 建底座：校准 token、建立唯一的 `MaterialTheme(...)` 装配点与主题三态、把 `Mint*` 令牌改成 CompositionLocal 读取（817 处调用点零重写即获得深色）、入库 `AppIcons.kt` 与 `IconBadge`、把九个共享组件建出来。批 2 用底座重排核心学习路径五屏。批 3 重排其余屏与入口分组（信息架构六条裁决），并用「棘轮测试」把私有实现的份数从 14/7/4/11 收敛到 1。
 每批用「契约测试读源码常量 + 计算 WCAG 相对亮度」守门（JVM 单测无法渲染 Compose），需要像素证据的用例走 connected（仅模拟器）。
@@ -68,7 +68,7 @@
 | `app/src/main/java/com/example/englishlearning/ui/theme/AppColors.kt` | `AppColorSet`（16 个中性 token 的一份取值）、`AppColorLight`/`AppColorDark`、`AppDomain` 枚举 + `DomainPalette` + 浅/深两套域色、`LocalAppColors`/`LocalDomainColors`/`LocalIsDark`、`appColors()`/`appDomain(AppDomain)` 读取器 |
 | `app/src/main/java/com/example/englishlearning/ui/theme/MintGlassTheme.kt` | 唯一 `MaterialTheme(...)` 装配点：`MintGlassTheme(...) { … }` 内 `CompositionLocalProvider` + `MaterialTheme(colorScheme, typography, shapes)`；`appTypography()`、`appColorScheme()` |
 | `app/src/main/java/com/example/englishlearning/ui/theme/AppThemePreference.kt` | `enum ThemeMode`、纯函数 `shouldUseDarkTheme`/`themeModeFromStorage`、`AppThemePreferences.read/write`（prefs `"ui_display_prefs"` / key `"theme_mode"`）、`rememberAppThemeMode()` |
-| `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` | 32 枚 B 案图标的数据：逐枚清单钉在文件头注释，每枚 `AppIconSpec(strokePaths, fillPaths)` |
+| `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` | 33 枚 B 案图标的数据：逐枚清单钉在文件头注释，每枚 `AppIconSpec(strokePaths, fillPaths)` |
 | `app/src/main/java/com/example/englishlearning/ui/components/AppIcon.kt` | 运行时用 `ImageVector.Builder`/`vector {}` 把 `AppIconSpec` 组装为可主题化的 `ImageVector`（描边骨架层 + 半透明填充层） |
 | `app/src/main/java/com/example/englishlearning/ui/components/IconBadge.kt` | 两种呈现：入口层（≥40dp 容器 = 域色渐变 + 白色两层字形 + 1px 内高光）、行内层（30dp 容器 / 17dp 图形 = `tint` 底 + 域色 `deep` 单层描边） |
 | `app/src/main/java/com/example/englishlearning/ui/components/AppScreenHeader.kt` | 返回 + 标题 + 副标题 + 右侧动作，全站唯一页头写法；`fontScale 2.0` 不裁字 |
@@ -84,7 +84,7 @@
 | `app/src/test/java/com/example/englishlearning/ui/DesignTokenContractTest.kt` | 读源码 hex 断言 token 取值 + 钉死的允许配对表（AC-R-01/03） |
 | `app/src/test/java/com/example/englishlearning/ui/MaterialThemeAssemblyContractTest.kt` | 装配点存在、`MintGlassTheme` 是 `MainActivity` 的唯一内容根、禁第二处 `MaterialTheme(` |
 | `app/src/test/java/com/example/englishlearning/ui/ThemeModeDecisionTest.kt` | 三态 × 系统态 → 是否深色的纯函数全组合 |
-| `app/src/test/java/com/example/englishlearning/ui/AppIconsStructureContractTest.kt` | 32 枚清单、两层结构、豁免表、`Icons.` 为 0 |
+| `app/src/test/java/com/example/englishlearning/ui/AppIconsStructureContractTest.kt` | 33 枚清单、两层结构、豁免表、`Icons.` 为 0 |
 | `app/src/test/java/com/example/englishlearning/ui/IconBadgeContrastContractTest.kt` | 渐变端取 `deep` 混 35% `base`、白字形 ≥3:1、行内 ≥3:1、禁 `base` 本体作白字形底 |
 | `app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` | 裸 hex 棘轮：seed 13 处只减不增 |
 | `app/src/test/java/com/example/englishlearning/ui/SharedComponentUniquenessRatchetTest.kt` | 私有实现份数棘轮：页头 14、WordRow 7、NotConfigured 4、InlineNotice 11 → 0 |
@@ -153,9 +153,9 @@ internal val MintBackground: Color
   1. **`text-3` 降级为「非正文角色」**：仅用于 ≥24sp 大数字/装饰性大字与纯图标描边，**不得作任何正文或标签前景**（实测 3.00–3.40，达不到 AA 正文 4.5）。需要第三级弱化文字时用 `text-2` + 降字号，不用 `text-3`。候选方案「把 `text-3` 调深到通过 4.5」被否：调深后与 `text-2` 视觉上不再成三级。
   2. **`text-2` 的可用底限于 `surface`/`bg`/`tint`**（5.15 / 4.87 / 4.55），**禁压 `tint-2`/`tint-3`**（4.15 / ≈4.0）。`tint-2`/`tint-3` 上的正文一律 `text-1`。
   3. **品牌渐变末端上的前景改用 `on-brand #04241C`**：`on-mint` 在 `#35B9B5` 上只有 4.07；`mint` 渐变三端从浅到深，因此**同一渐变上的文字统一取 `on-brand`**（起点 12.81、末端 6.87，处处合格），`on-mint` 保留给 `tint`/`mint-light` 一类浅薄荷底。spec §2.1 的「≈4.6:1」原文口径只适用于浅薄荷底，本条把它在渐变上的取值改钉为 `on-brand`。
-  4. **图标两层结构豁免表**：32 枚中 **5 枚只有描边骨架、不建填充层**——`Back`、`ChevronRight`、`ChevronDown`、`Close`、`Check`。理由是这些字形没有可闭合的内部区域，强行加填充层等于把描边变实心，正是 B 案要避免的「两族字形」。同时**这 5 枚不得进入 ≥40dp 入口容器**（它们只作行内/尾部指示）。AC-R-05b 的「每枚两层」据此改为「除豁免表外每枚两层」。
+  4. **图标两层结构豁免表**：33 枚中 **5 枚只有描边骨架、不建填充层**——`Back`、`ChevronRight`、`ChevronDown`、`Close`、`Check`。理由是这些字形没有可闭合的内部区域，强行加填充层等于把描边变实心，正是 B 案要避免的「两族字形」。同时**这 5 枚不得进入 ≥40dp 入口容器**（它们只作行内/尾部指示）。AC-R-05b 的「每枚两层」据此改为「除豁免表外每枚两层」。
 
-  并在同文档给出 **32 枚图标逐枚清单**（spec §10.5 留给批 1 第一个任务钉进 `AppIcons.kt` 顶部注释的那份），名字与顺序按 Interfaces 下方 Task 5 的清单。
+  并在同文档给出 **33 枚图标逐枚清单**（spec §10.5 留给批 1 第一个任务钉进 `AppIcons.kt` 顶部注释的那份），名字与顺序按 Task 6 Interfaces 的枚举清单。
 
 - [ ] **Step 3: 同步 spec 与风格指南**
 
@@ -336,29 +336,42 @@ internal val MintBackground: Color
 
 **Interfaces:**
 - Consumes: Task 2 的 `LocalAppColors`、`appColors()`、`AppColorSet` 字段名。
-- Produces: 八个 `internal val Mint*` 的组合期 getter（名字与可见性不变）：`MintBackground`、`MintSurface`、`MintPrimary`、`MintPrimaryContainer`、`MintOnPrimary`、`MintOutline`、`MintSeparator`（按文件实际成员名对齐——**先读该文件列出真实成员名，本计划不猜**；映射规则见 Step 2）。`AppleMint*` 与 `MintGlass*` 保持静态。
+- Produces: `MintPalette.kt` 内**七个**中性令牌改组合期 getter（名字与 `internal` 可见性不变）：`MintBackground`、`MintSurface`、`MintTint`、`MintPrimary`、`MintPrimaryDark`、`MintOutline`、`MintTextMuted`；四个品牌令牌 `AppleMintStart`/`AppleMintMiddle`/`AppleMintEnd`/`AppleMintLight` **保持静态**。
 
-- [ ] **Step 1: 先读现状**
+**已现场核实的映射表（`MintPalette.kt:13-25` 逐行读得，照此实现，别再猜）**：
+
+| 既有令牌 | 现值来源 | 目标读取 |
+|---|---|---|
+| `MintBackground` | `AppPalette.Background` | `LocalAppColors.current.background` |
+| `MintSurface` | `AppPalette.Surface` | `…surface` |
+| `MintTint` | 裸 `Color(0xFFDDF7E8)` | `…tint`（取值本就与 spec §2.1 相同，改读即顺手去掉一处裸 hex） |
+| `MintPrimary` | `DomainColors.AiSpeech.base` | `LocalDomainColors.current.getValue(AppDomain.AiSpeech).base` |
+| `MintPrimaryDark` | `AppPalette.TextPrimary` | `…text1` |
+| `MintOutline` | `AppPalette.Separator`（= 分隔线） | `…outlineSoft`（**不是** `outline`） |
+| `MintTextMuted` | `AppPalette.TextSecondary` | `…text2` |
+
+**命名陷阱（务必按此处置）**：`MintOutline` 名字像 spec 的 `outline #ADE7D2`，实际值是分隔线。若把它映射到 `outline`，817 处里所有分隔线会突然变成粗薄荷线。决定：`MintOutline → outlineSoft`，而 spec 的 `outline #ADE7D2` **不建 `Mint` 别名**，只由新组件（`IconBadge` 描边、卡片主描边）直接读 `appColors().outline`。
+
+
+- [ ] **Step 1: 复核现状**
 
   ```bash
-  grep -n 'internal val\|^val' app/src/main/java/com/example/englishlearning/ui/theme/MintPalette.kt
+  grep -n 'internal val' app/src/main/java/com/example/englishlearning/ui/theme/MintPalette.kt
   ```
-  把真实成员名与各自当前 hex 抄进任务报告，作为映射表的输入。若成员集合与本计划描述不符，**以文件为准**，映射规则照 Step 2 的语义套用，并把偏差写进报告。
+  Expected: 正好 11 行——七个 `Mint*` + 四个 `AppleMint*`，与上方映射表逐条对上。若不符（说明 `main` 又前进了），**以文件为准**补齐映射表并把差异写进报告，再往下走。
 
 - [ ] **Step 2: 写契约测试（失败）**
 
-  断言：每个中性 `Mint*` 的声明形状是 `internal val X: Color` + `@Composable @ReadOnlyComposable get() = LocalAppColors.current.<field>`；每个品牌/玻璃 `AppleMint*`/`MintGlass*` 仍是 `= Color(0x…)` 静态。规则用正则，配合成片段正/负用例各一组（形状同 Task 2）。失败信息要点名具体成员名。
+  断言：七个中性 `Mint*` 的声明形状是 `internal val X: Color` + `@Composable @ReadOnlyComposable get() = LocalAppColors.current.<field>`（`MintPrimary` 例外，读 `LocalDomainColors`）；四个 `AppleMint*` 仍是 `= Color(0x…)` 静态。规则用正则，配合成片段正/负用例各一组（形状同 Task 2）。失败信息要点名具体成员名。
 
 - [ ] **Step 3: 改写 `MintPalette.kt`**
 
-  语义映射（左：既有令牌 → 右：`AppColorSet` 字段）：
-  背景类 → `background`；表面/卡片底 → `surface`；主色容器/浅薄荷底 → `tint`；主色/描边 → `outline`；分隔线 → `outlineSoft`；主色上的文字（若存在 `MintOnPrimary` 一类）→ `onMint`。
-  注释里写明：817 处读点全在组合期内，因此这一步不改任何调用文件；`AppleMint*` 保持静态的原因（三处顶层 `Brush` + 品牌渐变模式不变）。
+  逐条按上方映射表落地。注释里写明两件事：① 全站 `Mint*` 读点全在组合期内，因此这一步不改任何调用文件；② `AppleMint*` 保持静态的原因（`AiFeatureScreen.kt:47`、`AiLearningScreen.kt:56`、`AppScreen.kt:100` 三处顶层 `Brush.linearGradient` 需要组合期外读取 + 品牌渐变模式不变）。
 
 - [ ] **Step 4: 编译并跑全部门控**
 
   Run: 门控命令。Expected: BUILD SUCCESSFUL。
-  **若出现「不是组合期」的调用点报错**（预期外的顶层/默认参数读取），停下并在报告里逐个列出报错站点；处理办法只有两种，按优先级：① 把该调用点移进 `@Composable`；② 若它本质是常量表（如 `GlassButton.kt:47` 的默认参数），改用无默认值 + 组合期实参传入。**不得**为了让它编译而把令牌退回静态 val——那会让深色失效。
+  **若出现「不是组合期」的调用点报错**（预期外的顶层/默认参数读取），停下并在报告里逐个列出报错站点；处理办法只有两种，按优先级：① 把该调用点移进 `@Composable`；② 若它本质是常量表（`GlassButton.kt:47` 的默认参数 `accent: DomainAccent = DomainColors.AiSpeech` 读的是**保持静态的** `DomainColors`，预期不报错；真报错才处理），改用无默认值 + 组合期实参传入。**不得**为了让它编译而把令牌退回静态 val——那会让深色失效。
 
 - [ ] **Step 5: 提交**
 
@@ -375,14 +388,17 @@ internal val MintBackground: Color
 
 **Files:**
 - Create: `app/src/main/java/com/example/englishlearning/ui/theme/MintGlassTheme.kt`
+- Create: `app/src/main/java/com/example/englishlearning/ui/theme/AppThemePreference.kt`（**本任务只交付纯码部分**：`enum ThemeMode` + `shouldUseDarkTheme` + `themeModeFromStorage`，不碰 `Context`； prefs 读写与 `rememberAppThemeMode` 由 Task 5 追加到同一文件）
 - Modify: `app/src/main/java/com/example/englishlearning/ui/theme/AppType.kt`（只加一个把六档语义装成 `Typography` 的函数，钉值不动）
 - Modify: `app/src/main/java/com/example/englishlearning/MainActivity.kt`（`setContent { AppScreen(...) }` 外面包一层 `MintGlassTheme`）
 - Test: `app/src/test/java/com/example/englishlearning/ui/MaterialThemeAssemblyContractTest.kt`
+- Test: `app/src/test/java/com/example/englishlearning/ui/ThemeModeDecisionTest.kt`（纯函数三态判定，本任务交付；Task 5 复用不重建）
 
 **Interfaces:**
 - Consumes: Task 2 的 `AppColorSet`/`LocalAppColors`/`LocalDomainColors`/`LocalIsDark`/两套域色 Map；Task 3 的组合期 `Mint*`；既有 `AppType`（六档钉值已符合 spec §2.2）、`AppShape`（`Dialog 24/Card 20/Button 14/Pill 50%`）、`MintColors`（既有 M3 `lightColorScheme` 装配源）。
 - Produces:
-  - `@Composable fun MintGlassTheme(themeMode: ThemeMode = ThemeMode.System, content: @Composable () -> Unit)`（Task 5 起被 `MainActivity` 使用；内部据 `shouldUseDarkTheme(themeMode, isSystemInDarkTheme())` 选 set 并 `CompositionLocalProvider`）
+  - `enum class ThemeMode(val storageKey: String) { System("system"), Light("light"), Dark("dark") }` 与纯函数 `fun shouldUseDarkTheme(mode: ThemeMode, systemInDark: Boolean): Boolean`、`fun themeModeFromStorage(raw: String?): ThemeMode`（**本任务交付这三个**；Task 5 的 prefs I/O 依赖它们）
+  - `@Composable fun MintGlassTheme(themeMode: ThemeMode = ThemeMode.System, content: @Composable () -> Unit)`（Task 4 起被 `MainActivity` 使用；内部据 `shouldUseDarkTheme(themeMode, isSystemInDarkTheme())` 选 set 并 `CompositionLocalProvider`）
   - `@Composable fun appTypography(): Typography`
   - `@Composable fun appColorScheme(dark: Boolean): ColorScheme`
   - `val AppShapes`（若 `AppShape` 尚未导出 `Shapes`，在此导出：`Dialog→large`、`Card→medium`、`Button→small`、额外 `extraSmall = CornerShape(icon 12)`）
@@ -450,56 +466,25 @@ internal val MintBackground: Color
   ```
 
   `appColorScheme(dark)` 用 `lightColorScheme(...)`/`darkColorScheme(...)`，参数**全部取自 `AppColorSet`**（不得再出现裸 hex；`primaryContainer` 取 `tint`、`onPrimaryContainer` 取 `onMint`、`error` 取 `error`、`background`/`surface`/`onBackground`/`onSurface` 按名对应，`outline` 取 `outline`、`outlineVariant` 取 `outlineSoft`）。`appTypography()` 把 `AppType` 六档映射到 M3 角色（Display→`displaySmall`、Headline→`headlineSmall`、Title→`titleMedium`、Body→`bodyMedium`、Footnote→`bodySmall`、Label→`labelMedium`），其余 M3 角色从这六档派生（不引新字号）。
+  `AppShapes` 导出时一并做 **Card 20dp → 18dp 校准**（spec §2.3「卡 18dp」；`Dialog 24`/`Button 14`/`Pill 50%` 与 spec 相符，不动）。取值一致性优先于「既有值不动」，但改这一档会让全部卡片圆角变化，属可见改动，须在提交信息点名并留给真机核验（Task 26 Step 4）。
 
-- [ ] **Step 4: 接 `MainActivity`**
+- [ ] **Step 4: 写 `AppThemePreference.kt` 的纯码部分 + `ThemeModeDecisionTest`**
 
-  `setContent {` 内包一层：
+  本步骤先于装配点接线落地下列三个纯符号（无 `Context`，可在 JVM 测）：
   ```kotlin
-  setContent {
-      val themeMode = rememberAppThemeMode()   // Task 5 提供；本任务先用 ThemeMode.System 常量占位，见下
-      MintGlassTheme(themeMode = ThemeMode.System) { AppScreen(/* 26 个 hiltViewModel 实参原样保留 */) }
+  enum class ThemeMode(val storageKey: String) { System("system"), Light("light"), Dark("dark") }
+
+  fun shouldUseDarkTheme(mode: ThemeMode, systemInDark: Boolean): Boolean = when (mode) {
+      ThemeMode.System -> systemInDark
+      ThemeMode.Light -> false
+      ThemeMode.Dark -> true
   }
+
+  /** 存储键写死、大小写敏感：非法/空/未知值一律回退 System，避免「两种写法都合法」的漂移。 */
+  fun themeModeFromStorage(raw: String?): ThemeMode =
+      ThemeMode.entries.firstOrNull { it.storageKey == raw } ?: ThemeMode.System
   ```
-  **本任务只接装配点、不接偏好读写**（Task 5 换成 `rememberAppThemeMode()`）。改这一行时 `AppScreen` 的 26 个实参顺序与表达式一字不动——`AppScreenProductionWiringTest` 强制每个可选参数都在 `MainActivity` 接线，漏一个即挂测试（预期门，非环境故障）。
-
-- [ ] **Step 5: 跑测试确认通过 + 门控**
-
-  Expected: `MaterialThemeAssemblyContractTest` 全绿；门控全绿；基线 1499 + 新增用例，0 失败。
-  额外人工检查：`"$GRADLE" :app:assembleDebug` 成功后 APK 内主题不崩——本任务无渲染测试，把「装配点下首个组合可能因 Local 无提供者而崩」列为批 1 收口 connected 走查项（Task 10）。
-
-- [ ] **Step 6: 提交**
-
-  ```bash
-  git add app/src/main/java/com/example/englishlearning/ui/theme/MintGlassTheme.kt \
-          app/src/main/java/com/example/englishlearning/ui/theme/AppType.kt \
-          app/src/main/java/com/example/englishlearning/MainActivity.kt \
-          app/src/test/java/com/example/englishlearning/ui/MaterialThemeAssemblyContractTest.kt
-  git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit \
-    -m "feat(ui-theme): 建立唯一 MaterialTheme 装配点并接入 MainActivity 内容根"
-  ```
-
----
-
-### Task 5: 主题三态偏好（跟随系统 / 浅色 / 深色）
-
-**Files:**
-- Create: `app/src/main/java/com/example/englishlearning/ui/theme/AppThemePreference.kt`
-- Modify: `app/src/main/java/com/example/englishlearning/MainActivity.kt`（换成 `rememberAppThemeMode()`）
-- Test: `app/src/test/java/com/example/englishlearning/ui/ThemeModeDecisionTest.kt`
-- Test（androidTest）: `app/src/androidTest/java/com/example/englishlearning/ui/ThemeModeSwitchTest.kt`
-
-**Interfaces:**
-- Consumes: Task 4 的 `MintGlassTheme(themeMode = …)`。
-- Produces:
-  - `enum class ThemeMode(val storageKey: String) { System("system"), Light("light"), Dark("dark") }`
-  - `fun shouldUseDarkTheme(mode: ThemeMode, systemInDark: Boolean): Boolean`（纯函数）
-  - `fun themeModeFromStorage(raw: String?): ThemeMode`（非法/缺失回退 `System`）
-  - `object AppThemePreferences { const val PREFS_NAME = "ui_display_prefs"; const val KEY_THEME_MODE = "theme_mode"; fun read(context: Context): ThemeMode; fun write(context: Context, mode: ThemeMode) }`
-  - `@Composable fun rememberAppThemeMode(): ThemeMode`（`ContextCompat` + `DisposableEffect` 的 `OnSharedPreferenceChangeListener`）
-
-- [ ] **Step 1: 写纯函数单测（失败）**
-
-  `ThemeModeDecisionTest`（JUnit5 + kotlin.test，无 Android 依赖——这正是把判定做成纯函数的原因）：
+  同任务建 `ThemeModeDecisionTest`（JUnit5 + kotlin.test，四条用例）：
   ```kotlin
   @Test fun `system mode follows the platform`() {
       assertTrue(shouldUseDarkTheme(ThemeMode.System, systemInDark = true))
@@ -518,19 +503,66 @@ internal val MintBackground: Color
       }
   }
   ```
-  （大小写敏感的 `LIGHT` 必须回退——存储键是写死的，不做归一化以免「两种写法都合法」的漂移。）
 
-- [ ] **Step 2: 跑测试确认失败** — Run `--tests '*ThemeModeDecisionTest*'`，Expected: 编译失败/未解析（`ThemeMode` 不存在）。
+- [ ] **Step 5: 接 `MainActivity`**
 
-- [ ] **Step 3: 实现 `AppThemePreference.kt`**
+  `setContent {` 内包一层：
+  ```kotlin
+  setContent {
+      val themeMode = rememberAppThemeMode()   // Task 5 提供；本任务先用 ThemeMode.System 常量占位，见下
+      MintGlassTheme(themeMode = ThemeMode.System) { AppScreen(/* 26 个 hiltViewModel 实参原样保留 */) }
+  }
+  ```
+  **本任务只接装配点、不接偏好读写**（Task 5 换成 `rememberAppThemeMode()`）。改这一行时 `AppScreen` 的 26 个实参顺序与表达式一字不动——`AppScreenProductionWiringTest` 强制每个可选参数都在 `MainActivity` 接线，漏一个即挂测试（预期门，非环境故障）。
 
-  纯函数 + prefs 读写 + `rememberAppThemeMode()`。类注释写明两条口径：
+- [ ] **Step 6: 跑测试确认通过 + 门控**
+
+  Expected: `MaterialThemeAssemblyContractTest` 全绿；门控全绿；基线 1499 + 新增用例，0 失败。
+  额外人工检查：`"$GRADLE" :app:assembleDebug` 成功后 APK 内主题不崩——本任务无渲染测试，把「装配点下首个组合可能因 Local 无提供者而崩」列为批 1 收口 connected 走查项（Task 10）。
+
+- [ ] **Step 7: 提交**
+
+  ```bash
+  git add app/src/main/java/com/example/englishlearning/ui/theme/MintGlassTheme.kt \
+          app/src/main/java/com/example/englishlearning/ui/theme/AppThemePreference.kt \
+          app/src/main/java/com/example/englishlearning/ui/theme/AppType.kt \
+          app/src/main/java/com/example/englishlearning/MainActivity.kt \
+          app/src/test/java/com/example/englishlearning/ui/MaterialThemeAssemblyContractTest.kt \
+          app/src/test/java/com/example/englishlearning/ui/ThemeModeDecisionTest.kt
+  git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit \
+    -m "feat(ui-theme): 建立唯一 MaterialTheme 装配点并接入 MainActivity 内容根"
+  ```
+
+---
+
+### Task 5: 主题三态偏好（跟随系统 / 浅色 / 深色）
+
+**Files:**
+- Modify: `app/src/main/java/com/example/englishlearning/ui/theme/AppThemePreference.kt`（Task 4 已建纯码部分；本任务在同一文件追加 prefs I/O 与 `rememberAppThemeMode`）
+- Modify: `app/src/main/java/com/example/englishlearning/MainActivity.kt`（换成 `rememberAppThemeMode()`）
+- Test: `app/src/test/java/com/example/englishlearning/ui/ThemeModeDecisionTest.kt`（**Task 4 已交付并跑绿**，本任务只复跑，不重建）
+- Test（androidTest）: `app/src/androidTest/java/com/example/englishlearning/ui/ThemeModeSwitchTest.kt`
+
+**Interfaces:**
+- Consumes: Task 4 的 `MintGlassTheme(themeMode = …)`、`ThemeMode`、`shouldUseDarkTheme`、`themeModeFromStorage`。
+- Produces:
+  - `object AppThemePreferences { const val PREFS_NAME = "ui_display_prefs"; const val KEY_THEME_MODE = "theme_mode"; fun read(context: Context): ThemeMode; fun write(context: Context, mode: ThemeMode) }`
+  - `@Composable fun rememberAppThemeMode(): ThemeMode`（`ContextCompat` + `DisposableEffect` 的 `OnSharedPreferenceChangeListener`）
+
+- [ ] **Step 1: 复跑纯函数单测确认绿**
+
+  Run: `"$GRADLE" :app:testDebugUnitTest --tests '*ThemeModeDecisionTest*' --offline --no-daemon --no-build-cache`
+  Expected: PASS（Task 4 交付的四条用例：`System` 跟随系统、`Light`/`Dark` 无视平台、`storageKey` 全枚举往返、`null`/空/`"darkish"`/大小写不符的 `"LIGHT"`/`"  "` 一律回退 `System`——**大小写敏感是有意为之**，存储键写死，不做归一化以免「两种写法都合法」的漂移）。
+
+- [ ] **Step 2: 追加 prefs I/O 与 `rememberAppThemeMode()`**
+
+  在 `AppThemePreference.kt` 内实现 `object AppThemePreferences { PREFS_NAME/KEY_THEME_MODE + read/write }` 与 `@Composable fun rememberAppThemeMode()`（`LocalContext.current` → `AppThemePreferences.read`，`DisposableEffect` 注册/注销 `OnSharedPreferenceChangeListener`，`mutableStateOf` 承载）。prefs 读写本身需要 `Context`，**不在 JVM 单测覆盖**（本仓库 JVM 测试零 Android 依赖，robolectric 依赖虽在但从未用过，不为一个 prefs 开新口径）；读写由 Step 3 的 connected 用例覆盖。
+
+  类注释写明两条口径：
   - **不进 Room、不做 v33 迁移、不进备份包**（spec §5.2）：显示偏好不是学习数据；因此不用 `LearningSettingsEntity`，也**不得**把 `ui_display_prefs` 加进任何备份文件清单。
   - prefs 文件是 app 私有，卸载即失——与 AGENTS.md「卸载/清除数据前未导出数据可能无法恢复」一致，主题偏好属可丢项。
 
-- [ ] **Step 4: 跑单测通过**
-
-- [ ] **Step 5: 写 connected 用例（像素证据）**
+- [ ] **Step 3: 写 connected 用例（像素证据）**
 
   `ThemeModeSwitchTest`（androidTest，`createComposeRule`）：同一测试类两个方法（**同一次测试内两次 `setContent` 真机必崩**——这是已记录怪癖，必须拆方法）：
   ```kotlin
@@ -545,11 +577,11 @@ internal val MintBackground: Color
   }
   ```
   另一方法同形断言 `0xF1FBF5`（`ThemeMode.Light`）。
-  注：`Box` 底色由 `MaterialTheme.colorScheme.background` 提供还是需显式 `.background(appColors().background)`——以 Step 6 现场为准；若 `setContent` 根不带背景，就显式加 `.background(LocalAppColors.current.background)` 并在注释说明这是探针而非生产形状。
+  注：`Box` 底色由 `MaterialTheme.colorScheme.background` 提供还是需显式 `.background(appColors().background)`——以 Step 4 现场为准；若 `setContent` 根不带背景，就显式加 `.background(LocalAppColors.current.background)` 并在注释说明这是探针而非生产形状。
 
-- [ ] **Step 6: `MainActivity` 接 `rememberAppThemeMode()`**，跑门控 + 编译 androidTest。
+- [ ] **Step 4: `MainActivity` 接 `rememberAppThemeMode()`**，跑门控 + 编译 androidTest。
 
-- [ ] **Step 7: 在 `emulator-5574` 跑 connected**
+- [ ] **Step 5: 在 `emulator-5574` 跑 connected**
 
   ```bash
   export ANDROID_SERIAL=emulator-5574
@@ -561,12 +593,11 @@ internal val MintBackground: Color
   ```
   Expected: 末行 `OK (2 tests)`。失败先看 logcat，再对照 `android-connected-qa-loop` 怪癖表（息屏/弹窗劫持/dump 过期）。
 
-- [ ] **Step 8: 提交**
+- [ ] **Step 6: 提交**
 
   ```bash
   git add app/src/main/java/com/example/englishlearning/ui/theme/AppThemePreference.kt \
           app/src/main/java/com/example/englishlearning/MainActivity.kt \
-          app/src/test/java/com/example/englishlearning/ui/ThemeModeDecisionTest.kt \
           app/src/androidTest/java/com/example/englishlearning/ui/ThemeModeSwitchTest.kt
   git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit \
     -m "feat(ui-theme): 主题三态偏好落 SharedPreferences 并用真像素验证深浅装配"
@@ -574,21 +605,21 @@ internal val MintBackground: Color
 
 ---
 
-### Task 6: `AppIcons.kt` — 32 枚 B 案图标的两层路径数据
+### Task 6: `AppIcons.kt` — 33 枚 B 案图标的两层路径数据
 
 **Files:**
 - Create: `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt`
 - Test: `app/src/test/java/com/example/englishlearning/ui/AppIconsStructureContractTest.kt`
 
 **Interfaces:**
-- Consumes: Task 1 决策文档的 32 枚清单与 5 枚两层豁免表。
+- Consumes: Task 1 决策文档的 33 枚清单与 5 枚两层豁免表。
 - Produces:
   - `data class AppIconSpec(val name: String, val strokePaths: List<String>, val fillPaths: List<String>, val fillAlpha: Float = 0.30f)`（路径为 24×24 画布的 SVG path data 字符串；圆形填充用 `CircleFill(cx, cy, r)` 标记串，由 Task 7 的渲染器解释）
   - `enum class AppIcon { Back, ChevronRight, ChevronDown, Close, Check, Search, Book, BookOpen, List, Bookmark, Star, Clock, Chart, Spark, Speaker, Play, Pause, Stop, Mic, Translate, Camera, Image, Document, Newspaper, Gear, Person, Info, Bell, Shield, Warning, Trash, Upload, Download }`
   - `val AppIcon.spec: AppIconSpec`（`AppIcons.all: Map<AppIcon, AppIconSpec>` 的读取扩展）
   - `val StrokeOnlyIcons: Set<AppIcon>` = `setOf(Back, ChevronRight, ChevronDown, Close, Check)`
 
-  **枚数核对**：枚举 33 个条目 = 32 枚字形（`Book` 与 `BookOpen` 是两枚不同字形：一本合上的书 / 摊开的书）。若执行时认为其中一枚冗余，删枚举条目属范围变化，先改 Task 1 决策文档的清单再删，不得静默改数。
+  **枚数核对**：枚举 33 条目 = 33 枚字形，符合 spec §4.1「约 30 枚上下」。`Book`（合上的书，底导「学习」tab 现状形状）与 `BookOpen`（摊开的书，阅读/词书页头）是两枚不同字形，都保留。若执行时认为其中一枚冗余，删枚举条目属范围变化，先改 Task 1 决策文档的清单再删，不得静默改数。
 
 - [ ] **Step 1: 写结构契约测试（失败）**
 
@@ -649,7 +680,7 @@ internal val MintBackground: Color
   - 方向类字形（chevron/back/check/close）笔画端点对称，17dp 行内尺寸下仍可辨；
   - 每枚补完在注释里标一行「原创自绘（B 案度量）」——许可台账 `app-authored-ui-icons` 的措辞依赖它（AC-R-05）。
 
-  文件头注释顺序写：许可结论 → 度量基准（仅参考 Material Symbols 的 24dp 网格与 2px 重量，未内嵌其路径数据）→ 逐枚清单（32 枚 + 各自用途屏）→ 豁免表 5 枚。
+  文件头注释顺序写：许可结论 → 度量基准（仅参考 Material Symbols 的 24dp 网格与 2px 重量，未内嵌其路径数据）→ 逐枚清单（33 枚 + 各自用途屏）→ 豁免表 5 枚。
 
 - [ ] **Step 4: 跑测试确认通过** — Run `--tests '*AppIconsStructureContractTest*'`，Expected: PASS。
 
@@ -659,7 +690,7 @@ internal val MintBackground: Color
   git add app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt \
           app/src/test/java/com/example/englishlearning/ui/AppIconsStructureContractTest.kt
   git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit \
-    -m "feat(ui-icons): 32 枚 B 案双色图标路径数据入库并钉住两层结构与零 Icons 引用"
+    -m "feat(ui-icons): 33 枚 B 案双色图标路径数据入库并钉住两层结构与零 Icons 引用"
   ```
 
 ---
@@ -1288,7 +1319,7 @@ internal val MintBackground: Color
 
 **1. 规格覆盖**：spec §2.1/§2.2/§2.3 → Task 2/3/4；§3 九个组件 → Task 9/10/11/12；§4 图标体系 → Task 1/6/7；§5 深色与三态 → Task 3/4/5/19；§6 六条裁决 → Task 19/20/22/23/24/25 + 补 1 → Task 13–17；§7 移交账 → Task 9/15/17/21/23/26；§8 外刊多源明确不占本轮 → Task 24 Step 3；§9 AC-R-01…08/20…23 → 各任务 Step 与 Task 26 证据表；AC-R-10/11/12 → Task 26 Step 4；§10 风险 → Task 20 Step 1（宿主拆分）、Task 16 Step 2（未核实项现场核）、Task 17 Step 1（testTag 影响面）、Task 26 Step 2（M-B1/M-B2）。
 **2. 占位符扫描**：全文无 TBD/TODO/「类似 Task N」；确需现场取值的三处（`MintPalette` 真实成员名、词书选取屏与字母 Rail 的真实文件名、`CardDetailScreen` 四宿主清单）都写成「先 grep 再动，并把偏差写进报告」的具体命令，而非留空。
-**3. 类型一致性**：`AppColorSet` 16 字段名、`AppDomain` 七条目名、`AppIcon` 33 枚举条目（32 字形）、`ThemeMode.storageKey`、`InlineNoticeKind`、`SpeakerState`、`PayloadKind`、`MyWordsSection` 在定义任务与消费任务的 Interfaces 块中逐字一致；`gradientStartForDomain`/`shouldUseDarkTheme`/`allowsInEntryContainer`/`noticeColors`/`speakerContentDescription`/`featureStatusBadge` 的签名在 Produces 与测试代码中同名同参。
+**3. 类型一致性**：`AppColorSet` 16 字段名、`AppDomain` 七条目名、`AppIcon` 33 枚举条目（33 字形）、`ThemeMode.storageKey`、`InlineNoticeKind`、`SpeakerState`、`PayloadKind`、`MyWordsSection` 在定义任务与消费任务的 Interfaces 块中逐字一致；`gradientStartForDomain`/`shouldUseDarkTheme`/`allowsInEntryContainer`/`noticeColors`/`speakerContentDescription`/`featureStatusBadge` 的签名在 Produces 与测试代码中同名同参。
 
 ---
 
