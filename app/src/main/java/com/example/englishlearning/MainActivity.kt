@@ -29,6 +29,8 @@ import com.example.englishlearning.ui.WordCardViewModel
 import com.example.englishlearning.ui.VocabularyViewModel
 import com.example.englishlearning.ui.VocabularyRelearnViewModel
 import com.example.englishlearning.ui.WorksheetViewModel
+import com.example.englishlearning.ui.theme.MintGlassTheme
+import com.example.englishlearning.ui.theme.ThemeMode
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.example.englishlearning.language.domain.PronunciationProvider
@@ -45,38 +47,42 @@ class MainActivity : FragmentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
-            AppScreen(
-                viewModel = hiltViewModel<AppViewModel>(),
-                learningSetupViewModel = hiltViewModel<LearningSetupViewModel>(),
-                todayPlanViewModel = hiltViewModel<TodayPlanViewModel>(),
-                wordCardViewModel = hiltViewModel<WordCardViewModel>(),
-                worksheetViewModel = hiltViewModel<WorksheetViewModel>(),
-                readingAccessViewModel = hiltViewModel<ReadingAccessViewModel>(),
-                articleReadingViewModel = hiltViewModel<ArticleReadingViewModel>(),
-                aiProfileViewModel = hiltViewModel<AiProfileSettingsViewModel>(),
-                speechSettingsViewModel = hiltViewModel<SpeechSettingsViewModel>(),
-                reminderSettingsViewModel = hiltViewModel<ReminderSettingsViewModel>(),
-                checkInViewModel = hiltViewModel<CheckInViewModel>(),
-                favoritesViewModel = hiltViewModel<FavoritesViewModel>(),
-                wrongWordsViewModel = hiltViewModel<WrongWordsViewModel>(),
-                articleVersionViewModel = hiltViewModel<ArticleVersionViewModel>(),
-                learningDataDeletionViewModel = hiltViewModel<LearningDataDeletionViewModel>(),
-                learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
-                wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),
-                vocabularyViewModel = hiltViewModel<VocabularyViewModel>(),
-                vocabularyRelearnViewModel = hiltViewModel<VocabularyRelearnViewModel>(),
-                wordQaViewModel = hiltViewModel<WordAiQaViewModel>(),
-                globalVocabularySearchViewModel = hiltViewModel<GlobalVocabularySearchViewModel>(),
-                sentenceAnalysisViewModel = hiltViewModel<SentenceAnalysisViewModel>(),
-                photoTranslationViewModel = hiltViewModel<com.example.englishlearning.ui.PhotoTranslationViewModel>(),
-                imageStudioViewModel = hiltViewModel<ImageStudioViewModel>(),
-                wordBookTransferViewModel = hiltViewModel<com.example.englishlearning.wordbook.WordBookTransferViewModel>(),
-                backupExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupExportViewModel>(),
-                backupRestoreViewModel = hiltViewModel<com.example.englishlearning.ui.BackupRestoreViewModel>(),
-                backupPairingExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupProtectedExportViewModel>(),
-                pronunciationProvider = pronunciationProvider,
-                refreshVocabularySearchIndex = refreshVocabularySearchIndex,
-            )
+            // 唯一装配点：LocalAppColors / LocalDomainColors / LocalIsDark 与 MaterialTheme 都在这里注入。
+            // themeMode 本任务先钉 ThemeMode.System，Task 5 换成 rememberAppThemeMode() 的 prefs 回读。
+            MintGlassTheme(themeMode = ThemeMode.System) {
+                AppScreen(
+                    viewModel = hiltViewModel<AppViewModel>(),
+                    learningSetupViewModel = hiltViewModel<LearningSetupViewModel>(),
+                    todayPlanViewModel = hiltViewModel<TodayPlanViewModel>(),
+                    wordCardViewModel = hiltViewModel<WordCardViewModel>(),
+                    worksheetViewModel = hiltViewModel<WorksheetViewModel>(),
+                    readingAccessViewModel = hiltViewModel<ReadingAccessViewModel>(),
+                    articleReadingViewModel = hiltViewModel<ArticleReadingViewModel>(),
+                    aiProfileViewModel = hiltViewModel<AiProfileSettingsViewModel>(),
+                    speechSettingsViewModel = hiltViewModel<SpeechSettingsViewModel>(),
+                    reminderSettingsViewModel = hiltViewModel<ReminderSettingsViewModel>(),
+                    checkInViewModel = hiltViewModel<CheckInViewModel>(),
+                    favoritesViewModel = hiltViewModel<FavoritesViewModel>(),
+                    wrongWordsViewModel = hiltViewModel<WrongWordsViewModel>(),
+                    articleVersionViewModel = hiltViewModel<ArticleVersionViewModel>(),
+                    learningDataDeletionViewModel = hiltViewModel<LearningDataDeletionViewModel>(),
+                    learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
+                    wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),
+                    vocabularyViewModel = hiltViewModel<VocabularyViewModel>(),
+                    vocabularyRelearnViewModel = hiltViewModel<VocabularyRelearnViewModel>(),
+                    wordQaViewModel = hiltViewModel<WordAiQaViewModel>(),
+                    globalVocabularySearchViewModel = hiltViewModel<GlobalVocabularySearchViewModel>(),
+                    sentenceAnalysisViewModel = hiltViewModel<SentenceAnalysisViewModel>(),
+                    photoTranslationViewModel = hiltViewModel<com.example.englishlearning.ui.PhotoTranslationViewModel>(),
+                    imageStudioViewModel = hiltViewModel<ImageStudioViewModel>(),
+                    wordBookTransferViewModel = hiltViewModel<com.example.englishlearning.wordbook.WordBookTransferViewModel>(),
+                    backupExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupExportViewModel>(),
+                    backupRestoreViewModel = hiltViewModel<com.example.englishlearning.ui.BackupRestoreViewModel>(),
+                    backupPairingExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupProtectedExportViewModel>(),
+                    pronunciationProvider = pronunciationProvider,
+                    refreshVocabularySearchIndex = refreshVocabularySearchIndex,
+                )
+            }
         }
     }
 }

@@ -426,22 +426,44 @@ class DesignTokenContractTest {
         listOf(
             Regex("""data class AppColorSet\(""") to "AppColorSet 数据类",
             Regex("""data class DomainPalette\(val base: Color, val deep: Color\)""") to "DomainPalette(base, deep)",
-            Regex("""val LocalAppColors\s*:\s*ProvidableCompositionLocal<AppColorSet>\s*=\s*staticCompositionLocalOf""") to "LocalAppColors",
-            Regex("""val LocalDomainColors\s*:\s*ProvidableCompositionLocal<Map<AppDomain, DomainPalette>>\s*=\s*staticCompositionLocalOf""") to "LocalDomainColors",
-            Regex("""val LocalIsDark\s*:\s*ProvidableCompositionLocal<Boolean>\s*=\s*staticCompositionLocalOf""") to "LocalIsDark",
+            Regex("""val LocalAppColors\s*:\s*ProvidableCompositionLocal<AppColorSet>\s*=\s*compositionLocalOf""") to "LocalAppColors",
+            Regex("""val LocalDomainColors\s*:\s*ProvidableCompositionLocal<Map<AppDomain, DomainPalette>>\s*=\s*compositionLocalOf""") to "LocalDomainColors",
+            Regex("""val LocalIsDark\s*:\s*ProvidableCompositionLocal<Boolean>\s*=\s*compositionLocalOf""") to "LocalIsDark",
             Regex("""fun appColors\(\)\s*:\s*AppColorSet\s*=\s*LocalAppColors\.current""") to "appColors()",
             Regex("""fun appDomain\(domain: AppDomain\)\s*:\s*DomainPalette\s*=\s*LocalDomainColors\.current\.getValue\(domain\)""") to "appDomain(domain)",
         ).forEach { (regex, label) ->
             assertTrue(regex.containsMatchIn(text), "Interfaces 声明缺失或形状偏离：$label")
         }
 
+        // 翻色链路（裁决 R1）：三个 Local 必须用 compositionLocalOf，不得回到 staticCompositionLocalOf。
+        // staticCompositionLocalOf 的读取方在值变化时不失效重绘，主题切换后 Mint* 仍会读旧一套色；
+        // 装配点 MintGlassTheme 提供的值来自组合期状态读取，只有 compositionLocalOf 能把它翻到消费方。
+        // 此处把「工厂名写成 static 前缀」显式判红（负向钉），改回即本用例红；正向钉在上方逐条要求
+        // compositionLocalOf，两条合起来把「只改一处」也判红。
+        val staticFactory = Regex("""staticCompositionLocalOf""")
+        assertTrue(
+            !staticFactory.containsMatchIn(text),
+            "AppColors.kt 仍有 staticCompositionLocalOf：静态 Local 的读取方在主题切换时不失效，" +
+                "装配点提供的新一套色翻不到消费方（应全部为 compositionLocalOf）",
+        )
+        // 防「永久绿」自检：上面两条规则在合成片段上必须一个抓得住、一个不越界。
+        assertTrue(
+            Regex("""val LocalAppColors\s*:\s*ProvidableCompositionLocal<AppColorSet>\s*=\s*compositionLocalOf""")
+                .containsMatchIn("val LocalAppColors: ProvidableCompositionLocal<AppColorSet> = compositionLocalOf { AppColorLight }"),
+            "合成正片段漏判：compositionLocalOf 正向钉抓不住标准形状",
+        )
+        assertTrue(
+            staticFactory.containsMatchIn("val LocalIsDark: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { false }"),
+            "合成负片段漏判：staticCompositionLocalOf 反向钉抓不住改回静态的写法",
+        )
+
         // 反向钉：三个 Local 的静态类型不得写成基类 `CompositionLocal<…>`（修复轮 1 的 Important）。
         // 上方正向匹配已要求 `Providable` 前缀，此处再把「宽化类型」显式判红，防止有人只改回一处
         // 或另写 `CompositionLocal<` 形状的等价声明：`provides` 只是 ProvidableCompositionLocal 的成员
         // （基类 `CompositionLocal` 只有 `current`），Task 4 装配点要写 `LocalAppColors provides set`，
         // 静态类型宽化即编译失败。
-        // 两个负向 lookbehind 排除 Providable/Dynamic 两个子类型前缀；`staticCompositionLocalOf` 不构成
-        // 误报，因为那里 `CompositionLocal` 之后紧跟的是 `Of` 而非 `<`。
+        // 两个负向 lookbehind 排除 Providable/Dynamic 两个子类型前缀；工厂函数名 `compositionLocalOf`
+        // 同样不构成误报，因为那里 `CompositionLocal` 之后紧跟的是 `Of` 而非 `<`。
         val widenedType = Regex("""(?<!Providable)(?<!Dynamic)CompositionLocal<""")
         assertTrue(
             !widenedType.containsMatchIn(text),
