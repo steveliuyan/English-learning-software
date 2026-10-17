@@ -1,11 +1,15 @@
 package com.example.englishlearning.ui
 
+import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.ui.components.AppIcons
+import com.example.englishlearning.ui.components.spec
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -15,9 +19,16 @@ import kotlin.test.assertTrue
  * `MaterialThemeAssemblyContractTest`）：
  *  - 「源码文本即契约」：枚数与顺序、两层结构、豁免表、路径字符集都读 `src/main/java` 文本，
  *    本测试不在 JVM 侧渲染 Compose；
+ *  - 唯一的例外是有意的缝（修复轮 I-1）：`every enum entry resolves to a spec…` 直接引用
+ *    `AppIcon` / `AppIcons.all` 符号，钉的是「路径表键集 == 枚举全集」这条运行时真相——
+ *    文本契约只要三处自洽就抓不住少一枚 spec（评审变异 M6 实证），只有读符号能抓；
  *  - 注释不计入代码契约：结构断言先过 `SourceRatchet.stripComments`，
- *    而「逐枚清单」那条钉的是注释本体，所以它单独读未剥离的原文；
- *  - 目录守卫内置在共享夹具 `uiFiles()`（`walkTopDown()` 对缺失路径只给空序列 = 静默空扫）；
+ *    而「逐枚清单」与「逐枚来历注释」钉的都是注释本体，所以它们单独读未剥离的原文；
+ *  - 来历注释口径（修复轮 I-2）：每枚必须紧邻一行来历注释，声明只能是
+ *    「原创自绘（B 案度量）」或「转录 §<小节号>」两种之一，且同一子句内不得混用——
+ *    分写两子句（外框转录 + 内幅自绘）是决策文档允许的正当形状，不在违规之列；
+ *  - 目录守卫内置在共享夹具 `uiFiles()`（`walkTopDown()` 对缺失路径只给空序列 = 静默空扫），
+ *    位置本身（`ui/components/`）由 `appIconsFile()` 的路径断言钉（修复轮 M-2）；
  *  - 每条规则都用合成正片段与合成负片段当场证明「抓得住且不越界」，不存在永久绿的空转断言。
  *
  * 规则的来源是决策文档，不是本文件：枚数、顺序、用途与豁免表逐枚钉在
@@ -50,6 +61,16 @@ class AppIconsStructureContractTest {
     /** 禁止 AndroidX material-icons：它会牵动 `material-icons-extended` 与 lockfile（本轮零新增依赖）。 */
     private val androidxIconRef = Regex("""\bIcons\.""")
 
+    /** 来历标记之一：本项目自绘。只认这个全称，「自绘」「原创」等简写不算（口径要能被 grep 复核）。 */
+    private val selfDrawnMarker = Regex("""原创自绘（B 案度量）""")
+
+    /** 来历标记之一的每一次「转录」提及，与它的合规范式：必须紧跟 `§` 与小节号（可带子节）。 */
+    private val transcriptionMention = Regex("""转录""")
+    private val numberedTranscription = Regex("""转录\s*§[0-9]+(?:\.[0-9]+)*""")
+
+    /** 来历注释的子句切分：注释按行、行内按分号/句号/破折号切，混用判定只在同一子句内生效。 */
+    private val provenanceClause = Regex("""[；;。\n]|——""")
+
     // ---------- 读取与解析 ----------
 
     private fun appIconsFile(): File {
@@ -59,7 +80,14 @@ class AppIconsStructureContractTest {
             "$APP_ICONS_NAME 应恰好一个，实际 ${files.size} 个（图标库未创建 / 被改名 / 扫描错位？" +
                 "期望目录 $UI_MAIN_SOURCE_PATH，JVM 工作目录 ${File(".").absolutePath}）"
         )
-        return files.single()
+        val file = files.single()
+        // 位置本身是 spec §4.1 的决定：只钉文件名时，文件被挪去别的包目录仍然绿（修复轮 M-2）。
+        assertContains(
+            file.path.replace('\\', '/'),
+            ICONS_LOCATION_SEGMENT,
+            message = "$APP_ICONS_NAME 不在 ui/components/ 下（图标库的位置是 spec §4.1 钉过的决定，换目录不该继续绿）：${file.path}",
+        )
+        return file
     }
 
     /** 剥注释后的实现文本：代码契约的入口。 */
@@ -178,6 +206,75 @@ class AppIconsStructureContractTest {
             .map { ListedGlyph(it.groupValues[1].toIntOrNull() ?: 0, it.groupValues[2], it.groupValues[3]) }
             .sortedBy { it.index }
             .toList()
+
+    /**
+     * 枚名 → 它前面紧邻的来历注释（连续 `//` 行合并；没有紧邻注释 = null）。
+     * 读原文而不是剥注释文本：这里被钉的对象就是注释本身。定位靠 spec 块的起始行往上走，
+     * 块与块之间的代码行会终止上溯，所以「整行删掉来历注释」得到 null 而不是捡到上一枚的注释。
+     */
+    private fun provenanceComments(raw: String): Map<String, String?> {
+        val lines = raw.split('\n')
+        val out = LinkedHashMap<String, String?>()
+        Regex("""AppIconSpec\(\s*name\s*=\s*"([^"]+)"""").findAll(raw).forEach { match ->
+            val specLineIndex = raw.substring(0, match.range.first).count { it == '\n' }
+            val block = mutableListOf<String>()
+            var index = specLineIndex - 1
+            while (index >= 0) {
+                val trimmed = lines[index].trim()
+                if (!trimmed.startsWith("//")) break
+                block.add(0, trimmed.removePrefix("//").trim())
+                index--
+            }
+            out[match.groupValues[1]] = if (block.isEmpty()) null else block.joinToString("\n")
+        }
+        return out
+    }
+
+    /** 来历注释纯函数：枚名到紧邻注释 → 违规描述（空表 = 合规）。 */
+    private fun provenanceViolations(provenance: Map<String, String?>): List<String> {
+        val offenders = mutableListOf<String>()
+        provenance.forEach { (name, comment) ->
+            if (comment == null) {
+                offenders += "$name 缺紧邻来历注释：许可台账 app-authored-ui-icons 的措辞依赖每枚来历声明（AC-R-05）"
+                return@forEach
+            }
+            val mentions = transcriptionMention.findAll(comment).count()
+            val selfDrawn = selfDrawnMarker.findAll(comment).count()
+            if (mentions == 0 && selfDrawn == 0) {
+                offenders += "$name 的来历注释两种来历标记都没有：既没标「原创自绘（B 案度量）」也没标「转录 §<小节号>」"
+            }
+            if (mentions != numberedTranscription.findAll(comment).count()) {
+                offenders += "$name 写了「转录」却没带小节号：出处标签查不实就等于没写（范式：转录 §5 / 转录 §6.1 / 转录 §7）"
+            }
+            provenanceClause.split(comment).forEach { clause ->
+                val text = clause.trim()
+                if (selfDrawnMarker.containsMatchIn(text) && transcriptionMention.containsMatchIn(text)) {
+                    offenders += "$name 的同一子句「$text」既称原创自绘又称转录：来历口径含糊 = 第二套真值"
+                }
+            }
+        }
+        return offenders
+    }
+
+    /**
+     * 填充不透明度纯函数（修复轮 M-1）：透明度是主题属性，只在 `DuotoneFillAlpha` 里成对出现，
+     * 既不许逐枚写回 `AppIconSpec(...)`，也不许只留一档。
+     */
+    private fun alphaViolations(text: String): List<String> {
+        val offenders = mutableListOf<String>()
+        if (!text.contains("0.42")) offenders += "缺浅色档 0.42（B 案浅色实心层 = DuotoneFillAlpha.Light）"
+        if (!text.contains("0.30")) offenders += "缺深色档 0.30（B 案深色实心层 = DuotoneFillAlpha.Dark）"
+        specBlocks(text).forEach { (name, block) ->
+            if (block.contains("fillAlpha")) {
+                offenders += "$name 把填充不透明度写回了 AppIconSpec(...) 调用：33 枚各写一份就是第二套真值"
+            }
+        }
+        val declaration = Regex("""data\s+class\s+AppIconSpec\s*\(([^)]*)\)""").find(text)
+        if (declaration != null && declaration.groupValues[1].contains("fillAlpha")) {
+            offenders += "AppIconSpec 又带回了 fillAlpha 字段：透明度按主题取（DuotoneFillAlpha.forTheme），不是字形属性"
+        }
+        return offenders
+    }
 
     // ---------- 用例：枚数与顺序（brief Step 1 断言 1） ----------
 
@@ -431,8 +528,139 @@ class AppIconsStructureContractTest {
         assertEquals(null, iconListSection("只有代码没有注释小节"), "小节锚点缺失时必须给 null，不能当成空清单")
     }
 
+    // ---------- 用例：键集完整性读符号（修复轮 I-1，文本契约的有意补缝） ----------
+
+    @Test
+    fun `every enum entry resolves to a spec and no spec is orphaned`() {
+        val icons = AppIcon.entries.toSet()
+        assertEquals(icons, AppIcons.all.keys, "枚举与路径表不同源：缺枚或多余枚")
+        assertEquals(33, AppIcons.all.size, "`AppIcons.all` 枚数不是 33：清单/枚举/spec 三处之一漂移")
+        expectedIcons.forEach { name -> assertSame(name, AppIcon.valueOf(name).spec.name, "$name 的 spec.name 与枚举名不一致") }
+
+        // 反空转：少一个键就必须让上面第一条判红（评审变异 M6 的形状，文本契约抓不到它）。
+        assertNotEquals(icons, (AppIcons.all - AppIcon.Download).keys, "键集比对空转：抽掉一枚仍与枚举全集相等")
+    }
+
+    // ---------- 用例：逐枚来历注释钉住许可台账的证据链（修复轮 I-2） ----------
+
+    @Test
+    fun `every glyph declares its provenance in the comment above its paths`() {
+        val provenance = provenanceComments(rawText())
+        assertEquals(
+            expectedIcons,
+            provenance.keys.toList(),
+            "来历注释解析面与钉值清单不同源（枚序或枚数漂移，本条没有可比对象）",
+        )
+        assertEquals(
+            emptyList(),
+            provenanceViolations(provenance),
+            "逐枚来历注释违规（缺失 / 混用两种标记 / 转录没带小节号，逐条见上）",
+        )
+    }
+
+    @Test
+    fun `the provenance rules are not vacuous`() {
+        // 合成正片段：外框与内幅分写两子句，各自一种标记 = 决策文档允许的正当形状，不得越界判红。
+        val splitProvenance = """
+            // Search：骨架层转录 §6.1；内幅原创自绘（B 案度量）
+            AppIconSpec(name = "Search", strokePaths = listOf("M11 5a6 6 0 010 12"), fillPaths = listOf("CircleFill(11, 11, 6)"))
+        """.trimIndent()
+        assertEquals(
+            emptyList(),
+            provenanceViolations(provenanceComments(splitProvenance)),
+            "合成正片段被误判：分写两子句（转录 + 自绘）被判成混用",
+        )
+
+        // 合成负例 1（评审变异 M8 的真实形状）：来历注释整行删掉 → 点名该枚。
+        val noComment = "AppIconSpec(name = \"Book\", strokePaths = listOf(\"M6.5 5h11\"), fillPaths = listOf(\"M5 6h5v10H5z\"))"
+        assertEquals(
+            listOf("Book 缺紧邻来历注释：许可台账 app-authored-ui-icons 的措辞依赖每枚来历声明（AC-R-05）"),
+            provenanceViolations(provenanceComments(noComment)),
+            "合成负例被放行：删掉来历注释仍算合规",
+        )
+
+        // 合成负例 2：同一子句里同时塞「原创自绘（B 案度量）」与「转录 §6.2」→ 点名该枚。
+        val mixedClause = """
+            // Star：骨架原创自绘（B 案度量）转录 §6.2 同串
+            AppIconSpec(name = "Star", strokePaths = listOf("M6.4 4h11z"), fillPaths = listOf("M6.4 4h11z"))
+        """.trimIndent()
+        assertTrue(
+            provenanceViolations(provenanceComments(mixedClause))
+                .any { it.startsWith("Star") && it.contains("既称原创自绘又称转录") },
+            "合成负例被放行：一枚里两种标记混写仍算合规（口径含糊 = 第二套真值）",
+        )
+
+        // 合成负例 3：写了「转录」却没有小节号 → 出处标签查不实。
+        val sectionless = """
+            // Info：圆环是稿中 <circle> 的标记串转录
+            AppIconSpec(name = "Info", strokePaths = listOf("M12 4a8 8 0 010 16"), fillPaths = listOf("CircleFill(12, 12, 8)"))
+        """.trimIndent()
+        assertTrue(
+            provenanceViolations(provenanceComments(sectionless)).any { it.startsWith("Info") && it.contains("没带小节号") },
+            "合成负例被放行：不带小节号的转录也算合规",
+        )
+
+        // 合成负例 4：注释在场但两种标记都没有 → 缺来历声明。
+        val markerless = """
+            // List：按 B 案度量补齐三条文字线与圆点
+            AppIconSpec(name = "List", strokePaths = listOf("M8 6h12"), fillPaths = listOf("M4 4.8h2.4v2.4H4z"))
+        """.trimIndent()
+        assertTrue(
+            provenanceViolations(provenanceComments(markerless)).any { it.startsWith("List") && it.contains("两种来历标记都没有") },
+            "合成负例被放行：只写度量不写来历也算合规",
+        )
+
+        // 解析面守卫：没有 spec 块时给空表，不冒充「零枚也合规」。
+        assertEquals(emptyMap(), provenanceComments("val unrelated = 1"), "没有 AppIconSpec 块时必须解析为空")
+    }
+
+    // ---------- 用例：填充不透明度是主题取值而非逐枚字段（修复轮 M-1） ----------
+
+    @Test
+    fun `duotone fill opacity is a themed pair of constants and never a per-glyph field`() {
+        val text = codeText()
+        assertTrue(
+            Regex("""data\s+class\s+AppIconSpec\s*\(""").containsMatchIn(text),
+            "找不到 AppIconSpec 声明：透明度字段的归属没有面可钉",
+        )
+        assertEquals(
+            emptyList(),
+            alphaViolations(text),
+            "填充不透明度口径违规（浅 0.42 / 深 0.30 两个主题档必须在场，且不得逐枚写字段）",
+        )
+    }
+
+    @Test
+    fun `the fill opacity rules are not vacuous`() {
+        // 合成正片段：主题常量成对 + 逐枚不写字段。
+        val themed = """
+            object DuotoneFillAlpha {
+                const val Light = 0.42f
+                const val Dark = 0.30f
+            }
+            AppIconSpec(name = "Search", strokePaths = listOf("M11 5a6 6 0 010 12"), fillPaths = listOf("CircleFill(11, 11, 6)"))
+        """.trimIndent()
+        assertEquals(emptyList(), alphaViolations(themed), "合成正片段被误判：主题成对常量被判违规")
+
+        // 合成负例 1：把透明度逐枚写回调用（评审变异 M7 的形状）。
+        val perGlyph = "AppIconSpec(name = \"Search\", strokePaths = listOf(\"M11 5\"), fillPaths = listOf(\"CircleFill(11, 11, 6)\"), fillAlpha = 0.9f)"
+        assertEquals(
+            listOf("Search 把填充不透明度写回了 AppIconSpec(...) 调用：33 枚各写一份就是第二套真值"),
+            alphaViolations(perGlyph).filter { it.contains("调用") },
+            "合成负例被放行：逐枚 fillAlpha 字段没被抓住",
+        )
+
+        // 合成负例 2：只剩一档（把深色档当成两档通用就是这个形状）。
+        val oneShade = "AppIconSpec(name = \"Search\", strokePaths = listOf(\"M11 5\"), fillPaths = listOf(\"CircleFill(11, 11, 6)\")) const val Dark = 0.30f"
+        assertTrue(
+            alphaViolations(oneShade).any { it.contains("0.42") },
+            "合成负例被放行：缺浅色档 0.42 没被点名",
+        )
+    }
+
     private companion object {
         const val APP_ICONS_NAME = "AppIcons.kt"
+        const val ICONS_LOCATION_SEGMENT = "/ui/components/"
         const val LIST_HEADING = "逐枚清单"
         const val EXEMPT_HEADING = "两层豁免表"
 

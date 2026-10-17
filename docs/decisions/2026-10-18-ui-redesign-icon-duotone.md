@@ -63,6 +63,12 @@ B 案的图形**不再复制 Material Symbols 的路径数据**，而是以它�
   自绘族的风格统一要靠度量约束（同一 24dp 网格、同一描边重量、同一圆头处理）而非上游字形保证。
 - 验收：
   - 每枚图标两层结构（描边骨架 + 内部半透明填充层），行内小尺寸退化为单层描边；
+  - 填充层不透明度是**主题属性**，不写进 `AppIconSpec`（逐枚各写一份就是第二套真值）：实现为
+    `ui/components/AppIcons.kt` 的 `DuotoneFillAlpha.Light` / `.Dark`，渲染器（Task 7 `AppGlyph`）按
+    `LocalIsDark` 取档。两个取值逐字转录视觉稿 §6.2 的 B 案 CSS——浅色
+    `.t-b .ux-f { fill:rgba(255,255,255,.42) }` = `0.42`（`docs/design/2026-10-17-ui-redesign-mockups.html:252`），
+    深色 `html[data-theme="dark"] .t-b .ux-f { fill:rgba(6,35,26,.30) }` = `0.30`（同文件 `:264`）。
+    本记录是这两个取值的唯一权威，代码注释只引用本记录、不写 `文件:行号` 锚点（行号会漂移而注释仍看似权威）；
   - 容器渐变亮端为 `deep` 混 35% `base`，白描边 ≥3:1 由计算函数当场判（AC-R-03）；
   - 禁止 emoji、含字徽标、各处自绘异形图标继续存在（「AI」「♪」「⏰」全部替换）；
   - 深浅两套 + `fontScale 2.0` 下逐枚真机核验（AC-R-10 / AC-R-11）；

@@ -742,7 +742,7 @@
 - 名称: Material Symbols 矢量图标集（仅作度量与风格基准；24dp 画布、2px 视觉重量、Outlined 变体）
 - 版本: Google Material Symbols 图标集（Outlined 变体、24dp 画布）；**UI 重设计轮批 1 按图标选型 B（双色层次自绘族）执行，本轮不复制其路径数据**，只沿用其网格、描边重量与无填充优先的风格作参照。实际入库的字形路径全部为自绘，逐枚清单记录在 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` 顶部注释并登记于 `app-authored-ui-icons`；若后续任何一枚改为直接内嵌上游路径数据，本条目对那一枚重新生效，须在本字段逐个列出内嵌的图标名与出处
 - 许可证: Apache License 2.0（Google 对 Material Symbols / Material 图标集的授权口径），允许商用、再分发与改作，条件是保留许可声明与 NOTICE；Google 另行说明该集合不含第三方品牌 logo（法务原因），故本项目不使用任何第三方标志
-- 用途: 为全站统一图标体系提供度量基准——替换现状的 emoji、字母缩写徽标（「AI」「♪」「⏰」）与各处自绘异形图标，使全站只有一族字形；因 `app/build.gradle.kts` 的 `dependencyLocking { lockAllConfigurations() }` 与「本轮不新增依赖」约束，不引入 `material-icons-extended`，改为把所需图标的 SVG path data 与圆形填充标记内嵌打包（`AppIcons.kt` 的 `AppIconSpec` 常量），由本项目的 `AppGlyph` 渲染器在设备内绘制
+- 用途: 为全站统一图标体系提供度量基准——替换现状的 emoji、字母缩写徽标（「AI」「♪」「⏰」）与各处自绘异形图标，使全站只有一族字形；因 `app/build.gradle.kts` 的 `dependencyLocking { lockAllConfigurations() }` 与「本轮不新增依赖」约束，不引入 `material-icons-extended`，改为把所需图标的 SVG path data 与圆形填充标记内嵌打包（`AppIcons.kt` 的 `AppIconSpec` 常量），由本项目的 `AppGlyph` 渲染器在设备内绘制；本条目只提供度量与风格基准——本项目只参考 Material Symbols 的 24dp 网格与 2px 视觉重量，未内嵌任何它的 path 数据，本 App 内全部字形为本项目自绘或本仓视觉稿转录（逐枚来历见 `app-authored-ui-icons` 与 `ui/components/AppIcons.kt`）
 - 数据流: 本条目为设计基准参照，无文件随 APK 打包；渲染所用的路径数据全部由本项目自行绘制，仅在设备内绘制，不联网、不读取也不传输任何用户数据
 - NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账）、`ui/components/AppIcons.kt` 顶部注释、`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`
 - 替代方案: 直接内嵌 Material Symbols 的 SVG 路径数据为 `ImageVector`（成本更低，但拿不到双色层次，视觉选型 A 案即此路径）；或引入 `androidx.compose.material.icons` 的 extended 工件（须先解除依赖锁定并另立决策记录）

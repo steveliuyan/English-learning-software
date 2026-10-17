@@ -3,6 +3,8 @@ package com.example.englishlearning.ui.components
 /**
  * B 案（双色层次 duotone）图标族的**路径数据**：本文件只讲几何，不含颜色、不含渲染码，
  * 也不含任何位图或第三方路径。渲染由 Task 7 的 `AppGlyph` 承担。
+ * 唯一的非几何取值是 `DuotoneFillAlpha` 的两个填充层不透明度常量——它按主题取档（浅 0.42 / 深 0.30），
+ * 不是字形属性，权威出处写在 `docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`。
  *
  * 许可结论：以下坐标全部由本项目自行绘制，不复制、不派生自任何第三方图标集、素材包或字形文件，
  * 因此不触发署名义务；登记在 `docs/third-party-notices.md` 的 `app-authored-ui-icons` 条目。
@@ -65,14 +67,26 @@ package com.example.englishlearning.ui.components
 /**
  * 一枚图标的两层几何：[strokePaths] 是描边骨架层（每枚至少一条），[fillPaths] 是内部半透明层
  * （除豁免表外每枚至少一条）。两种合法形状：24×24 画布的 SVG path data 串，或 `CircleFill(cx, cy, r)` 标记串。
- * [fillAlpha] 是填充层的默认不透明度，由渲染器乘上容器色；本文件不含任何颜色取值。
+ * 本类不含也不接受任何不透明度取值：填充层透明度是主题属性，取值见 [DuotoneFillAlpha]。
  */
 data class AppIconSpec(
     val name: String,
     val strokePaths: List<String>,
     val fillPaths: List<String>,
-    val fillAlpha: Float = 0.30f,
 )
+
+/**
+ * B 案两层结构的填充层不透明度。这是主题属性而非字形属性，所以不放在 [AppIconSpec] 上
+ * （逐枚各写一份就是第二套真值）。两个取值转录视觉稿 §6.2 的 B 案 CSS：
+ * 浅色 `.t-b .ux-f` = `rgba(255,255,255,.42)`，深色 `html[data-theme="dark"] .t-b .ux-f` = `rgba(6,35,26,.30)`。
+ * 权威出处（含稿内行号）钉在 `docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`；本注释不写 `文件:行号`，
+ * 行号随文件漂移而注释仍看似权威。渲染器（Task 7 `AppGlyph`）按 `LocalIsDark` 调 [forTheme] 取档。
+ */
+object DuotoneFillAlpha {
+    const val Light = 0.42f
+    const val Dark = 0.30f
+    fun forTheme(isDark: Boolean): Float = if (isDark) Dark else Light
+}
 
 /** 枚数、名字与顺序都是决策文档的钉值面；改动等于改产品范围，先改那份文档。 */
 enum class AppIcon { Back, ChevronRight, ChevronDown, Close, Check, Search, Book, BookOpen, List, Bookmark, Star, Clock, Chart, Spark, Speaker, Play, Pause, Stop, Mic, Translate, Camera, Image, Document, Newspaper, Gear, Person, Info, Bell, Shield, Warning, Trash, Upload, Download }
@@ -83,11 +97,13 @@ val StrokeOnlyIcons: Set<AppIcon> = setOf(AppIcon.Back, AppIcon.ChevronRight, Ap
 object AppIcons {
     /**
      * 逐枚路径数据。每枚的来历写在它前面一行：
-     *  - 「转录 §6.1/§6.2」= 视觉稿 §6.1/§6.2 已定稿的自绘骨架，坐标逐字照抄；
+     *  - 「转录 §<节号>」= 视觉稿那一节已经画出的几何，坐标逐字照抄（§5 共享组件 banner、§6.1 骨架网格、
+     *    §6.2 sprite 定稿形、§7 关键屏）；
      *  - 「原创自绘（B 案度量）」= 稿中未逐条给出、按文件头度量补齐的本项目自绘几何。
+     * 同一子句里不得混写两种标记；一枚的外框与内幅分写两子句是允许的（各自来历不同）。
      */
     private val specs: List<AppIconSpec> = listOf(
-        // Back：转录 §6.2 骨架层（开放折线，豁免枚）
+        // Back：转录 §6.1 骨架层（开放折线，豁免枚）
         AppIconSpec(name = "Back", strokePaths = listOf("M15 5l-7 7 7 7"), fillPaths = emptyList()),
         // ChevronRight：原创自绘（B 案度量）——端点对称的开口折线，与 Back 同一折角半径
         AppIconSpec(name = "ChevronRight", strokePaths = listOf("M9 5l7 7-7 7"), fillPaths = emptyList()),
@@ -97,14 +113,13 @@ object AppIcons {
         AppIconSpec(name = "Close", strokePaths = listOf("M6 6l12 12", "M18 6L6 18"), fillPaths = emptyList()),
         // Check：原创自绘（B 案度量）——短长臂对角的对勾，17dp 行内仍可辨
         AppIconSpec(name = "Check", strokePaths = listOf("M5 12l5 5 9-9"), fillPaths = emptyList()),
-        // Search：骨架层的手柄转录 §6.2；圆环与 CircleFill(11, 11, 6) 是视觉稿 <circle cx=11 cy=11 r=6>
-        // 的原创自绘（B 案度量）转录：圆环用两段圆弧写成 path，圆形填充走标记串
+        // Search：手柄折线、圆环与圆形填充转录 §6.2（视觉稿 `<circle cx=11 cy=11 r=6>` 写成两段圆弧 + 标记串）
         AppIconSpec(
             name = "Search",
             strokePaths = listOf("M11 5a6 6 0 010 12 6 6 0 010-12", "M20 20l-4.6-4.6"),
             fillPaths = listOf("CircleFill(11, 11, 6)"),
         ),
-        // Book：填充层转录 §6.2 左页半幅；书壳与书脊原创自绘（B 案度量）——对齐底导「学习」tab 现状几何
+        // Book：书壳与书脊原创自绘（B 案度量）；填充层转录 §6.2 左页半幅
         AppIconSpec(
             name = "Book",
             strokePaths = listOf("M6.5 5h11a2 2 0 012 2v11a2 2 0 01-2 2h-11a2 2 0 01-2-2V7a2 2 0 012-2z", "M12 5v14"),
@@ -134,7 +149,7 @@ object AppIcons {
             strokePaths = listOf("M6.4 4h11.2v15.2L12 15.6l-5.6 3.6z"),
             fillPaths = listOf("M6.4 4h11.2v15.2L12 15.6l-5.6 3.6z"),
         ),
-        // Clock：指针转录 §6.2；圆环原创自绘（B 案度量）——视觉稿的 <circle cx=12 cy=12 r=8> 写成两段圆弧
+        // Clock：指针与圆环转录 §6.2（视觉稿 `<circle cx=12 cy=12 r=8>` 写成两段圆弧）
         AppIconSpec(
             name = "Clock",
             strokePaths = listOf("M12 4a8 8 0 010 16 8 8 0 010-16", "M12 7.6V12l3.2 2"),
@@ -151,7 +166,7 @@ object AppIcons {
             name = "Spark",
             strokePaths = listOf(
                 "M11 3.5l1.8 4.5 4.5 1.8-4.5 1.8L11 16.1l-1.8-4.5L4.7 9.8l4.5-1.8z",
-                "M18.6 14.6l.9 2.2 2.2.9-2.2.9-.9 2.2-2.2-.9 2.2-.9z",
+                "M18.6 14.6l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z",
             ),
             fillPaths = listOf("M11 3.5l1.8 4.5 4.5 1.8-4.5 1.8L11 16.1l-1.8-4.5L4.7 9.8l4.5-1.8z"),
         ),
@@ -196,11 +211,11 @@ object AppIcons {
             strokePaths = listOf("M4 13l3.5-8 3.5 8", "M5.4 10h4.2", "M13 20l3.5-6.5 3.5 6.5", "M14.6 17h3.8"),
             fillPaths = listOf("M16.5 14.5l1.75 4h-3.5z"),
         ),
-        // Camera：骨架层转录 §6.1；镜头圆原创自绘（B 案度量）——稿中未画镜头，标记串按机身边距取值
+        // Camera：机身与镜头圆转录 §7 屏⑥（视觉稿 `<circle cx=12 cy=13 r=3.2>` 写成两段圆弧 + 标记串）
         AppIconSpec(
             name = "Camera",
-            strokePaths = listOf("M4 8h4l2-2h4l2 2h4v11H4z"),
-            fillPaths = listOf("CircleFill(12, 13, 3)"),
+            strokePaths = listOf("M4 8h4l2-2h4l2 2h4v11H4z", "M12 9.8a3.2 3.2 0 010 6.4 3.2 3.2 0 010-6.4"),
+            fillPaths = listOf("CircleFill(12, 13, 3.2)"),
         ),
         // Image：原创自绘（B 案度量）——画框 + 山形，日光圆作填充层
         AppIconSpec(
@@ -220,7 +235,7 @@ object AppIcons {
             strokePaths = listOf("M4 5h16v14H4z", "M7 12h10", "M7 15.5h6"),
             fillPaths = listOf("M5.4 6.4h13.2v3H5.4z"),
         ),
-        // Gear：滑杆三条转录 §6.1「设置」；旋钮圆是视觉稿 <circle cx=17 cy=17 r=2.5> 的标记串转录
+        // Gear：滑杆三条与旋钮圆转录 §6.1「设置」（视觉稿 `<circle cx=17 cy=17 r=2.5>` 写成标记串）
         AppIconSpec(
             name = "Gear",
             strokePaths = listOf("M4 7h16", "M4 12h16", "M4 17h10"),
@@ -232,7 +247,7 @@ object AppIcons {
             strokePaths = listOf("M12 4a4 4 0 010 8 4 4 0 010-8", "M4.5 20a7.5 7.5 0 0115 0"),
             fillPaths = listOf("CircleFill(12, 8, 4)"),
         ),
-        // Info：圆环原创自绘（B 案度量）；字干与点转录 §6.1「关于 / 许可」的 <circle cx=12 cy=12 r=8> 配线
+        // Info：圆环、字干与点转录 §6.1「关于 / 许可」（视觉稿 `<circle cx=12 cy=12 r=8>` 写成两段圆弧）
         AppIconSpec(
             name = "Info",
             strokePaths = listOf("M12 4a8 8 0 010 16 8 8 0 010-16", "M12 11v6", "M12 7.5v.5"),
@@ -250,7 +265,7 @@ object AppIcons {
             strokePaths = listOf("M12 4l7 3v5c0 4.2-3 7.3-7 8.2-4-.9-7-4-7-8.2V7z", "M9.2 12.2l2 2 4-4.2"),
             fillPaths = listOf("M12 4l7 3v5c0 4.2-3 7.3-7 8.2-4-.9-7-4-7-8.2V7z"),
         ),
-        // Warning：三角与感叹号转录 §6.1；三角内幅原创自绘（B 案度量）
+        // Warning：三角与感叹号转录 §5（banner warn 用图）；三角内幅原创自绘（B 案度量）
         AppIconSpec(
             name = "Warning",
             strokePaths = listOf("M12 4l8 14H4z", "M12 9v4", "M12 15.5v.5"),
@@ -268,7 +283,7 @@ object AppIcons {
             strokePaths = listOf("M12 20V9", "M8 13l4-4 4 4", "M5 5h14"),
             fillPaths = listOf("M12 9.6l3.4 3.4H8.6z"),
         ),
-        // Download：箭头与底栏三笔转录 §6.1「导出」（`M19 19h-14` 写作 `M5 19h14`）；箭头实心头原创自绘（B 案度量）
+        // Download：箭头与底栏三笔转录 §6.1「导出」；箭头实心头原创自绘（B 案度量）
         AppIconSpec(
             name = "Download",
             strokePaths = listOf("M12 4v9", "M8 10l4 4 4-4", "M5 19h14"),
