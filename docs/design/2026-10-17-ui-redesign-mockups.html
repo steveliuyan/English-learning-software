@@ -963,9 +963,16 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
   </section>
 
   <section id="open">
-    <h2><span class="no">8</span>　要你拍板的六条 / 本稿没做完的事</h2>
+    <h2><span class="no">8</span>　六条信息架构取舍（已拍板）/ 本稿没做完的事</h2>
 
     <h3>8.1 需要拍板的信息架构取舍（不是视觉问题，改了界面结构，得你点头）</h3>
+    <p class="lead"><b>拍板结果 2026-10-17</b>：①②③④⑥ 按下表推荐采纳；⑤ 的<b>版面</b>部分采纳（Feed 下沉独立二级层、偏好下沉「生成前参数」、双生成入口合并），
+      你顺带提出的「外刊除了 AI 生成还应该有真正的在线检索」经源码核查后<b>另立为能力决策</b>——外刊 Feed 现在<b>已经是真实联网抓取</b>
+      （<span class="mono">FetchArticleUseCase.kt:81-123</span> → RSS + 正文 GET → <span class="mono">articles</span> 表），
+      只是来源注册表硬锁 <span class="mono">voa-learning-english</span> 一源（<span class="mono">ArticleSourceRegistry.kt:29-57</span>，公有领域），
+      全仓无任何服务端搜索或开放抓取，请求体字段白名单也不含 tools（<span class="mono">AiRequestPolicy.kt:8-14</span>）。
+      三条路线与折中见 <span class="mono">docs/decisions/2026-10-17-ui-redesign-information-architecture.md</span>。
+      另：你提的<b>打卡页华丽动效</b>记为视觉定稿后的独立批次（需单独处理 <span class="mono">reduced-motion</span> 与 TalkBack 朗读），本轮不做。</p>
     <div class="panel">
       <table>
         <thead><tr><th style="width:150px">要拍的板</th><th style="width:210px">我的推荐</th><th>代价 / 不做的后果</th></tr></thead>
