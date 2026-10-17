@@ -50,12 +50,20 @@
 
 - [ ] **Step 1：写 RED 测试**（`NewWordOrderingTest`，方法名须与矩阵证据列逐字一致）
   - `order is deterministic across calls and a permutation of input`：同一册两次调用逐位相等；`sorted()==sorted(input)`、`distinct().size==input.size`。
-  - `order differs from the given order and spaces shared-prefix entries`：对一份 40 词、覆盖 ≥8 个前 3 字母组的样本，断言 `order(input) != input`，且对任意两个前 3 字母相同的 id，`abs(pos(a)-pos(b)) >= groups-1`。
-  - 另加：`order ignores the incoming order`（把输入 reverse 后结果与正序输入一致 → 证明顺序由内容而非入参位置决定）、`empty and single entry books are returned unchanged`。
+  - `order differs from the given order and spaces shared-prefix entries`：对一份覆盖多组前缀、含一个明显最大组的样本，
+    断言 `order(input) != input`，且对任意两个前 3 字母相同的 id，`abs(pos(a)-pos(b)) >= n / M`（整除，即 `floor(n/M)`）。
+  - `order ignores the incoming order`：把输入 reverse 后结果与正序输入逐位相同（证明顺序由内容而非入参位置决定）。
+  - `empty and single entry books are returned unchanged`：空表返回空；单元素返回自身；全同前缀（M==n，D==1）时不崩、仍是置换。
 - [ ] **Step 2：跑红**
   `"$GRADLE" :app:testDebugUnitTest --tests '*NewWordOrderingTest' --no-daemon --rerun-tasks` → 编译失败/未定义即 RED（记录原始报错行）。
-- [ ] **Step 3：最小实现**
-  FNV-1a 64 位哈希（纯 Kotlin，不用 `Random`、不用 `String.hashCode`）；`lemma = id.substringAfter(':')`，`prefix = lemma.take(3)`（不足 3 字符取全词、转小写）；先按 `(hash(prefix), hash(id), id)` 排序，再按 prefix 分组轮转展开，组顺序取各组首元素 `(hash(prefix), prefix)` 序。
+- [ ] **Step 3：最小实现**（`NewWordOrdering.order`）
+  - `lemma = id.substringAfter(':').ifEmpty { id }`（词书包契约：id 必以 `<bookId>:` 开头且更长，见 `WordBookPackage.kt:167`），
+    `prefix = lemma.lowercase().take(3)`；纯 Kotlin FNV-1a 64 位哈希，不用 `Random`、不用 `String.hashCode`。
+  - 组内按 `(hash(id), id)` 排序；`n = 总数`、`M = 最大组大小`、`D = if (M <= 0) 1 else n / M`（整除）。
+  - 确定性贪心：可出组的条件是该组上次落位 `<= t - D`；每槽从可出组里取「剩余最多」，并列时按 `(hash(prefix), prefix)` 升序。
+    实现用「已排好序的组表 + 每槽线性挑首个可出组」会被 1263 组 × 4308 槽放大到 500 万次比较，
+    因此用 `PriorityQueue` + 冷却队列（释放槽位 `t + D` 入队，每槽先按释放时间出队回流）；
+    队空时从冷却队列头部强制取（理论不可达，走到即说明可行性假设破了——测试用真实册规模守住）。
 - [ ] **Step 4：接 `StoredPlanCardSource.newCardIds`** 并改写既有三条顺序断言：
   `new cards skip the ones already reviewed` → 断言结果是 `order(ids)` 去掉已学词后的**前缀序列**（子序列 + 数量），不再断言字母序；
   `new cards are capped at the daily target` / `ten word sample fills target ten and target three truncates` → 同法改为对齐 `NewWordOrdering.order`。
