@@ -53,9 +53,9 @@
 | `MintOutlineSoft` | `#E4EFE9` | 分隔线（唯一允许的分隔用色；禁止用 `spacedBy` 造不可见间距） |
 | `MintTextStrong` | `#1C1C1E` | 正文与标题主文字 |
 | `MintTextMuted` | `#4E756A` | 辅助文字、说明文字、次级信息 |
-| `MintTextFaint` | `#7A9088` | 时间戳、脚注一类可省略信息；不得承载唯一操作信息 |
-| `OnMintForeground` | `#174C44` | **浅薄荷底与品牌渐变上的前景文字/图标专用色**（实测对比 ≈4.6:1） |
-| `OnBrandDeep` | `#04241C` | 渐变上需要更深字重时的唯一替代 |
+| `MintTextFaint` | `#7A9088` | 仅限 ≥24sp 大数字/装饰性大字与纯图标描边；不作任何正文或标签前景（时间戳、脚注属正文，改用 `MintTextMuted`，且受其可压底限制；见 §2.3 同口径补充） |
+| `OnMintForeground` | `#174C44` | **浅薄荷底上的前景文字/图标专用色**（压 `MintTint` 实测 8.61:1）；品牌渐变上不再取该色（压渐变末端实测 4.07:1，跌破 4.5，见裁决 3） |
+| `OnBrandDeep` | `#04241C` | 品牌渐变上前景文字的**标准**取色（压渐变末端实测 6.87:1、中段 9.95、起点 12.81，处处合格；裁决 3），不再是「唯一替代」 |
 | `MintError` | `#B30000` | 错误文字与破坏性操作文字（全站唯一） |
 | `MintErrorFill` | `#FF3B30` | 破坏性操作的填充/图标底（全站唯一） |
 | `MintSuccess` | `#1B5E20` | 成功回显文字 |
@@ -64,8 +64,11 @@
 文字必须保证足够对比度。浅色背景上不得使用低对比度的浅青文字；辅助文字只能用于非关键说明，不能承载唯一操作信息。
 
 **硬规则（F5-03 移交，任何批次不得回潮）**：`MintBackground`、`MintTint` 系与品牌渐变 `#A8F3C8 → #5DDFB4 → #35B9B5`
-之上**禁止白色前景**（`#FFFFFF` 与近白一律不可），前景文字与实底容器上的图标一律走 `OnMintForeground #174C44`。
+之上**禁止白色前景**（`#FFFFFF` 与近白一律不可）。前景按底色分取（2026-10-18 裁决 3）：
+浅薄荷底（`MintBackground`、`MintTint` 系）上的前景文字与实底容器上的图标走 `OnMintForeground #174C44`；
+品牌渐变上的前景文字走 `OnBrandDeep #04241C`。
 对比度必须由 WCAG 相对亮度函数计算得出（≥4.5:1），不得凭肉眼或经验宣称达标。
+裁决全文见 `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`。
 
 **与代码现状的差值（批 1 须校准，勿当已就位）**：`ui/theme/AppPalette.kt` 已存在且全站 154 处引用，
 但其中性色取值偏 iOS 灰，与本表不一致：`Background #F5F5F7 → #F1FBF5`、`TextSecondary #6E6E73 → #4E756A`、

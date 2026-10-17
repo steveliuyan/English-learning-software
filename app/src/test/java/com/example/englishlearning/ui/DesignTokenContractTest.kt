@@ -1,0 +1,558 @@
+package com.example.englishlearning.ui
+
+import java.io.File
+import kotlin.math.pow
+import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import kotlin.test.assertEquals
+
+/**
+ * AC-R-01/AC-R-03：token 取值由源码 hex 字面量钉住，配对可用性由 WCAG 相对亮度当场计算。
+ * 读源码而不是读渲染结果：本仓库 JVM 单测零 androidx.compose 导入（robolectric 依赖在但没用过），
+ * Compose 渲染类断言归 androidTest。
+ *
+ * 分节口径（批 1 预检裁决）：`AppColorLight` 与 `AppColorDark` 都含 `background = Color(0x…)`，
+ * 全文件搜索会让浅套断言被深套块满足（反之亦然），断言 vacuous。故所有 token 查找先按锚点
+ * `val AppColorLight` / `val AppColorDark` / `val DomainLight` / `val DomainDark` 切段，
+ * 段尾到下一个锚点；锚点在剥注释文本中必须各出现且仅出现一次（本测试第 4 用例钉此事，
+ * 并含「浅套缺字段、深套同名字段不得救活查找」的合成负例）。
+ *
+ * 查找正则形状（预检修正 1）：`(?<![\w.])token\s*=\s*Color\(\s*(0xRRGGBBAA)\s*\)`。
+ * 反自匹配论证：token 名要求其后紧跟（可含换行的）空白与 `=`，故 `tint` 不会命中 `tint2 =`
+ * （`tint` 后是 `2`）、`surface` 不会命中 `surfaceGlass =`（后是 `G`）、`outline` 不会命中
+ * `outlineSoft =`、`error` 不会命中 `errorFill =`、`text1` 不会命中假想的 `text10 =`；
+ * 前瞻侧 lookbehind `(?<![\w.])` 让 token 不能是更长标识符的后缀（`appTint =` 不命中 `tint`）
+ * 也不是带点成员（`style.background = Color(...)` 不命中 `background`）。所有负例都在
+ * `token lookup rule …` 用例里用合成片段当场证明，永久红的正则会在第一个 GREEN 前暴露。
+ *
+ * 取值断言以 Long（0xRRGGBBAA 无符号位形）比较剥段后 hex，alpha 位一并钉住
+ * （`surfaceGlass 0xEFFFFFFF` / 深色 `0xE617201C` 的口径差异就在 alpha 位上）。
+ * 比值注释只写 ADR/brief 已钉数值（复算口径见决策文档「背景」节公式，本文件 `luminance`
+ * 即该公式的实现，测试运行时现算，注释数值仅是可读性标注）。
+ */
+class DesignTokenContractTest {
+    private val themeDir = File(THEME_SOURCE_PATH)
+
+    private val anchors = listOf("val AppColorLight", "val AppColorDark", "val DomainLight", "val DomainDark")
+
+    // ---------- 读取与分节 ----------
+
+    /**
+     * 目录守卫：措辞与失败信息形状照抄 AccessibilityColorTokenContractTest.scanMainSources，
+     * 目录换 THEME_SOURCE_PATH（brief Step 1 原文要求）。本测试用 `uiFiles` 做实际扫描
+     * （SourceRatchet 共享夹具），守卫形状在此保留给目录层缺失的大声失败路径。
+     */
+    private fun scanThemeSources(dir: File = themeDir): List<File> {
+        assertTrue(
+            dir.isDirectory,
+            "token 契约扫描目录缺失（期望 $THEME_SOURCE_PATH）：${dir.path}，" +
+                "相对 JVM 工作目录 ${File(".").absolutePath}；" +
+                "walkTopDown() 对缺失路径返回空序列，会让契约测试无声通过——包名重构 / 工作目录变化必须先修此处路径。"
+        )
+        val files = dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        assertTrue(files.isNotEmpty(), "token 契约扫描空扫：${dir.path} 下没有 .kt 文件（文件数 0 不是合规，是漏扫）。")
+        return files
+    }
+
+    private fun themeFileNamed(name: String): String {
+        val files = scanThemeSources().filter { it.name == name }
+        assertTrue(
+            files.size == 1,
+            "$name 应恰好一个，实际 ${files.size} 个（扫描错位？期望目录 $THEME_SOURCE_PATH，" +
+                "相对 JVM 工作目录 ${File(".").absolutePath}）"
+        )
+        return stripComments(files.single().readText())
+    }
+
+    private fun appColorsText(): String = themeFileNamed("AppColors.kt")
+
+    private fun appPaletteText(): String = themeFileNamed("AppPalette.kt")
+
+    /** 按锚点切段：段起于锚点，段尾是下一个出现的锚点（无后续锚点则到文件尾）。 */
+    private fun section(text: String, anchor: String): String {
+        val idx = anchors.indexOf(anchor)
+        assertTrue(idx >= 0, "未知锚点：$anchor（锚点表：$anchors）")
+        val start = text.indexOf(anchor)
+        assertTrue(start >= 0, "AppColors.kt 缺失锚点声明：$anchor")
+        val end = anchors.drop(idx + 1)
+            .map { text.indexOf(it, start + anchor.length) }
+            .filter { it >= 0 }
+            .minOrNull() ?: text.length
+        return text.substring(start, end)
+    }
+
+    /**
+     * hex 文本 → Long 位形（0xRRGGBBAA 无符号值）。Kotlin 的 toLong(16)/toULong(16) 都拒绝
+     * `0x` 前缀（NumberFormatException: Invalid number format），这是 RED 轮实测教训，
+     * 必须先剥前缀；大小写 hex（0X / a-f）同样兼容。
+     */
+    private fun hexValue(text: String): Long =
+        text.removePrefix("0x").removePrefix("0X").toLong(16)
+
+    /** 预检修正 1 的查找形状；失败消息形状沿用 brief「token 未以 val … 形状声明」。 */
+    private fun hexOf(sectionText: String, token: String, scope: String): Int {
+        val m = Regex("""(?<![\w.])$token\s*=\s*Color\(\s*(0x[0-9A-Fa-f]{8})\s*\)""")
+            .find(sectionText) ?: error("token 未以 val $token = Color(0x…) 形状声明：$token（区段 $scope）")
+        return hexValue(m.groupValues[1]).toInt()
+    }
+
+    /** 域色条目子段：从 `AppDomain.<name>` 标记到下一个 `AppDomain.<...>` 标记（或段尾）。 */
+    private fun domainEntry(sectionText: String, scope: String, domain: String): String {
+        val m = Regex("""AppDomain\.$domain\b""").find(sectionText)
+            ?: error("域色条目未以 AppDomain.$domain to DomainPalette(...) 形状声明（区段 $scope）")
+        val next = Regex("""AppDomain\.\w+\b""").find(sectionText, m.range.last + 1)
+        return sectionText.substring(m.range.first, next?.range?.first ?: sectionText.length)
+    }
+
+    private fun domainHexes(sectionText: String, scope: String, domain: String): Pair<Long, Long> {
+        val entry = domainEntry(sectionText, scope, domain)
+        fun hexOfField(token: String): Long =
+            hexOf(entry, token, "$scope/$domain").toLong() and 0xFFFFFFFFL
+        return hexOfField("base") to hexOfField("deep")
+    }
+
+    private fun unsigned(value: Int): Long = value.toLong() and 0xFFFFFFFFL
+
+    // ---------- WCAG 计算（决策 2026-10-18 背景节公式的实现，运行时现算） ----------
+
+    /** WCAG 相对亮度（Global Constraints #7 的公式，逐分量实现，注释写明口径）。 */
+    private fun luminance(rgb: Int): Double {
+        fun lin(c: Int): Double {
+            val s = (c and 0xFF) / 255.0
+            return if (s <= 0.04045) s / 12.92 else ((s + 0.055) / 1.055).pow(2.4)
+        }
+        return 0.2126 * lin(rgb shr 16) + 0.7152 * lin(rgb shr 8) + 0.0722 * lin(rgb)
+    }
+
+    private fun ratio(fg: Int, bg: Int): Double {
+        val hi = maxOf(luminance(fg), luminance(bg))
+        val lo = minOf(luminance(fg), luminance(bg))
+        return (hi + 0.05) / (lo + 0.05)
+    }
+
+    private fun assertAtLeast(label: String, fg: Int, bg: Int, floor: Double) {
+        val r = ratio(fg, bg)
+        assertTrue(r >= floor, "$label 实测 %.2f:1 低于 %.1f:1".format(r, floor))
+    }
+
+    // ---------- 钉值表（逐字来自 spec §2.1 与 brief；Long 位形含 alpha） ----------
+
+    private val lightHex: Map<String, Long> = linkedMapOf(
+        "background" to 0xFFF1FBF5L,
+        "surface" to 0xFFFFFFFFL,
+        "surfaceGlass" to 0xEFFFFFFFL,
+        "tint" to 0xFFDDF7E8L,
+        "tint2" to 0xFFDCEAE1L,
+        "tint3" to 0xFFCDEDD9L,
+        "outline" to 0xFFADE7D2L,
+        "outlineSoft" to 0xFFE4EFE9L,
+        "text1" to 0xFF1C1C1EL,
+        "text2" to 0xFF4E756AL,
+        "text3" to 0xFF7A9088L,
+        "onMint" to 0xFF174C44L,
+        "onBrand" to 0xFF04241CL,
+        "error" to 0xFFB30000L,
+        "errorFill" to 0xFFFF3B30L,
+        "success" to 0xFF1B5E20L,
+    )
+
+    /**
+     * 深套 16 值。brief §深套表逐字给出 15 项，`onBrand` 缺项——品牌渐变深浅两套同三段
+     * （spec §2.1「品牌渐变保持现状不动」），裁决 3 只钉「渐变上的文字统一取 on-brand #04241C」，
+     * 未给深色另立值，故深套沿用 0xFF04241C；深色渐变前景的最终核验归 AC-R-11 真机实测。
+     * 该调和已记入 task-2 报告「计划缺陷」。
+     */
+    private val darkHex: Map<String, Long> = linkedMapOf(
+        "background" to 0xFF0E1512L,
+        "surface" to 0xFF17201CL,
+        "surfaceGlass" to 0xE617201CL,
+        "tint" to 0xFF1C2C26L,
+        "tint2" to 0xFF22322BL,
+        "tint3" to 0xFF27392FL,
+        "outline" to 0xFF2E4238L,
+        "outlineSoft" to 0xFF233029L,
+        "text1" to 0xFFE9F2ECL,
+        "text2" to 0xFF9FB3AAL,
+        "text3" to 0xFF7F938AL,
+        "onMint" to 0xFFDFF6ECL,
+        "onBrand" to 0xFF04241CL,
+        "error" to 0xFFFF8177L,
+        "errorFill" to 0xFFFF6B61L,
+        "success" to 0xFF6BD98AL,
+    )
+
+    /** 域浅套：spec §2.1 域色表 / 既有 DomainColors 逐值（base, deep）。hex 串同时供正则拼接，避免 Long 十进制插值。 */
+    private val domainLightHex: Map<String, Pair<String, String>> = linkedMapOf(
+        "AiSpeech" to ("0xFF2EC99C" to "0xFF188F76"),
+        "Learn" to ("0xFF0A84FF" to "0xFF075EB4"),
+        "Review" to ("0xFFFF9F0A" to "0xFFAB5700"),
+        "Library" to ("0xFFBF5AF2" to "0xFF8E34B8"),
+        "Reading" to ("0xFFFF375F" to "0xFFC81E46"),
+        "Danger" to ("0xFFFF3B30" to "0xFFB30000"),
+        "Settings" to ("0xFF8E8E93" to "0xFF48484A"),
+    )
+
+    /** 域深套：deep = base（spec §2.1「深色下域色与 base 合一」）。 */
+    private val domainDarkHex: Map<String, String> = linkedMapOf(
+        "AiSpeech" to "0xFF35E0AC",
+        "Learn" to "0xFF5AC0FF",
+        "Review" to "0xFFFFB340",
+        "Library" to "0xFFDA8CFF",
+        "Reading" to "0xFFFF7A93",
+        "Danger" to "0xFFFF6B61",
+        "Settings" to "0xFFB0B0B5",
+    )
+
+    private val appPaletteCalibrated: Map<String, Long> = linkedMapOf(
+        // Step 4 改值四项
+        "Background" to 0xFFF1FBF5L,
+        "TextSecondary" to 0xFF4E756AL,
+        "Separator" to 0xFFE4EFE9L,
+        "GlassFill" to 0xEFFFFFFFL,
+        // Step 4 新增八项（浅套静态源）
+        "Tint" to 0xFFDDF7E8L,
+        "Tint2" to 0xFFDCEAE1L,
+        "Tint3" to 0xFFCDEDD9L,
+        "Outline" to 0xFFADE7D2L,
+        "OutlineSoft" to 0xFFE4EFE9L,
+        "TextTertiary" to 0xFF7A9088L,
+        "OnBrand" to 0xFF04241CL,
+        "ErrorFill" to 0xFFFF3B30L,
+    )
+
+    private val appPaletteUnchanged: Map<String, Long> = linkedMapOf(
+        "Surface" to 0xFFFFFFFFL,
+        "TextPrimary" to 0xFF1C1C1EL,
+        "Scrim" to 0x66000000L,
+        "GlassHighlight" to 0x59FFFFFFL,
+    )
+
+    // ---------- 用例 ----------
+
+    @Test
+    fun `theme scan scope resolves to real kotlin sources`() {
+        val files = scanThemeSources()
+        val names = files.map { it.name }
+        assertTrue(
+            "AppPalette.kt" in names && "MintPalette.kt" in names,
+            "扫描到 ${files.size} 个 .kt 却缺 AppPalette.kt / MintPalette.kt，扫描范围疑似错位：$THEME_SOURCE_PATH"
+        )
+    }
+
+    @Test
+    fun `missing scan directory fails loudly instead of passing on an empty scan`() {
+        val missing = File("$THEME_SOURCE_PATH/__not_a_real_package__")
+        // 危险本体：无守卫时 walkTopDown() 只给空序列，真实文件契约用例会当成零违规通过。
+        assertTrue(
+            missing.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList().isEmpty(),
+            "walkTopDown() 对缺失路径本应给出空序列（静默空扫风险）"
+        )
+        // 守卫本体：同一缺失路径必须让扫描立即失败而不是返回空列表。
+        val error = assertFailsWith<AssertionError> { scanThemeSources(missing) }
+        assertTrue(
+            error.message?.contains(THEME_SOURCE_PATH) == true,
+            "守卫失败信息必须点名期望路径，实际：${error.message}"
+        )
+    }
+
+    /**
+     * 正则防「永久红」自检（预检修正 1 的验证义务）：合成正片段必须命中，
+     * 相邻声明负例必须不命中。断言顺序：先证明规则「抓得住」，再证明它「不越界」。
+     */
+    @Test
+    fun `token lookup rule works on synthetic snippets and cannot self match adjacent declarations`() {
+        val positives = listOf(
+            // 标准命名参数形状（AppColorSet 构造调用里的真实形状）
+            "AppColorSet(\n    background = Color(0xFFF1FBF5),\n)" to ("background" to 0xFFF1FBF5L),
+            // 跨行赋值与小写 hex：正则的 `\s*` 与 [0-9A-Fa-f] 必须容下
+            "AppColorSet(\n    surface\n        =\n        Color(\n            0xffffffff\n        ),\n)" to ("surface" to 0xFFFFFFFFL),
+            // 同行多字段，取第一个命中
+            "DomainPalette(base = Color(0xFF2EC99C), deep = Color(0xFF188F76))" to ("base" to 0xFF2EC99CL),
+        )
+        positives.forEach { (snippet, pair) ->
+            val (token, expected) = pair
+            assertEquals(expected, unsigned(hexOf(snippet, token, "synthetic")), "合成正片段漏判：$token")
+        }
+
+        val negatives = listOf(
+            // 前缀近名：`tint` 不得命中 `tint2 =`（token 后是 `2`，非空白/`=`）
+            "AppColorSet(tint2 = Color(0xFFDCEAE1))" to "tint",
+            // `surface` 不得命中 `surfaceGlass =`
+            "AppColorSet(surfaceGlass = Color(0xEFFFFFFF))" to "surface",
+            // `outline` 不得命中 `outlineSoft =`
+            "AppColorSet(outlineSoft = Color(0xFFE4EFE9))" to "outline",
+            // `error` 不得命中 `errorFill =`
+            "AppColorSet(errorFill = Color(0xFFFF3B30))" to "error",
+            // lookbehind：token 不得是更长标识符的后缀
+            "AppColorSet(appTint = Color(0xFF112233))" to "tint",
+            // lookbehind 的点：带点成员引用不算声明
+            "style.background = Color(0xFFF1FBF5)" to "background",
+            // 带类型注解的属性声明（`val x: Color = Color(...)`）不是构造命名参数，不得被形状误认
+            "val background: Color = Color(0xFFF1FBF5)" to "background",
+            // 注释里的同形代码不计入契约（剥注释后必须查不到）
+            "// background = Color(0xFFF1FBF5)\nval unrelated = 1" to "background",
+        )
+        negatives.forEach { (snippet, token) ->
+            val text = stripComments(snippet)
+            val failure = assertFailsWith<IllegalStateException> {
+                hexOf(text, token, "synthetic-negative")
+            }
+            assertTrue(
+                failure.message?.contains("token 未以 val $token = Color(0x…) 形状声明") == true,
+                "负例失败消息形状错误：${failure.message}"
+            )
+        }
+    }
+
+    /** 分节守卫（预检修正 2）：锚点唯一有序 + 同名字段深浅互不救活 + 深查 background 不得被浅值满足。 */
+    @Test
+    fun `light and dark token sets are sectioned by declaration anchors not whole file search`() {
+        val text = appColorsText()
+        anchors.forEach { anchor ->
+            val occurrences = text.split(anchor).size - 1
+            assertEquals(1, occurrences, "锚点在剥注释源码中应恰好出现一次（分节边界必须无歧义）：$anchor")
+        }
+        val positions = anchors.map { text.indexOf(it) }
+        assertTrue(
+            positions == positions.sorted(),
+            "锚点出现顺序应为 $anchors，实际位置 $positions（乱序说明分节切错）"
+        )
+
+        val light = section(text, "val AppColorLight")
+        val dark = section(text, "val AppColorDark")
+        val lightBg = hexOf(light, "background", "AppColorLight")
+        val darkBg = hexOf(dark, "background", "AppColorDark")
+        assertEquals(0xFFF1FBF5L, unsigned(lightBg), "浅套 background 偏离 spec §2.1")
+        assertEquals(0xFF0E1512L, unsigned(darkBg), "深套 background 偏离 spec §2.1")
+        // 显式「不等于对侧值」：若未来有人把两块合并/复制，此处先于取值表爆掉。
+        assertTrue(darkBg != lightBg, "深套 background 与浅套同值：分节已坍缩")
+        assertTrue(unsigned(darkBg) != 0xFFF1FBF5L, "深套 background 查到了浅套值：全文件搜索冒充分节")
+        assertTrue(unsigned(lightBg) != 0xFF0E1512L, "浅套 background 查到了深套值：全文件搜索冒充分节")
+
+        // 合成负例：浅套块缺 background、深套块有——分节查找必须失败而非被深套救活。
+        val synthetic = stripComments(
+            """
+            val AppColorLight = AppColorSet(
+                surface = Color(0xFFFFFFFF),
+            )
+            val AppColorDark = AppColorSet(
+                background = Color(0xFF0E1512),
+            )
+            """.trimIndent()
+        )
+        assertFailsWith<IllegalStateException> {
+            hexOf(section(synthetic, "val AppColorLight"), "background", "synthetic-light")
+        }
+    }
+
+    @Test
+    fun `light neutral set hexes match spec 2_1 verbatim`() {
+        val light = section(appColorsText(), "val AppColorLight")
+        assertEquals(16, lightHex.size, "钉值表自身必须逐字段写全（16 字段）")
+        lightHex.forEach { (token, expected) ->
+            assertEquals(expected, unsigned(hexOf(light, token, "AppColorLight")), "浅套 $token 偏离 spec §2.1 浅套钉值")
+        }
+    }
+
+    @Test
+    fun `dark neutral set hexes match spec 2_1 verbatim`() {
+        val dark = section(appColorsText(), "val AppColorDark")
+        assertEquals(16, darkHex.size, "钉值表自身必须逐字段写全（16 字段）")
+        darkHex.forEach { (token, expected) ->
+            assertEquals(expected, unsigned(hexOf(dark, token, "AppColorDark")), "深套 $token 偏离 spec §2.1 深套钉值")
+        }
+    }
+
+    @Test
+    fun `domain light map hexes match spec and equal existing DomainColors`() {
+        val text = appColorsText()
+        val lightSection = section(text, "val DomainLight")
+        domainLightHex.forEach { (domain, expected) ->
+            val (expBase, expDeep) = expected
+            val actual = domainHexes(lightSection, "DomainLight", domain)
+            assertEquals(hexValue(expBase), actual.first, "DomainLight.$domain.base 偏离 spec §2.1 浅套域色")
+            assertEquals(hexValue(expDeep), actual.second, "DomainLight.$domain.deep 偏离 spec §2.1 浅套域色")
+            // 「与既有 DomainColors 逐值相同（改了就是回归）」：同一批 hex 必须也钉在 AppPalette.kt。
+            val declared = Regex(
+                """val\s+$domain\s*=\s*DomainAccent\(\s*Color\(\s*$expBase\s*\)\s*,\s*Color\(\s*$expDeep\s*\)\s*\)""",
+                RegexOption.IGNORE_CASE,
+            )
+            assertTrue(
+                declared.containsMatchIn(appPaletteText()),
+                "AppPalette.kt 的 DomainColors.$domain 偏离既有钉值：应声明为 DomainAccent(Color($expBase), Color($expDeep))"
+            )
+        }
+    }
+
+    @Test
+    fun `domain dark map collapses deep to base at pinned hexes`() {
+        val darkSection = section(appColorsText(), "val DomainDark")
+        domainDarkHex.forEach { (domain, expected) ->
+            val (base, deep) = domainHexes(darkSection, "DomainDark", domain)
+            assertEquals(hexValue(expected), base, "DomainDark.$domain.base 偏离 spec §2.1 深套域色")
+            assertEquals(base, deep, "DomainDark.$domain 应 deep = base（深色下避免暗底深字）")
+        }
+    }
+
+    @Test
+    fun `app domain enum names match DomainColors property names for by name migration`() {
+        val enumBody = Regex("""enum class AppDomain \{([^}]*)\}""").find(appColorsText())
+            ?: error("AppColors.kt 缺 enum class AppDomain { … } 声明")
+        val enumNames = enumBody.groupValues[1].split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        assertEquals(
+            listOf("AiSpeech", "Learn", "Review", "Library", "Reading", "Danger", "Settings"),
+            enumNames,
+            "AppDomain 条目名是 Task 3 按名迁移的映射键，必须与 brief Interfaces 逐字一致",
+        )
+        val domainColorsBody = Regex("""object DomainColors \{([\s\S]*?)\n\}""").find(appPaletteText())
+            ?: error("AppPalette.kt 缺 object DomainColors { … } 声明")
+        val propertyNames = Regex("""val\s+(\w+)\s*=\s*DomainAccent""")
+            .findAll(domainColorsBody.groupValues[1])
+            .map { it.groupValues[1] }
+            .toList()
+        assertEquals(enumNames, propertyNames, "AppDomain 条目必须与 DomainColors 属性名逐字同序（按名对位）")
+    }
+
+    @Test
+    fun `composable access surface is declared per interfaces`() {
+        val text = appColorsText()
+        listOf(
+            Regex("""data class AppColorSet\(""") to "AppColorSet 数据类",
+            Regex("""data class DomainPalette\(val base: Color, val deep: Color\)""") to "DomainPalette(base, deep)",
+            Regex("""val LocalAppColors\s*:\s*CompositionLocal<AppColorSet>\s*=\s*staticCompositionLocalOf""") to "LocalAppColors",
+            Regex("""val LocalDomainColors\s*:\s*CompositionLocal<Map<AppDomain, DomainPalette>>\s*=\s*staticCompositionLocalOf""") to "LocalDomainColors",
+            Regex("""val LocalIsDark\s*:\s*CompositionLocal<Boolean>\s*=\s*staticCompositionLocalOf""") to "LocalIsDark",
+            Regex("""fun appColors\(\)\s*:\s*AppColorSet\s*=\s*LocalAppColors\.current""") to "appColors()",
+            Regex("""fun appDomain\(domain: AppDomain\)\s*:\s*DomainPalette\s*=\s*LocalDomainColors\.current\.getValue\(domain\)""") to "appDomain(domain)",
+        ).forEach { (regex, label) ->
+            assertTrue(regex.containsMatchIn(text), "Interfaces 声明缺失或形状偏离：$label")
+        }
+    }
+
+    /** 配对断言（操作数从源码取值读——token 漂移会当场爆，而不是留下永远绿的字面量）。 */
+    @Test
+    fun `allowed pairs meet WCAG floors computed from source tokens`() {
+        val text = appColorsText()
+        val light = section(text, "val AppColorLight")
+        val dark = section(text, "val AppColorDark")
+        fun l(token: String) = hexOf(light, token, "AppColorLight")
+        fun d(token: String) = hexOf(dark, token, "AppColorDark")
+
+        // 正文族 ≥4.5
+        assertAtLeast("text1/bg-light", l("text1"), l("background"), 4.5)   // 16.09
+        assertAtLeast("text1/tint", l("text1"), l("tint"), 4.5)             // 15.02
+        assertAtLeast("text2/surface", l("text2"), l("surface"), 4.5)       // 5.15
+        assertAtLeast("text2/bg", l("text2"), l("background"), 4.5)         // 4.87
+        assertAtLeast("text2/tint", l("text2"), l("tint"), 4.5)             // 4.55
+        assertAtLeast("error/surface", l("error"), l("surface"), 4.5)       // 7.20
+        assertAtLeast("success/surface", l("success"), l("surface"), 4.5)   // 7.87
+        assertAtLeast("onMint/tint", l("onMint"), l("tint"), 4.5)           // 8.61（ADR 复算值）
+        // 品牌渐变末端段不是 AppColorSet 字段（MintPalette.AppleMintEnd，取值在下方既有钉值用例），
+        // 故操作数取 brief 钉值字面量（.toInt()：十六进制字面量默认 Long，Int 形参需显式截位）。
+        assertAtLeast("onBrand/gradientEnd", l("onBrand"), 0xFF35B9B5.toInt(), 4.5) // 6.87
+        // 深套
+        assertAtLeast("dark text1/bg", d("text1"), d("background"), 4.5)    // 16.20
+        assertAtLeast("dark text2/surface", d("text2"), d("surface"), 4.5)  // 7.54（本测试复算）
+        assertAtLeast("dark error/surface", d("error"), d("surface"), 4.5)  // 6.87（本测试复算）
+        assertAtLeast("dark onMint/tint", d("onMint"), d("tint"), 4.5)      // 12.89
+    }
+
+    /** brief「必须出现的配对断言」字面量原文：钉住比值表本身（文档事实层；.toInt() 见上方说明）。 */
+    @Test
+    fun `pinned ratio table holds as documented WCAG facts`() {
+        // 正文族 ≥4.5
+        assertAtLeast("text1/bg-light", 0xFF1C1C1E.toInt(), 0xFFF1FBF5.toInt(), 4.5)   // 16.09
+        assertAtLeast("text1/tint", 0xFF1C1C1E.toInt(), 0xFFDDF7E8.toInt(), 4.5)       // 15.02
+        assertAtLeast("text2/surface", 0xFF4E756A.toInt(), 0xFFFFFFFF.toInt(), 4.5)    // 5.15
+        assertAtLeast("text2/bg", 0xFF4E756A.toInt(), 0xFFF1FBF5.toInt(), 4.5)         // 4.87
+        assertAtLeast("text2/tint", 0xFF4E756A.toInt(), 0xFFDDF7E8.toInt(), 4.5)       // 4.55
+        assertAtLeast("error/surface", 0xFFB30000.toInt(), 0xFFFFFFFF.toInt(), 4.5)    // 7.20
+        assertAtLeast("success/surface", 0xFF1B5E20.toInt(), 0xFFFFFFFF.toInt(), 4.5)  // 7.87
+        assertAtLeast("onMint/tint", 0xFF174C44.toInt(), 0xFFDDF7E8.toInt(), 4.5)      // 8.61
+        assertAtLeast("onBrand/gradientEnd", 0xFF04241C.toInt(), 0xFF35B9B5.toInt(), 4.5) // 6.87
+        // 深套
+        assertAtLeast("dark text1/bg", 0xFFE9F2EC.toInt(), 0xFF0E1512.toInt(), 4.5)    // 16.20
+        assertAtLeast("dark text2/surface", 0xFF9FB3AA.toInt(), 0xFF17201C.toInt(), 4.5)  // 7.54
+        assertAtLeast("dark error/surface", 0xFFFF8177.toInt(), 0xFF17201C.toInt(), 4.5)  // 6.87
+        assertAtLeast("dark onMint/tint", 0xFFDFF6EC.toInt(), 0xFF1C2C26.toInt(), 4.5) // 12.89
+
+        // 禁配（本禁配由 Task 1 裁决 #1/#2/#3 立；字面量层与源码层双钉，见下一用例）
+        assertTrue(ratio(0xFF7A9088.toInt(), 0xFFFFFFFF.toInt()) < 4.5, "text-3 若已合格，裁决 #1 需重议")   // 3.40
+        assertTrue(ratio(0xFF7A9088.toInt(), 0xFFDDF7E8.toInt()) < 4.5)                                     // 3.00
+        assertTrue(ratio(0xFF4E756A.toInt(), 0xFFDCEAE1.toInt()) < 4.5, "text-2 压 tint-2 若已合格，裁决 #2 需重议") // 4.15
+        assertTrue(ratio(0xFF174C44.toInt(), 0xFF35B9B5.toInt()) < 4.5, "on-mint 压渐变末端若已合格，裁决 #3 需重议") // 4.07
+    }
+
+    /** 禁配表（源码操作数版）：谁把 token 调深到「合格」，这里当场要求重议裁决。 */
+    @Test
+    fun `banned pairs from source tokens stay below thresholds`() {
+        val light = section(appColorsText(), "val AppColorLight")
+        fun l(token: String) = hexOf(light, token, "AppColorLight")
+        assertTrue(
+            ratio(l("text3"), l("surface")) < 4.5,
+            "text-3 若已合格，裁决 #1 需重议（实测 %.2f:1）".format(ratio(l("text3"), l("surface"))),
+        )
+        assertTrue(
+            ratio(l("text3"), l("tint")) < 4.5,
+            "text-3 压 tint 若已合格，裁决 #1 需重议（实测 %.2f:1）".format(ratio(l("text3"), l("tint"))),
+        )
+        assertTrue(
+            ratio(l("text3"), l("background")) < 4.5,
+            "text-3 压 bg 若已合格，裁决 #1 需重议（ADR 钉 3.22，实测 %.2f:1）".format(ratio(l("text3"), l("background"))),
+        )
+        assertTrue(
+            ratio(l("text2"), l("tint2")) < 4.5,
+            "text-2 压 tint-2 若已合格，裁决 #2 需重议（实测 %.2f:1）".format(ratio(l("text2"), l("tint2"))),
+        )
+        assertTrue(
+            ratio(l("text2"), l("tint3")) < 4.5,
+            "text-2 压 tint-3 若已合格，裁决 #2 需重议（ADR 钉 4.10，实测 %.2f:1）".format(ratio(l("text2"), l("tint3"))),
+        )
+        assertTrue(
+            ratio(l("onMint"), 0xFF35B9B5.toInt()) < 4.5,
+            "on-mint 压渐变末端若已合格，裁决 #3 需重议（实测 %.2f:1）".format(ratio(l("onMint"), 0xFF35B9B5.toInt())),
+        )
+        // 裁决 #2 的替代配对同口径钉住：text-1 压 tint-2/tint-3 必须合格（ADR 钉 13.69/13.54）。
+        assertAtLeast("text1/tint2(裁决#2 替代配对)", l("text1"), l("tint2"), 4.5) // 13.69
+        assertAtLeast("text1/tint3(裁决#2 替代配对)", l("text1"), l("tint3"), 4.5) // 13.54
+    }
+
+    @Test
+    fun `existing AppPalette pinned values unchanged`() {
+        val palette = appPaletteText()
+        listOf(
+            "OnMintPrimary" to "0xFF174C44",
+            "ErrorText" to "0xFFB30000",
+            "SuccessText" to "0xFF1B5E20",
+        ).forEach { (token, hex) ->
+            val declared = Regex("""val\s+$token\s*=\s*Color\(\s*$hex\s*\)""", RegexOption.IGNORE_CASE)
+            assertTrue(
+                declared.containsMatchIn(palette),
+                "AppPalette.$token 缺失或偏离既有钉值：应声明为 val $token = Color($hex)"
+            )
+        }
+        // 裁决 3 的渐变末端段操作数依赖：MintPalette.AppleMintEnd 必须是 #35B9B5。
+        assertTrue(
+            Regex("""val\s+AppleMintEnd\s*:\s*Color\s*=\s*Color\(\s*0xFF35B9B5\s*\)""")
+                .containsMatchIn(themeFileNamed("MintPalette.kt")),
+            "MintPalette.AppleMintEnd 偏离品牌渐变末端钉值 0xFF35B9B5（spec §2.1「品牌渐变保持现状不动」）",
+        )
+    }
+
+    @Test
+    fun `appPalette static light source calibrated to spec 2_1`() {
+        val palette = appPaletteText()
+        (appPaletteCalibrated + appPaletteUnchanged).forEach { (token, expected) ->
+            val declared = Regex(
+                """val\s+$token\s*=\s*Color\(\s*(0x[0-9A-Fa-f]{8})\s*\)""",
+                RegexOption.IGNORE_CASE,
+            )
+            val m = declared.find(palette)
+                ?: error("AppPalette.$token 未以 val $token = Color(0x…) 形状声明")
+            assertEquals(hexValue(m.groupValues[1]), expected, "AppPalette.$token 偏离 spec §2.1 浅套钉值")
+        }
+    }
+}
+
+private const val THEME_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui/theme"
