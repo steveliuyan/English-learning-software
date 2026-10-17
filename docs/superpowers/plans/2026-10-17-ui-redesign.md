@@ -140,7 +140,7 @@ internal val MintBackground: Color
 
   用 §Global Constraints #7 的公式（可临时写 Kotlin 脚本或 Python，放仓库外临时目录，不入提交）复算：
   - `text-3 #7A9088` 压 `surface #FFFFFF` / `bg #F1FBF5` / `tint #DDF7E8` = **3.40 / 3.22 / 3.00**
-  - `text-2 #4E756A` 压 `tint-2 #DCEAE1` = **4.15**（压 `tint #DDF7E8` 为 4.55，合格）
+  - `text-2 #4E756A` 压 `tint-2 #DCEAE1` = **4.15**、压 `tint-3 #CDEDD9` = **4.10**（压 `tint #DDF7E8` 为 4.55，合格）
   - `on-mint #174C44` 压品牌渐变末端 `#35B9B5` = **4.07**；压渐变中段 `#5DDFB4` = 5.89；压 `mint-light #D9FFF0` = 9.06
   - `on-brand #04241C` 压渐变末端 = **6.87**；压渐变起点 = 12.81
 
