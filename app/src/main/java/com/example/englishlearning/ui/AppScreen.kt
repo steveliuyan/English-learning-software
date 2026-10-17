@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1983,6 +1984,7 @@ private fun LearningSetupScreen(
                     book = book,
                     selected = book.id == state.selectedWordBookId,
                     progress = state.progressByBook[book.id],
+                    progressLoading = state.progressLoading,
                     onSelect = { viewModel.selectWordBook(book.id) },
                     onDelete = if (state.canDelete(book.id)) {
                         { viewModel.requestDelete(book) }
@@ -2074,12 +2076,19 @@ private fun SetupIntroductionCard() {
 /** 首帧骨架的行数：够填满「选择词书」下方一屏，又不至于让真实列表到位后滚动位置大幅跳动。 */
 private const val WORD_BOOK_PLACEHOLDER_ROWS = 3
 
+// 词书卡与它的骨架共用同一份版面参数，两边改一处就一起改，不会各漂各的。
+// 圆角沿用该卡既有的 18dp，不是 `AppShape.Card` 的 20dp：滑动删除底、描边与卡片必须同角，
+// 换成 AppShape 会让红底从四角渗出（WordBookSwipeRowTest 正是钉这一点），故在此记录偏差。
+private val WordBookCardShape = RoundedCornerShape(18.dp)
+private val WordBookCardMinHeight = 72.dp
+private val WordBookCardContentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+
 /**
- * 词书列表首帧骨架：与真实卡片同圆角、同最小行高的空壳。
+ * 词书列表首帧骨架：与真实卡片同圆角、同最小行高、同内边距的空壳。
  *
  * 刻意只有色块、没有任何文案和数字：占位行手里还没有数据，向 TalkBack 播报「已学 0 词 / 共 0 词」
  * 这种假数字比什么都不念更糟（spec F1-01 无障碍口径）。行距交给外层 Column 的 spacedBy，
- * 所以这里不额外加 padding，骨架与真卡片替换时版面不跳。
+ * 所以这里不额外加外层 padding；单选钮与文字列的起点也照抄真卡，骨架换成真卡时版面不跳。
  */
 @Composable
 private fun WordBookListPlaceholder(row: Int) {
@@ -2087,23 +2096,30 @@ private fun WordBookListPlaceholder(row: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .testTag("wordbook_placeholder_$row"),
-        shape = RoundedCornerShape(18.dp),
+        shape = WordBookCardShape,
         colors = CardDefaults.cardColors(containerColor = MintSurface),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 72.dp)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .heightIn(min = WordBookCardMinHeight)
+                .padding(WordBookCardContentPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 40dp 的盒子里放 20dp 的圆点：真卡的 RadioButton 也是 40dp 触控尺寸、20dp 圆面，
+            // 照抄这层盒子，后面的文字条才能和真卡文字对齐。
             Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .background(MintOutline.copy(alpha = 0.30f), RoundedCornerShape(percent = 50)),
-            )
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(MintOutline.copy(alpha = 0.30f), RoundedCornerShape(percent = 50)),
+                )
+            }
             Column(
-                modifier = Modifier.padding(start = 14.dp).weight(1f),
+                modifier = Modifier.padding(start = 8.dp).weight(1f),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 PlaceholderBar(fraction = 0.45f)
@@ -2135,11 +2151,13 @@ internal fun SwipableWordBookCard(
     book: WordBook,
     selected: Boolean,
     progress: com.example.englishlearning.learning.WordBookProgress?,
+    /** 整页进度回填是否还在进行：用来区分「还在算」与「这一本算不出来」两种 `progress == null`。 */
+    progressLoading: Boolean = false,
     onSelect: () -> Unit,
     onDelete: (() -> Unit)?,
 ) {
     if (onDelete == null) {
-        WordBookCard(book, selected, progress, onSelect)
+        WordBookCard(book, selected, progress, progressLoading, onSelect)
         return
     }
     val dismissState = rememberSwipeToDismissBoxState(
@@ -2168,7 +2186,7 @@ internal fun SwipableWordBookCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.error, RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.error, WordBookCardShape)
                     .padding(end = 20.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
@@ -2176,7 +2194,7 @@ internal fun SwipableWordBookCard(
             }
         },
     ) {
-        WordBookCard(book, selected, progress, onSelect, onDelete)
+        WordBookCard(book, selected, progress, progressLoading, onSelect, onDelete)
     }
 }
 
@@ -2185,6 +2203,7 @@ private fun WordBookCard(
     book: WordBook,
     selected: Boolean,
     progress: com.example.englishlearning.learning.WordBookProgress?,
+    progressLoading: Boolean,
     onSelect: () -> Unit,
     onDelete: (() -> Unit)? = null,
 ) {
@@ -2210,7 +2229,7 @@ private fun WordBookCard(
         // stateDescription 把已选/未选播报给读屏（F5-03 决策 §4），两套通道互不替代。
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+            .border(1.dp, borderColor, WordBookCardShape)
             .clickable(onClick = onSelect)
             .semantics {
                 // 滑动是视觉手势，TalkBack 念不到也做不出来：把「删除词书」登记为无障碍自定义动作。
@@ -2230,13 +2249,13 @@ private fun WordBookCard(
                 }
             },
         colors = CardDefaults.cardColors(containerColor = cardColor),
-        shape = RoundedCornerShape(18.dp),
+        shape = WordBookCardShape,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 72.dp)
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .heightIn(min = WordBookCardMinHeight)
+                .padding(WordBookCardContentPadding)
                 .semantics {
                     contentDescription = "选择词书 ${book.displayName}"
                     stateDescription = if (selected) "已选" else "未选"
@@ -2259,7 +2278,13 @@ private fun WordBookCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = progress?.let { "已学 ${it.learned}" } ?: "正在加载进度…",
+                        // 三种状态要分开说：进度已算出 / 整页还在逐册回填 / 这一本读不出来。
+                        // 最后一种绝不写成「已学 0」——那是个假数字（本地优先：降级要如实呈现）。
+                        text = when {
+                            progress != null -> "已学 ${progress.learned}"
+                            progressLoading -> "进度计算中"
+                            else -> "暂时读不到进度"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MintPrimaryDark,

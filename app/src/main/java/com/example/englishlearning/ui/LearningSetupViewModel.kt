@@ -30,10 +30,15 @@ import com.example.englishlearning.learning.WordBookVisibility
 import com.example.englishlearning.learning.WordCardSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.launch
 
 sealed interface LearningSetupEffect {
@@ -146,76 +151,103 @@ class LearningSetupViewModel @Inject constructor(
     val effects: SharedFlow<LearningSetupEffect> = _effects
     private var settingsProfileId: String? = null
 
+    /** 当前这一次加载的任务。新的 `load()` 必须取消它，见 [load]。 */
+    private var loadJob: Job? = null
+
     fun load(profileId: String) {
+        // 渐进发布把一次加载变成 N+2 次状态写入和一串挂起点：老任务必须在此彻底收手，
+        // 否则它会拿过期的册列表与设置覆盖新任务刚发布的结果（删除词书后页面会再加载一次）。
+        loadJob?.cancel()
         settingsProfileId = profileId
         // 同步置加载态：组合完成的第一帧就有骨架可看，而不是「卡一下、然后整列蹦出来」（spec F1-01）。
-        _uiState.value = _uiState.value.copy(wordBooksLoading = true, progressLoading = true, message = null)
-        viewModelScope.launch {
-            seedWordBooks()
-            val wordBooksResult = repository.listWordBooks()
-            val profileResult = repository.current(profileId)
-            if (wordBooksResult is RepositoryResult.Failure || profileResult is RepositoryResult.Failure) {
-                _uiState.value = LearningSetupUiState(
-                    message = "暂时无法加载学习设置",
-                    wordBooksLoading = false,
-                    progressLoading = false,
-                )
-                return@launch
-            }
-            val bundled = bundledIds.ids()
-            val imported = importedIds.ids()
-            val wordBooks = WordBookVisibility.visible(
-                all = (wordBooksResult as RepositoryResult.Success).value,
-                bundledIds = bundled,
-                importedIds = imported,
+        _uiState.update { it.copy(wordBooksLoading = true, progressLoading = true, message = null) }
+        loadJob = viewModelScope.launch { loadInto(profileId) }
+    }
+
+    private suspend fun loadInto(profileId: String) {
+        seedWordBooks()
+        val wordBooksResult = repository.listWordBooks()
+        val profileResult = repository.current(profileId)
+        if (wordBooksResult is RepositoryResult.Failure || profileResult is RepositoryResult.Failure) {
+            _uiState.value = LearningSetupUiState(
+                message = "暂时无法加载学习设置",
+                wordBooksLoading = false,
+                progressLoading = false,
             )
-            val profile = (profileResult as RepositoryResult.Success).value
-            val settings =
-                when (val result = getSettings(profileId)) {
-                    is LearningSettingsRepositoryResult.Success -> result.value
-                    LearningSettingsRepositoryResult.StorageUnavailable -> LearningSettings.defaults(profileId)
-                }
-            val activeId = profile?.activeWordBookId?.takeIf { id -> wordBooks.any { it.id == id } }
-            // 第一段发布：册先到、进度还空着。进度要逐册解析词书包（cet4 有 4308 张卡），
-            // 让它挡在列表前面就是把最慢的一步放到了用户最先等的位置。
-            _uiState.value =
-                LearningSetupUiState(
-                    wordBooks = wordBooks,
-                    progressByBook = emptyMap(),
-                    importedBookIds = imported.filterTo(mutableSetOf()) { it in wordBooks.map(WordBook::id) },
-                    selectedWordBookId = activeId ?: wordBooks.firstOrNull()?.id,
-                    dailyNewTarget = profile?.dailyNewTarget ?: LearningSetupUiState.DEFAULT_DAILY_TARGET,
-                    savedWordBookId = activeId,
-                    savedWordBookName = wordBooks.find { it.id == activeId }?.displayName,
-                    openDetailOnKnown = settings.openDetailOnKnown,
-                    openDetailOnFuzzy = settings.openDetailOnFuzzy,
-                    openDetailOnForgotten = settings.openDetailOnForgotten,
-                    showVocabularySearchCount = settings.showVocabularySearchCount,
-                    wordBooksLoading = false,
-                    progressLoading = true,
-                )
+            return
+        }
+        val bundled = bundledIds.ids()
+        val imported = importedIds.ids()
+        val wordBooks = WordBookVisibility.visible(
+            all = (wordBooksResult as RepositoryResult.Success).value,
+            bundledIds = bundled,
+            importedIds = imported,
+        )
+        val profile = (profileResult as RepositoryResult.Success).value
+        val settings =
+            when (val result = getSettings(profileId)) {
+                is LearningSettingsRepositoryResult.Success -> result.value
+                LearningSettingsRepositoryResult.StorageUnavailable -> LearningSettings.defaults(profileId)
+            }
+        val activeId = profile?.activeWordBookId?.takeIf { id -> wordBooks.any { it.id == id } }
+        // 第一段发布：册先到、进度还空着。进度要逐册解析词书包（cet4 有 4308 张卡），
+        // 让它挡在列表前面就是把最慢的一步放到了用户最先等的位置。
+        _uiState.value =
+            LearningSetupUiState(
+                wordBooks = wordBooks,
+                progressByBook = emptyMap(),
+                importedBookIds = imported.filterTo(mutableSetOf()) { it in wordBooks.map(WordBook::id) },
+                selectedWordBookId = activeId ?: wordBooks.firstOrNull()?.id,
+                dailyNewTarget = profile?.dailyNewTarget ?: LearningSetupUiState.DEFAULT_DAILY_TARGET,
+                savedWordBookId = activeId,
+                savedWordBookName = wordBooks.find { it.id == activeId }?.displayName,
+                openDetailOnKnown = settings.openDetailOnKnown,
+                openDetailOnFuzzy = settings.openDetailOnFuzzy,
+                openDetailOnForgotten = settings.openDetailOnForgotten,
+                showVocabularySearchCount = settings.showVocabularySearchCount,
+                wordBooksLoading = false,
+                progressLoading = true,
+            )
+        try {
             // 第二段：逐册回填，每算完一册就发布一次，用户看到的是进度条一本本长出来。
             val progress = LinkedHashMap<String, WordBookProgress>()
             wordBooks.forEach { book ->
-                progress[book.id] = progressOf(book)
-                _uiState.value = _uiState.value.copy(progressByBook = LinkedHashMap(progress))
+                progressOf(book)?.let { progress[book.id] = it }
+                _uiState.update { it.copy(progressByBook = LinkedHashMap(progress)) }
             }
-            _uiState.value = _uiState.value.copy(progressLoading = false)
-            // 种子写入只登记元数据；索引在这里补建/收敛，之后查词走索引而不解析词书包。
-            // 放在回填之后：它服务的是查词，不该挡学习设置的首帧（`dataVersion` 未变时本身几乎不花钱）。
-            refreshIndex?.invoke()
+        } finally {
+            // 被取代的旧任务不许翻掉新任务的加载态；但单册读盘抛异常时必须收口，
+            // 否则那一本会永远停在「进度计算中」。
+            if (coroutineContext.isActive) {
+                _uiState.update { it.copy(progressLoading = false) }
+                // 种子写入只登记元数据；索引在这里补建/收敛，之后查词走索引而不解析词书包。
+                // 放在回填之后：它服务的是查词，不该挡学习设置的首帧（`dataVersion` 未变时本身几乎不花钱）。
+                refreshIndex?.invoke()
+            }
         }
     }
 
-    /** 单册进度：读不到已学词时按 0 计，但册本身照常列出——列表的可见性优先于统计精度。 */
-    private suspend fun progressOf(book: WordBook): WordBookProgress {
-        val ids = cards.cardIds(book.id)
-        val reviewed = when (val result = events.reviewedCardIds(book.id)) {
-            is RepositoryResult.Success -> result.value
-            is RepositoryResult.Failure -> emptyList()
+    /**
+     * 单册进度。两类降级都不许把整页钉在加载态上（AGENTS.md「本地优先：存储与网络不得阻塞 UI」）：
+     * 读不到已学词时按 0 计、册子照常列出；而 `cards.cardIds` 是**会抛**的（内置册要从 assets 拷盘，
+     * `assets.open` 抛异常而不是返回 Failure），此时返回 null 让界面显示「暂时读不到进度」，
+     * 而不是编一个「已学 0 / 共 4308」的假数字。
+     */
+    private suspend fun progressOf(book: WordBook): WordBookProgress? =
+        try {
+            val ids = cards.cardIds(book.id)
+            val reviewed = when (val result = events.reviewedCardIds(book.id)) {
+                is RepositoryResult.Success -> result.value
+                is RepositoryResult.Failure -> emptyList()
+            }
+            WordBookProgress.calculate(book.totalWords, ids, reviewed)
+        } catch (cancellation: CancellationException) {
+            // 协作式取消必须原样上抛：被取代的加载在这里就该停止写状态，
+            // 而不是把「我被取消了」当成一次普通的读盘失败继续往下落笔。
+            throw cancellation
+        } catch (error: Exception) {
+            null
         }
-        return WordBookProgress.calculate(book.totalWords, ids, reviewed)
-    }
 
     fun selectWordBook(wordBookId: String) {
         _uiState.value = _uiState.value.copy(selectedWordBookId = wordBookId, savedWordBookName = null)

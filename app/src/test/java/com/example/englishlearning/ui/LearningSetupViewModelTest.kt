@@ -500,6 +500,70 @@ class LearningSetupViewModelTest {
         assertEquals(WordBookProgress(learned = 0, total = 0), withIndex.uiState.value.progressByBook["cet4"])
     }
 
+    @Test
+    fun `a superseded load stops writing once a newer load starts`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            profile = LearningProfile("default", "cet4", 10)
+            books += WordBook("cet4", "大学英语四级", "CET-4", 1, "v1", "ngsl-nawl-1.2")
+        }
+        val settingsRepo = FakeSettingsRepository()
+        val staleLoad = CompletableDeferred<Unit>()
+        settingsRepo.gateFirstFind = staleLoad
+        val viewModel = setupViewModel(repository, settingsRepo = settingsRepo)
+
+        // 老任务已经读完册列表与 profile（目标 10），卡在第一次设置读取上。
+        viewModel.load("default")
+        runCurrent()
+
+        // 页面重进（删除词书后也会再加载一次）：新任务照常跑完，读到的是目标 30。
+        repository.profile = LearningProfile("default", "cet4", 30)
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        assertEquals(30, viewModel.uiState.value.dailyNewTarget)
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+
+        // 老任务这时才被放行。它手里握着过期的 profile 与目标：渐进发布让它有 N+2 次落笔机会，
+        // 不取消就会把用户刚看到的目标改回 10。
+        staleLoad.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(30, viewModel.uiState.value.dailyNewTarget)
+        assertEquals(listOf("cet4"), viewModel.uiState.value.wordBooks.map(WordBook::id))
+        assertEquals(false, viewModel.uiState.value.wordBooksLoading)
+    }
+
+    @Test
+    fun `a word book whose cards cannot be read still lists with an unreadable progress`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 1, "v1", "ngsl-nawl-1.2")
+            books += WordBook("cet6", "大学英语六级", "CET-6", 2, "v1", "ngsl-nawl-1.2")
+        }
+        val viewModel = setupViewModel(
+            repository,
+            FlakyCards(mapOf("cet6" to listOf("cet6:x", "cet6:y"))),
+            bundledIds = setOf("cet4", "cet6"),
+        )
+
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        assertEquals(listOf("cet4", "cet6"), viewModel.uiState.value.wordBooks.map(WordBook::id))
+        // 读不出词卡的那本不进进度表：界面据此显示「暂时读不到进度」，而不是编一个「已学 0 / 共 4308」。
+        assertEquals(setOf("cet6"), viewModel.uiState.value.progressByBook.keys)
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+    }
+
+    /** 内置册的词卡要从 assets 拷到盘上，`assets.open` 失败是真实抛异常而不是返回 Failure。 */
+    private class FlakyCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
+        override suspend fun cardIds(wordBookId: String): List<String> {
+            if (wordBookId !in idsByBook) throw java.io.IOException("asset missing: $wordBookId")
+            return idsByBook.getValue(wordBookId)
+        }
+
+        override suspend fun cards(cardIds: List<String>) = emptyList<WordCard>()
+    }
+
     private class GatingCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
         val gates: Map<String, CompletableDeferred<Unit>> = idsByBook.keys.associateWith { CompletableDeferred() }
 
@@ -820,8 +884,18 @@ class LearningSetupViewModelTest {
     private class FakeSettingsRepository : LearningSettingsRepository {
         val stored = mutableMapOf<String, LearningSettings>()
 
-        override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
-            LearningSettingsRepositoryResult.Success(stored[profileId])
+        /**
+         * 让**第一次**设置读取挂起：模拟慢盘，把「老任务还活着、新任务已经跑完」这段时间
+         * 拉长到测试可以观测的程度（渐进发布之后一次加载有 N+2 次状态落笔）。
+         */
+        var gateFirstFind: CompletableDeferred<Unit>? = null
+        private var finds = 0
+
+        override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> {
+            finds += 1
+            if (finds == 1) gateFirstFind?.await()
+            return LearningSettingsRepositoryResult.Success(stored[profileId])
+        }
 
         override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> {
             stored[settings.profileId] = settings
