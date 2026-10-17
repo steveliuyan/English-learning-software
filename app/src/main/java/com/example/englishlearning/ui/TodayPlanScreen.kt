@@ -343,6 +343,11 @@ private fun learnedPercentLabel(progress: WordBookProgress): String {
 private val WorkloadReviewColor = Color(0xFFC7A47D)
 private val WorkloadNewColor = Color(0xFF68BDA6)
 
+/**
+ * 色表本体。Task 3 之后 `MintPrimary` 是组合期 getter，所以这张表必须本身是组合期函数：
+ * 两个调用点（`TodayWorkloadBar` 的分段条与图例圆点）都在组合期内，无需改动。
+ */
+@Composable
 private fun WorkloadKind.color(): Color = when (this) {
     WorkloadKind.LEARNED -> MintPrimary
     WorkloadKind.REVIEW -> WorkloadReviewColor

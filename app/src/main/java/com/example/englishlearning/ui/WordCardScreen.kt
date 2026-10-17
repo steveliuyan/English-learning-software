@@ -427,6 +427,8 @@ private fun WordCardSpeakerButton(lemma: String, modifier: Modifier = Modifier) 
 /** Material `volume_up` 比例的自绘喇叭（详情页 AccentSpeakerButton 同款几何，20dp）。 */
 @Composable
 private fun DetailSpeakerIcon() {
+    // Canvas 的绘制 lambda 是 DrawScope（组合期外），中性令牌必须先在外层组合期读好再带进去。
+    val glyph = MintPrimaryDark
     Canvas(modifier = Modifier.size(20.dp)) {
         val w = size.width
         val h = size.height
@@ -435,7 +437,7 @@ private fun DetailSpeakerIcon() {
         val boxTop = h * 0.40f
         val boxBottom = h * 0.60f
         drawRect(
-            color = MintPrimaryDark,
+            color = glyph,
             topLeft = androidx.compose.ui.geometry.Offset(boxLeft, boxTop),
             size = androidx.compose.ui.geometry.Size(boxRight - boxLeft, boxBottom - boxTop),
         )
@@ -447,10 +449,10 @@ private fun DetailSpeakerIcon() {
                 lineTo(boxRight, boxBottom)
                 close()
             },
-            color = MintPrimaryDark,
+            color = glyph,
         )
         drawArc(
-            color = MintPrimaryDark,
+            color = glyph,
             startAngle = -45f,
             sweepAngle = 90f,
             useCenter = false,
@@ -459,7 +461,7 @@ private fun DetailSpeakerIcon() {
             size = androidx.compose.ui.geometry.Size(w * 0.24f, h * 0.36f),
         )
         drawArc(
-            color = MintPrimaryDark,
+            color = glyph,
             startAngle = -45f,
             sweepAngle = 90f,
             useCenter = false,

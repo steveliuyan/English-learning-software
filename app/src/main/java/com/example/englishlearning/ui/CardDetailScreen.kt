@@ -570,6 +570,8 @@ private fun AccentSpeakerButton(
 /** Material `volume_up` 比例的自绘喇叭，24dp 视觉尺寸。 */
 @Composable
 private fun SpeakerGlyph(modifier: Modifier = Modifier) {
+    // Canvas 的绘制 lambda 是 DrawScope（组合期外），中性令牌必须先在外层组合期读好再带进去。
+    val glyph = MintPrimaryDark
     Canvas(modifier = modifier.size(24.dp)) {
         val w = size.width
         val h = size.height
@@ -579,7 +581,7 @@ private fun SpeakerGlyph(modifier: Modifier = Modifier) {
         val boxTop = h * 0.40f
         val boxBottom = h * 0.60f
         drawRect(
-            color = MintPrimaryDark,
+            color = glyph,
             topLeft = androidx.compose.ui.geometry.Offset(boxLeft, boxTop),
             size = androidx.compose.ui.geometry.Size(boxRight - boxLeft, boxBottom - boxTop),
         )
@@ -591,11 +593,11 @@ private fun SpeakerGlyph(modifier: Modifier = Modifier) {
                 lineTo(boxRight, boxBottom)
                 close()
             },
-            color = MintPrimaryDark,
+            color = glyph,
         )
         // 两道声波弧线
         drawArc(
-            color = MintPrimaryDark,
+            color = glyph,
             startAngle = -45f,
             sweepAngle = 90f,
             useCenter = false,
@@ -604,7 +606,7 @@ private fun SpeakerGlyph(modifier: Modifier = Modifier) {
             size = androidx.compose.ui.geometry.Size(w * 0.24f, h * 0.36f),
         )
         drawArc(
-            color = MintPrimaryDark,
+            color = glyph,
             startAngle = -45f,
             sweepAngle = 90f,
             useCenter = false,
