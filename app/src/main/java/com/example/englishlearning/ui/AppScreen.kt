@@ -2297,14 +2297,15 @@ private fun WordBookCard(
                         color = MintPrimaryDark,
                         modifier = Modifier.testTag("wordbook_learned_${book.id}"),
                     )
-                    progress?.let {
-                        Text(
-                            text = "共 ${it.total} 词",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MintTextMuted,
-                            modifier = Modifier.testTag("wordbook_total_${book.id}"),
-                        )
-                    }
+                    // 词量是册自带的元数据，首发布列表时就在手里（spec F1-01：册列表读到即先发布，
+                    // 含名称、等级、词量）。它绝不能挂在 progress 上：那样「进度计算中」的册
+                    // 连一共有多少词都念不出来，等于把最确定的信息跟着最不确定的信息一起藏起来。
+                    Text(
+                        text = "共 ${book.totalWords} 词",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MintTextMuted,
+                        modifier = Modifier.testTag("wordbook_total_${book.id}"),
+                    )
                 }
                 // 没算出来的进度不画条、也不报「未学」：一条 0% 的实心轨道等于把「不知道」说成
                 // 「一点没学」，和今日计划里「无数据不画进度条」的既有口径相冲（同一类假信号）。

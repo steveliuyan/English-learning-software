@@ -129,6 +129,56 @@ class NewWordOrderingTest {
     }
 
     /**
+     * The hash basis is part of this algorithm's identity: changing it rewrites every learner's
+     * remaining path in every book, which is why the KDoc freezes it. A comment can be "tidied"
+     * away; this literal cannot — it is the golden path of the sample book, and any change to the
+     * hash, the prefix rule, or the tie-breakers has to be a deliberate decision that rewrites
+     * existing users' sequences (record it in `docs/decisions/` before touching the expected list).
+     */
+    @Test
+    fun `the frozen hash basis pins the sample book path`() {
+        val golden = NewWordOrdering.order(sampleBook())
+
+        assertEquals(
+            listOf(
+                "cet4:conversation",
+                "cet4:computer",
+                "cet4:station",
+                "cet4:contribute",
+                "cet4:complain",
+                "cet4:state",
+                "cet4:control",
+                "cet4:above",
+                "cet4:compose",
+                "cet4:convenient",
+                "cet4:unique",
+                "cet4:produce",
+                "cet4:congress",
+                "cet4:status",
+                "cet4:reason",
+                "cet4:conduct",
+                "cet4:receipt",
+                "cet4:a",
+                "cet4:constant",
+                "cet4:ability",
+                "cet4:about",
+                "cet4:consider",
+                "cet4:able",
+                "cet4:abandon",
+                "cet4:contact",
+                "cet4:complete",
+                "cet4:united",
+                "cet4:product",
+            ),
+            golden,
+        )
+        // The literal above is the contract; these two lines keep it honest if the fixture itself
+        // is ever edited (a golden list copied from a mutated fixture would pin the wrong path).
+        assertEquals(sampleBook().sorted(), golden.sorted(), "the golden path must be a permutation of the fixture")
+        assertSpacingHolds(sampleBook(), golden)
+    }
+
+    /**
      * Recomputes `floor(n / M)` from the fixture itself and asserts every same-prefix pair respects
      * it, so the guarantee is checked against the definition and not against the production helper.
      */

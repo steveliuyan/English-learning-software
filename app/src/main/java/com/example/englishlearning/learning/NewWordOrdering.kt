@@ -63,7 +63,11 @@ object NewWordOrdering {
             while (cooling.isNotEmpty() && cooling.peek().releaseAt <= slot) ready.add(cooling.poll())
             // The greedy below is sufficient at this spacing, so `ready` should never be empty here.
             // If some future book shape breaks that, draining the cooldown queue keeps the result a
-            // total permutation instead of throwing in the middle of plan generation.
+            // total permutation instead of throwing in the middle of plan generation — but note what
+            // that costs: a cursor taken out of `cooling` has not finished its cooldown, so this
+            // position may sit closer than `spacing` to its own prefix's previous entry. Permutation
+            // and termination stay intact, the spacing guarantee is what gives way, and no caller may
+            // read this branch as "still interleaved".
             val cursor = ready.poll() ?: cooling.poll() ?: break
             ordered.add(cursor.items[cursor.next])
             cursor.next += 1

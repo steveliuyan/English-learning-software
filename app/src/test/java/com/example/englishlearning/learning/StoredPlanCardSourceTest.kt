@@ -4,6 +4,7 @@ import com.example.englishlearning.learning.domain.CardReviewState
 import com.example.englishlearning.learning.domain.LearningEvent
 import com.example.englishlearning.learning.domain.WordCard
 import java.time.Instant
+import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
@@ -23,8 +24,12 @@ import org.junit.jupiter.api.Test
 class StoredPlanCardSourceTest {
     private val now: Instant = Instant.parse("2026-09-19T08:00:00Z")
 
-    /** 词条前 3 字母——交错序的「相似词」单位，与 [NewWordOrdering] 的分组口径一致。 */
-    private fun prefixOf(cardId: String): String = cardId.substringAfter(':').take(3)
+    /**
+     * 词条前 3 字母——交错序的「相似词」单位。口径必须与 [NewWordOrdering] 逐字一致
+     * （含「无分隔符就回退整串」与大小写归一），否则这里的独立核验会在边界 id 上悄悄错开。
+     */
+    private fun prefixOf(cardId: String): String =
+        cardId.substringAfter(':').ifEmpty { cardId }.take(3).lowercase(Locale.ROOT)
 
     @Test
     fun `new cards skip the ones already reviewed`() = runTest {

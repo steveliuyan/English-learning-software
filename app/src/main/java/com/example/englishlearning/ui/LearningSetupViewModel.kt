@@ -193,12 +193,16 @@ class LearningSetupViewModel @Inject constructor(
         // 落笔前查一次任务是否还作数：上面这几步读盘一旦开始就停不下来（真实盘上拷贝不可中断），
         // `loadJob?.cancel()` 只能让协作式挂起点抛异常，挡不住「已经读完、正要写出去」的过期结果。
         if (!coroutineContext.isActive) return
-        // 第一段发布：册先到、进度还空着。进度要逐册解析词书包（cet4 有 4308 张卡），
+        // 重进这一页时，上一轮算好的进度仍然是同一批册子的真实数据：抹成空表会让用户眼看着
+        // 进度条消失一次再长回来。只保留「这一版列表里还在」的册子，删掉的那本不能靠旧数据继续画条。
+        val visibleBookIds = wordBooks.mapTo(mutableSetOf()) { it.id }
+        val preservedProgress = _uiState.value.progressByBook.filterKeys { it in visibleBookIds }
+        // 第一段发布：册先到、进度只带已算好的那部分。进度要逐册解析词书包（cet4 有 4308 张卡），
         // 让它挡在列表前面就是把最慢的一步放到了用户最先等的位置。
         _uiState.value =
             LearningSetupUiState(
                 wordBooks = wordBooks,
-                progressByBook = emptyMap(),
+                progressByBook = preservedProgress,
                 importedBookIds = imported.filterTo(mutableSetOf()) { it in wordBooks.map(WordBook::id) },
                 selectedWordBookId = activeId ?: wordBooks.firstOrNull()?.id,
                 dailyNewTarget = profile?.dailyNewTarget ?: LearningSetupUiState.DEFAULT_DAILY_TARGET,
@@ -213,9 +217,12 @@ class LearningSetupViewModel @Inject constructor(
             )
         try {
             // 第二段：逐册回填，每算完一册就发布一次，用户看到的是进度条一本本长出来。
-            val progress = LinkedHashMap<String, WordBookProgress>()
+            val progress = LinkedHashMap(preservedProgress)
             wordBooks.forEach { book ->
-                progressOf(book)?.let { progress[book.id] = it }
+                val computed = progressOf(book)
+                // 这一本这次读不出来，就把它从表里摘掉——留着上一轮的旧数字，等于把
+                // 「现在读不到」说成「还是原来那样」（本地优先：降级要如实呈现）。
+                if (computed != null) progress[book.id] = computed else progress.remove(book.id)
                 // 同上：这一本读完了、正要发布，任务可能已经在这段读盘里被取代。
                 // 过期任务既不该把新进度表换成旧数据，也不该继续读后面几本（白读盘）。
                 if (!coroutineContext.isActive) return

@@ -631,6 +631,125 @@ class LearningSetupViewModelTest {
         assertEquals(listOf("cet4", "kaoyan"), cards.reads)
     }
 
+    @Test
+    fun `a stale load finishing its read does not clear the newer load loading label`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 3, "v1", "ngsl-nawl-1.2")
+            books += WordBook("kaoyan", "考研英语", "考研", 2, "v1", "ngsl-nawl-1.2")
+        }
+        val cards = StubbornCards(
+            mapOf(
+                "cet4" to listOf("cet4:a", "cet4:b", "cet4:c"),
+                "kaoyan" to listOf("kaoyan:a", "kaoyan:b"),
+            ),
+        )
+        val viewModel =
+            setupViewModel(
+                repository,
+                cards,
+                FakeEvents(setOf("cet4:a")),
+                bundledIds = setOf("cet4", "kaoyan"),
+            )
+
+        // 老任务卡在取消不掉的第一本读盘上；新任务这时接管，也排在同一本后面。
+        viewModel.load("default")
+        runCurrent()
+        viewModel.load("default")
+        runCurrent()
+
+        // 放行这一段读盘：老任务「已经读完、正要落笔」，靠 `isActive` 收手；
+        // 新任务照常回填第一本，然后卡在第二本上——加载态这时必须还是「计算中」。
+        cards.release("cet4")
+        advanceUntilIdle()
+
+        assertEquals(setOf("cet4"), viewModel.uiState.value.progressByBook.keys)
+        // 新任务还在回填第二本，过期任务的收尾不许把加载态翻掉：
+        // 那会让没算出来的册子念成「暂时读不到进度」，是个会说谎的降级标签。
+        assertEquals(true, viewModel.uiState.value.progressLoading)
+
+        cards.release("kaoyan")
+        advanceUntilIdle()
+
+        assertEquals(setOf("cet4", "kaoyan"), viewModel.uiState.value.progressByBook.keys)
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+    }
+
+    @Test
+    fun `a reload keeps already computed progress visible while it backfills`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 3, "v1", "ngsl-nawl-1.2")
+            books += WordBook("cet6", "大学英语六级", "CET-6", 2, "v1", "ngsl-nawl-1.2")
+        }
+        val cards =
+            StubbornCards(
+                mapOf(
+                    "cet4" to listOf("cet4:a", "cet4:b", "cet4:c"),
+                    "cet6" to listOf("cet6:x", "cet6:y"),
+                ),
+            )
+        val viewModel =
+            setupViewModel(repository, cards, FakeEvents(setOf("cet4:a")), bundledIds = setOf("cet4", "cet6"))
+
+        viewModel.load("default")
+        cards.release("cet4")
+        cards.release("cet6")
+        advanceUntilIdle()
+        val cet4Progress = WordBookProgress(learned = 1, total = 3)
+        assertEquals(cet4Progress, viewModel.uiState.value.progressByBook["cet4"])
+
+        // 重进该页：第一本要重新解析词书包。此时手里明明还有刚算好的进度，
+        // 把它抹成空表就是让用户眼看着进度条消失一次再长回来。
+        cards.arm("cet4")
+        viewModel.load("default")
+        runCurrent()
+
+        assertEquals(true, viewModel.uiState.value.progressLoading)
+        assertEquals(setOf("cet4", "cet6"), viewModel.uiState.value.progressByBook.keys)
+        assertEquals(cet4Progress, viewModel.uiState.value.progressByBook["cet4"])
+
+        cards.release("cet4")
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+        assertEquals(setOf("cet4", "cet6"), viewModel.uiState.value.progressByBook.keys)
+    }
+
+    @Test
+    fun `a reload drops progress of books that are no longer listed`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 3, "v1", "ngsl-nawl-1.2")
+            books += WordBook("cet6", "大学英语六级", "CET-6", 2, "v1", "ngsl-nawl-1.2")
+        }
+        val cards =
+            StubbornCards(
+                mapOf(
+                    "cet4" to listOf("cet4:a", "cet4:b", "cet4:c"),
+                    "cet6" to listOf("cet6:x", "cet6:y"),
+                ),
+            )
+        val viewModel =
+            setupViewModel(repository, cards, FakeEvents(setOf("cet4:a")), bundledIds = setOf("cet4", "cet6"))
+
+        viewModel.load("default")
+        cards.release("cet4")
+        cards.release("cet6")
+        advanceUntilIdle()
+        assertEquals(setOf("cet4", "cet6"), viewModel.uiState.value.progressByBook.keys)
+
+        // 「保留已算出的进度」只适用于还在列表里的册子：删掉的那本绝不能靠旧数据继续画进度条。
+        repository.books.removeAll { it.id == "cet6" }
+        cards.arm("cet4")
+        viewModel.load("default")
+        runCurrent()
+
+        assertEquals(true, viewModel.uiState.value.progressLoading)
+        assertEquals(setOf("cet4"), viewModel.uiState.value.progressByBook.keys)
+
+        cards.release("cet4")
+        advanceUntilIdle()
+        assertEquals(setOf("cet4"), viewModel.uiState.value.progressByBook.keys)
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+    }
+
     /** 内置册的词卡要从 assets 拷到盘上，`assets.open` 失败是真实抛异常而不是返回 Failure。 */
     private class FlakyCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
         override suspend fun cardIds(wordBookId: String): List<String> {
@@ -659,11 +778,17 @@ class LearningSetupViewModelTest {
      * 协作式取消在这里救不了界面。
      */
     private class StubbornCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
-        private val gates = idsByBook.keys.associateWith { CompletableDeferred<Unit>() }
+        private val gates: MutableMap<String, CompletableDeferred<Unit>> =
+            idsByBook.keys.associateWith { CompletableDeferred<Unit>() }.toMutableMap()
         val reads = mutableListOf<String>()
 
         fun release(wordBookId: String) {
             gates.getValue(wordBookId).complete(Unit)
+        }
+
+        /** 重新上膛：让这一本的**下一次**读盘再挂住，用来观测「回填途中」那段界面该显示什么。 */
+        fun arm(wordBookId: String) {
+            gates[wordBookId] = CompletableDeferred()
         }
 
         override suspend fun cardIds(wordBookId: String): List<String> {
