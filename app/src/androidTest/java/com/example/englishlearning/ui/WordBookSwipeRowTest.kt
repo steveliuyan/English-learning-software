@@ -42,6 +42,7 @@ class WordBookSwipeRowTest {
                 book = book,
                 selected = false,
                 progress = null,
+                progressLoading = false,
                 onSelect = {},
                 onDelete = {},
             )
@@ -90,6 +91,7 @@ class WordBookSwipeRowTest {
                 book = book,
                 selected = false,
                 progress = null,
+                progressLoading = false,
                 onSelect = {},
                 onDelete = { deleted++ },
             )

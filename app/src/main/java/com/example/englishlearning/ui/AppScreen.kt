@@ -2088,7 +2088,11 @@ private val WordBookCardContentPadding = PaddingValues(horizontal = 14.dp, verti
  *
  * 刻意只有色块、没有任何文案和数字：占位行手里还没有数据，向 TalkBack 播报「已学 0 词 / 共 0 词」
  * 这种假数字比什么都不念更糟（spec F1-01 无障碍口径）。行距交给外层 Column 的 spacedBy，
- * 所以这里不额外加外层 padding；单选钮与文字列的起点也照抄真卡，骨架换成真卡时版面不跳。
+ * 所以这里不额外加外层 padding。
+ *
+ * 只保证**横向**起点对齐（圆角、行高下限、内边距、单选钮盒与文字列起点照抄真卡）。纵向高度不承诺一致：
+ * 真卡带进度文本 + 进度条 +「未学」时约 130dp，骨架按最小行高约 74dp，回填到位后卡片会长高——
+ * 这是刻意的取舍：首帧要的是「立刻有东西」，不是逐像素复刻最终版面。
  */
 @Composable
 private fun WordBookListPlaceholder(row: Int) {
@@ -2151,8 +2155,11 @@ internal fun SwipableWordBookCard(
     book: WordBook,
     selected: Boolean,
     progress: com.example.englishlearning.learning.WordBookProgress?,
-    /** 整页进度回填是否还在进行：用来区分「还在算」与「这一本算不出来」两种 `progress == null`。 */
-    progressLoading: Boolean = false,
+    /**
+     * 整页进度回填是否还在进行：用来区分「还在算」与「这一本算不出来」两种 `progress == null`。
+     * 刻意不给默认值——漏传会把「还在算」念成「暂时读不到进度」，那是个会说谎的降级标签。
+     */
+    progressLoading: Boolean,
     onSelect: () -> Unit,
     onDelete: (() -> Unit)?,
 ) {
@@ -2299,16 +2306,18 @@ private fun WordBookCard(
                         )
                     }
                 }
-                LinearProgressIndicator(
-                    progress = { progress?.fraction ?: 0f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 5.dp)
-                        .testTag("wordbook_progress_${book.id}"),
-                    color = MintPrimary,
-                    trackColor = MintOutline.copy(alpha = 0.35f),
-                )
+                // 没算出来的进度不画条、也不报「未学」：一条 0% 的实心轨道等于把「不知道」说成
+                // 「一点没学」，和今日计划里「无数据不画进度条」的既有口径相冲（同一类假信号）。
                 progress?.let {
+                    LinearProgressIndicator(
+                        progress = { it.fraction },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 5.dp)
+                            .testTag("wordbook_progress_${book.id}"),
+                        color = MintPrimary,
+                        trackColor = MintOutline.copy(alpha = 0.35f),
+                    )
                     Text(
                         text = "未学 ${it.unlearned} 词",
                         style = MaterialTheme.typography.bodySmall,

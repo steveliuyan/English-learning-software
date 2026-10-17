@@ -35,6 +35,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -554,6 +556,81 @@ class LearningSetupViewModelTest {
         assertEquals(false, viewModel.uiState.value.progressLoading)
     }
 
+    @Test
+    fun `a stale load stuck before the first publish does not overwrite the newer state`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            profile = LearningProfile("default", "cet4", 10)
+            books += WordBook("cet4", "大学英语四级", "CET-4", 1, "v1", "ngsl-nawl-1.2")
+        }
+        val settingsRepo = FakeSettingsRepository()
+        val staleRead = CompletableDeferred<Unit>()
+        settingsRepo.stubbornFirstFind = staleRead
+        val viewModel =
+            setupViewModel(repository, settingsRepo = settingsRepo, bundledIds = setOf("cet4", "kaoyan"))
+
+        // 老任务已经读走上一版的册列表（cet4）与目标（10），卡在第一次设置读取上，且这段取消不掉。
+        viewModel.load("default")
+        runCurrent()
+
+        repository.profile = LearningProfile("default", "kaoyan", 30)
+        repository.books.clear()
+        repository.books += WordBook("kaoyan", "考研英语", "考研", 1, "v1", "ngsl-nawl-1.2")
+        viewModel.load("default")
+        advanceUntilIdle()
+        assertEquals(30, viewModel.uiState.value.dailyNewTarget)
+        assertEquals(listOf("kaoyan"), viewModel.uiState.value.wordBooks.map(WordBook::id))
+
+        // 放行老任务：它手里握的是上一版的册列表与目标，一次整份发布就会把用户刚看到的内容换回去。
+        staleRead.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(30, viewModel.uiState.value.dailyNewTarget)
+        assertEquals(listOf("kaoyan"), viewModel.uiState.value.wordBooks.map(WordBook::id))
+        assertEquals(setOf("kaoyan"), viewModel.uiState.value.progressByBook.keys)
+    }
+
+    @Test
+    fun `a stale load that cannot be cancelled mid-read does not overwrite the newer progress`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 3, "v1", "ngsl-nawl-1.2")
+            books += WordBook("kaoyan", "考研英语", "考研", 2, "v1", "ngsl-nawl-1.2")
+        }
+        val cards = StubbornCards(
+            mapOf(
+                "cet4" to listOf("cet4:a", "cet4:b", "cet4:c"),
+                "kaoyan" to listOf("kaoyan:a", "kaoyan:b"),
+            ),
+        )
+        val viewModel =
+            setupViewModel(
+                repository,
+                cards,
+                FakeEvents(setOf("cet4:a")),
+                bundledIds = setOf("cet4", "kaoyan"),
+            )
+
+        viewModel.load("default")
+        runCurrent()
+        assertEquals(emptyMap(), viewModel.uiState.value.progressByBook)
+
+        // 老任务卡在「取消不掉」的第一本读盘上；此时词书被换成另一本，新任务跑完并发布。
+        repository.books.removeAll { it.id == "cet4" }
+        cards.release("kaoyan")
+        viewModel.load("default")
+        advanceUntilIdle()
+        assertEquals(setOf("kaoyan"), viewModel.uiState.value.progressByBook.keys)
+
+        // 老任务这次读盘才返回：落笔前不查任务是否还作数，就会把进度表整个换成过期数据，
+        // 并继续去读它那一版列表里剩下的书（白读盘）。
+        cards.release("cet4")
+        advanceUntilIdle()
+
+        assertEquals(setOf("kaoyan"), viewModel.uiState.value.progressByBook.keys)
+        assertEquals(listOf("kaoyan"), viewModel.uiState.value.wordBooks.map(WordBook::id))
+        assertEquals(false, viewModel.uiState.value.progressLoading)
+        assertEquals(listOf("cet4", "kaoyan"), cards.reads)
+    }
+
     /** 内置册的词卡要从 assets 拷到盘上，`assets.open` 失败是真实抛异常而不是返回 Failure。 */
     private class FlakyCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
         override suspend fun cardIds(wordBookId: String): List<String> {
@@ -569,6 +646,29 @@ class LearningSetupViewModelTest {
 
         override suspend fun cardIds(wordBookId: String): List<String> {
             gates.getValue(wordBookId).await()
+            return idsByBook.getValue(wordBookId)
+        }
+
+        override suspend fun cards(cardIds: List<String>) = emptyList<WordCard>()
+    }
+
+    /**
+     * 「一开始就停不下来」的词卡读取：把门住的那段用 `withContext(NonCancellable)` 包起来，
+     * 模拟真实盘上拷贝——`loadJob?.cancel()` 打不断它，老任务 resumed 后仍会走到落笔那一步。
+     * 这正是 [LearningSetupViewModel] 必须在每次发布前显式查一次任务还作数（`isActive`）的原因：
+     * 协作式取消在这里救不了界面。
+     */
+    private class StubbornCards(private val idsByBook: Map<String, List<String>>) : WordCardSource {
+        private val gates = idsByBook.keys.associateWith { CompletableDeferred<Unit>() }
+        val reads = mutableListOf<String>()
+
+        fun release(wordBookId: String) {
+            gates.getValue(wordBookId).complete(Unit)
+        }
+
+        override suspend fun cardIds(wordBookId: String): List<String> {
+            reads += wordBookId
+            withContext(NonCancellable) { gates.getValue(wordBookId).await() }
             return idsByBook.getValue(wordBookId)
         }
 
@@ -866,7 +966,9 @@ class LearningSetupViewModelTest {
             if (failBookList) {
                 RepositoryResult.Failure(LearningProfileRepositoryError.StorageUnavailable)
             } else {
-                RepositoryResult.Success(books)
+                // 快照而非活引用：真实盘上读一次就定稿，测试里后续增删词书不得穿透到「已经读走」的那一份，
+                // 否则过期任务发布的正好是新内容，判别力被 fake 自己抹掉。
+                RepositoryResult.Success(books.toList())
             }
 
         override suspend fun findWordBook(id: String) =
@@ -889,11 +991,20 @@ class LearningSetupViewModelTest {
          * 拉长到测试可以观测的程度（渐进发布之后一次加载有 N+2 次状态落笔）。
          */
         var gateFirstFind: CompletableDeferred<Unit>? = null
+
+        /**
+         * 同 [gateFirstFind]，但这段挂起**取消不掉**（`NonCancellable`）：老任务这时已经读走上一版的册列表
+         * 与目标，正要把过期结果整份写出去。协作式取消在这里救不了界面，落笔前的显式检查才是护栏。
+         */
+        var stubbornFirstFind: CompletableDeferred<Unit>? = null
         private var finds = 0
 
         override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> {
             finds += 1
-            if (finds == 1) gateFirstFind?.await()
+            if (finds == 1) {
+                gateFirstFind?.await()
+                stubbornFirstFind?.let { gate -> withContext(NonCancellable) { gate.await() } }
+            }
             return LearningSettingsRepositoryResult.Success(stored[profileId])
         }
 
