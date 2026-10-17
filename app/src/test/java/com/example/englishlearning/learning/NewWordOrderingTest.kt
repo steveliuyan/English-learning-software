@@ -99,25 +99,33 @@ class NewWordOrderingTest {
             listOf(File("src/main/assets/wordbooks"), File("app/src/main/assets/wordbooks"))
                 .firstOrNull(File::isDirectory)
                 ?: fail("bundled word books not found from ${File(".").absolutePath}")
-        val books =
+        val directories =
             root.listFiles { file -> file.isDirectory }
                 .orEmpty()
-                .mapNotNull { directory -> WordBookPackageParser.parse(directory).getOrNull() }
-                .map { parsed -> parsed.metadata.id to parsed.cards.map { it.cardId } }
+                .sortedBy { directory -> directory.name }
+        assertTrue(directories.isNotEmpty(), "no bundled word book directories under $root")
 
-        assertTrue(books.size >= 8, "expected the bundled books to parse, got ${books.size}")
+        // 逐册解析：任何一本解析失败都必须让用例失败，不许静默少测。
+        val books =
+            directories.map { directory ->
+                val parsed = WordBookPackageParser.parse(directory).getOrThrow()
+                parsed.metadata.id to parsed.cards.map { it.cardId }
+            }
 
-        // 只有「最大前缀组不止占满全册」的册才有可断言的间距；退化的册由上一条用例覆盖。
-        val spaced = books.filter { (_, stored) -> stored.size / stored.largestGroup() >= 2 }
-        assertTrue(spaced.size >= 4, "expected at least 4 bundled books to carry a spacing claim, got ${spaced.size}")
+        assertTrue(
+            books.count { (_, stored) -> stored.size / stored.largestGroup() >= 2 } >= 4,
+            "expected at least 4 bundled books to carry a spacing claim",
+        )
 
-        spaced.forEach { (bookId, storedOrder) ->
-            val ordered = NewWordOrdering.order(storedOrder)
+        books
+            .filter { (_, stored) -> stored.size / stored.largestGroup() >= 2 }
+            .forEach { (bookId, storedOrder) ->
+                val ordered = NewWordOrdering.order(storedOrder)
 
-            assertEquals(storedOrder.sorted(), ordered.sorted(), "$bookId must keep every entry")
-            assertNotEquals(storedOrder, ordered, "$bookId came out in its stored alphabetical order")
-            assertSpacingHolds(storedOrder, ordered)
-        }
+                assertEquals(storedOrder.sorted(), ordered.sorted(), "$bookId must keep every entry")
+                assertNotEquals(storedOrder, ordered, "$bookId came out in its stored alphabetical order")
+                assertSpacingHolds(storedOrder, ordered)
+            }
     }
 
     /**

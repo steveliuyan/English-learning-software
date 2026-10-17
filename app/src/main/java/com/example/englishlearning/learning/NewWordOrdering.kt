@@ -16,6 +16,9 @@ import java.util.PriorityQueue
  * cards carries distinct prefixes. It is a pure function of the card ids: no clock, no random
  * seed, no per-user state, so the same book yields the same path across processes, devices and
  * app updates, and dropping reviewed cards leaves a subsequence instead of a reshuffle.
+ *
+ * That last promise makes the hash basis part of the algorithm's identity: changing it rewrites
+ * every book's remaining path. It is frozen from this commit onward and may not be "tidied" later.
  */
 object NewWordOrdering {
     /** Lemma prefix treated as "these two words will be confused for each other". */
@@ -74,15 +77,16 @@ object NewWordOrdering {
     }
 
     /**
-     * @return `floor(n / M)`: the book's entry count divided by its largest prefix group — the
-     *  spacing [order] achieves and the upper bound any single fixed ordering could promise for
-     *  the dominant group. Degenerate books clamp to 1: when one group holds the whole book
-     *  (`M == n`), no ordering separates its entries at all.
+     * @return `floor(n / M)`: the book's entry count divided by its largest prefix group. This is
+     *  the spacing [order] provably achieves, not an optimality claim — a cleverer arrangement of
+     *  the same book could sometimes place two same-prefix entries further apart. It is a content
+     *  property, so it needs no guard: `M <= n` always, and `M == n` (one prefix holds the whole
+     *  book) yields 1, the only spacing such a book can have.
      */
     fun minimumSpacing(cardIds: List<String>): Int {
         if (cardIds.size < 2) return 1
         val largestGroup = cardIds.groupBy(::prefixOf).maxOf { (_, ids) -> ids.size }
-        return (cardIds.size / largestGroup).coerceAtLeast(1)
+        return cardIds.size / largestGroup
     }
 
     /**

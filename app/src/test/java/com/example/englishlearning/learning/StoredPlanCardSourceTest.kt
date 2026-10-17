@@ -87,10 +87,7 @@ class StoredPlanCardSourceTest {
         val plan = source.newCardIds("cet4", 4)
 
         assertEquals(order.filterNot { it == "cet4:con-1" }.take(4), plan)
-        assertEquals(4, plan.size)
         assertTrue(plan.none { it == "cet4:con-1" }, "a reviewed card must not be handed out as new")
-        val positions = plan.map { order.indexOf(it) }
-        assertEquals(positions.sorted(), positions, "removing a reviewed card must leave a subsequence")
     }
 
     @Test
