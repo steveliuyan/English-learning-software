@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>English Learning · 薄荷玻璃设计系统重设计稿（2026-10-17）</title>
+<style>
+/* ============================================================
+   单一真相源：所有色值/尺寸都写成 CSS 变量，页面与设备框只引用变量。
+   对照实现时，这套变量即批 1 的 token 表。
+   ============================================================ */
+:root {
+  /* —— 品牌渐变（§2.1 不动） —— */
+  --mint-start:#A8F3C8; --mint-mid:#5DDFB4; --mint-end:#35B9B5; --mint-light:#D9FFF0;
+  /* —— 浅色中性（本批定稿） —— */
+  --bg:#F1FBF5; --surface:#FFFFFF; --surface-glass:#EFFFFFFF; --tint:#DDF7E8;
+  --tint-2:#DCEAE1; --tint-3:#CDEDD9; --outline:#ADE7D2; --outline-soft:#E4EFE9;
+  --text-1:#1C1C1E; --text-2:#4E756A; --text-3:#7A9088;
+  --on-mint:#174C44; --on-brand:#04241C;
+  --error:#B30000; --error-fill:#FF3B30; --success:#1B5E20;
+  /* —— 功能域强调色：base=图形/渐变起点，deep=填充与文字 —— */
+  --d-ai:#188F76;      --d-ai-base:#2EC99C;
+  --d-learn:#075EB4;   --d-learn-base:#0A84FF;
+  --d-review:#AB5700;  --d-review-base:#FF9F0A;
+  --d-library:#8E34B8; --d-library-base:#BF5AF2;
+  --d-reading:#C81E46; --d-reading-base:#FF375F;
+  --d-danger:#B30000;  --d-danger-base:#FF3B30;
+  --d-settings:#48484A;--d-settings-base:#8E8E93;
+  /* —— 文档自身外壳 —— */
+  --doc-bg:#EDF3F0; --doc-ink:#16221D; --doc-muted:#5C6F68; --doc-line:#D6E0DA;
+  /* —— 尺度 —— */
+  --r-hero:24px; --r-card:18px; --r-btn:14px; --r-icon:12px; --r-pill:999px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:14px; --s5:16px; --s6:18px; --s7:20px; --s8:24px;
+  --page-pad:20px; --sec-gap:24px; --inner-gap:14px;
+  --k:1; /* 动态字体放大系数：控件里改这一个变量 */
+}
+html[data-theme="dark"] {
+  --bg:#0E1512; --surface:#17201C; --surface-glass:#E617201C; --tint:#1C2C26;
+  --tint-2:#22322B; --tint-3:#27392F; --outline:#2E4238; --outline-soft:#233029;
+  --text-1:#E9F2EC; --text-2:#9FB3AA; --text-3:#7F938A;
+  --on-mint:#DFF6EC; --on-brand:#04241C;
+  --error:#FF8177; --error-fill:#FF6B61; --success:#6BD98A;
+  --d-ai:#35E0AC;      --d-ai-base:#35E0AC;
+  --d-learn:#5AC0FF;   --d-learn-base:#5AC0FF;
+  --d-review:#FFB340;  --d-review-base:#FFB340;
+  --d-library:#DA8CFF; --d-library-base:#DA8CFF;
+  --d-reading:#FF7A93; --d-reading-base:#FF7A93;
+  --d-danger:#FF6B61;  --d-danger-base:#FF6B61;
+  --d-settings:#B0B0B5;--d-settings-base:#B0B0B5;
+  --doc-bg:#0B100E; --doc-ink:#E4EDE8; --doc-muted:#8FA39A; --doc-line:#223029;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--doc-bg); color:var(--doc-ink);
+  font:15px/1.6 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+.wrap { max-width:1400px; margin:0 auto; padding:0 24px 96px; }
+.masthead { padding:40px 0 8px; }
+.masthead h1 { margin:0 0 6px; font-size:30px; letter-spacing:.2px; }
+.masthead p { margin:0; color:var(--doc-muted); max-width:80ch; }
+.banner-note { margin:18px 0 0; padding:14px 18px; border-radius:var(--r-card);
+  background:linear-gradient(120deg,var(--mint-start),var(--mint-mid) 55%,var(--mint-end));
+  color:var(--on-brand); font-size:14px; }
+.banner-note b { font-weight:700; }
+.controls { position:sticky; top:0; z-index:40; display:flex; gap:14px; align-items:center;
+  flex-wrap:wrap; margin:20px -24px 0; padding:12px 24px;
+  background:color-mix(in srgb,var(--doc-bg) 88%,transparent);
+  backdrop-filter:blur(14px); border-bottom:1px solid var(--doc-line); }
+.seg { display:flex; gap:4px; padding:4px; border-radius:var(--r-pill);
+  background:var(--surface); border:1px solid var(--doc-line); }
+.seg button { border:0; background:transparent; color:var(--doc-ink); padding:6px 14px;
+  border-radius:var(--r-pill); font-size:13px; cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--d-ai); color:#08251C; font-weight:600; }
+.ctrl-label { font-size:12px; color:var(--doc-muted); letter-spacing:.3px; }
+section { margin-top:52px; }
+h2 { margin:0 0 4px; font-size:22px; }
+h2 .no { color:var(--d-ai); font-variant-numeric:tabular-nums; }
+.lead { margin:0 0 18px; color:var(--doc-muted); max-width:88ch; }
+h3 { margin:30px 0 10px; font-size:16px; letter-spacing:.2px; }
+.grid { display:grid; gap:16px; }
+.g2 { grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); }
+.g3 { grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+.g4 { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); }
+.panel { background:var(--surface); border:1px solid var(--doc-line);
+  border-radius:var(--r-card); padding:18px; }
+.panel > h4 { margin:0 0 12px; font-size:13px; letter-spacing:.4px; color:var(--doc-muted);
+  text-transform:uppercase; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--doc-line); vertical-align:top; }
+th { color:var(--doc-muted); font-weight:600; font-size:12px; }
+td code, .mono { font:12px/1.5 ui-monospace,"Cascadia Mono",Consolas,monospace; }
+.pass { color:#0B6B33; font-weight:600; } .warn { color:#8A4B00; font-weight:600; }
+.fail { color:#B30000; font-weight:600; }
+html[data-theme="dark"] .pass { color:#6BD98A; }
+html[data-theme="dark"] .warn { color:#FFB340; }
+html[data-theme="dark"] .fail { color:#FF8177; }
+/* —— 色卡 —— */
+.sw { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+.chip { width:46px; height:46px; border-radius:var(--r-icon); border:1px solid var(--doc-line); flex:0 0 auto; }
+.sw .meta { font-size:12px; color:var(--doc-muted); }
+.sw .name { font-size:13px; font-weight:600; }
+/* —— 字号阶梯 —— */
+.type-row { display:flex; align-items:baseline; gap:14px; padding:9px 0; border-bottom:1px dashed var(--doc-line); }
+.type-row .spec { margin-left:auto; font-size:12px; color:var(--doc-muted); white-space:nowrap; }
+.tk { font:12px ui-monospace,Consolas,monospace; padding:2px 7px; border-radius:6px;
+  background:var(--tint); color:var(--on-mint); }
+/* —— 设备框 —— */
+.devices { display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start; }
+.device-wrap { display:flex; flex-direction:column; gap:8px; }
+.device-cap { font-size:12px; color:var(--doc-muted); }
+.device { width:360px; height:760px; border-radius:34px; padding:0; overflow:hidden;
+  background:var(--bg); border:1px solid var(--doc-line);
+  box-shadow:0 24px 48px -28px rgba(6,40,28,.5);
+  font-size:calc(15px * var(--k)); color:var(--text-1); }
+.device .bar { height:26px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 18px; font-size:11px; color:var(--text-2); }
+.device .scr { padding:0 var(--page-pad) 28px; height:734px; overflow-y:auto; scrollbar-width:thin; }
+.device .scr::-webkit-scrollbar { width:5px; } .device .scr::-webkit-scrollbar-thumb { background:var(--outline); border-radius:3px; }
+.device .scrolly { max-height:690px; overflow:hidden; }
+/* —— 页头（AppHeader）—— */
+.appheader { display:flex; align-items:center; gap:10px; min-height:48px; margin-bottom:6px; }
+.appheader .back { width:40px; height:40px; flex:0 0 auto; border-radius:var(--r-icon);
+  display:grid; place-items:center; background:var(--surface); border:1px solid var(--outline-soft);
+  color:var(--text-1); }
+.appheader .ht { font-size:calc(17px * var(--k)); font-weight:700; letter-spacing:.2px;
+  line-height:1.25; min-width:0; overflow-wrap:anywhere; }
+.appheader .hs { display:block; font-size:calc(12px * var(--k)); font-weight:400; color:var(--text-2); margin-top:2px; }
+.appheader .tr { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.page-title { font-size:calc(24px * var(--k)); font-weight:700; letter-spacing:.2px; line-height:1.2; margin:6px 0 2px; }
+.page-sub { font-size:calc(13px * var(--k)); color:var(--text-2); margin:0 0 14px; }
+/* —— 区块标题（SectionTitle）—— */
+.sec-title { display:flex; align-items:baseline; gap:8px; margin:var(--sec-gap) 0 10px; }
+.sec-title .t { font-size:calc(15px * var(--k)); font-weight:700; letter-spacing:.2px; }
+.sec-title .c { font-size:calc(12px * var(--k)); color:var(--text-3); }
+.sec-title .more { margin-left:auto; font-size:calc(12px * var(--k)); color:var(--d-ai); font-weight:600; }
+/* —— 卡片 —— */
+.card { background:var(--surface); border:1px solid var(--outline-soft); border-radius:var(--r-card);
+  padding:var(--s6); }
+.card-hero { border-radius:var(--r-hero); padding:18px; }
+.card-sel { border:1.5px solid var(--d-ai-base); background:var(--tint); }
+.stack > * + * { margin-top:var(--inner-gap); }
+/* —— 按钮 —— */
+.btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  border-radius:var(--r-btn); font-weight:700; letter-spacing:.2px; border:1px solid transparent; }
+.btn-primary { min-height:54px; font-size:calc(16px * var(--k)); background:var(--d-ai-base); color:var(--on-brand); }
+.btn-secondary { min-height:48px; font-size:calc(15px * var(--k)); background:var(--surface);
+  color:var(--text-1); border-color:var(--outline); }
+.btn-ghost { min-height:48px; font-size:calc(14px * var(--k)); background:transparent; color:var(--d-ai); font-weight:600; }
+.btn-pill { width:auto; min-height:40px; padding:0 16px; border-radius:var(--r-pill);
+  font-size:calc(13px * var(--k)); background:var(--tint); color:var(--on-mint); font-weight:600; border:1px solid var(--outline); }
+/* —— 入口行（EntryRow）—— */
+.entry { display:flex; align-items:center; gap:12px; min-height:56px; padding:8px 0; }
+.entry + .entry { border-top:1px solid var(--outline-soft); }
+.ic { width:40px; height:40px; flex:0 0 auto; border-radius:var(--r-icon); display:grid; place-items:center; color:#fff; }
+.ic svg { width:22px; height:22px; }
+.ic-tint { color:var(--d); background:color-mix(in srgb,var(--d) 16%,var(--surface)); }
+.ic-tint svg { stroke:currentColor; }
+.entry .en { font-size:calc(15px * var(--k)); font-weight:600; line-height:1.3; }
+.entry .ed { font-size:calc(12px * var(--k)); color:var(--text-2); line-height:1.4; margin-top:1px; }
+.entry .chev { margin-left:auto; color:var(--text-3); flex:0 0 auto; }
+.entry .val { margin-left:auto; font-size:calc(13px * var(--k)); color:var(--text-2); }
+.entry .tail { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.pill-status { font-size:calc(11px * var(--k)); padding:3px 9px; border-radius:var(--r-pill);
+  background:var(--tint); color:var(--on-mint); font-weight:600; white-space:nowrap; }
+.pill-muted { background:var(--outline-soft); color:var(--text-2); }
+/* —— 分段控件 —— */
+.segment { display:flex; gap:3px; padding:3px; background:var(--outline-soft); border-radius:var(--r-btn); }
+.segment span { flex:1; text-align:center; padding:9px 0; font-size:calc(13px * var(--k));
+  border-radius:11px; color:var(--text-2); }
+.segment .on { background:var(--surface); color:var(--text-1); font-weight:600;
+  box-shadow:0 1px 3px rgba(6,40,28,.12); }
+/* —— 进度 —— */
+.prog { height:6px; border-radius:var(--r-pill); background:var(--outline-soft); overflow:hidden; }
+.prog i { display:block; height:100%; border-radius:var(--r-pill); background:var(--d-ai-base); }
+.ring { width:104px; height:104px; border-radius:50%; display:grid; place-items:center;
+  background:conic-gradient(var(--d-review) 0 62%, var(--outline-soft) 62% 100%); }
+.ring .hole { width:80px; height:80px; border-radius:50%; background:var(--surface);
+  display:grid; place-items:center; text-align:center; }
+/* —— Banner —— */
+.banner { display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:var(--r-card);
+  background:var(--tint); border:1px solid var(--outline); font-size:calc(13px * var(--k)); color:var(--on-mint); }
+.banner.warn { background:color-mix(in srgb,var(--d-review) 12%,var(--surface));
+  border-color:color-mix(in srgb,var(--d-review) 34%,transparent); color:var(--d-review); }
+.banner.err { background:color-mix(in srgb,var(--error-fill) 12%,var(--surface));
+  border-color:color-mix(in srgb,var(--error-fill) 36%,transparent); color:var(--error); }
+.banner svg { flex:0 0 auto; margin-top:1px; }
+.banner .txt { min-width:0; }
+.banner .act { margin-left:auto; flex:0 0 auto; align-self:center; font-weight:700; color:var(--d-ai); }
+/* —— 骨架 / 空态 —— */
+.skel { display:flex; gap:12px; align-items:center; min-height:72px; padding:var(--s6);
+  background:var(--surface); border:1px solid var(--outline-soft); border-radius:var(--r-card); }
+.skel i { display:block; border-radius:var(--r-pill);
+  background:linear-gradient(90deg,var(--tint-2),var(--tint-3),var(--tint-2));
+  background-size:220% 100%; animation:sh 1.4s ease-in-out infinite; }
+.skel .a { width:44%; height:15px; } .skel .b { width:66%; height:11px; margin-top:9px; }
+.skel .c { width:38px; height:38px; border-radius:var(--r-icon); flex:0 0 auto; }
+@keyframes sh { from{background-position:0 0} to{background-position:-120% 0} }
+.empty { text-align:center; padding:30px 18px 26px; }
+.empty .t { font-size:calc(15px * var(--k)); font-weight:700; margin-top:12px; }
+.empty .d { font-size:calc(13px * var(--k)); color:var(--text-2); margin-top:4px; }
+/* —— 词卡特有 —— */
+.word { font-size:calc(34px * var(--k)); font-weight:700; letter-spacing:.3px; line-height:1.15; }
+.ipa { font-size:calc(14px * var(--k)); color:var(--text-2); margin-top:4px; }
+.spk { display:flex; align-items:center; gap:6px; min-height:48px; padding:0 14px; border-radius:var(--r-pill);
+  background:var(--tint); border:1px solid var(--outline); color:var(--on-mint); font-size:calc(13px * var(--k)); font-weight:600; }
+.spk svg { width:20px; height:20px; }
+.fb { display:flex; gap:10px; }
+.fb > div { flex:1; min-height:52px; border-radius:var(--r-btn); display:grid; place-items:center;
+  font-size:calc(14px * var(--k)); font-weight:700; border:1px solid transparent; }
+.fb .f1 { background:var(--surface); border-color:var(--outline); color:var(--text-1); }
+.fb .f2 { background:color-mix(in srgb,var(--d-review) 14%,var(--surface)); border-color:color-mix(in srgb,var(--d-review) 40%,transparent); color:var(--d-review); }
+.fb .f3 { background:var(--tint); border-color:var(--d-ai-base); color:var(--on-mint); }
+.illus { display:block; margin:0 auto; }
+/* —— 图标清单 —— */
+.icon-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:14px; }
+.icon-cell { text-align:center; font-size:11px; color:var(--doc-muted); }
+.icon-cell .ic { width:44px; height:44px; margin:0 auto 6px; }
+svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+/* —— 渐变与层级演示 —— */
+.grad-hero { border-radius:var(--r-hero); padding:18px; color:var(--on-brand);
+  background:linear-gradient(120deg,var(--mint-start),var(--mint-mid) 52%,var(--mint-end)); }
+.grad-hero .t { font-size:calc(20px * var(--k)); font-weight:700; }
+.grad-hero .d { font-size:calc(13px * var(--k)); opacity:.86; }
+.glass { position:relative; border-radius:var(--r-hero); padding:16px; color:var(--on-mint);
+  background:var(--surface-glass); border:1px solid var(--surface-glass);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+.foot { margin-top:56px; padding-top:18px; border-top:1px solid var(--doc-line);
+  font-size:12px; color:var(--doc-muted); }
+.legend { display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--doc-muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <h1>薄荷玻璃 · 设计系统重设计稿</h1>
+    <p>这是 UI 重设计轮批 1 的视觉基线，不是生产代码。所有取值都是本仓库当场算过的：色值来自
+      <span class="mono">ui/theme/AppPalette.kt</span>、<span class="mono">MintPalette.kt</span> 与
+      <span class="mono">docs/design/visual-style-guide.md</span>；对比度按 WCAG 2.x 相对亮度公式现算。
+      设备框按 360dp 真比例绘制（1px = 1dp），字号与间距用同一套变量，缩放控件会同时作用于四屏。</p>
+    <div class="banner-note">
+      <b>一句话结论：</b>问题的根源不是薄荷玻璃不好看，而是<b>没有装配点</b>——全仓没有一处
+      <span class="mono">MaterialTheme(...)</span>，206 处 <span class="mono">MaterialTheme.typography</span> 吃的是 Material 3
+      默认字号，与已定义的薄荷六阶无关；深色模式也因此没有落点（<span class="mono">DarkColorScheme</span>、
+      <span class="mono">isInDarkTheme</span> 全仓 0 命中）。本稿先定 token 与组件，再让 33 屏逐个接上。
+    </div>
+  </div>
+
+  <div class="controls">
+    <span class="ctrl-label">主题</span>
+    <div class="seg" role="group" aria-label="主题">
+      <button id="t-light" aria-pressed="true" onclick="setTheme('light')">浅色</button>
+      <button id="t-dark" aria-pressed="false" onclick="setTheme('dark')">深色</button>
+    </div>
+    <span class="ctrl-label">字号（系统字体缩放）</span>
+    <div class="seg" role="group" aria-label="字号">
+      <button id="k-1" aria-pressed="true" onclick="setScale(1,'1.0× 标准')">1.0×</button>
+      <button id="k-13" aria-pressed="false" onclick="setScale(1.18,'1.3× 大字号')">1.3×</button>
+      <button id="k-2" aria-pressed="false" onclick="setScale(1.42,'2.0× 特大')">2.0×</button>
+    </div>
+    <span class="ctrl-label">当前：<b id="scale-name">1.0× 标准</b> · 大字号下卡片靠 min-height 与换行撑开，不裁字</span>
+  </div>
+
+  <section id="drift">
+    <h2><span class="no">0</span>　先记账：代码与规范现在互相矛盾的地方</h2>
+    <p class="lead">这几条不是新决定，是把已经漂移的既有事实钉回去。<b>规范文档 §11 明确写着「任何新增颜色、字体、材质、全局间距必须先在文档定义，再进入代码」</b>，所以下面每一行的「定稿」都要同步回
+      <span class="mono">docs/design/visual-style-guide.md</span> 才能开工。</p>
+    <div class="panel">
+      <table>
+        <thead><tr><th style="width:130px">项目</th><th>规范文档说的</th><th>代码里实际的</th><th>本批定稿</th></tr></thead>
+        <tbody>
+          <tr><td>页面背景</td><td class="mono">MintBackground #F1FBF5</td><td class="mono">AppPalette.Background #F5F5F7</td><td class="mono">#F1FBF5 <span class="warn">（代码漂成了 iOS 中性灰，薄荷底色丢了）</span></td></tr>
+          <tr><td>卡片表面</td><td class="mono">MintSurface #EFFFFFFF（半透明，仅轻微透出背景）</td><td class="mono">AppPalette.Surface #FFFFFF（实心）</td><td class="mono">实心 #FFFFFF 作卡片；#EFFFFFFF 只给浮层/弹层</td></tr>
+          <tr><td>柔和边框</td><td class="mono">MintOutline #ADE7D2</td><td class="mono">AppPalette.Separator #E5E5EA</td><td class="mono">#ADE7D2 作选中/强调边；新增 #E4EFE9 作默认弱边</td></tr>
+          <tr><td>辅助文字</td><td class="mono">MintTextMuted #4E756A</td><td class="mono">AppPalette.TextSecondary #6E6E73</td><td class="mono">#4E756A（白底 5.15:1；关键差别在薄荷底：<b>#6E6E73 在 #DDF7E8 上 4.48，差 0.02 不达 4.5</b>）</td></tr>
+          <tr><td>卡片圆角</td><td>主卡片 24 / 交互卡片 18</td><td class="mono">AppShape.Card 20（仅 5 处引用），实写 18 共 86 处</td><td>两档制：<span class="mono">--r-hero 24</span> / <span class="mono">--r-card 18</span>；<span class="mono">AppShape.Card</span> 改 18，新增 <span class="mono">AppShape.Hero</span> 24</td></tr>
+          <tr><td>主按钮高度</td><td>54dp</td><td class="mono">PillButton 下限 48dp；散写按钮 20 处 54dp</td><td>主 54 / 次 48 两档，写进共享组件，散写全部换掉</td></tr>
+          <tr><td>字号体系</td><td>§3.1「优先使用 Material 3 typography」并列了六个语义层级</td><td class="mono">AppType 六阶（34/24/17/15/13/12）无人引用；206 处拿 M3 默认（headlineSmall 24 / bodyMedium 14 …）</td><td>装 <span class="mono">MaterialTheme</span>，把 M3 十三个角色钉到薄荷六阶（下表 §2）</td></tr>
+          <tr><td>图标</td><td>未定义（§9 只禁止「自行引入未定义体系」）</td><td class="mono">Icons. 0 处；7 个 AI 功能用中文字当图标；设置页 10 个 Unicode badge 里 3 个同为 ⭕</td><td>新增 <span class="mono">AppIcons</span> 字形库 + 域色容器（§5、§6）</td></tr>
+          <tr><td>渐变上的文字</td><td>「文字必须保证足够对比度」</td><td class="mono">OnMintPrimary #174C44，交接时说 ≈4.6:1</td><td>实测渐变末端只有 <b>4.07:1</b>（见 §3）：新增 <span class="mono">#04241C</span> 作饱和青绿/渐变专用墨色</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tokens">
+    <h2><span class="no">1</span>　色彩 token（浅 / 深两套）</h2>
+    <p class="lead">深色模式按规范 §2.3 执行：品牌渐变三段<b>一个字节都不改</b>，只换背景、表面、边框与文字；不做「浅色反相」。
+      域色在深色下提亮一档并改为「亮底 + 深墨字形」，保证图形对比 ≥3:1。</p>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>中性 · 浅色</h4>
+        <div class="sw"><i class="chip" style="background:#F1FBF5"></i><div><div class="name">Background</div><div class="meta mono">#F1FBF5 · 页面底</div></div></div>
+        <div class="sw"><i class="chip" style="background:#FFFFFF"></i><div><div class="name">Surface</div><div class="meta mono">#FFFFFF · 卡片/浮层底</div></div></div>
+        <div class="sw"><i class="chip" style="background:#EFFFFFFF;border-color:#ADE7D2"></i><div><div class="name">SurfaceGlass</div><div class="meta mono">#EFFFFFFF + blur · 仅弹层/顶底浮层</div></div></div>
+        <div class="sw"><i class="chip" style="background:#DDF7E8"></i><div><div class="name">Tint</div><div class="meta mono">#DDF7E8 · 选中/提示底</div></div></div>
+        <div class="sw"><i class="chip" style="background:#ADE7D2"></i><div><div class="name">Outline</div><div class="meta mono">#ADE7D2 · 选中边 · 弱边 #E4EFE9</div></div></div>
+        <div class="sw"><i class="chip" style="background:#1C1C1E"></i><div><div class="name">TextPrimary</div><div class="meta mono">#1C1C1E · 正文（16.09:1 on bg）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#4E756A"></i><div><div class="name">TextMuted</div><div class="meta mono">#4E756A · 辅助（白底 5.15:1）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#174C44"></i><div><div class="name">OnMint</div><div class="meta mono">#174C44 · 浅薄荷底上的文字（Tint 8.61:1）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#04241C"></i><div><div class="name">OnBrand</div><div class="meta mono">#04241C · 饱和青绿/渐变专用墨色（渐变末端 6.87:1）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#B30000"></i><div><div class="name">Error / Success</div><div class="meta mono">#B30000 7.20:1 · #1B5E20 7.87:1 · 填充 #FF3B30</div></div></div>
+      </div>
+      <div class="panel">
+        <h4>中性 · 深色</h4>
+        <div class="sw"><i class="chip" style="background:#0E1512"></i><div><div class="name">Background</div><div class="meta mono">#0E1512 · 页面底（带薄荷偏移，不用纯黑）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#17201C"></i><div><div class="name">Surface</div><div class="meta mono">#17201C · 卡片 · 一级浮层 #1E2A25</div></div></div>
+        <div class="sw"><i class="chip" style="background:#E617201C"></i><div><div class="name">SurfaceGlass</div><div class="meta mono">#E617201C + blur · 仅弹层</div></div></div>
+        <div class="sw"><i class="chip" style="background:#1C2C26"></i><div><div class="name">Tint</div><div class="meta mono">#1C2C26 · 选中/提示底</div></div></div>
+        <div class="sw"><i class="chip" style="background:#2E4238"></i><div><div class="name">Outline</div><div class="meta mono">#2E4238 · 选中边 · 弱边 #233029</div></div></div>
+        <div class="sw"><i class="chip" style="background:#E9F2EC"></i><div><div class="name">TextPrimary</div><div class="meta mono">#E9F2EC · 正文（on Surface 14.59:1）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#9FB3AA"></i><div><div class="name">TextMuted</div><div class="meta mono">#9FB3AA · 辅助（on Surface 7.54:1）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#DFF6EC"></i><div><div class="name">OnMint</div><div class="meta mono">#DFF6EC · 深色下浅底反转为深底浅字</div></div></div>
+        <div class="sw"><i class="chip" style="background:#04241C"></i><div><div class="name">OnBrand</div><div class="meta mono">#04241C · 青绿主按钮上仍用深墨（7.81:1）</div></div></div>
+        <div class="sw"><i class="chip" style="background:#FF8177"></i><div><div class="name">Error / Success</div><div class="meta mono">#FF8177 · #6BD98A · 危险填充 #FF6B61</div></div></div>
+      </div>
+    </div>
+
+    <h3>品牌渐变（§2.1，两套主题共用，不得改值）</h3>
+    <div class="panel">
+      <div style="display:flex;gap:0;border-radius:var(--r-card);overflow:hidden;height:76px">
+        <div style="flex:1;background:#A8F3C8"></div>
+        <div style="flex:1;background:#5DDFB4"></div>
+        <div style="flex:1;background:#35B9B5"></div>
+      </div>
+      <div class="legend" style="margin-top:10px">
+        <span class="mono">AppleMintStart #A8F3C8</span>
+        <span class="mono">AppleMintMiddle #5DDFB4</span>
+        <span class="mono">AppleMintEnd #35B9B5</span>
+        <span class="mono">AppleMintLight #D9FFF0（高光/装饰）</span>
+      </div>
+      <p style="font-size:13px;color:var(--doc-muted);margin:12px 0 0">渐变上的文字一律用
+        <span class="mono">#04241C</span>；<span class="mono">#174C44</span> 只允许出现在 <span class="mono">#DDF7E8</span>
+        这类浅薄荷底上。理由见 §3 的实测表。</p>
+    </div>
+
+    <h3>功能域强调色（新增定义；只用于图标容器、小徽标、进度与图表，禁止用作页面背景或正文大标题）</h3>
+    <div class="panel">
+      <table>
+        <thead><tr><th>域</th><th>浅色 deep（填充/文字）</th><th>浅色 base（图形强调）</th><th>深色档</th><th>用在哪些屏</th></tr></thead>
+        <tbody>
+          <tr><td><b>品牌 / AI 语音</b></td><td><span class="mono">#188F76</span></td><td><span class="mono">#2EC99C</span></td><td><span class="mono">#35E0AC</span></td><td>今日计划、词卡、发音、AI 主页</td></tr>
+          <tr><td><b>学习</b></td><td><span class="mono">#075EB4</span></td><td><span class="mono">#0A84FF</span></td><td><span class="mono">#5AC0FF</span></td><td>词书选取、每日目标、默写纸</td></tr>
+          <tr><td><b>复习</b></td><td><span class="mono">#AB5700</span></td><td><span class="mono">#FF9F0A</span></td><td><span class="mono">#FFB340</span></td><td>打卡页、错词、模糊档反馈</td></tr>
+          <tr><td><b>词库</b></td><td><span class="mono">#8E34B8</span></td><td><span class="mono">#BF5AF2</span></td><td><span class="mono">#DA8CFF</span></td><td>查词、生词本、词书单词列表</td></tr>
+          <tr><td><b>阅读</b></td><td><span class="mono">#C81E46</span></td><td><span class="mono">#FF375F</span></td><td><span class="mono">#FF7A93</span></td><td>每日文章、AI 语境短文</td></tr>
+          <tr><td><b>危险</b></td><td><span class="mono">#B30000</span></td><td><span class="mono">#FF3B30</span></td><td><span class="mono">#FF6B61</span></td><td>删除词书、清空数据、恢复覆盖</td></tr>
+          <tr><td><b>设置 / 中性</b></td><td><span class="mono">#48484A</span></td><td><span class="mono">#8E8E93</span></td><td><span class="mono">#B0B0B5</span></td><td>备份、许可、关于、系统类入口</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px;color:var(--doc-muted);margin:12px 0 0">这七档其实已经在代码里（<span class="mono">AppPalette.kt</span> 的 <span class="mono">DomainColors</span>），
+        只是从没写进规范，等于 §9 禁止的「未定义颜色体系」。本批把定义补进 §2.4，并明确它与「不得恢复紫色旧主题」不冲突：
+        紫色只作为 <b>词库域的小面积容器色</b>出现，绝不做页面底、标题色或渐变成分。</p>
+    </div>
+  </section>
+
+  <section id="type">
+    <h2><span class="no">2</span>　排版：六阶语义尺度 + M3 角色钉值</h2>
+    <p class="lead">批 1 装好 <span class="mono">EnglishLearningTheme</span> 之后，那 206 处 <span class="mono">MaterialTheme.typography.*</span> 会一次性改吃下表的字号——
+      这是收益最大、影响面也最大的一改，所以映射表必须先定死再动代码，并按 §10 逐屏真机核对。
+      推荐新代码只写语义名（<span class="mono">AppType.Title</span> 等），把 M3 角色名留给旧调用点自然淘汰。</p>
+    <div class="panel">
+      <div class="type-row"><span style="font-size:34px;font-weight:700">abandon</span><span class="spec">Display 34sp · Bold · ls 0.4 · ← <span class="mono">displaySmall</span> 36→34</span></div>
+      <div class="type-row"><span style="font-size:24px;font-weight:700">今日计划</span><span class="spec">Headline 24sp · Bold · ← <span class="mono">headlineSmall</span> 24（同值，白赚）</span></div>
+      <div class="type-row"><span style="font-size:17px;font-weight:600">词书与每日目标</span><span class="spec">Title 17sp · SemiBold · ← <span class="mono">titleMedium</span> 16→17</span></div>
+      <div class="type-row"><span style="font-size:15px">卡片里的正文与列表主文案，最长可读行 42–60 字。</span><span class="spec">Body 15sp · Regular · ← <span class="mono">bodyMedium</span> 14→15</span></div>
+      <div class="type-row"><span style="font-size:13px;color:#4E756A">辅助说明、等级、来源与补充信息</span><span class="spec">Footnote 13sp · ← <span class="mono">bodySmall</span> 12→13</span></div>
+      <div class="type-row"><span style="font-size:12px;font-weight:500;letter-spacing:.3px;color:#4E756A">状态标签 / 已选 / 后续版本</span><span class="spec">Label 12sp · Medium · ls 0.3 · ← <span class="mono">labelMedium</span> 12（同值）</span></div>
+      <p style="font-size:13px;color:var(--doc-muted);margin:14px 0 0">未映射的 M3 角色（<span class="mono">displayLarge/displayMedium/headlineMedium/…/labelSmall</span>）
+        统一钉到相邻语义档，批 1 用契约测试把 13 个角色钉死在六阶之内，防止有人偷偷写 <span class="mono">fontSize = 22.sp</span> 这种「第 7 阶」——
+        现状实测 <span class="mono">22.sp</span> 用了 7 次，是个并不在阶梯里的事实标准。</p>
+    </div>
+  </section>
+
+  <section id="contrast">
+    <h2><span class="no">3</span>　对比度实测（当场算，不是估的）</h2>
+    <p class="lead">按 WCAG 相对亮度公式对最终 token 现算。文字要求 4.5:1（大号文字与图形 3:1）。这一节会直接变成契约测试的断言表。</p>
+    <div class="panel">
+      <table>
+        <thead><tr><th>组合</th><th>比值</th><th>要求</th><th>结论</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">#174C44 on #DDF7E8（选中卡文字）</td><td class="mono">8.61</td><td>4.5</td><td class="pass">通过</td></tr>
+          <tr><td class="mono">#174C44 on #A8F3C8（渐变起点）</td><td class="mono">7.58</td><td>4.5</td><td class="pass">通过</td></tr>
+          <tr><td class="mono">#174C44 on #5DDFB4（渐变中段）</td><td class="mono">5.89</td><td>4.5</td><td class="pass">通过</td></tr>
+          <tr><td class="mono"><b>#174C44 on #35B9B5（渐变末端）</b></td><td class="mono">4.07</td><td>4.5</td><td class="fail">不达标 → 渐变一律改 <span class="mono">#04241C</span></td></tr>
+          <tr><td class="mono">#04241C on #35B9B5 / #5DDFB4 / #2EC99C</td><td class="mono">6.87 / 9.95 / 7.81</td><td>4.5</td><td class="pass">通过（含深色模式主按钮）</td></tr>
+          <tr><td class="mono">#1C1C1E on #F1FBF5（正文 on 页面底）</td><td class="mono">16.09</td><td>4.5</td><td class="pass">通过</td></tr>
+          <tr><td class="mono">#4E756A on #FFFFFF / #F1FBF5 / #DDF7E8</td><td class="mono">5.15 / 4.87 / 4.55</td><td>4.5</td><td class="pass">通过（现值 #6E6E73 在 Tint 上 4.48，差 0.02 不达标，一并换掉）</td></tr>
+          <tr><td class="mono">#188F76 on #FFFFFF / #F1FBF5</td><td class="mono">4.02 / 3.80</td><td>4.5</td><td class="warn">仅限 ≥20sp 粗体 / 图形 / 边框；正文级小字禁止用</td></tr>
+          <tr><td class="mono">#B30000 / #1B5E20 on #FFFFFF</td><td class="mono">7.20 / 7.87</td><td>4.5</td><td class="pass">通过</td></tr>
+          <tr><td>白字形 on 七个域 deep 填充（图标为非文字，要求 3:1）</td><td class="mono">4.02–9.12</td><td>3.0</td><td class="pass">通过，最低是品牌档 4.02</td></tr>
+          <tr><td class="mono">#188F76 on #E2F7F1（tint14 弱容器，品牌域）</td><td class="mono">3.60</td><td>3.0</td><td class="warn">只可用于图形，不可放文字</td></tr>
+          <tr><td>域 deep on 其余六档 tint14</td><td class="mono">4.64–7.94</td><td>3.0</td><td class="pass">通过</td></tr>
+          <tr><td class="mono">#E9F2EC on #17201C / #0E1512（深色正文）</td><td class="mono">14.59 / 16.20</td><td>4.5</td><td class="pass">通过</td></tr>
+          <tr><td class="mono">#9FB3AA on #17201C（深色辅助）</td><td class="mono">7.54</td><td>4.5</td><td class="pass">通过</td></tr>
+          <tr><td class="mono">#06231A on 七档深色亮面容器</td><td class="mono">5.96–9.82</td><td>3.0</td><td class="pass">通过</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="space">
+    <h2><span class="no">4</span>　间距 / 圆角 / 尺寸栅格</h2>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>间距栅格（4 的倍数为主，14 与 18 是规范既有例外）</h4>
+        <table>
+          <thead><tr><th>token</th><th>值</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">space.1 / 2</td><td>4 / 8</td><td>行内元素间隔</td></tr>
+            <tr><td class="mono">space.3</td><td>12</td><td>图标与文字、标题与副标题</td></tr>
+            <tr><td class="mono">space.4</td><td>14</td><td>区块内卡片间距（规范既有值，保留）</td></tr>
+            <tr><td class="mono">space.5 / 6</td><td>16 / 18</td><td>卡片内边距 18 · 入口行左右 16</td></tr>
+            <tr><td class="mono">space.7</td><td>20</td><td>页面水平边距</td></tr>
+            <tr><td class="mono">space.8</td><td>24</td><td>页面垂直内边距 · 分组之间</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:13px;color:var(--doc-muted);margin:12px 0 0">现状是「幽灵间距」：
+          <span class="mono">spacedBy</span> 加在没有内容的分支上，视觉上留白但语义无物。批 1 的写法是
+          <b>内容驱动</b>——先决定该组有几张卡，再谈间距；骨架屏必须与真卡同高（下面 §6 第 3 行）。</p>
+      </div>
+      <div class="panel">
+        <h4>圆角与尺寸</h4>
+        <table>
+          <thead><tr><th>token</th><th>值</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">Shape.Hero</td><td>24</td><td>页面首卡/主视觉卡（新增）</td></tr>
+            <tr><td class="mono">Shape.Card</td><td>18</td><td>交互卡、列表卡（现值 20 → 18）</td></tr>
+            <tr><td class="mono">Shape.Button</td><td>14</td><td>主/次按钮、入口图标容器 12</td></tr>
+            <tr><td class="mono">Shape.Pill</td><td>50%</td><td>短标签、状态徽章、喇叭药片</td></tr>
+            <tr><td class="mono">Shape.Dialog</td><td>24</td><td>弹层（保留）</td></tr>
+            <tr><td class="mono">Size.ButtonPrimary</td><td>min 54dp</td><td>主操作</td></tr>
+            <tr><td class="mono">Size.ButtonSecondary / Touch</td><td>min 48dp</td><td>次操作 · 一切可点（F5-03 底线）</td></tr>
+            <tr><td class="mono">Size.IconContainer</td><td>40dp（内 22dp 字形）</td><td>入口行、卡片头部（现状 32 → 40）</td></tr>
+            <tr><td class="mono">Size.WordBookCard</td><td>min 72dp</td><td>词书卡（保留，骨架同高）</td></tr>
+            <tr><td class="mono">Size.NavBar</td><td>min 64dp</td><td>底导内容区（大字号可长高）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="components">
+    <h2><span class="no">5</span>　共享组件：每个「实测有 N 种写法」的控件收成一个</h2>
+    <p class="lead">下面每个样张都标了它替掉的现状写法数量。批 1 交付的是这些 composposable（含语义标签与 48dp 底线），
+      批 2/3 把它们铺到 33 屏。所有样张跟随顶部的主题与字号控件实时变化。</p>
+
+    <div class="grid g2">
+      <div class="panel">
+        <h4>AppHeader · 替掉实测 8 种返回写法</h4>
+        <div style="background:var(--bg);border-radius:var(--r-card);padding:14px 16px">
+          <div class="appheader">
+            <span class="back"><svg class="g" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>
+            <span class="ht">词书与每日目标<span class="hs">选一本在学的词书，明天起按新目标排计划</span></span>
+          </div>
+          <div class="appheader" style="margin-top:14px">
+            <span class="back"><svg class="g" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>
+            <span class="ht">发音设置</span>
+            <span class="tr"><span class="btn-pill">恢复默认</span></span>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--doc-muted);margin:10px 0 0">
+          现状是 <span class="mono">‹</span>、<span class="mono">←</span>、<span class="mono">← 返回</span>、
+          <span class="mono">← 返回上一层</span>、<span class="mono">← 返回设置</span> 五种文字加三种按钮写法（含 <span class="mono">fontSize = 22.sp</span> 字面量）。
+          定稿：40dp 容器 + 22dp 字形，<b>触控区仍 ≥48dp</b>（外扩 padding），标题走 Title 17，副标题只有二级页可给一行。</p>
+      </div>
+
+      <div class="panel">
+        <h4>AppCard · 三个家族收成一套</h4>
+        <div style="background:var(--bg);border-radius:var(--r-card);padding:14px 16px" class="stack">
+          <div class="card card-hero">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+              <div style="min-width:0">
+                <div style="font-size:calc(15px * var(--k));font-weight:700">CET-4 核心词</div>
+                <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:2px">共 4634 词 · 已学 128 词</div>
+              </div>
+              <span class="pill-status" style="margin-left:auto">在学</span>
+            </div>
+            <div class="prog" style="margin-top:12px"><i style="width:22%"></i></div>
+          </div>
+          <div class="card card-sel">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg></span>
+              <div><div style="font-size:calc(15px * var(--k));font-weight:700">选中态：边 + 底 + 控件 + 文字四重表达</div>
+                <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:2px">规范 §5.1「不得只靠颜色」</div></div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--doc-muted);margin:10px 0 0">现状 <span class="mono">Card</span> 66 处 /
+          <span class="mono">Surface</span> 6 处 / <span class="mono">Box+background</span> 69 处，圆角去重后 12 个形态。
+          定稿两档：Hero 24（每页最多一张）、Card 18，1dp 弱边 <span class="mono">#E4EFE9</span>，选中态边框换成品牌色。</p>
+      </div>
+
+      <div class="panel">
+        <h4>按钮 · 实测 6 种实现 → 主 / 次 / 文字 / 标签四档</h4>
+        <div style="background:var(--bg);border-radius:var(--r-card);padding:14px 16px" class="stack">
+          <div class="btn btn-primary">保存并开始学习</div>
+          <div class="btn btn-secondary">稍后再说</div>
+          <div class="btn btn-ghost">查看已缓存的 12 篇</div>
+          <div style="display:flex;gap:10px"><span class="btn-pill">全部词书</span><span class="btn-pill" style="background:var(--surface)">已导入 2 本</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--doc-muted);margin:10px 0 0">主按钮青绿填充配 <span class="mono">#04241C</span> 墨色（7.81:1），
+          白字一律禁止压青绿；文案按规范 §3.2 用动词（「保存并开始学习」而非「确定」）。
+          现状 <span class="mono">PillButton</span> 自身下限 48dp 与文档 54dp 打架，本批把两档写死。</p>
+      </div>
+
+      <div class="panel">
+        <h4>EntryRow · 彩色图标入口（你要的「设置里那种有颜色的图标」）</h4>
+        <div style="background:var(--surface);border-radius:var(--r-card);padding:4px 16px">
+          <div class="entry"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg></span>
+            <div><div class="en">词书与每日目标</div><div class="ed">CET-4 核心词 · 每天 10 新词</div></div><span class="chev">›</span></div>
+          <div class="entry"><span class="ic" style="background:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9z"/></svg></span>
+            <div><div class="en">AI 服务与密钥</div><div class="ed">未配置 · 域名与 Key 只存本机</div></div><span class="chev">›</span></div>
+          <div class="entry"><span class="ic ic-tint" style="--d:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>
+            <div><div class="en">查词与生词本</div><div class="ed">弱档：浅底 + 深字形，用于次要列表</div></div><span class="val">1,208 词</span><span class="chev">›</span></div>
+          <div class="entry"><span class="ic" style="background:var(--d-danger)"><svg class="g" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12"/></svg></span>
+            <div><div class="en" style="color:var(--error)">删除全部学习数据</div><div class="ed">不可撤销 · 建议先导出留档</div></div><span class="chev">›</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--doc-muted);margin:10px 0 0">容器 40dp / 字形 22dp，填充取该域
+          <b>deep 档</b>（白字形 4.02–9.12:1，全部 ≥3:1 图形底线）；弱化档「浅底 16% + deep 字形」只用于次要行，
+          品牌域弱档实测 3.60:1，故禁止在弱档里放文字。替代现状：设置页 10 个 Unicode badge（其中 3 个同为
+          <span class="mono">⭕</span>）、AI 页 7 个中文字当图标、2 处入口行连 badge 都没有。</p>
+      </div>
+
+      <div class="panel">
+        <h4>Banner · 现状 4 份逐字重复的「AI 未配置」提示收成 1 个组件</h4>
+        <div style="background:var(--bg);border-radius:var(--r-card);padding:14px 16px" class="stack">
+          <div class="banner"><svg class="g" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+            <div class="txt">AI 服务还没配置，生图与翻译暂不可用。Key 只保存在本机加密区。</div><span class="act">去配置</span></div>
+          <div class="banner warn"><svg class="g" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none"><path d="M12 4l8 14H4z"/><path d="M12 9v4M12 15.5v.5"/></svg>
+            <div class="txt">今天的计划已在 01:01 生成，乱序从明天的计划开始生效。今天可切词书立刻体验。</div></div>
+          <div class="banner err"><svg class="g" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+            <div class="txt">备份包校验失败，正式数据未做任何改动。</div><span class="act">重试</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--doc-muted);margin:10px 0 0">规范 §6 要求状态必须「不只靠颜色」，所以每条都带图标 + 文字 +
+          可选动作。现状里 <span class="mono">ImageStudioScreen</span> 等 4 屏把三行中文提示逐字抄了 4 遍且只给文字不给按钮。</p>
+      </div>
+
+      <div class="panel">
+        <h4>加载 / 空态 / 骨架 · 现在 13 屏无 loading、11 屏无空态</h4>
+        <div style="background:var(--bg);border-radius:var(--r-card);padding:14px 16px" class="stack">
+          <div class="skel"><i class="c"></i><div style="flex:1"><i class="a"></i><i class="b"></i></div></div>
+          <div class="skel"><i class="c"></i><div style="flex:1"><i class="a" style="width:52%"></i><i class="b" style="width:72%"></i></div></div>
+          <div class="card empty">
+            <svg class="illus" width="112" height="88" viewBox="0 0 112 88">
+              <path d="M18 66h76a6 6 0 006-6V24a6 6 0 00-6-6H56l-6 8H18a6 6 0 00-6 6v28a6 6 0 006 6z" fill="none" stroke="var(--d-ai)" stroke-width="3"/>
+              <path d="M34 40h30" stroke="var(--d-ai-base)" stroke-width="3" stroke-linecap="round"/>
+              <circle cx="74" cy="52" r="5" fill="var(--d-review-base)"/>
+            </svg>
+            <div class="t">还没有导入的词书</div>
+            <div class="d">先从内置的 10 本里挑一本，或导入 .wbpack 词书包</div>
+            <div style="margin-top:14px" class="btn btn-secondary">浏览内置词书</div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--doc-muted);margin:10px 0 0">骨架行与真卡<b>同 72dp 最小高、同 18dp 圆角、同底色</b>，
+          替换时版面不跳；刻意只用色块、零文案（上一批就是这么挡住 TalkBack 误读「已学 0 词」的）。
+          空态插画走 Canvas/Vector 自绘：随主题变色、零位图、零许可成本，风格沿用规范 §5.3（扁平、圆角、无洋红/紫）。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="icons">
+    <h2><span class="no">6</span>　图标体系：三套替代品 → 一套字形 + 域色容器</h2>
+    <p class="lead">下面是本稿手绘的等价示意，用于定形状与用法；生产实现按拍板结论改用内嵌 Material Symbols 路径数据（24×24 网格、2px 描边、
+      Apache-2.0，需登记第三方台账并过 <span class="mono">verifyThirdPartyNotices</span>），零新依赖、零锁文件变动。</p>
+    <div class="panel">
+      <div class="icon-grid">
+        <div class="icon-cell"><span class="ic" style="background:var(--text-1)"><svg class="g" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>返回</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>查词</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7L8 10z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11"/></svg></span>发音</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l2.4 5.2L20 10l-4.4 1.6L13 17l-1-5z"/><path d="M6 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg></span>AI 生成</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>词书</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-reading)"><svg class="g" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3-6 3z"/></svg></span>收藏</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="17" cy="17" r="2.5"/></svg></span>设置</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4v9"/><path d="M8 10l4 4 4-4"/><path d="M5 19h14"/></svg></span>导出</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 20V9"/><path d="M8 13l4-4 4 4"/><path d="M5 5h14"/></svg></span>导入</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V7z"/><path d="M9 12l2 2 4-4"/></svg></span>认证备份</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>提醒</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M5 12a7 7 0 0114 0"/><path d="M4 12h2M18 12h2M12 4v2"/><path d="M9 15h6"/></svg></span>语音朗读</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-danger)"><svg class="g" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12"/></svg></span>删除</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 11v6M12 7.5v.5"/></svg></span>关于 / 许可</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M5 19V9l7-4 7 4v10"/><path d="M9 19v-5h6v5"/></svg></span>今日计划</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 6-8"/><path d="M4 6v12h16"/></svg></span>学习记录</div>
+      </div>
+      <p style="font-size:13px;color:var(--doc-muted);margin:14px 0 0">
+        本批要消灭的三类现状：<span class="mono">7 个 AI 功能用单个中文字</span>（文 填 听 讲 析 拍 画，注释自述「避免引图标库」）、
+        <span class="mono">设置页 3 个不同备份入口共用同一个 ⭕</span>、<span class="mono">同一只喇叭被手写两份</span>
+        （<span class="mono">CardDetailScreen.kt:571</span> 24dp 与 <span class="mono">WordCardScreen.kt:428</span> 20dp）。
+        底导 4 个 tab 的 Canvas 自绘是现状里唯一「像图标」的一组，改成同族字形并加选中态短横，其余自绘（环形弧、配对码、吉祥物）保留但统一取色。</p>
+    </div>
+  </section>
+
+  <section id="screens">
+    <h2><span class="no">7</span>　四屏真比例版面（360dp 宽，1px = 1dp）</h2>
+    <p class="lead">顶部「深色」按钮会把下面所有设备框一起切到深色 token，字号按钮切 <span class="mono">--k</span>（模拟系统字体缩放）。
+      这两件事在现状里都是<b>做不到</b>的：没有装配点，深浅与字号只能逐屏硬写。</p>
+
+    <h3>① 词书选取（你抱怨「卡一下才蹦出来」的那屏）</h3>
+    <div class="devices">
+      <div class="device-wrap"><div class="device"><div class="bar"><span>01:01</span><span>词书</span></div>
+        <div class="scr">
+          <div class="appheader"><span class="back"><svg class="g" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>
+            <span class="ht">选一本在学的词书<span class="hs">明天起的计划按新顺序排布</span></span></div>
+          <div class="sec-title"><span class="t">内置与应用内学习分组</span><span class="c">10 本</span></div>
+          <div class="stack">
+            <div class="skel"><i class="c"></i><div style="flex:1"><i class="a"></i><i class="b"></i></div></div>
+            <div class="skel"><i class="c"></i><div style="flex:1"><i class="a" style="width:52%"></i><i class="b" style="width:70%"></i></div></div>
+            <div class="skel"><i class="c"></i><div style="flex:1"><i class="a" style="width:40%"></i><i class="b" style="width:60%"></i></div></div>
+          </div>
+        </div></div>
+        <div class="device-cap">首帧：列表还没读出来时给 3 行骨架，同 72dp / 同圆角 / 同底色，替换时不跳版；零文案，避免 TalkBack 念「已学 0 词」。</div>
+      </div>
+
+      <div class="device-wrap"><div class="device"><div class="bar"><span>01:01</span><span>词书</span></div>
+        <div class="scr">
+          <div class="appheader"><span class="back"><svg class="g" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>
+            <span class="ht">选一本在学的词书<span class="hs">明天起的计划按新顺序排布</span></span></div>
+          <div class="sec-title"><span class="t">内置与应用内学习分组</span><span class="c">10 本</span><span class="more">导入词书包</span></div>
+          <div class="stack">
+            <div class="card card-sel" style="padding:14px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+                <div style="min-width:0;flex:1">
+                  <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:calc(15px * var(--k));font-weight:700">CET-4 核心词</span>
+                    <span class="pill-status">在学</span></div>
+                  <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:3px">共 4634 词 · 已学 128 词 · 待复习 21</div>
+                  <div class="prog" style="margin-top:8px"><i style="width:2.8%"></i></div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="padding:14px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:calc(15px * var(--k));font-weight:700">考研词汇</div>
+                  <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:3px">共 5215 词 · <span style="color:var(--d-review)">正在加载进度…</span></div>
+                  <div class="prog" style="margin-top:8px"><i style="width:0%"></i></div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="padding:14px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><path d="M5 19V9l7-4 7 4v10"/><path d="M9 19v-5h6v5"/></svg></span>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:calc(15px * var(--k));font-weight:700">自编：外贸邮件高频词</div>
+                  <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:3px">共 312 词 · 导入于 10-12 · 左滑可删除</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sec-title"><span class="t">每日目标</span><span class="c">新词 10 · 复习 20</span></div>
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px">
+              <span style="font-size:calc(34px * var(--k));font-weight:700;color:var(--d-ai);min-width:64px">10</span>
+              <div style="flex:1">
+                <div style="font-size:calc(13px * var(--k));color:var(--text-2)">每天新学词数</div>
+                <div style="margin-top:8px;height:6px;border-radius:999px;background:var(--outline-soft);position:relative">
+                  <div style="width:20%;height:100%;border-radius:999px;background:var(--d-ai-base)"></div>
+                  <div style="position:absolute;left:20%;top:-5px;width:16px;height:16px;border-radius:50%;background:var(--surface);border:3px solid var(--d-ai)"></div>
+                </div>
+              </div>
+            </div>
+            <div class="segment" style="margin-top:14px"><span>5</span><span class="on">10</span><span>15</span><span>20</span><span>30</span></div>
+          </div>
+          <div class="banner" style="margin-top:14px"><svg class="g" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+            <div class="txt">新顺序从<b>明天生成的计划</b>开始生效；今天已提交的反馈不会重排。</div></div>
+          <div class="btn btn-primary" style="margin-top:14px">保存并开始学习</div>
+        </div></div>
+        <div class="device-cap">就绪态：册名 + 词量 + 进度三重表达，选中态用「底色 + 品牌边 + 在学标签 + 字重」四重（规范 §5.1）。词量挂在册元数据上，进度未到也照念。</div>
+      </div>
+    </div>
+
+    <h3>② 今日计划（入口分组：把散在 4 屏的查词 / 生词本 / 错词 / 收藏收进一组）</h3>
+    <div class="devices">
+      <div class="device-wrap"><div class="device"><div class="bar"><span>07:40</span><span>今日</span></div>
+        <div class="scr">
+          <div style="padding:8px 0 2px">
+            <div style="font-size:calc(12px * var(--k));letter-spacing:.3px;color:var(--text-2)">10 月 17 日 · 周六</div>
+            <div class="page-title">今日计划</div>
+            <div class="page-sub">CET-4 核心词 · 严格模式：新词与复习都完成才解锁文章</div>
+          </div>
+          <div class="grad-hero">
+            <div style="display:flex;align-items:flex-end;gap:8px">
+              <span style="font-size:calc(34px * var(--k));font-weight:700;line-height:1">4</span>
+              <span style="font-size:calc(13px * var(--k));padding-bottom:7px">/ 10 新词 · 复习 6 / 20</span>
+            </div>
+            <div class="d" style="margin-top:6px">已按乱序排布：形近词彼此间隔 ≥ 48 位</div>
+            <div style="margin-top:14px" class="btn btn-secondary">继续学习（剩 6 新词）</div>
+          </div>
+          <div class="sec-title"><span class="t">学习与复习</span></div>
+          <div class="card" style="padding:6px 16px">
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l2.4 5.2L20 10l-4.4 1.6L13 17l-1-5z"/></svg></span>
+              <div><div class="en">待复习</div><div class="ed">FSRS 排期 · 最近到期 10-18</div></div><span class="val">6</span><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>
+              <div><div class="en">查词与生词本</div><div class="ed">离线词典 · 不联网也能查</div></div><span class="val">1,208</span><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-reading)"><svg class="g" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3-6 3z"/></svg></span>
+              <div><div class="en">收藏 · 错词</div><div class="ed">现状：这两个入口只埋在打卡页的文字链里</div></div><span class="val">34 · 12</span><span class="chev">›</span></div>
+          </div>
+          <div class="sec-title"><span class="t">今日文章</span><span class="c">未解锁</span></div>
+          <div class="card" style="display:flex;gap:12px;align-items:center">
+            <span class="ic" style="background:var(--d-reading)"><svg class="g" viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg></span>
+            <div style="min-width:0;flex:1">
+              <div style="font-size:calc(15px * var(--k));font-weight:600">完成今日计划后生成</div>
+              <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:2px">历史文章随时可重读，不受解锁限制</div>
+            </div>
+          </div>
+          <div class="sec-title"><span class="t">连续与记录</span></div>
+          <div class="card" style="display:flex;align-items:center;gap:14px">
+            <div class="ring" style="width:64px;height:64px"><div class="hole" style="width:46px;height:46px">
+              <span style="font-size:calc(14px * var(--k));font-weight:700;color:var(--d-review)">4/7</span></div></div>
+            <div style="flex:1"><div style="font-size:calc(15px * var(--k));font-weight:600">本周打卡 4 天</div>
+              <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:2px">累计学习 246 词 · 复习 512 次</div></div>
+            <span class="chev">›</span>
+          </div>
+        </div></div>
+        <div class="device-cap">页头收成「日期 → 主标题 → 一行说明」三行，主视觉用品牌渐变 + <span class="mono">#04241C</span> 墨色（实测末端 6.87:1）。
+          四个入口从「3 屏 4 处」合并进一张卡，浅底 + deep 字形属弱档。</div>
+      </div>
+    </div>
+
+    <h3>③ 词卡（回忆 → 揭晓；喇叭药片放大到 48dp 触控）</h3>
+    <div class="devices">
+      <div class="device-wrap"><div class="device"><div class="bar"><span>07:41</span><span>第 5 / 10</span></div>
+        <div class="scr">
+          <div class="appheader"><span class="back"><svg class="g" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>
+            <span class="ht">convenient</span><span class="tr"><span class="pill-status pill-muted">回忆中</span></span></div>
+          <div style="height:6px;border-radius:999px;background:var(--outline-soft);margin:2px 0 18px"><i style="display:block;width:50%;height:100%;border-radius:999px;background:var(--d-ai-base)"></i></div>
+          <div class="card card-hero" style="text-align:center;padding:28px 18px">
+            <div class="word">convenient</div>
+            <div class="ipa">/kənˈviːniənt/</div>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+              <span class="spk"><svg class="g" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg>英</span>
+              <span class="spk"><svg class="g" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7L8 10z"/><path d="M16 9a4 4 0 010 6"/></svg>美</span>
+            </div>
+            <div class="illus" style="margin-top:22px">
+              <svg class="illus" width="160" height="110" viewBox="0 0 160 110">
+                <rect x="34" y="26" width="92" height="58" rx="12" fill="none" stroke="var(--d-ai)" stroke-width="3"/>
+                <path d="M52 44h40M52 56h28" stroke="var(--d-ai-base)" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="112" cy="56" r="7" fill="var(--d-review-base)"/>
+              </svg>
+            </div>
+            <div style="font-size:calc(13px * var(--k));color:var(--text-2);margin-top:18px">先回想，再点开释义</div>
+            <div class="btn btn-secondary" style="margin-top:12px">显示释义</div>
+          </div>
+        </div></div>
+        <div class="device-cap">回忆帧：说明图 160dp 透明底、无文字水印（规范 §5.3）。喇叭从现状 20dp 自绘放大到 48dp 触控 + 22dp 字形，口音标注改文字尾缀。</div>
+      </div>
+
+      <div class="device-wrap"><div class="device"><div class="bar"><span>07:41</span><span>第 5 / 10</span></div>
+        <div class="scr">
+          <div class="appheader"><span class="back"><svg class="g" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></span>
+            <span class="ht">convenient</span><span class="tr"><span class="pill-status">已揭晓</span></span></div>
+          <div style="height:6px;border-radius:999px;background:var(--outline-soft);margin:2px 0 14px"><i style="display:block;width:50%;height:100%;border-radius:999px;background:var(--d-ai-base)"></i></div>
+          <div class="card" style="padding:16px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="min-width:0"><span style="font-size:calc(24px * var(--k));font-weight:700">convenient</span>
+                <span class="ipa" style="margin-left:8px">/kənˈviːniənt/</span></div>
+              <span class="tail" style="margin-left:auto;display:flex;gap:6px">
+                <span class="spk" style="min-height:48px;padding:0 10px"><svg class="g" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7L8 10z"/></svg></span>
+                <span class="spk" style="min-height:48px;padding:0 10px;background:var(--surface)"><svg class="g" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3-6 3z"/></svg></span>
+              </span>
+            </div>
+            <div style="margin-top:12px;font-size:calc(15px * var(--k));line-height:1.6">
+              <span style="border-bottom:2px dotted var(--d-ai);cursor:pointer">adj.</span> 方便的；<span style="border-bottom:2px dotted var(--d-ai);cursor:pointer">便利的</span>；就近的
+            </div>
+            <div style="font-size:calc(13px * var(--k));color:var(--text-2);margin-top:8px;line-height:1.6">
+              Is it convenient for you to meet on Friday?<br>
+              <span style="color:var(--text-3)">你周五见面方便吗？</span>
+            </div>
+          </div>
+          <div class="sec-title"><span class="t">形近词</span><span class="c">本批已按前缀隔开排布</span></div>
+          <div class="card" style="display:flex;gap:8px;flex-wrap:wrap;padding:14px">
+            <span class="btn-pill" style="background:var(--surface)">convent</span>
+            <span class="btn-pill" style="background:var(--surface)">convene</span>
+            <span class="btn-pill" style="background:var(--surface)">conveniently</span>
+          </div>
+          <div class="fb" style="margin-top:20px">
+            <div class="f1">不认识</div><div class="f2">模糊</div><div class="f3">认识</div>
+          </div>
+          <div style="text-align:center;font-size:calc(12px * var(--k));color:var(--text-3);margin-top:10px">反馈先写本机，网络与 AI 不参与判定</div>
+        </div></div>
+        <div class="device-cap">揭晓帧：释义逐词可点（<span class="mono">ClickableText</span> 现状欠账）；三档反馈用「描边 / 弱橙 / 薄荷」三档而非红黄绿三色块，色觉异常下靠文字与字重区分。</div>
+      </div>
+    </div>
+
+    <h3>④ 设置（分组 + 彩色图标 + 深色三态开关）</h3>
+    <div class="devices">
+      <div class="device-wrap"><div class="device"><div class="bar"><span>07:42</span><span>设置</span></div>
+        <div class="scr">
+          <div style="padding:8px 0 2px">
+            <div class="page-title">设置</div>
+            <div class="page-sub">学习、AI、语音、数据与外观。API Key 只保存在本机加密区。</div>
+          </div>
+          <div class="sec-title"><span class="t">学习</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+              <div><div class="en">词书与每日目标</div><div class="ed">CET-4 核心词 · 每天 10 新词</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M5 6h14v12H5z"/><path d="M9 10h6M9 14h4"/></svg></span>
+              <div><div class="en">生成默写纸</div><div class="ed">可打印 PDF · 仅本机生成</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4M12 15v.5"/></svg></span>
+              <div><div class="en">文章类型与长度偏好</div></div><span class="tail"><span class="pill-status pill-muted">后续版本</span></span></div>
+          </div>
+          <div class="sec-title"><span class="t">AI 能力</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic" style="background:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9z"/></svg></span>
+              <div><div class="en">AI 服务与密钥</div><div class="ed">未配置 · Endpoint 与 Key 绑定同一 Profile</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M5 12a7 7 0 0114 0"/><path d="M9 15h6"/></svg></span>
+              <div><div class="en">语音朗读</div><div class="ed">系统 TTS · 语速 1.0×</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
+              <div><div class="en">学习提醒</div><div class="ed">已关闭 · 每天最多一次，不补发</div></div><span class="tail"><span class="pill-status pill-muted">关</span></span></div>
+          </div>
+          <div class="sec-title"><span class="t">外观</span><span class="c">本轮新增</span></div>
+          <div class="card">
+            <div style="font-size:calc(15px * var(--k));font-weight:600">主题</div>
+            <div class="segment" style="margin-top:10px"><span class="on">跟随系统</span><span>浅色</span><span>深色</span></div>
+            <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:10px">
+              系统字体缩放 1.0×。字号放大时卡片靠最小高度与换行撑开，不裁词书名与目标数字。</div>
+          </div>
+          <div class="sec-title"><span class="t">数据与备份</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 20V9"/><path d="M8 13l4-4 4 4"/><path d="M5 5h14"/></svg></span>
+              <div><div class="en">导入词书包</div><div class="ed">.wbpack · 限制大小与条目数</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4v9"/><path d="M8 10l4 4 4-4"/><path d="M5 19h14"/></svg></span>
+              <div><div class="en">导出词书</div><div class="ed">现状：三个备份入口共用同一个 ⭕</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
+              <div><div class="en">认证导出 / 认证恢复</div><div class="ed">一次性挑战码配对 · 不含 Key</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic" style="background:var(--d-danger)"><svg class="g" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12"/></svg></span>
+              <div><div class="en" style="color:var(--error)">删除全部学习数据</div><div class="ed">不可撤销 · 确认框统一走 ConfirmDestructiveDialog</div></div><span class="chev">›</span></div>
+          </div>
+          <div class="sec-title"><span class="t">关于</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 11v6M12 7.5v.5"/></svg></span>
+              <div><div class="en">开源许可与隐私说明</div><div class="ed">v0.0.1 · 第三方台账逐条登记</div></div><span class="chev">›</span></div>
+          </div>
+        </div></div>
+        <div class="device-cap">分组从现状「12 行一张长列表」改成 5 组 + 组标题；每行图标容器 40dp；主档实心底用于组内首行与危险行，弱档用于次要行，形成节奏而不是一片高饱和。</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="open">
+    <h2><span class="no">8</span>　本稿没做完 / 需要你或真机才能定的事</h2>
+    <div class="panel">
+      <table>
+        <thead><tr><th style="width:150px">事项</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>图标真实字形</td><td>本稿是手绘示意。生产按拍板改用内嵌 Material Symbols 路径数据（Apache-2.0），批 1 落地时同步登记
+            <span class="mono">docs/third-party-notices.md</span> 并过 <span class="mono">verifyThirdPartyNotices</span>。若你不想新增第三方内容，
+            退路是把这 16 个字形按本稿继续自绘（零许可成本，代价是形状不如官方精修）。</td></tr>
+          <tr><td>字母 Rail 真 48dp</td><td>F5-03 遗留：词书单词页的字母索引要做成逐个 ≥48dp 触控，必须改信息架构（改成可展开抽屉或分组列表），
+            不是样式微调。本稿未画这屏，批 2 出方案再定。</td></tr>
+          <tr><td>装配点的副作用</td><td>钉死 M3 十三角色后，206 处调用点会同时变字号（多数变小）。这是收益也是风险，批 1 完成后必须逐屏真机截图核对，
+            未核对前不得宣称视觉一致（规范 §9 明文）。</td></tr>
+          <tr><td>弱档容器的文字禁令</td><td>浅底 16% + deep 字形在品牌域只有 3.60:1，只能放图形。契约测试要禁「弱档里写文字」，
+            否则很容易被拿去当省钱方案滥用。</td></tr>
+          <tr><td>玻璃材质的边界</td><td>规范 §5.2 与 §9 禁止玻璃拟态堆叠。本稿只在弹层/顶底浮层用 <span class="mono">SurfaceGlass + blur</span>，
+            卡片一律实心白。你说「薄荷玻璃可以」，我按这个口径理解成保留材质语言但限制在浮层，若你其实想让卡片也半透明，得先改规范。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    生产实现约定：本稿全部用 CSS 变量表达，等价于批 1 的 <span class="mono">ui/theme</span> token；
+    设备框内 1px = 1dp，页面宽 360dp。图标为本稿临时手绘，生产字形按拍板结论改用内嵌 Material Symbols 路径数据（Apache-2.0，需登记第三方台账）。
+    本页不写「已验证」结论，凡未跑真机的视觉判断都标注在 §7 待办里。
+  </div>
+</div>
+<script>
+function setTheme(t){document.documentElement.dataset.theme=t;
+  document.getElementById('t-light').setAttribute('aria-pressed',String(t==='light'));
+  document.getElementById('t-dark').setAttribute('aria-pressed',String(t==='dark'));}
+function setScale(k,name){document.querySelectorAll('.device').forEach(d=>d.style.setProperty('--k',k));
+  document.getElementById('scale-name').textContent=name;
+  ['k-1','k-13','k-2'].forEach((id,i)=>document.getElementById(id).setAttribute('aria-pressed',String([1,1.18,1.42][i]===k)));}
+</script>
+</body>
+</html>
