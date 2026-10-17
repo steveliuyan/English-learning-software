@@ -4,7 +4,7 @@
 
 **Goal:** 把 33 屏「不统一、太乱、有些页面不该出现这些东西」的体验问题，一次解决到可发布水位——统一设计系统（浅/深两套 token + 装配点）+ 九个共享组件 + 33 枚 B 案双色层次图标 + 每屏只承担自己的职责。
 
-**Architecture:** 三批串行。批 1 建底座：校准 token、建立唯一的 `MaterialTheme(...)` 装配点与主题三态、把 `Mint*` 令牌改成 CompositionLocal 读取（817 处调用点零重写即获得深色）、入库 `AppIcons.kt` 与 `IconBadge`、把九个共享组件建出来。批 2 用底座重排核心学习路径五屏。批 3 重排其余屏与入口分组（信息架构六条裁决），并用「棘轮测试」把私有实现的份数从 14/7/4/11 收敛到 1。
+**Architecture:** 三批串行。批 1 建底座：校准 token、建立唯一的 `MaterialTheme(...)` 装配点与主题三态、把 `Mint*` 令牌改成 CompositionLocal 读取（611 行读点里仅 3 处需就地提读，其余零重写即获得深色）、入库 `AppIcons.kt` 与 `IconBadge`、把九个共享组件建出来。批 2 用底座重排核心学习路径五屏。批 3 重排其余屏与入口分组（信息架构六条裁决），并用「棘轮测试」把私有实现的份数从 14/7/4/11 收敛到 1。
 每批用「契约测试读源码常量 + 计算 WCAG 相对亮度」守门（JVM 单测无法渲染 Compose），需要像素证据的用例走 connected（仅模拟器）。
 
 **Tech Stack:** Kotlin、Jetpack Compose（Material3）、Hilt、Room（本轮**不加列、不做迁移**）、`Context.getSharedPreferences`（框架 API，项目此前未使用）、JUnit5 + kotlin.test、`androidx.test` + `captureToImage`（androidTest）。
@@ -99,17 +99,22 @@
 
 ## 深色模式迁移策略（本计划的核心决策，先读这段再动手）
 
-现状：`ui/theme/MintPalette.kt` 定义七个 `internal val Mint*`，全站 817 处 `Mint*` 读点（实测计数）**全部位于 `@Composable` 函数体内**，仅 3 处顶层 `Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))`（`AiFeatureScreen.kt:47`、`AiLearningScreen.kt:56`、`AppScreen.kt:100`）和 1 处默认参数 `accent: DomainAccent = DomainColors.AiSpeech`（`glass/GlassButton.kt:47`）是组合期之外的读取。
+现状（Task 3 落地后实测口径，重算命令见下）：`ui/theme/MintPalette.kt` 定义七个 `internal val Mint*`，`ui/` 里对它们的读点是 **808 处出现 / 611 行非 import 读取 / 31 个文件**（`c64df0a` 后为 803 / 606 / 31）。读点绝大多数在组合期内，但**并非全部**位于 `@Composable` 函数体内——Task 3 现场撞出 3 个组合期之外的读取站点：两处 `Canvas` 的 `DrawScope` lambda（`CardDetailScreen.SpeakerGlyph`、`WordCardScreen.DetailSpeakerIcon`）和一处返回 `Color` 的非组合辅助函数（`TodayPlanScreen.WorkloadKind.color()`），处置是把读取提到组合期局部 `val` / 给表加 `@Composable`。组合期之外的既有读取另有：3 处顶层 `Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))`（`AiFeatureScreen.kt:47`、`AiLearningScreen.kt:56`、`AppScreen.kt:100`，读的是保持静态的 `AppleMint*`）和 1 处默认参数 `accent: DomainAccent = DomainColors.AiSpeech`（`glass/GlassButton.kt:47`，读保持静态的 `DomainColors`）。
+重算命令（禁止把数写死后不再验）：
+```bash
+git grep -c -E '\bMint(Background|Surface|Tint|Primary|PrimaryDark|Outline|TextMuted)\b' -- app/src/main/java/com/example/englishlearning/ui \
+  | grep -v 'MintPalette.kt'   # 出现次数；再排除 import 行即得读点行数
+```
 
 据此采用 Material 自己的做法——把 `Mint*` 从 `val` 改成读 `CompositionLocal` 的 `@Composable @ReadOnlyComposable get()`：
 
 ```kotlin
-// MintPalette.kt 目标形状（保持名字与包内可见性，817 处调用点一行不改）
+// MintPalette.kt 目标形状（保持名字与包内可见性，组合期内的读点一行不改）
 internal val MintBackground: Color
     @Composable @ReadOnlyComposable get() = LocalAppColors.current.background
 ```
 
-817 处读点因为在组合期内，自动获得深色取值，零重写。`AppleMint*`（品牌渐变三端 + `mint-light`）**保持静态 `val`**：品牌渐变模式不变（spec §2.1「品牌渐变保持现状不动」），且三处顶层 `Brush` 需要组合期外的静态读取——若改成组合读取会让这三个顶层 val 编译失败。
+组合期内的读点因为在组合期内，自动获得深色取值，零重写；组合期之外的 3 处（`DrawScope` lambda 两处 + 非组合 `Color` 表一处）按 Step 4 的优先级就地提读。`AppleMint*`（品牌渐变三端 + `mint-light`）**保持静态 `val`**：品牌渐变模式不变（spec §2.1「品牌渐变保持现状不动」），且三处顶层 `Brush` 需要组合期外的静态读取——若改成组合读取会让这三个顶层 val 编译失败。
 
 `AppPalette`（91 处）与 `DomainColors`（71 处）**保持静态浅色源**，另建深色兄弟（`AppColorDark`、`DomainPalette` 深套），由 `LocalAppColors`/`LocalDomainColors` 在装配点选择；组合期代码改读 `appColors().textSecondary` / `appDomain(AppDomain.AiSpeech).deep`。这一步无法一次做完（162 处），因此用 `DarkTokenConsumptionRatchetTest` 把**按屏的静态读点计数**做成只减不增的棘轮：批 1 建表并记 seed，批 2/批 3 每屏重排时顺手迁完自己那屏，收口时 seed 应清零或仅剩确实与主题无关的站点（逐条写明理由）。
 
@@ -291,7 +296,7 @@ internal val MintBackground: Color
 
 - [ ] **Step 3: 写 `AppColors.kt`**
 
-  按 Interfaces 的形状把浅/深两套 `AppColorSet` 与两套域色 Map 写成顶层 val，注释里点名「取值来自 spec §2.1 + 决策 2026-10-18 裁决」；`LocalAppColors`/`LocalDomainColors`/`LocalIsDark` 用 `staticCompositionLocalOf`（整树切换，不需要每次变更重建）。读取器：
+  按 Interfaces 的形状把浅/深两套 `AppColorSet` 与两套域色 Map 写成顶层 val，注释里点名「取值来自 spec §2.1 + 决策 2026-10-18 裁决」；`LocalAppColors`/`LocalDomainColors`/`LocalIsDark` 用 **`compositionLocalOf`**（不是 `staticCompositionLocalOf`）。订正理由（Task 3 实现现场发现，控制者裁决）：三态主题（跟随系统 / 浅色 / 深色）在设置页翻动时 `MaterialTheme` 装配不重建，`staticCompositionLocalOf` 的读取**不会失效重算**，所有 `Mint*` 组合期 getter 会停在旧值——「整树切换、不需要每次变更重建」正是把静默失效当成优化。`compositionLocalOf` 多一次记录查找，换来的是能用的深色。Task 4 必须连带把三个 Local 的声明与 `DesignTokenContractTest` 的形状断言一并改过来。读取器：
 
   ```kotlin
   @Composable @ReadOnlyComposable
@@ -350,7 +355,7 @@ internal val MintBackground: Color
 | `MintOutline` | `AppPalette.Separator`（= 分隔线） | `…outlineSoft`（**不是** `outline`） |
 | `MintTextMuted` | `AppPalette.TextSecondary` | `…text2` |
 
-**命名陷阱（务必按此处置）**：`MintOutline` 名字像 spec 的 `outline #ADE7D2`，实际值是分隔线。若把它映射到 `outline`，817 处里所有分隔线会突然变成粗薄荷线。决定：`MintOutline → outlineSoft`，而 spec 的 `outline #ADE7D2` **不建 `Mint` 别名**，只由新组件（`IconBadge` 描边、卡片主描边）直接读 `appColors().outline`。
+**命名陷阱（务必按此处置）**：`MintOutline` 名字像 spec 的 `outline #ADE7D2`，实际值是分隔线。若把它映射到 `outline`，全部既有分隔线会突然变成粗薄荷线。决定：`MintOutline → outlineSoft`，而 spec 的 `outline #ADE7D2` **不建 `Mint` 别名**，只由新组件（`IconBadge` 描边、卡片主描边）直接读 `appColors().outline`。
 
 
 - [ ] **Step 1: 复核现状**
@@ -371,7 +376,7 @@ internal val MintBackground: Color
 - [ ] **Step 4: 编译并跑全部门控**
 
   Run: 门控命令。Expected: BUILD SUCCESSFUL。
-  **若出现「不是组合期」的调用点报错**（预期外的顶层/默认参数读取），停下并在报告里逐个列出报错站点；处理办法只有两种，按优先级：① 把该调用点移进 `@Composable`；② 若它本质是常量表（`GlassButton.kt:47` 的默认参数 `accent: DomainAccent = DomainColors.AiSpeech` 读的是**保持静态的** `DomainColors`，预期不报错；真报错才处理），改用无默认值 + 组合期实参传入。**不得**为了让它编译而把令牌退回静态 val——那会让深色失效。
+  **若出现「不是组合期」的调用点报错**——已实测的预期站点有三类：`Canvas` 的 `DrawScope` lambda（`Modifier.drawBehind` 同形）、`graphicsLayer`/`Painter` 一类 lambda、以及返回 `Color` 的非组合辅助函数（枚举色表之类）；另外留意顶层 `val`/默认参数/`object` 属性初始化。停下并在报告里逐个列出报错站点；处理办法只有两种，按优先级：① 把该调用点移进 `@Composable`（`DrawScope` 站点 = 在组合期读进局部 `val`，lambda 只捕获该 `val`）；② 若它本质是常量表（`GlassButton.kt:47` 的默认参数 `accent: DomainAccent = DomainColors.AiSpeech` 读的是**保持静态的** `DomainColors`，预期不报错；真报错才处理），改用无默认值 + 组合期实参传入。**不得**为了让它编译而把令牌退回静态 val——那会让深色失效。
 
 - [ ] **Step 5: 提交**
 
@@ -379,8 +384,10 @@ internal val MintBackground: Color
   git add app/src/main/java/com/example/englishlearning/ui/theme/MintPalette.kt \
           app/src/test/java/com/example/englishlearning/ui/MintTokenIsComposableContractTest.kt
   git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit \
-    -m "refactor(ui-theme): Mint 中性令牌改读 CompositionLocal，817 处调用点零重写获得深色能力"
+    -m "refactor(ui-theme): Mint 中性令牌改读 CompositionLocal，组合期读点零重写获得深色能力"
   ```
+
+  落地说明（Task 3 后补）：已提交的 `c64df0a` 沿用了本行原文的「817 处调用点」——那是计划撰写时的估算，实测口径为 808 出现 / 611 读点行 / 31 文件（改后 803 / 606 / 31）。提交信息不改写历史（禁 `--amend`），收口文档 `docs/verification/ui-redesign-2026-10.md` 与交接报告一律以实测口径为准。
 
 ---
 
