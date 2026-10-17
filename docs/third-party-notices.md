@@ -739,14 +739,24 @@
 - 商业分发结论: 应用本体可商业分发；不含也不分发上游服务，服务依赖由用户自配自担
 
 ## material-symbols-icon-paths
-- 名称: Material Symbols 矢量图标路径数据（内嵌为 Compose `ImageVector`）
-- 版本: Google Material Symbols 图标集（Outlined 变体、24dp 画布）；实际内嵌的字形清单与逐个图标出处记录在 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` 顶部注释，每新增一枚图标须同步更新该清单与本字段
+- 名称: Material Symbols 矢量图标集（仅作度量与风格基准；24dp 画布、2px 视觉重量、Outlined 变体）
+- 版本: Google Material Symbols 图标集（Outlined 变体、24dp 画布）；**UI 重设计轮批 1 按图标选型 B（双色层次自绘族）执行，本轮不复制其路径数据**，只沿用其网格、描边重量与无填充优先的风格作参照。实际入库的字形路径全部为自绘，逐枚清单记录在 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` 顶部注释并登记于 `app-authored-ui-icons`；若后续任何一枚改为直接内嵌上游路径数据，本条目对那一枚重新生效，须在本字段逐个列出内嵌的图标名与出处
 - 许可证: Apache License 2.0（Google 对 Material Symbols / Material 图标集的授权口径），允许商用、再分发与改作，条件是保留许可声明与 NOTICE；Google 另行说明该集合不含第三方品牌 logo（法务原因），故本项目不使用任何第三方标志
-- 用途: UI 重设计轮的统一图标体系——替换现状的 emoji、字母缩写徽标（「AI」「♪」「⏰」）与各处自绘异形图标，使全站只有一族描边字形；因 `app/build.gradle.kts` 的 `dependencyLocking { lockAllConfigurations() }` 与「本轮不新增依赖」约束，不引入 `material-icons-extended`，改为把所需图标的 SVG 路径数据内嵌为 `ImageVector`
-- 数据流: 路径数据随 APK 打包，仅在设备内渲染；不联网、不读取也不传输任何用户数据
-- NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账）、`ui/components/AppIcons.kt` 顶部注释
-- 替代方案: 自行绘制全部图标（工作量大且风格难统一）；或引入 `androidx.compose.material.icons` 的 extended 工件（须先解除依赖锁定并另立决策记录）
-- 商业分发结论: 可商业分发。Apache-2.0 下保留许可与 NOTICE 即合规；Google 在 Material 图标指南中「希望在应用关于界面注明出处，但非强制」，本项目主动署名。路径数据经简化重绘后内嵌属改作，仍受同一许可覆盖；若上游字形改版，须同步本条目「版本」字段与 `AppIcons.kt` 清单
+- 用途: 为全站统一图标体系提供度量基准——替换现状的 emoji、字母缩写徽标（「AI」「♪」「⏰」）与各处自绘异形图标，使全站只有一族字形；因 `app/build.gradle.kts` 的 `dependencyLocking { lockAllConfigurations() }` 与「本轮不新增依赖」约束，不引入 `material-icons-extended`，改为把所需图标以内嵌 `ImageVector` 常量形式打包
+- 数据流: 本条目为设计基准参照，无文件随 APK 打包；渲染所用的路径数据全部由本项目自行绘制，仅在设备内绘制，不联网、不读取也不传输任何用户数据
+- NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账）、`ui/components/AppIcons.kt` 顶部注释、`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`
+- 替代方案: 直接内嵌 Material Symbols 的 SVG 路径数据为 `ImageVector`（成本更低，但拿不到双色层次，视觉选型 A 案即此路径）；或引入 `androidx.compose.material.icons` 的 extended 工件（须先解除依赖锁定并另立决策记录）
+- 商业分发结论: 可商业分发。Apache-2.0 下保留许可与 NOTICE 即合规；Google 在 Material 图标指南中「希望在应用关于界面注明出处，但非强制」，本项目主动署名。若某枚图标改为内嵌上游路径数据并经简化重绘，属改作，仍受同一许可覆盖，且须同步本条目「版本」字段与 `AppIcons.kt` 清单
+
+## app-authored-ui-icons
+- 名称: 应用自绘 UI 图标族（双色层次 duotone，描边骨架 + 内部半透明填充层）
+- 版本: v1 规划（实现为 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` 中的 `ImageVector` 常量，每枚两层；逐枚清单与命名钉在该文件顶部注释，规模约 30 枚上下，每新增一枚须同步本字段与 `material-symbols-icon-paths` 的生效范围说明）
+- 许可证: 无第三方许可依赖。路径数据由本项目按统一度量（24dp 网格、2px 视觉重量、圆头描边）自行绘制，不复制、不派生自任何第三方图标集、素材包或字形文件，因此不触发署名义务；造型仅参考 Material Symbols 的度量与风格标准（度量与风格不受版权保护），不使用其路径数据
+- 用途: 承载 UI 重设计轮的图标体系（用户 2026-10-18 选定 B 案）：入口块为域色渐变容器 + 双色层次字形，列表行内退化为单层描边；替换 7 个 AI 功能的单字徽标、设置页共用同一 ⭕ 的 3 个备份入口、以及被手写两次的喇叭图形
+- 数据流: 仅以 Kotlin 路径数据随 APK 打包并在设备内绘制；不下载、不上传、不联网、不含位图素材文件，也不参与任何 AI 或网络请求
+- NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账）、`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`、`ui/components/AppIcons.kt` 顶部注释
+- 替代方案: 直接内嵌经 Apache-2.0 授权的 Material Symbols 路径数据（选型 A，工时更低但无双色层次）；或引入 extended 工件（违反本轮不新增依赖约束）
+- 商业分发结论: 可随应用分发，无许可或署名义务。约束：全站只允许这一族字形，禁止再混入 emoji、含字徽标或各处自绘异形图标；容器渐变亮端必须取 `deep` 混 35% `base`，白描边非文本对比 ≥3:1 由计算函数当场判定（浅色 `base` 直接作白字形底不合格：AI 2.11:1、复习 2.06:1）
 
 ## app-authored-ui-illustrations
 - 名称: 应用自绘界面插画（UI 重设计轮空态与首启引导，上限 5 张）
