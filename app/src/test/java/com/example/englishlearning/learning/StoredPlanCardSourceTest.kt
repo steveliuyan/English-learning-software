@@ -6,6 +6,8 @@ import com.example.englishlearning.learning.domain.WordCard
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 
@@ -13,30 +15,42 @@ import org.junit.jupiter.api.Test
  * Plan card selection must be honest about what has been learned: reviewed cards stop being
  * "new", due cards come from the derived schedule, and a storage failure is never reported as
  * an empty plan — the day's plan is an immutable snapshot, so an empty one would lose the day.
+ *
+ * New cards are drawn from the interleaved order (spec F1-02, decision 2026-10-17), never from
+ * the word book's own order — a 4000-word cet4 book stored alphabetically would otherwise make
+ * the learner finish every "a" word before ever seeing a "b" word.
  */
 class StoredPlanCardSourceTest {
     private val now: Instant = Instant.parse("2026-09-19T08:00:00Z")
 
+    /** 词条前 3 字母——交错序的「相似词」单位，与 [NewWordOrdering] 的分组口径一致。 */
+    private fun prefixOf(cardId: String): String = cardId.substringAfter(':').take(3)
+
     @Test
     fun `new cards skip the ones already reviewed`() = runTest {
+        val ids = listOf("cet4:ability", "cet4:achieve", "cet4:benefit")
         val source =
             StoredPlanCardSource(
-                Content(listOf("cet4:ability", "cet4:achieve", "cet4:benefit")),
+                Content(ids),
                 FakeEvents(reviewed = listOf("cet4:ability")),
             )
 
-        assertEquals(listOf("cet4:achieve", "cet4:benefit"), source.newCardIds("cet4", 10))
+        assertEquals(
+            NewWordOrdering.order(ids).filterNot { it == "cet4:ability" },
+            source.newCardIds("cet4", 10),
+        )
     }
 
     @Test
     fun `new cards are capped at the daily target`() = runTest {
+        val ids = listOf("cet4:ability", "cet4:achieve", "cet4:benefit")
         val source =
             StoredPlanCardSource(
-                Content(listOf("cet4:ability", "cet4:achieve", "cet4:benefit")),
+                Content(ids),
                 FakeEvents(),
             )
 
-        assertEquals(listOf("cet4:ability", "cet4:achieve"), source.newCardIds("cet4", 2))
+        assertEquals(NewWordOrdering.order(ids).take(2), source.newCardIds("cet4", 2))
         assertEquals(emptyList<String>(), source.newCardIds("cet4", 0))
     }
 
@@ -44,9 +58,46 @@ class StoredPlanCardSourceTest {
     fun `ten word sample fills target ten and target three truncates`() = runTest {
         val ids = (1..10).map { "sample:word-$it" }
         val source = StoredPlanCardSource(Content(ids), FakeEvents())
+        val order = NewWordOrdering.order(ids)
 
-        assertEquals(ids, source.newCardIds("sample", 10))
-        assertEquals(ids.take(3), source.newCardIds("sample", 3))
+        assertEquals(order, source.newCardIds("sample", 10))
+        assertEquals(order.take(3), source.newCardIds("sample", 3))
+    }
+
+    @Test
+    fun `new cards are the interleaved order minus reviewed ones as a subsequence`() = runTest {
+        val ids =
+            listOf(
+                "cet4:act-1",
+                "cet4:act-2",
+                "cet4:com-1",
+                "cet4:com-2",
+                "cet4:con-1",
+                "cet4:con-2",
+            )
+        val order = NewWordOrdering.order(ids)
+        val source = StoredPlanCardSource(Content(ids), FakeEvents(reviewed = listOf("cet4:act-2")))
+
+        // 词书原始顺序会先发 act-1/act-2 这对同前缀邻居；交错序不会。
+        val firstTwo = source.newCardIds("cet4", 2)
+        assertEquals(2, firstTwo.size)
+        assertNotEquals(prefixOf(firstTwo[0]), prefixOf(firstTwo[1]))
+
+        val remaining = source.newCardIds("cet4", 10)
+        assertEquals(order.filterNot { it == "cet4:act-2" }, remaining)
+        val positions = remaining.map { order.indexOf(it) }
+        assertTrue(positions.isNotEmpty() && positions.all { it >= 0 })
+        assertEquals(positions.sorted(), positions)
+    }
+
+    @Test
+    fun `short word book returns every remaining card and a zero target returns none`() = runTest {
+        val ids = listOf("cet4:ability", "cet4:achieve")
+        val source = StoredPlanCardSource(Content(ids), FakeEvents(reviewed = listOf("cet4:ability")))
+
+        assertEquals(listOf("cet4:achieve"), source.newCardIds("cet4", 10))
+        assertEquals(emptyList<String>(), source.newCardIds("cet4", 0))
+        assertEquals(emptyList<String>(), source.newCardIds("cet4", -1))
     }
 
     @Test

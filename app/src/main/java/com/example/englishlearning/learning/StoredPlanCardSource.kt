@@ -19,6 +19,11 @@ class PlanCardSourceUnavailable : Exception("learning event store unavailable")
  * never been reviewed, and the two sets are disjoint by construction: a reviewed card has a
  * derived state, a new card does not. New cards are capped at the profile's daily target and
  * fall short when the word book has less content left.
+ *
+ * New cards are drawn from [NewWordOrdering.order], not from the word book's own order: built-in
+ * books are stored alphabetically, so taking their head would make a learner finish every "ab-"
+ * word before ever seeing a "co-" word. Interleaving is content-derived and stable, so removing
+ * already-reviewed cards leaves the remaining relative order untouched (decision 2026-10-17).
  */
 class StoredPlanCardSource(
     private val content: WordCardSource,
@@ -30,7 +35,7 @@ class StoredPlanCardSource(
     override suspend fun newCardIds(wordBookId: String, limit: Int): List<String> {
         if (limit <= 0) return emptyList()
         val reviewed = events.reviewedCardIds(wordBookId).orUnavailable().toSet()
-        return content.cardIds(wordBookId).filterNot(reviewed::contains).take(limit)
+        return NewWordOrdering.order(content.cardIds(wordBookId)).filterNot(reviewed::contains).take(limit)
     }
 
     private fun <T> RepositoryResult<T>.orUnavailable(): T =
