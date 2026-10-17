@@ -603,7 +603,7 @@ class MaterialThemeAssemblyContractTest {
     // ---------- 用例：CompositionLocal 提供者（翻色链路 + 域色完整性） ----------
 
     @Test
-    fun `MintGlassTheme is the sole provider of the three theme locals`() {
+    fun `MintGlassTheme is the sole provider of the theme locals and the root content ink`() {
         val text = mintGlassThemeText()
         val body = functionText(text, "MintGlassTheme")
         listOf(

@@ -45,7 +45,7 @@ fun MintGlassTheme(
             typography = appTypography(),
             shapes = AppShapes,
         ) {
-            // 根内容墨：AppScreen 有三处 `Modifier.fillMaxSize().background(MintBackground)` 直接当页底，
+            // 根内容墨：AppScreen 一类页面以 `Modifier.background(MintBackground)` 直接铺页底，
             // 底下未指定 color 的 Text 走的是 LocalContentColor 默认值（Color.Black），
             // 浅套下近似 text1 看不出来，深套下就是黑压黑。这里显式给出当前主题的中性主墨，
             // 位置必须在 MaterialTheme 之内——material3 若自己也提供 LocalContentColor，外层会被它盖掉。
@@ -62,8 +62,10 @@ fun MintGlassTheme(
  * 为什么是 `lightColorScheme(...)` / `darkColorScheme(...)` 两个分支而不是 `ColorScheme(...)`
  * 构造器：material3 1.4.0 的 `ColorScheme` 构造器每个参数都必传（同签名重载分别是浅层 31 项、
  * 容器 36 项、动态色 44 项，都没有默认值），单点构造就必须为 `scrim` 与 `*Fixed` 族另立 hex；
- * 这两个 builder 才带库内默认值，未在本表列出的角色（`scrim`、`*Fixed` 族、`secondaryContainer`
- * 以外的动态色）因此保持库默认——本批不给它们立新 token。
+ * 这两个 builder 才带库内默认值。按 `ColorScheme` 的实际角色清单核对过（48 个角色 - 本表 35 项），
+ * 保持库默认的只有 `scrim` 与 `*Fixed` 三族（`primaryFixed` / `primaryFixedDim` / `onPrimaryFixed` /
+ * `onPrimaryFixedVariant` 同款共九项 × 三个色族）——`secondaryContainer` 与全部 `surfaceContainer*`
+ * 都在本表内，不是库默认。本批不给 `scrim` 与 `*Fixed` 族立新 token。
  *
  * 分支漂移由契约压死：`MaterialThemeAssemblyContractTest` 把两个分支的具名实参各自与同一张共享
  * 取值表逐字比对，并要求两者只差 `onErrorContainer` 一项，深浅两套不可能各自漂移。
