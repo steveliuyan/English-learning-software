@@ -737,3 +737,23 @@
 - NOTICE 位置: 本文件、应用内「关于与开源许可」页隐私说明（`LicensesScreen`）与 `docs/verification/release-notes-v0.0.1.md`
 - 替代方案: 系统 TTS、离线 OCR、不启用 AI 功能
 - 商业分发结论: 应用本体可商业分发；不含也不分发上游服务，服务依赖由用户自配自担
+
+## material-symbols-icon-paths
+- 名称: Material Symbols 矢量图标路径数据（内嵌为 Compose `ImageVector`）
+- 版本: Google Material Symbols 图标集（Outlined 变体、24dp 画布）；实际内嵌的字形清单与逐个图标出处记录在 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` 顶部注释，每新增一枚图标须同步更新该清单与本字段
+- 许可证: Apache License 2.0（Google 对 Material Symbols / Material 图标集的授权口径），允许商用、再分发与改作，条件是保留许可声明与 NOTICE；Google 另行说明该集合不含第三方品牌 logo（法务原因），故本项目不使用任何第三方标志
+- 用途: UI 重设计轮的统一图标体系——替换现状的 emoji、字母缩写徽标（「AI」「♪」「⏰」）与各处自绘异形图标，使全站只有一族描边字形；因 `app/build.gradle.kts` 的 `dependencyLocking { lockAllConfigurations() }` 与「本轮不新增依赖」约束，不引入 `material-icons-extended`，改为把所需图标的 SVG 路径数据内嵌为 `ImageVector`
+- 数据流: 路径数据随 APK 打包，仅在设备内渲染；不联网、不读取也不传输任何用户数据
+- NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账）、`ui/components/AppIcons.kt` 顶部注释
+- 替代方案: 自行绘制全部图标（工作量大且风格难统一）；或引入 `androidx.compose.material.icons` 的 extended 工件（须先解除依赖锁定并另立决策记录）
+- 商业分发结论: 可商业分发。Apache-2.0 下保留许可与 NOTICE 即合规；Google 在 Material 图标指南中「希望在应用关于界面注明出处，但非强制」，本项目主动署名。路径数据经简化重绘后内嵌属改作，仍受同一许可覆盖；若上游字形改版，须同步本条目「版本」字段与 `AppIcons.kt` 清单
+
+## app-authored-ui-illustrations
+- 名称: 应用自绘界面插画（UI 重设计轮空态与首启引导，上限 5 张）
+- 版本: v1 规划（实现为 `app/src/main/java/com/example/englishlearning/ui/components/AppIllustrations.kt` 中的 `ImageVector` 常量；清单与落点逐张记录在 `docs/decisions/2026-10-17-ui-redesign-illustrations.md`，每新增一张须同步该记录与本字段）
+- 许可证: 无第三方许可依赖。每张插画的几何路径由本项目自行设计绘制，不复制、不派生自任何第三方图库、素材包、图标集或角色作品，因此不触发 CC BY-SA 4.0 或其他素材许可义务，也不产生署名义务；不使用 Material Symbols 作为插画载体，不模仿任何第三方品牌或吉祥物造型
+- 用途: 为空态与首启引导提供情绪锚（首启未选词书、收藏为空、生词本为空、错词本为空、阅读历史为空），语义由旁边文字与动作承担，图形本身为装饰性 `contentDescription = null`
+- 数据流: 仅以 Kotlin 路径数据随 APK 打包并在设备内绘制；不下载、不上传、不联网、不含任何位图素材文件，也不参与任何 AI 或网络请求
+- NOTICE 位置: 本文件、`docs/decisions/2026-10-17-ui-redesign-illustrations.md`、`docs/superpowers/specs/2026-10-17-ui-redesign-design.md` §4.5
+- 替代方案: 空态一律纯文字加一个动作（零图形资产，但五个空态全无锚点）；或采用经逐张许可核验的第三方插画（须逐项确认归属与署名）
+- 商业分发结论: 可随应用分发，无许可或署名义务。硬上限 5 张，新增第 6 张须先改决策记录与本条目；本轮为静态矢量，不含动画
