@@ -652,7 +652,8 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
         本批要消灭的三类现状：<span class="mono">7 个 AI 功能用单个中文字</span>（文 填 听 讲 析 拍 画，注释自述「避免引图标库」）、
         <span class="mono">设置页 3 个不同备份入口共用同一个 ⭕</span>、<span class="mono">同一只喇叭被手写两份</span>
         （<span class="mono">CardDetailScreen.kt:571</span> 24dp 与 <span class="mono">WordCardScreen.kt:428</span> 20dp）。
-        底导 4 个 tab 的 Canvas 自绘是现状里唯一「像图标」的一组，改成同族字形并加选中态短横，其余自绘（环形弧、配对码、吉祥物）保留但统一取色。</p>
+        底导 4 个 tab 的 Canvas 自绘是现状里唯一「像图标」的一组，改成同族字形并加选中态短横，其余自绘（环形弧、配对码、吉祥物）保留但统一取色。
+        <b>本节上面 16 枚画的是造型骨架，不是最终呈现</b>——最终呈现（两层 duotone + 渐变容器 / 行内单层描边）已按 §6.2 的 B 案定稿。</p>
     </div>
 
     <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -687,13 +688,15 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
       </symbol>
     </svg>
 
-    <h3>6.2 三案对照：要不要更「像应用图标」（图标呈现方式待你定）</h3>
+    <h3>6.2 三案对照：要不要更「像应用图标」（已定 B 案 · 双色层次，2026-10-18）</h3>
     <p class="lead">你提到想要扇贝那种「里面有自己设计的图案、像应用图标、挺高级」的图标。先把一件事说清：
       公开可查的竞品分析里，<b>扇贝老版本恰恰是「以文字为主、少用图标」</b>
       （<a href="https://m.zcool.com.cn/article/ZNjcxOTI0.html">站酷 · 扇贝/百词斩竞品分析</a>），
       所以这轮不能照着"抄扇贝的图标"——能借的是那种<b>图块化 + 有内部层次</b>的观感，
       而不是它具体的图形。下面三案用的是<b>同一套造型骨架</b>，只差容器与内部层次，
-      你只需要判"要几层"，不必判"画得好不好"（真机与深浅两套都由顶栏控件现切）。</p>
+      你只需要判"要几层"，不必判"画得好不好"（真机与深浅两套都由顶栏控件现切）。
+      <b>拍板结果 2026-10-18：选 B</b>——入口层拿渐变容器 + 双色层次，行内仍是单层描边；
+      过程、实测数字与许可影响见 <span class="mono">docs/decisions/2026-10-18-ui-redesign-icon-duotone.md</span>。下面三案保留作选型依据，A/C 不再实施。</p>
     <div class="panel">
       <div class="trial">
         <h4>方案 A · 单色描边 + 域色实底（现稿定的方案）</h4>
@@ -717,7 +720,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
       </div>
 
       <div class="trial">
-        <h4>方案 B · 双色层次（duotone）+ 域色渐变容器 · 自绘族（我的推荐）</h4>
+        <h4>方案 B · 双色层次（duotone）+ 域色渐变容器 · 自绘族（✅ 已选定）</h4>
         <p class="tr-note">容器走 140° 渐变（域色 <span class="mono">base → deep</span>）+ 1px 内高光描边；
           图形保留描边骨架，但主体内部加一层半透明填充 —— 观感上"图里还有图案"，就是应用图标那层意思。
           代价：字形不再直接用 Material Symbols 的路径，而是<b>以它为骨架自绘重画</b>（约 30 枚上下，逐枚手写 <span class="mono">ImageVector</span>），
@@ -776,11 +779,11 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
       <p style="font-size:13px;color:var(--doc-muted);margin:12px 0 0">
         这张图是选型的真正依据：<b>"高级感"来自 ≥40dp 的实底容器与内部层次，行内小图标无论选哪案都会收敛成
         浅底 + 域色描边</b>。所以三案的差别只发生在首屏入口、设置页分组、AI 能力目录这些"大图块"位置（全站约 8–12 处），
-        而 33 屏的绝大多数图标其实是下面这一行。据此，<b>我建议 B</b>：入口层拿到渐变 + 双色层次的"图块感"，
+        而 33 屏的绝大多数图标其实是下面这一行。据此，<b>建议并已由用户选定 B</b>：入口层拿到渐变 + 双色层次的"图块感"，
         行内仍是描边，一套骨架两处通用；C 的实心图形在行内不可用，等于要做两族。</p>
 
       <table style="margin-top:16px">
-        <thead><tr><th style="width:110px">维度</th><th>A 描边 + 实底</th><th>B 双色 + 渐变（推荐）</th><th>C 图块 + 实心</th></tr></thead>
+        <thead><tr><th style="width:110px">维度</th><th>A 描边 + 实底</th><th>B 双色 + 渐变（✅ 已选定）</th><th>C 图块 + 实心</th></tr></thead>
         <tbody>
           <tr><td>自绘程度</td><td>低（直接用 Apache-2.0 路径数据）</td><td>中（借骨架重画约 30 枚）</td><td>高（逐枚设计，含内部实心形）</td></tr>
           <tr><td>高级感</td><td>干净但平</td><td>有明显层次，接近应用图标</td><td>最强，首页好看</td></tr>
@@ -1168,7 +1171,8 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
       全仓无任何服务端搜索或开放抓取，请求体字段白名单也不含 tools（<span class="mono">AiRequestPolicy.kt:8-14</span>）。
       三条路线与折中见 <span class="mono">docs/decisions/2026-10-17-ui-redesign-information-architecture.md</span>。
       另：你提的<b>打卡页华丽动效</b>记为视觉定稿后的独立批次（需单独处理 <span class="mono">reduced-motion</span> 与 TalkBack 朗读），本轮不做。
-      六条板落地后，<b>全站还开着的一块是 §6.2 的图标呈现三案</b>（纯视觉选型，不改界面结构，但它决定批 1 的 <span class="mono">AppIcons.kt</span> 工时与许可台账措辞）。</p>
+      六条板落地后曾开着的一块是 <b>§6.2 的图标呈现三案</b>，<b>2026-10-18 已定为 B 案（双色层次 + 域色渐变容器）</b>，
+      批 1 的 <span class="mono">AppIcons.kt</span> 工时与许可台账措辞随之锁定，见 <span class="mono">docs/decisions/2026-10-18-ui-redesign-icon-duotone.md</span>。</p>
     <div class="panel">
       <table>
         <thead><tr><th style="width:150px">要拍的板</th><th style="width:210px">我的推荐</th><th>代价 / 不做的后果</th></tr></thead>

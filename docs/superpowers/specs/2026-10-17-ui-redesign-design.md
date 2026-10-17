@@ -1,6 +1,7 @@
 # UI 重设计轮 · 设计规格（2026-10-17）
 
-**状态**：待用户审阅。审阅通过后由 `docs/superpowers/plans/2026-10-17-ui-redesign.md` 拆成代码级实现计划。
+**状态**：用户 2026-10-17 已审阅（「整体没问题」），唯一悬留的图标呈现选型已于 2026-10-18 定为 B 案并落进 §4。
+本规格即为批 1 开工依据，由 `docs/superpowers/plans/2026-10-17-ui-redesign.md` 拆成代码级实现计划。
 **上游依据**：
 [`docs/design/2026-10-17-ui-redesign-mockups.html`](../design/2026-10-17-ui-redesign-mockups.html)（已定稿的视觉基线，token/组件/六屏真比例 + 深浅与三档字号对照）、
 [`docs/design/2026-10-17-content-placement-audit.md`](../design/2026-10-17-content-placement-audit.md)（33 屏逐屏审计）、
@@ -126,26 +127,27 @@
 
 ## 4. 图标体系
 
-1. **字形来源**：Material Symbols（Google，Apache License 2.0）作骨架。因 `dependencyLocking` 不新增依赖，
-   采取「把所需图标的 SVG 路径数据内嵌为 `ImageVector`」写入 `ui/components/AppIcons.kt`，
-   并在 `docs/third-party-notices.md` 登记（本规格 §4.4）。
-   **呈现方式三案待用户拍板**（对照稿见 `docs/design/2026-10-17-ui-redesign-mockups.html` §6.2）：
-   A 单色描边 + 域色 `deep` 实底；B 双色层次（duotone）+ 域色渐变容器（主控推荐，用户诉求「像应用图标、挺高级」与此案最贴合）；
-   C 图块化 48dp 渐变块 + 实心图形。三案共用同一造型骨架与 §4.2 度量，差别只在容器与内部层数；
-   **选 B 或 C 时字形不再直接复制 Material 路径数据**，而是以其为骨架自绘重画（约 30 枚），
-   §4.4 的台账条目随之改为「仅参考其度量、不复制其路径」，自绘部分并入 `app-authored-*` 条目。
+1. **字形来源与选型（已定稿）**：用户 2026-10-18 选定 **B 案 · 双色层次（duotone）+ 域色渐变容器**
+   （三案对照与选型理由见 [`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`](../../decisions/2026-10-18-ui-redesign-icon-duotone.md)）。
+   因此**不复制 Material Symbols 的路径数据**，只以它的 24dp 网格、2px 视觉重量与 Outlined 无填充风格作度量基准，
+   逐枚自行绘制矢量路径并内嵌为 `ImageVector` 常量，集中写入 `ui/components/AppIcons.kt`（约 30 枚上下，每枚两层）。
+   落选的 A（单色描边 + `deep` 实底，直接内嵌上游路径）与 C（48dp 图块 + 实心图形 + 高光条 + 投影）
+   仍可在 `docs/design/2026-10-17-ui-redesign-mockups.html` §6.2 复核；C 被否的决定性原因是
+   行内 17dp 实心图形不可用，等于要维护两族字形。
 2. **风格**：单一字形族 + 统一描边（2px 视觉重量、24dp 画布、圆头描边、无填充优先），
    禁止再混入 emoji、字母缩写徽标、自绘异形图标。**含文字的徽标**（如「AI」「♪」「⏰」）一律替换为矢量图标。
-3. **容器与配色**：图标只允许两种呈现——域色容器（实底或渐变，按 §4.1 选型）+ 白色字形，或域色浅底 tint + 域色字形。
+3. **两层结构与两种呈现**：每枚图标由「描边骨架层 + 内部半透明填充层」组成；
+   入口层（≥40dp 容器）呈现为域色渐变容器 + 白色两层字形，容器渐变亮端取 **`deep` 混 35% `base`**、
+   叠 `inset 0 0 0 1px rgba(255,255,255,.26)` 内高光，不得用 `base` 本体作底；
+   行内层（30dp 容器 / 17dp 图形）**退化为单层描边**——浅底 `tint` + 域色 `deep` 字形，填充层不显示。
    **图形本身要按非文本对比 ≥3:1 当场计算**（WCAG 1.4.11 口径），不得再写「图标不参与对比度判定」；
    容器上的任何文字另受 §2.1 两条硬规则约束（浅薄荷底禁白字、渐变亮端不得用 `base`）。
-   C 案的白色高光层与投影必须在深浅两套下逐枚实测后才算通过（§9 AC-R-11）。
-4. **许可结论**：Material Symbols 为 Apache-2.0，允许商业分发与改作（路径数据经简化重绘，属改作）；
-   Google 在 Material 图标指南中「希望在应用 about 界面注明出处，但非强制」——本应用许可页本就渲染同一份台账，
-   故主动署名。第三方 logo 类图标不在使用范围内（Google 明示因法务原因不含第三方标志）。
-   登记条目：`material-symbols-icon-paths`。**台账措辞随 §4.1 选型定稿**：选 A 时按「内嵌路径数据的改作」登记；
-   选 B/C 时按「仅参考其 24dp 网格与 2px 描边度量、路径数据自行绘制」登记，并把自绘字形并入原创条目——
-   两条都要在批 1 合入前与实际入库代码一致，不得保留与实现不符的描述。
+4. **许可结论**：本轮入库的图标路径全部为原创自绘，登记于台账条目 `app-authored-ui-icons`
+   （无第三方许可依赖、无署名义务、不新增依赖）。`material-symbols-icon-paths` 条目改述为
+   「仅参考其 24dp 网格与 2px 描边度量，本轮未内嵌其路径数据」，并保留 Apache-2.0 的主动署名口径——
+   若后续某枚图标改为直接内嵌上游路径数据，该条目对这一枚重新生效并须逐个列出。
+   第三方 logo 类图标仍不在使用范围内（Google 明示因法务原因该集合不含第三方标志）。
+   两条描述都必须与批 1 实际入库代码一致，不得保留与实现不符的措辞。
 5. **自绘插画**：上限 5 张，仅用于空态与首启引导（逐张落点见
    [`docs/decisions/2026-10-17-ui-redesign-illustrations.md`](../../decisions/2026-10-17-ui-redesign-illustrations.md)）。
    产出为原创矢量 `ImageVector`（非位图、不含第三方素材、装饰性 `contentDescription = null`），
@@ -226,8 +228,12 @@
   同一测试口径覆盖图标：白色字形/图形在域色容器上按非文本 ≥3:1 计算（浅底 tint + 域色字形另按 ≥3:1），
   渐变容器亮端取 `deep` 混 35% `base`，出现以浅色 `base` 直接作白字形底的容器即判失败（AI 2.11:1 / 复习 2.06:1）。
 - AC-R-04：所有可交互控件高度 `≥ 48.dp`（`heightIn`/`defaultMinSize` 断言，沿用 F5-03 测试口径）。
-- AC-R-05：`verifyThirdPartyNotices` 通过，且台账含 `material-symbols-icon-paths` 与 `app-authored-ui-illustrations`
-  两条（8 字段均非空），应用内许可页渲染出同一份内容。
+- AC-R-05：`verifyThirdPartyNotices` 通过，且台账含 `material-symbols-icon-paths`（改述为仅参考度量）、
+  `app-authored-ui-icons` 与 `app-authored-ui-illustrations` 三条（8 字段均非空），
+  描述与 `AppIcons.kt` 实际入库的路径来源一致，应用内许可页渲染出同一份内容。
+- AC-R-05b：`AppIcons.kt` 每枚图标为两层结构（描边骨架 + 填充层），逐枚清单与本规格 §4.1 的规模相符；
+  行内呈现下填充层不显示；全站 `Icons.` 引用仍为 0、不新增 `material-icons-extended` 依赖
+  （`dependencyLocking` 锁文件零变化）。
 - AC-R-06：`AppTabTest` 与既有业务规则测试零修改通过；JVM 单测基线只增不减（当前基线 1499 测试 / 206 套件 / 0 失败，须每次重算不得引用陈旧数）。
 - AC-R-07：`fontScale = 2.0` 的 connected 用例覆盖六屏重排后的标题与卡片（护栏沿用 `CheckInScreenTest` 口径）。
 - AC-R-08：§3 每个共享组件有对应「全站唯一实现」的静态检查或组件测试；被替换的私有实现数从 7/14/5/11 降到 1。
@@ -257,6 +263,6 @@
    这些不进本规格的验收标准，实施时逐条现场核实。
 3. 各屏 `testTag` 变更对 connected 用例的影响面尚未逐屏统计，批 2/批 3 开工前须列清单。
 4. Material Symbols 台账条目描述的是「内嵌路径数据的改作」，若上游字形版本更新，需同步台账「版本」字段。
-5. **图标呈现选型未定**（§4.1 三案，对照稿视觉稿 §6.2）：用户 2026-10-17 提出想要"有自己设计的图案、像应用图标、挺高级"，
-   主控据此补了三案对照并推荐 B；批 1 的 `AppIcons.kt` 工时与 §4.4 台账措辞都由这一票决定，
-   **开工前必须有结论**。已实测的公共约束（浅色 `base` 不能直接作白字形底）已写入 §2.1 与 §4.3，不随选型变。
+5. **图标呈现选型已定**：用户在 2026-10-18 选定 B 案（双色层次 + 渐变容器），§4 已按此定稿，
+   选型过程与许可影响见 `docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`。
+   仍待用户在批 1 开工前确认的是：约 30 枚的逐枚清单（批 1 第一个任务即产出该清单并钉进 `AppIcons.kt` 顶部注释）。
