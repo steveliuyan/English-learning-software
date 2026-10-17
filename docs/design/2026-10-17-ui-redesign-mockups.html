@@ -225,6 +225,52 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
 .foot { margin-top:56px; padding-top:18px; border-top:1px solid var(--doc-line);
   font-size:12px; color:var(--doc-muted); }
 .legend { display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--doc-muted); }
+/* —— §6.2 图标呈现三案（对照用）。
+   每枚图标由两个 <use> 叠加：.ux-o 描边层 + .ux-f 实心层。
+   样式只写在 <use> 宿主元素上——use 影子树不吃外部选择器，只继承 fill/stroke 等继承属性。 —— */
+.sprite { position:absolute; width:0; height:0; overflow:hidden; }
+svg.iu { display:block; }
+.trial { border:1px solid var(--doc-line); border-radius:var(--r-card); padding:16px; margin-top:14px; }
+.trial h4 { margin:0 0 2px; font-size:15px; }
+.trial .tr-note { font-size:12.5px; color:var(--doc-muted); margin:0 0 12px; }
+.ixrow { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.ixrow + .ixrow { margin-top:12px; padding-top:12px; border-top:1px dashed var(--doc-line); }
+.ixcell { width:78px; text-align:center; font-size:11.5px; color:var(--text-2); }
+.ixc { position:relative; display:grid; place-items:center; margin:0 auto 6px; border-radius:var(--r-icon); }
+.ix-lg .ixc { width:44px; height:44px; }
+.ix-lg svg.iu { width:24px; height:24px; }
+.ix-sm .ixc { width:30px; height:30px; border-radius:9px; }
+.ix-sm svg.iu { width:17px; height:17px; }
+.ix-entry .ixc { width:44px; height:44px; flex:none; }
+.ix-entry svg.iu { width:24px; height:24px; }
+.ix-sm .ixc { background:color-mix(in srgb,var(--d) 15%,var(--surface)); }
+/* 底：A 案 = 纯描边（实心层不显示）；描边默认给白色，供实底/渐变容器使用 */
+.ux-o { fill:none; stroke:#FFFFFF; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.ux-f { display:none; }
+.t-a .ixc { background:var(--d); }
+.t-b .ixc { background:linear-gradient(140deg,color-mix(in srgb,var(--d) 65%,var(--db)),var(--d)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.26); }
+.t-b .ux-f { display:block; fill:rgba(255,255,255,.42); stroke:none; }
+.t-c .ux-f { display:block; fill:#FFFFFF; stroke:none; }
+.t-c .ixc { width:48px; height:48px; border-radius:14px;
+  background:radial-gradient(115% 115% at 26% 14%, rgba(255,255,255,.40), rgba(255,255,255,0) 56%),
+             linear-gradient(158deg,color-mix(in srgb,var(--d) 65%,var(--db)),var(--d));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.30), 0 2px 6px rgba(4,36,28,.16); }
+.t-c .ixc::after { content:""; position:absolute; left:16%; right:16%; top:5px; height:1.5px;
+  border-radius:2px; background:rgba(255,255,255,.55); }
+/* 行内小尺寸：浅底 + 域色描边（三案在此收敛为同一种呈现） */
+.ix-sm .ux-o { stroke:var(--d); }
+/* 深色模式：容器变亮，字形改深，实心层降为低透明度 */
+html[data-theme="dark"] .ux-o { stroke:#06231A; }
+html[data-theme="dark"] .t-b .ux-f { fill:rgba(6,35,26,.30); }
+html[data-theme="dark"] .t-c .ux-f { fill:#06231A; }
+html[data-theme="dark"] .t-b .ixc, html[data-theme="dark"] .t-c .ixc { box-shadow:inset 0 0 0 1px rgba(255,255,255,.20); }
+html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
+/* 入口行样张（每案一卡） */
+.ix-entry { display:flex; align-items:center; gap:12px; padding:10px 0; }
+.ix-entry + .ix-entry { border-top:1px solid var(--outline-soft); }
+.ix-entry .en { font-size:calc(15px * var(--k)); font-weight:600; color:var(--text-1); }
+.ix-entry .ed { font-size:calc(12px * var(--k)); color:var(--text-2); }
+.ix-entry .chev { margin-left:auto; color:var(--text-3); }
 </style>
 </head>
 <body>
@@ -304,7 +350,7 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
 
   <section id="tokens">
     <h2><span class="no">1</span>　色彩 token（浅 / 深两套）</h2>
-    <p class="lead">深色模式按规范 §2.3 执行：品牌渐变三段<b>一个字节都不改</b>，只换背景、表面、边框与文字；不做「浅色反相」。
+    <p class="lead">深色模式按规范 §2.4 执行：品牌渐变三段<b>一个字节都不改</b>，只换背景、表面、边框与文字；不做「浅色反相」。
       域色在深色下提亮一档并改为「亮底 + 深墨字形」，保证图形对比 ≥3:1。</p>
     <div class="grid g2">
       <div class="panel">
@@ -368,7 +414,7 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
         </tbody>
       </table>
       <p style="font-size:13px;color:var(--doc-muted);margin:12px 0 0">这七档其实已经在代码里（<span class="mono">AppPalette.kt</span> 的 <span class="mono">DomainColors</span>），
-        只是从没写进规范，等于 §9 禁止的「未定义颜色体系」。本批把定义补进 §2.4，并明确它与「不得恢复紫色旧主题」不冲突：
+        只是从没写进规范，等于 §9 禁止的「未定义颜色体系」。本批把定义补进 §2.3，并明确它与「不得恢复紫色旧主题」不冲突：
         紫色只作为 <b>词库域的小面积容器色</b>出现，绝不做页面底、标题色或渐变成分。</p>
     </div>
   </section>
@@ -607,6 +653,155 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
         <span class="mono">设置页 3 个不同备份入口共用同一个 ⭕</span>、<span class="mono">同一只喇叭被手写两份</span>
         （<span class="mono">CardDetailScreen.kt:571</span> 24dp 与 <span class="mono">WordCardScreen.kt:428</span> 20dp）。
         底导 4 个 tab 的 Canvas 自绘是现状里唯一「像图标」的一组，改成同族字形并加选中态短横，其余自绘（环形弧、配对码、吉祥物）保留但统一取色。</p>
+    </div>
+
+    <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <symbol id="i-book-f" viewBox="0 0 24 24"><path d="M5 6h5.2v10.6H5z"/></symbol>
+      <symbol id="i-book-o" viewBox="0 0 24 24">
+        <path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/>
+      </symbol>
+      <symbol id="i-search-f" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/></symbol>
+      <symbol id="i-search-o" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="6"/><path d="M20 20l-4.6-4.6"/>
+      </symbol>
+      <symbol id="i-sound-f" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7L8 10z"/></symbol>
+      <symbol id="i-sound-o" viewBox="0 0 24 24">
+        <path d="M5 10v4h3l4 3V7L8 10z"/><path d="M16 9a4 4 0 010 6"/><path d="M18.6 6.4a7.6 7.6 0 010 11.2"/>
+      </symbol>
+      <symbol id="i-spark-f" viewBox="0 0 24 24"><path d="M11 3.5l1.8 4.5 4.5 1.8-4.5 1.8L11 16.1l-1.8-4.5L4.7 9.8l4.5-1.8z"/></symbol>
+      <symbol id="i-spark-o" viewBox="0 0 24 24">
+        <path d="M11 3.5l1.8 4.5 4.5 1.8-4.5 1.8L11 16.1l-1.8-4.5L4.7 9.8l4.5-1.8z"/>
+        <path d="M18.6 14.6l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z"/>
+      </symbol>
+      <symbol id="i-star-f" viewBox="0 0 24 24"><path d="M6.4 4h11.2v15.2L12 15.6l-5.6 3.6z"/></symbol>
+      <symbol id="i-star-o" viewBox="0 0 24 24"><path d="M6.4 4h11.2v15.2L12 15.6l-5.6 3.6z"/></symbol>
+      <symbol id="i-clock-f" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
+      <symbol id="i-clock-o" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3.2 2"/></symbol>
+      <symbol id="i-shield-f" viewBox="0 0 24 24"><path d="M12 4l7 3v5c0 4.2-3 7.3-7 8.2-4-.9-7-4-7-8.2V7z"/></symbol>
+      <symbol id="i-shield-o" viewBox="0 0 24 24">
+        <path d="M12 4l7 3v5c0 4.2-3 7.3-7 8.2-4-.9-7-4-7-8.2V7z"/><path d="M9.2 12.2l2 2 4-4.2"/>
+      </symbol>
+      <symbol id="i-trash-f" viewBox="0 0 24 24"><path d="M7.6 8h8.8l-.9 11.2H8.5z"/></symbol>
+      <symbol id="i-trash-o" viewBox="0 0 24 24">
+        <path d="M5 7h14"/><path d="M9.2 7V5h5.6v2"/><path d="M7.6 8l.9 11.2h6.9L16.4 8"/>
+      </symbol>
+    </svg>
+
+    <h3>6.2 三案对照：要不要更「像应用图标」（图标呈现方式待你定）</h3>
+    <p class="lead">你提到想要扇贝那种「里面有自己设计的图案、像应用图标、挺高级」的图标。先把一件事说清：
+      公开可查的竞品分析里，<b>扇贝老版本恰恰是「以文字为主、少用图标」</b>
+      （<a href="https://m.zcool.com.cn/article/ZNjcxOTI0.html">站酷 · 扇贝/百词斩竞品分析</a>），
+      所以这轮不能照着"抄扇贝的图标"——能借的是那种<b>图块化 + 有内部层次</b>的观感，
+      而不是它具体的图形。下面三案用的是<b>同一套造型骨架</b>，只差容器与内部层次，
+      你只需要判"要几层"，不必判"画得好不好"（真机与深浅两套都由顶栏控件现切）。</p>
+    <div class="panel">
+      <div class="trial">
+        <h4>方案 A · 单色描边 + 域色实底（现稿定的方案）</h4>
+        <p class="tr-note">字形来自 Material Symbols 路径数据（Apache-2.0，已登记台账）。成本最低、33 屏最不会走样，
+          但容器是平色、图形只有一层 —— 也就是你说的"不够高级"。</p>
+        <div class="ixrow ix-lg t-a">
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-learn);--db:var(--d-learn-base)"><svg class="iu"><use class="ux-f" href="#i-book-f"/><use class="ux-o" href="#i-book-o"/></svg></span>词书</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-library);--db:var(--d-library-base)"><svg class="iu"><use class="ux-f" href="#i-search-f"/><use class="ux-o" href="#i-search-o"/></svg></span>查词</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-ai);--db:var(--d-ai-base)"><svg class="iu"><use class="ux-f" href="#i-sound-f"/><use class="ux-o" href="#i-sound-o"/></svg></span>发音</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-review);--db:var(--d-review-base)"><svg class="iu"><use class="ux-f" href="#i-spark-f"/><use class="ux-o" href="#i-spark-o"/></svg></span>AI 生成</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-reading);--db:var(--d-reading-base)"><svg class="iu"><use class="ux-f" href="#i-star-f"/><use class="ux-o" href="#i-star-o"/></svg></span>收藏</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-review);--db:var(--d-review-base)"><svg class="iu"><use class="ux-f" href="#i-clock-f"/><use class="ux-o" href="#i-clock-o"/></svg></span>提醒</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-settings);--db:var(--d-settings-base)"><svg class="iu"><use class="ux-f" href="#i-shield-f"/><use class="ux-o" href="#i-shield-o"/></svg></span>认证备份</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-danger);--db:var(--d-danger-base)"><svg class="iu"><use class="ux-f" href="#i-trash-f"/><use class="ux-o" href="#i-trash-o"/></svg></span>删除</div>
+        </div>
+        <div class="card" style="margin-top:14px;padding:4px 16px">
+          <div class="ix-entry t-a"><span class="ixc" style="--d:var(--d-learn);--db:var(--d-learn-base)"><svg class="iu"><use class="ux-f" href="#i-book-f"/><use class="ux-o" href="#i-book-o"/></svg></span><div><div class="en">词书与每日目标</div><div class="ed">CET-4 核心词 · 每天 10 新词</div></div><span class="chev">›</span></div>
+          <div class="ix-entry t-a"><span class="ixc" style="--d:var(--d-reading);--db:var(--d-reading-base)"><svg class="iu"><use class="ux-f" href="#i-star-f"/><use class="ux-o" href="#i-star-o"/></svg></span><div><div class="en">收藏</div><div class="ed">12 词 · 点词卡详情「☆ 收藏」攒下的</div></div><span class="chev">›</span></div>
+          <div class="ix-entry t-a"><span class="ixc" style="--d:var(--d-settings);--db:var(--d-settings-base)"><svg class="iu"><use class="ux-f" href="#i-shield-f"/><use class="ux-o" href="#i-shield-o"/></svg></span><div><div class="en">备份与恢复</div><div class="ed">留档 / 认证导出 / 换机恢复</div></div><span class="chev">›</span></div>
+        </div>
+      </div>
+
+      <div class="trial">
+        <h4>方案 B · 双色层次（duotone）+ 域色渐变容器 · 自绘族（我的推荐）</h4>
+        <p class="tr-note">容器走 140° 渐变（域色 <span class="mono">base → deep</span>）+ 1px 内高光描边；
+          图形保留描边骨架，但主体内部加一层半透明填充 —— 观感上"图里还有图案"，就是应用图标那层意思。
+          代价：字形不再直接用 Material Symbols 的路径，而是<b>以它为骨架自绘重画</b>（约 30 枚上下，逐枚手写 <span class="mono">ImageVector</span>），
+          台账里那条 <span class="mono">material-symbols-icon-paths</span> 要改成"参考其度量、不复制其路径"。</p>
+        <div class="ixrow ix-lg t-b">
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-learn);--db:var(--d-learn-base)"><svg class="iu"><use class="ux-f" href="#i-book-f"/><use class="ux-o" href="#i-book-o"/></svg></span>词书</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-library);--db:var(--d-library-base)"><svg class="iu"><use class="ux-f" href="#i-search-f"/><use class="ux-o" href="#i-search-o"/></svg></span>查词</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-ai);--db:var(--d-ai-base)"><svg class="iu"><use class="ux-f" href="#i-sound-f"/><use class="ux-o" href="#i-sound-o"/></svg></span>发音</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-review);--db:var(--d-review-base)"><svg class="iu"><use class="ux-f" href="#i-spark-f"/><use class="ux-o" href="#i-spark-o"/></svg></span>AI 生成</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-reading);--db:var(--d-reading-base)"><svg class="iu"><use class="ux-f" href="#i-star-f"/><use class="ux-o" href="#i-star-o"/></svg></span>收藏</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-review);--db:var(--d-review-base)"><svg class="iu"><use class="ux-f" href="#i-clock-f"/><use class="ux-o" href="#i-clock-o"/></svg></span>提醒</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-settings);--db:var(--d-settings-base)"><svg class="iu"><use class="ux-f" href="#i-shield-f"/><use class="ux-o" href="#i-shield-o"/></svg></span>认证备份</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-danger);--db:var(--d-danger-base)"><svg class="iu"><use class="ux-f" href="#i-trash-f"/><use class="ux-o" href="#i-trash-o"/></svg></span>删除</div>
+        </div>
+        <div class="card" style="margin-top:14px;padding:4px 16px">
+          <div class="ix-entry t-b"><span class="ixc" style="--d:var(--d-learn);--db:var(--d-learn-base)"><svg class="iu"><use class="ux-f" href="#i-book-f"/><use class="ux-o" href="#i-book-o"/></svg></span><div><div class="en">词书与每日目标</div><div class="ed">CET-4 核心词 · 每天 10 新词</div></div><span class="chev">›</span></div>
+          <div class="ix-entry t-b"><span class="ixc" style="--d:var(--d-reading);--db:var(--d-reading-base)"><svg class="iu"><use class="ux-f" href="#i-star-f"/><use class="ux-o" href="#i-star-o"/></svg></span><div><div class="en">收藏</div><div class="ed">12 词 · 点词卡详情「☆ 收藏」攒下的</div></div><span class="chev">›</span></div>
+          <div class="ix-entry t-b"><span class="ixc" style="--d:var(--d-settings);--db:var(--d-settings-base)"><svg class="iu"><use class="ux-f" href="#i-shield-f"/><use class="ux-o" href="#i-shield-o"/></svg></span><div><div class="en">备份与恢复</div><div class="ed">留档 / 认证导出 / 换机恢复</div></div><span class="chev">›</span></div>
+        </div>
+      </div>
+
+      <div class="trial">
+        <h4>方案 C · 图块化（最像应用图标）：48dp 渐变块 + 顶部高光 + 实心图形</h4>
+        <p class="tr-note">图形由描边变实心，容器放大到 48dp、加渐变与顶部高光条、带极轻投影 ——
+          华丽感最强，首页九宫格会非常好看。代价也最直接：小尺寸（列表行内 17–22dp）实心图形会糊成一团，
+          必须退回描边；投影与高光在深色下要逐枚实测；全站 30 枚逐枚设计，工作量约为 A 的 3–4 倍，
+          且风格一旦"重"起来，33 屏里凡是复用它的地方都会一起变重。</p>
+        <div class="ixrow ix-lg t-c">
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-learn);--db:var(--d-learn-base)"><svg class="iu"><use class="ux-f" href="#i-book-f"/><use class="ux-o" href="#i-book-o"/></svg></span>词书</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-library);--db:var(--d-library-base)"><svg class="iu"><use class="ux-f" href="#i-search-f"/><use class="ux-o" href="#i-search-o"/></svg></span>查词</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-ai);--db:var(--d-ai-base)"><svg class="iu"><use class="ux-f" href="#i-sound-f"/><use class="ux-o" href="#i-sound-o"/></svg></span>发音</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-review);--db:var(--d-review-base)"><svg class="iu"><use class="ux-f" href="#i-spark-f"/><use class="ux-o" href="#i-spark-o"/></svg></span>AI 生成</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-reading);--db:var(--d-reading-base)"><svg class="iu"><use class="ux-f" href="#i-star-f"/><use class="ux-o" href="#i-star-o"/></svg></span>收藏</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-review);--db:var(--d-review-base)"><svg class="iu"><use class="ux-f" href="#i-clock-f"/><use class="ux-o" href="#i-clock-o"/></svg></span>提醒</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-settings);--db:var(--d-settings-base)"><svg class="iu"><use class="ux-f" href="#i-shield-f"/><use class="ux-o" href="#i-shield-o"/></svg></span>认证备份</div>
+          <div class="ixcell"><span class="ixc" style="--d:var(--d-danger);--db:var(--d-danger-base)"><svg class="iu"><use class="ux-f" href="#i-trash-f"/><use class="ux-o" href="#i-trash-o"/></svg></span>删除</div>
+        </div>
+        <div class="card" style="margin-top:14px;padding:4px 16px">
+          <div class="ix-entry t-c"><span class="ixc" style="--d:var(--d-learn);--db:var(--d-learn-base)"><svg class="iu"><use class="ux-f" href="#i-book-f"/><use class="ux-o" href="#i-book-o"/></svg></span><div><div class="en">词书与每日目标</div><div class="ed">CET-4 核心词 · 每天 10 新词</div></div><span class="chev">›</span></div>
+          <div class="ix-entry t-c"><span class="ixc" style="--d:var(--d-reading);--db:var(--d-reading-base)"><svg class="iu"><use class="ux-f" href="#i-star-f"/><use class="ux-o" href="#i-star-o"/></svg></span><div><div class="en">收藏</div><div class="ed">12 词 · 点词卡详情「☆ 收藏」攒下的</div></div><span class="chev">›</span></div>
+          <div class="ix-entry t-c"><span class="ixc" style="--d:var(--d-settings);--db:var(--d-settings-base)"><svg class="iu"><use class="ux-f" href="#i-shield-f"/><use class="ux-o" href="#i-shield-o"/></svg></span><div><div class="en">备份与恢复</div><div class="ed">留档 / 认证导出 / 换机恢复</div></div><span class="chev">›</span></div>
+        </div>
+      </div>
+
+      <h4 style="margin-top:20px">三案都会退化的地方：行内小尺寸（列表 30dp 容器 / 17dp 图形）</h4>
+      <div class="ixrow ix-sm">
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-learn)"><svg class="iu"><use class="ux-f" href="#i-book-f"/><use class="ux-o" href="#i-book-o"/></svg></span>词书</div>
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-library)"><svg class="iu"><use class="ux-f" href="#i-search-f"/><use class="ux-o" href="#i-search-o"/></svg></span>查词</div>
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-ai)"><svg class="iu"><use class="ux-f" href="#i-sound-f"/><use class="ux-o" href="#i-sound-o"/></svg></span>发音</div>
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-review)"><svg class="iu"><use class="ux-f" href="#i-spark-f"/><use class="ux-o" href="#i-spark-o"/></svg></span>AI 生成</div>
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-reading)"><svg class="iu"><use class="ux-f" href="#i-star-f"/><use class="ux-o" href="#i-star-o"/></svg></span>收藏</div>
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-review)"><svg class="iu"><use class="ux-f" href="#i-clock-f"/><use class="ux-o" href="#i-clock-o"/></svg></span>提醒</div>
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-settings)"><svg class="iu"><use class="ux-f" href="#i-shield-f"/><use class="ux-o" href="#i-shield-o"/></svg></span>认证备份</div>
+        <div class="ixcell"><span class="ixc" style="--d:var(--d-danger)"><svg class="iu"><use class="ux-f" href="#i-trash-f"/><use class="ux-o" href="#i-trash-o"/></svg></span>删除</div>
+      </div>
+      <p style="font-size:13px;color:var(--doc-muted);margin:12px 0 0">
+        这张图是选型的真正依据：<b>"高级感"来自 ≥40dp 的实底容器与内部层次，行内小图标无论选哪案都会收敛成
+        浅底 + 域色描边</b>。所以三案的差别只发生在首屏入口、设置页分组、AI 能力目录这些"大图块"位置（全站约 8–12 处），
+        而 33 屏的绝大多数图标其实是下面这一行。据此，<b>我建议 B</b>：入口层拿到渐变 + 双色层次的"图块感"，
+        行内仍是描边，一套骨架两处通用；C 的实心图形在行内不可用，等于要做两族。</p>
+
+      <table style="margin-top:16px">
+        <thead><tr><th style="width:110px">维度</th><th>A 描边 + 实底</th><th>B 双色 + 渐变（推荐）</th><th>C 图块 + 实心</th></tr></thead>
+        <tbody>
+          <tr><td>自绘程度</td><td>低（直接用 Apache-2.0 路径数据）</td><td>中（借骨架重画约 30 枚）</td><td>高（逐枚设计，含内部实心形）</td></tr>
+          <tr><td>高级感</td><td>干净但平</td><td>有明显层次，接近应用图标</td><td>最强，首页好看</td></tr>
+          <tr><td>行内小尺寸</td><td>原生适用</td><td>需一层"行内变体"（浅底描边）</td><td>不可用，必须另做一族</td></tr>
+          <tr><td>深色模式</td><td>字形翻成 <span class="mono">#06231A</span> 即可（已实测 ≥5.96:1）</td><td>渐变在深色下 <span class="mono">base=deep</span> 塌成平色，靠内高光撑层次</td><td>高光与投影在深色下逐枚核验，最容易翻车</td></tr>
+          <tr><td>许可台账</td><td><span class="mono">material-symbols-icon-paths</span> 照登记</td><td>该条改为"仅参考度量，不复制路径"，自绘部分并入 <span class="mono">app-authored-*</span></td><td>同 B，且自绘比例更高</td></tr>
+          <tr><td>批 1 工时</td><td>基准</td><td>约 1.6–2 倍</td><td>约 3–4 倍</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px;color:var(--doc-muted);margin:12px 0 0">
+        三案共同的红线，不随选型变：单族造型、24dp 网格、统一描边重量、容器 <span class="mono">12dp</span>（B/C 入口块可 <span class="mono">14dp</span>）、
+        禁止 emoji 与含字徽标、图形对比 ≥3:1 当场算、装饰性图形 <span class="mono">contentDescription = null</span>、
+        有语义的图标按钮必须有真实读屏名。选型改的只是"容器与内部几层"，不动这些。</p>
+      <p style="font-size:13px;color:var(--doc-muted);margin:10px 0 0">
+        这一版顺手改掉了一个我实测出来的坑：<b>浅色模式若把渐变亮端直接设为域色 <span class="mono">base</span>，白描边会不合格</b>——
+        AI <span class="mono">#2EC99C</span> 上白字 2.11:1、复习 <span class="mono">#FF9F0A</span> 上白字 2.06:1，连图形 3:1 的下限都不到，
+        薄荷与橙恰恰是最"好看"的两个域。因此 B/C 的渐变亮端一律取
+        <span class="mono">deep 混 35% base</span>（不是 base 本体），实测七域白描边落在 <b>3.17:1 ~ 6.26:1</b>，最差是 AI；
+        A 案容器本就用 <span class="mono">deep</span>，白描边 4.02:1 ~ 9.12:1。深色模式容器改用亮域色 +
+        <span class="mono">#06231A</span> 字形，实测 5.96:1 ~ 9.82:1，最差是危险。
+        C 案还额外叠了一层白色高光，那层压在哪枚字形上要逐枚实测——这是 C 的隐性成本之一。</p>
     </div>
   </section>
 
@@ -972,7 +1167,8 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
       只是来源注册表硬锁 <span class="mono">voa-learning-english</span> 一源（<span class="mono">ArticleSourceRegistry.kt:29-57</span>，公有领域），
       全仓无任何服务端搜索或开放抓取，请求体字段白名单也不含 tools（<span class="mono">AiRequestPolicy.kt:8-14</span>）。
       三条路线与折中见 <span class="mono">docs/decisions/2026-10-17-ui-redesign-information-architecture.md</span>。
-      另：你提的<b>打卡页华丽动效</b>记为视觉定稿后的独立批次（需单独处理 <span class="mono">reduced-motion</span> 与 TalkBack 朗读），本轮不做。</p>
+      另：你提的<b>打卡页华丽动效</b>记为视觉定稿后的独立批次（需单独处理 <span class="mono">reduced-motion</span> 与 TalkBack 朗读），本轮不做。
+      六条板落地后，<b>全站还开着的一块是 §6.2 的图标呈现三案</b>（纯视觉选型，不改界面结构，但它决定批 1 的 <span class="mono">AppIcons.kt</span> 工时与许可台账措辞）。</p>
     <div class="panel">
       <table>
         <thead><tr><th style="width:150px">要拍的板</th><th style="width:210px">我的推荐</th><th>代价 / 不做的后果</th></tr></thead>
