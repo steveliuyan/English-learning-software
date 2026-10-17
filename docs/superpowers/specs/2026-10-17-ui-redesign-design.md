@@ -67,7 +67,12 @@
 | 危险 | `#B30000` / `#FF3B30` | `#FF6B61` |
 | 设置 | `#48484A` / `#8E8E93` | `#B0B0B5` |
 
-**硬规则（F5-03 移交，不得回潮）**：浅薄荷底与品牌渐变上**禁止白字**，前景一律 `on-mint #174C44`（实测 ≈4.6:1）。
+**硬规则（F5-03 移交，不得回潮）**：浅薄荷底与品牌渐变上**禁止白字**；浅薄荷底前景取 `on-mint #174C44`，
+**品牌渐变上的文字统一取 `on-brand #04241C`**（`on-mint` 压渐变末端 `#35B9B5` 实测仅 4.07:1，
+原「≈4.6:1」口径只适用于浅薄荷底）。`text-3` 不作任何正文或标签前景（实测 3.00–3.40，需要第三级弱化用
+`text-2` + 降字号）；`text-2` 只许压 `surface`/`bg`/`tint`，不得压 `tint-2`/`tint-3`。
+三条裁决与图标两层豁免表见
+[`docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`](../../decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md)。
 深色下域色与 `base` 合一，避免暗底深字；危险色全站只用一套（`error` 文 / `error-fill` 填充），
 禁止再出现裸 `Color(0xFF…)` 现场调色（现存残留：`TodayPlanScreen.kt:160-161` 的 `#68BDA6`/`#C7A47D`、`:247` 的 `#795B36`、
 `AppScreen.kt:2223`/`:2336`）。
@@ -226,12 +231,17 @@
 - AC-R-02：全站无裸 `Color(0xFF…)` 字面量出现在 `ui/` 布局代码中（沿用 F5-03 已有的禁令契约测试并扩展）。
 - AC-R-03：浅底与品牌渐变上的前景色只能是 `on-mint`/`on-brand` 系；对比度由 WCAG 相对亮度函数计算 ≥ 4.5:1，禁止估。
   同一测试口径覆盖图标：白色字形/图形在域色容器上按非文本 ≥3:1 计算（浅底 tint + 域色字形另按 ≥3:1），
-  渐变容器亮端取 `deep` 混 35% `base`，出现以浅色 `base` 直接作白字形底的容器即判失败（AI 2.11:1 / 复习 2.06:1）。
+  渐变容器亮端取 `deep` 混 35% `base`，出现以浅色 `base` 直接作白字形底的容器即判失败（AI 2.11:1 / 复习 2.06:1）；
+  允许配对与禁配（`text-2` 禁压 `tint-2`/`tint-3`、渐变上取 `on-brand`）由 `DesignTokenContractTest` 的表钉住
+  （取值见 `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`）。
 - AC-R-04：所有可交互控件高度 `≥ 48.dp`（`heightIn`/`defaultMinSize` 断言，沿用 F5-03 测试口径）。
 - AC-R-05：`verifyThirdPartyNotices` 通过，且台账含 `material-symbols-icon-paths`（改述为仅参考度量）、
   `app-authored-ui-icons` 与 `app-authored-ui-illustrations` 三条（8 字段均非空），
   描述与 `AppIcons.kt` 实际入库的路径来源一致，应用内许可页渲染出同一份内容。
-- AC-R-05b：`AppIcons.kt` 每枚图标为两层结构（描边骨架 + 填充层），逐枚清单与本规格 §4.1 的规模相符；
+- AC-R-05b：`AppIcons.kt` 除 `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`
+  豁免表内 5 枚（`Back`/`ChevronRight`/`ChevronDown`/`Close`/`Check`，只有描边骨架、不建填充层）外
+  每枚图标为两层结构（描边骨架 + 填充层），豁免表内 5 枚不得进入 ≥40dp 入口容器（只作行内/尾部指示）；
+  逐枚清单以该决策文档钉定的 33 枚为准，与本规格 §4.1 的规模相符；
   行内呈现下填充层不显示；全站 `Icons.` 引用仍为 0、不新增 `material-icons-extended` 依赖
   （`dependencyLocking` 锁文件零变化）。
 - AC-R-06：`AppTabTest` 与既有业务规则测试零修改通过；JVM 单测基线只增不减（当前基线 1499 测试 / 206 套件 / 0 失败，须每次重算不得引用陈旧数）。
