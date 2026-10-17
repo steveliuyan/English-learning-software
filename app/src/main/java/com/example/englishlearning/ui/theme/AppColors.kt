@@ -1,7 +1,7 @@
 package com.example.englishlearning.ui.theme
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocal
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -114,10 +114,14 @@ val DomainDark: Map<AppDomain, DomainPalette> = mapOf(
 /**
  * 主题装配用 CompositionLocal（Task 4 装配点 provides 注入；整树一次性切换，
  * 故取 staticCompositionLocalOf，不需要每次变更重建读取，计划 Task 2 Step 3 口径）。
+ *
+ * 静态类型必须写成 `ProvidableCompositionLocal<…>`（计划 Task 2 Interfaces 已订正）：`provides`
+ * 是 `ProvidableCompositionLocal` 的成员，基类 `CompositionLocal` 只有 `current`；标注成基类
+ * 就是刻意放宽静态类型，Task 4 的 `LocalAppColors provides set` 会当场编译不过。
  */
-val LocalAppColors: CompositionLocal<AppColorSet> = staticCompositionLocalOf { AppColorLight }
-val LocalDomainColors: CompositionLocal<Map<AppDomain, DomainPalette>> = staticCompositionLocalOf { DomainLight }
-val LocalIsDark: CompositionLocal<Boolean> = staticCompositionLocalOf { false }
+val LocalAppColors: ProvidableCompositionLocal<AppColorSet> = staticCompositionLocalOf { AppColorLight }
+val LocalDomainColors: ProvidableCompositionLocal<Map<AppDomain, DomainPalette>> = staticCompositionLocalOf { DomainLight }
+val LocalIsDark: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { false }
 
 /** 组合期读取当前主题中性 token 集。 */
 @Composable

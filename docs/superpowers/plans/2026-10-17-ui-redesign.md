@@ -199,7 +199,7 @@ internal val MintBackground: Color
   - `enum class AppDomain { AiSpeech, Learn, Review, Library, Reading, Danger, Settings }`
   - `data class DomainPalette(val base: Color, val deep: Color)`
   - `val DomainLight: Map<AppDomain, DomainPalette>`、`val DomainDark: Map<AppDomain, DomainPalette>`
-  - `val LocalAppColors: CompositionLocal<AppColorSet>`、`val LocalDomainColors: CompositionLocal<Map<AppDomain, DomainPalette>>`、`val LocalIsDark: CompositionLocal<Boolean>`
+  - `val LocalAppColors: ProvidableCompositionLocal<AppColorSet>`、`val LocalDomainColors: ProvidableCompositionLocal<Map<AppDomain, DomainPalette>>`、`val LocalIsDark: ProvidableCompositionLocal<Boolean>`（**必须**是 `ProvidableCompositionLocal`：`provides` 是它的成员而非 `CompositionLocal` 的，Task 4 的装配点要写 `LocalAppColors provides set`，静态类型收窄成 `CompositionLocal` 就编译不过。原写作 `CompositionLocal<T>` 是本计划的笔误，Task 2 修复轮 1 已按此订正）
   - `@Composable @ReadOnlyComposable fun appColors(): AppColorSet`、`@Composable @ReadOnlyComposable fun appDomain(domain: AppDomain): DomainPalette`
 
 - [ ] **Step 1: 写失败的契约测试**

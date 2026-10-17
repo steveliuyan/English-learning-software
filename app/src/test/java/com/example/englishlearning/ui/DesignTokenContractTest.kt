@@ -22,7 +22,8 @@ import kotlin.test.assertEquals
  * 反自匹配论证：token 名要求其后紧跟（可含换行的）空白与 `=`，故 `tint` 不会命中 `tint2 =`
  * （`tint` 后是 `2`）、`surface` 不会命中 `surfaceGlass =`（后是 `G`）、`outline` 不会命中
  * `outlineSoft =`、`error` 不会命中 `errorFill =`、`text1` 不会命中假想的 `text10 =`；
- * 前瞻侧 lookbehind `(?<![\w.])` 让 token 不能是更长标识符的后缀（`appTint =` 不命中 `tint`）
+ * 前瞻侧 lookbehind `(?<![\w.])` 让 token 不能是更长标识符的后缀（小写的 `apptint =` 不命中 `tint`、
+ * `webbackground =` 不命中 `background`；`appTint =` 同样不命中，但它靠的是大小写）
  * 也不是带点成员（`style.background = Color(...)` 不命中 `background`）。所有负例都在
  * `token lookup rule …` 用例里用合成片段当场证明，永久红的正则会在第一个 GREEN 前暴露。
  *
@@ -40,8 +41,10 @@ class DesignTokenContractTest {
 
     /**
      * 目录守卫：措辞与失败信息形状照抄 AccessibilityColorTokenContractTest.scanMainSources，
-     * 目录换 THEME_SOURCE_PATH（brief Step 1 原文要求）。本测试用 `uiFiles` 做实际扫描
-     * （SourceRatchet 共享夹具），守卫形状在此保留给目录层缺失的大声失败路径。
+     * 目录换 THEME_SOURCE_PATH（brief Step 1 原文要求）。本类的实际扫描一律走这个类内守卫——
+     * AppColors.kt / AppPalette.kt / MintPalette.kt 的按名查找与「缺失目录大声失败」用例都基于它。
+     * `SourceRatchet.uiFiles` 是同批建下的共享夹具（守卫形状同源，扫的是整个 `ui/` 包），
+     * 由 Task 6 的 raw-color 棘轮消费，本任务不接它，两者互不依赖。
      */
     private fun scanThemeSources(dir: File = themeDir): List<File> {
         assertTrue(
@@ -284,8 +287,11 @@ class DesignTokenContractTest {
             "AppColorSet(outlineSoft = Color(0xFFE4EFE9))" to "outline",
             // `error` 不得命中 `errorFill =`
             "AppColorSet(errorFill = Color(0xFFFF3B30))" to "error",
-            // lookbehind：token 不得是更长标识符的后缀
+            // lookbehind：token 不得是更长标识符的后缀（本条实为大小写拦住：appTint 内没有小写 tint 子串）
             "AppColorSet(appTint = Color(0xFF112233))" to "tint",
+            // lookbehind 的 `\w` 分支本体：全小写后缀嵌入，大小写给不出任何理由，只能由 (?<![\w.]) 拦下
+            "AppColorSet(apptint = Color(0xFF112233))" to "tint",
+            "AppColorSet(webbackground = Color(0xFF112233))" to "background",
             // lookbehind 的点：带点成员引用不算声明
             "style.background = Color(0xFFF1FBF5)" to "background",
             // 带类型注解的属性声明（`val x: Color = Color(...)`）不是构造命名参数，不得被形状误认
@@ -420,14 +426,27 @@ class DesignTokenContractTest {
         listOf(
             Regex("""data class AppColorSet\(""") to "AppColorSet 数据类",
             Regex("""data class DomainPalette\(val base: Color, val deep: Color\)""") to "DomainPalette(base, deep)",
-            Regex("""val LocalAppColors\s*:\s*CompositionLocal<AppColorSet>\s*=\s*staticCompositionLocalOf""") to "LocalAppColors",
-            Regex("""val LocalDomainColors\s*:\s*CompositionLocal<Map<AppDomain, DomainPalette>>\s*=\s*staticCompositionLocalOf""") to "LocalDomainColors",
-            Regex("""val LocalIsDark\s*:\s*CompositionLocal<Boolean>\s*=\s*staticCompositionLocalOf""") to "LocalIsDark",
+            Regex("""val LocalAppColors\s*:\s*ProvidableCompositionLocal<AppColorSet>\s*=\s*staticCompositionLocalOf""") to "LocalAppColors",
+            Regex("""val LocalDomainColors\s*:\s*ProvidableCompositionLocal<Map<AppDomain, DomainPalette>>\s*=\s*staticCompositionLocalOf""") to "LocalDomainColors",
+            Regex("""val LocalIsDark\s*:\s*ProvidableCompositionLocal<Boolean>\s*=\s*staticCompositionLocalOf""") to "LocalIsDark",
             Regex("""fun appColors\(\)\s*:\s*AppColorSet\s*=\s*LocalAppColors\.current""") to "appColors()",
             Regex("""fun appDomain\(domain: AppDomain\)\s*:\s*DomainPalette\s*=\s*LocalDomainColors\.current\.getValue\(domain\)""") to "appDomain(domain)",
         ).forEach { (regex, label) ->
             assertTrue(regex.containsMatchIn(text), "Interfaces 声明缺失或形状偏离：$label")
         }
+
+        // 反向钉：三个 Local 的静态类型不得写成基类 `CompositionLocal<…>`（修复轮 1 的 Important）。
+        // 上方正向匹配已要求 `Providable` 前缀，此处再把「宽化类型」显式判红，防止有人只改回一处
+        // 或另写 `CompositionLocal<` 形状的等价声明：`provides` 只是 ProvidableCompositionLocal 的成员
+        // （基类 `CompositionLocal` 只有 `current`），Task 4 装配点要写 `LocalAppColors provides set`，
+        // 静态类型宽化即编译失败。
+        // 两个负向 lookbehind 排除 Providable/Dynamic 两个子类型前缀；`staticCompositionLocalOf` 不构成
+        // 误报，因为那里 `CompositionLocal` 之后紧跟的是 `Of` 而非 `<`。
+        val widenedType = Regex("""(?<!Providable)(?<!Dynamic)CompositionLocal<""")
+        assertTrue(
+            !widenedType.containsMatchIn(text),
+            "Local 的静态类型被写成基类 CompositionLocal<…>：provides 不属于该类型，Task 4 装配点会编译不过（应为 ProvidableCompositionLocal<…>）",
+        )
     }
 
     /** 配对断言（操作数从源码取值读——token 漂移会当场爆，而不是留下永远绿的字面量）。 */
