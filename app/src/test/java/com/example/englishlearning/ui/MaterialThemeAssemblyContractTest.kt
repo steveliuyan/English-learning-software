@@ -397,13 +397,12 @@ class MaterialThemeAssemblyContractTest {
             setContentRoot.containsMatchIn(body),
             "MainActivity 内容根必须是 MintGlassTheme，否则 CompositionLocal 无提供者，Mint* 会取到默认浅套"
         )
-        // M-3：原先这里还有一条对 `import …theme.ThemeMode` 的字面 import 断言，已删——Task 5 会把
-        // `themeMode = ThemeMode.System` 换成 `themeMode = rememberAppThemeMode()`，该 import 届时可能消失，
-        // 字面断言会假红。下面的实参名守卫保留，接线形状契约不变：Task 5 必须是
-        // `MintGlassTheme(themeMode = rememberAppThemeMode()) { AppScreen(...) }`——实参名保留、值换成回读表达式。
+        // M-3：原先这里还有一条对 `import …theme.ThemeMode` 的字面 import 断言，已删——接线改成
+        // prefs 回读后该 import 可能消失，字面断言会假红。Task 5 落定后实参形状已可钉死：
+        // `MintGlassTheme(themeMode = rememberAppThemeMode()) { AppScreen(...) }`。
         assertTrue(
-            Regex("""MintGlassTheme\(\s*themeMode\s*=""").containsMatchIn(body),
-            "MintGlassTheme 必须显式接 themeMode 实参（Task 5 把它换成 rememberAppThemeMode()）"
+            Regex("""MintGlassTheme\(\s*themeMode\s*=\s*rememberAppThemeMode\(\)\s*\)""").containsMatchIn(body),
+            "MintGlassTheme 必须显式接 themeMode = rememberAppThemeMode()：偏好落点若换回去，主题三态会失去活链路"
         )
         listOf(
             "import com.example.englishlearning.ui.theme.MintGlassTheme",

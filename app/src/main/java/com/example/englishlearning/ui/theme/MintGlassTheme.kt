@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.dp
  *
  * 翻色链路：[shouldUseDarkTheme] 的 `systemInDark` 实参来自 [isSystemInDarkTheme]（组合期状态
  * 读取），所以三态翻动会让本函数的 `dark` 重算，进而让 `compositionLocalOf` 的读取失效重算，
- * 整棵子树的 token 与 M3 配色同时换套（Task 5 把 `themeMode` 换成 `rememberAppThemeMode()` 的
- * prefs 回读，同样是组合期状态）。
+ * 整棵子树的 token 与 M3 配色同时换套。`themeMode` 实参由调用方提供：生产接线（`MainActivity`）
+ * 传 [rememberAppThemeMode] 的 prefs 回读，同样是组合期状态，改偏好即翻色。
  */
 @Composable
 fun MintGlassTheme(

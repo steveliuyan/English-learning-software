@@ -890,7 +890,7 @@ internal val MintBackground: Color
   `ScreenUnavailable`：`tint` 底卡片 + `InlineIconBadge` 位（或 `AppGlyph`）+ 原因文案 + **一个**动作按钮，`testTag("screen_unavailable_action")`。
   两者颜色全部走 `appColors()`，零裸 hex（Task 8 棘轮会挡）。
 
-- [ ] **Step 4: 跑 connected 通过 + 门控**（emulator-5574，命令见 Task 5 Step 7）。
+- [ ] **Step 4: 跑 connected 通过 + 门控**（emulator-5574，命令见 Task 5 Step 5）。
 
 - [ ] **Step 5: 提交**
 

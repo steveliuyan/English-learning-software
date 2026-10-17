@@ -60,33 +60,43 @@ object AppThemePreferences {
     const val KEY_THEME_MODE = "theme_mode"
 
     /** 回读：缺失、空串、未知或大小写不符的取值一律按 [ThemeMode.System] 处理（口径见 [themeModeFromStorage]）。 */
-    fun read(context: Context): ThemeMode =
-        themeModeFromStorage(preferences(context).getString(KEY_THEME_MODE, null))
+    fun read(context: Context): ThemeMode = read(appThemePreferences(context))
+
+    /**
+     * 解码的唯一口径：[read] 与 [rememberAppThemeMode] 的监听回调都走这里。
+     * 组合侧已持有实例，直接从实例读；另立一条「存储值 → ThemeMode」路径就是漂移。
+     */
+    internal fun read(preferences: SharedPreferences): ThemeMode =
+        themeModeFromStorage(preferences.getString(KEY_THEME_MODE, null))
 
     /** 落盘用 `apply()`：偏好改动不该阻塞调用线程，且下一次进程起来时磁盘值已足够。 */
     fun write(context: Context, mode: ThemeMode) {
-        preferences(context).edit().putString(KEY_THEME_MODE, mode.storageKey).apply()
+        appThemePreferences(context).edit().putString(KEY_THEME_MODE, mode.storageKey).apply()
     }
-
-    /**
-     * 统一入口：`getSharedPreferences` 的实例按「包名 + 文件名」进程级缓存，
-     * 所以这里取 applicationContext 只是避免泄漏 Activity，跨 Context 拿到的仍是同一个
-     * [SharedPreferences] 对象——[rememberAppThemeMode] 的监听因此能收到别的站点写入的通知。
-     */
-    internal fun preferences(context: Context): SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 }
+
+/**
+ * prefs 实例的统一入口，所以是本文件的 `private`：外部（含测试）只该经 [AppThemePreferences.read] /
+ * [AppThemePreferences.write] 碰这份文件，拿不到裸实例也就无法绕开解码口径。
+ *
+ * `getSharedPreferences` 的实例按「包名 + 文件名」进程级缓存，这里取 applicationContext 只是避免
+ * 泄漏 Activity，跨 Context 拿到的仍是同一个 [SharedPreferences] 对象——[rememberAppThemeMode]
+ * 的监听因此能收到别的站点写入的通知。
+ */
+private fun appThemePreferences(context: Context): SharedPreferences =
+    context.applicationContext.getSharedPreferences(AppThemePreferences.PREFS_NAME, Context.MODE_PRIVATE)
 
 /**
  * 组合期读取当前主题三态偏好，并在偏好被改写时立即让读取方重算（不重建 `setContent`）。
  *
- * 活链路的每一环都不可省：
+ * 活链路的一环一环：
  * 1. 初值经 [AppThemePreferences.read] 回读，非法存储值因此仍走 [ThemeMode.System]；
  * 2. `DisposableEffect` 注册 [SharedPreferences.OnSharedPreferenceChangeListener]，
  *    离开组合时注销——监听是弱引用语义，注册方必须由组合持有（此处的 effect 就是持有者）；
- * 3. 回调线程是 SharedPreferences 的磁盘写线程，而 `mutableStateOf` 的写入必须在主线程才会
- *    立刻触发重组，所以经 `ContextCompat.getMainExecutor` 跳回主线程（minSdk 26，
- *    不能用 `Context.mainExecutor`，那是 API 28）；
+ * 3. 回调不保证跑在主线程（通知来自 SharedPreferences 的写线程），所以按 Compose 惯例经
+ *    `ContextCompat.getMainExecutor` 跳回主线程再写 `mutableStateOf`；minSdk 26 用不了
+ *    `Context.mainExecutor`（API 28），故走 androidx 兼容入口。**这一跳板是本文件的写法选择，
+ *    不是被证过「删掉就红」的必要条件**——connected 用例只证活链路整体通，没做过删跳板的反证；
  * 4. 状态一变，装配点 [MintGlassTheme] 的 `themeMode` 实参重算，`compositionLocalOf` 的读取失效，
  *    整棵子树换套。
  *
@@ -95,16 +105,14 @@ object AppThemePreferences {
 @Composable
 fun rememberAppThemeMode(): ThemeMode {
     val context = LocalContext.current
-    val preferences = remember(context) { AppThemePreferences.preferences(context) }
-    var mode by remember(preferences) { mutableStateOf(AppThemePreferences.read(context)) }
+    val preferences = remember(context) { appThemePreferences(context) }
+    var mode by remember(preferences) { mutableStateOf(AppThemePreferences.read(preferences)) }
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
 
     DisposableEffect(preferences, mainExecutor) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { changed, key ->
             if (key == null || key == AppThemePreferences.KEY_THEME_MODE) {
-                mainExecutor.execute {
-                    mode = themeModeFromStorage(changed.getString(AppThemePreferences.KEY_THEME_MODE, null))
-                }
+                mainExecutor.execute { mode = AppThemePreferences.read(changed) }
             }
         }
         preferences.registerOnSharedPreferenceChangeListener(listener)
