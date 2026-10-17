@@ -21,7 +21,8 @@ object NewWordOrdering {
     /** Lemma prefix treated as "these two words will be confused for each other". */
     private const val PREFIX_LENGTH = 3
 
-    private const val FNV_OFFSET_BASIS = -0x340D633AC5184B37L // 0xcbf29ce484222325
+    /** FNV-1a 64 位标准 offset basis（`0xcbf29ce484222325`）的有符号字面量。 */
+    private const val FNV_OFFSET_BASIS = -0x340D631B7BDDDCDBL
     private const val FNV_PRIME = 1099511628211L
 
     /** Ties are broken by content hash, so the result never depends on the incoming order. */
@@ -73,8 +74,10 @@ object NewWordOrdering {
     }
 
     /**
-     * @return `floor(n / M)`: the book's entry count divided by its largest prefix group. This is
-     *  both the strongest uniform spacing any ordering could promise and the one [order] achieves.
+     * @return `floor(n / M)`: the book's entry count divided by its largest prefix group — the
+     *  spacing [order] achieves and the upper bound any single fixed ordering could promise for
+     *  the dominant group. Degenerate books clamp to 1: when one group holds the whole book
+     *  (`M == n`), no ordering separates its entries at all.
      */
     fun minimumSpacing(cardIds: List<String>): Int {
         if (cardIds.size < 2) return 1

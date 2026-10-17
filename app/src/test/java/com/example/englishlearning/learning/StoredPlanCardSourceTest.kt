@@ -76,18 +76,21 @@ class StoredPlanCardSourceTest {
                 "cet4:con-2",
             )
         val order = NewWordOrdering.order(ids)
-        val source = StoredPlanCardSource(Content(ids), FakeEvents(reviewed = listOf("cet4:act-2")))
 
-        // 词书原始顺序会先发 act-1/act-2 这对同前缀邻居；交错序不会。
-        val firstTwo = source.newCardIds("cet4", 2)
+        // 词书原始顺序的前两张就是 act-1/act-2 这对同前缀邻居；交错序必须把它们岔开。
+        val firstTwo = StoredPlanCardSource(Content(ids), FakeEvents()).newCardIds("cet4", 2)
         assertEquals(2, firstTwo.size)
         assertNotEquals(prefixOf(firstTwo[0]), prefixOf(firstTwo[1]))
 
-        val remaining = source.newCardIds("cet4", 10)
-        assertEquals(order.filterNot { it == "cet4:act-2" }, remaining)
-        val positions = remaining.map { order.indexOf(it) }
-        assertTrue(positions.isNotEmpty() && positions.all { it >= 0 })
-        assertEquals(positions.sorted(), positions)
+        // 剔除一个已学词只能从完整顺序里删掉它，其余相对次序与取到的张数都不许变。
+        val source = StoredPlanCardSource(Content(ids), FakeEvents(reviewed = listOf("cet4:con-1")))
+        val plan = source.newCardIds("cet4", 4)
+
+        assertEquals(order.filterNot { it == "cet4:con-1" }.take(4), plan)
+        assertEquals(4, plan.size)
+        assertTrue(plan.none { it == "cet4:con-1" }, "a reviewed card must not be handed out as new")
+        val positions = plan.map { order.indexOf(it) }
+        assertEquals(positions.sorted(), positions, "removing a reviewed card must leave a subsequence")
     }
 
     @Test

@@ -1,9 +1,12 @@
 package com.example.englishlearning.learning
 
+import com.example.englishlearning.wordbook.WordBookPackageParser
+import java.io.File
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import org.junit.jupiter.api.Test
 
 /**
@@ -67,18 +70,22 @@ class NewWordOrderingTest {
 
     @Test
     fun `a full sized book keeps its spacing guarantee`() {
-        // Shaped like the real CET-4 book: thousands of entries, one dominant prefix group.
+        // Shaped like the real CET-4 book: thousands of entries, one dominant prefix group (84),
+        // every other group of 3. Prefixes are built collision-free, so the group sizes below are
+        // what the fixture actually has — the real books are asserted in the next test.
         val book = buildList {
             addAll((1..84).map { "cet4:con-item-$it" })
             addAll((1..48).map { "cet4:com-item-$it" })
             addAll((1..45).map { "cet4:pro-item-$it" })
             var group = 0
             while (size < 4308) {
-                val prefix = "x%02d".format(Locale.ROOT, group % 900)
+                val prefix = threeLetters(group)
                 addAll((1..3).map { "cet4:$prefix-item-$it" })
                 group += 1
             }
         }.take(4308)
+
+        assertEquals(84, book.groupBy(::prefixOf).maxOf { it.value.size }, "fixture lost its dominant group")
 
         val ordered = NewWordOrdering.order(book)
 
@@ -86,12 +93,39 @@ class NewWordOrderingTest {
         assertSpacingHolds(book, ordered)
     }
 
+    @Test
+    fun `bundled books are reordered and keep their spacing guarantee`() {
+        val root =
+            listOf(File("src/main/assets/wordbooks"), File("app/src/main/assets/wordbooks"))
+                .firstOrNull(File::isDirectory)
+                ?: fail("bundled word books not found from ${File(".").absolutePath}")
+        val books =
+            root.listFiles { file -> file.isDirectory }
+                .orEmpty()
+                .mapNotNull { directory -> WordBookPackageParser.parse(directory).getOrNull() }
+                .map { parsed -> parsed.metadata.id to parsed.cards.map { it.cardId } }
+
+        assertTrue(books.size >= 8, "expected the bundled books to parse, got ${books.size}")
+
+        // 只有「最大前缀组不止占满全册」的册才有可断言的间距；退化的册由上一条用例覆盖。
+        val spaced = books.filter { (_, stored) -> stored.size / stored.largestGroup() >= 2 }
+        assertTrue(spaced.size >= 4, "expected at least 4 bundled books to carry a spacing claim, got ${spaced.size}")
+
+        spaced.forEach { (bookId, storedOrder) ->
+            val ordered = NewWordOrdering.order(storedOrder)
+
+            assertEquals(storedOrder.sorted(), ordered.sorted(), "$bookId must keep every entry")
+            assertNotEquals(storedOrder, ordered, "$bookId came out in its stored alphabetical order")
+            assertSpacingHolds(storedOrder, ordered)
+        }
+    }
+
     /**
      * Recomputes `floor(n / M)` from the fixture itself and asserts every same-prefix pair respects
-     * it, so the guarantee is checked against the definition rather than a hardcoded constant.
+     * it, so the guarantee is checked against the definition and not against the production helper.
      */
     private fun assertSpacingHolds(book: List<String>, ordered: List<String>) {
-        val minimumSpacing = NewWordOrdering.minimumSpacing(book)
+        val minimumSpacing = book.size / book.largestGroup()
         assertTrue(minimumSpacing >= 2, "fixture too lopsided to test spacing: floor(n/M)=$minimumSpacing")
 
         val positions = ordered.withIndex().groupBy({ prefixOf(it.value) }, { it.index })
@@ -104,6 +138,13 @@ class NewWordOrderingTest {
             }
         }
     }
+
+    /** Largest shared-prefix group of a book — the `M` in `floor(n / M)`, computed independently. */
+    private fun List<String>.largestGroup(): Int = groupBy(::prefixOf).maxOf { (_, ids) -> ids.size }
+
+    /** A collision-free three-letter prefix, so a synthetic book's group sizes are the stated ones. */
+    private fun threeLetters(index: Int): String =
+        "${'d' + index / 676 % 24}${'a' + index / 26 % 26}${'a' + index % 26}"
 
     private fun prefixOf(cardId: String): String =
         cardId.substringAfter(':').ifEmpty { cardId }.take(3).lowercase(Locale.ROOT)
