@@ -5,11 +5,12 @@ import kotlin.test.assertTrue
 
 /**
  * 批 1 源码级契约测试共享夹具（计划 Task 2 建 `uiFiles`/`stripComments`/`countMatches` 三件；
- * Task 6 再在本文件补 `violations` 棘轮入口，届时不要另起第二份夹具）。
+ * `violations` 棘轮入口由计划 Task 8「三件棘轮测试上线」在本文件补，届时不要另起第二份夹具）。
  *
  * 口径（有意为之，勿「顺手加严」）：
- *  - 本仓库 JVM 单测零 `androidx.compose` 导入，所以「源码文本即契约」：取值、形状、计数
- *    都以纯函数读 `src/main/java` 文本；Compose 渲染类断言归 androidTest。
+ *  - JVM 单测只按需导入 compose 的纯数据符号（如 `androidx.compose.ui.graphics.Color`，用来算亮度），
+ *    不引入 robolectric 或渲染运行时，所以「源码文本即契约」：取值、形状、计数都以纯函数读
+ *    `src/main/java` 文本；Compose 渲染类断言归 androidTest。
  *  - 注释文本不计入契约：`stripComments` 形状逐字沿用 AccessibilityColorTokenContractTest:48-51。
  *    实现文件的 KDoc 会合法复述同一批 hex（如「取值来自 spec §2.1」），不先剥注释的正则会被
  *    注释满足，契约就成空转——所有源码断言必须先过 stripComments 再匹配。
