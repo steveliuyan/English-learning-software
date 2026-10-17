@@ -278,6 +278,28 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
         </tbody>
       </table>
     </div>
+
+    <h3>口径更正：上一轮我给的审计数字里有两条不成立，逐屏复核后以此为准</h3>
+    <div class="panel">
+      <table>
+        <thead><tr><th style="width:130px">项目</th><th>我上一轮说的</th><th>逐屏复核后的事实</th></tr></thead>
+        <tbody>
+          <tr><td>设置页结构</td><td>「一张无分组的长列表，12 行」</td>
+            <td>实测 <b>7 组 14 行</b>（12 可点 + 2 占位）：组标题在 <span class="mono">SettingsScreen.kt:171</span>/<span class="mono">:186</span>/<span class="mono">:197</span>/<span class="mono">:224</span>/<span class="mono">:242</span>/<span class="mono">:284</span>/<span class="mono">:314</span>。
+              真问题不是「没分组」，是<b>分组分错</b>：学习提醒挂在 AI 组（<span class="mono">:214</span>）、「关于」挂在「账户」组（<span class="mono">:230</span>）、「阅读」组只为一个不可点占位行存在（<span class="mono">:186-192</span>）。</td></tr>
+          <tr><td>收藏空态</td><td>「让用户点界面上根本不存在的星标」</td>
+            <td>按钮确实存在：<span class="mono">PillButton "☆ 收藏"</span>（<span class="mono">CardDetailScreen.kt:386-394</span>，覆盖 5 个详情宿主）。缺陷是<b>叫法对不上</b>——空态写「点星标」（<span class="mono">FavoritesScreen.kt:101</span>），界面上写「☆ 收藏」。改文案，不改交互。</td></tr>
+          <tr><td>今日计划入口</td><td>「按钮偏多」</td>
+            <td>可量化：CTA 下方 <b>7 个整宽跳转按钮</b>（<span class="mono">TodayPlanScreen.kt:148-283</span>），其中「阅读文章」「学习工具与设置」只是切底导（<span class="mono">AppScreen.kt:1533</span>），底导本就常驻 → 纯占高。</td></tr>
+          <tr><td>AI 主页状态文案</td><td>未提及</td>
+            <td>「长难句分析与生图正在开发，其余功能点开只能看到进度」（<span class="mono">AiLearningScreen.kt:312</span>）与 <span class="mono">AiFeature.kt:85/97/110</span> 的 <span class="mono">implemented = true</span> 直接矛盾——是<b>过期文案</b>，不属视觉决定。</td></tr>
+          <tr><td>备份文案</td><td>未提及</td>
+            <td>「导出学习数据留档…暂不可用于认证恢复」（<span class="mono">SettingsScreen.kt:287</span>）已过时：认证恢复整条链路已实现并有独立入口（<span class="mono">BackupRestoreScreen.kt</span> 全文件、门在 <span class="mono">:301</span>）。仍在向用户宣称自家能力不存在。</td></tr>
+        </tbody>
+      </table>
+      <p class="lead" style="margin:14px 0 0">这五条与前一张表的性质不同：分组错、文案过期、数字口径<b>属于「按既定规范直接修」的缺陷</b>，不需要设计拍板；
+        需要拍板的是 <span class="mono">§8</span> 里那六条信息架构取舍。</p>
+    </div>
   </section>
 
   <section id="tokens">
@@ -589,9 +611,11 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
   </section>
 
   <section id="screens">
-    <h2><span class="no">7</span>　四屏真比例版面（360dp 宽，1px = 1dp）</h2>
+    <h2><span class="no">7</span>　六屏真比例版面 + 每屏只留什么（360dp 宽，1px = 1dp）</h2>
     <p class="lead">顶部「深色」按钮会把下面所有设备框一起切到深色 token，字号按钮切 <span class="mono">--k</span>（模拟系统字体缩放）。
-      这两件事在现状里都是<b>做不到</b>的：没有装配点，深浅与字号只能逐屏硬写。</p>
+      这两件事在现状里都是<b>做不到</b>的：没有装配点，深浅与字号只能逐屏硬写。
+      ⑤⑥ 与 §7 表是本轮「逐屏内容归属审计」的结论落图——审计口径与证据在 <span class="mono">docs/design/2026-10-17-content-placement-audit.md</span>，
+      本稿只画结论版面，不重复列证据。</p>
 
     <h3>① 词书选取（你抱怨「卡一下才蹦出来」的那屏）</h3>
     <div class="devices">
@@ -685,14 +709,14 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
             <div class="d" style="margin-top:6px">已按乱序排布：形近词彼此间隔 ≥ 48 位</div>
             <div style="margin-top:14px" class="btn btn-secondary">继续学习（剩 6 新词）</div>
           </div>
-          <div class="sec-title"><span class="t">学习与复习</span></div>
+          <div class="sec-title"><span class="t">我的词汇</span><span class="c">现状：这 3 个入口散在 8 个按钮 + 打卡页 2 条文字链里</span></div>
           <div class="card" style="padding:6px 16px">
-            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l2.4 5.2L20 10l-4.4 1.6L13 17l-1-5z"/></svg></span>
-              <div><div class="en">待复习</div><div class="ed">FSRS 排期 · 最近到期 10-18</div></div><span class="val">6</span><span class="chev">›</span></div>
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>
-              <div><div class="en">查词与生词本</div><div class="ed">离线词典 · 不联网也能查</div></div><span class="val">1,208</span><span class="chev">›</span></div>
+              <div><div class="en">查词</div><div class="ed">离线词典 · 覆盖本机已装词书</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+              <div><div class="en">词书单词</div><div class="ed">整册浏览 · CET-4 核心词 4,634</div></div><span class="chev">›</span></div>
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-reading)"><svg class="g" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3-6 3z"/></svg></span>
-              <div><div class="en">收藏 · 错词</div><div class="ed">现状：这两个入口只埋在打卡页的文字链里</div></div><span class="val">34 · 12</span><span class="chev">›</span></div>
+              <div><div class="en">我攒的词</div><div class="ed">收藏 · 生词本 · 错词，一页三段</div></div><span class="val">34 · 12 · 8</span><span class="chev">›</span></div>
           </div>
           <div class="sec-title"><span class="t">今日文章</span><span class="c">未解锁</span></div>
           <div class="card" style="display:flex;gap:12px;align-items:center">
@@ -712,7 +736,11 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
           </div>
         </div></div>
         <div class="device-cap">页头收成「日期 → 主标题 → 一行说明」三行，主视觉用品牌渐变 + <span class="mono">#04241C</span> 墨色（实测末端 6.87:1）。
-          四个入口从「3 屏 4 处」合并进一张卡，浅底 + deep 字形属弱档。</div>
+          <b>现状这一屏连 CTA 共 8 个整宽按钮</b>（<span class="mono">TodayPlanScreen.kt:148-283</span>），只有「开始学习」回答「今天做什么」，其余 7 个是目录项或切 tab；
+          其中「阅读文章」「学习工具与设置」只是切底导（<span class="mono">AppScreen.kt:1532-1533</span>，底导本就常驻）→ 删，其余 5 个压成上面这一组入口行。今日数字从「CountCard <span class="mono">:159-162</span> + 进度卡 <span class="mono">:177-179</span> + 图例 <span class="mono">:398-409</span>」三套版式收成为 Hero 一处；
+          「已解锁：文章已解锁」+ 按钮 enabled + 说明行三处（<span class="mono">:183-184</span>/<span class="mono">:206-222</span>/<span class="mono">:223-230</span>）收成组标题右侧一个状态点。
+          <b>查词入口两处审计结论相反，这里取折中</b>：G1 判它占了所有状态分支之上的第一视觉位（<span class="mono">:80</span>、全站工具不服务「今天学什么」），G2 判它是词汇域三入口之一该保留——
+          做法是<b>入口留在组内第一行，页首常驻搜索条取消</b>（阅读页与拍照页两个上下文查词入口不动）。「调整词书与目标」不再占一块 54dp 整宽按钮，改页头行尾文字入口（与设置页同名条目合并为一处，<span class="mono">SettingsScreen.kt:172-177</span>）。</div>
       </div>
     </div>
 
@@ -793,51 +821,182 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
           <div class="card" style="padding:4px 16px">
             <div class="entry"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
               <div><div class="en">词书与每日目标</div><div class="ed">CET-4 核心词 · 每天 10 新词</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
+              <div><div class="en">学习提醒</div><div class="ed">已关闭 · 每天最多一次，不补发</div></div><span class="tail"><span class="pill-status pill-muted">关</span></span></div>
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M5 6h14v12H5z"/><path d="M9 10h6M9 14h4"/></svg></span>
               <div><div class="en">生成默写纸</div><div class="ed">可打印 PDF · 仅本机生成</div></div><span class="chev">›</span></div>
-            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4M12 15v.5"/></svg></span>
-              <div><div class="en">文章类型与长度偏好</div></div><span class="tail"><span class="pill-status pill-muted">后续版本</span></span></div>
           </div>
-          <div class="sec-title"><span class="t">AI 能力</span></div>
+          <div class="sec-title"><span class="t">AI 与语音</span></div>
           <div class="card" style="padding:4px 16px">
             <div class="entry"><span class="ic" style="background:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9z"/></svg></span>
               <div><div class="en">AI 服务与密钥</div><div class="ed">未配置 · Endpoint 与 Key 绑定同一 Profile</div></div><span class="chev">›</span></div>
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M5 12a7 7 0 0114 0"/><path d="M9 15h6"/></svg></span>
               <div><div class="en">语音朗读</div><div class="ed">系统 TTS · 语速 1.0×</div></div><span class="chev">›</span></div>
-            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
-              <div><div class="en">学习提醒</div><div class="ed">已关闭 · 每天最多一次，不补发</div></div><span class="tail"><span class="pill-status pill-muted">关</span></span></div>
           </div>
-          <div class="sec-title"><span class="t">外观</span><span class="c">本轮新增</span></div>
+          <div class="sec-title"><span class="t">外观与关于</span></div>
           <div class="card">
             <div style="font-size:calc(15px * var(--k));font-weight:600">主题</div>
             <div class="segment" style="margin-top:10px"><span class="on">跟随系统</span><span>浅色</span><span>深色</span></div>
             <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:10px">
               系统字体缩放 1.0×。字号放大时卡片靠最小高度与换行撑开，不裁词书名与目标数字。</div>
           </div>
-          <div class="sec-title"><span class="t">数据与备份</span></div>
-          <div class="card" style="padding:4px 16px">
-            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 20V9"/><path d="M8 13l4-4 4 4"/><path d="M5 5h14"/></svg></span>
-              <div><div class="en">导入词书包</div><div class="ed">.wbpack · 限制大小与条目数</div></div><span class="chev">›</span></div>
-            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4v9"/><path d="M8 10l4 4 4-4"/><path d="M5 19h14"/></svg></span>
-              <div><div class="en">导出词书</div><div class="ed">现状：三个备份入口共用同一个 ⭕</div></div><span class="chev">›</span></div>
-            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
-              <div><div class="en">认证导出 / 认证恢复</div><div class="ed">一次性挑战码配对 · 不含 Key</div></div><span class="chev">›</span></div>
-            <div class="entry"><span class="ic" style="background:var(--d-danger)"><svg class="g" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12"/></svg></span>
-              <div><div class="en" style="color:var(--error)">删除全部学习数据</div><div class="ed">不可撤销 · 确认框统一走 ConfirmDestructiveDialog</div></div><span class="chev">›</span></div>
-          </div>
-          <div class="sec-title"><span class="t">关于</span></div>
           <div class="card" style="padding:4px 16px">
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 11v6M12 7.5v.5"/></svg></span>
               <div><div class="en">开源许可与隐私说明</div><div class="ed">v0.0.1 · 第三方台账逐条登记</div></div><span class="chev">›</span></div>
           </div>
+          <div class="sec-title"><span class="t">数据与安全</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><path d="M12 20V9"/><path d="M8 13l4-4 4 4"/><path d="M5 5h14"/></svg></span>
+              <div><div class="en">词书内容包</div><div class="ed">导入 / 导出 <span class="mono">.wbpack</span> · 全离线</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
+              <div><div class="en">备份与恢复</div><div class="ed">留档 / 认证导出 / 换机恢复，进子页三节</div></div><span class="chev">›</span></div>
+          </div>
         </div></div>
-        <div class="device-cap">分组从现状「12 行一张长列表」改成 5 组 + 组标题；每行图标容器 40dp；主档实心底用于组内首行与危险行，弱档用于次要行，形成节奏而不是一片高饱和。</div>
+        <div class="device-cap">现状实测 <b>7 组 14 行</b>（不是「一张无分组长列表」——上一轮审计口径有误，已在 <span class="mono">§0</span> 更正）：「学习提醒」错挂 AI 组（<span class="mono">SettingsScreen.kt:214</span>）、
+          「关于」挂在<b>「账户」组</b>内（<span class="mono">:224-237</span>，直接撞上「无账户」红线）、两条「后续版本」占位行各占一组（<span class="mono">:187</span>、<span class="mono">:225</span>）、
+          资料卡把今日计划数字搬进设置（<span class="mono">:159-167</span>）、三个备份门与「删除全部学习数据」同屏底部相邻（<span class="mono">:285-322</span>）。
+          收成 4 组 9 行，危险项下沉到「数据与安全」子页末节（仍保级联条数 + 二次确认，规则零改动）。删除入口在此稿上不再出现在一级页。</div>
       </div>
+    </div>
+
+    <h3>⑤ 阅读主页（主 CTA 上第一屏；来源、偏好、Feed 下沉）</h3>
+    <div class="devices">
+      <div class="device-wrap"><div class="device"><div class="bar"><span>07:43</span><span>阅读</span></div>
+        <div class="scr">
+          <div style="padding:8px 0 2px">
+            <div class="page-title">今日文章</div>
+            <div class="page-sub">CET-4 核心词 · 约 320 词 · 已随今日计划解锁</div>
+          </div>
+          <div class="card card-hero stack">
+            <div>
+              <div style="font-size:calc(19px * var(--k));font-weight:700;line-height:1.3">The Quiet Cost of Always Being Available</div>
+              <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:6px">AI 生成 · 本机保存 · 今天 07:12</div>
+            </div>
+            <div class="btn btn-primary">阅读今天的文章</div>
+            <div style="display:flex;gap:8px">
+              <span class="btn-pill" style="flex:1;min-height:48px;display:flex;align-items:center;justify-content:center">换一篇</span>
+              <span class="btn-pill" style="flex:1;min-height:48px;display:flex;align-items:center;justify-content:center;background:var(--surface)">生成前参数 ›</span>
+            </div>
+          </div>
+          <div class="sec-title"><span class="t">读别的</span><span class="c">低频动作，收到主任务之后</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-reading)"><svg class="g" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3-6 3z"/></svg></span>
+              <div><div class="en">历史文章</div><div class="ed">已解锁的随时可重读，不受今日限制</div></div><span class="val">18 篇</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg></span>
+              <div><div class="en">外刊 Feed</div><div class="ed">离线清单 · 点开是独立二级页</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 20V9"/><path d="M8 13l4-4 4 4"/><path d="M5 5h14"/></svg></span>
+              <div><div class="en">粘贴一篇导入</div><div class="ed">全离线 · 不发任何网络请求</div></div><span class="chev">›</span></div>
+          </div>
+          <div class="banner" style="margin-top:14px"><svg class="g" viewBox="0 0 24 24" style="width:18px;height:18px"><circle cx="12" cy="12" r="8"/><path d="M12 11v6M12 7.5v.5"/></svg>
+            <span class="txt">未解锁时这一屏只留一行状态点 + 「回到今日计划」，不放 4 个禁用按钮。</span></div>
+        </div></div>
+        <div class="device-cap">现状这一屏第 8 块才是「阅读今天的文章」（<span class="mono">ReadingAccessScreen.kt:197-220</span>），它前面压着 3 个并列来源入口（<span class="mono">:167</span>/<span class="mono">:177</span>/<span class="mono">:178</span>）、
+          「文章已解锁」宣告卡（<span class="mono">:161-165</span>）、4 个类型按钮（<span class="mono">:235-237</span>）与偏好卡（<span class="mono">:224-234</span>）；锁定态还画 4 个禁用按钮（<span class="mono">:124-126</span>）、且无任何前进行为。
+          本屏改法：类型与长度是<b>写偏好的配置</b>（<span class="mono">ReadingAccessViewModel.kt:129-134</span>）→ 收进「生成前参数」；外刊 Feed 现状原地内联展开、无上限也无收起入口（<span class="mono">:222</span>、<span class="mono">:349-359</span>）→ 独立二级层；
+          「AI 生成文章」与「换一篇」是同一个 <span class="mono">generate</span> 的两个开关（<span class="mono">:167</span> vs <span class="mono">:209-218</span>、VM <span class="mono">:136-138</span>）→ 合成一个动作；「粘贴文章」低频一次性 → 降为次级文字入口。</div>
+      </div>
+    </div>
+
+    <h3>⑥ AI 主页（能力目录：能用 / 未上线分开，未配置给出口）</h3>
+    <div class="devices">
+      <div class="device-wrap"><div class="device"><div class="bar"><span>07:44</span><span>AI 学</span></div>
+        <div class="scr">
+          <div style="padding:8px 0 2px">
+            <div class="page-title">AI 能力</div>
+            <div class="page-sub">长难句、拍照翻译、生图。只有你点进去时才会用到网络。</div>
+          </div>
+          <div class="banner warn"><svg class="g" viewBox="0 0 24 24" style="width:18px;height:18px"><circle cx="12" cy="12" r="8"/><path d="M12 11v6M12 7.5v.5"/></svg>
+            <span class="txt">还没有可用的 AI 服务。配好 Endpoint 与 Key 后这三项立刻能用。</span><span class="act">去配置 ›</span></div>
+          <div class="sec-title"><span class="t">现在能用</span><span class="c">3 项</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic" style="background:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M4 6h16M4 12h11M4 18h7"/></svg></span>
+              <div><div class="en">长难句分析</div><div class="ed">粘贴一句 · 拆结构 · 给译文</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 8h4l2-2h4l2 2h4v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
+              <div><div class="en">拍照翻译</div><div class="ed">本机 OCR · 上传前逐次确认</div></div><span class="chev">›</span></div>
+            <div class="entry"><span class="ic" style="background:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9z"/></svg></span>
+              <div><div class="en">AI 生图</div><div class="ed">按提示词出图 · 保存前确认</div></div><span class="chev">›</span></div>
+          </div>
+          <div class="sec-title"><span class="t">尚未上线</span><span class="c">4 项 · 默认收起</span></div>
+          <div class="card" style="padding:4px 16px">
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg></span>
+              <div><div class="en">词文串学 · 文章摘要 · 对话练口语 · 作文批改</div><div class="ed">进度与还差什么，展开看</div></div><span class="tail"><span class="pill-status pill-muted">未上线</span></span></div>
+          </div>
+          <div class="card" style="padding:4px 16px;margin-top:14px">
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 11v6M12 7.5v.5"/></svg></span>
+              <div><div class="en">AI 会用到哪些数据、发往哪里</div><div class="ed">一句话说明 + 域名白名单口径</div></div><span class="tail"><span class="chev">›</span></span></div>
+          </div>
+        </div></div>
+        <div class="device-cap">现状主页唯一职责（选能力）默认不可见：功能列表默认折叠（<span class="mono">AiLearningScreen.kt:91</span>）且行内无可用/未实现标记；
+          整张「AI 学习导航」卡只为切一个底导已有 tab（<span class="mono">:218-271</span> → <span class="mono">AppScreen.kt:1584</span>）→ 删；
+          解释卡「现在的状态」写「长难句分析与生图正在开发，其余功能点开只能看到进度」（<span class="mono">:312</span>），与 <span class="mono">AiFeature.kt:85/97/110</span> 三项 <span class="mono">implemented = true</span> 直接矛盾 → 删；
+          副标题承诺「用你学过的词…」（<span class="mono">:160</span>）三个可用能力都不成立 → 改中性一句；
+          未配置时主页无任何出口（参数表 <span class="mono">:82-88</span> 只有 <span class="mono">onOpenFeature/onOpenWordList</span>）→ 状态行改可点，复用现成 <span class="mono">showAiProfiles</span> 通道（<span class="mono">AppScreen.kt:1131-1149</span>），与阅读页 <span class="mono">onOpenAiSettings</span>（<span class="mono">:1559-1567</span>）同规则，不新增安全面。</div>
+      </div>
+    </div>
+
+    <h3>⑦ 一句话记住：每屏该只留什么（摘掉的都是重复表达或越职内容）</h3>
+    <div class="panel">
+      <table>
+        <thead><tr><th style="width:120px">屏</th><th style="width:230px">只留</th><th>摘掉 / 移走（证据）</th></tr></thead>
+        <tbody>
+          <tr><td>今日计划</td><td>Hero 一屏数字 + 一个开始按钮 + 一组入口行</td>
+            <td>「CountCard + 进度卡 + 图例」三处同源数字（<span class="mono">TodayPlanScreen.kt:160-179</span>）；CTA 下方 7 个整宽跳转按钮（<span class="mono">:148-283</span>），其中「阅读文章」「学习工具与设置」只是切底导（<span class="mono">AppScreen.kt:1533</span>）。</td></tr>
+          <tr><td>词书选取</td><td>一句「正在使用」+ 一列可选词书 + 每日目标</td>
+            <td>每册重复的说明卡与骨架占位；进入前的一次卡顿属批 2 预加载，不在内容面。</td></tr>
+          <tr><td>词卡 / 词卡详情</td><td>卡面 + 一次反馈；详情留释义、例句、收藏、笔记</td>
+            <td>详情页重画一遍列表级信息；笔记权威位置只留一处（<span class="mono">CardDetailScreen.kt:200-234</span>），问词页的「我的笔记」整块移回这里（<span class="mono">WordAiQaScreen.kt:94-127</span>）。</td></tr>
+          <tr><td>查词 / 词表 / 我的词</td><td>三个入口，各管一件事</td>
+            <td>生词本行内的例句/派生/短语/近义词（<span class="mono">VocabularyScreen.kt:148-183</span>）与行内「查看详情」（<span class="mono">:185</span>）；词书单词的 FSRS 状态筛选（<span class="mono">WordBookWordsScreen.kt:200-220</span>）；打卡页头部两条裸文字链（<span class="mono">CheckInScreen.kt:78-83</span>）。</td></tr>
+          <tr><td>阅读主页</td><td>一行状态 + 今天这篇 + 一行历史入口</td>
+            <td>4 个类型按钮与偏好卡（<span class="mono">ReadingAccessScreen.kt:224-237</span>）、Feed 原地内联（<span class="mono">:222</span>）、「文章已解锁」宣告卡（<span class="mono">:161-165</span>）、锁定态禁用按钮（<span class="mono">:124-126</span>）。</td></tr>
+          <tr><td>正文页</td><td>标题、来源一行、显示控制一行、正文、译文开关、完成阅读</td>
+            <td>进文拦截的覆盖词模态弹窗（<span class="mono">ArticleReadingScreen.kt:170-211</span>）压成一行；「原文链接（不会自动打开）」自解释行（<span class="mono">:386-391</span>）；「该来源没有中文翻译」与禁用译文按钮二选一（<span class="mono">:255-266</span>）。</td></tr>
+          <tr><td>AI 主页 / 使用页</td><td>主页只管选能力；使用页只管「输入 → 确认 → 结果」</td>
+            <td>「AI 学习导航」整卡（<span class="mono">AiLearningScreen.kt:218-271</span>）、过期状态行（<span class="mono">:312</span>）、骨架页的研发阻塞清单（<span class="mono">AiFeatureScreen.kt:110-122</span>）、4 份逐字重复的「未配置」三行式、5 份重复的出站确认对话框；拍照页的离线模型卡与已保存列表折叠/移出（<span class="mono">PhotoTranslationScreen.kt:550-666</span>）。</td></tr>
+          <tr><td>设置</td><td>入口分诊：每行 = 一个目的地 + 一行状态</td>
+            <td>资料卡里的今日计划数字（<span class="mono">SettingsScreen.kt:159-167</span>）、两条「后续版本」占位行（<span class="mono">:187</span>/<span class="mono">:225</span>）、「账户」组（<span class="mono">:224</span>，撞「无账户」红线）、一级页里的「删除全部学习数据」（<span class="mono">:315</span>）。</td></tr>
+          <tr><td>打卡 / 学习记录</td><td>打卡只管坚持度与趋势；记录只管逐条事件</td>
+            <td>打卡页与今日计划逐字重复的「今日」卡（<span class="mono">CheckInScreen.kt:100-107</span>）与三套同日完成度（<span class="mono">:114-157</span>，留两套）；记录页分组头里的解锁与文章生成状态（<span class="mono">LearningRecordsScreen.kt:196-202</span>）。</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
   <section id="open">
-    <h2><span class="no">8</span>　本稿没做完 / 需要你或真机才能定的事</h2>
+    <h2><span class="no">8</span>　要你拍板的六条 / 本稿没做完的事</h2>
+
+    <h3>8.1 需要拍板的信息架构取舍（不是视觉问题，改了界面结构，得你点头）</h3>
+    <div class="panel">
+      <table>
+        <thead><tr><th style="width:150px">要拍的板</th><th style="width:210px">我的推荐</th><th>代价 / 不做的后果</th></tr></thead>
+        <tbody>
+          <tr><td>① 词汇域入口怎么收</td>
+            <td><b>方案 A</b>：三个入口——查词 / 词表 / <b>我的词</b>（收藏 · 生词本 · 错词合成一页三段）。B 是入口不动、只把收藏与错词从打卡页搬到今日计划；C 是生词本与错词合并（语义风险最高）。</td>
+            <td>A 要新增一个分段容器，且三个 ViewModel 得在同一宿主并存——<span class="mono">AppScreen.kt</span> 已 <b>2424 行</b>（实测），这是最大实现风险；还要改 <span class="mono">CheckInScreenTest</span> 等 connected 断言。不做则「我攒下来的词要去三个页面找」的现状保留，打卡页继续兼职资产目录。</td></tr>
+          <tr><td>② 设置页收成几组，占位行删不删</td>
+            <td><b>4 组 9 行</b>（本稿④）。两条「后续版本」占位行<b>全删</b>，连同「账户」整组、「阅读」整组（一组只为一个不可点占位行存在）。</td>
+            <td>4 组版与本稿批 1 原本的 5 组版冲突：合并了「外观 + 关于」与「词书包 + 备份」。你若要求照 5 组落地，退路是 5 组 10 行，但无论几组，「学习提醒」都必须留在「学习」组（现状代码错挂在 AI 组，<span class="mono">SettingsScreen.kt:214</span>），否则等于把实现里的 bug 抄进稿子。占位行留着则继续撞「无账户」红线并虚报路线图。</td></tr>
+          <tr><td>③ 打卡页头部的收藏 / 错词链接</td>
+            <td>整体移出（随 ① 落进「我的词」）。统计页不该当资产目录，注释已自认这是全站唯一入口（<span class="mono">CheckInScreen.kt:57</span>）。</td>
+            <td>移出前必须先有新入口，否则用户找不到收藏。因此 ③ 依赖 ① 的结论，不能单独做。</td></tr>
+          <tr><td>④ AI 主页那 4 项未实现能力留不留</td>
+            <td>留，但<b>默认折叠成一组、标「未上线」</b>；可用 3 项默认展开。「词文串学」条目移回阅读 tab 或改直达（阅读页生成入口已可用，<span class="mono">ReadingAccessScreen.kt:167</span>）。</td>
+            <td>现状主页把已实现与未实现平铺同级且整列默认收起（<span class="mono">AiLearningScreen.kt:91</span>/<span class="mono">:120-122</span>），主页唯一职责「选能力」默认不可见。全删则路线图痕迹消失；全留则用户逐条点开才发现点不动。</td></tr>
+          <tr><td>⑤ 阅读主页的 Feed 与偏好</td>
+            <td>外刊 Feed 改独立二级层（带返回）；类型与长度偏好下沉到「生成前参数」；「AI 生成」与「换一篇」合成一个动作。</td>
+            <td>Feed 现状原地内联展开、无条数上限也无收起入口（<span class="mono">:222</span>/<span class="mono">:349-359</span>），会把首页撑爆；偏好卡写的是 <span class="mono">defaultArticleType</span>（VM <span class="mono">:129-134</span>），属配置不属「今天读什么」。另外偏好卡的「长度」半边全仓无编辑入口，只读展示——要么删展示、要么补设置入口（补入口属新增交互，需先改 Spec）。</td></tr>
+          <tr><td>⑥ 备份三门与危险项</td>
+            <td>「导出留档 / 认证导出 / 换机恢复」合成 1 个入口进子页三节；<b>「删除全部学习数据」下沉到该子页末节</b>，级联条数 + 二次确认规则一字不改（<span class="mono">AppScreen.kt:1699-1730</span>）。</td>
+            <td>现状三个备份门与全机唯一清空操作同屏底部相邻、同一组件同一行高同一「›」尾符（<span class="mono">SettingsScreen.kt:285-322</span>），从行形态分不出「读」与「毁」。多一层是否可接受，只有你定。</td></tr>
+        </tbody>
+      </table>
+      <p class="lead" style="margin:14px 0 0">另有两类<b>不需要拍板、直接按规范修</b>的缺陷（已列在 <span class="mono">§0</span> 口径更正表与 <span class="mono">§7 ⑦</span> 动作行里）：
+        过期文案（AI 状态行、备份「暂不可用」）、开发者术语泄漏（<span class="mono">F4-04</span>、「AI Profile」、「Salvage 包」）、
+        <span class="mono">ReadingHistoryScreen.kt:52-53</span> 根 <span class="mono">Column</span> 缺 <span class="mono">verticalScroll</span> 导致列表尾部不可达、
+        <span class="mono">WordAiQaScreen.kt:129-131</span> 把 <span class="mono">WordQaKind.Personal</span> 画成 48dp 整宽按钮但点下去走 <span class="mono">error(...)</span> 且被 <span class="mono">catch (_: Throwable)</span> 吞掉（<span class="mono">WordAiQaViewModel.kt:155-162</span>、<span class="mono">:225-227</span>）= 零反馈假功能。</p>
+    </div>
+
+    <h3>8.2 本稿没做完 / 只能真机定的事</h3>
     <div class="panel">
       <table>
         <thead><tr><th style="width:150px">事项</th><th>说明</th></tr></thead>
@@ -861,7 +1020,8 @@ svg.g { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; st
   <div class="foot">
     生产实现约定：本稿全部用 CSS 变量表达，等价于批 1 的 <span class="mono">ui/theme</span> token；
     设备框内 1px = 1dp，页面宽 360dp。图标为本稿临时手绘，生产字形按拍板结论改用内嵌 Material Symbols 路径数据（Apache-2.0，需登记第三方台账）。
-    本页不写「已验证」结论，凡未跑真机的视觉判断都标注在 §7 待办里。
+    本页不写「已验证」结论，凡未跑真机的视觉判断都标在 <span class="mono">§8</span>；逐屏内容归属的完整证据链在
+    <span class="mono">docs/design/2026-10-17-content-placement-audit.md</span>。
   </div>
 </div>
 <script>
