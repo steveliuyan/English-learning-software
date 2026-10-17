@@ -640,7 +640,7 @@ internal val MintBackground: Color
       "Bell", "Shield", "Warning", "Trash", "Upload", "Download",
   )
   ```
-  断言四条：
+  断言六条（计划原文写「四条」实列五条，控制者裁决追加第 6 条）：
   1. `enum class AppIcon { … }` 条目集合与 `expectedIcons` **完全等序**（解析枚举体，逗号切分后比对；不等时报出差异项）。
   2. 除 `StrokeOnlyIcons` 五枚外，每枚的 `fillPaths = listOf(...)` 至少一条路径；五枚豁免必须 `fillPaths = emptyList()`（双向都测：豁免表内若有填充层也算失败，防止「两层」变成含糊口径）。
   3. 每枚 `strokePaths` 至少一条；每条路径以 `M`/`m` 开头且只含允许字符集 `[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s-]`（防把 `CircleFill` 塞进 stroke）。
@@ -652,8 +652,9 @@ internal val MintBackground: Color
      assertTrue(hits.isEmpty(), "禁止 AndroidX material-icons（会牵动 lockfile）：${hits.distinct()}")
      ```
   5. `AppIcons.kt` 文件头注释含「逐枚清单」小节，且注释里枚到的名字与枚举一致（用注释文本 `contains` 逐个查）。这条钉的是 spec §10.5 要求的「逐枚清单钉进 `AppIcons.kt` 顶部注释」。
+  6. `fillPaths` 每条必须**要么**以 `M`/`m` 开头并符合同样的描边字符集，**要么**匹配 `CircleFill(<数>, <数>, <数>)` 标记形状。裁决理由：不钉这条，「往填充层塞任意字符串」也能通过，第 3 条防的那类漂移只是换个口袋重长。另注：`CircleFill(...)` 是本仓库自定标记（视觉稿里对应的是 `<circle cx cy r>`，稿中不存在该串），文件头注释须写明它由 Task 7 的 `AppGlyph` 渲染器解释，圆形填充不走 SVG path 语法。
 
-- [ ] **Step 2: 跑测试确认失败** — Expected: 编译失败（`AppIcon` 未定义）。
+- [ ] **Step 2: 跑测试确认失败** — Expected: 断言失败而非编译失败。源码文本契约不引用 `AppIcon` 符号，`AppIcons.kt` 尚不存在时第 1/5 条会以「应恰好一个，实际 0 个」一类信息红掉，这即是 RED 证据（计划原文写「编译失败（`AppIcon` 未定义）」是把文本契约误当成符号引用测试，现按实际形状记录）。
 
 - [ ] **Step 3: 转录路径数据**
 
@@ -1056,6 +1057,12 @@ internal val MintBackground: Color
   ANDROID_SERIAL=bf353dda adb install -r app/build/outputs/apk/debug/app-debug.apk
   ```
   Expected: 全绿；基线 ≥1499 且 0 失败；lockfile 未改；真机装上后**手工试用**（真机只 `install -r`，绝不 `am instrument`）。批 1 时页头/入口行尚未接入业务屏，真机可看的是底导与设置页既有形状 + 主题三态（此时设置页尚无主题开关，Task 19 接入）——把「图标在真机上的第一印象」列为本步人工核验项并记进报告。
+
+  本步的人工核验清单（Task 3/4 复评遗留的三项「只有真机能判」的风险，逐条写进报告，缺项不得放行）：
+  1. **行高**：六档 `AppType` 不写 `lineHeight`，装配后 M3 每角色的库内行高消失，正文变紧。判「太紧」即触发批 2 在装配点补 `lineHeight`，并先把取值写进 spec §2.2（不得只改代码）。
+  2. **排印换档的整体观感**：全站 `MaterialTheme.typography.*` 读点集体按 R3 映射换档（`titleLarge` 22→24、`titleMedium` 14→17、`bodySmall` 12→13、`labelLarge` 14→12、`titleSmall` 14→15），逐屏看有没有被撑破或挤扁的头部。
+  3. **M3 控件默认色**：`ColorScheme` 装配后所有 M3 控件默认色由库紫转薄荷，另加两处形状改动（Card 圆角 20→18dp、`colorScheme.outline` 由库默认换成 `text2` 使描边变深），确认可接受。
+  4. **深色与 `fontScale 2.0`**：切系统深色走查一遍底导与设置页（本批次唯一可用的深色入口就是跟随系统），大字号下标题与卡片不裁。
 
 - [ ] **Step 6: 提交 + 推送 + 核验**
 

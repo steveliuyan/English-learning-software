@@ -40,5 +40,5 @@ internal fun stripComments(text: String): String = text
     .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
     .replace(Regex("//.*"), "")
 
-/** 剥注释后的命中计数（锚点唯一性守卫与 Task 6 棘轮共用此入口）。 */
+/** 剥注释后的命中计数（锚点唯一性守卫与 Task 8 的裸 hex / 份数棘轮共用此入口）。 */
 internal fun countMatches(source: String, regex: Regex): Int = regex.findAll(stripComments(source)).count()
