@@ -1248,7 +1248,7 @@ internal val MintBackground: Color
   git diff --name-only main..HEAD | grep -c lockfile   # 期望 0：依赖锁零变化
   ANDROID_SERIAL=bf353dda adb install -r app/build/outputs/apk/debug/app-debug.apk
   ```
-  Expected: 全绿；基线 ≥1499 且 0 失败；lockfile 未改；真机装上后**手工试用**（真机只 `install -r`，绝不 `am instrument`）。批 1 时页头/入口行尚未接入业务屏，真机可看的是底导与设置页既有形状 + 主题三态（此时设置页尚无主题开关，Task 19 接入）。**图标不在本步真机核验范围**（新字形尚未接进任何业务屏），图标的第一印象归 Step 4b 的模拟器截图与清单；真机上第一次看到新图标是批 2 收口（Task 18 Step 1）。
+  Expected: 全绿；单测计数**只增不减、且必须按下一行的重算命令现场取数**（R-12.1：本行原稿写的「基线 ≥1499」是批 1 早期的旧数，Task 10 收口时实测已到 **217 suites / 1610 tests / 0 失败 / 0 跳过**；按 Global Constraints #16，计划与报告都不得写会自漂移的绝对计数，要写就写成可重算的命令 + 当次输出）；lockfile 未改；真机装上后**手工试用**（真机只 `install -r`，绝不 `am instrument`）。批 1 时页头/入口行尚未接入业务屏，真机可看的是底导与设置页既有形状 + 主题三态（此时设置页尚无主题开关，Task 19 接入）。**图标不在本步真机核验范围**（新字形尚未接进任何业务屏），图标的第一印象归 Step 4b 的模拟器截图与清单；真机上第一次看到新图标是批 2 收口（Task 18 Step 1）。
 
   本步的人工核验清单（Task 3/4 复评遗留的三项「只有真机能判」的风险，逐条写进报告，缺项不得放行）：
   1. **行高**：六档 `AppType` 不写 `lineHeight`，装配后 M3 每角色的库内行高消失，正文变紧。判「太紧」即触发批 2 在装配点补 `lineHeight`，并先把取值写进 spec §2.2（不得只改代码）。
@@ -1266,6 +1266,8 @@ internal val MintBackground: Color
   git -c credential.interactive=false ls-remote origin stage-5-ui-r1-design-system
   ```
   Expected: `ls-remote` 哈希 == `git rev-parse HEAD`。
+
+  **R-12.2（控制者裁决，压过本步的推送命令）**：用户在批 1 执行期间明确说过「**不用合 main，先停在分支上**」，且本仓规矩是推送属需授权动作。所以本步的 `push origin stage-5-ui-r1-design-system` **不是执行者的自主动作**：提交照做，推送**当场请示用户**，得到明确同意后才推；未获同意就在报告里写「已提交未推送，等授权」，并把 `git rev-parse HEAD` 记进去。合 main 一律不在本计划范围内（批 1/2/3 全部停在各自分支）。若获准推送，仍按 Global Constraints #15 用 `ls-remote` 与 HEAD 比对核验，未核验不得宣称已备份；禁 force push、禁删远端分支。
 
 ---
 
