@@ -752,7 +752,7 @@
 - 名称: 应用自绘 UI 图标族（双色层次 duotone，描边骨架 + 内部半透明填充层）
 - 版本: v1 已入库（实现为 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` 中的 `AppIconSpec` 路径数据常量：24×24 画布的 SVG path data 串 + `CircleFill(cx, cy, r)` 圆形填充标记，由 `AppGlyph` 渲染器绘制，本族不含渲染码与颜色取值；枚数以 `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md` 钉定的 33 枚清单为准，结构由 `AppIconsStructureContractTest` 双向钉住——除该文档豁免表的 5 枚描边 only 外每枚两层；逐枚清单与命名同时钉在该文件顶部注释，每新增一枚须同步本字段与 `material-symbols-icon-paths` 生效范围说明）
 - 许可证: 无第三方许可依赖。路径数据由本项目按统一度量（24dp 网格、2px 视觉重量、圆头描边）自行绘制，不复制、不派生自任何第三方图标集、素材包或字形文件，因此不触发署名义务；造型仅参考 Material Symbols 的度量与风格标准（度量与风格不受版权保护），不使用其路径数据
-- 用途: 承载 UI 重设计轮的图标体系（用户 2026-10-18 选定 B 案）：入口块为域色渐变容器 + 双色层次字形，列表行内退化为单层描边；替换 7 个 AI 功能的单字徽标、设置页共用同一 ⭕ 的 3 个备份入口、以及被手写两次的喇叭图形
+- 用途: 承载 UI 重设计轮的图标体系（用户 2026-10-18 选定 B 案）：入口块为域色渐变容器 + 双色层次字形，列表行内退化为单层描边；替换 7 个 AI 功能的单字徽标、设置页共用同一 ⭕ 的 3 个备份入口、以及被手写两次的喇叭图形；使用位置 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt`（33 枚 `AppIconSpec` 路径数据常量与 5 枚两层豁免表所在地），运行时组装在 `app/src/main/java/com/example/englishlearning/ui/components/AppIcon.kt`，容器呈现（40dp 入口 / 30dp 行内）在 `app/src/main/java/com/example/englishlearning/ui/components/IconBadge.kt`
 - 数据流: 仅以 Kotlin 路径数据随 APK 打包并在设备内绘制；不下载、不上传、不联网、不含位图素材文件，也不参与任何 AI 或网络请求
 - NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账）、`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`、`ui/components/AppIcons.kt` 顶部注释
 - 替代方案: 直接内嵌经 Apache-2.0 授权的 Material Symbols 路径数据（选型 A，工时更低但无双色层次）；或引入 extended 工件（违反本轮不新增依赖约束）
