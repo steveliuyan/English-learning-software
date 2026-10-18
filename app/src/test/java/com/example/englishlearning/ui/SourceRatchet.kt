@@ -7,7 +7,8 @@ import kotlin.test.assertTrue
 /**
  * 批 1 源码级契约测试共享夹具（计划 Task 2 建 `uiFiles`/`stripComments`/`countMatches` 三件，
  * Task 7 起再加 `luminance`/`ratio` 亮度复算一对；
- * `violations` 棘轮入口由计划 Task 8「三件棘轮测试上线」在本文件补，届时不要另起第二份夹具）。
+ * `violations` 棘轮入口由计划 Task 8「裸 hex / 深色令牌消费两件棘轮上线」在本文件补齐，
+ * 第三件「组件份数」棘轮（顺延至 Task 12）同样走这个入口，届时不要另起第二份夹具）。
  *
  * 口径（有意为之，勿「顺手加严」）：
  *  - JVM 单测只按需导入 compose 的纯数据符号（如 `androidx.compose.ui.graphics.Color`，用来算亮度），
@@ -19,10 +20,14 @@ import kotlin.test.assertTrue
  *  - 已知仓库陷阱：含「块注释闭合序列」（星号紧跟斜杠）的字符串字面量会吞掉块注释正则。
  *    测试文件本体不在扫描范围（扫描对象是 main 源码），故 `stripComments` 自身的块注释正则
  *    字面量安全；后续任务勿在这些测试文件的注释或字面量里写出该闭合序列本体。
- *  - `walkTopDown()` 对缺失路径返回空序列（静默空扫），故目录守卫必须内置在 `uiFiles`。
+ *  - `walkTopDown()` 对缺失路径返回空序列（静默空扫），故目录守卫必须内置在 `uiFiles`，
+ *    并由 `violations` 复用同一入口而不是再写一份扫描。
  */
 
 internal const val UI_MAIN_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui"
+
+/** 裸 hex 棘轮的整目录豁免目标：令牌定义本体必须写 hex，故从债务扫描里划出去。 */
+internal const val UI_THEME_SOURCE_PATH = "$UI_MAIN_SOURCE_PATH/theme"
 
 /** 目录守卫：目录与 .kt 文件必须真实存在，否则契约测试静默空扫。 */
 internal fun uiFiles(dir: File = File(UI_MAIN_SOURCE_PATH)): List<File> {
@@ -68,4 +73,61 @@ internal fun ratio(fg: Int, bg: Int): Double {
     val hi = maxOf(luminance(fg), luminance(bg))
     val lo = minOf(luminance(fg), luminance(bg))
     return (hi + 0.05) / (lo + 0.05)
+}
+
+/**
+ * 棘轮入口（计划 Task 8 Step 1）：返回 `scanDir` 下命中 `rule`、且未被 `allowlist` / `exemptDirNames`
+ * 覆盖的站点，条目形状「文件名: 折叠空白后的源码行」，**不报行号**——块注释剥离会把其后的行折叠进同
+ * 一段文本，此时行号与内容已经对不上（offender 口径逐字沿用 `AccessibilityColorTokenContractTest`）。
+ * `allowlist` 条目必须是同一个「文件名: 折叠行」形状，否则豁免永远写不中（该风险由调用方的合成用例证）。
+ *
+ * 三条内置守卫，都属于「棘轮不许空转」这一族：
+ *  - 目录守卫复用 [uiFiles]（缺失路径与零 `.kt` 当场失败，消息点名期望路径与当前 JVM 工作目录），
+ *    不再手写第二份扫描；
+ *  - `exemptDirNames` 非空时必须真的覆盖到文件：指向失效目录的豁免会让债务悄悄换扫法却依旧绿；
+ *  - 豁免过滤后扫描集不得为空：不许把整批债务一次性豁免掉，让棘轮退化成 no-op。
+ *
+ * 返回集刻意不做 distinct：同一物理行含两处命中时（`if (...) DomainColors.X.deep else AppPalette.Y`），
+ * distinct 会把两次命中显示成一条、掩盖真实计数。「数量精确」由调用方的按文件计数用例负责，
+ * 本函数只负责点名与 allowlist 比对；调用方若要用行集当台账，须自带「条目两两互不相同」的核验。
+ */
+internal fun violations(
+    label: String,
+    rule: Regex,
+    allowlist: Set<String>,
+    scanDir: File = File(UI_MAIN_SOURCE_PATH),
+    exemptDirNames: Set<String> = emptySet(),
+): List<String> {
+    val files = uiFiles(scanDir)
+    val exempt = files.filter { file -> exemptDirNames.any { name -> file.relativeDirNames(scanDir).contains(name) } }
+    if (exemptDirNames.isNotEmpty()) {
+        assertTrue(
+            exempt.isNotEmpty(),
+            "$label：目录豁免 $exemptDirNames 在 ${scanDir.path}（相对 JVM 工作目录 ${File(".").absolutePath}）" +
+                "下没覆盖到任何 .kt 文件——空转的豁免等于把债务换个地方漏扫，必须先修豁免名或修扫描路径。"
+        )
+    }
+    val scanned = files - exempt.toSet()
+    assertTrue(
+        scanned.isNotEmpty(),
+        "$label：豁免 $exemptDirNames 之后扫描集为空（${scanDir.path} 下 ${files.size} 个 .kt 全被豁免覆盖）——" +
+            "棘轮不接受把自己整体豁免掉。"
+    )
+    return scanned
+        .flatMap { file -> foldedHitLines(file.readText(), rule).map { hit -> "${file.name}: $hit" } }
+        .filterNot { it in allowlist }
+}
+
+/** 文件相对扫描根所经过的目录名链（不含文件名本身）；豁免按目录名匹配，路径失效由调用方守卫。 */
+private fun File.relativeDirNames(root: File): List<String> =
+    relativeTo(root).invariantSeparatorsPath.split('/').dropLast(1)
+
+/** 命中所在行的「折叠空白」取样：先剥注释，再按命中位置回溯整行；跨行命中的多行文本一并折叠成一行。 */
+private fun foldedHitLines(text: String, rule: Regex): List<String> {
+    val stripped = stripComments(text)
+    return rule.findAll(stripped).map { match ->
+        val lineStart = stripped.lastIndexOf('\n', match.range.first) + 1
+        val lineEnd = stripped.indexOf('\n', match.range.last).let { i -> if (i == -1) stripped.length else i }
+        stripped.substring(lineStart, lineEnd).trim().replace(Regex("""\s+"""), " ")
+    }.toList()
 }
