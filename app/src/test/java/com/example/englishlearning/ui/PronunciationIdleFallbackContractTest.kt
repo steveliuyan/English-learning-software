@@ -26,10 +26,9 @@ import kotlin.test.assertTrue
  *     声明写进注释必须被放行（剥注释防线），HEAD 三个真实 `else -> 原状态` 形状必须被放行。
  *
  * 已知局限（如实记录，不为未修复的面做假测试）：
- *  - `stripComments` 的行注释正则会把字符串字面量里的 `//`（如 https 地址）之后整行抹掉
- *    （与本仓库禁令 1/3 与 Switch 标签契约同款已知债，统一处置见
- *     `docs/verification/f5-03-accessibility-hardening-2026-10.md` §1.1），本契约的匹配对象是
- *     纯字面量 `else -> PronunciationStatus.Idle`，与含 `//` 的 URL 同行概率极低，但形状仍成立；
+ *  - 剥注释口径已统一到共享夹具（批 1 终审 F6）：本类私有正则实现已删除，改调 `SourceRatchet.kt`
+ *    那份字符串感知的 `stripComments`，「字符串字面量里的双斜杠之后整行被抹掉」这一局限对本类不再成立
+ *    （`docs/verification/f5-03-accessibility-hardening-2026-10.md` §1.1 记的是当年的正则实现，留作历史）；
  *  - 文件级子串匹配只锁「该字面形状」：写成 `else -> PronunciationStatus.Idle.also { … }`、
  *    或把 `else ->` 与 `PronunciationStatus.Idle` 拆成两行的等价形态不在匹配面内——与禁令族同一口径，
  *     由 connected 三处状态持有者用例与代码评审兜住，此处不做 AST 解析；
@@ -37,11 +36,6 @@ import kotlin.test.assertTrue
  */
 class PronunciationIdleFallbackContractTest {
     private val uiDir = File(PRONUNCIATION_IDLE_FALLBACK_SOURCE_PATH)
-
-    /** 剥注释样板（沿用禁令 1/2/3 与状态语义契约）：注释里的历史写法不计入代码形状。 */
-    private fun stripComments(text: String): String = text
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
 
     /** 禁令形状：决策 §2 作废的计划原文写法（播控失败落空闲）。 */
     private val forbiddenShape = "else -> PronunciationStatus.Idle"

@@ -46,14 +46,35 @@ internal const val UI_DIR_NAME = "ui"
 internal const val UI_THEME_SOURCE_PATH = "$UI_MAIN_SOURCE_PATH/theme"
 
 /**
+ * 测试侧 `ui/` 源码根（相对模块目录）：F6 的「不得再长出私有剥注释实现」闸用它作扫描根。
+ * 与 [UI_MAIN_SOURCE_PATH] 一样按相对路径写，JVM 单测的工作目录就是 `app/` 模块目录。
+ */
+internal const val TEST_UI_SOURCE_DIR_PATH = "src/test/java/com/example/englishlearning/ui"
+
+/**
+ * 裸 hex 字面量的唯一匹配口径（批 1 终审 F2）。
+ * 必须容忍 Kotlin 整型字面量后缀与窄化调用：Compose 只有 `Color(Long)`，
+ * `Color(0xFF6B61L)` / `Color(0xFF6B61FFu.toLong())` 都是**能编译**的裸 hex 写法，
+ * 只匹配「十六进制紧跟右括号」的老正则会被这类换形整体绕过。
+ */
+internal val rawColorLiteral = Regex(
+    """Color\(\s*0x[0-9A-Fa-f]{6,8}[uUlL]*\s*(?:\.to(?:Int|Long|UShort|ULong|Float)\(\s*\))?\s*\)"""
+)
+
+/**
  * 主题目录排除的唯一入口（修复轮 1 的 N3：原先 `violations` 与调用方各写一份目录判定，批 2/批 3 改一处漏一处）。
  * `ui/` 与 `ui/theme/` 的豁免都走这里，按“文件相对扫描根所经过的目录名链”匹配，不含文件名本身。
+ *
+ * **口径收窄（批 1 终审 F8 的 M-3 第二半）**：只认「相对扫描根的**第一段**目录名」，不再是路径链上任一段。
+ * 旧口径下 `feature/ui/`、`a/theme/` 这类未来目录会被整片静默豁免出扫描面，债务只要换个嵌套位置就隐形；
+ * 现在的两处真实调用（`ui/` 根下的 `theme/`、`app` 根下的 `ui/`）第一段语义不变，负片段由
+ * `RawColorLiteralRatchetTest.directory exemption covers exactly the first segment under the scan root` 钉住。
  */
 internal fun File.dirChainFrom(root: File): List<String> =
     relativeTo(root).invariantSeparatorsPath.split('/').dropLast(1)
 
-/** 文件是否位于某个指定目录名下（路径链上任一段匹配即算，与 [violations] 的目录豁免同口径）。 */
-internal fun File.isUnderDirNamed(root: File, dirName: String): Boolean = dirChainFrom(root).contains(dirName)
+/** 文件是否**恰在扫描根下的那个目录名**之下（只看第一段，与 [violations] 的目录豁免同口径，见 [dirChainFrom]）。 */
+internal fun File.isUnderDirNamed(root: File, dirName: String): Boolean = dirChainFrom(root).firstOrNull() == dirName
 
 /** 文件相对扫描根的不变路径（正斜杠）；债务台账的 key 用它，免疫不同目录下同名文件互相冒名顶替。 */
 internal fun File.relativePathFrom(root: File): String = relativeTo(root).invariantSeparatorsPath
@@ -209,8 +230,18 @@ internal fun uiComponentSource(name: String, dirFragment: String = COMPONENTS_DI
  * 按文件名在 `ui/` **根目录**取剥注释后的源码（屏文件专用，与 [uiComponentSource] 区分）。
  * 守卫按「父目录恰等于 [UI_MAIN_SOURCE_PATH]」判，不做子串匹配：
  * 屏文件一旦搬家进 `ui/<子目录>/`，本夹具响亮失败，而不是像 `dirFragment = "/"` 那样静默放行。
+ *
+ * **m6（批 1 终审，Seat B M-6 同源）**：本入口只服务**屏文件**，所以再加一道文件名形状钉
+ * （必须以 `Screen.kt` 结尾）。批 2 会新增屏文件，若把 `WordRow.kt`（组件）或 `AiFeature.kt`
+ * （`ui/` 根下的非屏文件）误当屏文件读，契约就对着一个不是屏的文件绿；形状钉让这种误用在入口当场判红。
+ * 钉在父目录守卫**之前**：同名的搬家文件也应先按「是不是屏」定性，再谈位置。
  */
 internal fun uiScreenSource(name: String): String {
+    assertTrue(
+        name.endsWith("Screen.kt"),
+        "$name 不是屏文件（uiScreenSource 只服务 `ui/` 根下文件名以 Screen.kt 结尾的屏）：" +
+            "组件请走 uiComponentSource，非屏文件请显式按路径读取。"
+    )
     val files = uiFiles().filter { it.name == name }
     assertTrue(
         files.size == 1,

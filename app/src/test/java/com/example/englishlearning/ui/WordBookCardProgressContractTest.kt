@@ -19,17 +19,14 @@ import kotlin.test.assertTrue
  *        这一本读不出来（「暂时读不到进度」）。后两态都对应 `progress == null`，只有 `progressLoading`
  *        能把它们分开；合成一个「已学 0」就是撒谎（AGENTS.md「降级要如实呈现」）。
  *
- * 已知局限（如实记录，同 F5-03 债 M-B2）：`stripComments` 的行注释正则会把字符串字面量里的双斜杠
- * 之后整行抹掉，块注释正则也可能被字面量里的「星号紧跟斜杠」那一对吞掉一段真实代码；
+ * 已知局限（如实记录）：剥注释口径已统一到共享夹具（批 1 终审 F6）——本类私有的正则版实现已删除，
+ * 改调 `SourceRatchet.kt` 那份字符串感知实现，所以 F5-03 债 M-B2 记的「字符串里的双斜杠之后整行被抹掉」
+ * 「字面量里的星号紧跟斜杠吞掉其后真实代码」两条对本类都不再成立；
  * 规则锁精确书写形状，
  * 换空格/换变量名会触发契约——重排版时要有意识地一起改，而不是事后无声放宽。
  */
 class WordBookCardProgressContractTest {
     private val uiDir = File(WORD_BOOK_PROGRESS_CONTRACT_SOURCE_PATH)
-
-    private fun stripComments(text: String): String = text
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
 
     private val totalFromBook = "text = \"共 \${book.totalWords} 词\""
     private val totalFromProgress = "共 \${it.total}"

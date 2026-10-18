@@ -23,6 +23,8 @@ import kotlin.test.assertTrue
  *    （GlassButton 品牌渐变、AiFeatureScreen 头部 glyph 徽标）归 Task 12 的 connected 清单，
  *    用设备侧截图/取色取证；本契约只保证「不因看不准而误伤」，不背书任何渐变组合。
  *  - 沿用禁令1 判定面：认 buttonColors 调用内的字面量形状。
+ *  - 剥注释口径：批 1 终审 F6 起本类直接调共享夹具 `SourceRatchet.kt` 里那份**字符串感知**的
+ *    `stripComments`，私有正则实现已删除（正则版不认字符串字面量，会吞掉 MIME 字面量之后的真代码）。
  *
  * 已知漏判面（无法用源码正则可靠闭合，故记录口径而非做脆弱重写）：
  *  - 变量容器 / 变量文字色（如 WordCardScreen FeedbackButton 的 container、content 局部变量）
@@ -38,11 +40,6 @@ import kotlin.test.assertTrue
  */
 class AccessibilityContrastContractTest {
     private val uiDir = File(UI_CONTRAST_SOURCE_PATH)
-
-    /** 剥注释样板（沿用 RestoreNoBypassContractTest）：注释里的示例代码不计入契约。 */
-    private fun stripComments(text: String): String = text
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
 
     /**
      * 禁令2 的匹配面：同一次 buttonColors 调用（参数内不含 `)`）里

@@ -31,12 +31,11 @@ import kotlin.test.assertTrue
  *     改名或删除、semantics 块被整段搬走时，必须报「契约空转」而不是无声通过。
  *
  * 已知漏判/过判面（启发式局限，如实记录，不为未修复的面做假测试）：
- *  - stripComments 的行注释正则会把字符串字面量里的 `//`（如 https 地址）之后整行抹掉
- *    （禁令1/禁令3/Task 4 同款缺陷未修，统一口径与处置归口见
- *    `docs/verification/f5-03-accessibility-hardening-2026-10.md` §1.1「契约测试匹配面局限」，
- *    账号=已知债 M-B2）：语义声明与含 `//`
- *    的字面量同行时，该行后半段对契约不可见；块注释正则同理可能被字符串里的开头星斜杠对
- *    吞掉一段真实代码——新增站点别把声明写到含 URL 字面量的同一行即可规避；
+ *  - 剥注释口径**已统一到共享夹具**（批 1 终审 F6）：本类私有正则实现已删除，改用 `SourceRatchet.kt`
+ *    那份字符串感知的 `stripComments`，所以「字符串字面量里的 `//` 之后整行被抹掉」「字符串里的
+ *    星号紧跟斜杠把其后真代码当块注释吞掉」两个失明窗口对本类不复存在。
+ *    `docs/verification/f5-03-accessibility-hardening-2026-10.md` §1.1「契约测试匹配面局限」
+ *    （债 M-B2）记的是当年的正则实现，保留作历史，勿再按它推断本类仍失明；
  *  - 规则锁**一种精确书写形状**：跨行换行放行（子串匹配不含换行的形状体），但改空格、
  *    把 if 换成 when、把 selected/expanded 改名都会触发契约——这是有意的刚性：重排版时
  *    契约与代码要有意识地一起改，而不是事后被误判了再无声放宽；
@@ -48,11 +47,6 @@ import kotlin.test.assertTrue
  */
 class AccessibilityStateSemanticsContractTest {
     private val uiDir = File(UI_STATE_SEMANTICS_SOURCE_PATH)
-
-    /** 剥注释样板（沿用禁令1/禁令2/禁令3/Switch 标签契约）：注释里的示例代码不计入语义声明。 */
-    private fun stripComments(text: String): String = text
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
 
     /** 规则形状 = brief 正则锁定的精确字面文本（正则无通配段，子串匹配与之等价，见类 KDoc）。 */
     private val wordBookSelectedSemantics = "stateDescription = if (selected) \"已选\" else \"未选\""

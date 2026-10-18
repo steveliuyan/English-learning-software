@@ -23,7 +23,8 @@ import kotlin.test.assertTrue
  * 两份契约互为双轨：本契约锁位置，禁令1 锁内容。
  *
  * 结构沿用 AccessibilityLabelContractTest / ContrastContractTest / ColorTokenContractTest 样板：
- *  1. 剥注释与规则判定收进纯函数（入参源码文本，返回 offender 列表），规则形状由合成片段的
+ *  1. 剥注释（口径见共享夹具 `SourceRatchet.kt` 的字符串感知 `stripComments`，批 1 终审 F6 起本类
+ *     不再有私有正则实现）与规则判定收进纯函数（入参源码文本，返回 offender 列表），规则形状由合成片段的
  *     断言证明，而不是只观察真实文件；
  *  2. 真实文件扫描统一走 scanUiSources(dir)：目录缺失或零 .kt 文件立即失败，禁止 walkTopDown()
  *     在路径失效时返回空序列造成的静默空扫（包名重构 / 工作目录变化防线）；
@@ -31,13 +32,12 @@ import kotlin.test.assertTrue
  *     外加锚点存在性断言（testTag/Switch( 被删除或改名时契约必须报错而不是无声通过）。
  *
  * 已知漏判面（无法用源码正则可靠闭合，故记录口径而非做脆弱重写）：
- *  - **剥行注释的字符串字面量泄漏**：stripComments 的 `//.*` 会把字符串里出现的 `//` 之后
- *    （同一行）一并抹掉——如 `url = "https://example.com"` 所在行若同时携带 testTag 锚点或
- *    contentDescription，该行后半段对规则不可见，offender 会**静默逃逸**。禁令1（Task 1）与
- *    禁令3（Task 3）的 stripComments 同款缺陷尚未在各自 KDoc 记录，本条按控制者裁决先记于此，
- *    统一口径与处置归口见 `docs/verification/f5-03-accessibility-hardening-2026-10.md`
- *    §1.1「契约测试匹配面局限」（账号=已知债 M-B2，本轮不改判定逻辑）；
- *    新增站点不要把锚点/标签写到含 `//` 字面量的同一行即可规避；
+ *  - **剥注释的字符串字面量泄漏对本类已不再是缺陷**（批 1 终审 F6）：私有的 `//.*` 正则实现已删除，
+ *    本类改调共享夹具 `SourceRatchet.kt` 里那份字符串感知实现，`url = "https://example.com"`
+ *    这类字面量之后的同一行代码不再被抹掉，锚点/标签写到含双斜杠字面量的同一行也不再静默逃逸。
+ *    `docs/verification/f5-03-accessibility-hardening-2026-10.md` §1.1（债 M-B2）记的是当年那批
+ *    正则实现，保留作历史；防复发由 `SharedComponentUniquenessRatchetTest` 的
+ *    `no_private_block_comment_stripper_survives_under_ui_test_sources` 闸负责；
  *  - 窗口判定是「锚点之后文本里出现 contentDescription 字样」而非 AST 级配对：锚点后 80 字符内
  *    恰好出现**别的**组件的 contentDescription 会误放行未加标签的开关（漏判）；反之标签合法但
  *    书写距离超窗（如插入长 lambda）会误判违规（过判）——误伤时优先紧凑书写，勿放宽窗口；
@@ -55,11 +55,6 @@ class AccessibilitySwitchLabelContractTest {
         "ArticleReadingScreen.kt" to "article_marks_switch",
         "BackupExportScreen.kt" to "backup_export_audio_switch",
     )
-
-    /** 剥注释样板（沿用禁令1/禁令2/禁令3）：注释里的示例代码不计入契约。 */
-    private fun stripComments(text: String): String = text
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
 
     /** 规则1 的锚点与窗口：testTag("<tag>") 之后 80 字符内必须出现 contentDescription。 */
     private fun tagAnchor(tag: String) = Regex("""testTag\("${Regex.escape(tag)}"\)""")

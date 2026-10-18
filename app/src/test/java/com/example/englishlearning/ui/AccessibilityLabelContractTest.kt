@@ -17,7 +17,8 @@ import kotlin.test.assertTrue
  *
  * 本类的三段结构是 Task 2「AccessibilityContrastContractTest」与 Task 3
  * 「AccessibilityColorTokenContractTest」契约测试的样板（同骨架，只替换规则纯函数）：
- *  1. 剥注释与规则判定收进纯函数（入参源码文本、返回 offender 列表），规则形状由合成片段的
+ *  1. 剥注释（口径见共享夹具 `SourceRatchet.kt` 的字符串感知 `stripComments`，批 1 终审 F6 起本类
+ *     不再有私有正则实现）与规则判定收进纯函数（入参源码文本、返回 offender 列表），规则形状由合成片段的
  *     断言证明，而不是只观察真实文件；
  *  2. 真实文件扫描统一走 scanUiSources(dir)：目录缺失或零 .kt 文件立即失败，禁止 walkTopDown()
  *     在路径失效时返回空序列造成的静默空扫（包名重构 / 工作目录变化防线）；缺失目录用例现场
@@ -26,11 +27,6 @@ import kotlin.test.assertTrue
  */
 class AccessibilityLabelContractTest {
     private val uiDir = File(UI_SOURCE_PATH)
-
-    /** 剥注释样板（沿用 RestoreNoBypassContractTest）：注释里的示例代码不计入契约。 */
-    private fun stripComments(text: String): String = text
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
 
     private val cjkLiteral = Regex("""contentDescription = "([^"]*)"""")
 

@@ -13,10 +13,12 @@ class RestoreNoBypassContractTest {
     private fun mainSource(name: String): String =
         File("src/main/java/com/example/englishlearning/ui/$name").readText()
 
-    /** 去掉块注释与行注释后的代码体。 */
-    private fun codeOf(name: String): String = mainSource(name)
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
+    /**
+     * 代码体 = 读文件后过**共享夹具** `SourceRatchet.kt` 的字符串感知 `stripComments`。
+     * 批 1 终审 F6 起本类不再有私有的正则剥注释实现（正则版不认字符串字面量，
+     * 会被 SAF / MIME 字面量里的注释标记吞掉其后几十行真代码，让禁令在那段区间失明）。
+     */
+    private fun codeOf(name: String): String = stripComments(mainSource(name))
 
     @Test
     fun `restore view model has no bypass states or forced import paths`() {

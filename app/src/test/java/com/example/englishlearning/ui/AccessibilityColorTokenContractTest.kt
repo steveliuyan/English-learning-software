@@ -21,7 +21,8 @@ import kotlin.test.assertTrue
  *    误伤会让后期每个错误态组件都被迫改 token，禁令变成噪声源。
  *  - `\b` 让 `Color.Red` 是完整成员名：`Color.ReddishOrange` 这类近名写法不判违规，
  *    而 `Color.Red.copy(...)` 仍判违规（派生不改「裸红字」这个事实）。
- *  - 注释里的示例不计入契约（沿用 RestoreNoBypassContractTest 的剥注释样板）。
+ *  - 注释里的示例不计入契约：剥注释口径已统一到共享夹具（批 1 终审 F6），本文件不再有私有正则实现，
+ *    直接调 `SourceRatchet.kt` 里那份**字符串感知**的 `stripComments`。
  *
  * 已知漏判面（无法用源码正则可靠闭合，故记录口径而非做脆弱重写）：
  *  - 「等价的裸红」写法看不见：`Colors.Red`（Material 2 命名，当前 main 源集零出现）、
@@ -43,11 +44,6 @@ import kotlin.test.assertTrue
  */
 class AccessibilityColorTokenContractTest {
     private val mainDir = File(MAIN_COLOR_TOKEN_SOURCE_PATH)
-
-    /** 剥注释样板（沿用禁令1/禁令2）：注释里的示例代码不计入契约。 */
-    private fun stripComments(text: String): String = text
-        .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-        .replace(Regex("//.*"), "")
 
     /**
      * 禁令3 的匹配面：裸 `Color.Red`（含 `androidx.compose.ui.graphics.Color.Red` 全限定写法，
