@@ -98,27 +98,14 @@ class IconBadgeContrastContractTest {
 
     // ---------- 读取与守卫 ----------
 
-    /** 按文件名在 `ui/components/` 取剥注释源码（本任务两个实现文件与 Task 6 的 AppIcons.kt 同目录）。 */
-    private fun uiComponentSource(name: String): String = uiSource(name, "/ui/components/")
-
-    /** 按文件名在 `ui/theme/` 取剥注释源码（`AppShape.kt` 的两档圆角数值归这里）。 */
-    private fun uiThemeSource(name: String): String = uiSource(name, "/ui/theme/")
-
-    /** 按文件名在共享夹具扫描面里取剥注释源码；文件缺失 = 契约没有对象，必须点名而不是空扫过关。 */
-    private fun uiSource(name: String, dirFragment: String): String {
-        val files = uiFiles().filter { it.name == name }
-        assertTrue(
-            files.size == 1,
-            "$name 应恰好一个，实际 ${files.size} 个（实现文件未创建 / 被改名 / 扫描错位？" +
-                "期望目录 $UI_MAIN_SOURCE_PATH，JVM 工作目录 ${File(".").absolutePath}）"
-        )
-        val file = files.single()
-        assertTrue(
-            file.path.replace('\\', '/').contains(dirFragment),
-            "$name 不在 $dirFragment 下（目录挪动会让本契约读错文件）：${file.path}"
-        )
-        return stripComments(file.readText())
-    }
+    /**
+     * 按文件名在 `ui/theme/` 取剥注释源码（`AppShape.kt` 的两档圆角数值归这里）。
+     *
+     * M-3（Task 11 复评结转、Task 12 兑现）：组件目录那一份读取入口已提升为 `SourceRatchet.kt` 的
+     * [uiComponentSource]，「文件恰一个 + 目录守卫」两条断言只在那一份里；本类不再留私有副本，
+     * 只按共享夹具开放的 `dirFragment` 形参再开一个主题目录别名。
+     */
+    private fun uiThemeSource(name: String): String = uiComponentSource(name, "/ui/theme/")
 
     // ---------- 规则形状 ----------
 

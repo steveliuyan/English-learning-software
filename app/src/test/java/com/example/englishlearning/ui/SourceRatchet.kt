@@ -76,6 +76,41 @@ internal fun stripComments(text: String): String = text
 /** 剥注释后的命中计数（锚点唯一性守卫与 Task 8 的裸 hex / 份数棘轮共用此入口）。 */
 internal fun countMatches(source: String, regex: Regex): Int = regex.findAll(stripComments(source)).count()
 
+/** `ui/components/` 目录片段：按文件名取共享组件源码时的目录守卫目标（Windows 反斜杠路径先转正斜杠再比对）。 */
+internal const val COMPONENTS_DIR_FRAGMENT = "/ui/components/"
+
+/**
+ * 按文件名在 `ui/components/` 取**剥注释后**的源码，供源码级契约测试当唯一读法入口。
+ *
+ * 搬家说明（M-3，Task 11 复评结转、Task 12 兑现）：这个函数原先逐字重复了 4 份
+ * （`SharedComponentGeometryContractTest`、`NotConfiguredCardContractTest`、`ConfirmDestructiveInkTest`、
+ * `InlineNoticeActionContractTest` 各一份私有副本），第 5 份（`IconBadgeContrastContractTest.uiSource`，
+ * 多一个 `dirFragment` 形参）现在也改成委托本函数。Task 12 的组件份数棘轮要读第 5、第 6 个组件文件，
+ * 再抄一份就是 6 份同文——故提升成共享夹具，与 [uiFiles]/[stripComments]/[countMatches] 同处一文件。
+ *
+ * 两条断言与私有版逐字一致，都属于「契约不许空转」这一族：
+ *  - **文件恰一个**：0 个 = 实现文件未创建/被改名，2 个 = 同名文件互相冒名顶替，两者都必须点名失败，
+ *    不能静默返回空串让 `countMatches(...) == 0` 那类断言假绿；
+ *  - **目录守卫**：文件必须真在 [dirFragment] 下，目录挪动会让契约读到别的文件。
+ *
+ * [dirFragment] 只为第 5 份（`IconBadgeContrastContractTest` 还要读 `ui/theme/` 下的文件）保留，
+ * 缺省即组件目录；不要用它去读组件目录之外的组件文件——那是把守卫改成摆设。
+ */
+internal fun uiComponentSource(name: String, dirFragment: String = COMPONENTS_DIR_FRAGMENT): String {
+    val files = uiFiles().filter { it.name == name }
+    assertTrue(
+        files.size == 1,
+        "$name 应恰好一个，实际 ${files.size} 个（实现文件未创建 / 被改名 / 扫描错位？" +
+            "期望目录 $UI_MAIN_SOURCE_PATH，JVM 工作目录 ${File(".").absolutePath}）"
+    )
+    val file = files.single()
+    assertTrue(
+        file.path.replace('\\', '/').contains(dirFragment),
+        "$name 不在 $dirFragment 下（目录挪动会让本契约读错文件）：${file.path}"
+    )
+    return stripComments(file.readText())
+}
+
 /**
  * WCAG 相对亮度，int 域（0xRRGGBB / 0xAARRGGBB 都只看低三字节，与 `DesignTokenContractTest` 的
  * hex 取值口径一致）；Global Constraints #7 的公式实现，逐分量复算，禁止估。

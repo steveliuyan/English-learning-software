@@ -34,27 +34,10 @@ class SharedComponentGeometryContractTest {
         const val ENTRY_ROW = "EntryRow.kt"
         const val INLINE_NOTICE = "InlineNotice.kt"
         const val ICON_BADGE = "IconBadge.kt"
-        const val COMPONENTS_DIR = "/ui/components/"
     }
 
-    /**
-     * 按文件名在 `ui/components/` 取剥注释源码（私有版，照 `IconBadgeContrastContractTest.uiSource`
-     * 的写法：文件缺失/多份/目录挪动都点名失败，不留空扫；不去改那个类，本任务自带一份）。
-     */
-    private fun uiComponentSource(name: String): String {
-        val files = uiFiles().filter { it.name == name }
-        assertTrue(
-            files.size == 1,
-            "$name 应恰好一个，实际 ${files.size} 个（实现文件未创建 / 被改名 / 扫描错位？" +
-                "期望目录 $UI_MAIN_SOURCE_PATH，JVM 工作目录 ${File(".").absolutePath}）"
-        )
-        val file = files.single()
-        assertTrue(
-            file.path.replace('\\', '/').contains(COMPONENTS_DIR),
-            "$name 不在 $COMPONENTS_DIR 下（目录挪动会让本契约读错文件）：${file.path}"
-        )
-        return stripComments(file.readText())
-    }
+    // 读法（M-3，Task 12 兑现）：本类原先自带一份私有 `uiComponentSource`，与另外三份逐字相同，
+    // 现已提升为共享夹具（`SourceRatchet.kt`），本文件直接调用同名顶层函数，不再持有第二份实现。
 
     // ---------- EntryRow.kt ----------
 

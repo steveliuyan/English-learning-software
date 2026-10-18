@@ -174,22 +174,6 @@ class ConfirmDestructiveInkTest {
         )
     }
 
-    /**
-     * 按文件名在 `ui/components/` 取剥注释源码（私有版，照 `SharedComponentGeometryContractTest.uiComponentSource`
-     * 的写法：文件缺失/多份/目录挪动都点名失败，不留空扫）。
-     */
-    private fun uiComponentSource(name: String): String {
-        val files = uiFiles().filter { it.name == name }
-        assertTrue(
-            files.size == 1,
-            "$name 应恰好一个，实际 ${files.size} 个（实现文件未创建 / 被改名 / 扫描错位？" +
-                "期望目录 $UI_MAIN_SOURCE_PATH，JVM 工作目录 ${File(".").absolutePath}）"
-        )
-        val file = files.single()
-        assertTrue(
-            file.path.replace('\\', '/').contains("/ui/components/"),
-            "$name 不在 /ui/components/ 下（目录挪动会让本契约读错文件）：${file.path}"
-        )
-        return stripComments(file.readText())
-    }
+    // M-3（Task 12 兑现）：本类原先自带一份私有 uiComponentSource，与另外三份逐字相同，已提升为
+    // SourceRatchet.kt 的共享夹具（文件恰一个 + 目录守卫两条断言逐字保留），本文件直接调用同名顶层函数。
 }
