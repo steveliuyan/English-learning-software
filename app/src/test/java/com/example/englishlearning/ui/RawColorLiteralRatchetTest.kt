@@ -4,6 +4,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -39,10 +40,12 @@ import kotlin.test.assertTrue
  *    折叠进同一行文本，此时行号已不可信）。
  *  - offender 取样不做 distinct：同一物理行含两处命中时，distinct 会把两次命中显示成一条、掩盖真实
  *    计数；「数量精确」由按文件计数用例保证，违规集只负责点名。
- *  - 规则形状逐字取自计划 Task 8 Step 2，只认 8 位 hex。6 位缩写、`Color.argb(...)`、命名常量异名
- *    同色都不在本棘轮视野内（那是禁令族与亮度复算契约的事）；放宽正则会把存量债务一次性炸出来，
- *    批 1 不做。同理，合成用例的样例值必须写满 8 位（`0xFF112233`），写成 10 位的 `Color(0xFF11223344)`
- *    规则抓不到——那是规则的边界而不是夹具坏了，别拿它当「夹具不工作」的证据去放宽正则。
+ *  - 规则口径 = 共享夹具唯一的 [rawColorLiteral]（批 1 终审 F2 对计划 Task 8 Step 2 原文规则的订正）：
+ *    认 6 位与 8 位十六进制、容忍 Kotlin 整型字面量后缀与 `.toInt()/.toLong()/…` 窄化调用，
+ *    因为 Compose 只有 `Color(Long)`，`Color(0xFF6B61L)` 这类换形**能编译**。
+ *    `Color.argb(...)`、命名常量异名同色仍不在本棘轮视野内（那是禁令族与亮度复算契约的事）；
+ *    超过 8 位的十六进制（`Color(0xFF11223344)`）也抓不到——那是规则的边界而不是夹具坏了，
+ *    别拿它当「夹具不工作」的证据去放宽正则。
  */
 
 /**
@@ -98,9 +101,14 @@ internal val RawHexThemeDefinitionFiles: Map<String, String> = mapOf(
  * （`AppleMintStart/Middle/End` 的逐字副本）。AppleMint* 保持静态是 Task 3 已验收的「品牌渐变模式不变」口径，
  * 本条只负责「别让它成为唯一没人管的裸 hex、并长出第二份副本」；具体迁法（改引 AppleMint* 还是 token 化）
  * 由批 3 的 Task 26 收口时定。三枚色值同在一条物理行上，故折叠后只有一条站点行，计数（3）以按文件计数为准。
+ *
+ * key 口径（批 1 终审 F8 的 M-3 前半）：**相对 `src/main/java/com/example/englishlearning` 根的精确路径**，
+ * 与 [RawColorSeedAllowlist]（相对 `ui` 根）同形，避免 `ui/` 外未来同名 `.kt` 在 `associate` 里互相顶替；
+ * [BrandLaunchSeedSiteLines] 保持「裸文件名: 折叠行」形状，因为那是共享夹具 [violations] 的 offender 形状，
+ * 本轮不改夹具签名（`scan scope resolves to real ui sources` 那条重名守卫负责盯住它不冒名）。
  */
 internal val BrandLaunchSeedAllowlist: Map<String, Int> = mapOf(
-    "BrandLaunchActivity.kt" to 3,
+    "launch/BrandLaunchActivity.kt" to 3,
 )
 
 /** 与 [BrandLaunchSeedAllowlist] 同形状的「文件名: 折叠源码行」行集，喂 `violations` 作 `ui/` 外扫描的行级 allowlist。 */
@@ -113,8 +121,14 @@ class RawColorLiteralRatchetTest {
     private val appDir = File(APP_MAIN_SOURCE_PATH)
     private val themeDir = File(UI_THEME_SOURCE_PATH)
 
-    /** 计划 Task 8 Step 2 原文规则，逐字照用。 */
-    private val rule = Regex("""Color\(\s*0x[0-9A-Fa-f]{8}\s*\)""")
+    /**
+     * 检测口径 = 共享夹具唯一的 [rawColorLiteral]（批 1 终审 F2）。
+     * 计划 Task 8 Step 2 的「逐字照用」原文规则本身**有缺陷**，本简报即为对该计划的订正：
+     * 旧形状 `Color\(\s*0x[0-9A-Fa-f]{8}\s*\)` 要求十六进制紧跟右括号，而 Compose 只有 `Color(Long)`，
+     * `Color(0xFF6B61L)`、`Color(0xFF6B61FFu.toLong())` 都能编译 —— 后缀与窄化调用一律躲过旧探针
+     * （缺陷由批 1 终审 C2 席实测，变异证据见本轮报告）。
+     */
+    private val rule = rawColorLiteral
 
     private fun File.relativeUiPath(): String = relativePathFrom(uiDir)
 
@@ -132,10 +146,15 @@ class RawColorLiteralRatchetTest {
         .associate { it.relativeUiPath() to countMatches(it.readText(), rule) }
         .filterValues { it > 0 }
 
-    /** `ui/` 之外的全仓裸 hex 按文件计数（offender 用裸文件名，与 [BrandLaunchSeedAllowlist] key 同形）。 */
+    /**
+     * `ui/` 之外的全仓裸 hex 按文件计数。
+     * **M-3 前半（批 1 终审 F8）**：key 用相对 `app` 源码根的**精确路径**（`launch/BrandLaunchActivity.kt`），
+     * 与 [actualCounts] 的相对 `ui` 根路径同形。旧版用裸文件名，而 [violations] 的 offender 形状也用裸文件名，
+     * `ui/` 外一旦出现同名 `.kt`，`associate` 会静默覆盖、少计一处债务。
+     */
     private fun nonUiActualCounts(): Map<String, Int> = uiFiles(appDir, expectedHint = "ui 外裸 hex：${appDir.path}")
         .filterNot { it.isUnderDirNamed(appDir, UI_DIR_NAME) }
-        .associate { it.name to countMatches(it.readText(), rule) }
+        .associate { it.relativePathFrom(appDir) to countMatches(it.readText(), rule) }
         .filterValues { it > 0 }
 
     private fun nonUiOffenders(): List<String> =
@@ -344,6 +363,42 @@ class RawColorLiteralRatchetTest {
             assertTrue(
                 violations("合成裸 hex", rule, setOf("Spread.kt:$SEED_LINE_SEPARATOR$spread"), dir).size == 1,
                 "按原始未折叠文本写 allowlist 不得生效——seed 只能用折叠形状"
+            )
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    /**
+     * **M-3 第二半（批 1 终审 F8）：目录豁免只认「扫描根下的第一段」**。
+     * 旧实现按路径链任一段匹配，`feature/ui/`、`a/theme/` 这类未来目录会被整片静默豁免出扫描面
+     * （债务换个嵌套目录就隐形）。负片段用真实目录形状（`feature/theme/Deep.kt`）当场证明豁免面收窄。
+     */
+    @Test
+    fun `directory exemption covers exactly the first segment under the scan root`() {
+        val dir = tempSources(
+            "theme/Defs.kt" to "private val b = Color(0xFF999999)\n",
+            "feature/theme/Deep.kt" to "private val c = Color(0xFF888888)\n",
+        )
+        try {
+            val files = uiFiles(dir)
+            val firstSegment = files.single { it.relativePathFrom(dir) == "theme/Defs.kt" }
+            val nested = files.single { it.relativePathFrom(dir) == "feature/theme/Deep.kt" }
+            assertTrue(
+                firstSegment.isUnderDirNamed(dir, THEME_DIR_NAME),
+                "扫描根第一段的 theme 目录必须被豁免（否则主题定义文件全都判违规）"
+            )
+            assertFalse(
+                nested.isUnderDirNamed(dir, THEME_DIR_NAME),
+                "M-3：theme 出现在第二段（feature/theme/）不得被豁免——任一段匹配的旧口径会把 " +
+                    "feature/ui/ 一类未来目录整片放出扫描面，债务只是换了个嵌套位置"
+            )
+            // 同一收窄口径必须在 violations 的 exemptDirNames 上成立：只有第一段的 theme 被吃掉。
+            val offenders = violations("合成裸 hex", rule, emptySet(), dir, exemptDirNames = setOf(THEME_DIR_NAME))
+            assertEquals(
+                listOf("Deep.kt: private val c = Color(0xFF888888)"),
+                offenders,
+                "violations 的目录豁免必须只认第一段（嵌套同名目录里的裸 hex 仍是违规）"
             )
         } finally {
             dir.deleteRecursively()

@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -122,18 +123,30 @@ class SharedComponentUniquenessRatchetTest {
     /**
      * 四族的债务台账：族名 → 违规文件的相对路径集（相对 `ui/` 根，正斜杠）。
      *
-     * seed 取值为控制者本席 grep 实测 + 本文件同口径复算（`task-12-precheck.md` §2/§3/§4/§6、计划 R-12.3）：
-     *  - 页头 **22** 枚：R-12.3 ② 明写「批 1 断不出 14 → 0」，本族只钉实测存量、只减不增，清零归批 3；
-     *  - 提示条 **12** 枚：R-12.3 ③ 订正了 Task 8 Step 4 点名的清单（`LearningRecordsScreen.kt` 与
-     *    `SettingsScreen.kt` **不在**其中），以实测 12 为准，清零归批 3；
-     *  - 未配置卡 **4** 枚：R-12.3 ① 已核实（`ImageStudioScreen`/`PhotoTranslationScreen`/
-     *    `SentenceAnalysisScreen`/`WordAiQaScreen` 各一份私有定义），批 2/批 3 接线时逐枚删；
-     *  - 词行 **6** 枚：spec §3 点名的 6 个文件（`WordBookWordsScreen`/`LearningRecordsScreen`/
-     *    `GlobalVocabularySearchScreen`/`VocabularyScreen`/`WrongWordsScreen`/`FavoritesScreen`）。
-     *    spec 说「7 份」是「6 文件 + `GlobalVocabularySearchScreen` 里的第二变体」，
-     *    本台账按**文件**计（同文件两变体接线时一并消失，按变体计会让 seed 半路删不掉）。
+     * **M-2（批 1 终审 D-M-2）：本 KDoc 不再写死每族「N 枚」的绝对数。**
+     * 台账本身就是唯一真值：行数 = 该族当前的债务份数，接线完毕就删一行（写死数字与本文件的设计直接对冲，
+     * 上一次它把「错误 / 回执行 11 份」漂成了实际 12/13）。
+     * 重算命令（要一个可核对的数就跑这条，别抄文档里的数；本机 gradle 路径解析方式见 skill
+     * `android-repo-session-handoff`，**绝不用 `./gradlew`**，wrapper 会联网下载）：
+     * ```
+     * "$GRADLE" :app:testDebugUnitTest --offline --no-daemon --no-build-cache \
+     *   --tests com.example.englishlearning.ui.SharedComponentUniquenessRatchetTest
+     * ```
+     * 判据用例 `each_family_offender_set_equals_its_seed_exactly` 红的时候会把**实际集合**与 seed 的差集
+     * （`added` / `cleared`）逐枚点名，照它同步 seed 即可；
+     * `wc -l` 式的粗算也可以用，但口径必须与本文件 [offendersOf] 一致（先 [stripComments] 再判形状，
+     * 「本文件调了共享组件即整体合规」的出口在下面 F7 条目里钉着，粗算时容易把它漏掉而多计）。
      *
-     * 台账**不含**任何组件文件：`components/` 下的 12 枚是各族的唯一真值，它们出现在 seed 里就等于
+     * 取值为控制者本席 grep 实测 + 本文件同口径复算（`task-12-precheck.md` §2/§3/§4/§6、计划 R-12.3）：
+     *  - 页头族：R-12.3 ② 明写「批 1 断不出 14 → 0」，本族只钉实测存量、只减不增，清零归批 3；
+     *  - 提示条族：R-12.3 ③ 订正了 Task 8 Step 4 点名的清单（`LearningRecordsScreen.kt` 与
+     *    `SettingsScreen.kt` **不在**其中），以实测为准，清零归批 3；
+     *  - 未配置卡族：R-12.3 ① 已核实（`ImageStudioScreen`/`PhotoTranslationScreen`/
+     *    `SentenceAnalysisScreen`/`WordAiQaScreen` 各一份私有定义），批 2/批 3 接线时逐枚删；
+     *  - 词行族：spec §3 点名的六个文件。spec 说「7 份」是「6 文件 + `GlobalVocabularySearchScreen`
+     *    里的第二变体」，本台账按**文件**计（同文件两变体接线时一并消失，按变体计会让 seed 半路删不掉）。
+     *
+     * 台账**不含**任何组件文件：`components/` 下的组件是各族的唯一真值，它们出现在 seed 里就等于
      * 把「唯一份」登记成「债务」；[canonical component files exist with exactly one top level definition each]
      * 从反方向钉这件事。
      */
@@ -258,6 +271,10 @@ class SharedComponentUniquenessRatchetTest {
             )
         }
         canonicalDefinitions.forEach { (component, file) ->
+            // 顶层定义锚点前提（批 1 终审 F8 的 M-5 后半，**登记不修**）：`(?m)^fun X(` 只认「行首 fun」。
+            // 它漏计 `@Composable fun X(` 这种**注解与定义同行**的写法。本仓全部分支的约定是注解独立成行，
+            // 所以现状无漏；批 2 若有组件改成同行写法，这条锚点会数到 0 → 本用例撞红（不会静默放行），
+            // 届时按「先改锚点形状再补合成片段」处理，别顺手放宽成 `fun X\(`（那会把缩进的私有同形态份也数进来）。
             val total = sources.sumOf { (_, source) ->
                 countMatches(source, Regex("""(?m)^fun $component\("""))
             }
@@ -267,11 +284,19 @@ class SharedComponentUniquenessRatchetTest {
                 "共享组件 $component 在整个 ui/ 扫描面上应恰一处顶层定义（承载文件 $file），实际 $total 处——" +
                     "0 处 = 组件被删/改名，2 处及以上 = 长出了第二份同形态组件"
             )
-            val inOwner = sources.first { (path, _) -> path.endsWith("/$file") }.second
+            // M-5（批 1 终审 D-M-5）：归属定位用**精确相对路径相等**（key 与 seed 台账同口径，相对 `ui/` 根），
+            // 旧的 `path.endsWith("/$file")` 只比尾巴：`components/glass/` 或未来任何子目录里出现同名文件时，
+            // 它会捡到错误的那一枚，「唯一顶层定义在承载文件里」这条就指着别的文件绿。
+            val ownerPath = "components/$file"
+            val inOwner = sources.firstOrNull { (path, _) -> path == ownerPath }?.second
+                ?: error(
+                    "$component 的承载文件在扫描面上定位不到（精确相等口径）：期望 $ownerPath，" +
+                        "扫描根 ${uiDir.path}，实际路径集 ${sources.map { (path, _) -> path }.sorted()}"
+                )
             assertEquals(
                 1,
                 countMatches(inOwner, Regex("""(?m)^fun $component\(""")),
-                "$component 的唯一顶层定义应在 $file 里（跑到别的文件即组件归属失唯一真值）"
+                "$component 的唯一顶层定义应在 $ownerPath 里（跑到别的文件即组件归属失唯一真值）"
             )
         }
         // AppIcons.kt 承载的是 33 枚字形的枚举，不是 @Composable：按 enum 声明钉唯一性。
@@ -554,6 +579,86 @@ class SharedComponentUniquenessRatchetTest {
             "字符串字面量里的 \"*/*\" 不得把其后的真代码当块注释吞掉",
         )
         assertEquals(0, countMatches(stripped, Regex("""AppPalette\.ErrorText""")), "夹具空转自检用")
+    }
+
+    /**
+     * **F6 防复发闸（批 1 终审 D-I-2）**：`app/src/test` 下的 `ui/` 测试目录里不得再长出私有的「块注释剥离」正则。
+     *
+     * 为什么这条闸存在：共享夹具 [stripComments] 早已是**字符串感知**的实现，而本仓曾有 7 份私有副本
+     * （`Accessibility*ContractTest` 五份 + `PronunciationIdleFallbackContractTest` + `WordBookCardProgressContractTest`）
+     * 加 `RestoreNoBypassContractTest.codeOf` 一共 8 处用正则版剥注释。正则版不认识字符串字面量，
+     * `AppScreen.kt`/`BackupRestoreScreen.kt` 里 SAF 的 MIME 字面量会让块注释正则从那一行一路吞到下一条行注释的
+     * 闭合序列，那几十行里的 forbidden 形态对全部 7 个契约同时隐形（失明窗口，实测窗口两处仍在现状里）。
+     * 批 2/批 3 还会新增源码契约测试，没有这道闸就会再长出第 9 份，所以本条是**防复发**而不是修历史。
+     *
+     * 口径与本仓所有源码契约一致：先 [stripComments] 再匹配（注释里复述的形状不计入）。
+     * 形状本体用 `"/" + "*"` 拼接构造，否则本文件会被自己的探针判红——这也是为什么本条注释
+     * 刻意不写出那两个序列的本体。
+     */
+    @Test
+    fun no_private_block_comment_stripper_survives_under_ui_test_sources() {
+        val blockOpen = "/" + "*"   // 拼接构造：写成本体字面量会让本探针自锁
+        val probes = listOf(
+            "replace(Regex(块注释起始…)) 形状" to Regex("""replace\(\s*Regex\(\s*"/(\\\\)*\*"""),
+            "Regex 本体以块注释起始开头" to Regex("""Regex\(\s*["]{0,3}\s*/(\\\\)*\*"""),
+        )
+        val dir = File(TEST_UI_SOURCE_DIR_PATH)
+        assertTrue(
+            dir.isDirectory,
+            "测试侧源码目录缺失（期望 $TEST_UI_SOURCE_DIR_PATH，JVM 工作目录 ${File(".").absolutePath}）：" +
+                "本闸会静默空扫，路径必须先修。"
+        )
+        val files = dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        assertTrue(files.isNotEmpty(), "本闸空扫：$TEST_UI_SOURCE_DIR_PATH 下没有 .kt（文件数 0 不是合规，是漏扫）。")
+        val offenders = files.flatMap { file ->
+            val text = stripComments(file.readText())
+            probes.mapNotNull { (shape, probe) ->
+                val hits = probe.findAll(text).count()
+                if (hits == 0) null else "${file.relativePathFrom(dir)}（$shape，$hits 处）"
+            }
+        }
+        assertTrue(
+            offenders.isEmpty(),
+            "测试源码里出现私有的块注释剥离正则 $offenders —— 剥注释只有共享夹具 [stripComments] 一份口径：" +
+                "正则版不认字符串字面量，会吞掉 MIME 字面量之后的几十行真代码，令所有「先剥注释再匹配」的契约" +
+                "在那一段区间集体失明（批 1 终审 F6）。删掉私有实现、直接调共享函数。"
+        )
+        // 合成负片段：含该形态的样例文本必须被判命中，否则本闸是空转。
+        val syntheticNaive = "private fun strip(text: String): String = text\n" +
+            "    .replace(Regex(\"$blockOpen[*]" + "\\\\s\\\\S]*?\")" + ", \"\")\n"
+        assertTrue(
+            probes.any { (_, probe) -> probe.containsMatchIn(syntheticNaive) },
+            "合成负片段未被本闸判出：探针形状与私有条实现脱节（闸空转）"
+        )
+        assertEquals(
+            0,
+            probes.count { (_, probe) -> probe.containsMatchIn("val ok = stripComments(source)") },
+            "合成正片段被误判：委托共享夹具的写法不得被抓"
+        )
+    }
+
+    /**
+     * **m6（批 1 终审，Seat B M-6 同源）**：[uiScreenSource] 只服务 `ui/` 根的**屏文件**。
+     * 文件名形状钉在夹具入口里：批 2 会新增屏文件，把 `ViewModel.kt`/`AiFeature.kt` 这类同目录非屏文件
+     * 误当屏文件读会让契约对着错的文件绿，所以形状必须当场判红（不只是靠父目录守卫）。
+     */
+    @Test
+    fun screen_source_fixture_only_accepts_screen_files() {
+        val screen = assertFailsWith<AssertionError> { uiScreenSource("WordRow.kt") }
+        assertTrue(
+            screen.message?.contains("Screen.kt") == true,
+            "uiScreenSource(\"WordRow.kt\") 必须按「文件名以 Screen.kt 结尾」的形状钉判红，实际消息：${screen.message}"
+        )
+        val nonScreenInRoot = assertFailsWith<AssertionError> { uiScreenSource("AiFeature.kt") }
+        assertTrue(
+            nonScreenInRoot.message?.contains("Screen.kt") == true,
+            "ui/ 根下的非屏文件（AiFeature.kt）也必须被形状钉挡住——只有父目录守卫时它会静默读到，" +
+                "契约就对着一枚不是屏的文件绿。实际消息：${nonScreenInRoot.message}"
+        )
+        assertTrue(
+            uiScreenSource("BackupRestoreScreen.kt").isNotBlank(),
+            "合规屏文件必须读得到（夹具退化到谁都判红同样是事故）"
+        )
     }
 
     /**

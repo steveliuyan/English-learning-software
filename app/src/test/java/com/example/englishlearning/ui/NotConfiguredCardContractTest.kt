@@ -153,7 +153,9 @@ class NotConfiguredCardContractTest {
         assertEquals(
             1,
             countMatches(source, Regex("""fillMaxWidth\(\)\s*\.clickable\(""")),
-            "出口必须整行可点：clickable 紧跟 fillMaxWidth()（EntryRow 的「40dp 假面」教训，顺序即契约）",
+            "出口必须整行可点：clickable 排在 fillMaxWidth() 之后、任何 padding 之前" +
+                "（EntryRow 的「40dp 假面」教训；本锚按生产现链字面取样，heightIn 与 clickable 的先后中性——" +
+                "可点面两条共同交付见 EntryRow.kt KDoc 与 SharedComponentGeometryContractTest.entryRowOrderIndices）",
         )
         assertEquals(1, countMatches(source, Regex("""MaterialTheme\.shapes\.medium""")), "圆角必须恰一处装配档（= 稿 --r-card 18dp）")
         assertEquals(0, countMatches(source, Regex("""AppShape\.Card""")), "新组件禁读 AppShape.Card（20dp 旧档）")
@@ -180,8 +182,8 @@ class NotConfiguredCardContractTest {
         )
         assertEquals(
             0,
-            countMatches(source, Regex("""Color\(\s*0x[0-9A-Fa-f]{8}\s*\)""")),
-            "新组件不得写裸 hex（RawColorLiteralRatchetTest 同口径）",
+            countMatches(source, rawColorLiteral),
+            "新组件不得写裸 hex（口径 = 共享夹具 rawColorLiteral，与 RawColorLiteralRatchetTest 同一份，批 1 终审 F2）",
         )
 
         // 合成正/负片段：必填形参探针既认自家形状，也认得出「可空」「带默认值」两种死屏后门。

@@ -54,7 +54,12 @@ import org.junit.runner.RunWith
  *  - `EntryIconBadge` 40dp 域渐变容器 + 两层：豁免表那几枚（Back/ChevronRight/ChevronDown/Close/Check）
  *    **必须跳过**——`IconBadge.kt` 开头的 `require` 会抛 `IllegalArgumentException`，
  *    那是设计层面的拦死（两层豁免枚不得进 ≥40dp 入口容器），不是本用例要绕开的障碍；
- *    跳过关系**按 [StrokeOnlyIcons] 集合双向钉**——「全部枚 − 豁免表」的枚集合必须逐枚等于进容器那批的枚集合，
+ *    跳过关系**按 [StrokeOnlyIcons] 集合逐枚比对**——「全部枚 − 豁免表」的枚集合必须等于进容器那批的枚集合。
+ *    说清它咬什么、不咬什么（批 1 终审 m5，原措辞「双向钉」超卖）：本用例与 `IconBadge.kt` 的
+ *    `allowsInEntryContainer = icon !in StrokeOnlyIcons` **共用同一个谓词符号**，所以它咬得住的是
+ *    **生产谓词的语义漂移**（把豁免枚放进容器、或把非豁免枚跳掉，集合等式当场不成立）；
+ *    它**咬不到豁免表本身被改**——把 [StrokeOnlyIcons] 增删一枚，期望侧与实际侧会一起动，本用例照样绿；
+ *    豁免表的内容由 `AppIconsStructureContractTest`（与决策文档豁免表、逐枚清单层列三处同源比对）钉住。
  *    不写会漂移的绝对数，也不写能自相抵消的结构等式（修复轮 2 的 Fix I-2：
  *    `exemptCount` 定义就是 `entries.size - entryIcons.size`，旧那条「枚数等式」化简后恒真、不咬任何漂移）；
  *  - `InlineIconBadge` 30dp tint 底 + 17dp 单层描边：33 枚全上（豁免枚唯一的合法去处就是行内）。

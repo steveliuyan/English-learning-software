@@ -33,22 +33,41 @@ import kotlin.test.assertTrue
  */
 class MaterialThemeAssemblyContractTest {
 
-    // ---------- 钉值表（逐字来自 spec §2.2 / §2.3 与 Task 4 的角色映射裁决） ----------
+    // ---------- 钉值表（拆成两段：spec §2.2 钉值段 + 批 1 墨色债务段；见 m12） ----------
 
-    /** 六个语义档在 `AppType.kt` 里的完整声明行（本任务只准新增装配函数，六档逐字不动）。 */
-    private val appTypeTierDeclarations: Map<String, String> = linkedMapOf(
+    /**
+     * 六个语义档在 `AppType.kt` 里的声明，**按判据来源拆成两处**（批 1 终审 m12，Seat A「口径 6 反向锁」）：
+     *
+     *  - [appTypeSpecSegments]：**spec 钉值段**（`fontSize` / `fontWeight` / `letterSpacing`）。
+     *    spec §2.2 的钉值表（`docs/superpowers/specs/2026-10-17-ui-redesign-design.md` §2.2）
+     *    只钉这三项与 M3 角色对位，**从未钉过 `color`**；
+     *  - [appTypeInkSegments]：**批 1 债务段**（`color = AppPalette.Text…`）。它钉的是「六档今日仍硬编码浅套墨」
+     *    这一笔**债务**，台账在 `DarkTokenConsumptionRatchetTest` 的 `seed("theme/AppType.kt" = 6)`；
+     *    批 3 给六档摘色时删掉的是本段与那 6 处 seed，**不构成 spec 冲突**。
+     *
+     * 两段拼起来与旧的整条字面比对**逐字节等价**（用例仍断言 `contains(spec + ink)`），所以本轮没有放松任何判据，
+     * 只是让批 3 摘色时红的是「债务段」而不是「规格段」。六档取值一个字节都没动。
+     */
+    private val appTypeSpecSegments: Map<String, String> = linkedMapOf(
         "Display" to "val Display = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, " +
-            "letterSpacing = 0.4.sp, color = AppPalette.TextPrimary)",
+            "letterSpacing = 0.4.sp",
         "Headline" to "val Headline = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, " +
-            "letterSpacing = 0.2.sp, color = AppPalette.TextPrimary)",
-        "Title" to "val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, " +
-            "color = AppPalette.TextPrimary)",
-        "Body" to "val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, " +
-            "color = AppPalette.TextPrimary)",
-        "Footnote" to "val Footnote = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, " +
-            "color = AppPalette.TextSecondary)",
+            "letterSpacing = 0.2.sp",
+        "Title" to "val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold",
+        "Body" to "val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal",
+        "Footnote" to "val Footnote = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal",
         "Label" to "val Label = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, " +
-            "letterSpacing = 0.3.sp, color = AppPalette.TextSecondary)",
+            "letterSpacing = 0.3.sp",
+    )
+
+    /** 六档的批 1 墨色债务段（紧跟 spec 段之后、以右括号收尾）；台账见 `seed("theme/AppType.kt" = 6)`。 */
+    private val appTypeInkSegments: Map<String, String> = linkedMapOf(
+        "Display" to ", color = AppPalette.TextPrimary)",
+        "Headline" to ", color = AppPalette.TextPrimary)",
+        "Title" to ", color = AppPalette.TextPrimary)",
+        "Body" to ", color = AppPalette.TextPrimary)",
+        "Footnote" to ", color = AppPalette.TextSecondary)",
+        "Label" to ", color = AppPalette.TextSecondary)",
     )
 
     /**
@@ -139,6 +158,9 @@ class MaterialThemeAssemblyContractTest {
     /**
      * 装配点引入的字形对容器配对，全部按正文族下限 4.5:1 复算（左列字形压右列容器；
      * 后几组是同一批容器色在「字形直接压底」用法下的对偶，如 TextButton 取 `primary` 作字色）。
+     * 复算对象同样是**生产装配实参**（m9：与下面 `boundaryRoles` 用例同口径，
+     * 取 `namedArgs(parenBlock(生产 appColorScheme 体, light/darkSchemeCall))`，不再读测试自己的
+     * `colorSchemeExpressions` 表——那张表只是另一条用例的比对基准，不该替本例把关）。
      * `outline` / `outlineVariant` 故意不在本表：M3 `outline` 槽是非文本边界（控件描边），其
      * 3:1 下限由下面 `boundaryRoles` 用例按 WCAG 1.4.11 单独当场复算；`outlineVariant` 取
      * `outlineSoft`，只作 Divider 等装饰细线、不承担非文本信息（域色 `deep` 容器的非文本下限走
@@ -270,11 +292,28 @@ class MaterialThemeAssemblyContractTest {
         error("fun $name 函数体花括号未配平")
     }
 
-    /** 逐行命名字段：`role = <expr>,` → `role` 到 `<expr>`（实现约定一条实参一行，值不跨行）。 */
-    private fun namedArgs(block: String): Map<String, String> =
-        Regex("""^\s*([a-zA-Z]\w*)\s*=\s*(.+?)\s*,?\s*$""", RegexOption.MULTILINE)
+    /**
+     * 逐行命名字段：`role = <expr>,` → `role` 到 `<expr>`（实现约定一条实参一行，值不跨行）。
+     *
+     * **m11（批 1 终审，Seat A M-4）**：同角色出现两次必须判红，不能像 `associate` 那样让后一份
+     * 静默覆盖前一份——覆盖后比表面还少一项，装配里却多了一条无人认领的实参，逐字比对会照常通过。
+     * 消息点名所有重复角色（由 `named args helper rejects a duplicated role …` 用例用合成片段钉住）。
+     */
+    private fun namedArgs(block: String): Map<String, String> {
+        val pairs = Regex("""^\s*([a-zA-Z]\w*)\s*=\s*(.+?)\s*,?\s*$""", RegexOption.MULTILINE)
             .findAll(block)
-            .associate { it.groupValues[1] to it.groupValues[2] }
+            .map { it.groupValues[1] to it.groupValues[2] }
+            .toList()
+        val seen = LinkedHashSet<String>()
+        val duplicated = LinkedHashSet<String>()
+        for ((role, _) in pairs) if (!seen.add(role)) duplicated += role
+        assertTrue(
+            duplicated.isEmpty(),
+            "命名字段里出现重复实参角色（${duplicated.joinToString()}）：`associate` 会让后写的一份静默" +
+                "覆盖前一份，逐字比对就再也看不见多出来的那条赋值。每条角色只允许出现一次。"
+        )
+        return pairs.toMap()
+    }
 
     /** 取色表达式里出现的 `AppColorSet` 字段名。 */
     private fun fieldsOf(expr: String): List<String> =
@@ -382,6 +421,26 @@ class MaterialThemeAssemblyContractTest {
         """.trimIndent()
         assertEquals(2, countMatches(calls, materialThemeCall), "同行与换行两种调用形状都必须被抓住")
 
+        // m10 新增形状钉：空实参 + 尾随 lambda、纯尾随 lambda 都是**调用**，旧口径两种都抓不到。
+        val trailingLambdaCalls = """
+            MaterialTheme { content() }
+            MaterialTheme() { content() }
+        """.trimIndent()
+        assertEquals(
+            2,
+            countMatches(trailingLambdaCalls, materialThemeCall),
+            "m10：`MaterialTheme {` 与 `MaterialTheme() {` 是合法调用形状，唯一性守卫抓不到它们就等于留了洞",
+        )
+        // 同一枚前瞻继续排除读点与同后缀名字：放宽成「见到 MaterialTheme 就数」会把下面四行全数进去。
+        val stillReads = """
+            val line = MaterialTheme.typography.bodySmall
+            val ink = MaterialTheme.colorScheme.error
+            val alias = AppMaterialTheme(colorScheme = scheme)
+            val spacing = MaterialTheme
+                .shapes
+        """.trimIndent()
+        assertEquals(0, countMatches(stillReads, materialThemeCall), "读点 / 同后缀名字被误判成调用：口径越界")
+
         // 注释里的调用形状不计入契约（证明 stripComments 是本规则的入口而不是摆设）。
         assertEquals(
             0,
@@ -434,15 +493,31 @@ class MaterialThemeAssemblyContractTest {
         )
     }
 
-    // ---------- 用例：六档钉值（brief Step 1 断言 3，spec §2.2） ----------
+    // ---------- 用例：六档钉值（brief Step 1 断言 3；spec 钉值段 + 批 1 债务段分开判，m12） ----------
 
+    /**
+     * 六档声明逐字钉住，但**按判据来源分两层报红**：
+     *  - spec 段（字号/字重/字距）红 = 真的偏离 spec §2.2；
+     *  - 墨色段红 = 批 1 债务形态变了（`color = AppPalette.Text…`），由 `DarkTokenConsumptionRatchetTest`
+     *    的 `seed("theme/AppType.kt" = 6)` 台账记账，批 3 摘色时连同本判据一起删，**不是**规格冲突。
+     * 两段仍做整串 `contains`，判据强度与拆分前逐字节等价。
+     */
     @Test
-    fun `AppType six tiers match spec 2_2 verbatim`() {
+    fun `AppType six tiers match spec 2_2 metrics and the batch 1 ink segment`() {
         val text = appTypeText()
-        appTypeTierDeclarations.forEach { (tier, declaration) ->
+        appTypeSpecSegments.forEach { (tier, specSegment) ->
             assertTrue(
-                text.contains(declaration),
-                "AppType.$tier 偏离 spec §2.2 钉值（本任务只准新增装配函数，六档声明逐字不动）：期望 $declaration"
+                text.contains(specSegment),
+                "AppType.$tier 偏离 **spec §2.2 钉值段**（只钉 fontSize/fontWeight/letterSpacing 与 M3 角色对位，" +
+                    "spec 从未钉 color）：期望 $specSegment"
+            )
+            val inkSegment = appTypeInkSegments.getValue(tier)
+            assertTrue(
+                text.contains(specSegment + inkSegment),
+                "AppType.$tier 的**批 1 墨色债务段** $inkSegment 没有紧跟在 spec 钉值段之后（被改写或位置移动）。" +
+                    "注意：这一段不是 spec 要求，它是 `DarkTokenConsumptionRatchetTest` 的 " +
+                    "seed(theme/AppType.kt = 6) 台账登记的浅套硬编码墨色，批 3 摘色时连同本判据一并删除；" +
+                    "若 spec 钉值段本身也漂了，上面那条判据会先红。"
             )
         }
         assertEquals(
@@ -461,6 +536,26 @@ class MaterialThemeAssemblyContractTest {
         val expected = typographyRoleTiers.mapValues { neutralTierStyle(it.value) }
         assertEquals(expected, args, "appTypography 的角色映射偏离钉值表（缺角色 / 错档 / 未去色都会在这里爆）")
         assertEquals(15, args.size, "M3 Typography 的核心角色恰好十五个")
+    }
+
+    /**
+     * **m11（批 1 终审，Seat A M-4）**：[namedArgs] 不得用 `associate` 静默吞掉同角色重复实参。
+     * 合成负片段（`primary` 写两次）必须被点名判红——否则「逐字与共享表比对」会放过一次多余赋值：
+     * 后写的 `primary = set.text1` 覆盖前一份，比表面还少一项，装配里却多了一条无人认领的实参。
+     */
+    @Test
+    fun `named args helper rejects a duplicated role instead of silently overwriting`() {
+        val duplicated = "        primary = set.onMint,\n        primary = set.text1,\n        onPrimary = set.background,\n"
+        val failure = assertFailsWith<AssertionError> { namedArgs(duplicated) }
+        assertTrue(
+            failure.message?.contains("primary") == true,
+            "重复实参必须被点名（消息里要有角色名 primary），实际：${failure.message}"
+        )
+        assertEquals(
+            mapOf("onPrimary" to "set.background"),
+            namedArgs("        onPrimary = set.background,\n"),
+            "合成正片段失效：单次实参的正常形状被误判",
+        )
     }
 
     @Test
@@ -548,19 +643,21 @@ class MaterialThemeAssemblyContractTest {
 
     @Test
     fun `scheme ink pairs introduced by the assembly meet WCAG floors computed at runtime`() {
+        // m9（批 1 终审 Seat A M-2）：复算对象是**生产装配实参**，与下面 boundaryRoles 用例同口径。
+        // 旧写法读的是测试自己的 colorSchemeExpressions(dark) 表，KDoc 却声称「装配点引入的字形对」——
+        // 那张表要等 `appColorScheme takes every named role…` 比对过生产才与生产等价，本例等于把把关
+        // 责任隐性寄托在另一条用例上（那条一旦被删或放宽，本例照样绿）。现在两条用例各自读生产，无跨用例依赖。
+        val body = functionText(mintGlassThemeText(), "appColorScheme")
         listOf(false to AppColorLight, true to AppColorDark).forEach { (dark, set) ->
             val schemeName = if (dark) "深套" else "浅套"
-            val expressions = colorSchemeExpressions(dark)
-            fun colorOf(role: String): Color {
-                val expr = expressions[role] ?: error("钉值表缺角色 $role")
-                return fieldOf(set, fieldsOf(expr).single())
-            }
+            val args = namedArgs(parenBlock(body, if (dark) darkSchemeCall else lightSchemeCall))
             textPairRoles.forEach { (inkRole, containerRole) ->
+                val inkExpr = args[inkRole] ?: error("$schemeName 装配缺 $inkRole 实参")
+                val containerExpr = args[containerRole] ?: error("$schemeName 装配缺 $containerRole 实参")
                 assertAtLeast(
-                    "$schemeName $inkRole(${expressions.getValue(inkRole)}) 压 " +
-                        "$containerRole(${expressions.getValue(containerRole)})",
-                    colorOf(inkRole),
-                    colorOf(containerRole),
+                    "$schemeName colorScheme.$inkRole($inkExpr) 压 $containerRole($containerExpr)（正文族下限）",
+                    fieldOf(set, fieldsOf(inkExpr).single()),
+                    fieldOf(set, fieldsOf(containerExpr).single()),
                     4.5,
                 )
             }
@@ -752,8 +849,17 @@ class MaterialThemeAssemblyContractTest {
 
     // ---------- 规则常量 ----------
 
-    /** `MaterialTheme(` 的**调用**形状：紧跟标识符（同行或换行后），排除 `.typography` / `.colorScheme` 读点。 */
-    private val materialThemeCall = Regex("""MaterialTheme\(\s*[a-zA-Z_]""")
+    /**
+     * `MaterialTheme` 的**调用**形状（m10，Seat A M-4）：先用 `(?<![\w.])MaterialTheme\b` 抓到标识符本体
+     * （`(?<![\w.])` 排除 `AppMaterialTheme` 这类同后缀名字），再要求它紧跟 `(` 或 `{`（可有空白）才算一次调用。
+     * 旧口径 `MaterialTheme\(\s*[a-zA-Z_]` 有两处洞：`MaterialTheme() { … }`（空实参 + 尾随 lambda）与
+     * `MaterialTheme { … }`（material3 允许只传 content）都抓不到，第二套主题就能从这两种写法里长出来。
+     * 读点侧（`MaterialTheme.typography` / `.colorScheme` / `.shapes`）由「后跟 `(` 或 `{`」这一步继续排除。
+     * **登记一条残留**：全限定调用 `androidx.compose.material3.MaterialTheme(…)` 也被同一个前瞻排除
+     * （它与「`x.MaterialTheme` 不是本包那个名字」共用一条守卫）；本仓 main 现无该写法，若批 2 出现，
+     * 由本用例的「装配点应唯一」之外的 import 审查兜住，收紧口径须先补合成片段。
+     */
+    private val materialThemeCall = Regex("""(?<![\w.])MaterialTheme\b(?=\s*[\({])""")
 
     /** 装配点内部那一次调用：前面必须是空白或左大括号，排除 `fun MintGlassTheme(` 之类同后缀名字。 */
     private val materialThemeCallInAssembly = Regex("""[\s{]MaterialTheme\(""")

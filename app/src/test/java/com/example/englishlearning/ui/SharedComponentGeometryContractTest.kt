@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -17,8 +18,9 @@ import kotlin.test.assertTrue
  * 且本文件不写裸十六进制/`Color(0x…)` 字面量。
  *
  * 每条用例都配合成正片段 + 合成负片段自证正则承重（先例：本仓
- * `entry_glyph_shapes_are_pinned_tone_by_tone`）；**按顺序承重的锚点**（clickable 紧跟 fillMaxWidth、
- * drawBehind 在 padding 外侧、size 在 layer 之前）在断言消息里写明顺序即契约。
+ * `entry_glyph_shapes_are_pinned_tone_by_tone`）；**按顺序承重的锚点**（clickable 在 fillMaxWidth() 之后
+ * 且在任何 padding 之前——`heightIn` 不参与判定，判据见 [entryRowOrderIndices] 的 F1 说明；
+ * drawBehind 在 padding 外侧；size 在 layer 之前）在断言消息里写明自己钉的是哪一条顺序。
  * 变异自证（brief Step 4 ⑥⑦）：生产 `spacedBy(12.dp)`→`spacedBy(10.dp)` 与本文件 12dp 锚红；
  * 生产提示条 `vertical = 12.dp`→`vertical = 14.dp` 与本文件 padding 锚红。
  *
@@ -75,8 +77,36 @@ class SharedComponentGeometryContractTest {
     private val hairlineOutsideContent =
         Regex("""drawBehind\s*\{[^{}]*1\.dp\.toPx\(\)[^{}]*\}\s*\.padding\(top = 1\.dp\)""")
 
-    /** 新顺序（实测教训，计划 :1049）：clickable 紧跟 fillMaxWidth，可点面才是整盒。 */
-    private val clickableRightAfterFillMaxWidth = Regex("""fillMaxWidth\(\)\s*\.clickable\(""")
+    /**
+     * 可点面的第②条交付（批 1 终审 F1 重写）：`clickable` 排在任何 `padding` **之前**。
+     *
+     * 判据形状照 `WordRowSpeakerContractTest.pillOrderIndices` 的**下标比较**，不再用字面文本正则定位：
+     * 旧锚 `fillMaxWidth\(\)\s*\.clickable\(` 把「`heightIn` 插在 `fillMaxWidth` 与 `clickable` 之间」这一
+     * **合法**写法判成不合法（数到 0 处），批 2 任何按 `.fillMaxWidth().heightIn(...).clickable(...)` 写的
+     * 入口行都会假红。`clickable` 不参与测量，所以 `heightIn` 在不在它前面与可点面尺寸无关（第①条交付
+     * 由 [rowMinHeight56] 单独钉）；本函数只看两件事：`clickable` 在 `fillMaxWidth()` 之后、在首枚
+     * `padding(` 之前。
+     */
+    private fun entryRowOrderIndices(source: String): Triple<Int, Int, Int> = Triple(
+        source.indexOf(".fillMaxWidth()"),
+        source.indexOf(".clickable("),
+        source.indexOf(".padding("),
+    )
+
+    /** [entryRowOrderIndices] 的判据本体（生产源码与合成片段共用一套口径，避免断言与自证各写一遍）。 */
+    private fun clickableCoversWholeBox(source: String): Boolean {
+        val (fillIndex, clickableIndex, paddingIndex) = entryRowOrderIndices(source)
+        return fillIndex in 0 until clickableIndex && clickableIndex < paddingIndex
+    }
+
+    /** 断言消息用的实际下标（-1 = 本文件里没有那一枚），让「红在顺序上」可读而不是红在计数上。 */
+    private fun entryRowOrderDebug(source: String): String {
+        val (fillIndex, clickableIndex, paddingIndex) = entryRowOrderIndices(source)
+        return "fillMaxWidth=$fillIndex, clickable=$clickableIndex, padding=$paddingIndex"
+    }
+
+    /** 链上只此一枚可点源（「整行一个可点目标」的源码面镜像；少了这一条时 indexOf 只认第一枚会放过重复）。 */
+    private val singleClickable = Regex("""\.clickable\(""")
 
     /** 旧形状（禁止）：clickable 排在 heightIn/padding 之后——真机只给出 40dp 可点面，撞 F5-03。 */
     private val clickableAfterPadding = Regex(
@@ -96,21 +126,40 @@ class SharedComponentGeometryContractTest {
         assertEquals(1, countMatches(source, chevronStroke16), "chevron 必须恰一处 size = 16.dp 且带 StrokeOnly（锚点按 size→layer 顺序承重）")
         assertEquals(1, countMatches(source, hairlineToPx), "发丝线宽度必须恰一处 1.dp.toPx()")
         assertEquals(1, countMatches(source, hairlineOutsideContent), "发丝线必须恰一处「drawBehind 在前、padding(top = 1.dp) 让位在后」（顺序即契约，R-10.5）")
-        assertEquals(1, countMatches(source, clickableRightAfterFillMaxWidth), "clickable 必须紧跟 fillMaxWidth()（可点面 = 整盒；计划 :1049 的实测教训）")
+        assertTrue(
+            clickableCoversWholeBox(source),
+            "可点面必须覆盖整盒：clickable 排在 fillMaxWidth() 之后、任何 padding 之前（计划 :1049 的实测教训；" +
+                "首次下标 ${entryRowOrderDebug(source)}；-1 = 本文件缺那一枚；clickable > padding = 可点面缩回内容盒。" +
+                "heightIn 在 clickable 之前**不算**违规，两条共同交付见 EntryRow.kt KDoc）",
+        )
+        assertEquals(1, countMatches(source, singleClickable), "入口行链上 clickable 只此一处（两处 = 第二个可点源，撞「整行一个可点目标」用例）")
         assertEquals(0, countMatches(source, clickableAfterPadding), "禁旧形状 clickable 排在 heightIn/padding 之后（真机只有 40dp 可点面，撞 F5-03）")
 
-        // 合成正片段：新顺序形状必须被「新顺序」探针认出、且不被「旧形状」探针误认。
+        // 合成正片段：新顺序形状必须被下标判据认出、且不被「旧形状」探针误认。
         val newShape = "Row(modifier = modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)" +
             ".heightIn(min = 56.dp).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp))"
-        assertEquals(1, countMatches(newShape, clickableRightAfterFillMaxWidth), "合成正片段漏判：新顺序没被认出来")
+        assertTrue(clickableCoversWholeBox(newShape), "合成正片段漏判：新顺序没被下标判据认出来（${entryRowOrderDebug(newShape)}）")
         assertEquals(0, countMatches(newShape, clickableAfterPadding), "合成正片段越界：新顺序被判成了旧形状")
         assertEquals(1, countMatches(newShape, rowGap12), "合成正片段漏判：12dp 间隙锚认不出自家形状")
 
-        // 合成负片段：旧顺序串必须被「旧形状」探针命中、且被「新顺序」探针判 0 处。
+        // 合成负片段：旧顺序串必须被「旧形状」探针命中，且不满足下标判据。
         val legacyShape = "Row(modifier = modifier.heightIn(min = 56.dp).padding(vertical = 8.dp)" +
             ".clickable(role = Role.Button, onClick = onClick))"
         assertEquals(1, countMatches(legacyShape, clickableAfterPadding), "合成负片段失控：旧顺序没被禁形探针认出")
-        assertEquals(0, countMatches(legacyShape, clickableRightAfterFillMaxWidth), "合成负片段被放行：旧顺序竟过了「clickable 紧跟 fillMaxWidth」锚")
+        assertFalse(clickableCoversWholeBox(legacyShape), "合成负片段被放行：padding 在 clickable 之前的旧顺序竟过了下标判据（${entryRowOrderDebug(legacyShape)}）")
+
+        // 反假红钉（批 1 终审 F1，本项验收物）：heightIn 插在 fillMaxWidth 与 clickable 之间**同样合法**
+        // ——clickable 不参与测量，可点面尺寸只由「链上有 48dp 下限」+「clickable 在任何 padding 之前」
+        // 两条共同交付（先例：DialogButton 的 heightIn 在前、NotConfiguredCard 出口 heightIn 在后，
+        // 两处 connected 都实测 ≥48dp）。旧锚（要求 clickable 紧跟 fillMaxWidth）在这条上判 0 处，
+        // 批 2 任何按 `.fillMaxWidth().heightIn(...).clickable(...)` 写的入口行都会假红。
+        val heightInFirstShape = "Row(modifier = modifier.fillMaxWidth().heightIn(min = 56.dp)" +
+            ".clickable(role = Role.Button, onClick = onClick).padding(vertical = 8.dp))"
+        assertTrue(
+            clickableCoversWholeBox(heightInFirstShape),
+            "反假红钉失控：heightIn 插在 clickable 之前的合法链被下标判据误判成不合法（${entryRowOrderDebug(heightInFirstShape)}）",
+        )
+        assertEquals(0, countMatches(heightInFirstShape, clickableAfterPadding), "反假红钉越界：heightIn 在前的合法链被旧顺序禁形探针误命中")
 
         // 合成负片段：邻近取值不得互相冒名——48dp 串不得被 56dp 锚命中，10dp 串不得被 12dp 锚命中。
         assertEquals(0, countMatches("Box(Modifier.heightIn(min = 48.dp))", rowMinHeight56), "合成负片段被放行：48dp 下限串被 56dp 取值锚冒名命中")

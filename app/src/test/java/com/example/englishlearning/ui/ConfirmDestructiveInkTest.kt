@@ -154,8 +154,8 @@ class ConfirmDestructiveInkTest {
         )
         assertEquals(
             0,
-            countMatches(source, Regex("""Color\(\s*0x[0-9A-Fa-f]{8}\s*\)""")),
-            "新组件不得写裸 hex（`RawColorLiteralRatchetTest` 的同一口径）",
+            countMatches(source, rawColorLiteral),
+            "新组件不得写裸 hex（口径 = 共享夹具 rawColorLiteral，与 `RawColorLiteralRatchetTest` 同一份，批 1 终审 F2）",
         )
 
         // 合成正/负片段：证明上面几枚探针既抓得住也不越界（house 口径：每条源码契约自带双边取样）。

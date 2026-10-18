@@ -78,10 +78,12 @@ class WordRowSpeakerContractTest {
     private val staticPaletteRead = Regex("""AppPalette\.|DomainColors\.""")
 
     /**
-     * 裸 hex 探针：`Color(0x…)` 的字面量位数按「8 位（AARRGGBB）**或** 6 位（RRGGBB）」两档都认
-     * （M-b，修复轮 2：原先只写 `{8}`，`Color(0xFF3B30)` 这一类省略 alpha 的写法会漏过本条红线）。
+     * 裸 hex 探针 = 共享夹具唯一的 [rawColorLiteral]（批 1 终审 F2：口径不许在本文件再抄一遍）。
+     * 位数按「8 位（AARRGGBB）**或** 6 位（RRGGBB）」两档都认（M-b，修复轮 2），并容忍 Kotlin 整型字面量
+     * 后缀与 `.toInt()/.toLong()/…` 窄化调用（F2：`Color(0xFF6B61L)` 这类写法能编译，
+     * 只匹配「十六进制紧跟右括号」的旧正则会被整体绕过）。
      */
-    private val rawHex = Regex("""Color\(\s*0x(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{6})\s*\)""")
+    private val rawHex = rawColorLiteral
 
     /** 字形随态取图走纯函数（不在组件里写第二份 `when`）。 */
     private val glyphFromPureMapper = Regex("""AppGlyph\(\s*icon = speakerGlyph\(state\)""")
@@ -123,6 +125,16 @@ class WordRowSpeakerContractTest {
     /** 两个可空槽必须真的被调用（槽位形同虚设的话批 2 会各自手搓第二份）。 */
     private val leadingSlotInvoked = Regex("""leadingSlot\(\)""")
     private val actionsSlotInvoked = Regex("""content = actionsSlot""")
+
+    /**
+     * 右列宽度上限（批 1 终审 F3，C1 I-2）：状态/meta 那一列必须带 `widthIn(max = …)`。
+     *
+     * 为什么是形状断言而不是取值断言：`Row` 先量**无权重**的孩子，右列既无 weight 又无上限时，
+     * `fontScale = 2.0` 加日期型 meta 能把 `weight(1f)` 的 lemma 列挤到 0dp（词头整列消失，连省略号都没有）。
+     * 本条只钉「右列必须有一道宽度上限」这一形状；上限取值（120dp）的理由在 `WordRow.kt` KDoc，
+     * 实际能否站住由 connected 的 `WordRowTest` 在 fontScale 2.0 下量 lemma 宽度（≥48dp）。
+     */
+    private val rightColumnWidthCap = Regex("""widthIn\(max = \d+\.dp\)""")
 
     /** 词行不读域色：`domain` 形参不参与取色（域色只在 `leading` 槽里由调用方组合的徽标自己取）。 */
     private val domainAccentRead = Regex("""appDomain\(""")
@@ -303,6 +315,7 @@ class WordRowSpeakerContractTest {
         assertEquals(1, countMatches(source, roleFollowsClickability), "role 必须按 onClick 是否为空取 Role.Button/无（非可点行不得念成按钮）")
         assertEquals(1, countMatches(source, lemmaOneLine), "lemma 必须单行 + 省略号（提示性内容）")
         assertEquals(1, countMatches(source, glossTwoLines), "释义必须最多两行（brief Step 2）：一行放不下长释义，不限行会在 fontScale 2.0 下把整行撑成一列")
+        assertEquals(1, countMatches(source, rightColumnWidthCap), "状态/meta 右列必须带 widthIn(max = …) 宽度上限（F3：无上限的无权重右列会在 fontScale 2.0 下把 lemma 列挤成 0dp）")
         assertEquals(0, countMatches(source, bannedCardShape), "新组件禁读 AppShape.Card（20dp 旧档）")
     }
 
@@ -448,5 +461,21 @@ class WordRowSpeakerContractTest {
         assertEquals(0, countMatches("val inks = wordRowInks(appColors())", domainAccentRead), "负控：读中性纯表不得被误判成读域色")
         assertEquals(1, countMatches("\nfun WordRow(", singleDefinition), "正控：组件定义命中")
         assertEquals(0, countMatches("\nprivate fun WordRow(", singleDefinition), "负控：屏内私有影子份不得算成共享组件定义")
+        // F3（右列宽度上限）的承重自证：上限形状认得出、缺上限与写反方向都判不命中。
+        assertEquals(
+            1,
+            countMatches("Column(modifier = Modifier.widthIn(max = 120.dp), horizontalAlignment = Alignment.End)", rightColumnWidthCap),
+            "正控：右列带 widthIn(max = …) 必须命中",
+        )
+        assertEquals(
+            0,
+            countMatches("Column(horizontalAlignment = Alignment.End)\n    Text(meta, maxLines = 1)", rightColumnWidthCap),
+            "负控：无上限的右列（F3 的失明形状）不得命中",
+        )
+        assertEquals(
+            0,
+            countMatches("Modifier.widthIn(min = 120.dp)", rightColumnWidthCap),
+            "负控：把上限写成下限（widthIn(min = …)）不得命中——方向写反等于没有上限",
+        )
     }
 }

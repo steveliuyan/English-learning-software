@@ -116,8 +116,9 @@ class EntryRowTest {
      * `Modifier.testTag("entry_row")` 由调用方传在链首 = 修饰符链的**最外层**语义节点，
      * 只要 `heightIn(min = 56.dp)` 还在链里，它量出来就恒 ≥56dp；而 F5-03 的 48dp 约束的是
      * **能点的那枚节点**（`clickable` 所在层）。`padding` 是 LayoutModifier 会新开一层布局节点，
-     * 所以批 2 有人按稿面顺序把 `clickable` 挪回 `heightIn`/`padding` 内侧时（`EntryRow.kt:70-76`
-     * 明令禁止的那个写法），可点面缩成 40dp、外层盒子一动不动 → 只靠上面两条会**静默放行**。
+     * 所以批 2 有人按稿面顺序把 `clickable` 挪回 `padding` **内侧**时（`EntryRow.kt` 的「可点面的两条共同交付」
+     * 段明令禁止的那个写法；`heightIn` 排在 `clickable` 之前或之后都合法，它不影响可点面尺寸），
+     * 可点面缩成 40dp、外层盒子一动不动 → 只靠上面两条会**静默放行**。
      * 故第三条必须打在带 click action 的那枚节点上（变异自证 ⑧：调回旧顺序 → 红的就是这条，
      * 且报的是可点节点 40dp 而不是外层 56dp）。
      */

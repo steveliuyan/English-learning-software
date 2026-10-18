@@ -9,7 +9,6 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -206,6 +205,24 @@ class AppIconsStructureContractTest {
             .map { ListedGlyph(it.groupValues[1].toIntOrNull() ?: 0, it.groupValues[2], it.groupValues[3]) }
             .sortedBy { it.index }
             .toList()
+
+    /**
+     * 层列形状判据（批 1 终审 m1）：每枚编号行都必须带「｜<层列取值>」，取值只有两种合法词表——
+     * `两层`（精确相等）或以 `豁免` 起头（现状写作 `豁免（描边only）`）。
+     * 存在的理由：补一枚字形时忘写层列、或把层列写成第三种说法（单层 / 仅描边 / stroke-only…），
+     * 「两层豁免表」与 `StrokeOnlyIcons` 的同源比对是**之后**才发生的，那种漂移会让豁免口径先隐形一轮；
+     * 本判据在形状层就把它挡住。返回违规行描述，空 = 全部合规。
+     */
+    private fun layerColumnViolations(listed: List<ListedGlyph>): List<String> = listed.mapNotNull { glyph ->
+        val tail = glyph.layerColumn
+        val value = tail.substringAfter('｜', missingDelimiterValue = "").trim()
+        when {
+            !tail.contains('｜') -> "${glyph.index}. `${glyph.name}`：整行没有「｜层列」（$tail）"
+            value.isEmpty() -> "${glyph.index}. `${glyph.name}`：层列为空（$tail）"
+            value == "两层" || value.startsWith("豁免") -> null
+            else -> "${glyph.index}. `${glyph.name}`：层列取值「$value」不在词表（两层 / 豁免…）"
+        }
+    }
 
     /**
      * 枚名 → 它前面紧邻的来历注释（连续 `//` 行合并；没有紧邻注释 = null）。
@@ -481,7 +498,16 @@ class AppIconsStructureContractTest {
 
         val listed = iconListEntries(section!!)
         assertSameOrder("文件头逐枚清单", expectedIcons, listed.map { it.name })
-        listed.forEach { glyph -> assertContains(raw, "`${glyph.name}`") }
+        // m1（批 1 终审 Seat D）：这里原来是一条 `listed.forEach { assertContains(raw, "`${it.name}`") }`
+        // 的**恒真**子断言——`listed` 正是从这段 raw 解析出来的，枚名当然在 raw 里，生产怎么漂它都绿。
+        // 换成有牙齿的形状判据：每枚都必须带「｜<层列取值>」，且取值只能落在两种词表里
+        // （`两层` / `豁免…`）。有人补一枚却忘写层列、或把层列写成第三种说法（单层 / 仅描边 / stroke-only…），
+        // 本条当场红；判据本体是纯函数 [layerColumnViolations]，由「parser is not vacuous」用例给合成正/负片段。
+        assertEquals(
+            emptyList(),
+            layerColumnViolations(listed),
+            "逐枚清单里有行缺「｜两层列」或层列取值不在词表（两层 / 豁免…）内",
+        )
 
         // 「两层」列必须与代码里的豁免表同源：注释说豁免、代码带填充（或反之）都判红。
         val claimedExempt = listed.filter { it.layerColumn.contains("豁免") }.map { it.name }.toSet()
@@ -526,6 +552,32 @@ class AppIconsStructureContractTest {
             "合成负例被放行：清单缺枚没造成可比差异",
         )
         assertEquals(null, iconListSection("只有代码没有注释小节"), "小节锚点缺失时必须给 null，不能当成空清单")
+
+        // m1 的合成正/负片段：层列判据必须「合规行放行、换形行抓得住」，否则它自己就是一枚恒真断言。
+        assertEquals(
+            emptyList(),
+            layerColumnViolations(parsed),
+            "m1 合成正片段失效：合规的「｜两层」「｜豁免（描边only）」两种取值被判成违规",
+        )
+        val driftedSection = """
+              逐枚清单
+              ---------
+              1. `Back` — 返回键｜豁免（描边only）
+              2. `Search` — 查词入口
+              3. `Star` — 通用｜仅描边
+              4. `Bell` — 提醒行｜
+              两层豁免表
+        """.trimIndent()
+        val drifted = iconListEntries(iconListSection(driftedSection) ?: error("m1 合成负片段小节定位不到"))
+        assertEquals(
+            listOf(
+                "2. `Search`：整行没有「｜层列」（ — 查词入口）",
+                "3. `Star`：层列取值「仅描边」不在词表（两层 / 豁免…）",
+                "4. `Bell`：层列为空（ — 提醒行｜）",
+            ),
+            layerColumnViolations(drifted),
+            "m1 合成负片段失效：缺层列 / 第三种说法 / 空层列三种漂移没有被逐条点名",
+        )
     }
 
     // ---------- 用例：键集完整性读符号（修复轮 I-1，文本契约的有意补缝） ----------
@@ -535,7 +587,7 @@ class AppIconsStructureContractTest {
         val icons = AppIcon.entries.toSet()
         assertEquals(icons, AppIcons.all.keys, "枚举与路径表不同源：缺枚或多余枚")
         assertEquals(33, AppIcons.all.size, "`AppIcons.all` 枚数不是 33：清单/枚举/spec 三处之一漂移")
-        expectedIcons.forEach { name -> assertSame(name, AppIcon.valueOf(name).spec.name, "$name 的 spec.name 与枚举名不一致") }
+        expectedIcons.forEach { name -> assertEquals(name, AppIcon.valueOf(name).spec.name, "$name 的 spec.name 与枚举名不一致") }
 
         // 反空转：少一个键就必须让上面第一条判红（评审变异 M6 的形状，文本契约抓不到它）。
         assertNotEquals(icons, (AppIcons.all - AppIcon.Download).keys, "键集比对空转：抽掉一枚仍与枚举全集相等")

@@ -103,7 +103,8 @@ class InlineNoticeActionContractTest {
             1,
             countMatches(source, clickOnCallerModifier),
             "clickable 必须恰一处挂在调用方传进来的 modifier 之后（`modifier.clickable(…)`）：" +
-                "调用方的 padding/尺寸修饰符因此落在可点面外侧，顺序即契约",
+                "调用方的 padding/尺寸修饰符因此落在可点面外侧——这是「可点面两条共同交付」的第②条" +
+                "（clickable 在任何 padding 之前；heightIn 与 clickable 的先后中性，见 EntryRow.kt KDoc）",
         )
         assertEquals(
             0,

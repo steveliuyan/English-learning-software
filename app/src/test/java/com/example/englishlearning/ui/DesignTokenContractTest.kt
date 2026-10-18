@@ -93,7 +93,16 @@ class DesignTokenContractTest {
     private fun hexValue(text: String): Long =
         text.removePrefix("0x").removePrefix("0X").toLong(16)
 
-    /** 预检修正 1 的查找形状；失败消息形状沿用 brief「token 未以 val … 形状声明」。 */
+    /**
+     * 预检修正 1 的查找形状；失败消息形状沿用 brief「token 未以 val … 形状声明」。
+     *
+     * **与 F2 口径的分工**（批 1 终审）：本函数与 `appPalette static light source calibrated to spec 2_1`
+     * 里的同款正则是**读钉值**的解析器，只认「8 位十六进制、无后缀、紧跟右括号」这一种书写形，
+     * 因为 spec §2.1 的钉值本来就是按这一形状落进 `AppPalette`/`AppColors` 的；
+     * 「裸 hex 是否越界」的**探针**口径另有一份（共享夹具 [rawColorLiteral]，宽到能抓后缀与窄化调用），
+     * 两者读的是不同问题，不许互相替换：拿解析器当探针会重演 F2 的可编译换形绕过，
+     * 拿探针当解析器则 `\((?:…)?\)` 的可选组会把取值读成空。
+     */
     private fun hexOf(sectionText: String, token: String, scope: String): Int {
         val m = Regex("""(?<![\w.])$token\s*=\s*Color\(\s*(0x[0-9A-Fa-f]{8})\s*\)""")
             .find(sectionText) ?: error("token 未以 val $token = Color(0x…) 形状声明：$token（区段 $scope）")
@@ -174,6 +183,17 @@ class DesignTokenContractTest {
         "errorFill" to 0xFFFF6B61L,
         "success" to 0xFF6BD98AL,
     )
+
+    /**
+     * 「浅深两套逐字相同」豁免名单（`AppColorSet` 字段名，口径见用例
+     * `neutral token identical in both sets is a dead token unless exempted by name`）。
+     * 名单里每一项都必须在这里给出决策依据；名单与实测同值集合双向精确相等。
+     *
+     * `onBrand`：spec §2.1 明写「品牌渐变保持现状不动」，裁决 3 只钉「渐变上的文字统一取 `on-brand #04241C`」，
+     * 未给深套另立值（深套沿用浅值，见 [darkHex] 的缺项调和说明）；品牌渐变两套同三段时前景本就同一枚墨，
+     * 所以它是**有据可依的主题无关值**，不是无人认领的死 token。深色下玻璃面板上的前景最终核验归 AC-R-11 真机实测。
+     */
+    private val crossSetIdenticalNeutralTokenExemptions: Set<String> = setOf("onBrand")
 
     /** 域浅套：spec §2.1 域色表 / 既有 DomainColors 逐值（base, deep）。hex 串同时供正则拼接，避免 Long 十进制插值。 */
     private val domainLightHex: Map<String, Pair<String, String>> = linkedMapOf(
@@ -342,10 +362,42 @@ class DesignTokenContractTest {
         }
     }
 
+    /**
+     * 从**生产** `data class AppColorSet(` 的参数表解析字段名（m8，批 1 终审 Seat A M1 的修法）。
+     *
+     * 为什么要从生产解析：旧口径拿本文件自己的 `lightHex.size` 与常量 `16` 比，是**表自指**——
+     * 表少写一格会红（能挡漏抄），但生产加第 17 枚字段永不红（挡不住「数据面长出没人钉的第 17 格」）。
+     * 改成「解析出的字段名集合 == 钉值表 key 集合」的精确集合相等后，两个方向都挡：
+     * 生产多一枚 → 红，钉值表多一枚（生产已删）→ 也红。
+     * 取样前提是本仓字段逐行书写、右括号落在行首（`AppColors.kt` 现状），锚点由下一条断言负责。
+     */
+    private fun appColorSetFieldNames(text: String): Set<String> {
+        val anchor = "data class AppColorSet("
+        val start = text.indexOf(anchor)
+        assertTrue(start >= 0, "生产 AppColors.kt 里找不到 $anchor 声明（改名/挪走/换写法都要先同步本夹具）")
+        val end = text.indexOf("\n)", start)
+        assertTrue(end > start, "$anchor 的参数表没有落在「行首右括号」形状上，解析前提失效")
+        return Regex("""val\s+(\w+)\s*:\s*Color""")
+            .findAll(text.substring(start + anchor.length, end))
+            .map { it.groupValues[1] }
+            .toSet()
+    }
+
+    /** 浅/深两套钉值表与生产字段名集合的精确相等（m8 的判据本体；`16` 只作为解析结果的下游断言）。 */
+    private fun assertFieldTablesCoverProduction(table: Set<String>, setLabel: String) {
+        val production = appColorSetFieldNames(appColorsText())
+        assertTrue(
+            production.isNotEmpty(),
+            "$setLabel：从生产 AppColorSet 解析出 0 枚字段——解析前提或扫描面失效，空表会让本闸假绿"
+        )
+        assertEquals(production, table, "$setLabel 的钉值表与生产 data class AppColorSet 的字段名集合不符（双向精确相等，多一格少一格都红）")
+    }
+
     @Test
     fun `light neutral set hexes match spec 2_1 verbatim`() {
         val light = section(appColorsText(), "val AppColorLight")
-        assertEquals(16, lightHex.size, "钉值表自身必须逐字段写全（16 字段）")
+        assertFieldTablesCoverProduction(lightHex.keys, "浅套")
+        assertEquals(16, appColorSetFieldNames(appColorsText()).size, "生产 AppColorSet 解析出的字段数应为 16（spec §2.1 中性 16 枚；真加第 17 枚要先改 spec 再改本条）")
         lightHex.forEach { (token, expected) ->
             assertEquals(expected, unsigned(hexOf(light, token, "AppColorLight")), "浅套 $token 偏离 spec §2.1 浅套钉值")
         }
@@ -354,10 +406,66 @@ class DesignTokenContractTest {
     @Test
     fun `dark neutral set hexes match spec 2_1 verbatim`() {
         val dark = section(appColorsText(), "val AppColorDark")
-        assertEquals(16, darkHex.size, "钉值表自身必须逐字段写全（16 字段）")
+        assertFieldTablesCoverProduction(darkHex.keys, "深套")
+        assertEquals(16, appColorSetFieldNames(appColorsText()).size, "生产 AppColorSet 解析出的字段数应为 16（与浅套用例同一口径）")
         darkHex.forEach { (token, expected) ->
             assertEquals(expected, unsigned(hexOf(dark, token, "AppColorDark")), "深套 $token 偏离 spec §2.1 深套钉值")
         }
+    }
+
+    /**
+     * m8 的承重自证：解析器必须真能从生产文本里数出字段，且**生产多加一格时判据会翻**。
+     * 合成片段拿生产文本改（保留原形状，只追加一枚 `val test17: Color`），断言它与钉值表 key 集合不再相等。
+     */
+    @Test
+    fun `field name parser catches a seventeenth production field instead of self indexing`() {
+        val production = appColorSetFieldNames(appColorsText())
+        assertEquals(lightHex.keys, production, "解析结果与浅套钉值表不吻合（本用例的底本必须干净）")
+        val drifted = appColorSetFieldNames(appColorsText().replace("    val success: Color,", "    val success: Color,\n    val test17: Color,"))
+        assertTrue(
+            drifted != production && "test17" in drifted,
+            "合成负片段失控：生产多加一枚 test17 字段后解析结果没变，等于表自指没被修掉（$drifted）",
+        )
+        assertTrue(
+            lightHex.keys != drifted,
+            "合成负片段被放行：多加的第 17 枚字段没有让「钉值表 == 生产字段」判据翻红，m8 修法空转"
+        )
+    }
+
+    /**
+     * **防死 token 闸（批 1 终审 F4，控制者对 Seat A I-1 的改法）**：16 枚中性 token 中，
+     * 凡浅套与深套取值**逐字相同**的即判红，豁免必须逐枚点名。
+     *
+     * 堵的是哪条路径：`AppColorSet` 的字段语义是「同一角色在两套主题里各有一份值」。浅深同值 = 换套时
+     * 这一枚永不翻，成为一个「读得到、但深色下不生效」的死 token。Seat A 实测：把
+     * `AppColorDark.surfaceGlass` 改成与浅值逐字相同，批 1 全部门禁（含 1646 例）全绿——
+     * 本闸就是那条路径上唯一的承重断言（变异自证：改深套 surfaceGlass 为浅值 → 本用例红）。
+     *
+     * 豁免口径与深色令牌棘轮的蒙版台账同形但**独立**：这里钉的是 `AppColorSet` 字段（两套主题的数据面），
+     * `DarkTokenConsumptionRatchetTest.ThemeInvariantMaskMembers` 钉的是 `AppPalette` 静态成员（蒙版/高光）。
+     * 豁免只留给「按决策本就与主题无关」的语义：`onBrand` 随品牌渐变，spec §2.1 明写「品牌渐变保持现状不动」、
+     * 裁决 3 只钉「渐变上的文字统一取 `on-brand #04241C`」而未给深套另立值（AC-R-11 真机核验前不预判）。
+     * 名单与实测同值集合**双向精确相等**：多一项（那枚已不再同值）判红，少一项（长了新的同值）也判红。
+     */
+    @Test
+    fun `neutral token identical in both sets is a dead token unless exempted by name`() {
+        val light = section(appColorsText(), "val AppColorLight")
+        val dark = section(appColorsText(), "val AppColorDark")
+        val identical = lightHex.keys
+            .filter { token -> hexOf(light, token, "AppColorLight") == hexOf(dark, token, "AppColorDark") }
+            .toSet()
+        val unexempted = identical - crossSetIdenticalNeutralTokenExemptions
+        assertTrue(
+            unexempted.isEmpty(),
+            "浅深两套逐字相同的中性 token（深色下永不翻 = 死 token）：$unexempted —— " +
+                "要么给深套一个真正随主题的值，要么先立决策再把它逐枚写进 " +
+                "crossSetIdenticalNeutralTokenExemptions（并注明决策依据），本闸不接受无名豁免"
+        )
+        val stale = crossSetIdenticalNeutralTokenExemptions - identical
+        assertTrue(
+            stale.isEmpty(),
+            "豁免名单里的 $stale 如今两套取值已不同：它不再需要豁免，必须从名单删掉（豁免是台账不是永久名额）"
+        )
     }
 
     @Test
@@ -547,6 +655,33 @@ class DesignTokenContractTest {
         // 裁决 #2 的替代配对同口径钉住：text-1 压 tint-2/tint-3 必须合格（ADR 钉 13.69/13.54）。
         assertAtLeast("text1/tint2(裁决#2 替代配对)", l("text1"), l("tint2"), 4.5) // 13.69
         assertAtLeast("text1/tint3(裁决#2 替代配对)", l("text1"), l("tint3"), 4.5) // 13.54
+
+        // ---------- F5（批 1 终审 Seat A I-2）：text-3 的**图形/非文本**下限方向 ----------
+        // 上面三条只按正文 4.5 判「text-3 不合格」，从未按图形下限判过：裁决 1 允许 text-3 用于
+        // 「纯图标描边」，而描边是非文本图形（Global Constraints #7：≥3:1），Task 10 又把装饰档局部收紧到
+        // ≥3.1（「边界上的合格不算合格」）。text-3 压 tint 恰好卡在 3.0 线上、压 tint-2/tint-3 连 3:1 都不过，
+        // 所以批 2 任何一枚照裁决 1 字面用 text-3 描边的图标都能穿过全部批 1 门禁 —— 这三条钉的就是那个缺口。
+        assertTrue(
+            ratio(l("text3"), l("tint")) < 3.1,
+            "text-3 压 tint 已达 %.2f:1（≥3.1 装饰档下限）——裁决 1 的「图标描边可用底」需按 F5 重议，" +
+                "描边可以放回 tint".format(ratio(l("text3"), l("tint"))),
+        )
+        assertTrue(
+            ratio(l("text3"), l("tint2")) < 3.0,
+            "text-3 压 tint-2 已达 %.2f:1（≥非文本 3:1）——F5 的禁配依据失效，需重议裁决 1 的可用底清单".format(
+                ratio(l("text3"), l("tint2")),
+            ),
+        )
+        assertTrue(
+            ratio(l("text3"), l("tint3")) < 3.0,
+            "text-3 压 tint-3 已达 %.2f:1（≥非文本 3:1）——F5 的禁配依据失效，需重议裁决 1 的可用底清单".format(
+                ratio(l("text3"), l("tint3")),
+            ),
+        )
+        // 同一条裁决的另一半：text-3 压 surface/bg 是**合格**的图形档，正向钉住，
+        // 免得有人把「text-3 一律不合格」当口径把描边一并禁掉（两条正向钉的是既有取值事实，不随本轮改动漂移）。
+        assertAtLeast("text3/surface(裁决#1 描边可用底)", l("text3"), l("surface"), 3.1)
+        assertAtLeast("text3/background(裁决#1 描边可用底)", l("text3"), l("background"), 3.1)
     }
 
     @Test
@@ -571,6 +706,11 @@ class DesignTokenContractTest {
         )
     }
 
+    /**
+     * 浅套静态源逐枚读钉值（spec §2.1）。
+     * 这里的正则是**解析器**而不是探针：只认 8 位无后缀形状，口径分工见 [hexOf] 的 F2 说明；
+     * 「新增裸 hex 判违规」的宽探针是共享夹具 [rawColorLiteral]。
+     */
     @Test
     fun `appPalette static light source calibrated to spec 2_1`() {
         val palette = appPaletteText()
