@@ -1309,7 +1309,16 @@ internal val MintBackground: Color
 - [ ] **Step 1: 写失败测试**：Ready 态下整宽主按钮数 == 1，入口行数 ≥3；断言「今日新词/到期数」在屏幕上只出现一处 `Display` 尺寸节点。
 - [ ] **Step 2: 实现**：主 CTA 唯一（继续学习），其余动作换 `EntryRow`；`TodayPlanScreen.kt:160-161/247/343-344` 五处裸 hex（`#68BDA6`/`#C7A47D`/`#795B36`）token 化并**从 `RawColorLiteralRatchetTest` seed 删除对应条目**；Workload 三档色改取域色（复习 `Review` 系）。
   **硬项（Task 9 评审裁决 4.3 前置②，不是「顺带看」）**：`PillButton` 的静态 ink 债必须在本任务裁决并落地——Secondary 档容器读 `AppPalette.Surface`（浅套白）、文字读 `accent.deep`（默认 `DomainColors.AiSpeech.deep` = `#188F76`）、描边读 `AppPalette.Separator`，深套下整屏浮白药片（压白 4.02:1 / 压深套 surface 4.15:1，数字与推论见 Task 9 登记）。同批一起处理稿按钮族档位差与「白字压域色」，修法走**改 `PillButton` 本体**（Task 12 棘轮已预登记豁免该路径），消费面含 `ScreenUnavailable` 的动作位。
+  **R-14.1（控制者预算好的修法，别再让执行者现场试色）**：上面那句「同批处理白字压域色」没给可过的配方，本条补齐。全部数字为控制者按 WCAG 相对亮度实算（同一套线性化，脚本可重算），`DomainColors` 七域的 `base`/`deep` 取自 `AppPalette.kt:47-55`。
+  **① Primary 非品牌域（`style == Primary && accent != AiSpeech`）：白字压 `base→deep` 渐变，亮端全线不合规。** 白 on `base`：AiSpeech 2.110 / Learn 3.647 / Review 2.056 / Library 3.524 / Reading 3.521 / Danger 3.547 / Settings 3.261——七域**无一**过 4.5，最好也只有 3.647。白 on `deep`：Learn 6.424 / Review 5.128 / Library 6.300 / Reading 5.630 / Danger 7.200 / Settings 9.125，全过（AiSpeech 走品牌渐变分支，不经此路）。
+  **根因是渐变跨度**：`base→deep` 太宽，任何单一前景都守不住两端——深字（`text1` #1C1C1E）在 base 端 4.665~8.277 全过，却在 deep 端掉到 1.865~4.237 全崩；白字正好相反。所以**不是换前景色能解决的，必须收窄容器**。
+  裁决：容器改成**只往深走**——纯 `accent.deep`，或 `deep → lerp(deep, Color.Black, 0.15f)` 的渐变（暗端实测白字 6.597~10.838，只会更好）。**禁止把 `base` 端留在白字容器里**。前景保持白色（`Color.White` 是 Compose 具名常量，不是 `Color(0x…)` 裸字面量，不撞 `RawColorLiteralRatchetTest`）；这里容器是**主题无关**的饱和域色，前景也必须主题无关，所以**不要**改成 `set.surface`（深套会翻成 #17201C，白字变深字，deep 端只有 1.827~3.250，反而全线崩）。品牌分支现状已合规（`OnMintPrimary` #174C44 压三端 5.373 / 5.887 / 7.577），不动。
+  **② Text/Secondary 档（前景 = 域色、容器 = surface）：深套全线不合规，浅套有一处不合规。** `accent.deep` 压浅套 surface(#FFFFFF)：AiSpeech **4.016（不过）** / Learn 6.424 / Review 5.128 / Library 6.300 / Reading 5.630 / Danger 7.200 / Settings 9.125；`accent.deep` 压深套 surface(#17201C)：1.827~4.151，**七域全不过**（这正是 Task 9 登记的 4.02/4.15 那两枚，本条已复算确认）。`accent.base` 压深套 surface：AiSpeech 7.899 / Learn 4.570 / Review 8.109 / Library 4.731 / Reading 4.734 / Danger 4.699 / Settings 5.112，**全过**。
+  裁决：这一档的前景**按套分叉**——浅套 `accent.deep`、深套 `accent.base`（容器/描边一并从 `AppPalette.Surface`/`AppPalette.Separator` 迁到 `appColors()`，否则 `DarkTokenConsumptionRatchetTest` 的静态读点计数不减）。唯一残口是 **AiSpeech 在浅套的 4.016**：先 `grep -rn 'PillStyle.Text\|PillStyle.Secondary' app/src/main/java` 核实是否真有调用点以 AiSpeech（默认值！）走这两档——**有**则该处前景改 `set.onMint`（#174C44 压 #FFFFFF = 9.751，实测），**没有**就不为它造例外分支，只在测试注释里记这条边界。注意 `accent` 形参默认值就是 `DomainColors.AiSpeech`，所以「没人显式传 accent」的调用点全都落在这个残口上，grep 时要按「未显式传 accent」来数，不能只搜 `AiSpeech` 字样。
+  **③ 用例**：新增 JVM 对比度契约（仿 `EntryRowInkTest`），对七域 × 两套 × 三档逐一断 ≥4.5，并钉两条**会被拒的候选**：`ratioOf(Color.White, DomainColors.Review.base) < 4.5`（2.056，白字压 base 的代表）与 `ratioOf(DomainColors.AiSpeech.deep, AppColorLight.surface) < 4.5`（4.016，Secondary 浅套残口）。改 `PillButton` 本体属 Task 12 棘轮预登记豁免路径，不得为绕门另造一枚按钮。
+
 - [ ] **Step 3: 规则零改动自检**：解锁条件、快照不可变性相关代码一行不动；跑该屏业务单测（`grep -rln TodayPlan app/src/test` 全跑）。
+
 - [ ] **Step 4: 门控 + connected + 提交**（`feat(ui-learning): 今日计划收成单一主按钮与入口行，今日数字一处权威`）。
 
 ---
