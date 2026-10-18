@@ -103,8 +103,17 @@
   `on-brand #04241C`（`on-mint` 压末端仅 4.07），§2.2 表内 `OnMintForeground`「≈4.6:1」与 `OnBrandDeep`
   「唯一替代」两行旧措辞以此为准、随批 1 token 校准改写。裁决全文见
   `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`。
-- 禁止在页面里现场调色（裸 `Color(0xFF…)`）。现存待清残留：`TodayPlanScreen.kt:160-161` 的 `#68BDA6`/`#C7A47D`、
-  `:247` 的 `#795B36`、`AppScreen.kt:2223`/`:2336`。
+- 禁止在页面里现场调色（裸 `Color(0xFF…)`）。**本文档不再抄写残留站点的文件名与行号**（批 1 终审 F8/D-I-6：
+  原先用行号点名的 5 处早已漂移，真实分布是 `ui/` 内 6 个文件 13 处 + `ui/` 外 1 个文件 3 处，
+  而行号会随任何一次改动失效）。权威台账两张表：
+  `RawColorLiteralRatchetTest.kt` 的 `RawColorSeedAllowlist`（相对 `ui` 根的按文件计数）、
+  `RawColorSeedSiteLines`（行级站点原文，棘轮就吃它作 allowlist）与 `BrandLaunchSeedAllowlist`（`ui/` 外
+  唯一携带裸 hex 的 `launch/BrandLaunchActivity.kt`，品牌渐变三段）。
+  重算命令（要一个可核对的数就跑这条）：
+  `gradle :app:testDebugUnitTest --offline --no-daemon --tests com.example.englishlearning.ui.RawColorLiteralRatchetTest`
+  ——seed 与实测任何一侧漂移都会红；粗算可用
+  `grep -rc 'Color(0x' app/src/main/java/com/example/englishlearning/ui --include=*.kt | grep -v ':0' | grep -v 'ui/theme'`
+  （`ui/theme/` 是令牌定义地，按裸 hex 棘轮的目录豁免不计）。迁移方向与批次数见 `docs/superpowers/plans/2026-10-17-ui-redesign.md`。
 
 ### 2.4 深色模式
 
@@ -354,17 +363,24 @@ UI 重设计轮（2026-10-17）的图标体系与共享组件口径见 §12、§
 
 ## 13. 共享组件与每屏职责（UI 重设计轮新增）
 
-**同一语义只允许一个组件**。下列组件的份数是实测现状（写进规范是为了让它可核验）：
+**同一语义只允许一个组件**。下表**不再抄写实测份数的绝对数**（批 1 终审 D-I-6 / F8：原先「14 个页头」「11 份实现」
+这类数字与台账漂移过——文档里抄的数会变，棘轮 seed 不会），只写「谁持有这份账 + 怎么重算」：
 
-| 组件 | 现状份数 | 目标 |
+| 组件 | 现状份数（以台账为准） | 目标 |
 | --- | --- | --- |
-| 页头 + 返回 | 14 个页头 / 6 种返回写法 | `AppScreenHeader` 一个 |
-| 词行（lemma + 释义 + 状态/时间 + 动作） | 7 份私有实现、0 复用 | `WordRow` 一个 |
-| AI 未配置提示 | 4 屏 12 行，4 处无出口 | `NotConfiguredCard`，必须带「去配置 ›」 |
-| 出站确认对话框 | 5 份 | `OutboundConfirmDialog` 一个 |
-| 破坏性确认 | 4 份 AlertDialog + 1 份行内、4 种措辞 | `ConfirmDestructiveDialog` 一个 |
-| 错误 / 回执行 | 11 份实现 | `InlineNotice` 一个 |
-| 喇叭与播控 | 两套同构几何 | `SpeakerButton` + 播控组一个 |
+| 页头 + 返回 | 族 1「页头（应调 AppScreenHeader）」seed = `SharedComponentUniquenessRatchetTest.componentFamilySeeds` | `AppScreenHeader` 一个 |
+| 词行（lemma + 释义 + 状态/时间 + 动作） | 族 4「词行（应调 WordRow）」同一张 seed | `WordRow` 一个 |
+| AI 未配置提示 | 族 3「未配置卡（应调 NotConfiguredCard）」同一张 seed | `NotConfiguredCard`，必须带「去配置 ›」 |
+| 出站确认对话框 | 形状契约见 `OutboundConfirmDialogContractTest`，无份数 seed（批 1 时点尚未登记为债务族） | `OutboundConfirmDialog` 一个 |
+| 破坏性确认 | 形状契约见 `ConfirmDestructiveInkTest`，无份数 seed | `ConfirmDestructiveDialog` 一个 |
+| 错误 / 回执行 | 族 2「错误提示条（应调 InlineNotice）」同一张 seed | `InlineNotice` 一个 |
+| 喇叭与播控 | 形状契约见 `WordRowSpeakerContractTest`，无份数 seed | `SpeakerButton` + 播控组一个 |
+
+重算命令（要一个可核对的数就跑这条，别抄文档里的数）：
+`gradle :app:testDebugUnitTest --offline --no-daemon --tests com.example.englishlearning.ui.SharedComponentUniquenessRatchetTest`，
+用例 `each_family_offender_set_equals_its_seed_exactly` 红时会把该族的**实际集合**与 seed 的差集
+（`added` / `cleared`）逐枚点名；本机 gradle 路径解析见 skill `android-repo-session-handoff`（**勿用 `./gradlew`**）。
+接线完毕即从 seed 删行，四族清零 = 本表全部达成目标。
 
 每屏只承担一个职责：今日计划只回答"今天做什么"，打卡页只回答"坚持得怎样"，
 学习记录只回答"逐条发生了什么"，设置页只回答"要改哪条配置"。同一数字（今日新增/复习）
