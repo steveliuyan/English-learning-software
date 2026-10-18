@@ -57,6 +57,19 @@ class EntryRowTest {
     /**
      * 钉的破坏：入口行的可点性被拆成多枚（徽标或 chevron 各自 `clickable`）、或整行丢了
      * `Role.Button`（TalkBack 只念「组」不念「按钮」）。数量断言用节点数而不是 `onLast()` 恒真写法。
+     *
+     * **两条计数各有分工，不是重复（R-10.7②，修复轮 2 的 I-2 补口）**：合并树那条抓得住「行丢了 click
+     * （计数变 0）」；未合并树那条抓的是「行内长出第二枚可点源」，并且是**非合并型 click 源**
+     * （`Modifier.semantics { onClick = … }` 这类不给自己开 `mergeDescendants` 的写法）的唯一防线——
+     * 那种源会被父级并进整行、合并树计数不加。
+     * 实测口径（变异自证 ⑩：给 chevron 的 `AppGlyph` 加一枚 `Modifier.clickable { }`）要写清，别照二手
+     * 推断读：本行 42dp、chevron 16dp，**两棵树当时都数到了 2**（`Modifier.clickable` 自己会写
+     * `MergeDescendants = true`，所以它作为子节点不会被并进父节点、合并树也数得出）。故本轮证据是
+     * 「合并树 `expected:<1> but was:<2>` + 未合并树 `Expected exactly '1' node but found '2'`」两条同时红，
+     * 不是「只有未合并树红」。未合并树这条仍按 R-10.7② 保留：它把「未合并树里也只有这一枚可点节点」
+     * 变成契约，覆盖上面那类合并型源以外的写法。
+     * 与 Task 9 `AppScreenHeaderTest`（`:106/131`）的口径差别：那边根节点不是 clickable，子级可点源的
+     * 合并行为与这里不同，**同一写法不等于同一承重**，照抄前先按本段实测复核。
      */
     @Test
     fun entry_row_is_one_click_target_whole_row_with_button_role() {
@@ -82,6 +95,11 @@ class EntryRowTest {
             1,
             composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size,
         )
+        assertEquals(
+            "未合并树里也只能有一枚可点节点：徽标/chevron/尾部值都不得长出第二处 clickable（合并树会把它并进整行、数不出来）",
+            1,
+            composeRule.onAllNodes(hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes().size,
+        )
         clicked = false
         row.performClick()
         assertTrue("整行点击必须回调 onClick", clicked)
@@ -92,6 +110,15 @@ class EntryRowTest {
      *
      * **故意钉 48 而不是 56**：48 是无障碍硬下限（回归会立刻响），56 只是本组件的设计目标值
      * （稿 `.entry { min-height:56px }`）——把 56 钉死会让任何合法的字体缩放或内容增高变成假红。
+     *
+     * **上面那两条量的是「整行外框」，它证明不了可点面（R-10.7①，修复轮 2 的 C-1 补口）**：
+     * `Modifier.testTag("entry_row")` 由调用方传在链首 = 修饰符链的**最外层**语义节点，
+     * 只要 `heightIn(min = 56.dp)` 还在链里，它量出来就恒 ≥56dp；而 F5-03 的 48dp 约束的是
+     * **能点的那枚节点**（`clickable` 所在层）。`padding` 是 LayoutModifier 会新开一层布局节点，
+     * 所以批 2 有人按稿面顺序把 `clickable` 挪回 `heightIn`/`padding` 内侧时（`EntryRow.kt:70-76`
+     * 明令禁止的那个写法），可点面缩成 40dp、外层盒子一动不动 → 只靠上面两条会**静默放行**。
+     * 故第三条必须打在带 click action 的那枚节点上（变异自证 ⑧：调回旧顺序 → 红的就是这条，
+     * 且报的是可点节点 40dp 而不是外层 56dp）。
      */
     @Test
     fun entry_row_clears_the_48dp_touch_floor() {
@@ -109,6 +136,7 @@ class EntryRowTest {
         row.assertHeightIsAtLeast(48.dp)
         val box = row.getUnclippedBoundsInRoot()
         assertTrue("整行高度应 ≥48dp（F5-03 硬下限），实际=$box", box.bottom - box.top >= 48.dp)
+        composeRule.onNode(hasClickAction(), useUnmergedTree = true).assertHeightIsAtLeast(48.dp)
     }
 
     /**

@@ -40,7 +40,9 @@ import org.junit.Test
  *
  * 48dp 只属于**动作节点**：无动作的 `.banner` 约 42dp（12dp 上下 padding + 13sp 行高），它是内容
  * 不是触控目标，把它钉成 ≥48dp 会造出一条稿里没有、F5-03 也没要求的水线——所以本类只有带 action 的
- * 用例断高度，且断的是 `inline_notice_action` 那枚节点。
+ * 用例断高度，且**两枚节点各断一次**：`inline_notice_action`（组件的包裹层，钉「槽声明了 48dp」）
+ * 与带 click action 的槽内节点（钉「48dp 真的传给了能点的那一枚」，修复轮 2 的 C-2 补口，
+ * 详见该用例 KDoc）。
  */
 class InlineNoticeTest {
     @get:Rule val composeRule = createComposeRule()
@@ -76,6 +78,21 @@ class InlineNoticeTest {
      * `inline_notice_action` 这个标签与 `clickable` 必须在**同一枚语义节点**上：组件把动作槽包在
      * `mergeDescendants` 的容器里，槽内容由调用方渲染成稿 `.act` 的形状（`Text` + `clickable` +
      * `FontWeight.Bold` + `noticeInk(...).action` 的墨色）。用例这里就是「调用方该怎么写」的样张。
+     *
+     * **第一条 48dp 打在包裹层上是自证（R-10.7①，修复轮 2 的 C-2 补口）**：`inline_notice_action` 那枚
+     * 标签落在组件的包裹 `Box` 上，而那个 `Box` 自己就写着 `heightIn(min = 48.dp)`
+     * （`InlineNotice.kt:173-179`）→ 除非把 `heightIn` 整个删掉，这条恒真。把 48dp 真正**交给槽内那枚
+     * `clickable`** 的是包裹层的 `propagateMinConstraints = true`：删掉它以后 `Box` 仍是 48dp，
+     * 而槽内 `Text` 退回 13sp 行高（真机实测 15.24dp），提示条的动作就成了「看着像链接、点不着」——
+     * F5-03 已破、上面的老断言继续绿（F5-03 的移交账点过名这一族）。所以第二条必须打在带 click action
+     * 的节点上（变异自证 ⑨：删 `propagateMinConstraints` → 红的正是这条，报 `Actual height is 15.238096.dp`）。
+     *
+     * **两条可点计数的分工同 `EntryRowTest`（R-10.7②，I-2）**：合并树那条抓「动作丢了 click（计数变 0）」；
+     * 未合并树那条把「这条提示里只能有一枚可点节点」钉成契约，并且是**非合并型 click 源**
+     * （`Modifier.semantics { onClick = … }` 不给自己开 `mergeDescendants`，会被并进动作节点）的唯一防线。
+     * 合并型源（`Modifier.clickable`）在两棵树里都数得出——实测口径见 `EntryRowTest` 变异 ⑩ 那段，别照
+     * 「合并树一定数不出」的二手推断读。与 Task 9 `AppScreenHeaderTest`（`:106/131`）的差别：那边根节点
+     * 不是 clickable，子级可点源的合并行为不同，照抄写法不等于照抄承重。
      */
     @Test
     fun notice_action_is_the_only_click_target_and_meets_the_48dp_floor() {
@@ -102,10 +119,17 @@ class InlineNoticeTest {
         }
         val action = composeRule.onNodeWithTag("inline_notice_action")
         action.assertHeightIsAtLeast(48.dp)
+        composeRule.onNode(hasClickAction(), useUnmergedTree = true).assertHeightIsAtLeast(48.dp)
         assertEquals(
             "动作是这条提示里唯一的可点目标",
             1,
             composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            "未合并树里也只能有一枚可点节点：提示条本体与槽内装饰都不得长出第二处 clickable" +
+                "（合并树会把它并进动作节点、数不出来，R-10.7②）",
+            1,
+            composeRule.onAllNodes(hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes().size,
         )
         action.performClick()
         assertEquals(1, clicks)
