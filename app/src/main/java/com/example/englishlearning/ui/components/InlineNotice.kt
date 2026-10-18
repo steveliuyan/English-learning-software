@@ -2,6 +2,7 @@ package com.example.englishlearning.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppColorSet
 import com.example.englishlearning.ui.theme.AppType
@@ -123,8 +125,10 @@ internal val InlineNoticeKind.glyphLayer: AppGlyphLayer
  * 这条方向差异由 `InlineNoticeTest.notice_text_wraps_instead_of_clipping_at_font_scale_2` 钉住。
  *
  * `action` 是尾部动作槽（稿 `.act` 是**无容器的文本链接**，所以这里不给 `PillButton`——那会把
- * 「一条提示」升级成「一个主操作」）。槽内容由调用方渲染成 `Text` + `clickable` +
- * `FontWeight.Bold`（稿 700），墨色取 [NoticeInk.action]（`noticeInk(kind, appColors()).action`）。
+ * 「一条提示」升级成「一个主操作」）。槽内容一律用同文件的 [InlineNoticeAction] 渲染
+ * （裁决 R-11.0：动作本体 = `Text` + `clickable` + `FontWeight.Bold` + [NoticeInk.action] 四件套，
+ * 批 2/3 要收 11 份提示，配方留在调用方就会长出 11 份链接写法，而 Task 12 的份数棘轮按**文件**数
+ * 「不走 `InlineNotice(` 的错误渲染站点」，自排动作链接既不新增文件也不是错误 Text 站点 → 抓不住）。
  * 本组件负责两件槽内拿不到的事：
  *  ① 把 F5-03 的 48dp 触控硬下限**只**派给动作节点——`heightIn(min = 48.dp)` 落在包裹层并用
  *     `propagateMinConstraints` 传进槽内，让槽内的 `clickable` 真填满 48dp 高（**不给整条提示**：
@@ -182,4 +186,61 @@ fun InlineNotice(
             }
         }
     }
+}
+
+/**
+ * 提示条动作槽里的**唯一**链接配方（裁决 R-11.0，Task 10 二轮评审 I-5）：稿 `.act` 的四件套
+ * —— `Text` + `clickable` + `FontWeight.Bold`（稿 700）+ [NoticeInk.action] 的墨色——只在这里写一遍。
+ *
+ * 调用方写法（批 2/3 十几处一律照此，不要再自排动作链接）：
+ * ```
+ * InlineNotice(text = "语音评测暂时不可用", kind = InlineNoticeKind.Error,
+ *     action = { InlineNoticeAction(InlineNoticeKind.Error, "重试", onClick = { retry() }) })
+ * ```
+ * **回调必须具名传 `onClick =`，尾随 lambda 写法编译不过**：签名按裁决 R-11.0 钉成
+ * `(kind, label, onClick, modifier = Modifier)`，末位是 `modifier`（不是函数类型），
+ * 而 Kotlin 的尾随 lambda 只绑末位形参——写成 `InlineNoticeAction(kind, "重试") { … }` 的实测报错是
+ * `No value passed for parameter 'onClick'` + `Argument type mismatch: actual type is 'Function0<Unit>',
+ * but 'Modifier' was expected`。签名形状由 `InlineNoticeActionContractTest.publicSignature` 逐字钉住，
+ * 要改成「`onClick` 末位、可用尾随 lambda」得连那条正则一起改，并走计划裁决重议（不许只改一边）。
+ *
+ * 自排（`Text` + `Modifier.clickable` + 自己 `noticeInk(...)` 取墨）不会被 Task 12 的份数棘轮抓到
+ * ——那条棘轮按文件数「不走 `InlineNotice(` 的错误渲染站点」，动作链接既不新增文件也不是错误 Text 站点；
+ * 所以本仓另用 `InlineNoticeActionContractTest` 钉「配方各恰一处 + 全域 0 处 `color = noticeInk(`」。
+ *
+ * **为什么与 [InlineNotice] 同文件**（不是新文件）：同文件新增不撞份数棘轮，且墨色/字重/触控只有一处真值。
+ *
+ * **触控面不在这里钉、也不在这里「承接」（本棒真机实测订正 R-11.0 的措辞）**：48dp 的交付机制是
+ * [InlineNotice] 动作槽包裹层上的 `heightIn(min = 48.dp)` + `propagateMinConstraints = true`（R-10.7①）
+ * ——包裹层把 48dp 的**最小高约束**传进槽内，槽内的 `Text` 量出来就是 48dp，`clickable` 的可点面随之 48dp。
+ * 裁决原文那句「内部再加 `fillMaxHeight()` 承接 48dp」**实测不成立**：`fillMaxHeight()` 吃的是**最大**高约束
+ * 而不是最小，在有界宿主（组件级 `createComposeRule()` 的窗口高度有界）里它把可点面撑到 635.05dp、
+ * 整条提示被拉成半屏空白（实测消息 `expected:<48.0.dp> but was:<635.0476.dp>`）；在无界宿主
+ * （`LazyColumn` 一类可滚动容器）里它又是空操作，48dp 仍旧全靠 `propagateMinConstraints` 交付。
+ * 故本函数不写 `fillMaxHeight()`，并把「本文件 0 处 `fillMaxHeight`」钉进 `InlineNoticeActionContractTest`。
+ * 自己另写一条 48dp 也不行：那会让「48dp 只有一处」的源码锚变成两处
+ * （`SharedComponentGeometryContractTest` 那条 `heightIn(min = 48.dp)` 恰一处的断言会红）。
+ *
+ * 顺序仍是契约：`clickable` 挂在调用方传进来的 [modifier] **之后**（`modifier.clickable(…)`），
+ * 于是调用方的 `padding`/尺寸修饰符落在可点面**外侧**；`clickable` 排在 `padding` 之后的写法可点面
+ * 只剩内容盒（`EntryRow` 真机 40dp「假面」、`InlineNotice` 变异自证 ⑨ 的 15.24dp 是同族教训）。
+ *
+ * [kind] 必须与外层 [InlineNotice] 的 `kind` 一致：动作墨是三态纯表的一枚字段，传错态就是拿另一态的墨
+ * 画这一态的链接（三态 `action` 当前同值 `text1`，但表是权威、不是「反正都一样」的借口）。
+ */
+@Composable
+fun InlineNoticeAction(
+    kind: InlineNoticeKind,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val ink = noticeInk(kind, appColors())
+    Text(
+        text = label,
+        style = AppType.Footnote,
+        color = ink.action,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier.clickable(onClick = onClick),
+    )
 }
