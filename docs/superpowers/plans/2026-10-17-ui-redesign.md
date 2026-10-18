@@ -116,7 +116,9 @@ internal val MintBackground: Color
 
 组合期内的读点因为在组合期内，自动获得深色取值，零重写；组合期之外的 3 处（`DrawScope` lambda 两处 + 非组合 `Color` 表一处）按 Step 4 的优先级就地提读。`AppleMint*`（品牌渐变三端 + `mint-light`）**保持静态 `val`**：品牌渐变模式不变（spec §2.1「品牌渐变保持现状不动」），且三处顶层 `Brush` 需要组合期外的静态读取——若改成组合读取会让这三个顶层 val 编译失败。
 
-`AppPalette`（91 处）与 `DomainColors`（71 处）**保持静态浅色源**，另建深色兄弟（`AppColorDark`、`DomainPalette` 深套），由 `LocalAppColors`/`LocalDomainColors` 在装配点选择；组合期代码改读 `appColors().textSecondary` / `appDomain(AppDomain.AiSpeech).deep`。这一步无法一次做完（162 处），因此用 `DarkTokenConsumptionRatchetTest` 把**按屏的静态读点计数**做成只减不增的棘轮：批 1 建表并记 seed，批 2/批 3 每屏重排时顺手迁完自己那屏，收口时 seed 应清零或仅剩确实与主题无关的站点（逐条写明理由）。
+`AppPalette` 与 `DomainColors` **保持静态浅色源**，另建深色兄弟（`AppColorDark`、`DomainPalette` 深套），由 `LocalAppColors`/`LocalDomainColors` 在装配点选择；组合期代码改读 `appColors().textSecondary` / `appDomain(AppDomain.AiSpeech).deep`。这一步无法一次做完，因此用 `DarkTokenConsumptionRatchetTest` 把**按屏的静态读点计数**做成只减不增的棘轮：批 1 建表并记 seed，批 2/批 3 每屏重排时顺手迁完自己那屏，收口时 seed 应清零或仅剩确实与主题无关的站点（逐条写明理由）。
+**读点数不写在计划里**（批 1 终审 D-I-3 订正）：原稿这里的「91 处 / 71 处 / 共 162 处」是撰写时的估算，与批 1 出厂台账不符。权威数是 `DarkTokenSeedAllowlist`，可重算：
+`sed -n '/internal val DarkTokenSeedAllowlist/,/^)/p' app/src/test/java/com/example/englishlearning/ui/DarkTokenConsumptionRatchetTest.kt | grep -oE '"[^"]+" to [0-9]+' | awk -F'to ' '{s+=$2; n++} END{print "files="n" hits="s}'`（批 1 tip 打印 `files=32 hits=157`）。清零的拆族口径见「批 3 深色清零专项」。
 
 `LocalIsDark` 存在的理由：玻璃层、阴影、`inset` 高光等少数需要按模式分支的视觉细节（spec §5.4），用它而不是到处 `isSystemInDarkTheme()`。
 
@@ -822,7 +824,7 @@ internal val MintBackground: Color
 
   四条私有实现规则，seed 为 spec §3 实测份数，目标是清零：
   - 页头：`Regex("""Text\([^)]*(?:title|Title)[^)]*style = MaterialTheme\.typography\.headline""")` 形态的私有页头 + 手写返回 `IconButton`/`Icons`-替代的 `clickable`；实测 14 份（`AppScreenHeader(` 调用数应 == 使用它的屏数）。规则形状取「出现 `AppScreenHeader(` 的文件数」与「不出现该调用却含返回+标题版式的文件数」两者，后者即违规。
-  - `WordRow`：私有行实现 7 份（spec §3 点名的 6 个文件里的行组合 + 1 变体）。
+  - `WordRow`：私有行实现台账 = `SharedComponentUniquenessRatchetTest.componentFamilySeeds["词行（应调 WordRow）"]`（**按文件计**，一个文件可能含两枚裸行组合，故「文件数」≤「实现份数」；原稿写的「7 份」是把 `GlobalVocabularySearchScreen` 的两枚各算一次得到的份数，不是台账数）。台账只减不增，接线一屏删一行，清零归批 2/批 3。
   - `NotConfiguredCard`：4 屏 12 行，规则 = 出现「未配置」文案但不用 `NotConfiguredCard(` 的文件；seed = `SentenceAnalysisScreen.kt`、`WordAiQaScreen.kt`、`PhotoTranslationScreen.kt`、`ImageStudioScreen.kt`。
   - `InlineNotice`：11 份，规则 = 用 `AppPalette.ErrorText`/`colorScheme.error` 直接渲染错误 `Text` 而不走 `InlineNotice(`；seed 从 `LearningRecordsScreen.kt`、`ReminderSettingsScreen.kt`、`BackupExportScreen.kt`、`SettingsScreen.kt` 现场枚举。
   **本任务先只建规则与 seed**，此时九个组件尚未存在，规则应给出「组件文件不存在 → 该规则整体跳过并打印警告」以外的行为：改成断言 `AppScreenHeader.kt` 等文件存在（Task 9/10 建出前本测试会红，因此**把本 Step 放在 Task 10 之后执行**，或先建三个组件的**空签名占位**）。
@@ -1026,7 +1028,7 @@ internal val MintBackground: Color
 
   几何一律以视觉稿为准（稿 §入口行 `mockups.html:150-160`、§Banner `:178-186`）。控制者派前对照稿子与既有契约下五裁决（R-10.1~R-10.5），稿子是权威、计划原表述与之冲突时按裁决改：
 
-  - **R-10.1 `InlineNotice` = 稿 `.banner` 家族**：`Row(fillMaxWidth().clip(MaterialTheme.shapes.medium).background(backdrop).border(1.dp, ink.border, MaterialTheme.shapes.medium).padding(horizontal = 14.dp, vertical = 12.dp), spacedBy(10.dp), verticalAlignment = Top)` + `AppGlyph(状态字形, ink.foreground, 18.dp)`（稿 `.banner svg` 是 18px；字形按 `AppIcons.kt` 逐枚清单已登记的落点取：**Info→`Info`、Error→`Warning`（`:30` 钉死）、Success→`Check`（`:5`）**。稿 `.err` 画的是「圆圈+叉」，本仓字形家族没有这枚（B 案 31 枚已定稿，扩一枚要重走图标决策 + 许可登记），按 `:30` 的登记用三角承载 Error，这是**已登记的偏离**、不是随手替换，KDoc 里写明；**层开关按豁免表走**：`Info`/`Warning` 是两层枚用默认 `Duotone`，`Check` 在 `StrokeOnlyIcons` 里、必须显式 `layer = AppGlyphLayer.StrokeOnly`；字形是装饰层，`contentDescription = null`，语义由文案承载）+ 文案 `AppType.Footnote`（稿 13px）+ `ink.foreground`（**不给 `maxLines`**：提示文案裁掉即丢信息，与入口行副标题不同口径）+ `action`。**动作不是按钮**：稿 `.act` 是无容器文本链接，`PillButton` 会把「一条提示」升级成「一个主操作」，故用 `Text` + `clickable` + `ink.action` + `FontWeight.Bold`（稿 700）+ `Modifier.testTag("inline_notice_action")`，触控面按 F5-03 硬下限给 **`Modifier.heightIn(min = 48.dp).padding(horizontal = 8.dp)`**（在 `clickable` 之前）。**注意别把 48dp 下限错派给整条提示**：无动作的 `.banner` 只有 `padding(vertical = 12)` + 13sp 行高 ≈ 42dp，它是**内容不是触控目标**，48dp 只约束动作节点——`EntryRow` 那种整行可点的才需要行级下限。**border 三态取稿**：Info `set.outline`、Error `set.errorFill.copy(alpha = 0.36f)`、Success `set.success.copy(alpha = 0.34f)`（稿 `color-mix(… 34%/36%, transparent)` 的等价写法就是 alpha）。
+  - **R-10.1 `InlineNotice` = 稿 `.banner` 家族**：`Row(fillMaxWidth().clip(MaterialTheme.shapes.medium).background(backdrop).border(1.dp, ink.border, MaterialTheme.shapes.medium).padding(horizontal = 14.dp, vertical = 12.dp), spacedBy(10.dp), verticalAlignment = Top)` + `AppGlyph(状态字形, ink.foreground, 18.dp)`（稿 `.banner svg` 是 18px；字形按 `AppIcons.kt` 逐枚清单已登记的落点取：**Info→`Info`、Error→`Warning`（`:30` 钉死）、Success→`Check`（`:5`）**。稿 `.err` 画的是「圆圈+叉」，本仓字形家族没有这枚（B 案 **33** 枚已定稿——Task 1 决策文档的逐枚清单与本计划通篇同数，枚数可重算：`sed -n '/^enum class AppIcon /p' app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt | sed 's/.*{//; s/}//' | tr ',' '\n' | wc -l` 打印 33；扩一枚要重走图标决策 + 许可登记），按 `:30` 的登记用三角承载 Error，这是**已登记的偏离**、不是随手替换，KDoc 里写明；**层开关按豁免表走**：`Info`/`Warning` 是两层枚用默认 `Duotone`，`Check` 在 `StrokeOnlyIcons` 里、必须显式 `layer = AppGlyphLayer.StrokeOnly`；字形是装饰层，`contentDescription = null`，语义由文案承载）+ 文案 `AppType.Footnote`（稿 13px）+ `ink.foreground`（**不给 `maxLines`**：提示文案裁掉即丢信息，与入口行副标题不同口径）+ `action`。**动作不是按钮**：稿 `.act` 是无容器文本链接，`PillButton` 会把「一条提示」升级成「一个主操作」，故用 `Text` + `clickable` + `ink.action` + `FontWeight.Bold`（稿 700）+ `Modifier.testTag("inline_notice_action")`，触控面按 F5-03 硬下限给 **`Modifier.heightIn(min = 48.dp).padding(horizontal = 8.dp)`**（在 `clickable` 之前）。**注意别把 48dp 下限错派给整条提示**：无动作的 `.banner` 只有 `padding(vertical = 12)` + 13sp 行高 ≈ 42dp，它是**内容不是触控目标**，48dp 只约束动作节点——`EntryRow` 那种整行可点的才需要行级下限。**border 三态取稿**：Info `set.outline`、Error `set.errorFill.copy(alpha = 0.36f)`、Success `set.success.copy(alpha = 0.34f)`（稿 `color-mix(… 34%/36%, transparent)` 的等价写法就是 alpha）。
   - **R-10.2 入口图标容器有两档强度，`EntryIconBadge` 加 `tone` 而不是再造组件**：稿 `.ic`（40dp，实底域渐变 + 白墨）与 `.ic-tint`（同 40dp 容器、底 = `color-mix(in srgb, deep 16%, surface)`、字形 = `deep` 单层描边）是**同族两档**，稿里 `.ic-tint` 出现 21 次，且批 2 Task 14「今日计划」的三条入口行**全部用弱档**（稿 `:912-916`）——不加 `tone` 就等于让 Task 14 手搓第二份容器，正撞 Task 12 份数棘轮。做法：`IconBadge.kt` 内新增 `enum class EntryIconTone { Gradient, Tint }`，`EntryIconBadge` 加 `tone: EntryIconTone = EntryIconTone.Gradient` 默认形参（既有调用零改动）；`Tint` 档 = `size(40.dp)` + `clip(AppShape.Icon)` + `background(lerp(colors.surface, palette.deep, 0.16f))` + `AppGlyph(icon, palette.deep, 22.dp, layer = StrokeOnly)`，**不描 1dp 玻璃高光边**（稿 `.ic-tint` 无描边；高光边属于 `.ic` 实底档）。准入 `require(allowsInEntryContainer(icon))` **两档都保留**（弱档同样不该承接开放折线豁免枚——豁免枚只在行内/尾部出现）。控制者已按 `SourceRatchet` 同式复算弱档「`deep` 字形压 16% 混色底」（底色 = `lerp(set.surface, palette.deep, 0.16f)`，浅套 `surface` 取 `FFFFFF`、深套取 `17201C`，**不是** `background`）的非文本 3:1：浅套最低 `AiSpeech` **3.30**、其余 4.11~7.04；深套最低 `Danger` **4.76**、其余 5.21~6.86 → **七域两套全部达标**，`IconBadgeContrastContractTest` 里要按这 28 个组合（7 域 × 2 档 × 2 主题）双向复算，比值写进断言消息、注释不抄数（抄了会随取值漂移）。两档字形调用段的**形状**契约重写见 R-10.3——同一文件、同一提交，别只改对比不改形状。
   - **R-10.3 字形 24dp → 22dp，且 `IconBadgeContrastContractTest` 的入口形状段必须同提交重写**：稿 `.ic svg { width:22px; height:22px }`（`:153`），Task 7 出厂的 `EntryIconBadge` 画的是 24dp。批 1 里这是最后一处能顺手对齐的度量差，且 `EntryIconBadge` 目前**零生产消费方**（改它不会波及任何屏）。
     现有契约（`IconBadgeContrastContractTest.kt:126-146`、`:673-700`）钉的是三件事：行内 17dp 调用**必须**显式 `layer = StrokeOnly`（`strokeOnlyGlyphCall`）；入口调用段靠 `entryGlyphCallSegment`（内含 `size = 24.dp`）找出**恰好 1 处**；该段内 `layer =` 出现 **0 次**（`explicitLayerArgument`），另有一条 `strokeOnlyOnEntryGlyph`（`size = 24.dp , layer = StrokeOnly`）禁止入口被降级成单层。R-10.2 落地后这三条里有一条**口径反了**：弱档合法地就是单层。因此本任务把这一段改成（逐条写进测试，含双向合成片段）：
@@ -1040,7 +1042,7 @@ internal val MintBackground: Color
     断言面：`entryGlyphCallSegments(badge).size == 2`（0/1/3 都判红：1 处 = 弱档没接上或两档坍缩成一档）；**两档各按其形状判**——恰一处含 `entryStrokeOnlyCall`（弱档单层），余下一处 `layer =` 出现 0 次（实底档靠默认两层）。`strokeOnlyOnEntryGlyph` 这条旧禁令连同 `24.dp` 锚点一并删除，别留死正则。合成片段同步：实底档 22dp 无 layer、弱档 22dp 带 StrokeOnly、行内 17dp 带 StrokeOnly（不得被认成入口段）、旧 24dp 串不得再被任何入口正则匹配。
     **反向变异自证**（Task 9 C-1 学到的纪律：改锚点必须自证锚点还承重）：① 生产实底档字形改回 `24.dp` → 契约红；② 生产弱档删掉 `layer = StrokeOnly` → 契约红；③ 生产弱档补上渐变（多一处 `linearGradient`）→ `gradientFromRule` 的「恰好一处」红。三次变异各跑一次、贴输出、改回。
     另注意：`rawBaseEndpoint` 与 `gradientFromRule` 两条正则在两档实现下仍然成立（弱档底色是 `lerp(colors.surface, palette.deep, 0.16f)`，不含裸 `.base`，也不新增渐变），不要顺手改它们。
-  - **R-10.4 入口行墨色走纯表 `entryRowInks(set)`**：`AppGlyph`/`Text` 的颜色不是语义节点能读的东西，connected 侧「断言 chevron 颜色 == `text2`」根本取不到色（Task 9 实测口径）。把墨色抽成纯函数在 JVM 侧钉，`EntryRow` 只读这张表：`title = text1`、`subtitle = text2`、`trailing = text2`、`chevron = text2`、`divider = outlineSoft`。**chevron 用 `text2` 不用 `text3`**（控制者复算：`text3` 压浅套 `tint` 恰 **3.00:1**、压白 3.40，`text2` 压 `tint` **4.55**、压白 5.15；非文本 3:1 线卡在边界上不可靠，Task 1 裁决 #1 也禁 `text-3` 作前景）。用例里同时钉「`chevron != set.text3`」，防止有人「按稿改回 text3」。
+  - **R-10.4 入口行墨色走纯表 `entryRowInks(set)`**：`AppGlyph`/`Text` 的颜色不是语义节点能读的东西，connected 侧「断言 chevron 颜色 == `text2`」经语义树根本取不到色（Task 9 实测口径；像素捕获不在本条口径内，见 Task 10 Step 3 口径）。把墨色抽成纯函数在 JVM 侧钉，`EntryRow` 只读这张表：`title = text1`、`subtitle = text2`、`trailing = text2`、`chevron = text2`、`divider = outlineSoft`。**chevron 用 `text2` 不用 `text3`**（控制者复算：`text3` 压浅套 `tint` 恰 **3.00:1**、压白 3.40，`text2` 压 `tint` **4.55**、压白 5.15；非文本 3:1 线卡在边界上不可靠，Task 1 裁决 #1 也禁 `text-3` 作前景）。用例里同时钉「`chevron != set.text3`」，防止有人「按稿改回 text3」。
   - **R-10.5 行间发丝线归组件、用 `topDivider: Boolean = false`**：稿 `.entry + .entry { border-top:1px outline-soft }` 是「除首行外每行一条顶线」。不新增 `EntryRowGroup`（撞份数棘轮），也不留给各屏手搓 `HorizontalDivider`（批 2 有 5 屏 × 3~8 行要抄 30 余次）；`topDivider == true` 时在内容行**外侧**画一条 1dp `entryRowInks(set).divider` 顶线（`drawBehind` 或外层 `Column` 皆可），**不得**把 56dp 最小内容高吃成 55/57。
   - **R-10.6 可证性两条（Task 10 评审轮由控制者补，批 2 起同样适用）**：
     ① **几何值必须在 JVM 侧有契约面**：connected 只能钉「下限」（`assertHeightIsAtLeast(48.dp)`、`≥40dp`），钉不住稿面的**取值**（徽标容器 40dp、行 56dp/间隙 12dp/padding 8dp、提示条 padding 14×12dp、间隙 10dp、字形 18dp、1dp 描边）。取值漂移（把 40 改成 48、把 12 改成 8）在 connected 全绿，只有源码契约能挡——用共享夹具 `uiFiles()` + `stripComments`（`SourceRatchet.kt`，`IconBadgeContrastContractTest` 同一读法）在 `app/src/test/.../ui/SharedComponentGeometryContractTest.kt` 里逐枚钉字面量，并配合成正/负片段自证正则承重（本仓 glyph 尺寸锚的先例口径）。
@@ -1056,7 +1058,8 @@ internal val MintBackground: Color
 
 - [ ] **Step 3: 写 connected 用例（`EntryRowTest` + `InlineNoticeTest`）**
 
-  **口径先写清楚**：connected **读不到颜色**（Task 9 实测），所以墨色一律由 Step 1 的 JVM 纯表（`noticeInk` / `entryRowInks`）钉死，connected 只钉**几何、语义、可点数量、裁切**四件事。计划原来那句「connected 断言 chevron 颜色 == `text2`」是不可执行的，作废。
+  **口径先写清楚**（批 1 终审 Seat A M7 收窄，原句过宽）：connected **经语义树读不到颜色**（Task 9 实测）——`contentDescription` 与 `SemanticsPropertyKey` 里没有渲染色值，所以墨色一律由 Step 1 的 JVM 纯表（`noticeInk` / `entryRowInks`）钉死，**组件级 connected 用例**只钉**几何、语义、可点数量、裁切**四件事。计划原来那句「connected 断言 chevron 颜色 == `text2`」是不可执行的，作废。
+  **但「connected 读不到颜色」不等于「connected 不能验色」**：`captureToImage().asAndroidBitmap()` 读得到真实像素，Task 5 `ThemeModeSwitchTest` 与 Task 12 `IconGalleryRenderTest` 就是靠它把 prefs→装配→像素这条链闭合的（语义通道给不了的唯一证法）。走像素捕获的用例必须写明它依赖的渲染链假设——宿主有没有铺主题底、取样点取在哪、深色档靠 `rememberAppThemeMode()` 活链路还是靠重新 `setContent`；假设不写出来，「取样点其实不是那块底」这类假绿后人无从复核（`IconGalleryRenderTest` 的铺底缺陷就是现例）。
   另一条 Task 9 学到的：`assertHeightIsAtLeast` / `getUnclippedBoundsInRoot` 走的是同一个 `withUnclippedBoundsInRoot` 口径（单口径，不是双口径），`assertIsDisplayed` 才是裁剪后口径；`performScrollTo()` 在组件级 `createComposeRule()` 下无可滚动祖先会抛，别写。
 
   `EntryRowTest`（每条一个 `setContent`，同方法内不二次 `setContent`——真机必崩）：
@@ -1229,11 +1232,13 @@ internal val MintBackground: Color
   **R-12.3（Task 8 Step 4 四条规则的实现期订正，控制者本席 grep 实测；详表见 `.superpowers/sdd/2026-10-17-ui-redesign/task-12-precheck.md`）**：
   ① **`NotConfiguredCard` 份数 = 4，已核实**（`ImageStudioScreen.kt:250`/`PhotoTranslationScreen.kt:706`/`SentenceAnalysisScreen.kt:209`/`WordAiQaScreen.kt:264` 各一份 `private fun NotConfiguredCard(`），共享份在 `components/NotConfiguredCard.kt:117`。
   注意**同名遮蔽**：私有份与共享份同名，所以「文件里出现 `NotConfiguredCard(`」不能当合规证据——规则必须是「出现 `private fun NotConfiguredCard(` 即违规」+「`components/NotConfiguredCard.kt` 恰 1 处 `fun NotConfiguredCard(`」。
-  ② **页头规则的「14」在批 1 时点断不出东西**：`grep -rl 'AppScreenHeader(' .` 只命中组件自身（批 1 不接线业务屏，接线在批 2/3），Task 8 Step 4 那条「出现 `AppScreenHeader(` 的文件数 == 使用它的屏数」两侧都是 0/1。
+  ② **页头规则的「14」在批 1 时点断不出东西**：`grep -rl 'AppScreenHeader(' app/src/main/java/com/example/englishlearning/ui` 只命中组件自身（批 1 不接线业务屏，接线在批 2/3），Task 8 Step 4 那条「出现 `AppScreenHeader(` 的文件数 == 使用它的屏数」两侧都是 0/1。
+  **扫描根一律写死为 `app/src/main/java/com/example/englishlearning/ui`，别用 `.` 或省参数**（Task 12 派前补）：`.` 会把 `docs/`、`.superpowers/` 简报里的引用和 `app/build/` 的生成物一起卷进来，数出来的「份数」与测试的 `uiFiles()` 口径不同源，两条数无法对账。
   本任务只钉两条：`components/AppScreenHeader.kt` 存在且恰 1 处 `fun AppScreenHeader(`；私有页头形态（同文件含 `MaterialTheme.typography.headline` 却不调 `AppScreenHeader(`）的**文件数** seed = 实测值、只减不增。14 → 0 的兑现归批 3，本任务不宣称清零。
-  ③ **`InlineNotice` 的 seed 文件清单与 Task 8 Step 4 写的不符**：实测 `grep -rln 'AppPalette.ErrorText\|colorScheme.error'` 得 **12 个文件**（`AppScreen`/`ArticleImportScreen`/`BackupExportScreen`/`BackupPairingExportScreen`/`BackupRestoreScreen`/`CardDetailScreen`/`ReadingAccessScreen`/`ReminderSettingsScreen`/`SpeechSettingsScreen`/`WordAiQaScreen`/`WordCardScreen`/`WorksheetSettingsScreen`），
+  ③ **`InlineNotice` 的 seed 文件清单与 Task 8 Step 4 写的不符**：实测 `grep -rln 'AppPalette\.ErrorText\|colorScheme\.error' app/src/main/java/com/example/englishlearning/ui` 得 **13 个文件**，其中 `InlineNotice.kt` 是共享组件自身（它合法读错误色），排除后 **12 个**即 seed（`AppScreen`/`ArticleImportScreen`/`BackupExportScreen`/`BackupPairingExportScreen`/`BackupRestoreScreen`/`CardDetailScreen`/`ReadingAccessScreen`/`ReminderSettingsScreen`/`SpeechSettingsScreen`/`WordAiQaScreen`/`WordCardScreen`/`WorksheetSettingsScreen`），
   Task 8 点名的 `LearningRecordsScreen.kt` 与 `SettingsScreen.kt` **不在其中**。Task 8 已写「现场枚举」，故以实测 12 为 seed，清零归批 3。
-  ④ **`WordRow` 私有份不能只搜函数名**：私有实现多是 `Row { Text(lemma); Text(gloss) }` 这类无名裸组合，规则按「同文件出现 lemma+gloss 两枚 Text 且不调 `WordRow(`」的形态写。
+  **两处口径差要记住，裸 grep 数不等于测试数**：测试走的是**剥注释后**的源码，而 `components/InlineNotice.kt` 的 KDoc 里逐字复述了上面这条 grep、`AppScreen.kt` 也有一行注释提到 `colorScheme.error`——裸 grep 会把注释当债务；同时共享组件文件本身要排除。**seed 的权威是 `SharedComponentUniquenessRatchetTest.componentFamilySeeds`，不是本行写的 12**；接线一屏就删一行、文档随之改，别拿文档当台账。
+  ④ **`WordRow` 私有份不能只搜函数名**：私有实现多是 `Row { Text(lemma); Text(gloss) }` 这类无名裸组合，规则按「同文件出现 lemma+gloss 两枚 Text 且不调 `WordRow(`」的形态写；扫描根同②，`ui/` 全目录（含子包）。
   ⑤ **预登记豁免照 Task 12 Step 3 原文写进棘轮注释与 seed 说明**：本棘轮管「同一形态不得有第二份组件」，不管「就地改既有组件的取值面」——Task 14 修 `PillButton` 必须改本体，不得被本棘轮挡。
   **预登记豁免（Task 9 评审裁决 4.3 前置②）**：本棘轮管「同一形态不得有第二份组件」，**不管「就地改既有组件的取值面」**——Task 14 修 `PillButton` 的静态 ink / 档位差时必须改 `PillButton` 本体而不是新建按钮，这条路径不得被本棘轮挡；写进测试注释与 seed 说明，避免批 2 为绕门再造一枚按钮。
 
@@ -1407,6 +1412,33 @@ internal val MintBackground: Color
 批 3 承载信息架构六条裁决中的 ①②③④⑤⑥ 与 F5-03 移交账剩余项。
 **入口迁移铁律（spec §6，违反即判失败）**：先建新入口，验证可达且 `testTag`/朗读描述齐全，**再**摘旧入口。收藏与错词在「我的词」可用之前绝不能先从打卡页删掉——因此 Task 20 必须早于 Task 22。
 
+### 批 3 深色清零专项（批 1 终审 D-I-3 增补：Task 19–26 共同的硬项，Task 26 Step 3 的收口判据）
+
+批 1 只交付了深色**能力**（两套 token + 装配点 + 主题三态活链路），业务屏的静态浅套读点一处没迁——line 119 那句
+「批 2/批 3 每屏顺手迁完自己那屏」从本专项起有了明确的族划分与收口判据，Task 26 Step 3 按本节验收，**不是「顺手清理」**。专项的权威台账是 `DarkTokenConsumptionRatchetTest.DarkTokenSeedAllowlist`（`Map<相对 ui 根路径, 命中数>`，
+双向精确相等），**批 1 tip 实测 32 个文件 / 157 处命中**（可重算：
+`sed -n '/internal val DarkTokenSeedAllowlist/,/^)/p' app/src/test/java/com/example/englishlearning/ui/DarkTokenConsumptionRatchetTest.kt | grep -oE '"[^"]+" to [0-9]+' | awk -F'to ' '{s+=$2; n++} END{print "files="n" hits="s}'`）。
+**文档里不写死站点数**：本会话内两份人工盘点就得出过 88 与 93 两个数（差在 `GlassButton.kt` 的主题不变蒙版色归类口径），
+这正是「抄来的数会漂」的现场证据——要数就现跑上面那条，或在测试里读 seed。
+
+拆成三族，各族的收法不同，**不许只迁填充不迁墨**：
+
+1. **排印墨色族**（深色下「当场不可读」的主因）：`theme/AppType.kt` 六档里写死的 `AppPalette.TextPrimary`/`TextSecondary`
+   与散落在屏里的 `AppPalette.Text*` 读点。收法 = 批 3 的 `appTypography()` 摘色版（装配点按 `LocalAppColors` 出六档），
+   或逐点改读 `appColors().text1/text2`。**这条与视觉稿 §2.2 的六档锁不冲突**：摘的是 `color=`，字号/字重/字距一字不动。
+2. **玻璃容器族**：四处 `AppPalette.GlassFill` 站点（`components/glass/GlassDialog.kt:46`、`components/glass/GlassOverlay.kt:69`、
+   `AiProfileSettingsScreen.kt:499`、`SpeechSettingsScreen.kt:234`，可重算 `grep -rn 'AppPalette\.GlassFill' app/src/main/java --include=*.kt`，
+   `ConfirmDestructiveDialog.kt:45` 是 KDoc 不是站点）**必须与其面板内的前景墨同一次提交迁移**——批 1 终审 F4 的裁决，
+   只改填充会把「深墨压不透明白板 = 意外可读」变成「深墨压深板 = 当场不可读」，是净退化。
+   目标值 `appColors().surfaceGlass`。收完后 `GlassFillBackdropDebtLedger` 与 seed **两张表同减**，单漂移即红。
+3. **主题不变蒙版族**：`AppPalette.GlassHighlight` / `Scrim` 共 5 文件 6 处（`ThemeInvariantMaskReadLedger`）——**不迁**，
+   它们是「白或黑 + alpha」的蒙版，深浅两套都合法；批 3 收口时这族留在台账里并写明理由，即兑现 line 119 的
+   「seed 清零或仅剩确实与主题无关、已逐条登记理由的站点」。
+
+每迁一屏的固定动作：减该文件 seed（减到 0 才删行）→ 跑门禁 → 在浅/深两套下截图（AC-R-10/11 的逐屏证据面）→
+`AC-R-11` 那四处一并收口（`docs/verification/ui-redesign-2026-10.md` 的 AC-R-11 行现在就是这四个站点）。
+**禁止**用「先 `rm -rf` 再整表重抄」的方式清 seed：seed 是债务台账，重抄等于抹掉「只减不增」的历史。
+
 ---
 
 ### Task 19: 设置页 4 组 9 行 + 主题三态开关（AC-R-21）
@@ -1459,7 +1491,7 @@ internal val MintBackground: Color
   若探针失败：本任务降级为「三段用同一 ViewModel 的聚合查询端口」，并在 `docs/decisions/2026-10-19-ui-redesign-mywords-host.md` 记录降级方案与影响——**这属架构级取舍，必须先向用户请示再实施**（四件停止事项之一：接口重构影响面大）。
 - [ ] **Step 2: 写失败测试**：三段各自的行渲染正确（收藏段显示收藏词、错词段显示错词）、段标题可读、空态用 `ScreenUnavailable`/空态文案、每段有一个可点进详情的出口。
 - [ ] **Step 3: 实现**：新入口挂到词汇域（三入口文案「查词 / 词表 / 我的词」，参考扇贝单词的简洁三段）；旧入口**保留**，摘除动作在 Task 22 之后或本批收口时执行，并在报告里逐条列出「哪些旧入口仍在」。
-- [ ] **Step 4: `WordRow` 替换 7 份私有行实现**中的本域 4 份（`WordBookWordsScreen.kt:239-258`、`GlobalVocabularySearchScreen.kt:274-299/:319-358`、`WrongWordsScreen.kt:110-129`、`FavoritesScreen.kt:116-156`），同步递减 `SharedComponentUniquenessRatchetTest` seed。
+- [ ] **Step 4: `WordRow` 替换词行台账（`componentFamilySeeds["词行（应调 WordRow）"]`，批 1 出厂 6 个文件 / 7 枚裸行组合）中的本域侧**——`WordBookWordsScreen.kt:239-258`、`GlobalVocabularySearchScreen.kt:274-299/:319-358`（**一个文件两枚**）、`WrongWordsScreen.kt:110-129`、`FavoritesScreen.kt:116-156` 四个文件；同步递减 seed（seed 按文件计，四文件一次删净，剩下 `LearningRecordsScreen.kt`/`VocabularyScreen.kt` 两文件归批 3）。
 - [ ] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。
 
 ---
@@ -1544,7 +1576,7 @@ internal val MintBackground: Color
 
 - [ ] **Step 1: `ClickableText` 逐词无障碍**（F5-03 移交账）：逐词点击站点在朗读里能逐词播报。先写失败测试（语义断言 `TextRange`/`onClick` 标签），再改；本轮**不改**逐词点击的交互行为。
 - [ ] **Step 2: 契约测试正则局限 M-B1/M-B2 补测**（不改门禁语义）：为两处已记录漏判面补合成用例与新规则；补完后 `AccessibilityColorTokenContractTest` 既有用例必须原样通过。
-- [ ] **Step 3: 棘轮清零**（AC-R-02 兑现）：`RawColorLiteralRatchetTest` seed 应为空；若非空，逐站点要么 token 化、要么在验证文档写明「该站点与主题无关，理由是 X」。`SharedComponentUniquenessRatchetTest` 四条 seed 归零或写明保留理由。`DarkTokenConsumptionRatchetTest` 按 Task 8 口径收口。
+- [ ] **Step 3: 棘轮清零**（AC-R-02 兑现）：`RawColorLiteralRatchetTest` seed 应为空；若非空，逐站点要么 token 化、要么在验证文档写明「该站点与主题无关，理由是 X」。`SharedComponentUniquenessRatchetTest` 四条 seed 归零或写明保留理由。`DarkTokenConsumptionRatchetTest` 按**本批开头的「批 3 深色清零专项」**收口：排印墨色族与玻璃容器族迁净、蒙版族留档写理由，四处 `AppPalette.GlassFill` 的迁移动作即 AC-R-11 的兑现面（该行的站点清单已在验证文档登记，别另起口径）。
 - [ ] **Step 4: 真机取证（不得凭代码宣称一致）**：六屏在 360dp 宽真机浅/深两套截图，逐屏与 `docs/design/2026-10-17-ui-redesign-mockups.html` 比对（AC-R-10）；玻璃层与域色容器深色下可读性实测（AC-R-11）；TalkBack 走查一遍（AC-R-12：图标替换后描述、逐词、未配置卡出口）。截图与脚本只放 `.git/qa-scratch/`，**不入库**；报告不写含用户数据的绝对路径。
 - [ ] **Step 5: 门禁 + 基线重算 + lockfile 零变化确认**：Global Constraints #11 命令 + #10 重算 + `git diff --name-only main..HEAD | grep -c lockfile` == 0；`verifyThirdPartyNotices` 与 `verifyAcTraceabilityMatrix` 全绿（AC-R 不进矩阵，见 `build.gradle.kts:45-72` 的 `AC[0-4]-\d{2}` 过滤）。
 - [ ] **Step 6: 更新 `docs/verification/ui-redesign-2026-10.md`**：AC-R-01…23 全表证据（含真机项的取证方式与结论），逐条要么给证据要么写「未覆盖 + 原因」。

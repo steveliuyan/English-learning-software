@@ -742,7 +742,7 @@
 - 名称: Material Symbols 矢量图标集（仅作度量与风格基准；24dp 画布、2px 视觉重量、Outlined 变体）
 - 版本: Google Material Symbols 图标集（Outlined 变体、24dp 画布）；**UI 重设计轮批 1 按图标选型 B（双色层次自绘族）执行，本轮不复制其路径数据**，只沿用其网格、描边重量与无填充优先的风格作参照。实际入库的字形路径全部为自绘，逐枚清单记录在 `app/src/main/java/com/example/englishlearning/ui/components/AppIcons.kt` 顶部注释并登记于 `app-authored-ui-icons`；若后续任何一枚改为直接内嵌上游路径数据，本条目对那一枚重新生效，须在本字段逐个列出内嵌的图标名与出处
 - 许可证: Apache License 2.0（Google 对 Material Symbols / Material 图标集的授权口径），允许商用、再分发与改作，条件是保留许可声明与 NOTICE；Google 另行说明该集合不含第三方品牌 logo（法务原因），故本项目不使用任何第三方标志
-- 用途: 为全站统一图标体系提供度量基准——替换现状的 emoji、字母缩写徽标（「AI」「♪」「⏰」）与各处自绘异形图标，使全站只有一族字形；因 `app/build.gradle.kts` 的 `dependencyLocking { lockAllConfigurations() }` 与「本轮不新增依赖」约束，不引入 `material-icons-extended`，改为把所需图标的 SVG path data 与圆形填充标记内嵌打包（`AppIcons.kt` 的 `AppIconSpec` 常量），由本项目的 `AppGlyph` 渲染器在设备内绘制；本条目只提供度量与风格基准——本项目只参考 Material Symbols 的 24dp 网格与 2px 视觉重量，未内嵌任何它的 path 数据，本 App 内全部字形为本项目自绘或本仓视觉稿转录（逐枚来历见 `app-authored-ui-icons` 与 `ui/components/AppIcons.kt`）
+- 用途: 为全站统一图标体系提供度量基准——替换现状的 emoji、字母缩写徽标（「AI」「♪」「⏰」）与各处自绘异形图标，使全站只有一族字形；因 `app/build.gradle.kts` 的 `dependencyLocking { lockAllConfigurations() }` 与「本轮不新增依赖」约束，不引入 `material-icons-extended`，改为把本项目**自绘**的 SVG path data 与圆形填充标记内嵌打包（`AppIcons.kt` 的 `AppIconSpec` 常量），由本项目的 `AppGlyph` 渲染器在设备内绘制。**本条目只提供度量与风格基准**：本项目只参考 Material Symbols 的 24dp 网格与 2px 视觉重量，未内嵌、也未派生任何它的 path data（度量与风格标准不受版权保护），本 App 内全部字形为本项目自绘或本仓视觉稿转录（逐枚来历见 `app-authored-ui-icons` 与 `ui/components/AppIcons.kt`）；「内嵌打包」一句的主语始终是本项目自绘的那 33 枚，不是上游图标集
 - 数据流: 本条目为设计基准参照，无文件随 APK 打包；渲染所用的路径数据全部由本项目自行绘制，仅在设备内绘制，不联网、不读取也不传输任何用户数据
 - NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账）、`ui/components/AppIcons.kt` 顶部注释、`docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`
 - 替代方案: 直接内嵌 Material Symbols 的 SVG 路径数据为 `ImageVector`（成本更低，但拿不到双色层次，视觉选型 A 案即此路径）；或引入 `androidx.compose.material.icons` 的 extended 工件（须先解除依赖锁定并另立决策记录）
@@ -764,6 +764,6 @@
 - 许可证: 无第三方许可依赖。每张插画的几何路径由本项目自行设计绘制，不复制、不派生自任何第三方图库、素材包、图标集或角色作品，因此不触发 CC BY-SA 4.0 或其他素材许可义务，也不产生署名义务；不使用 Material Symbols 作为插画载体，不模仿任何第三方品牌或吉祥物造型
 - 用途: 为空态与首启引导提供情绪锚（首启未选词书、收藏为空、生词本为空、错词本为空、阅读历史为空），语义由旁边文字与动作承担，图形本身为装饰性 `contentDescription = null`
 - 数据流: 仅以 Kotlin 路径数据随 APK 打包并在设备内绘制；不下载、不上传、不联网、不含任何位图素材文件，也不参与任何 AI 或网络请求
-- NOTICE 位置: 本文件、`docs/decisions/2026-10-17-ui-redesign-illustrations.md`、`docs/superpowers/specs/2026-10-17-ui-redesign-design.md` §4.5
+- NOTICE 位置: 本文件、`docs/decisions/2026-10-17-ui-redesign-illustrations.md`、`docs/superpowers/specs/2026-10-17-ui-redesign-design.md` §4.5。**当前状态 = 待建**：`app/src/main/java/com/example/englishlearning/ui/components/AppIllustrations.kt` 尚未落码（批 3 交付），所以「实现文件顶部注释」与「应用内开源许可页 `LicensesScreen` 的对应条目」这两处 NOTICE 落点现在还不存在——批 3 落码时必须一并补上，届时删除本段「待建」标注；在此之前不要把本条目当作已随 APK 分发的 NOTICE 证据
 - 替代方案: 空态一律纯文字加一个动作（零图形资产，但五个空态全无锚点）；或采用经逐张许可核验的第三方插画（须逐项确认归属与署名）
 - 商业分发结论: 可随应用分发，无许可或署名义务。硬上限 5 张，新增第 6 张须先改决策记录与本条目；本轮为静态矢量，不含动画
