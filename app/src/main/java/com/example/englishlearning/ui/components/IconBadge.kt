@@ -21,7 +21,9 @@ import com.example.englishlearning.ui.theme.appDomain
 import kotlin.math.roundToInt
 
 /**
- * B 案图标的两种呈现：≥40dp 入口容器（渐变底 + 两层字形）与 30dp 行内徽标（tint 底 + 单层描边字形）。
+ * B 案图标的两种呈现：`EntryIconBadge` 一族的域渐变入口容器（渐变底 + 两层字形，40dp 档）与 30dp
+ * 行内徽标（tint 底 + 单层描边字形）。这里的「入口容器」专指这一族，不含页头 `.back` 那种
+ * surface 底 + 1dp outlineSoft 的容器（几何见稿 `mockups.html:119-122`，由 Task 9 `AppScreenHeader` 承载）。
  *
  * 本文件的颜色数学与容器几何都是契约对象，不是随手写法：`IconBadgeContrastContractTest` 用测试端
  * 独立实现的 int 域混色复算同一端点，并把容器尺寸、裁角、描边与层开关按源码文本钉死。
@@ -62,13 +64,15 @@ private fun mixArgb(from: Int, to: Int, fraction: Double): Int {
 
 /**
  * 入口容器的准入门槛：两层豁免表（`StrokeOnlyIcons`，决策文档裁决 4）里的字形都是开放折线，
- * 没有可闭合的内部区域，塞进 ≥40dp 容器只会得到一枚「看起来缺了层」的字形，故只作行内/尾部指示。
+ * 没有可闭合的内部区域，塞进 `EntryIconBadge` 一族的域渐变入口容器只会得到一枚「看起来缺了层」的字形，
+ * 故只作行内/尾部指示；页头 `.back` 的 surface 容器不属这一族，不受本函数管辖。
  * 判定抽成纯函数是为了让这条规则能在 JVM 单测里双向复算（`EntryIconBadge` 用它做 `require`）。
  */
 fun allowsInEntryContainer(icon: AppIcon): Boolean = icon !in StrokeOnlyIcons
 
 /**
- * ≥40dp 入口容器：域渐变底（亮端 = deep 混 35% base，暗端 = deep）+ 两层字形 + 1dp 玻璃高光内描边。
+ * `EntryIconBadge` 一族的域渐变入口容器（40dp 档）：域渐变底（亮端 = deep 混 35% base，暗端 = deep）
+ * + 两层字形 + 1dp 玻璃高光内描边。
  *
  * 字形墨色分主题两套：浅套取白，深套取中性墨 `AppColorDark.onBrand`。这不是随手挑的——深套域色在
  * 深色下就是浅底（`DomainDark.deep` 与 base 合一），白描边压它不达非文本 3:1 线，故视觉稿在深色下
@@ -76,7 +80,9 @@ fun allowsInEntryContainer(icon: AppIcon): Boolean = icon !in StrokeOnlyIcons
  * 两条配对各由 `IconBadgeContrastContractTest` 当场按相对亮度复算并钉住 3:1。
  *
  * 开头那条 `require` 是豁免表的执行点：表里的开放折线（返回、箭头、关闭、勾选一类）没有可闭合的
- * 内部区域，放进 40dp 容器只会得到一枚「看起来缺了层」的字形，属于设计层面的误用，直接拦死。
+ * 内部区域，放进这一族容器只会得到一枚「看起来缺了层」的字形，属于设计层面的误用，直接拦死。
+ * 它管的只有本函数这一族：页头 `.back` 那种 surface 底 + 1dp outlineSoft 的容器不经过这条 `require`，
+ * 字形度量由 `AppScreenHeader` 自己按稿承载。
  */
 @Composable
 fun EntryIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier) {

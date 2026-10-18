@@ -61,7 +61,10 @@ package com.example.englishlearning.ui.components
  *
  * 两层豁免表（`StrokeOnlyIcons`，裁决 4）：`Back`、`ChevronRight`、`ChevronDown`、`Close`、`Check`
  * 是开放折线，没有可闭合的内部区域，强行加填充层等于把描边变实心（正是 B 案选型要避开的「两族字形」）；
- * 这五枚只作描边骨架，且不得进入 ≥40dp 入口容器，只作行内/尾部指示。
+ * 这五枚只作描边骨架，且不得进入 `EntryIconBadge` 一族的域渐变入口容器（页头 `.back` 的 surface
+ * 容器除外——它是稿 `mockups.html:119-122` 的另一种容器：surface 底 + 1dp outlineSoft + `text1` 描边字形，
+ * 不走 `EntryIconBadge` 开头的准入 `require`），只作行内/尾部指示。禁令的执行点就是那条 `require`；
+ * 别把这句读成「任何 ≥40dp 容器都不许豁免枚进」，那会把页头返回位「修」成运行时报错。
  */
 
 /**
