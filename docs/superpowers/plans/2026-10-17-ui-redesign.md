@@ -956,45 +956,151 @@ internal val MintBackground: Color
 **Files:**
 - Create: `app/src/main/java/com/example/englishlearning/ui/components/InlineNotice.kt`
 - Create: `app/src/main/java/com/example/englishlearning/ui/components/EntryRow.kt`
+- Modify: `app/src/main/java/com/example/englishlearning/ui/components/IconBadge.kt`（R-10.2 加 `EntryIconTone` + `tone` 形参；R-10.3 字形 24→22dp）
+- Modify: `app/src/test/java/com/example/englishlearning/ui/IconBadgeContrastContractTest.kt`（28 组合复算 + 锚点串 `size = 24.dp` → `22.dp`）
 - Test: `app/src/androidTest/java/com/example/englishlearning/ui/EntryRowTest.kt`
+- Test: `app/src/androidTest/java/com/example/englishlearning/ui/InlineNoticeTest.kt`
 - Test: `app/src/test/java/com/example/englishlearning/ui/InlineNoticeKindTest.kt`
+- Test: `app/src/test/java/com/example/englishlearning/ui/EntryRowInkTest.kt`
 
 **Interfaces:**
-- Consumes: `appColors()`、`appDomain(AppDomain)`、`IconBadge`（`EntryIconBadge`/`InlineIconBadge`）、`AppType.Body/Footnote`。
+- Consumes: `appColors()`、`appDomain(AppDomain)`、`IconBadge`（`EntryIconBadge`/`InlineIconBadge`）、`AppType.Body/Footnote`、`androidx.compose.ui.graphics.lerp`。
 - Produces:
   - `enum class InlineNoticeKind { Error, Info, Success }`
+  - `data class NoticeInk(val foreground: Color, val backdrop: Color, val border: Color, val action: Color)`（控制者派前把原 `Pair<Color, Color>` 扩成四字段：稿 `.banner` 每态钉的是**前景 + 底 + 描边 + 动作墨**四个值，Pair 钉不住后两个 → 纯表必须全覆盖才叫「纯表」）
+  - `fun noticeInk(kind: InlineNoticeKind, set: AppColorSet): NoticeInk`（纯函数，无 `@Composable`）
   - `@Composable fun InlineNotice(text: String, kind: InlineNoticeKind, modifier: Modifier = Modifier, action: @Composable (() -> Unit)? = null)`（`testTag("inline_notice_${kind.name.lowercase()}")`）
-  - `@Composable fun EntryRow(icon: AppIcon, domain: AppDomain, title: String, modifier: Modifier = Modifier, subtitle: String? = null, trailing: String? = null, showChevron: Boolean = true, onClick: () -> Unit)`（整行 ≥48dp、`role = Role.Button`、`testTag` 由调用方传入）
+  - `enum class EntryIconTone { Gradient, Tint }`（新增在 `IconBadge.kt`，见 R-10.2）
+  - `@Composable fun EntryIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier, tone: EntryIconTone = EntryIconTone.Gradient)`（既有签名**加默认值形参**，批 1 既有调用零改动）
+  - `data class EntryRowInk(val title: Color, val subtitle: Color, val trailing: Color, val chevron: Color, val divider: Color)` + `fun entryRowInks(set: AppColorSet): EntryRowInk`（纯表，见 R-10.4）
+  - `@Composable fun EntryRow(icon: AppIcon, domain: AppDomain, title: String, modifier: Modifier = Modifier, subtitle: String? = null, trailing: String? = null, showChevron: Boolean = true, topDivider: Boolean = false, iconTone: EntryIconTone = EntryIconTone.Gradient, onClick: () -> Unit)`（整行 ≥48dp、`role = Role.Button`、`testTag` 由调用方经 `modifier` 传入）
 
 - [ ] **Step 1: 写纯函数单测（失败）**
 
-  `InlineNoticeKindTest` 断言三态到 token 的映射是**纯表**（把映射抽成 `fun noticeColors(kind: InlineNoticeKind, set: AppColorSet): Pair<Color, Color>` 返回 (前景, 底)）：
+  `InlineNoticeKindTest` 断言三态到 token 的映射是**纯表**（`noticeInk(kind, set)`，两套主题各跑一遍；亮度函数在测试端独立实现，同 `SourceRatchet`/`IconBadgeContrastContractTest` 的先例，注释不抄比值以防漂移）。控制者已按下表**先算过一遍**（公式与 `SourceRatchet` 同式；底色里的 `mix` 是 CSS `color-mix(in srgb, X f%, surface)` 的 sRGB 逐通道插值，等价 `lerp(surface, X, f)`）：
+
+  | 态 | 前景 | 底 | 浅套比值 | 深套比值 |
+  |---|---|---|---|---|
+  | Info | `onMint` | `tint`（token 直取） | **8.61** | **12.89** |
+  | Error | `error` | `lerp(surface, errorFill, 0.12)` | **6.11** | **5.84** |
+  | Success | `success` | `lerp(surface, success, 0.12)` | **6.53** | **7.34** |
+
+  三条用例（每条都双向：既钉「等哪个 token」也钉「≥4.5」）：
   ```kotlin
-  @Test fun error_notice_uses_error_foreground_not_named_red() {
-      val (fg, bg) = noticeColors(InlineNoticeKind.Error, AppColorLight)
-      assertEquals(AppColorLight.error, fg)
-      assertTrue(fg != AppColorLight.errorFill)   // 前景是 error 文，不是 error-fill 填充
-      assertTrue(ratioOf(fg, bg) >= 4.5)          // 复用 Task 2 的亮度函数（测试侧独立实现）
+  @Test fun error_notice_foreground_is_the_error_text_token_not_the_error_fill() {
+      val ink = noticeInk(InlineNoticeKind.Error, AppColorLight)
+      assertEquals(AppColorLight.error, ink.foreground)
+      assertTrue(ink.foreground != AppColorLight.errorFill)   // 前景是 error 文，不是 error-fill 填充
+      assertEquals(lerp(AppColorLight.surface, AppColorLight.errorFill, 0.12f), ink.backdrop)
+      assertTrue(ratioOf(ink.foreground, ink.backdrop) >= 4.5)
   }
-  @Test fun success_and_info_foregrounds_clear_aa_on_their_backdrops() { /* 同形两条 */ }
+  @Test fun info_notice_pins_tint_backdrop_and_on_mint_foreground() { /* 同形，钉 tint + onMint，浅深两套都 ≥4.5 */ }
+  @Test fun success_notice_clears_aa_on_its_own_backdrop_in_both_sets() { /* 同形，两套主题各断一次 */ }
   ```
-  Expected: 编译失败。
+  **动作墨必须偏离稿值（R-10.1b，控制者实测后裁决）**：稿 `.banner .act { color: var(--d-ai) }`（浅套 = `#188F76`）压浅套 `tint` 只有 **3.55:1**，正文级文本不达 4.5，会被批 1 Task 1 的低对比禁令契约当场挡下；`noticeInk` 的 `action` 一律取 `set.text1`（压三态底最低：浅 **14.11**、深 **11.31**），稿的 700 字重靠 `FontWeight.Bold` 保「动作是一枚链接」的读感。深套 `.act` 实测 8.63 达标，但两套同值比「按主题分叉一个未裁决的强调色」便宜。
 
-- [ ] **Step 2: 实现 `InlineNotice.kt`**（含 `noticeColors` 纯表）与 `EntryRow.kt`。
-  `EntryRow` 布局：`Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button))` = `EntryIconBadge` + `Column(weight = 1f)`（title `AppType.Body` `text1`，subtitle `AppType.Footnote` `text2`）+ trailing（`text2`）+ `AppGlyph(ChevronRight, text3?, 16.dp)`。
-  **注意 Task 1 裁决 #1**：`text-3` 不作正文前景。chevron 是图形不是文字，按非文本 ≥3:1 判定；`text3` 压在 `tint` 上实测 3.00 恰好不过 3:1 的边界风险，因此 chevron 一律用 **`text2`**（tint 上 4.55）。把这条写成断言进 `EntryRowTest`：chevron 颜色 == `appColors().text2`。
+  **只有三态，不建 `Warning` 第四态（R-10.1c）**：稿另有 `.banner warn`（琥珀三角，`mockups.html:180-181`），但它的两处出现分别是组件样张本身（`:596`）与 AI 屏的「未配置」提示（`:1106`，归 Task 11 `NotConfiguredCard`），且 `AppIcons.kt:30` 已把 `Warning` 字形登记为 **`InlineNoticeKind.Error` 用图**——枚举加第四态会让图标登记与 `DesignTokenContractTest` 双双对不上（spec §2.1 的 token 表没有 warning 值，组件里私设琥珀色就是私设 token）。处置：三态 = `Info`/`Error`/`Success`，`Error` 取稿 `.err` 的红与 `Warning` 字形；若批 2 真出现「警示但不致命」的行，走 token 契约升级（spec §2.1 补值 + Task 2 契约同步），不在组件里凑色。`Success` 态稿面没有样张，依据是 spec §组件表把 `InlineNotice` 定义为「错误/**回执**行统一样式」+ `AppIcons.kt:5` 已登记 `Check` 为成功回显——墨色用既有 `success` token 按 `.warn` 同式（12% 混底 + 34% alpha 边），不是新造色。
 
-- [ ] **Step 3: 写 `EntryRowTest`（connected）**：整行可点、`Role.Button`、最小高度 ≥48dp、chevron 色取 `text2`、大字号下 subtitle 可省略（`maxLines = 1` 允许省略号——副标题是提示性内容，可裁）。
+  同一步再建 `EntryRowInkTest`（钉 R-10.4 的 `entryRowInks` 纯表，浅深两套各一遍）——connected 读不到颜色，这张表是入口行墨色的**唯一**证据面：
+  ```kotlin
+  @Test fun entry_row_inks_are_pinboard_slots_not_ad_hoc_colors() {
+      val inks = entryRowInks(AppColorLight)
+      assertEquals(AppColorLight.text1, inks.title)
+      assertEquals(AppColorLight.text2, inks.subtitle)
+      assertEquals(AppColorLight.text2, inks.trailing)
+      assertEquals(AppColorLight.outlineSoft, inks.divider)
+  }
+  @Test fun chevron_is_pinned_to_text2_and_explicitly_not_to_text3() {
+      // text3 压浅套 tint 恰 3.00:1，卡在非文本 3:1 线上；Task 1 裁决 #1 又禁 text-3 作前景
+      listOf(AppColorLight, AppColorDark).forEach { set ->
+          val inks = entryRowInks(set)
+          assertEquals(set.text2, inks.chevron)
+          assertTrue(inks.chevron != set.text3, "chevron 不得回到 text3：$inks")
+          assertTrue(ratioOf(inks.chevron, set.tint) >= 3.0, "chevron 压 tint 的非文本对比：${ratioOf(inks.chevron, set.tint)}")
+      }
+  }
+  ```
+  Expected: 编译失败（`InlineNoticeKind`/`noticeInk`/`EntryRowInk`/`entryRowInks` 不存在）——这就是 RED 证据，贴原始输出。
+
+- [ ] **Step 2: 实现 `InlineNotice.kt`**（含 `noticeInk` 纯表）与 `EntryRow.kt`。
+
+  几何一律以视觉稿为准（稿 §入口行 `mockups.html:150-160`、§Banner `:178-186`）。控制者派前对照稿子与既有契约下五裁决（R-10.1~R-10.5），稿子是权威、计划原表述与之冲突时按裁决改：
+
+  - **R-10.1 `InlineNotice` = 稿 `.banner` 家族**：`Row(fillMaxWidth().clip(MaterialTheme.shapes.medium).background(backdrop).border(1.dp, ink.border, MaterialTheme.shapes.medium).padding(horizontal = 14.dp, vertical = 12.dp), spacedBy(10.dp), verticalAlignment = Top)` + `AppGlyph(状态字形, ink.foreground, 18.dp)`（稿 `.banner svg` 是 18px；字形按 `AppIcons.kt` 逐枚清单已登记的落点取：**Info→`Info`、Error→`Warning`（`:30` 钉死）、Success→`Check`（`:5`）**。稿 `.err` 画的是「圆圈+叉」，本仓字形家族没有这枚（B 案 31 枚已定稿，扩一枚要重走图标决策 + 许可登记），按 `:30` 的登记用三角承载 Error，这是**已登记的偏离**、不是随手替换，KDoc 里写明；**层开关按豁免表走**：`Info`/`Warning` 是两层枚用默认 `Duotone`，`Check` 在 `StrokeOnlyIcons` 里、必须显式 `layer = AppGlyphLayer.StrokeOnly`；字形是装饰层，`contentDescription = null`，语义由文案承载）+ 文案 `AppType.Footnote`（稿 13px）+ `ink.foreground`（**不给 `maxLines`**：提示文案裁掉即丢信息，与入口行副标题不同口径）+ `action`。**动作不是按钮**：稿 `.act` 是无容器文本链接，`PillButton` 会把「一条提示」升级成「一个主操作」，故用 `Text` + `clickable` + `ink.action` + `FontWeight.Bold`（稿 700）+ `Modifier.testTag("inline_notice_action")`，触控面按 F5-03 硬下限给 **`Modifier.heightIn(min = 48.dp).padding(horizontal = 8.dp)`**（在 `clickable` 之前）。**注意别把 48dp 下限错派给整条提示**：无动作的 `.banner` 只有 `padding(vertical = 12)` + 13sp 行高 ≈ 42dp，它是**内容不是触控目标**，48dp 只约束动作节点——`EntryRow` 那种整行可点的才需要行级下限。**border 三态取稿**：Info `set.outline`、Error `set.errorFill.copy(alpha = 0.36f)`、Success `set.success.copy(alpha = 0.34f)`（稿 `color-mix(… 34%/36%, transparent)` 的等价写法就是 alpha）。
+  - **R-10.2 入口图标容器有两档强度，`EntryIconBadge` 加 `tone` 而不是再造组件**：稿 `.ic`（40dp，实底域渐变 + 白墨）与 `.ic-tint`（同 40dp 容器、底 = `color-mix(in srgb, deep 16%, surface)`、字形 = `deep` 单层描边）是**同族两档**，稿里 `.ic-tint` 出现 21 次，且批 2 Task 14「今日计划」的三条入口行**全部用弱档**（稿 `:912-916`）——不加 `tone` 就等于让 Task 14 手搓第二份容器，正撞 Task 12 份数棘轮。做法：`IconBadge.kt` 内新增 `enum class EntryIconTone { Gradient, Tint }`，`EntryIconBadge` 加 `tone: EntryIconTone = EntryIconTone.Gradient` 默认形参（既有调用零改动）；`Tint` 档 = `size(40.dp)` + `clip(AppShape.Icon)` + `background(lerp(colors.surface, palette.deep, 0.16f))` + `AppGlyph(icon, palette.deep, 22.dp, layer = StrokeOnly)`，**不描 1dp 玻璃高光边**（稿 `.ic-tint` 无描边；高光边属于 `.ic` 实底档）。准入 `require(allowsInEntryContainer(icon))` **两档都保留**（弱档同样不该承接开放折线豁免枚——豁免枚只在行内/尾部出现）。控制者已按 `SourceRatchet` 同式复算弱档「`deep` 字形压 16% 混色底」（底色 = `lerp(set.surface, palette.deep, 0.16f)`，浅套 `surface` 取 `FFFFFF`、深套取 `17201C`，**不是** `background`）的非文本 3:1：浅套最低 `AiSpeech` **3.30**、其余 4.11~7.04；深套最低 `Danger` **4.76**、其余 5.21~6.86 → **七域两套全部达标**，`IconBadgeContrastContractTest` 里要按这 28 个组合（7 域 × 2 档 × 2 主题）双向复算，比值写进断言消息、注释不抄数（抄了会随取值漂移）。两档字形调用段的**形状**契约重写见 R-10.3——同一文件、同一提交，别只改对比不改形状。
+  - **R-10.3 字形 24dp → 22dp，且 `IconBadgeContrastContractTest` 的入口形状段必须同提交重写**：稿 `.ic svg { width:22px; height:22px }`（`:153`），Task 7 出厂的 `EntryIconBadge` 画的是 24dp。批 1 里这是最后一处能顺手对齐的度量差，且 `EntryIconBadge` 目前**零生产消费方**（改它不会波及任何屏）。
+    现有契约（`IconBadgeContrastContractTest.kt:126-146`、`:673-700`）钉的是三件事：行内 17dp 调用**必须**显式 `layer = StrokeOnly`（`strokeOnlyGlyphCall`）；入口调用段靠 `entryGlyphCallSegment`（内含 `size = 24.dp`）找出**恰好 1 处**；该段内 `layer =` 出现 **0 次**（`explicitLayerArgument`），另有一条 `strokeOnlyOnEntryGlyph`（`size = 24.dp , layer = StrokeOnly`）禁止入口被降级成单层。R-10.2 落地后这三条里有一条**口径反了**：弱档合法地就是单层。因此本任务把这一段改成（逐条写进测试，含双向合成片段）：
+    ```kotlin
+    // 入口族字形统一 22dp（稿 .ic svg）；两档各一枚，共 2 处调用
+    private val entryGlyphCallSegment =
+        Regex("""AppGlyph\((?:[^()]|\([^()]*\))*?size\s*=\s*22\.dp(?:[^()]|\([^()]*\))*?\)""")
+    private val entryStrokeOnlyCall =
+        Regex("""size\s*=\s*22\.dp\s*,\s*layer\s*=\s*AppGlyphLayer\.StrokeOnly""")
+    ```
+    断言面：`entryGlyphCallSegments(badge).size == 2`（0/1/3 都判红：1 处 = 弱档没接上或两档坍缩成一档）；**两档各按其形状判**——恰一处含 `entryStrokeOnlyCall`（弱档单层），余下一处 `layer =` 出现 0 次（实底档靠默认两层）。`strokeOnlyOnEntryGlyph` 这条旧禁令连同 `24.dp` 锚点一并删除，别留死正则。合成片段同步：实底档 22dp 无 layer、弱档 22dp 带 StrokeOnly、行内 17dp 带 StrokeOnly（不得被认成入口段）、旧 24dp 串不得再被任何入口正则匹配。
+    **反向变异自证**（Task 9 C-1 学到的纪律：改锚点必须自证锚点还承重）：① 生产实底档字形改回 `24.dp` → 契约红；② 生产弱档删掉 `layer = StrokeOnly` → 契约红；③ 生产弱档补上渐变（多一处 `linearGradient`）→ `gradientFromRule` 的「恰好一处」红。三次变异各跑一次、贴输出、改回。
+    另注意：`rawBaseEndpoint` 与 `gradientFromRule` 两条正则在两档实现下仍然成立（弱档底色是 `lerp(colors.surface, palette.deep, 0.16f)`，不含裸 `.base`，也不新增渐变），不要顺手改它们。
+  - **R-10.4 入口行墨色走纯表 `entryRowInks(set)`**：`AppGlyph`/`Text` 的颜色不是语义节点能读的东西，connected 侧「断言 chevron 颜色 == `text2`」根本取不到色（Task 9 实测口径）。把墨色抽成纯函数在 JVM 侧钉，`EntryRow` 只读这张表：`title = text1`、`subtitle = text2`、`trailing = text2`、`chevron = text2`、`divider = outlineSoft`。**chevron 用 `text2` 不用 `text3`**（控制者复算：`text3` 压浅套 `tint` 恰 **3.00:1**、压白 3.40，`text2` 压 `tint` **4.55**、压白 5.15；非文本 3:1 线卡在边界上不可靠，Task 1 裁决 #1 也禁 `text-3` 作前景）。用例里同时钉「`chevron != set.text3`」，防止有人「按稿改回 text3」。
+  - **R-10.5 行间发丝线归组件、用 `topDivider: Boolean = false`**：稿 `.entry + .entry { border-top:1px outline-soft }` 是「除首行外每行一条顶线」。不新增 `EntryRowGroup`（撞份数棘轮），也不留给各屏手搓 `HorizontalDivider`（批 2 有 5 屏 × 3~8 行要抄 30 余次）；`topDivider == true` 时在内容行**外侧**画一条 1dp `entryRowInks(set).divider` 顶线（`drawBehind` 或外层 `Column` 皆可），**不得**把 56dp 最小内容高吃成 55/57。
+  `EntryRow` 布局：`Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 8.dp).clickable(role = Role.Button, onClick = onClick), spacedBy(12.dp), CenterVertically)` = `EntryIconBadge(icon, domain, tone = iconTone)` + `Column(weight = 1f)`（`title` 取 `AppType.Body` + `text1` + `maxLines = 1` + `Ellipsis`；`subtitle` 取 `AppType.Footnote` + `text2` + `padding(top = 1.dp)` + `maxLines = 1` + `Ellipsis`——入口行的标题/副标题都是提示性内容，与页标题不同档，允许省略号，稿 `.en`/`.ed` 各一行）+ `trailing`（`AppType.Footnote` + `text2`）+ `AppGlyph(AppIcon.ChevronRight, text2, 16.dp, layer = StrokeOnly)`（`showChevron` 为真时）。
+  排印按 token 近似的两处要写进 KDoc：稿 `.en` 是 15px/**600**，六档 `Body` 是 15sp/400；稿 `.ed` 是 12px/400，六档无 12sp Regular 档（同 Task 9 副标题，取 `Footnote` 13sp）。**不引新档、不 `copy(fontWeight = …)`**（spec §2.2 六档锁）。
+
+- [ ] **Step 3: 写 connected 用例（`EntryRowTest` + `InlineNoticeTest`）**
+
+  **口径先写清楚**：connected **读不到颜色**（Task 9 实测），所以墨色一律由 Step 1 的 JVM 纯表（`noticeInk` / `entryRowInks`）钉死，connected 只钉**几何、语义、可点数量、裁切**四件事。计划原来那句「connected 断言 chevron 颜色 == `text2`」是不可执行的，作废。
+  另一条 Task 9 学到的：`assertHeightIsAtLeast` / `getUnclippedBoundsInRoot` 走的是同一个 `withUnclippedBoundsInRoot` 口径（单口径，不是双口径），`assertIsDisplayed` 才是裁剪后口径；`performScrollTo()` 在组件级 `createComposeRule()` 下无可滚动祖先会抛，别写。
+
+  `EntryRowTest`（每条一个 `setContent`，同方法内不二次 `setContent`——真机必崩）：
+  1. `entry_row_is_one_click_target_whole_row_with_button_role`：`Modifier.testTag("entry_row")` + `assert(hasClickAction())` + `SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)` + `performClick()` 后 `clicked == true`；同时 `onAllNodes(hasClickAction()).fetchSemanticsNodes().size == 1`（徽标与 chevron 不得是第二可点源）。
+  2. `entry_row_clears_the_48dp_touch_floor`：`assertHeightIsAtLeast(48.dp)`。**故意钉 48 而不是 56**——48 是 F5-03 无障碍硬下限（回归会立刻响），56 是本组件的设计目标值，钉死 56 会让任何合法的字体缩放/内容增高变成假红。
+  3. `entry_row_keeps_a_40dp_icon_container_in_both_tones`：`iconTone = Gradient` 与 `Tint` 各一条 `EntryRow`（同一 `setContent` 内竖排两行），取徽标节点的 `getUnclippedBoundsInRoot`，断两档**宽高都 ≥40dp 且相等**（R-10.2 的「同族两档」= 同容器尺寸，只有底色/字形墨不同）。
+  4. `entry_row_truncates_title_and_subtitle_with_ellipsis_not_clipping`：`fontScale = 2f` 口径 + 超长标题/副标题，对两个文本节点各取 `TextLayoutResult`（`performSemanticsAction(SemanticsActions.GetTextLayoutResult)`，仓库先例 `WordBookWordsScreenTest.kt:179-186`），断 `lineCount == 1`。这里 **`hasVisualOverflow == true` 是期望结果**（省略号生效=提示性内容被裁，合规），与页头用例的判定方向相反，KDoc 必须写明这条相反口径，否则后人会当成同族断言改掉。
+  5. `entry_row_top_divider_is_outside_the_content_height`：两条 `EntryRow`（`topDivider` false / true），断两条 `getUnclippedBoundsInRoot` 高度差 ≥1dp（线画在外侧）且都 ≥48dp——钉 R-10.5 的「不得把 56dp 吃成 55」。
+
+  `InlineNoticeTest`：
+  1. `notice_without_action_has_no_click_target`：三态各一条 `InlineNotice`（无 `action`）竖排在**一个** `setContent` 里，`onAllNodes(hasClickAction()).fetchSemanticsNodes().size == 0`，三条 `testTag`（`inline_notice_error` / `_info` / `_success`）都 `assertExists`。
+  2. `notice_action_is_the_only_click_target_and_meets_the_48dp_floor`：带 `action` 的一条，`onNodeWithTag("inline_notice_action").performClick()` 触达一次，可点节点数 == 1，且该动作节点 `assertHeightIsAtLeast(48.dp)`（48dp 下限属于**动作**，不属于提示条本体）。
+  3. `notice_text_wraps_instead_of_clipping_at_font_scale_2`：长文案 + `fontScale = 2f`，`TextLayoutResult` 断 `!hasVisualOverflow`（提示文案不给省略号，被裁掉的是信息——与入口行副标题的判定方向相反）；**本用例不断高度**，无动作的提示条约 42dp 是合规的（它是内容不是触控目标），把它断成 ≥48dp 会钉出一条稿里没有、F5-03 也没要求的水线。
 
 - [ ] **Step 4: 跑测试通过 + 门控 + 提交**
+
+  JVM 门控（基线 **214 suites / 1599 tests / 0 失败 / 0 跳过**，本任务净增 JVM 用例：`InlineNoticeKindTest` 3 + `EntryRowInkTest` 2 + `IconBadgeContrastContractTest` 的 28 组合改写（净增 0 或按实际），只增不减；`rm -rf` 后按 XML 重数）：
+
+  ```bash
+  V=$(grep -oE 'gradle-[0-9]+\.[0-9]+' gradle/wrapper/gradle-wrapper.properties | head -1)
+  GRADLE=$(ls -1 "$HOME/.gradle/wrapper/dists/$V-bin/"*/"$V/bin/gradle.bat" | head -1)
+  rm -rf app/build/test-results/testDebugUnitTest
+  "$GRADLE" :app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin \
+    verifyThirdPartyNotices --offline --no-daemon --no-build-cache 2>&1 \
+    | grep -E 'FAILED|^e:|BUILD|tests completed' ; exit ${PIPESTATUS[0]}
+  ```
+
+  connected 只跑这两个类（`emulator-5574`，**绝不用 `connectedDebugAndroidTest`**，绝不在真机 `bf353dda` 上跑）：
+
+  ```bash
+  export ANDROID_SERIAL=emulator-5574
+  adb install -r app/build/outputs/apk/debug/app-debug.apk
+  adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+  adb shell am instrument -w \
+    -e class com.example.englishlearning.ui.EntryRowTest \
+    com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner
+  adb shell am instrument -w \
+    -e class com.example.englishlearning.ui.InlineNoticeTest \
+    com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner
+  ```
+  Expected: 两个类各自 `OK (n tests)`。**反向变异自证**（R-10.3 要求）：把 `EntryIconBadge` 的字形改回 `24.dp` → `IconBadgeContrastContractTest` 必须红；把 `entryRowInks` 的 `chevron` 改回 `text3` → `EntryRowInkTest` 必须红。两次变异各跑一次、贴输出、然后改回。
 
   ```bash
   git add app/src/main/java/com/example/englishlearning/ui/components/InlineNotice.kt \
           app/src/main/java/com/example/englishlearning/ui/components/EntryRow.kt \
+          app/src/main/java/com/example/englishlearning/ui/components/IconBadge.kt \
+          app/src/test/java/com/example/englishlearning/ui/IconBadgeContrastContractTest.kt \
           app/src/test/java/com/example/englishlearning/ui/InlineNoticeKindTest.kt \
-          app/src/androidTest/java/com/example/englishlearning/ui/EntryRowTest.kt
+          app/src/test/java/com/example/englishlearning/ui/EntryRowInkTest.kt \
+          app/src/androidTest/java/com/example/englishlearning/ui/EntryRowTest.kt \
+          app/src/androidTest/java/com/example/englishlearning/ui/InlineNoticeTest.kt
   git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit \
-    -m "feat(ui-components): 统一行内提示与彩色图标入口行，chevron 按非文本对比取 text2"
+    -m "feat(ui-components): 统一行内提示与彩色图标入口行，chevron 按非文本对比取 text2，入口徽标补弱档"
   ```
 
 ---
