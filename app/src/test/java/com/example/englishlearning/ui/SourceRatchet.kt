@@ -26,14 +26,40 @@ import kotlin.test.assertTrue
 
 internal const val UI_MAIN_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui"
 
-/** 裸 hex 棘轮的整目录豁免目标：令牌定义本体必须写 hex，故从债务扫描里划出去。 */
+/** `ui` 包所在的源码根：裸 hex 棘轮扫描 `ui/` 之外的全仓裸 hex 站点时用它作扫描根。 */
+internal const val APP_MAIN_SOURCE_PATH = "src/main/java/com/example/englishlearning"
+
+/** 裸 hex 棘轮的主题侧豁免目标目录名；令牌定义文件集中于此，豁免按文件名名单收窄（见裸 hex 棘轮）。 */
+internal const val THEME_DIR_NAME = "theme"
+
+/** `ui` 包目录名：`ui/` 之外的全仓裸 hex 扫描用它把整个 `ui` 子树排除出视野。 */
+internal const val UI_DIR_NAME = "ui"
+
+/** `ui/theme/` 目录：令牌定义文件所在地，裸 hex 豁免名单与深色政策豁免都按此根定位。 */
 internal const val UI_THEME_SOURCE_PATH = "$UI_MAIN_SOURCE_PATH/theme"
 
-/** 目录守卫：目录与 .kt 文件必须真实存在，否则契约测试静默空扫。 */
-internal fun uiFiles(dir: File = File(UI_MAIN_SOURCE_PATH)): List<File> {
+/**
+ * 主题目录排除的唯一入口（修复轮 1 的 N3：原先 `violations` 与调用方各写一份目录判定，批 2/批 3 改一处漏一处）。
+ * `ui/` 与 `ui/theme/` 的豁免都走这里，按“文件相对扫描根所经过的目录名链”匹配，不含文件名本身。
+ */
+internal fun File.dirChainFrom(root: File): List<String> =
+    relativeTo(root).invariantSeparatorsPath.split('/').dropLast(1)
+
+/** 文件是否位于某个指定目录名下（路径链上任一段匹配即算，与 [violations] 的目录豁免同口径）。 */
+internal fun File.isUnderDirNamed(root: File, dirName: String): Boolean = dirChainFrom(root).contains(dirName)
+
+/** 文件相对扫描根的不变路径（正斜杠）；债务台账的 key 用它，免疫不同目录下同名文件互相冒名顶替。 */
+internal fun File.relativePathFrom(root: File): String = relativeTo(root).invariantSeparatorsPath
+
+/**
+ * 目录守卫：目录与 .kt 文件必须真实存在，否则契约测试静默空扫。
+ * `expectedHint`（修复轮 1 的 N5）让同一个入口服务多个扫描根时，失败消息点名的是**本次真正要扫的根**
+ * 而不是写死的 `ui` 常量；缺省仍回落到 `ui`，保持既有调用点的文案不变。
+ */
+internal fun uiFiles(dir: File = File(UI_MAIN_SOURCE_PATH), expectedHint: String? = null): List<File> {
     assertTrue(
         dir.isDirectory,
-        "UI 源码契约扫描目录缺失（期望 $UI_MAIN_SOURCE_PATH）：${dir.path}，" +
+        "UI 源码契约扫描目录缺失（期望 ${expectedHint ?: UI_MAIN_SOURCE_PATH}）：${dir.path}，" +
             "相对 JVM 工作目录 ${File(".").absolutePath}；" +
             "walkTopDown() 对缺失路径返回空序列，会让契约测试无声通过——包名重构 / 工作目录变化必须先修此处路径。"
     )
@@ -98,8 +124,8 @@ internal fun violations(
     scanDir: File = File(UI_MAIN_SOURCE_PATH),
     exemptDirNames: Set<String> = emptySet(),
 ): List<String> {
-    val files = uiFiles(scanDir)
-    val exempt = files.filter { file -> exemptDirNames.any { name -> file.relativeDirNames(scanDir).contains(name) } }
+    val files = uiFiles(scanDir, expectedHint = "$label：${scanDir.path}")
+    val exempt = files.filter { file -> exemptDirNames.any { name -> file.isUnderDirNamed(scanDir, name) } }
     if (exemptDirNames.isNotEmpty()) {
         assertTrue(
             exempt.isNotEmpty(),
@@ -117,10 +143,6 @@ internal fun violations(
         .flatMap { file -> foldedHitLines(file.readText(), rule).map { hit -> "${file.name}: $hit" } }
         .filterNot { it in allowlist }
 }
-
-/** 文件相对扫描根所经过的目录名链（不含文件名本身）；豁免按目录名匹配，路径失效由调用方守卫。 */
-private fun File.relativeDirNames(root: File): List<String> =
-    relativeTo(root).invariantSeparatorsPath.split('/').dropLast(1)
 
 /** 命中所在行的「折叠空白」取样：先剥注释，再按命中位置回溯整行；跨行命中的多行文本一并折叠成一行。 */
 private fun foldedHitLines(text: String, rule: Regex): List<String> {

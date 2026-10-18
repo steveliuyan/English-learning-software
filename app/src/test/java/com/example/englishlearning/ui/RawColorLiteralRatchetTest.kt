@@ -7,26 +7,38 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * AC-R-02 裸 hex 棘轮（批 1 Task 8 Step 2）。
+ * AC-R-02 裸 hex 棘轮（批 1 Task 8 Step 2；修复轮 1 收 I1/I3/M-N2/M-N3/M-N5）。
  *
- * 管什么：`ui` 包（`ui/theme/` 整目录除外）里新增一处 `Color(0xAARRGGBB)` 裸字面量即当场红；
- * 存量站点由本文件的 seed 表逐文件登记，且两侧都不许偏——
+ * 管什么：`ui` 包里新增一处 `Color(0xAARRGGBB)` 裸字面量即当场红；存量站点由本文件的 seed 表逐文件登记，
+ * 且两侧都不许偏——
  *  ① 命中行不在 seed 行集里 → 新增即挡；
  *  ② 每文件实际命中数 != 该文件 seed 计数，两个方向都挡：既挡「seed 有而文件已消失/改名」，
  *    也挡「实际减了而 seed 没跟着减」。
  * 所以 token 化掉一处裸 hex 时必须同步把本文件的 seed 减 1：seed 是债务台账，不是永久豁免。
  *
- * 不管什么：本棘轮不宣称「全站零裸 hex」。AC-R-02 的那个「零」由批 3 收口时把 seed 表清空来兑现，
- * 批 1 只负责把债务冻住，并让它在批 2/批 3 的每屏迁移里单调递减。
+ * 还管 `ui/` 之外：`ui/` 是全仓唯一成片的裸 hex 聚集地，但它不是「唯一一处」。`launch/BrandLaunchActivity.kt`
+ * 的三段品牌渐变是 `ui/` 之外全仓仅存的裸 hex，Task 4 已把它路由给本棘轮的台账/收口清理；故本文件另起一条
+ * 同规则、扫描根换成 `src/main/java`（排除整个 `ui` 子树）的用例把它冻进 seed，免得它在 Task 26 收口时隐身。
+ *
+ * 不管什么：本棘轮不宣称「全站零裸 hex」。AC-R-02 的那个「零」由批 3 收口时把 seed 表清零、或只剩经计划
+ * 修订确认的不可迁移站点（逐条写明理由）来兑现；批 1 只负责把债务冻住，并让它在批 2/批 3 的每屏迁移里单调递减。
+ *
+ * 主题侧豁免口径（修复轮 1 的 I1，替代旧版「整目录豁免 `ui/theme/`」）：
+ *  - 旧版把 `ui/theme/` 整个目录划出视野，可洗债：往 `ui/theme/AppShape.kt` 这种「非定义文件」加一枚裸 hex，
+ *    目录豁免让它对 `violations` 隐形，seed 又只覆盖 `ui` 非主题文件 → 16 条全绿，AC-R-02 出现可绕过缺口。
+ *  - 现口径：豁免只对**实测含 hex 的三个定义文件**成立（`theme/AppPalette.kt`、`theme/AppColors.kt`、
+ *    `theme/MintPalette.kt`，理由见 [RawHexThemeDefinitionFiles]）；其余 `ui/theme/` 文件一律恢复纳管，
+ *    由 `non definition ui theme files hold no raw hex` 断言 0 命中（探针即在此变红）、
+ *    由 `theme exemption is exactly the load bearing definition list` 双向钉住「名单 = 实际含 hex 的主题文件」
+ *    （名单里某个文件跌到 0 命中 → 它已不再是定义文件 → 红，防名单固化，与深色棘轮裁决 2 同口径）。
+ *  - 共享夹具 `violations` 的 `exemptDirNames` 仍按目录名工作（其签名语义本轮不改，见 M-N6）；主题侧的「收窄到定义
+ *    文件名单」落在上面两条专属用例里，offenders 取数仍走目录豁免，二者互补而非重复。
  *
  * 口径（与共享夹具 `SourceRatchet` 一致）：
  *  - 先剥注释再匹配；offender 形如「文件名: 折叠空白的源码行」，不报行号（块注释剥离会把其后行
  *    折叠进同一行文本，此时行号已不可信）。
  *  - offender 取样不做 distinct：同一物理行含两处命中时，distinct 会把两次命中显示成一条、掩盖真实
  *    计数；「数量精确」由按文件计数用例保证，违规集只负责点名。
- *  - `ui/theme/` 豁免的是令牌定义本体（AppPalette / AppColors / MintPalette 必须写 hex）。豁免是否
- *    名副其实由 `violations` 的目录守卫与本文件的「豁免确实在承担命中」用例一起兜底：豁免名覆盖不到
- *    任何文件、或主题目录一处 hex 都没有时当场判红，防止路径失效后棘轮静默换扫法。
  *  - 规则形状逐字取自计划 Task 8 Step 2，只认 8 位 hex。6 位缩写、`Color.argb(...)`、命名常量异名
  *    同色都不在本棘轮视野内（那是禁令族与亮度复算契约的事）；放宽正则会把存量债务一次性炸出来，
  *    批 1 不做。同理，合成用例的样例值必须写满 8 位（`0xFF112233`），写成 10 位的 `Color(0xFF11223344)`
@@ -35,7 +47,7 @@ import kotlin.test.assertTrue
 
 /**
  * 债务台账：`ui` 包内（`ui/theme/` 除外）裸 hex 的按文件计数，key 为相对 `ui` 根的路径。
- * 批 2/批 3 每屏迁移的收口证据就是这张表对应行减到 0；批 3 收口时整表清空。
+ * 批 2/批 3 每屏迁移的收口证据就是这张表对应行减到 0；批 3 收口时清零，或只剩经计划修订确认的不可迁移站点。
  */
 internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
     "AppScreen.kt" to 4,
@@ -68,27 +80,66 @@ internal val RawColorSeedSiteLines: List<String> = listOf(
     "AiMascot.kt: private val EyeColor: Color = Color(0xFF188F76)",
 )
 
+/**
+ * 裸 hex 的主题侧豁免名单（修复轮 1 的 I1）：只有这三枚「令牌定义本体」被允许携带裸 hex，因为它们就是
+ * 设计令牌取值的书写地（key 为相对 `ui` 根的路径，M-N2：与其余台账同一口径，按精确相等而非后缀匹配）。
+ * 其余 `ui/theme/` 文件不在本名单，恢复纳管——它们若长出裸 hex，由 `non definition ui theme files hold no raw hex`
+ * 当场判红，堵住旧版「整目录豁免」可把债务洗进 `ui/theme/` 非定义文件的路径。
+ */
+internal val RawHexThemeDefinitionFiles: Map<String, String> = mapOf(
+    "theme/AppPalette.kt" to "浅套静态源与 DomainColors 定义本体：色值在这里写死，是 hex 的书写地",
+    "theme/AppColors.kt" to "深浅两套 AppColorSet / DomainPalette 装配源：逐枚令牌以裸 hex 定义",
+    "theme/MintPalette.kt" to "薄荷令牌静态源（AppleMint* 品牌渐变等）：品牌色在此以裸 hex 定稿",
+)
+
+/**
+ * `ui/` 之外的全仓裸 hex 台账（修复轮 1 的 I3，承接 Task 4 交回 Task 8 的清算项）。
+ * `launch/BrandLaunchActivity.kt` 是 `ui/` 之外唯一携带裸 hex 的文件：三段品牌渐变三端
+ * （`AppleMintStart/Middle/End` 的逐字副本）。AppleMint* 保持静态是 Task 3 已验收的「品牌渐变模式不变」口径，
+ * 本条只负责「别让它成为唯一没人管的裸 hex、并长出第二份副本」；具体迁法（改引 AppleMint* 还是 token 化）
+ * 由批 3 的 Task 26 收口时定。三枚色值同在一条物理行上，故折叠后只有一条站点行，计数（3）以按文件计数为准。
+ */
+internal val BrandLaunchSeedAllowlist: Map<String, Int> = mapOf(
+    "BrandLaunchActivity.kt" to 3,
+)
+
+/** 与 [BrandLaunchSeedAllowlist] 同形状的「文件名: 折叠源码行」行集，喂 `violations` 作 `ui/` 外扫描的行级 allowlist。 */
+internal val BrandLaunchSeedSiteLines: List<String> = listOf(
+    "BrandLaunchActivity.kt: listOf(Color(0xFFA8F3C8), Color(0xFF5DDFB4), Color(0xFF35B9B5)),",
+)
+
 class RawColorLiteralRatchetTest {
     private val uiDir = File(UI_MAIN_SOURCE_PATH)
+    private val appDir = File(APP_MAIN_SOURCE_PATH)
+    private val themeDir = File(UI_THEME_SOURCE_PATH)
 
     /** 计划 Task 8 Step 2 原文规则，逐字照用。 */
     private val rule = Regex("""Color\(\s*0x[0-9A-Fa-f]{8}\s*\)""")
 
-    private fun File.relativeUiPath(): String = relativeTo(uiDir).invariantSeparatorsPath
+    private fun File.relativeUiPath(): String = relativePathFrom(uiDir)
 
     /** 「文件名: 行」形状要成立，文件名必须在扫描集内唯一，否则两个同名文件的站点会互相冒名顶替。 */
     private fun filesByName(): Map<String, File> = uiFiles(uiDir).associateBy { it.name }
 
-    private fun File.isInThemeDir(): Boolean =
-        relativeUiPath().split('/').dropLast(1).contains(THEME_EXEMPT_DIR_NAME)
+    /** 主题侧排除走共享夹具入口（M-N3：不再在本文件另写一份目录判定，与 `violations` 同口径）。 */
+    private fun File.isInThemeDir(): Boolean = isUnderDirNamed(uiDir, THEME_DIR_NAME)
 
     private fun offenders(): List<String> =
-        violations("裸 hex", rule, RawColorSeedSiteLines.toSet(), uiDir, exemptDirNames = setOf(THEME_EXEMPT_DIR_NAME))
+        violations("裸 hex", rule, RawColorSeedSiteLines.toSet(), uiDir, exemptDirNames = setOf(THEME_DIR_NAME))
 
     private fun actualCounts(): Map<String, Int> = uiFiles(uiDir)
         .filterNot { it.isInThemeDir() }
         .associate { it.relativeUiPath() to countMatches(it.readText(), rule) }
         .filterValues { it > 0 }
+
+    /** `ui/` 之外的全仓裸 hex 按文件计数（offender 用裸文件名，与 [BrandLaunchSeedAllowlist] key 同形）。 */
+    private fun nonUiActualCounts(): Map<String, Int> = uiFiles(appDir, expectedHint = "ui 外裸 hex：${appDir.path}")
+        .filterNot { it.isUnderDirNamed(appDir, UI_DIR_NAME) }
+        .associate { it.name to countMatches(it.readText(), rule) }
+        .filterValues { it > 0 }
+
+    private fun nonUiOffenders(): List<String> =
+        violations("ui 外裸 hex", rule, BrandLaunchSeedSiteLines.toSet(), appDir, exemptDirNames = setOf(UI_DIR_NAME))
 
     private fun tempSources(vararg sources: Pair<String, String>): File {
         val dir = java.nio.file.Files.createTempDirectory("raw-color-ratchet").toFile()
@@ -114,7 +165,8 @@ class RawColorLiteralRatchetTest {
         )
         assertTrue(
             files.any { it.isInThemeDir() },
-            "裸 hex 棘轮的整目录豁免在扫描集里一个文件都没覆盖到，豁免名疑似失效：$UI_THEME_SOURCE_PATH"
+            "裸 hex 的 violations 目录豁免（用于把令牌定义文件排除出行级扫描）在扫描集里一个文件都没覆盖到，" +
+                "豁免名疑似失效：$UI_THEME_SOURCE_PATH"
         )
     }
 
@@ -181,14 +233,75 @@ class RawColorLiteralRatchetTest {
     }
 
     @Test
-    fun `theme exemption is load bearing not a blanket blind spot`() {
-        val themeFiles = uiFiles(File(UI_THEME_SOURCE_PATH))
-        val themeHexHits = themeFiles.sumOf { countMatches(it.readText(), rule) }
+    fun `theme exemption is exactly the load bearing definition list`() {
+        // I1 的「防名单固化」与「豁免 = 实际含 hex 的主题文件」双向钉死：
+        //  ① 名单里某个定义文件跌到 0 命中（它已不再写 hex）→ 红，免得名单悄悄变成无人核验的盲区；
+        //  ② 名单外某个 theme 文件长出裸 hex → 红，这正是旧版整目录豁免洗债的路径。
+        val hexBearingThemeFiles = uiFiles(themeDir)
+            .associate { it.relativeUiPath() to countMatches(it.readText(), rule) }
+            .filterValues { it > 0 }
+            .keys
+        val staleEntries = RawHexThemeDefinitionFiles.keys.filterNot { it in hexBearingThemeFiles }
         assertTrue(
-            themeHexHits > 0,
-            "ui/theme 豁免的理由是「令牌定义本体必须写 hex」，但该目录一处 hex 都没有：$UI_THEME_SOURCE_PATH" +
-                "（${themeFiles.size} 个 .kt）——要么定义已换写法、要么豁免路径已失效，都必须当场处理，" +
-                "不能让棘轮靠一条空豁免继续跑"
+            staleEntries.isEmpty(),
+            "裸 hex 豁免名单里的定义文件已不再含裸 hex（已换写法或已迁走）：$staleEntries —— " +
+                "它不再需要豁免，必须从名单删掉，否则豁免区里多一个没人看的文件"
+        )
+        val unlisted = hexBearingThemeFiles.filterNot { it in RawHexThemeDefinitionFiles.keys }
+        assertTrue(
+            unlisted.isEmpty(),
+            "ui/theme 里出现了名单之外的含裸 hex 文件：$unlisted —— 令牌定义之外的主题文件不该写裸 hex，" +
+                "要么把它迁成 token 并登记进债务 seed，要么先修订计划再把它加进定义文件名单"
+        )
+    }
+
+    @Test
+    fun `non definition ui theme files hold no raw hex`() {
+        // I1 的探针落点：往 ui/theme/AppShape.kt（非定义文件）加一枚裸 hex，本用例必须当场判红。
+        val offenders = uiFiles(themeDir)
+            .filterNot { it.relativeUiPath() in RawHexThemeDefinitionFiles.keys }
+            .map { it.relativeUiPath() to countMatches(it.readText(), rule) }
+            .filter { (_, count) -> count > 0 }
+        assertTrue(
+            offenders.isEmpty(),
+            "ui/theme 的非定义文件里出现裸 hex $offenders —— AC-R-02 不接受把债务洗进主题目录的豁免区：" +
+                "这些文件不写令牌定义，应改用 token；若确有主题定义需要落在此处，先修订计划再补进定义文件名单"
+        )
+    }
+
+    @Test
+    fun `raw hex outside ui is exactly the registered launch ledger`() {
+        // I3：ui 之外全仓仅 launch/BrandLaunchActivity.kt 一段品牌渐变（3 枚同处一物理行）。
+        val offenders = nonUiOffenders()
+        assertTrue(
+            offenders.isEmpty(),
+            "ui 之外新增了未登记的裸 hex：\n${offenders.joinToString("\n")} —— " +
+                "全仓裸 hex 只允许 launch 的三段品牌渐变（与 AppleMint* 重复，Task 4 路由给本棘轮），" +
+                "新增副本会先撞这里；迁法由批 3 的 Task 26 收口时定"
+        )
+        val actual = nonUiActualCounts()
+        val staleSeed = BrandLaunchSeedAllowlist.filterKeys { it !in actual }
+        assertTrue(
+            staleSeed.isEmpty(),
+            "ui 外裸 hex 台账登记的文件已无命中（已迁走/改名）：$staleSeed —— 同步把本行 seed 删掉"
+        )
+        val unseeded = actual.filterKeys { it !in BrandLaunchSeedAllowlist }
+        assertTrue(
+            unseeded.isEmpty(),
+            "ui 之外出现了台账未覆盖的裸 hex 文件：$unseeded —— 应登记进 BrandLaunchSeedAllowlist 或迁成 token"
+        )
+        val drifted = actual.filter { (name, count) -> BrandLaunchSeedAllowlist[name] != count }
+        assertTrue(
+            drifted.isEmpty(),
+            "ui 外裸 hex 计数与台账不符（增即挡，减了不同步改也挡）：\n" +
+                drifted.entries.joinToString("\n") { (name, count) ->
+                    "$name 实际 $count 处，seed ${BrandLaunchSeedAllowlist[name]} 处"
+                }
+        )
+        // 复用 I1 补好的目录守卫：ui 之外的扫描根必须解析得到文件，禁止静默空扫（launch 段消失即在此暴露）。
+        assertTrue(
+            uiFiles(appDir, expectedHint = "ui 外裸 hex：${appDir.path}").isNotEmpty(),
+            "ui 之外的扫描根解析不到任何 .kt：${appDir.path} —— 包名重构 / 工作目录变化必须先修扫描路径"
         )
     }
 
@@ -244,7 +357,7 @@ class RawColorLiteralRatchetTest {
             "theme/Defs.kt" to "private val b = Color(0xFF999999)\n",
         )
         try {
-            val offenders = violations("合成裸 hex", rule, emptySet(), dir, exemptDirNames = setOf(THEME_EXEMPT_DIR_NAME))
+            val offenders = violations("合成裸 hex", rule, emptySet(), dir, exemptDirNames = setOf(THEME_DIR_NAME))
             assertEquals(listOf("Plain.kt: private val a = Color(0xFF112233)"), offenders, "整目录豁免只吃掉 theme 下的站点")
             val deadExemption = assertFailsWith<AssertionError> {
                 violations("合成裸 hex", rule, emptySet(), dir, exemptDirNames = setOf("no_such_dir"))
@@ -267,13 +380,14 @@ class RawColorLiteralRatchetTest {
         )
         val error = assertFailsWith<AssertionError> { violations("裸 hex", rule, emptySet(), missing) }
         assertTrue(
-            error.message?.contains(UI_MAIN_SOURCE_PATH) == true,
-            "守卫失败信息必须点名期望路径与当前 JVM 工作目录，实际：${error.message}"
+            error.message?.contains("__not_a_real_package__") == true &&
+                error.message?.contains(File(".").absolutePath) == true,
+            "守卫失败信息必须点名本次真正请求的扫描路径与当前 JVM 工作目录（M-N5 参数化后不再写死 ui 常量），" +
+                "实际：${error.message}"
         )
     }
 
     private companion object {
-        const val THEME_EXEMPT_DIR_NAME = "theme"
         const val SEED_LINE_SEPARATOR = ": "
     }
 }
