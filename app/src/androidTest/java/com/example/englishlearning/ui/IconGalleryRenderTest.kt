@@ -2,6 +2,7 @@ package com.example.englishlearning.ui
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -170,10 +171,19 @@ class IconGalleryRenderTest {
         return save(fileName, mode, checkNotNull(latest) { "waitUntil 没有产生任何取样：$fileName" })
     }
 
+    /**
+     * 宿主必须自己铺主题底色：`captureToImage()` 只截该节点**自身图层**，不合成它身后的窗口，
+     * 不铺底时深色轮的 PNG 会落成「浅底 + 淡墨」，人眼无法据此核验深色可读性（目视清单的证据就废了），
+     * 而 `inkRatio` 的底色取样也只剩采样器自己造出来的白。铺了 `appColors().background` 之后，
+     * 左上角取样仍是页底（8dp padding 落在底上），两条断言口径不变，深色轮才真的能看。
+     */
     @Composable
     private fun Gallery(icons: List<AppIcon>, glyph: @Composable (Cell) -> Unit) {
         Column(
-            modifier = Modifier.testTag(GALLERY_TAG).padding(8.dp),
+            modifier = Modifier
+                .testTag(GALLERY_TAG)
+                .background(appColors().background)
+                .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             icons.withIndex().map { Cell(it.index, it.value) }.chunked(PER_ROW).forEach { row ->
