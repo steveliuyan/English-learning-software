@@ -27,6 +27,16 @@ import kotlin.test.assertTrue
  * （precheck §3：`grep -rl 'AppScreenHeader('` 只命中组件自身），所以四族的 seed 都是**实测存量**，
  * 清零归批 2/批 3 逐屏接线，最终收口判据见计划批 3。
  *
+ * 第三条「不管什么」（**批 1 终审 F7 / D-I-1 登记**）：族 1/2/4 的判定面各带一个**合规出口** ——
+ * 「本文件调了共享组件即整体合规」。裁决保留出口（它撑住「已接线但私有形态未删净」的中间态与
+ * R-12.3 ⑤ 的取值面豁免），但必须写明它的后果：**接线之后，同一屏残留的私有 forbidden 形态对本棘轮
+ * 整体隐形**，即「补一行 `AppScreenHeader(` 就能让该屏从债务视野里消失」。批 1 时点全仓没有任何业务屏
+ * 调用那三枚共享组件，所以这是「批 2 一接线即激活」的潜在失明面，不是现行缺陷。
+ * 出口语义由 [family compliance exits are a declared known blindness surface] 双向钉住；
+ * **批 2 的接线判据因此是「该屏 forbidden 读点清零」，不是「出现共享调用即准删 seed 行」**。
+ * 收紧路径（本轮不做，属计划修订事项）：把 seed 从「文件级 0/1」改成「每屏读点计数」，
+ * 并同步四族台账与 `each_family_offender_set_equals_its_seed_exactly` 的差集口径。
+ *
  * 三条实现口径（前几棒踩过的坑）：
  *  - **先剥注释再匹配**：`components/InlineNotice.kt` 的 KDoc 里逐字复述了本棘轮那条 grep 命令
  *    （含 `AppPalette.ErrorText\|colorScheme.error`），`AppScreen.kt` 也有一行注释提到 `colorScheme.error`；
@@ -135,7 +145,7 @@ class SharedComponentUniquenessRatchetTest {
      * 判据用例 `each_family_offender_set_equals_its_seed_exactly` 红的时候会把**实际集合**与 seed 的差集
      * （`added` / `cleared`）逐枚点名，照它同步 seed 即可；
      * `wc -l` 式的粗算也可以用，但口径必须与本文件 [offendersOf] 一致（先 [stripComments] 再判形状，
-     * 「本文件调了共享组件即整体合规」的出口在下面 F7 条目里钉着，粗算时容易把它漏掉而多计）。
+     * 「本文件调了共享组件即整体合规」的出口钉在 [family compliance exits are a declared known blindness surface] 里，粗算时容易把它漏掉而多计）。
      *
      * 取值为控制者本席 grep 实测 + 本文件同口径复算（`task-12-precheck.md` §2/§3/§4/§6、计划 R-12.3）：
      *  - 页头族：R-12.3 ② 明写「批 1 断不出 14 → 0」，本族只钉实测存量、只减不增，清零归批 3；
@@ -464,17 +474,9 @@ class SharedComponentUniquenessRatchetTest {
         // 族 4 要的是顶层私有 `*Row*` 函数体窗口，故追加片段的右花括号必须写在第 0 列（本仓顶层函数的既有形状），
         // 否则不落 `rowFunctionBodies` 的窗口 —— 那是窗口规则的前提，不是本次要改的判定面。
         assertTrue(isWordRowOffender(bare + "\n\n@Composable\nprivate fun SyntheticWordRow(lemma: String, gloss: String) {\n    Text(lemma)\n    Text(gloss)\n}"), "追加私有词行后族 4 未判违规：规则空转")
-        // 族 1/族 2 的「调了共享组件即合规」这一半也要能判红，否则规则退化成「只要出现 headline 就违规」。
-        assertEquals(
-            false,
-            isHeaderOffender("@Composable\nprivate fun H() {\n    AppScreenHeader(title = \"t\")\n    Text(\"t\", style = MaterialTheme.typography.headlineMedium)\n}"),
-            "调了 AppScreenHeader 仍被判私有页头：族 1 的合规出口失效"
-        )
-        assertEquals(
-            false,
-            isNoticeOffender("@Composable\nprivate fun N() {\n    InlineNotice(kind = InlineNoticeKind.Error, message = \"boom\")\n    Text(\"x\", color = MaterialTheme.colorScheme.error)\n}"),
-            "调了 InlineNotice 仍被判私有提示条：族 2 的合规出口失效"
-        )
+        // 族 1/族 2/族 4 的「调了共享组件即合规」出口不在这里复述：
+        // 那半边由 [family compliance exits are a declared known blindness surface] 单独承重
+        // （批 1 终审 F7：出口必须配失明面声明，不能只留一条行为断言）。
         // 族 4 的窗口化自证：文件级提到 lemma、但私有 Row 体内没有词头行的两枚真实误伤源不得判违规。
         assertEquals(
             false,
@@ -503,6 +505,120 @@ class SharedComponentUniquenessRatchetTest {
                 """.trimIndent()
             ),
             "族 4 误伤：体内没有 lemma 词头行的私有 Row（AppScreen.DetailToggleRow 形状）被判违规——窗口化失效"
+        )
+    }
+
+    /**
+     * **F7（批 1 终审 D-I-1）：把「本文件调了共享组件即整体合规」的出口钉成显式契约。**
+     *
+     * 出口的形状是裁决**保留**的（族 1 [isHeaderOffender] 的 `&& !source.contains("AppScreenHeader(")`、
+     * 族 2 [isNoticeOffender] 的 `InlineNotice(` 同形、族 4 [isWordRowOffender] 命中 `sharedWordRowCall`
+     * 即 `return false`）：它让「屏已接线、私有形态还没删干净」的中间态不被判成新增债务，
+     * 也让 R-12.3 ⑤ 的「就地改既有组件取值面」豁免有处可落。族 3（未配置卡）只看
+     * 「出现 `private fun NotConfiguredCard(` 即违规」，**没有出口**，所以不在本条覆盖范围内。
+     *
+     * 代价必须写死，这是本条存在的全部理由：**出口同时是一只已知失明面**。同一文件只要留着那枚共享调用，
+     * 该文件其余的 forbidden 读点对本棘轮整体不可见。批 1 时点全仓业务屏没有任何一枚共享调用
+     * （precheck §3：`grep -rl 'AppScreenHeader('` 只命中组件自身），所以失明面今天不产生实际漏计，
+     * **批 2 一接线即激活**。因此接线判据是「该屏 forbidden 读点清零」，**不是**
+     * 「补一行 `AppScreenHeader(` 就准删 seed 行」（已同步写进计划批 2 的开工判据）。
+     * 收紧路径 = 把 seed 形状从「文件级 0/1」改成「读点计数」并同步四族台账，属计划修订事项，本轮不做。
+     *
+     * 断言的写法本身要防「恒真」：正反向只在**那枚共享调用是否存在**上不同，forbidden 读点两侧逐字相同，
+     * 所以先用 `countMatches` 钉住「片段里确有 forbidden 读点且两侧等量」，再判合规翻转 ——
+     * 判红只可能来自出口那一半被删/规则变严，或 forbidden 探针形状失控。
+     */
+    @Test
+    fun family_compliance_exits_are_a_declared_known_blindness_surface() {
+        val dropCall = { source: String, call: String ->
+            source.lines().filterNot { it.contains(call) }.joinToString("\n")
+        }
+        val blindness = "已知失明面：留着该枚共享调用时，同文件的 forbidden 读点对本棘轮整体不可见。" +
+            "批 2 接线判据是「该屏 forbidden 读点清零」，不是「补一行调用就准删 seed 行」。" +
+            "若这条判红，说明出口被删或规则变严 —— 那要同步重算四族 seed，属计划修订事项。"
+
+        // ---- 族 1 页头：AppScreenHeader( 出口 ----
+        val headerWired = """
+            @Composable
+            private fun SyntheticWiredHeaderScreen() {
+                AppScreenHeader(title = "今日计划")
+                Text("今日计划", style = MaterialTheme.typography.headlineMedium)
+            }
+        """.trimIndent()
+        val headerBare = dropCall(headerWired, "AppScreenHeader(")
+        assertEquals(1, countMatches(headerWired, headlineRead), "合成片段自检：页头 forbidden 读点没写进去，本条空转")
+        assertEquals(1, countMatches(headerBare, headlineRead), "反向片段自检：摘调用把读点也摘掉了，两侧不再等量")
+        assertEquals(
+            false,
+            isHeaderOffender(headerWired),
+            "族 1 的合规出口失效（接线屏被判违规）。$blindness"
+        )
+        assertTrue(
+            isHeaderOffender(headerBare),
+            "摘掉 AppScreenHeader( 后族 1 仍未判违规：出口那一半是恒真断言，本条失去意义"
+        )
+
+        // ---- 族 2 错误提示条：InlineNotice( 出口 ----
+        val noticeWired = """
+            @Composable
+            private fun SyntheticWiredNoticeScreen() {
+                InlineNotice(kind = InlineNoticeKind.Error, message = "同步失败")
+                Text("同步失败", color = MaterialTheme.colorScheme.error)
+            }
+        """.trimIndent()
+        val noticeBare = dropCall(noticeWired, "InlineNotice(")
+        assertEquals(1, countMatches(noticeWired, errorInkRead), "合成片段自检：错误色读点没写进去，本条空转")
+        assertEquals(1, countMatches(noticeBare, errorInkRead), "反向片段自检：摘调用把读点也摘掉了，两侧不再等量")
+        assertEquals(
+            false,
+            isNoticeOffender(noticeWired),
+            "族 2 的合规出口失效（接线屏被判违规）。$blindness"
+        )
+        assertTrue(
+            isNoticeOffender(noticeBare),
+            "摘掉 InlineNotice( 后族 2 仍未判违规：出口那一半是恒真断言，本条失去意义"
+        )
+
+        // ---- 族 4 词行：WordRow( 出口（窗口规则同样被出口整体豁免，接线屏残留私有词行即逃逸）----
+        // 合成函数名刻意**不含** `WordRow(` 子串（`SyntheticWiredWordRow` 会让摘调用顺手摘掉声明行），
+        // 但必须仍落 `^private fun …Row…\(` 的取样窗口。
+        val wordRowWired = """
+            @Composable
+            private fun SyntheticWiredRow(lemma: String, gloss: String) {
+                WordRow(lemma = lemma, gloss = gloss)
+                Text(lemma)
+                Text(gloss)
+            }
+        """.trimIndent()
+        val wordRowBare = dropCall(wordRowWired, "WordRow(")
+        assertEquals(1, rowFunctionBodies(wordRowWired).size, "合成片段自检：私有 *Row* 窗口没落进取样面，本条空转")
+        assertEquals(1, rowFunctionBodies(wordRowBare).size, "反向片段自检：摘调用把窗口也摘掉了，两侧不再等量")
+        assertEquals(
+            false,
+            isWordRowOffender(wordRowWired),
+            "族 4 的合规出口失效（接线屏被判违规）。$blindness"
+        )
+        assertTrue(
+            isWordRowOffender(wordRowBare),
+            "摘掉 WordRow( 后族 4 仍未判违规：出口那一半是恒真断言，本条失去意义"
+        )
+
+        // ---- 族 3 没有出口：本条不得把它算进「接线即失明」的豁免面 ----
+        val cardFragment = """
+            @Composable
+            private fun SyntheticWiredCardScreen() {
+                NotConfiguredCard(title = "未配置", body = "先去设置里配置")
+            }
+            @Composable
+            private fun NotConfiguredCard(title: String, body: String) {
+                Text(title)
+                Text(body)
+            }
+        """.trimIndent()
+        assertTrue(
+            isCardOffender(cardFragment),
+            "族 3 出现私有 fun NotConfiguredCard( 却不判违规：本族没有合规出口，" +
+                "把它当「接线即豁免」会让未配置卡的四枚债务在批 2 整体隐形"
         )
     }
 

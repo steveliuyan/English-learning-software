@@ -84,25 +84,41 @@ class SharedComponentGeometryContractTest {
      * 旧锚 `fillMaxWidth\(\)\s*\.clickable\(` 把「`heightIn` 插在 `fillMaxWidth` 与 `clickable` 之间」这一
      * **合法**写法判成不合法（数到 0 处），批 2 任何按 `.fillMaxWidth().heightIn(...).clickable(...)` 写的
      * 入口行都会假红。`clickable` 不参与测量，所以 `heightIn` 在不在它前面与可点面尺寸无关（第①条交付
-     * 由 [rowMinHeight56] 单独钉）；本函数只看两件事：`clickable` 在 `fillMaxWidth()` 之后、在首枚
-     * `padding(` 之前。
+     * 由 [rowMinHeight56] 单独钉）；本函数只看两件事：`clickable` 在 `fillMaxWidth()` 之后、在本条链里
+     * 早于 `clickable` 的 `padding(` 不存在。
+     *
+     * **padding 的取样窗口必须只有本条 modifier 链**（批 1 终审窄复评 N-3）：原先取的是**全文件首个**
+     * `.padding(`，于是同一文件里行链之前任何别处的 padding（上方另一枚 `Box`、子组件形参默认值）都会
+     * 把合法链判成假红，而批 2 正是往 `EntryRow.kt` 里加东西的那一棒。链头用「`clickable` 之前最近的一枚
+     * `modifier`/`Modifier` 接收者」定位（本仓行链一律写 `modifier.fillMaxWidth()…`），
+     * 第三个下标语义随之改成「链内早于 clickable 的第一枚 padding 的下标；-1 = 没有（合规）」。
      */
-    private fun entryRowOrderIndices(source: String): Triple<Int, Int, Int> = Triple(
-        source.indexOf(".fillMaxWidth()"),
-        source.indexOf(".clickable("),
-        source.indexOf(".padding("),
-    )
+    private fun entryRowOrderIndices(source: String): Triple<Int, Int, Int> {
+        val fillIndex = source.indexOf(".fillMaxWidth()")
+        val clickableIndex = source.indexOf(".clickable(")
+        val chainStart = maxOf(
+            source.lastIndexOf("modifier", clickableIndex),
+            source.lastIndexOf("Modifier", clickableIndex),
+        )
+        val paddingBeforeClickable = if (chainStart in 0 until clickableIndex) {
+            val index = source.indexOf(".padding(", chainStart)
+            if (index in 0 until clickableIndex) index else -1
+        } else {
+            -1
+        }
+        return Triple(fillIndex, clickableIndex, paddingBeforeClickable)
+    }
 
     /** [entryRowOrderIndices] 的判据本体（生产源码与合成片段共用一套口径，避免断言与自证各写一遍）。 */
     private fun clickableCoversWholeBox(source: String): Boolean {
         val (fillIndex, clickableIndex, paddingIndex) = entryRowOrderIndices(source)
-        return fillIndex in 0 until clickableIndex && clickableIndex < paddingIndex
+        return fillIndex in 0 until clickableIndex && paddingIndex == -1
     }
 
-    /** 断言消息用的实际下标（-1 = 本文件里没有那一枚），让「红在顺序上」可读而不是红在计数上。 */
+    /** 断言消息用的实际下标（-1 = 缺那一枚 / 链内没有早于 clickable 的 padding），让「红在顺序上」可读而不是红在计数上。 */
     private fun entryRowOrderDebug(source: String): String {
         val (fillIndex, clickableIndex, paddingIndex) = entryRowOrderIndices(source)
-        return "fillMaxWidth=$fillIndex, clickable=$clickableIndex, padding=$paddingIndex"
+        return "fillMaxWidth=$fillIndex, clickable=$clickableIndex, 链内早于clickable的padding=$paddingIndex"
     }
 
     /** 链上只此一枚可点源（「整行一个可点目标」的源码面镜像；少了这一条时 indexOf 只认第一枚会放过重复）。 */
@@ -128,8 +144,9 @@ class SharedComponentGeometryContractTest {
         assertEquals(1, countMatches(source, hairlineOutsideContent), "发丝线必须恰一处「drawBehind 在前、padding(top = 1.dp) 让位在后」（顺序即契约，R-10.5）")
         assertTrue(
             clickableCoversWholeBox(source),
-            "可点面必须覆盖整盒：clickable 排在 fillMaxWidth() 之后、任何 padding 之前（计划 :1049 的实测教训；" +
-                "首次下标 ${entryRowOrderDebug(source)}；-1 = 本文件缺那一枚；clickable > padding = 可点面缩回内容盒。" +
+            "可点面必须覆盖整盒：clickable 排在 fillMaxWidth() 之后、本条链里没有任何早于它的 padding（计划 :1049 的实测教训；" +
+                "实际下标 ${entryRowOrderDebug(source)}；padding=-1 = 链内 clickable 之前没有 padding（合规），" +
+                "padding ≥ 0 = 可点面缩回内容盒。" +
                 "heightIn 在 clickable 之前**不算**违规，两条共同交付见 EntryRow.kt KDoc）",
         )
         assertEquals(1, countMatches(source, singleClickable), "入口行链上 clickable 只此一处（两处 = 第二个可点源，撞「整行一个可点目标」用例）")
@@ -139,6 +156,14 @@ class SharedComponentGeometryContractTest {
         val newShape = "Row(modifier = modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)" +
             ".heightIn(min = 56.dp).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp))"
         assertTrue(clickableCoversWholeBox(newShape), "合成正片段漏判：新顺序没被下标判据认出来（${entryRowOrderDebug(newShape)}）")
+        // 反假红钉（批 1 终审窄复评 N-3）：**别处**先出现的 `.padding(` 不得把本判据带红。
+        // 旧实现取全文件首个 `.padding(` 下标，批 2 只要在行链之前往 EntryRow.kt 里加任何别处的 padding
+        // （上方另一枚 Box、子组件形参默认值）就会当场假红——判定窗口必须只有「本条 modifier 链」。
+        val otherPaddingEarlier = "Box(Modifier.padding(horizontal = 4.dp))\n" + newShape
+        assertTrue(
+            clickableCoversWholeBox(otherPaddingEarlier),
+            "反假红钉失控：同一文件里行链之前的无关 padding 把合法链判成了违规（${entryRowOrderDebug(otherPaddingEarlier)}）",
+        )
         assertEquals(0, countMatches(newShape, clickableAfterPadding), "合成正片段越界：新顺序被判成了旧形状")
         assertEquals(1, countMatches(newShape, rowGap12), "合成正片段漏判：12dp 间隙锚认不出自家形状")
 

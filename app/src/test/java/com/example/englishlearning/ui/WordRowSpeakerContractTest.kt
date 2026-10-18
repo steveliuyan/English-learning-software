@@ -50,15 +50,39 @@ class WordRowSpeakerContractTest {
 
     /**
      * 药片可点面顺序锚：`clickable` 排在 `padding` **之外**（药片链形 = heightIn → clip → background →
-     * clickable → padding），判据取「两个修饰符各自首次出现的下标」再数值比较。
+     * clickable → padding），判据取「clickable 的下标」与「**本条链内**早于 clickable 的第一枚 padding 的下标」再数值比较。
      *
      * 为什么不用字面文本正则定位（M-c，修复轮 2）：旧形状把回调体 `onClick = { onClick(state) }` 写死进模式，
      * 良性重构（回调改名、换成函数引用、参数换行）会让它带着「顺序错了」这一**误导性消息**红——
      * 而这条契约真正问的只是「谁在链上更靠前」，与回调体怎么写无关。
      * 「真的排反了」那一半仍由反面锚 [paddingOutsideClickable] 负责，它保留 160 字符窄窗口（窗口开太宽会失去定位力）。
+     *
+     * **padding 的取样窗口必须只有本条 modifier 链**（批 1 终审窄复评 N-3，与 `SharedComponentGeometryContractTest`
+     * 的 `entryRowOrderIndices` 同族缺陷）：原先取的是**全文件首个** `.padding(`，于是同一文件里药片链之前
+     * 任何别处的 padding（内部图标 Row 的间距、子组件形参默认值）都会把合法链判成假红，而批 2 正是往
+     * `SpeakerButton.kt` 里加东西的那一棒。链头用「clickable 之前最近的一枚 `modifier`/`Modifier` 接收者」定位，
+     * 第二个下标的语义随之改成「链内早于 clickable 的 padding 下标；-1 = 没有（合规）」。
      */
-    private fun pillOrderIndices(source: String): Pair<Int, Int> =
-        source.indexOf(".clickable(") to source.indexOf(".padding(")
+    private fun pillOrderIndices(source: String): Pair<Int, Int> {
+        val clickableIndex = source.indexOf(".clickable(")
+        val chainStart = maxOf(
+            source.lastIndexOf("modifier", clickableIndex),
+            source.lastIndexOf("Modifier", clickableIndex),
+        )
+        val paddingBeforeClickable = if (chainStart in 0 until clickableIndex) {
+            val index = source.indexOf(".padding(", chainStart)
+            if (index in 0 until clickableIndex) index else -1
+        } else {
+            -1
+        }
+        return clickableIndex to paddingBeforeClickable
+    }
+
+    /** [pillOrderIndices] 的判据本体：链上有 clickable，且链内没有早于它的 padding。 */
+    private fun pillClickableCoversPill(source: String): Boolean {
+        val (clickableIndex, paddingIndex) = pillOrderIndices(source)
+        return clickableIndex >= 0 && paddingIndex == -1
+    }
 
     /** 反面形状：`padding` 排在 `clickable` 之外 = 可点面退回内容盒（`EntryRow` 真机 40dp 的成因）。 */
     private val paddingOutsideClickable = Regex("""\.padding\([\s\S]{0,160}?\.clickable\(""")
@@ -268,15 +292,38 @@ class WordRowSpeakerContractTest {
         assertEquals(1, countMatches(source, touchFloor48), "48dp 触控下限必须恰一处（0 = 靠 padding 凑；≥2 = 两份几何）")
         assertEquals(1, countMatches(source, Regex("""\.clickable\(""")), "药片链上 clickable 只此一处（两处 = 两份可点面）")
         assertTrue(
-            clickableIndex in 0 until paddingIndex,
-            "clickable 必须排在 padding 之前（可点面 = 整枚药片含内边距）：首次下标 clickable=$clickableIndex, " +
-                "padding=$paddingIndex（-1 = 本文件里没有那一枚；clickable > padding 就是把可点面缩回内容盒）",
+            pillClickableCoversPill(source),
+            "clickable 必须排在 padding 之前（可点面 = 整枚药片含内边距）：链内下标 clickable=$clickableIndex, " +
+                "链内早于 clickable 的 padding=$paddingIndex（padding=-1 = 链里没有，合规；" +
+                "padding ≥ 0 = 可点面缩回内容盒）",
         )
         assertEquals(0, countMatches(source, paddingOutsideClickable), "padding 排在 clickable 之外会把可点面缩回内容盒（EntryRow 真机 40dp、旧喇叭药片 32.38dp 的成因族）")
         assertEquals(1, countMatches(source, rippleAboveBackdrop), "clickable 必须排在 background 之后，否则水波纹被底色盖住")
         assertEquals(1, countMatches(source, pillClip), "药片裁角只此一处（第二处 = 第二份容器）")
         assertEquals(1, countMatches(source, pillBackdrop), "药片底色只此一处")
         assertEquals(0, countMatches(source, bannedCardShape), "新组件禁读 AppShape.Card（20dp 旧档）")
+
+        // 反假红钉（批 1 终审窄复评 N-3 的同族，本文件同形缺陷）：同一文件里**别处**先出现的 `.padding(`
+        // 不得把本判据带红。[pillOrderIndices] 原先取的是全文件首个 padding 下标，于是批 2 只要在药片链之前
+        // 往 SpeakerButton.kt 加任何别处的 padding（内部图标 Row 的间距、形参默认值）就当场假红。
+        val pillChain = "Row(modifier = modifier.heightIn(min = 48.dp).clip(AppShape.Pill)" +
+            ".background(ink.backdrop).clickable(role = Role.Button, onClick = onClick)" +
+            ".padding(horizontal = 16.dp))"
+        val unrelatedPaddingEarlier = "Box(Modifier.padding(horizontal = 4.dp))\n" + pillChain
+        val (unrelatedClickable, unrelatedPadding) = pillOrderIndices(unrelatedPaddingEarlier)
+        assertTrue(
+            pillClickableCoversPill(unrelatedPaddingEarlier),
+            "反假红钉失控：行链之前的无关 padding 把合法药片链判成了违规（clickable=$unrelatedClickable, " +
+                "链内早于 clickable 的 padding=$unrelatedPadding）"
+        )
+        // 同一条收窄不得放过真违规：padding 排在 clickable 之前的链必须照旧判红。
+        val legacyPillChain = "Row(modifier = modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp)" +
+            ".clip(AppShape.Pill).background(ink.backdrop).clickable(role = Role.Button, onClick = onClick))"
+        val (legacyClickable, legacyPadding) = pillOrderIndices(legacyPillChain)
+        assertFalse(
+            pillClickableCoversPill(legacyPillChain),
+            "反假红钉越界：padding 在 clickable 之前的旧顺序竟过了判据（clickable=$legacyClickable, padding=$legacyPadding）"
+        )
     }
 
     /**
@@ -373,16 +420,16 @@ class WordRowSpeakerContractTest {
                 .clickable(role = Role.Button, onClick = { onClick(state) })
                 .heightIn(min = 48.dp)) {}
         """.trimIndent()
-        // 正面判据（下标比较）与反面锚（窄窗口正则）在两段片段上必须各自判得出，见 [pillOrderIndices] 的 M-c 说明。
+        // 正面判据（链内下标比较）与反面锚（窄窗口正则）在两段片段上必须各自判得出，见 [pillOrderIndices] 的 M-c/N-3 说明。
         val (goodClickable, goodPadding) = pillOrderIndices(goodPill)
         assertTrue(
-            goodClickable in 0 until goodPadding,
+            pillClickableCoversPill(goodPill),
             "正控：clickable 在 padding 之外的药片链必须满足下标判据，实际 clickable=$goodClickable, padding=$goodPadding",
         )
         assertEquals(0, countMatches(goodPill, paddingOutsideClickable), "正控：合规链不得被反面锚命中")
         val (badClickable, badPadding) = pillOrderIndices(badPill)
         assertFalse(
-            badClickable in 0 until badPadding,
+            pillClickableCoversPill(badPill),
             "负控：padding 在 clickable 之外的链不得满足下标判据，实际 clickable=$badClickable, padding=$badPadding",
         )
         assertEquals(1, countMatches(badPill, paddingOutsideClickable), "负控：padding 在 clickable 之外必须被反面锚抓到")
