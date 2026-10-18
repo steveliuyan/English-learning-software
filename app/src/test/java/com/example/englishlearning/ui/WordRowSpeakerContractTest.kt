@@ -12,6 +12,7 @@ import com.example.englishlearning.ui.theme.AppColorDark
 import com.example.englishlearning.ui.theme.AppColorLight
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -48,11 +49,16 @@ class WordRowSpeakerContractTest {
     private val touchFloor48 = Regex("""heightIn\(min = 48\.dp\)""")
 
     /**
-     * 药片可点面顺序锚：`clickable` 在 `padding` **之外**（药片链形 = heightIn → clip → background →
-     * clickable → padding）。窗口 160 字符够跨一行；开太宽会让反面锚失去定位力。
+     * 药片可点面顺序锚：`clickable` 排在 `padding` **之外**（药片链形 = heightIn → clip → background →
+     * clickable → padding），判据取「两个修饰符各自首次出现的下标」再数值比较。
+     *
+     * 为什么不用字面文本正则定位（M-c，修复轮 2）：旧形状把回调体 `onClick = { onClick(state) }` 写死进模式，
+     * 良性重构（回调改名、换成函数引用、参数换行）会让它带着「顺序错了」这一**误导性消息**红——
+     * 而这条契约真正问的只是「谁在链上更靠前」，与回调体怎么写无关。
+     * 「真的排反了」那一半仍由反面锚 [paddingOutsideClickable] 负责，它保留 160 字符窄窗口（窗口开太宽会失去定位力）。
      */
-    private val pillClickableOutsidePadding =
-        Regex("""\.clickable\(role = Role\.Button, onClick = \{ onClick\(state\) \}\)[\s\S]{0,160}?\.padding\(""")
+    private fun pillOrderIndices(source: String): Pair<Int, Int> =
+        source.indexOf(".clickable(") to source.indexOf(".padding(")
 
     /** 反面形状：`padding` 排在 `clickable` 之外 = 可点面退回内容盒（`EntryRow` 真机 40dp 的成因）。 */
     private val paddingOutsideClickable = Regex("""\.padding\([\s\S]{0,160}?\.clickable\(""")
@@ -70,7 +76,12 @@ class WordRowSpeakerContractTest {
     /** 墨色只从纯表取一次；组件体内不得出现静态令牌读点或裸 hex（两份既有棘轮的同一红线）。 */
     private val pillInkFromPureTable = Regex("""speakerButtonInk\(appColors\(\)\)""")
     private val staticPaletteRead = Regex("""AppPalette\.|DomainColors\.""")
-    private val rawHex = Regex("""Color\(\s*0x[0-9A-Fa-f]{8}\s*\)""")
+
+    /**
+     * 裸 hex 探针：`Color(0x…)` 的字面量位数按「8 位（AARRGGBB）**或** 6 位（RRGGBB）」两档都认
+     * （M-b，修复轮 2：原先只写 `{8}`，`Color(0xFF3B30)` 这一类省略 alpha 的写法会漏过本条红线）。
+     */
+    private val rawHex = Regex("""Color\(\s*0x(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{6})\s*\)""")
 
     /** 字形随态取图走纯函数（不在组件里写第二份 `when`）。 */
     private val glyphFromPureMapper = Regex("""AppGlyph\(\s*icon = speakerGlyph\(state\)""")
@@ -196,8 +207,10 @@ class WordRowSpeakerContractTest {
      * 稿面词行没有第三种文字层级，再分档就会有人拿 `text3` 当状态色，而 `text3` 是批 1 Task 1 裁决 #1
      * 明令不得作前景的那一枚——被拒候选在本用例当场复算判不合格（比值只进断言消息）。
      *
-     * 词行本体不铺底色（卡面与描边归调用方容器），所以配对对象是本套 `surface`，
-     * 不是 [InlineNotice] 那种自带 `tint` 底。
+     * 词行本体不铺底色（卡面与描边归调用方容器），所以配对对象是**调用方可能给的那两档底**：
+     * 本套 `surface`（卡片面）与本套 `background`（页底，行直接落在列表页底时的实际情形），
+     * 不是 [InlineNotice] 那种自带 `tint` 底。四枚槽 × 两档底 × 两套主题逐组合复算，
+     * 阈值一律正文 AA 4.5、不放宽（M-a，修复轮 2：原先只配 `surface`，漏掉了页底这一档）。
      */
     @Test
     fun word_row_inks_are_pinboard_slots_and_clear_aa_on_surface() {
@@ -209,11 +222,13 @@ class WordRowSpeakerContractTest {
             assertEquals(set.text2, inks.meta, "时间/出处一类元信息必须取 text2")
             listOf("lemma" to inks.lemma, "gloss" to inks.gloss, "status" to inks.status, "meta" to inks.meta)
                 .forEach { (slot, ink) ->
-                    val value = ratioOf(ink, set.surface)
-                    assertTrue(
-                        value >= 4.5,
-                        "词行 $slot 压本套 surface 只有 %.2f:1，不足正文 AA 4.5（set=$set）".format(value),
-                    )
+                    listOf("surface" to set.surface, "background" to set.background).forEach { (backdrop, color) ->
+                        val value = ratioOf(ink, color)
+                        assertTrue(
+                            value >= 4.5,
+                            "词行 $slot 压本套 $backdrop 只有 %.2f:1，不足正文 AA 4.5（set=$set）".format(value),
+                        )
+                    }
                 }
         }
         val rejected = ratioOf(AppColorLight.text3, AppColorLight.surface)
@@ -229,16 +244,22 @@ class WordRowSpeakerContractTest {
      * 药片几何与可点面顺序：48dp 下限恰一处、`clickable` 在 `padding` 之外、水波纹在底色之上、
      * 容器（裁角/底色）各恰一处、不读 `AppShape.Card`。
      *
-     * 顺序承重的两条各有分工：[pillClickableOutsidePadding] 是正面锚（顺序对才命中），
+     * 顺序承重的两条各有分工：[pillOrderIndices] 是正面判据（取下标比谁更靠前，M-c 之后不再靠字面文本定位），
      * [paddingOutsideClickable] 是反面锚（顺序错才命中）——只钉正面锚时，把整条链重排成
      * `padding … clickable` 会让正面锚静默不命中（计数变 0 才红），报错说不清「错在顺序」；
-     * 反面锚直接把成因点名。
+     * 反面锚直接把成因点名。正面判据另钉「`.clickable(` 恰一处」，等于旧那条「正面锚命中 1 次」里的份数那一半。
      */
     @Test
     fun pill_geometry_and_touch_order_are_pinned_in_source() {
         val source = uiComponentSource(SPEAKER_BUTTON)
+        val (clickableIndex, paddingIndex) = pillOrderIndices(source)
         assertEquals(1, countMatches(source, touchFloor48), "48dp 触控下限必须恰一处（0 = 靠 padding 凑；≥2 = 两份几何）")
-        assertEquals(1, countMatches(source, pillClickableOutsidePadding), "clickable 必须排在 padding 之前（可点面 = 整枚药片含内边距）")
+        assertEquals(1, countMatches(source, Regex("""\.clickable\(""")), "药片链上 clickable 只此一处（两处 = 两份可点面）")
+        assertTrue(
+            clickableIndex in 0 until paddingIndex,
+            "clickable 必须排在 padding 之前（可点面 = 整枚药片含内边距）：首次下标 clickable=$clickableIndex, " +
+                "padding=$paddingIndex（-1 = 本文件里没有那一枚；clickable > padding 就是把可点面缩回内容盒）",
+        )
         assertEquals(0, countMatches(source, paddingOutsideClickable), "padding 排在 clickable 之外会把可点面缩回内容盒（EntryRow 真机 40dp、旧喇叭药片 32.38dp 的成因族）")
         assertEquals(1, countMatches(source, rippleAboveBackdrop), "clickable 必须排在 background 之后，否则水波纹被底色盖住")
         assertEquals(1, countMatches(source, pillClip), "药片裁角只此一处（第二处 = 第二份容器）")
@@ -339,9 +360,18 @@ class WordRowSpeakerContractTest {
                 .clickable(role = Role.Button, onClick = { onClick(state) })
                 .heightIn(min = 48.dp)) {}
         """.trimIndent()
-        assertEquals(1, countMatches(goodPill, pillClickableOutsidePadding), "正控：clickable 在 padding 之外的药片链必须命中")
+        // 正面判据（下标比较）与反面锚（窄窗口正则）在两段片段上必须各自判得出，见 [pillOrderIndices] 的 M-c 说明。
+        val (goodClickable, goodPadding) = pillOrderIndices(goodPill)
+        assertTrue(
+            goodClickable in 0 until goodPadding,
+            "正控：clickable 在 padding 之外的药片链必须满足下标判据，实际 clickable=$goodClickable, padding=$goodPadding",
+        )
         assertEquals(0, countMatches(goodPill, paddingOutsideClickable), "正控：合规链不得被反面锚命中")
-        assertEquals(0, countMatches(badPill, pillClickableOutsidePadding), "负控：padding 在 clickable 之外的链不得命中正面锚")
+        val (badClickable, badPadding) = pillOrderIndices(badPill)
+        assertFalse(
+            badClickable in 0 until badPadding,
+            "负控：padding 在 clickable 之外的链不得满足下标判据，实际 clickable=$badClickable, padding=$badPadding",
+        )
         assertEquals(1, countMatches(badPill, paddingOutsideClickable), "负控：padding 在 clickable 之外必须被反面锚抓到")
         assertEquals(1, countMatches(goodPill, rippleAboveBackdrop), "正控：background 在 clickable 之前（水波纹在底色之上）命中")
         assertEquals(

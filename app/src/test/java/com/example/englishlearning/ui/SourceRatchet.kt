@@ -90,6 +90,13 @@ private const val TRIPLE_QUOTE = "\"\"\""
  *    **整段原样保留**；
  *  - 只有在字符串外才识别行注释（剥到行尾但**保留换行**，行号与 `(?m)^` 锚点口径不变）
  *    与块注释（惰性到下一个闭合序列；未闭合则吞到文末）。
+ *
+ * 两条与旧正则同源、**故意不修**的遗留限制（修复轮 2 的 M-f 只做登记，改动前须先补合成用例）：
+ *  - Kotlin 的块注释**可嵌套**（外层开→内层开→内层闭→外层闭），本实现按「惰性到第一个闭合序列」收尾，
+ *    于是嵌套块多出来的那半条尾巴会漏回代码里；漏回来的是注释文本，最坏让源码棘轮多判一处命中（假红），
+ *    不会把真代码吞掉（不失明）。
+ *  - 三引号原始串**不认反斜杠转义**（Kotlin 语义如此，实现按「下一个三引号」收尾），
+ *    串内用四连引号一类形状表达字面量三引号时会被提前判结束；本仓 main 源码不含该形状。
  */
 internal fun stripComments(text: String): String {
     val out = StringBuilder(text.length)
@@ -180,6 +187,8 @@ internal const val COMPONENTS_DIR_FRAGMENT = "/ui/components/"
  *
  * [dirFragment] 只为第 5 份（`IconBadgeContrastContractTest` 还要读 `ui/theme/` 下的文件）保留，
  * 缺省即组件目录；不要用它去读组件目录之外的组件文件——那是把守卫改成摆设。
+ * 读 `ui/` **根**下的屏文件请改走 [uiScreenSource]（修复轮 2 的 Fix I-3：`dirFragment = "/"` 那两处已搬走，
+ * 因为任何绝对路径都含 `/`，子串匹配在那两处上等于取消守卫）。
  */
 internal fun uiComponentSource(name: String, dirFragment: String = COMPONENTS_DIR_FRAGMENT): String {
     val files = uiFiles().filter { it.name == name }
@@ -192,6 +201,26 @@ internal fun uiComponentSource(name: String, dirFragment: String = COMPONENTS_DI
     assertTrue(
         file.path.replace('\\', '/').contains(dirFragment),
         "$name 不在 $dirFragment 下（目录挪动会让本契约读错文件）：${file.path}"
+    )
+    return stripComments(file.readText())
+}
+
+/**
+ * 按文件名在 `ui/` **根目录**取剥注释后的源码（屏文件专用，与 [uiComponentSource] 区分）。
+ * 守卫按「父目录恰等于 [UI_MAIN_SOURCE_PATH]」判，不做子串匹配：
+ * 屏文件一旦搬家进 `ui/<子目录>/`，本夹具响亮失败，而不是像 `dirFragment = "/"` 那样静默放行。
+ */
+internal fun uiScreenSource(name: String): String {
+    val files = uiFiles().filter { it.name == name }
+    assertTrue(
+        files.size == 1,
+        "$name 应恰好一个，实际 ${files.size} 个（实现文件未创建 / 被改名 / 扫描错位？期望目录 $UI_MAIN_SOURCE_PATH，" +
+            "JVM 工作目录 ${File(".").absolutePath}）",
+    )
+    val file = files.single()
+    assertTrue(
+        file.parentFile.relativeTo(File(UI_MAIN_SOURCE_PATH)).path.isEmpty(),
+        "$name 不在 $UI_MAIN_SOURCE_PATH 根下（屏文件搬家会让本契约读错文件）：${file.path}",
     )
     return stripComments(file.readText())
 }

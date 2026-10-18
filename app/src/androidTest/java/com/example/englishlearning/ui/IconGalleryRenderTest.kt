@@ -22,6 +22,7 @@ import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.EntryIconBadge
 import com.example.englishlearning.ui.components.InlineIconBadge
+import com.example.englishlearning.ui.components.StrokeOnlyIcons
 import com.example.englishlearning.ui.components.allowsInEntryContainer
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppThemePreferences
@@ -53,7 +54,9 @@ import org.junit.runner.RunWith
  *  - `EntryIconBadge` 40dp 域渐变容器 + 两层：豁免表那几枚（Back/ChevronRight/ChevronDown/Close/Check）
  *    **必须跳过**——`IconBadge.kt` 开头的 `require` 会抛 `IllegalArgumentException`，
  *    那是设计层面的拦死（两层豁免枚不得进 ≥40dp 入口容器），不是本用例要绕开的障碍；
- *    跳过关系用「全部枚数 − 豁免枚数 == 进容器的枚数」这一结构等式当场钉住，不写会漂移的绝对数；
+ *    跳过关系**按 [StrokeOnlyIcons] 集合双向钉**——「全部枚 − 豁免表」的枚集合必须逐枚等于进容器那批的枚集合，
+ *    不写会漂移的绝对数，也不写能自相抵消的结构等式（修复轮 2 的 Fix I-2：
+ *    `exemptCount` 定义就是 `entries.size - entryIcons.size`，旧那条「枚数等式」化简后恒真、不咬任何漂移）；
  *  - `InlineIconBadge` 30dp tint 底 + 17dp 单层描边：33 枚全上（豁免枚唯一的合法去处就是行内）。
  *
  * 四条平台坑（本仓 `android-connected-qa-loop` 记录，逐条都落进写法）：
@@ -112,10 +115,12 @@ class IconGalleryRenderTest {
         assertRoundRendered("EntryIconBadge 40dp", light)
         assertRoundRendered("EntryIconBadge 40dp", dark)
         assertThemeFlipReachedTheAssemblyPoint(light, dark)
+        // 参数顺序按 JUnit（消息在首位）：本类 import 的是 org.junit.Assert.assertEquals，
+        // 它没有 (expected, actual, message) 这一重载，简报片段照抄会编译不过——只调顺序、判据不变。
         assertEquals(
-            "进容器的枚数与「全部枚数 − 豁免枚数」不等：过滤口径漂了（豁免枚进容器会让 require 直接抛）",
-            AppIcon.entries.size - exemptCount,
-            entryIcons.size,
+            "进容器的枚集合与「全部枚 − StrokeOnlyIcons 豁免表」不等：过滤口径漂了（豁免枚进容器会让 require 直接抛）",
+            AppIcon.entries.toSet() - StrokeOnlyIcons,
+            entryIcons.toSet(),
         )
     }
 

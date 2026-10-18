@@ -29,7 +29,10 @@ import kotlin.test.assertTrue
  * 三条实现口径（前几棒踩过的坑）：
  *  - **先剥注释再匹配**：`components/InlineNotice.kt` 的 KDoc 里逐字复述了本棘轮那条 grep 命令
  *    （含 `AppPalette.ErrorText\|colorScheme.error`），`AppScreen.kt` 也有一行注释提到 `colorScheme.error`；
- *    不剥注释就会把注释当债务、把契约写成空转。读法一律走共享夹具 [uiComponentSource]/[uiFiles] + [stripComments]。
+ *    不剥注释就会把注释当债务、把契约写成空转。读法一律走共享夹具：组件文件走 [uiComponentSource]
+ *    （目录守卫按 `ui/components/` 片段匹配），`ui/` **根**下的屏文件走 [uiScreenSource]
+ *    （守卫按「父目录恰等于 `ui` 根」判，修复轮 2 的 Fix I-3 —— 原先传 `dirFragment = "/"` 等于把守卫取消）；
+ *    两者最终都落到 [uiFiles] + [stripComments] 这同一个入口。
  *    **夹具本身也有债**（修复轮 1 的 Fix 1）：正则版 `stripComments` 不认字符串字面量，SAF 的 MIME 字面量
  *    「星斜星斜」那一枚会让块注释正则吞掉其后几十行真代码，使 `BackupRestoreScreen.kt` 的错误色裸用点
  *    从棘轮视野里消失。现夹具是字符串感知的扫描式实现，由
@@ -58,7 +61,14 @@ class SharedComponentUniquenessRatchetTest {
 
     // ---------- 四族规则（纯函数：只吃源码文本，便于合成用例双向自证） ----------
 
-    /** 族 1 页头：用了库内 `headline*` 版式却不调共享页头。 */
+    /**
+     * 族 1 页头：用了库内 `headline*` 版式却不调共享页头。
+     *
+     * 与预检 §3 的形状有一处**有意偏差**（修复轮 2 的 M-e，批 3 别按预检重新推导别的数）：预检把形状写成
+     * `Text(… style = MaterialTheme.typography.headline…)`，本规则只锚「文件里出现 `MaterialTheme.typography.headline`」
+     * 这半边——少锚一半即**更宽**，只会多抓不会漏抓（两席独立枚举的命中文件数一致，无失明风险），
+     * 代价是不问这枚版式被用在哪儿；若哪天确证需要收紧，先改规则形状再同步本条与本族 seed。
+     */
     private val headlineRead = Regex("""MaterialTheme\.typography\.headline""")
     private fun isHeaderOffender(source: String): Boolean =
         headlineRead.containsMatchIn(source) && !source.contains("AppScreenHeader(")
@@ -499,7 +509,7 @@ class SharedComponentUniquenessRatchetTest {
             seed,
             "词行族 seed 与 spec §3 点名的 6 个文件不符（改 seed 前先改规则形状并说明理由）"
         )
-        val search = uiComponentSource("GlobalVocabularySearchScreen.kt", "/")
+        val search = uiScreenSource("GlobalVocabularySearchScreen.kt")
         val hits = rowFunctionBodies(search).count { body ->
             lemmaText.containsMatchIn(body) && anyText.findAll(body).count() >= 2
         }
@@ -522,6 +532,12 @@ class SharedComponentUniquenessRatchetTest {
      * 这条用例喂**合成输入**（不含任何本仓真实文件），同时钉住两半：
      *  - 字面量里的注释标记**不得**吞掉其后的代码（否则数到 0）；
      *  - 真注释仍须被剥掉（否则数到 2）。**别把 1 改成 2** —— 那等于放行「行注释剥不掉」这一半退化。
+     *
+     * **末尾那行「尾部真块注释」是故意给的闭合序列**（修复轮 2 的 Fix I-1）：退化成正则版时，字面量里那枚
+     * 「斜杠紧跟星号」要一路吞到下一个「星号紧跟斜杠」才算闭合；本夹具若无这个末尾闭合序列，正则版就
+     * **什么都剥不到**，第一条断言照样绿，夹具对「改回正则版」这条退化只剩「行注释剥不掉」一半是敏感的。
+     * 补上它之后，正则版会把中间那行真错误色读点一起吃掉 → 数到 0 → 当场红。
+     * **别把这一行当冗余清理掉**，也别让它含 `colorScheme.error`（那会让数到 1 由注释本体自己贡献，判据失效）。
      */
     @Test
     fun stripComments_keeps_code_after_a_string_literal_that_contains_a_comment_marker() {
@@ -529,6 +545,7 @@ class SharedComponentUniquenessRatchetTest {
             val mime = arrayOf("application/zip", "*/*")
             val bad = Text(x, color = MaterialTheme.colorScheme.error)
             // colorScheme.error 在注释里，不该被算命中
+            /** 尾部真块注释，提供闭合序列 */
         """.trimIndent()
         val stripped = stripComments(source)
         assertEquals(
@@ -546,7 +563,7 @@ class SharedComponentUniquenessRatchetTest {
      */
     @Test
     fun notice_family_ledger_pins_the_backup_restore_site_that_comment_stripping_used_to_swallow() {
-        val source = uiComponentSource("BackupRestoreScreen.kt", "/")
+        val source = uiScreenSource("BackupRestoreScreen.kt")
         assertEquals(
             1,
             countMatches(source, Regex("""AppPalette\.ErrorText|colorScheme\.error""")),
