@@ -10,6 +10,12 @@ object AppShape {
     val Button = RoundedCornerShape(14.dp)
     val Pill = RoundedCornerShape(percent = 50)
 
-    /** 图标容器档（视觉稿 §4 的 12px 小控件）：数值与 Material `AppShapes.extraSmall` 相同，但语义归本设计系统，供 ≥40dp 入口与 30dp 行内徽标共用，不复用 extraSmall 槽位。 */
+    /** 图标容器档（视觉稿 §4 的 12px 小控件）：数值与 Material `AppShapes.extraSmall` 相同，但语义归本设计系统，供 ≥40dp 入口徽标使用，不复用 extraSmall 槽位。 */
     val Icon: Shape = RoundedCornerShape(12.dp)
+
+    /**
+     * 行内徽标档：30dp 行内徽标按视觉稿 §4 的 inline chip 圆角取 9px，
+     * 与 [Icon] 的 12px 是**两档不同数值**（行内尺寸小、圆角占比大），不是同一档的两种写法。
+     */
+    val Inline: Shape = RoundedCornerShape(9.dp)
 }

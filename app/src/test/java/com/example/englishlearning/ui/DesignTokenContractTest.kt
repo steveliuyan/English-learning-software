@@ -8,8 +8,9 @@ import kotlin.test.assertEquals
 
 /**
  * AC-R-01/AC-R-03：token 取值由源码 hex 字面量钉住，配对可用性由 WCAG 相对亮度当场计算。
- * 读源码而不是读渲染结果：本仓库 JVM 单测零 androidx.compose 导入（robolectric 依赖在但没用过），
- * Compose 渲染类断言归 androidTest。
+ * 读源码而不是读渲染结果：口径见共享夹具 `SourceRatchet` 的头注释——JVM 单测只按需导入 compose 的
+ * 纯数据符号（例如 `androidx.compose.ui.graphics.Color`，本类与夹具的亮度复算都要读它），
+ * 不引入 robolectric 或渲染运行时；Compose 渲染类断言归 androidTest。
  *
  * 分节口径（批 1 预检裁决）：`AppColorLight` 与 `AppColorDark` 都含 `background = Color(0x…)`，
  * 全文件搜索会让浅套断言被深套块满足（反之亦然），断言 vacuous。故所有 token 查找先按锚点

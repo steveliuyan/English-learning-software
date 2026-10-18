@@ -61,7 +61,7 @@ private fun mixArgb(from: Int, to: Int, fraction: Double): Int {
 }
 
 /**
- * 入口容器的准入门槛：两层豁免表（`StrokeOnlyIcons`，决策文档裁决 4）里的五枚是开放折线，
+ * 入口容器的准入门槛：两层豁免表（`StrokeOnlyIcons`，决策文档裁决 4）里的字形都是开放折线，
  * 没有可闭合的内部区域，塞进 ≥40dp 容器只会得到一枚「看起来缺了层」的字形，故只作行内/尾部指示。
  * 判定抽成纯函数是为了让这条规则能在 JVM 单测里双向复算（`EntryIconBadge` 用它做 `require`）。
  */
@@ -75,8 +75,8 @@ fun allowsInEntryContainer(icon: AppIcon): Boolean = icon !in StrokeOnlyIcons
  * 也把白描边改成墨色。具体比值不抄在这里（与 `AppColors.kt` 同一口径：抄进注释就会随取值漂移），
  * 两条配对各由 `IconBadgeContrastContractTest` 当场按相对亮度复算并钉住 3:1。
  *
- * 开头那条 `require` 是豁免表的执行点：五枚开放折线（返回、箭头、关闭、勾选）没有可闭合的内部
- * 区域，放进 40dp 容器只会得到一枚「看起来缺了层」的字形，属于设计层面的误用，直接拦死。
+ * 开头那条 `require` 是豁免表的执行点：表里的开放折线（返回、箭头、关闭、勾选一类）没有可闭合的
+ * 内部区域，放进 40dp 容器只会得到一枚「看起来缺了层」的字形，属于设计层面的误用，直接拦死。
  */
 @Composable
 fun EntryIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier) {
@@ -106,7 +106,8 @@ fun EntryIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifi
  * 两种呈现的分工就在这里：行内已有文案承载语义，容器只是定位辅助，浅底上再铺一层按主题给的
  * 实心填充（`DuotoneFillAlpha`）只会把字形糊成一坨；能达标的配对是「域 `deep` 单层描边压 tint」，
  * 这一对由 `IconBadgeContrastContractTest` 当场按相对亮度复算，注释不抄比值（抄了就会随取值漂移）。
- * 底色走 `appColors().tint`（深浅两套随主题翻），不写死浅绿字面量。
+ * 底色走 `appColors().tint`（深浅两套随主题翻），不写死浅绿字面量；
+ * 容器圆角走 `AppShape.Inline`（视觉稿行内 chip 档），与入口的 `AppShape.Icon` 是两档不同数值，不是同一档。
  */
 @Composable
 fun InlineIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier) {
@@ -114,7 +115,7 @@ fun InlineIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modif
     Box(
         modifier = modifier
             .size(30.dp)
-            .clip(AppShape.Icon)
+            .clip(AppShape.Inline)
             .background(appColors().tint),
         contentAlignment = Alignment.Center,
     ) {

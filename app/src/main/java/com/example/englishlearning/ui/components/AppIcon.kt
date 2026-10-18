@@ -29,8 +29,10 @@ import com.example.englishlearning.ui.theme.LocalIsDark
  * 输入不变就复用同一个实例，输入一变（翻主题、换域色）就重建。
  *
  * `CircleFill(cx, cy, r)` 是 `AppIcons.kt` 里唯一非 SVG path 的形状（视觉稿的 `<circle>` 转录成标记串），
- * 由本文件的 [circleFillPathData] 解释成两段首尾相接的圆弧，再走同一个解析器；
- * 圆弧的写法（`0 0 1` 大弧/顺时针标志）与 `AppIcons.kt` 里圆环描边用的 idiom 同形，不改坐标数值。
+ * 由本文件的 [circleFillPathData] 解释成**过上下极点的两段绝对圆弧**（`A` 命令）再走同一个解析器。
+ * 前缀命中却解析不出三个正数就当场 `require` 抛错并带上原始串——不回落给 SVG 解析器：
+ * 回落得到的只是解析器自己的 `Unknown command for: i`（开头的 `C` 被当成立方贝塞尔命令），
+ * 消息里既没有字形名也没有坐标，认不出坏在哪一枚圆形，等于把几何错误推迟到运行时才炸。
  *
  * 描边重量：视觉描边 2 随 [appImageVector] 的 `strokeScale` 缩放，圆头与圆角连接由渲染端统一给
  * （`StrokeCap.Round` / `StrokeJoin.Round`），路径数据里不写画笔参数——那是 Task 6 的度量基准。
@@ -66,7 +68,7 @@ fun appImageVector(
 ): ImageVector {
     val isDark = LocalIsDark.current
     return remember(icon, tint, strokeScale, layer, isDark) {
-        buildGlyphVector(icon = icon, tint = tint, strokeScale = strokeScale, layer = layer, isDark = isDark)
+        buildAppImageVector(icon = icon, tint = tint, strokeScale = strokeScale, layer = layer, isDark = isDark)
     }
 }
 
@@ -90,7 +92,7 @@ fun AppGlyph(
     )
 }
 
-private fun buildGlyphVector(
+internal fun buildAppImageVector(
     icon: AppIcon,
     tint: Color,
     strokeScale: Float,
@@ -123,28 +125,41 @@ private fun buildGlyphVector(
     }.build()
 }
 
-/** 一条路径数据（SVG 串或圆形标记串）→ 解析后的节点表。 */
+/** 一条路径数据（SVG 串或圆形标记串）→ 解析后的节点表；标记串必须先解释，绝不让原始标记串进解析器。 */
 private fun pathNodesOf(data: String): List<PathNode> =
-    PathParser().parsePathString(circleFillPathData(data) ?: data).toNodes()
+    PathParser().parsePathString(if (isCircleFillMarker(data)) circleFillPathData(data) else data).toNodes()
+
+/** 标记串判定：前缀命中就归 [circleFillPathData] 解释，不再存在「解析失败就当 SVG 用」的回落。 */
+internal fun isCircleFillMarker(path: String): Boolean = path.startsWith(CIRCLE_FILL_PREFIX)
 
 /**
- * `CircleFill(cx, cy, r)` → 两段首尾相接的半圆弧（同一个圆，视觉稿 `<circle>` 的 path 形）；
- * 不是这个形状就返回 null，交给 SVG path 解析器。
+ * `CircleFill(cx, cy, r)` → 过上下极点 `(cx, cy-r)` / `(cx, cy+r)` 的两段绝对圆弧（同一个圆的 path 形）。
+ *
+ * 坏标记一律 `require` 抛错，消息里带原始串：静默返回 null 让调用方回落，等于把「圆形根本没画出来」
+ * 留给肉眼验收；这里抛错则让任何一枚解释不了的圆形在第一次组装时就暴露。
  */
-private fun circleFillPathData(path: String): String? {
-    if (!path.startsWith(CIRCLE_FILL_PREFIX) || !path.endsWith(")")) return null
-    val values = path.removePrefix(CIRCLE_FILL_PREFIX).removeSuffix(")")
+internal fun circleFillPathData(path: String): String {
+    require(isCircleFillMarker(path)) { "不是 $CIRCLE_FILL_PREFIX 标记串，无从展开成圆弧：$path" }
+    val body = path.removePrefix(CIRCLE_FILL_PREFIX)
+    require(body.endsWith(")")) { "$CIRCLE_FILL_PREFIX 缺少右括号：$path" }
+    val values = body.removeSuffix(")")
         .split(',')
         .map { it.trim().toDoubleOrNull() }
-    if (values.size != 3 || values.any { it == null }) return null
+    require(values.size == 3 && values.all { it != null && it.isFinite() && it > 0.0 }) {
+        "$CIRCLE_FILL_PREFIX 需要 (cx, cy, 正半径) 三个有限数值：$path"
+    }
     val (cx, cy, radius) = values.map { requireNotNull(it) }
-    val left = cx - radius
-    val right = cx + radius
-    return "M ${plain(left)} ${plain(cy)}" +
-        " a ${plain(radius)} ${plain(radius)} 0 0 1 ${plain(right - left)} 0" +
-        " a ${plain(radius)} ${plain(radius)} 0 0 1 ${plain(left - right)} 0"
+    val top = cy - radius
+    val bottom = cy + radius
+    return "M ${plain(cx)} ${plain(top)}" +
+        " A ${plain(radius)} ${plain(radius)} 0 0 1 ${plain(cx)} ${plain(bottom)}" +
+        " A ${plain(radius)} ${plain(radius)} 0 0 1 ${plain(cx)} ${plain(top)}"
 }
 
-/** 整数就写整数、小数按原样写：避免 `11.0` 这种噪声，也避免极小值被写成科学计数法。 */
+/**
+ * 整数就写整数（去掉 `11.0` 这类噪声尾巴），小数按 `Double.toString` 原样输出：
+ * 因此小数串可能带浮点尾数、极小值还会落成科学计数法，产物形态不适合做字符串相等断言——
+ * 本文件的契约只对「极点数值落在串里」与「解析后节点非空」两条负责。
+ */
 private fun plain(value: Double): String =
     if (value == Math.floor(value) && !value.isInfinite()) value.toLong().toString() else value.toString()
