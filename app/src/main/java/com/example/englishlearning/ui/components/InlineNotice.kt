@@ -127,7 +127,9 @@ internal val InlineNoticeKind.glyphLayer: AppGlyphLayer
  * `action` 是尾部动作槽（稿 `.act` 是**无容器的文本链接**，所以这里不给 `PillButton`——那会把
  * 「一条提示」升级成「一个主操作」）。槽内容一律用同文件的 [InlineNoticeAction] 渲染
  * （裁决 R-11.0：动作本体 = `Text` + `clickable` + `FontWeight.Bold` + [NoticeInk.action] 四件套，
- * 批 2/3 要收 11 份提示，配方留在调用方就会长出 11 份链接写法，而 Task 12 的份数棘轮按**文件**数
+ * 批 2/3 要收的错误提示站点（份数以计划裁决 R-12.3 的实测清单为准，重算：
+ * `grep -rln 'AppPalette.ErrorText\|colorScheme.error' app/src/main/java/com/example/englishlearning/ui | wc -l`），
+ * 配方留在调用方就会长出同数目的链接写法，而 Task 12 的份数棘轮按**文件**数
  * 「不走 `InlineNotice(` 的错误渲染站点」，自排动作链接既不新增文件也不是错误 Text 站点 → 抓不住）。
  * 本组件负责两件槽内拿不到的事：
  *  ① 把 F5-03 的 48dp 触控硬下限**只**派给动作节点——`heightIn(min = 48.dp)` 落在包裹层并用

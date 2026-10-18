@@ -205,6 +205,18 @@ class NotConfiguredCardContractTest {
         )
     }
 
+    @Test
+    fun card_container_and_border_tokens_are_pinned_to_the_current_set() {
+        val source = uiComponentSource("NotConfiguredCard.kt")
+        // 卡面底与描边读的是当前套（浅/深各自一枚），不是静态浅值：纯表只管四枚槽位墨、不代管容器色，
+        // 所以这两枚得在源码侧钉住。少了这条，把 set.surface 换成 AppPalette.Surface 一类静态读点
+        // 只有「AppPalette|DomainColors 0 处」那条粗探针能挡，换成别的静态写法就漏（评审 M-2）。
+        assertEquals(1, countMatches(source, Regex("""\.background\(set\.surface\)""")), "卡面底必须恰一处读当前套 surface")
+        assertEquals(1, countMatches(source, Regex("""border\(1\.dp, set\.outlineSoft""")), "描边必须恰一处读当前套 outlineSoft")
+        // 负控：静态读点形态一条都不许出现（正控已由上面两条恰一处承担）
+        assertEquals(0, countMatches(source, Regex("""AppPalette\.(Surface|Separator)""")), "容器色不得退回静态 token")
+    }
+
     /** 按文件名在 `ui/components/` 取剥注释源码（照 `SharedComponentGeometryContractTest` 的私有版写法）。 */
     private fun uiComponentSource(name: String): String {
         val files = uiFiles().filter { it.name == name }

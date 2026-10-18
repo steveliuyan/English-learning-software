@@ -16,8 +16,10 @@ import com.example.englishlearning.ui.theme.appColors
 /**
  * 批 1 Task 11：出站确认对话框（spec §3「首次调用第三方 Endpoint 前展示域名并确认」）。
  *
- * 收的是现网 5 份出站确认（`SentenceAnalysisScreen.kt:171-206` 那一族：长难句、拍照翻译、图片工坊、
- * 词书 AI 问答、发音评测）。这 5 处的现状是「域名 + 密钥会一起外发 + 发的是文本还是图片」三件事各屏各写，
+ * 收的是现网各屏私有的出站确认（长难句 `SentenceAnalysisScreen`、拍照翻译 `PhotoTranslationScreen`、
+ * 图片工坊 `ImageStudioScreen`、词书 AI 问答 `WordAiQaScreen`、阅读解锁 `ReadingAccessScreen`；
+ * 份数会随批 3 收口归零，故不写死——重算：`grep -rln '密钥将发送给' app/src/main/java/com/example/englishlearning/ui | grep -v components/`）。
+ * 这些站点的现状是「域名 + 密钥会一起外发 + 发的是文本还是图片」三件事各屏各写，
  * 措辞漂一条没人发现，所以正文收成纯函数 [outboundConfirmBody]、
  * 「图片每次都问 / 文本按域名记忆」收成纯函数 [mustAskEveryTime]，
  * 两条都由 `ConfirmDestructiveWordingTest` 逐格断言。

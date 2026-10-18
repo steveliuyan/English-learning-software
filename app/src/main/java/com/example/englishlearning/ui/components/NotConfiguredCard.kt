@@ -102,8 +102,12 @@ fun notConfiguredStatusLine(featureLabel: String): String = "「$featureLabel」
  *
  * 出口是这张卡**唯一**的触控目标：整行 `clickable(role = Role.Button)`，`heightIn(min = 48.dp)` 只落在
  * 出口这一枚（卡本体是内容不是触控目标，给它钉 48dp 等于造一条稿里没有的水线）。
- * 修饰符顺序就是契约：`clickable` 紧跟 `fillMaxWidth()`、`heightIn` 排在其后——反过来写可点面会退回
- * 内容盒（`EntryRow` 真机量到 40dp 的「假面」教训）。`testTag("not_configured_goto")` 与可点语义并到
+ * 48dp 触控面由「链上存在 `heightIn(min = 48.dp)`」+「`clickable` 排在任何 `padding` 之前」两条共同交付；
+ * `heightIn` 与 `clickable` 的先后**不影响**可点面尺寸（`DialogButton` 是 heightIn 在前、这里是 heightIn
+ * 在后，两处 connected 都实测 ≥48dp）。`clickable` 紧跟 `fillMaxWidth()` 这一形状仍由源码契约正则钉住，
+ * 但它是**形状锚**（保证 `fillMaxWidth` 不被漏掉、可点面是整宽），不是高度机制；`EntryRow` 真机量到 40dp
+ * 的「假面」成因是 `padding` 排在 `clickable` 之前（见 `EntryRow.kt:70-75`），与本处顺序无关。
+ * `testTag("not_configured_goto")` 与可点语义并到
  * 同一枚节点（`mergeDescendants = true`），否则标签在父、click 在子，真机上
  * `onNodeWithTag("not_configured_goto").performClick()` 会打在没有 click action 的节点上。
  *

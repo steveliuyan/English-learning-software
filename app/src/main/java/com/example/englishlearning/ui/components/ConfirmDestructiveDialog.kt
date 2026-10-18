@@ -30,7 +30,8 @@ import com.example.englishlearning.ui.theme.appColors
 /**
  * 批 1 Task 11：破坏性确认对话框（spec §3「删除/清空确认：级联条数 + 不受影响的保留面 + 不可撤销」）。
  *
- * 收的是现网 4 份 `AlertDialog` + 1 份行内确认（词书删除、学习数据清空、备份覆盖一类）。这 5 处的现状是
+ * 收的是现网各屏私有的破坏性确认（词书删除、学习数据清空、备份覆盖一类；份数会随批 3 收口归零，
+ * 故不写死——重算：`grep -rn 'AlertDialog(' app/src/main/java/com/example/englishlearning/ui --include=*.kt | grep -v components/ | wc -l`）。这些站点的现状是
  * 「级联条数、保留面、不可撤销」三件事各屏各写、少写哪件没人发现，所以：
  *  - **措辞**收成纯函数 [destructiveDialogBody]，由 `ConfirmDestructiveWordingTest` 逐要素断言；
  *  - **按钮墨色**收成纯表 [dialogButtonInk]，由 `ConfirmDestructiveInkTest` 逐档复算（connected 读不到颜色，
@@ -160,9 +161,14 @@ internal fun DialogPanel(
  * 对话框按钮（两枚对话框共用）：整宽等分、≥48dp 触控、圆角走装配档 `small`（= `AppShape.Button` 14dp），
  * 墨色一律从纯表 [dialogButtonInk] 取（源码契约钉「本文件恰一处取墨」）。
  *
- * 修饰符顺序就是契约：`heightIn(min = 48.dp)` 排在 `clickable` **之前**，可点面才是整枚 48dp 盒；
- * 反过来写（`clickable` 后再 `heightIn`/`padding`）可点面会退回内容盒——`EntryRow` 真机量到 40dp
- * 的「假面」教训、`InlineNotice` 动作槽量到 15.24dp 的教训，都是同一条。
+ * 48dp 触控面由两条**共同**交付，别把其中一条当成「顺序契约」：① 链上存在 `heightIn(min = 48.dp)`；
+ * ② `clickable` 排在任何 `padding` **之前**（即最外层可点面）。`heightIn` 与 `clickable` 的先后
+ * **不影响**可点面尺寸——`clickable`/`pointerInput` 不参与测量，`heightIn` 的最小高约束向内传播、
+ * 实测尺寸向外冒泡，两种顺序下可点节点都 ≥48dp（本文件的 [DialogButton] 是 heightIn 在前、
+ * `NotConfiguredCard` 的出口是 heightIn 在后，两处 connected 用例都实测 ≥48dp，即双证）。
+ * `EntryRow` 真机量到 40dp 的「假面」成因是 **`padding` 排在 `clickable` 之前**把可点面挤回内容盒
+ * （56 − 8 − 8 = 40，原始现场逐字记在 `EntryRow.kt:70-75`）；`InlineNotice` 动作槽量到 15.24dp
+ * 是**链上压根没有 48dp 下限**（变异自证 ⑨），两者都不是 heightIn 的先后问题。
  *
  * `testTag` 与可点语义并到同一枚节点（`mergeDescendants = true`）：标签在父、click 在子的写法会让
  * `onNodeWithTag(…).performClick()` 打在没有 click action 的节点上（`InlineNotice` 动作槽同一处置）。
@@ -197,7 +203,7 @@ internal fun DialogButton(
 /**
  * 破坏性确认对话框：级联条数 + 不受影响的保留面 + 不可撤销，一次说全（spec §3）。
  *
- * [state] 是显隐开关（`false` 时不组合任何节点，与现网 4 份 `AlertDialog` 的
+ * [state] 是显隐开关（`false` 时不组合任何节点，与现网各屏私有 `AlertDialog` 的
  * `if (showDialog) { … }` 同口径），批 2/3 各屏接的是「ViewModel 的确认请求态」而不是自建 Boolean。
  *
  * [cascadeLines] / [keepLines] 由调用方逐字给（组件不猜条数、不猜保留面），[irreversible] 默认 `true`
