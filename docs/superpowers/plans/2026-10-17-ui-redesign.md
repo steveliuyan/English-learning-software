@@ -1045,6 +1045,10 @@ internal val MintBackground: Color
   - **R-10.6 可证性两条（Task 10 评审轮由控制者补，批 2 起同样适用）**：
     ① **几何值必须在 JVM 侧有契约面**：connected 只能钉「下限」（`assertHeightIsAtLeast(48.dp)`、`≥40dp`），钉不住稿面的**取值**（徽标容器 40dp、行 56dp/间隙 12dp/padding 8dp、提示条 padding 14×12dp、间隙 10dp、字形 18dp、1dp 描边）。取值漂移（把 40 改成 48、把 12 改成 8）在 connected 全绿，只有源码契约能挡——用共享夹具 `uiFiles()` + `stripComments`（`SourceRatchet.kt`，`IconBadgeContrastContractTest` 同一读法）在 `app/src/test/.../ui/SharedComponentGeometryContractTest.kt` 里逐枚钉字面量，并配合成正/负片段自证正则承重（本仓 glyph 尺寸锚的先例口径）。
     ② **墨色「防回潮」必须是可判红的断言**：`assertTrue(inks.chevron != set.text3)` 这类写法在 `assertEquals(set.text2, inks.chevron)` 之后**永远不会单独红**（两枚 token 取值不同，等值成立即不等式成立）——它是文档不是闸。要留裁决就得留它的**依据**：把被拒候选当场复算成不合格（`ratioOf(AppColorLight.text3, AppColorLight.tint) < 3.1`：浅套 text3 压 tint 恰 3.00，卡在 3:1 线上没有余量；`ratioOf(AppColorLight.errorFill, 浅套 Error 底) < 4.5`：实测 3.01）。装饰档阈值因此从 `≥3.0` 收紧为 `≥3.1`（「边界上的合格不算合格」的算术写法，与被拒依据同一条线）。同族先例：`InlineNoticeKindTest` 里 R-10.1b 的 `mockActionRatio < 4.5` 就是这种承重写法，不抄数值、只写进断言消息，token 漂移时当场提示重议。
+  - **R-10.7 触控与可点计数的测量节点（Task 10 二轮评审由控制者补，批 2/批 3 全部 connected 用例适用）**：
+    ① **48dp 下限必须量在「能点的那枚节点」上**。`assertHeightIsAtLeast` 打在调用方链首的 `testTag` 节点上量到的是整行外框（恒 ≥56dp），把 `clickable` 挪回 `padding` 内侧那种回归（真机实测的可点面只有 40dp）它抓不住；正确写法是 `onNode(hasClickAction(), useUnmergedTree = true).assertHeightIsAtLeast(48.dp)`。同理，`InlineNotice` 的动作槽若把 48dp 断在自带 `heightIn(min = 48.dp)` 的包裹 `Box` 上就是**自证恒真**——槽内文字能否填满 48dp 由 `propagateMinConstraints = true` 决定，断言必须打在槽内那枚可点上。
+    ② **「整行只有一个可点目标」这类计数必须再跑一遍未合并树**。行本体是 `clickable`（`mergeDescendants`）时，子级新长出的 clickable 会被并进父节点、合并树计数不加，那条断言实际只抓得住「行丢了 click」。修法：同一计数再加 `onAllNodes(hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes().size == 1`。（Task 9 `AppScreenHeaderTest` 的合并树写法在根节点**不是** clickable 时确实有效，不是照抄就等价。）
+    ③ **测试端复算的配方必须绑回生产源码**。28 组合对比表若在测试里自己 `mix(surface, deep, 0.16)` 现算底色，而生产写成 `background` 或 `0.30f`，全表照绿——那张表只对「理想配方」成立。修法：给配方加一条源码字面量锚（`lerp\(colors\.surface,\s*palette\.deep,\s*0\.16f\)` 恰 1 处 + 禁形 `colors\.background`/异系数 0 处 + 正负片段自证），与本任务的几何契约同类。
   `EntryRow` 布局（**Task 10 实测后修订，修饰符顺序就是契约，别再按稿面顺序「顺手调回去」**）：`Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).then(顶线装饰).heightIn(min = 56.dp).padding(vertical = 8.dp), spacedBy(12.dp), CenterVertically)` = `EntryIconBadge(icon, domain, modifier = Modifier.testTag("entry_row_icon"), tone = iconTone)`
   —— 计划原稿写的 `.heightIn(…).padding(…).clickable(…)` 在真机上量到的可点面只有 **40dp**：`clickable` 排在 padding 之后时，上下 8dp padding 与那条 1dp 顶线都留在可点面**外侧**，可点区塌成内容盒，直接撞 F5-03 的 48dp 硬下限（connected 用例 `entry_row_clears_the_48dp_touch_floor` 首跑实测 `Actual height is 40.0.dp` 红，改成上面的顺序后 56dp 绿）。几何等价：整盒仍是 1dp 线 + 56dp（内含 8+8 padding、内容下限 40dp），行的外框不因线而缩。
   行内内容：`Column(weight = 1f)`（`title` 取 `AppType.Body` + `text1` + `maxLines = 1` + `Ellipsis`；`subtitle` 取 `AppType.Footnote` + `text2` + `padding(top = 1.dp)` + `maxLines = 1` + `Ellipsis`——入口行的标题/副标题都是提示性内容，与页标题不同档，允许省略号，稿 `.en`/`.ed` 各一行）+ `trailing`（`AppType.Footnote` + `text2`）+ `AppGlyph(AppIcon.ChevronRight, text2, 16.dp, layer = StrokeOnly)`（`showChevron` 为真时）。**省略号必须可证**：`hasVisualOverflow == true` 判不出 `Ellipsis` 与 `Clip`（两种都报 true），所以钉省略号的用例要加 `layout.isLineEllipsized(0)`（R-10.6，Task 10 评审轮补）。
@@ -1116,6 +1120,14 @@ internal val MintBackground: Color
 ---
 
 ### Task 11: `NotConfiguredCard` + `ConfirmDestructiveDialog` + `OutboundConfirmDialog`
+
+> **R-11.0（Task 10 二轮评审 I-5 的控制者裁决，接线前定）**：`InlineNotice` 的 `action` 槽目前只给「48dp + testTag + 合并语义」，
+> 动作本体（`Text` + `clickable` + `FontWeight.Bold` + `noticeInk(kind, appColors()).action`）**留给调用方**——批 2/3 收 11 份提示的同时会长出 11 份链接配方，
+> 而 Task 12 的份数棘轮按**文件**数「不走 `InlineNotice(` 的错误渲染站点」，自排动作链接既不是错误 Text 站点也不新增文件，抓不住。
+> 裁决：Task 11 的第一步就是在 **`InlineNotice.kt` 同文件**里加公开 `InlineNoticeAction(kind: InlineNoticeKind, label: String, onClick: () -> Unit, modifier: Modifier = Modifier)`
+> （内部就是那四件套 + `fillMaxHeight()` 承接 48dp），调用方写成 `action = { InlineNoticeAction(InlineNoticeKind.Error, "重试") { … } }`。
+> 同文件新增 → 不撞份数棘轮；墨色/字重/触控只有一处真值。先写失败用例（connected：槽内可点节点 ≥48dp 且未合并树计数仍为 1；JVM：源码契约钉 `FontWeight.Bold` 与 `noticeInk(…).action` 各恰 1 处、
+> 且禁止调用方文件里出现 `color = noticeInk(` 自取动作墨），再实现。R-10.7① 的那条 48dp 断言在本任务起改打在 `InlineNoticeAction` 的可点节点上。
 
 **Files:**
 - Create: `app/src/main/java/com/example/englishlearning/ui/components/NotConfiguredCard.kt`
