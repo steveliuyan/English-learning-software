@@ -29,7 +29,6 @@ import com.example.englishlearning.ui.components.EntryIconTone
 import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.MintGlassTheme
-import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -115,6 +114,11 @@ class EntryRowTest {
     /**
      * 钉的破坏（R-10.2）：弱档另起一份容器、两档容器尺寸不同 = 「同族两档」变成两种组件。
      * 两档只有底色与字形墨不同，容器必须同宽同高且 ≥40dp。
+     *
+     * **等宽等高是严格相等，不是容差**（R-10.6，Task 10 评审轮收紧）：两档共用同一枚
+     * `Box(Modifier.size(40.dp))`（`IconBadge.kt` 里只写一遍，几何契约见 `SharedComponentGeometryContractTest`），
+     * 实测必然相同；真机若不相等就是 R-10.2 真违规（弱档另起了容器），不许把本条放宽回 0.6dp 容差。
+     * `≥40dp` 下限保留——那是 F5-03 侧的闸，与等宽等高分属两件事。
      */
     @Test
     fun entry_row_keeps_a_40dp_icon_container_in_both_tones() {
@@ -148,9 +152,17 @@ class EntryRowTest {
         val tintH = tinted.bottom - tinted.top
         assertTrue("两档容器都必须 ≥40dp：实底档 ${solidW}x${solidH}、弱档 ${tintW}x${tintH}",
             solidW >= 40.dp && solidH >= 40.dp && tintW >= 40.dp && tintH >= 40.dp)
-        assertTrue(
-            "R-10.2 的「同族两档」= 同容器尺寸（只有底色/字形墨不同）：实底档 ${solidW}x${solidH} vs 弱档 ${tintW}x${tintH}",
-            abs((solidW - tintW).value) < 0.6 && abs((solidH - tintH).value) < 0.6,
+        assertEquals(
+            "R-10.2「同族两档」= 同一枚容器（只有底色/字形墨不同）：实测宽度差 $solidW - $tintW，" +
+                "两档共用 `Box(size(40.dp))`，宽度差必须为 0（严格相等，不许放宽回 0.6dp 容差）",
+            0.dp,
+            solidW - tintW,
+        )
+        assertEquals(
+            "R-10.2「同族两档」= 同一枚容器（只有底色/字形墨不同）：实测高度差 $solidH - $tintH，" +
+                "两档共用 `Box(size(40.dp))`，高度差必须为 0（严格相等，不许放宽回 0.6dp 容差）",
+            0.dp,
+            solidH - tintH,
         )
     }
 
@@ -161,6 +173,12 @@ class EntryRowTest {
      * 组件给 `maxLines = 1` + `Ellipsis`，所以这里 `hasVisualOverflow == true` 是**期望结果**
      * （省略号生效 = 提示性内容被合法裁掉）；页头 `AppScreenHeaderTest` 钉的是 `!hasVisualOverflow`
      * （页标题裁掉即丢信息）。把本用例「改成」`!hasVisualOverflow` 就等于把两个相反口径合成一个。
+     *
+     * **为什么单靠 `hasVisualOverflow` 不够（R-10.6，Task 10 评审轮补）**：`Ellipsis` 与 `Clip` 两种
+     * 溢出写法都让 `hasVisualOverflow == true`，它判不出「省略号收尾 vs 字形直接裁掉」——而用例名
+     * （not_clipping）与 KDoc 声称钉的正是后者。`TextLayoutResult.isLineEllipsized(0)` 只在省略号
+     * 真的加到该行时返回 true：`Clip` 下它为 false，本条当场红（变异自证 ⑤：标题 `Ellipsis` → `Clip`，
+     * 红的必须是这条而不是 `lineCount`/`hasVisualOverflow`）。
      */
     @Test
     fun entry_row_truncates_title_and_subtitle_with_ellipsis_not_clipping() {
@@ -197,6 +215,12 @@ class EntryRowTest {
                     "false 说明超长内容根本没被省略号处理）：overflow=${layout.hasVisualOverflow} " +
                     "width=${layout.didOverflowWidth} size=${layout.size}",
                 layout.hasVisualOverflow,
+            )
+            assertTrue(
+                "「$text」必须真的以省略号收尾而不是把字形裁掉（Clip 也报 hasVisualOverflow=true，" +
+                    "判不出裁切 vs 省略号，只有本条判得出，R-10.6）：isLineEllipsized(0)=false " +
+                    "overflow=${layout.hasVisualOverflow} lineCount=${layout.lineCount}",
+                layout.isLineEllipsized(0),
             )
         }
     }

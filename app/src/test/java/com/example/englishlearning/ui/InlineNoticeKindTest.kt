@@ -47,19 +47,18 @@ class InlineNoticeKindTest {
     /**
      * R-10.1 的 `.err` 配对：前景取 `error`（error **文**），底取稿的 `color-mix(error-fill 12%, surface)`。
      *
-     * `foreground != errorFill` 这条不是装饰：稿的 `.banner.err` 底色就是 error-fill 的 12% 混色，
-     * 若有人把前景也换成 error-fill（「反正都是那枚红」），浅套白底上会掉到正文不达标且与稿的
-     * `color: var(--error)` 分家——本条连同下一条比值把它钉回 error 文。
+     * 评审轮（R-10.6）把「防回潮」从 `assertTrue(ink.foreground != set.errorFill)`（重言：两枚 token
+     * 取值本不相同，等值 `assertEquals(set.error, ink.foreground)` 成立即不等式必然成立，永不单独红）
+     * 改成**被拒候选当场不合格**的复算：error-fill 压浅套 Error 底不足正文 4.5——这才是
+     * 「error 文 vs error-fill 填充」这条裁决的依据本身在承重（与 `info_notice…` 里 R-10.1b 的
+     * `mockActionRatio < 4.5` 同族）。**浅套是这条裁决的现场**；深套 errorFill 达标，所以只按浅套
+     * 断言——若哪天 token 漂移让浅套 errorFill 也压得动自家 Error 底，这条会红，提示裁决重议。
      */
     @Test
     fun error_notice_foreground_is_the_error_text_token_not_the_error_fill() {
         sets.forEach { set ->
             val ink = noticeInk(InlineNoticeKind.Error, set)
             assertEquals(set.error, ink.foreground, "Error 态前景必须是 error 文 token（R-10.1）")
-            assertTrue(
-                ink.foreground != set.errorFill,
-                "Error 前景被换成了 error-fill 填充：与稿 `color: var(--error)` 分家（set=$set）"
-            )
             assertEquals(
                 lerp(set.surface, set.errorFill, 0.12f),
                 ink.backdrop,
@@ -83,6 +82,18 @@ class InlineNoticeKindTest {
                 "Error 动作墨压自家底只有 %.2f:1，不足正文 AA 4.5（set=$set）".format(action)
             )
         }
+        // 裁决依据承重（R-10.6）：被拒候选 error-fill 压浅套 Error 底（lerp(surface, errorFill, 0.12)）
+        // 不足正文 4.5——这是「Error 前景取 error 文、不取 error-fill 填充」的依据；深套 errorFill 达标，
+        // 浅套才是现场。若 token 漂移让该比值升到 ≥4.5，这条红，提示裁决重议。
+        val rejectedFillRatio = ratioOf(
+            AppColorLight.errorFill,
+            noticeInk(InlineNoticeKind.Error, AppColorLight).backdrop,
+        )
+        assertTrue(
+            rejectedFillRatio < 4.5,
+            "裁决依据失效：被拒候选 error-fill 压浅套 Error 底已升到 %.2f:1（≥4.5），" +
+                "「Error 前景必须偏离 error-fill」需重议".format(rejectedFillRatio)
+        )
     }
 
     /**
