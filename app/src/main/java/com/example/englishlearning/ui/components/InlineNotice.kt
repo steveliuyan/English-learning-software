@@ -128,7 +128,9 @@ internal val InlineNoticeKind.glyphLayer: AppGlyphLayer
  * 「一条提示」升级成「一个主操作」）。槽内容一律用同文件的 [InlineNoticeAction] 渲染
  * （裁决 R-11.0：动作本体 = `Text` + `clickable` + `FontWeight.Bold` + [NoticeInk.action] 四件套，
  * 批 2/3 要收的错误提示站点（份数以计划裁决 R-12.3 的实测清单为准，重算：
- * `grep -rln 'AppPalette.ErrorText\|colorScheme.error' app/src/main/java/com/example/englishlearning/ui | wc -l`），
+ * `grep -rln 'AppPalette.ErrorText\|colorScheme.error' app/src/main/java/com/example/englishlearning/ui | grep -v components/ | wc -l`
+ * ——**必须带 `grep -v components/`**：本行 KDoc 自己就含那两个字面量，不排除组件目录会自匹配多数一枚，
+ * 实测不带 = 13、带 = 12，R-12.3 的 12 是后者的口径），
  * 配方留在调用方就会长出同数目的链接写法，而 Task 12 的份数棘轮按**文件**数
  * 「不走 `InlineNotice(` 的错误渲染站点」，自排动作链接既不新增文件也不是错误 Text 站点 → 抓不住）。
  * 本组件负责两件槽内拿不到的事：

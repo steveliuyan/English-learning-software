@@ -213,6 +213,10 @@ class NotConfiguredCardContractTest {
         // 只有「AppPalette|DomainColors 0 处」那条粗探针能挡，换成别的静态写法就漏（评审 M-2）。
         assertEquals(1, countMatches(source, Regex("""\.background\(set\.surface\)""")), "卡面底必须恰一处读当前套 surface")
         assertEquals(1, countMatches(source, Regex("""border\(1\.dp, set\.outlineSoft""")), "描边必须恰一处读当前套 outlineSoft")
+        // 上面两条只钉了 token **名字**，钉不住 `set` 是谁：`val set = AppColorLight` 能让两条照常绿，
+        // 而深色模式下卡面就成了静态浅值（复评 N-2）。故再钉「本文件 `val set = appColors()` 恰一处」，
+        // 让「读的是当前套」这件事本身也有锚。
+        assertEquals(1, countMatches(source, Regex("""val set = appColors\(\)""")), "容器色必须取自当前套 appColors()，不得写死某一套")
         // 负控：静态读点形态一条都不许出现（正控已由上面两条恰一处承担）
         assertEquals(0, countMatches(source, Regex("""AppPalette\.(Surface|Separator)""")), "容器色不得退回静态 token")
     }
