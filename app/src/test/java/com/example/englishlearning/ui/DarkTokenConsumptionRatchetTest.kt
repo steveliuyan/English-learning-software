@@ -2,6 +2,7 @@ package com.example.englishlearning.ui
 
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -90,6 +91,22 @@ internal val StaticReadPolicyExemptions: Map<String, String> = mapOf(
     "MintPalette.kt" to "薄荷令牌静态 getter 桥：内部读 LocalAppColors / LocalDomainColors，不读 AppPalette",
 )
 
+/**
+ * 结构形态注记（不是豁免）：`DarkTokenSeedAllowlist` 里哪些命中位于「非可组合上下文」——
+ * 形参默认值与顶层 `val/var`。Kotlin 不允许在非组合上下文里调用 `@Composable`，这类站点不能就地换成
+ * `appDomain(...)`；正确迁移做法是把默认值改成可空哨兵、在函数体内解析（`accent: DomainAccent? = null`
+ * 然后 `accent ?: appDomain(AppDomain.AiSpeech)`）。计数仍以 [DarkTokenSeedAllowlist] 为准，本表只是注记，
+ * 修掉一处时两张表一起减 1；两张表都由「精确相等」守着，新增未登记即红。
+ *
+ * 登记内容：`components/glass/GlassButton.kt` 的 `PillButton` 形参默认值
+ * `accent: DomainAccent = DomainColors.AiSpeech`（计划 Task 3 现场撞出、brief Step 3 点名要「一并列入并注明」
+ * 的那一类）。顶层 `Brush` 形态当前实测 0 处：现状三处顶层 `Brush.linearGradient(...)` 读的是保持静态的
+ * `AppleMint*`（MintPalette 那条线），不含 `AppPalette.` / `DomainColors.`，本规则看不见它们。
+ */
+internal val NonComposableStaticReadLedger: Map<String, Int> = mapOf(
+    "components/glass/GlassButton.kt" to 1,
+)
+
 class DarkTokenConsumptionRatchetTest {
     private val uiDir = File(UI_MAIN_SOURCE_PATH)
 
@@ -99,17 +116,30 @@ class DarkTokenConsumptionRatchetTest {
      */
     private val rule = Regex("""\b(?:AppPalette|DomainColors)\.[A-Za-z0-9_]+""")
 
+    /** 顶层 `val/var` 形态：只在剥注释后仍位于列 0 的行上生效（块注释剥离保留换行，缩进信息不丢）。 */
     private val topLevelDeclarationRead =
         Regex("""^(private |internal |public )?(val|var)\s+\w+.*\b(?:AppPalette|DomainColors)\.""")
 
-    private val defaultParameterRead =
-        Regex("""[A-Za-z0-9_]+\s*:\s*Color\s*=\s*\b(?:AppPalette|DomainColors)\.""")
+    /** 形参 / 带类型标注的 `名字: 类型 = AppPalette.X` 形态（默认参数不能调 @Composable，故结构上不可就地迁移）。 */
+    private val typedDeclarationRead =
+        Regex("""\w+\s*:\s*[A-Z]\w*\s*=\s*\b(?:AppPalette|DomainColors)\.""")
 
     private fun File.relativeUiPath(): String = relativeTo(uiDir).invariantSeparatorsPath
 
     private fun actualCounts(): Map<String, Int> = uiFiles(uiDir)
         .associate { it.relativeUiPath() to countMatches(it.readText(), rule) }
         .filterValues { it > 0 }
+
+    /** 命中「非可组合上下文」两种形态的行，返回「相对路径: 折叠行」。 */
+    private fun nonComposableShapedSites(): List<String> = uiFiles(uiDir).flatMap { file ->
+        stripComments(file.readText()).lines()
+            .filter { line ->
+                val atColumnZero = line.isNotEmpty() && !line.first().isWhitespace()
+                (atColumnZero && topLevelDeclarationRead.containsMatchIn(line)) ||
+                    typedDeclarationRead.containsMatchIn(line)
+            }
+            .map { line -> "${file.relativeUiPath()}: ${line.trim().replace(Regex("""\s+"""), " ")}" }
+    }
 
     @Test
     fun `seed and exemption keys point at real scanned files`() {
@@ -187,23 +217,24 @@ class DarkTokenConsumptionRatchetTest {
     }
 
     @Test
-    fun `non-composable static reads remain a registered zero today`() {
-        val sites = uiFiles(uiDir).flatMap { file ->
-            stripComments(file.readText()).lines()
-                .filter { line ->
-                    val atColumnZero = line.isNotEmpty() && !line.first().isWhitespace()
-                    (atColumnZero && topLevelDeclarationRead.containsMatchIn(line)) ||
-                        defaultParameterRead.containsMatchIn(line)
-                }
-                .map { line -> "${file.relativeUiPath()}: ${line.trim().replace(Regex("""\s+"""), " ")}" }
-        }
+    fun `non-composable shaped reads are exactly the registered ledger`() {
+        val sites = nonComposableShapedSites()
+        val detected = sites.groupingBy { it.substringBefore(": ") }.eachCount()
+        val unregistered = detected.filterKeys { it !in NonComposableStaticReadLedger }
         assertTrue(
-            sites.isEmpty(),
-            "出现顶层 val/var 或形参默认值形态的静态深色读点：\n${sites.joinToString("\n")}\n" +
-                "这类站点确实无法在 @Composable 外读 appColors()，但必须先登记：把该文件的 seed 计数加上并在" +
-                "代码注释里写明它为什么不可迁移，未登记即违规。本用例只做启发式点名，判红由人来裁决，" +
-                "不接受「顺手放宽规则」。"
+            unregistered.isEmpty(),
+            "出现未登记的「非可组合上下文」静态读点（顶层 val/var 或形参默认值）：\n" +
+                sites.filter { it.substringBefore(": ") in unregistered.keys }.joinToString("\n") +
+                "\n首选改结构迁移（默认值换成可空哨兵、在函数体内 appDomain(...) 解析），" +
+                "确实无法迁移才登记进 NonComposableStaticReadLedger 并写明理由；本用例只做形态点名，判红由人来裁决。"
         )
+        assertTrue(
+            NonComposableStaticReadLedger.keys.all { it in detected },
+            "注记表里登记的站点已不存在（结构已改对或文件已改名）：" +
+                NonComposableStaticReadLedger.keys.filterNot { it in detected } +
+                " —— 注记必须随之删除，残留注记会让下一个同类站点蒙过去。"
+        )
+        assertEquals(NonComposableStaticReadLedger, detected, "非可组合形态站点与注记表逐文件计数不符")
     }
 
     @Test
