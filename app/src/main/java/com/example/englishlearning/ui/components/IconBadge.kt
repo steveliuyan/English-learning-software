@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppDomain
@@ -21,12 +22,14 @@ import com.example.englishlearning.ui.theme.appDomain
 import kotlin.math.roundToInt
 
 /**
- * B 案图标的两种呈现：`EntryIconBadge` 一族的域渐变入口容器（渐变底 + 两层字形，40dp 档）与 30dp
- * 行内徽标（tint 底 + 单层描边字形）。这里的「入口容器」专指这一族，不含页头 `.back` 那种
- * surface 底 + 1dp outlineSoft 的容器（几何见稿 `mockups.html:119-122`，由 Task 9 `AppScreenHeader` 承载）。
+ * B 案图标的两种呈现：`EntryIconBadge` 一族的 ≥40dp 入口容器（40dp 档，内分实底渐变与弱档 tint
+ * 两档强度，见 [EntryIconTone]）与 30dp 行内徽标（tint 底 + 单层描边字形）。这里的「入口容器」专指
+ * 这一族，不含页头 `.back` 那种 surface 底 + 1dp outlineSoft 的容器（几何见稿 `mockups.html:119-122`，
+ * 由 Task 9 `AppScreenHeader` 承载）。
  *
  * 本文件的颜色数学与容器几何都是契约对象，不是随手写法：`IconBadgeContrastContractTest` 用测试端
- * 独立实现的 int 域混色复算同一端点，并把容器尺寸、裁角、描边与层开关按源码文本钉死。
+ * 独立实现的 int 域混色复算同一端点，并把容器尺寸、裁角、描边、字形度量（入口 22dp / 行内 17dp）
+ * 与层开关按源码文本钉死。
  * 域色一律经 [appDomain] 取（`AppColors.kt` 的两套映射），中性色一律经 [appColors] 取，
  * 本文件不出现任何裸 hex。
  */
@@ -71,38 +74,80 @@ private fun mixArgb(from: Int, to: Int, fraction: Double): Int {
 fun allowsInEntryContainer(icon: AppIcon): Boolean = icon !in StrokeOnlyIcons
 
 /**
- * `EntryIconBadge` 一族的域渐变入口容器（40dp 档）：域渐变底（亮端 = deep 混 35% base，暗端 = deep）
- * + 两层字形 + 1dp 玻璃高光内描边。
+ * 入口容器的两档强度（裁决 R-10.2）：稿 `.ic`（实底域渐变 + 白墨）与 `.ic-tint`（同 40dp 容器、
+ * 底 = `deep` 混 16% surface、字形 = `deep` 单层描边、**无描边高光**）是同族两档，稿里 `.ic-tint`
+ * 出现 21 次，且批 2「今日计划」的三条入口行全部用弱档（`mockups.html:912-916`）。
  *
- * 字形墨色分主题两套：浅套取白，深套取中性墨 `AppColorDark.onBrand`。这不是随手挑的——深套域色在
+ * 加档位而不是再造组件：弱档另起一份容器 = 让批 2 手搓第二份 40dp 容器，正撞计划 Task 12 的组件份数棘轮。
+ * 两档共用同一枚外层 `Box`（`size(40.dp)` 与 `clip(AppShape.Icon)` 各只写一遍），差别只在底色、
+ * 是否描玻璃高光、以及字形层开关——这也是 `IconBadgeContrastContractTest` 把容器计数钉成「各恰一处」、
+ * 把入口字形调用钉成「恰两处」的原因。
+ */
+enum class EntryIconTone { Gradient, Tint }
+
+/**
+ * `EntryIconBadge` 一族的入口容器（40dp 档，两档强度见 [EntryIconTone]）：
+ *
+ * - [EntryIconTone.Gradient]（稿 `.ic`，默认档）：域渐变底（亮端 = deep 混 35% base，暗端 = deep）
+ *   + 两层字形 + 1dp 玻璃高光内描边；
+ * - [EntryIconTone.Tint]（稿 `.ic-tint`）：底 = `lerp(surface, deep, 0.16)`（稿
+ *   `color-mix(in srgb, var(--d) 16%, var(--surface))` 的同口径 sRGB 逐通道插值）+ `deep` 单层描边字形，
+ *   **不描 1dp 玻璃高光边**（稿 `.ic-tint` 无描边，高光边属于 `.ic` 实底档）。
+ *
+ * 字形度量按稿 `.ic svg { width:22px; height:22px }`（`mockups.html:153`）取 22dp（裁决 R-10.3，
+ * 与本任务同步把 Task 7 出厂的 24dp 对齐；`EntryIconBadge` 目前零生产消费方，改动不波及任何屏）。
+ *
+ * 字形墨色分主题两套（实底档）：浅套取白，深套取中性墨 `AppColorDark.onBrand`。这不是随手挑的——深套域色在
  * 深色下就是浅底（`DomainDark.deep` 与 base 合一），白描边压它不达非文本 3:1 线，故视觉稿在深色下
  * 也把白描边改成墨色。具体比值不抄在这里（与 `AppColors.kt` 同一口径：抄进注释就会随取值漂移），
- * 两条配对各由 `IconBadgeContrastContractTest` 当场按相对亮度复算并钉住 3:1。
+ * 两条配对各由 `IconBadgeContrastContractTest` 当场按相对亮度复算并钉住 3:1。弱档那对「`deep` 字形压
+ * 16% 混色底」同样由该契约按 7 域 × 2 档 × 2 主题共 28 个组合复算（R-10.2 的控制者预演算：浅套最低
+ * 是 `AiSpeech`、深套最低是 `Danger`，都在 3:1 线以上；数值只写进断言消息，这里不抄）。
  *
  * 开头那条 `require` 是豁免表的执行点：表里的开放折线（返回、箭头、关闭、勾选一类）没有可闭合的
  * 内部区域，放进这一族容器只会得到一枚「看起来缺了层」的字形，属于设计层面的误用，直接拦死。
+ * **两档都过这道门**（R-10.2）：弱档也不承接豁免枚——豁免枚只在行内/尾部出现。
  * 它管的只有本函数这一族：页头 `.back` 那种 surface 底 + 1dp outlineSoft 的容器不经过这条 `require`，
  * 字形度量由 `AppScreenHeader` 自己按稿承载。
  */
 @Composable
-fun EntryIconBadge(icon: AppIcon, domain: AppDomain, modifier: Modifier = Modifier) {
+fun EntryIconBadge(
+    icon: AppIcon,
+    domain: AppDomain,
+    modifier: Modifier = Modifier,
+    tone: EntryIconTone = EntryIconTone.Gradient,
+) {
     require(allowsInEntryContainer(icon)) {
         "$icon 属两层豁免表，只作行内/尾部指示，不得进入 ≥40dp 入口容器"
     }
     val palette = appDomain(domain)
-    val ink = if (LocalIsDark.current) appColors().onBrand else Color.White
-    val brush = Brush.linearGradient(
-        listOf(gradientStartForDomain(palette.deep, palette.base), palette.deep)
-    )
+    val colors = appColors()
+    val tintTone = tone == EntryIconTone.Tint
+    // 两档共用同一枚外层容器：底色与描边的差异收进这一条链，尺寸与裁角只写一遍（R-10.2）。
+    val backdropModifier = if (tintTone) {
+        Modifier.background(lerp(colors.surface, palette.deep, 0.16f))
+    } else {
+        Modifier
+            .background(
+                Brush.linearGradient(
+                    listOf(gradientStartForDomain(palette.deep, palette.base), palette.deep)
+                )
+            )
+            .border(1.dp, AppPalette.GlassHighlight, AppShape.Icon)
+    }
     Box(
         modifier = modifier
             .size(40.dp)
             .clip(AppShape.Icon)
-            .background(brush)
-            .border(1.dp, AppPalette.GlassHighlight, AppShape.Icon),
+            .then(backdropModifier),
         contentAlignment = Alignment.Center,
     ) {
-        AppGlyph(icon = icon, tint = ink, size = 24.dp)
+        if (tintTone) {
+            AppGlyph(icon = icon, tint = palette.deep, size = 22.dp, layer = AppGlyphLayer.StrokeOnly)
+        } else {
+            val ink = if (LocalIsDark.current) colors.onBrand else Color.White
+            AppGlyph(icon = icon, tint = ink, size = 22.dp)
+        }
     }
 }
 

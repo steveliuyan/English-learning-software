@@ -36,6 +36,10 @@ import kotlin.test.fail
 
 /**
  * 批 1 Task 7 契约：双色图标的两种呈现（≥40dp 入口容器 / 30dp 行内徽标）按实测对比与几何钉死。
+ * Task 10 在同一文件里给入口容器补了第二档强度（`EntryIconTone`，裁决 R-10.2）并把入口字形对齐稿的
+ * 22dp（裁决 R-10.3），故本类的入口对比段扩成 7 域 × 2 档 × 2 主题共 28 个组合复算
+ * （[both_entry_tones_clear_3_to_1_in_both_theme_sets]），入口形状段按档重写
+ * （[entry_glyph_shapes_are_pinned_tone_by_tone]）。
  *
  * 口径沿用 Task 2/4/6（`DesignTokenContractTest` / `MaterialThemeAssemblyContractTest` /
  * `AppIconsStructureContractTest`）：
@@ -51,8 +55,10 @@ import kotlin.test.fail
  *    写法背后能不能真画出东西由组装用例判定——[buildAppImageVector] 是纯函数，JVM 侧直接读
  *    返回的 `ImageVector` 节点表与画笔参数（修复轮 I-1：只钉「文本里出现过 CircleFill」曾恒真，
  *    删掉标记解释也不会有任何一条红）。入口字形那条文本钉在修复轮 2 改成**否定式**：
- *    [entryGlyphCallSegment] 只负责找出 24dp 调用整段（允许批 2 追加合法实参），
- *    口径由「段内 [explicitLayerArgument] 出现 0 次」把守，两份入口写法真值合并成一条。
+ *    [entryGlyphCallSegment] 只负责找出 22dp 调用整段（允许批 2 追加合法实参），
+ *    口径按档分开把守（Task 10 R-10.3 重写，见 [entry_glyph_shapes_are_pinned_tone_by_tone]）：
+ *    弱档那处**必须**显式单层（[entryStrokeOnlyCall]），实底档那处 `layer =` 出现 0 次
+ *    （[explicitLayerArgument]）——旧版「入口一律不得显式 layer」的口径在有了弱档之后正好反了。
  *
  * [mixArgb] 是本测试自带的第二份混色实现（int 域），与生产的 `gradientStartForDomain` 不共享一行代码：
  * 这是**有意的重复**——两端点必须算出同一个颜色才算契约成立（逐通道比对见
@@ -125,25 +131,36 @@ class IconBadgeContrastContractTest {
     /** 行内徽标：17dp 字形必须显式只要描边层——填充层在 30dp 浅底上没有信息量，只会把字形糊成一坨。 */
     private val strokeOnlyGlyphCall = Regex("""size\s*=\s*17\.dp\s*,\s*layer\s*=\s*AppGlyphLayer\.StrokeOnly""")
 
-    // 首轮那条 `size = 24.dp)` 把「不带 layer 实参」与「size 是最后一个实参」混为一谈（评审 M-2）；
-    // 修复轮 1 换成「整段调用字面量写死」又留下反向脆弱（复评 N-3：批 2 加一个合法实参就报不相干理由）。
-    // 本轮（修复轮 2）改成否定式：先用 entryGlyphCallSegment 把入口那段调用找出来，再断言段内 `layer` 出现 0 次；
-    // 行为面另由组装用例
-    // [assembled_vector_keeps_both_layers_for_duotone_and_only_the_skeleton_for_stroke_only] 真断言。
-
-    /** 禁止形状：把描边-only 开关用到入口字形上（两种呈现的差异就坍缩成一种）。 */
-    private val strokeOnlyOnEntryGlyph = Regex("""size\s*=\s*24\.dp\s*,\s*layer\s*=\s*AppGlyphLayer\.StrokeOnly""")
-
     /**
-     * 入口字形的 24dp `AppGlyph` 调用**整段**——本文件唯一的入口形状真值，源码断言只走这一条：
+     * 入口族字形的 `AppGlyph` 调用**整段**（稿 `.ic svg { width:22px; height:22px }`，`mockups.html:153`，
+     * R-10.3 把 Task 7 出厂的 24dp 对齐成 22dp）——本文件唯一的入口形状真值，源码断言只走这一条：
      * 只负责「把那段调用找出来」，允许批 2 接线时增补合法实参（`modifier = …`、`strokeScale = …`）与换序，
-     * 实参里再嵌一层括号（`Modifier.padding(4.dp)` 一类）也不截断；行内的 17dp 调用不含 `size = 24.dp`，
-     * 因此不会被认成入口段（那条本就该显式带 `layer`）。
+     * 实参里再嵌一层括号（`Modifier.padding(4.dp)` 一类）也不截断；行内的 17dp 调用不含 `size = 22.dp`，
+     * 因此不会被认成入口段。**两档各一枚，共 2 处**（R-10.2：实底渐变档 + 弱档 tint）。
      */
     private val entryGlyphCallSegment =
-        Regex("""AppGlyph\((?:[^()]|\([^()]*\))*?size\s*=\s*24\.dp(?:[^()]|\([^()]*\))*?\)""")
+        Regex("""AppGlyph\((?:[^()]|\([^()]*\))*?size\s*=\s*22\.dp(?:[^()]|\([^()]*\))*?\)""")
 
-    /** 禁止形状：入口调用段里显式写 `layer =`——两层口径靠默认值承载，写死即改口径。 */
+    /**
+     * 弱档形状真值：22dp 且**显式**只要描边层（稿 `.ic-tint` 的字形就是 `deep` 的单层描边）。
+     * 这是 R-10.3 推翻旧禁令后的正向锚点——旧 `strokeOnlyOnEntryGlyph` 把这一形状当禁止写法，
+     * 口径已经反了，故连同 `24.dp` 锚点一并删除，不留死正则。
+     */
+    private val entryStrokeOnlyCall =
+        Regex("""size\s*=\s*22\.dp\s*,\s*layer\s*=\s*AppGlyphLayer\.StrokeOnly""")
+
+    /**
+     * 禁止形状（换序留痕）：把 `layer` 写在前、`size` 写在后的弱档调用。R-10.3 要求入口形状「两档各恰一处」，
+     * 同一处写法换个个儿就不该被 [entryStrokeOnlyCall] 数到——本用例靠这条合成负片段自证锚点真在按顺序承重
+     * （变异自证：把生产弱档的 `layer = StrokeOnly` 删掉，计数当场红）。
+     */
+    private val strokeOnlyBeforeSize =
+        Regex("""layer\s*=\s*AppGlyphLayer\.StrokeOnly[^()]*size\s*=\s*22\.dp""")
+
+    /** 禁止形状：入口族之外的旧 24dp 锚点串残留（字形度量必须只有 22dp 一档，Task 10 R-10.3）。 */
+    private val legacyEntryGlyphSize = Regex("""size\s*=\s*24\.dp""")
+
+    /** 禁止形状：入口实底档调用段里显式写 `layer =`——两层口径靠默认值承载，写死即改口径。 */
     private val explicitLayerArgument = Regex("""layer\s*=""")
 
     /** 豁免表强制：入口容器开头必须由纯函数判定挡住豁免枚。 */
@@ -215,7 +232,7 @@ class IconBadgeContrastContractTest {
     private fun inlinedGeometryLiterals(text: String): List<String> =
         quotedLiteral.findAll(text).map { it.groupValues[1] }.filter { svgPathShape.matches(it) }.toList()
 
-    /** 入口 24dp 调用的整段命中：段内再做「不得含 `layer =`」的否定式判定，源码断言与本用例片段共用同一条正则。 */
+    /** 入口族 22dp 调用的整段命中（两档各一枚）：段内再做分档判定，源码断言与本用例片段共用同一条正则。 */
     private fun entryGlyphCallSegments(text: String): List<String> =
         entryGlyphCallSegment.findAll(text).map { it.value }.toList()
 
@@ -674,59 +691,149 @@ class IconBadgeContrastContractTest {
     fun inline_badge_glyph_shows_the_stroke_layer_only() {
         val badge = uiComponentSource(BADGE_SOURCE_NAME)
         assertEquals(1, countMatches(badge, strokeOnlyGlyphCall), "行内 17dp 字形必须显式取描边-only 层")
-        assertEquals(0, countMatches(badge, strokeOnlyOnEntryGlyph), "入口 24dp 字形被降级成单层：两种呈现坍缩成一种")
 
-        // 入口字形：否定式判定。段匹配只负责「把那枚 24dp 调用找出来」（恰一处），
-        // 口径由「段内 layer 出现 0 次」把守——批 2 追加 modifier / strokeScale 一类合法实参不会报红，
-        // 把 layer 写死进去口才红，红的原因与契约要守的东西一致（复评 N-3 要消除的「报不相干理由」）。
+        // 行内那枚的字形度量必须仍然「不是入口段」：入口族改到 22dp 后，17dp 调用绝不能被算进入口计数，
+        // 否则 R-10.2 的两档计数与行内档位会互相顶替（入口段判定见 entry_glyph_shapes_are_pinned_tone_by_tone）。
+        val good = "AppGlyph(icon = icon, tint = palette.deep, size = 17.dp, layer = AppGlyphLayer.StrokeOnly)"
+        assertEquals(1, countMatches(good, strokeOnlyGlyphCall), "合成正片段漏判：行内单层形状抓不住")
+        assertEquals(0, entryGlyphCallSegments(good).size, "合成正片段越界：行内 17dp 调用被当成入口段")
+        val unlayered = "AppGlyph(icon = icon, tint = palette.deep, size = 17.dp)"
+        assertEquals(0, countMatches(unlayered, strokeOnlyGlyphCall), "合成负片段被放行：行内没关填充层也算合格")
+    }
+
+    /**
+     * R-10.3 的入口形状段（Task 10 与 `EntryIconTone` 同提交重写）：入口族字形统一 22dp（稿 `.ic svg`），
+     * 两档各一枚、共 2 处调用，且**两档各按其形状判**——弱档恰一处显式单层，实底档那一处 `layer =` 出现 0 次。
+     *
+     * 旧版这里钉的是「入口 24dp、段内不得出现 layer =」，并有一条把 `24.dp + StrokeOnly` 判成禁止写法的
+     * `strokeOnlyOnEntryGlyph`。R-10.2 落地后这条口径**反了**：弱档合法地就是单层。所以旧禁令连同
+     * `24.dp` 锚点一并删除（不留死正则），换成上面的分档判定。
+     *
+     * 反向变异自证（本用例的三条承重线，brief Step 4 逐条跑过、贴输出、改回）：
+     *  ① 生产实底档字形改回 `24.dp` → [entryGlyphCallSegment] 只数到 1 处、且 [legacyEntryGlyphSize] 不归零，双红；
+     *  ② 生产弱档删掉 `layer = StrokeOnly` → [entryStrokeOnlyCall] 的分档计数从 1 掉到 0；
+     *  ③ 生产弱档补上渐变（多一处 `linearGradient`）→ `gradientFromRule` 的「恰好一处」红
+     *     （该正则本身按 brief 要求不动，见 [entry_gradient_start_is_produced_by_the_domain_rule_not_a_raw_base_endpoint]）。
+     */
+    @Test
+    fun entry_glyph_shapes_are_pinned_tone_by_tone() {
+        val badge = uiComponentSource(BADGE_SOURCE_NAME)
         val entryCalls = entryGlyphCallSegments(badge)
         assertEquals(
-            1,
+            2,
             entryCalls.size,
-            "入口必须恰好一枚 24dp `AppGlyph` 调用：0 处 = 接线把形状改到本契约失去对象，2 处 = 两套入口口径",
+            "入口族必须恰好两枚 22dp `AppGlyph` 调用（实底档 + 弱档）：0/1 处 = 弱档没接上或两档坍缩成一档，3 处 = 第三套入口口径",
         )
-        entryCalls.forEach { call ->
+        val strokeOnlyCalls = entryCalls.filter { countMatches(it, entryStrokeOnlyCall) == 1 }
+        assertEquals(
+            1,
+            strokeOnlyCalls.size,
+            "两档里必须恰一处是弱档形状（22dp 且显式 StrokeOnly），实际 ${strokeOnlyCalls.size} 处：$entryCalls",
+        )
+        entryCalls.filterNot { it in strokeOnlyCalls }.forEach { call ->
             assertEquals(
                 0,
                 countMatches(call, explicitLayerArgument),
-                "入口 24dp 字形把 layer 实参写死了：默认两层口径被改成显式口径（追加 modifier 等合法实参不在禁止范围）",
+                "入口实底档把 layer 实参写死了：默认两层口径被改成显式口径（追加 modifier 一类合法实参不在禁止范围）",
             )
         }
+        assertEquals(0, countMatches(badge, legacyEntryGlyphSize), "入口族字形度量已统一到 22dp：残留 size = 24.dp 就是第二套度量")
+        assertEquals(0, countMatches(badge, strokeOnlyBeforeSize), "入口族不得靠「layer 写在 size 之前」的形状存在（锚点按顺序承重）")
 
-        val good = "AppGlyph(icon = icon, tint = palette.deep, size = 17.dp, layer = AppGlyphLayer.StrokeOnly)"
-        assertEquals(1, countMatches(good, strokeOnlyGlyphCall), "合成正片段漏判：行内单层形状抓不住")
-        assertEquals(0, entryGlyphCallSegments(good).size, "合成正片段越界：行内 17dp 调用被当成入口段（layer 禁令会打错对象）")
-        val unlayered = "AppGlyph(icon = icon, tint = palette.deep, size = 17.dp)"
-        assertEquals(0, countMatches(unlayered, strokeOnlyGlyphCall), "合成负片段被放行：行内没关填充层也算合格")
-        val wrongBadge = "AppGlyph(icon = icon, tint = ink, size = 24.dp, layer = AppGlyphLayer.StrokeOnly)"
-        assertEquals(1, countMatches(wrongBadge, strokeOnlyOnEntryGlyph), "合成负片段被放行：入口字形被降级没被抓")
-
-        // 入口段匹配与 layer 禁令各自的合成正/负片段。
-        val defaultEntry = "AppGlyph(icon = icon, tint = ink, size = 24.dp)"
-        assertEquals(0, countMatches(defaultEntry, strokeOnlyOnEntryGlyph), "合成正片段越界：不传 layer 的合法入口被判成降级")
-        assertEquals(1, entryGlyphCallSegments(defaultEntry).size, "合成正片段漏判：默认两层的入口调用没被认出来")
+        // 合成正片段：两档各一枚，形状与生产同形。
+        val solid = "AppGlyph(icon = icon, tint = ink, size = 22.dp)"
+        val tint = "AppGlyph(icon = icon, tint = palette.deep, size = 22.dp, layer = AppGlyphLayer.StrokeOnly)"
+        val both = "$solid\n$tint"
+        assertEquals(2, entryGlyphCallSegments(both).size, "合成正片段漏判：两档 22dp 调用没被数成两处")
+        assertEquals(1, entryGlyphCallSegments(both).count { countMatches(it, entryStrokeOnlyCall) == 1 }, "合成正片段漏判：弱档形状没被认出")
         assertEquals(
-            0,
-            countMatches(entryGlyphCallSegments(defaultEntry).single(), explicitLayerArgument),
-            "合成正片段越界：不传 layer 的入口调用被判成写死 layer",
+            1,
+            entryGlyphCallSegments(both).count { countMatches(it, explicitLayerArgument) == 0 },
+            "合成正片段漏判：实底档的「无 layer」没被认出",
         )
-        val augmentedEntry = "AppGlyph(icon = icon, tint = ink, size = 24.dp, modifier = Modifier.padding(4.dp))"
-        assertEquals(1, entryGlyphCallSegments(augmentedEntry).size, "合成正片段漏判：批 2 给入口加 modifier 后调用段认不出来")
+        assertEquals(0, countMatches(both, legacyEntryGlyphSize), "合成正片段越界：22dp 片段里不该有 24dp 命中")
+        // 批 2 追加合法实参后仍然认得（复评 N-3 的口径不变）。
+        val augmented = "AppGlyph(icon = icon, tint = ink, size = 22.dp, modifier = Modifier.padding(4.dp))"
+        assertEquals(1, entryGlyphCallSegments(augmented).size, "合成正片段漏判：追加 modifier 的入口调用认不出来")
         assertEquals(
             0,
-            countMatches(entryGlyphCallSegments(augmentedEntry).single(), explicitLayerArgument),
+            countMatches(entryGlyphCallSegments(augmented).single(), explicitLayerArgument),
             "合成正片段越界：追加合法实参被算成改口径",
         )
-        val explicitDuotone = "AppGlyph(icon = icon, tint = ink, size = 24.dp, layer = AppGlyphLayer.Duotone)"
+
+        // 合成负片段：旧 24dp 串不得再被任何入口正则匹配（锚点搬走的证据）。
+        val legacy = "AppGlyph(icon = icon, tint = ink, size = 24.dp)"
+        assertEquals(0, entryGlyphCallSegments(legacy).size, "合成负片段被放行：旧的 24dp 入口调用仍被当成入口段")
+        assertEquals(1, countMatches(legacy, legacyEntryGlyphSize), "合成负片段失控：24dp 锚点串根本没被数出来")
+        // 合成负片段：两档坍缩成一档（弱档丢了 StrokeOnly）必须让分档计数归零。
+        val collapsed = "$solid\nAppGlyph(icon = icon, tint = palette.deep, size = 22.dp)"
         assertEquals(
-            1,
-            entryGlyphCallSegments(explicitDuotone).size,
-            "合成负片段失控：写死 layer 的入口调用连段都认不出（否定式判定失去对象）",
+            0,
+            entryGlyphCallSegments(collapsed).count { countMatches(it, entryStrokeOnlyCall) == 1 },
+            "合成负片段被放行：弱档丢了单层开关也算两档齐",
         )
+        // 合成负片段：把 layer 写到 size 之前（换个写法就想绕开形状锚点）。
+        val reordered = "AppGlyph(icon = icon, tint = palette.deep, layer = AppGlyphLayer.StrokeOnly, size = 22.dp)"
+        assertEquals(0, countMatches(reordered, entryStrokeOnlyCall), "合成负片段被放行：换序后的单层写法也算弱档形状")
+        assertEquals(1, countMatches(reordered, strokeOnlyBeforeSize), "合成负片段失控：换序片段本身没被 order 探针认出")
+        assertEquals(1, entryGlyphCallSegments(reordered).size, "合成负片段失控：换序写法连入口段都不在计数里（分档判定会失去对象）")
+    }
+
+    /**
+     * R-10.2 的对比面：入口族两档在两套主题下的 28 个组合（7 域 × 2 档 × 2 主题）逐个按 WCAG 相对亮度
+     * 复算非文本 3:1，阈值与配比都当场算、**比值只写进断言消息**（注释与消息里的数字都不当判据）。
+     *
+     * 两档的配对各按生产取：
+     *  - 实底档：底 = 渐变亮端 = deep 混 35% base（与 [white_glyph_on_every_domain_gradient_start_clears_3_to_1]
+     *    同一条端点算法），字形墨浅套白、深套 `onBrand`（深套 `DomainDark` 里 deep == base，混色不改变端点）；
+     *  - 弱档：底 = `surface` 混 16% deep（稿 `.ic-tint` 的 `color-mix(in srgb, var(--d) 16%, var(--surface))`，
+     *    底色是**本套 surface**、不是 `background`），字形墨 = 同域 `deep`。
+     *
+     * 两条反空转分别证明「混色分数承重」与「3:1 阈值抓得住取错字段」——少一条，28 个组合都可能恒真。
+     */
+    @Test
+    fun both_entry_tones_clear_3_to_1_in_both_theme_sets() {
+        listOf(false to DomainLight, true to DomainDark).forEach { (isDark, table) ->
+            val set = if (isDark) AppColorDark else AppColorLight
+            val surface = argbOf(set.surface)
+            val solidInk = if (isDark) rgbOf(set.onBrand) else 0xFFFFFF
+            table.forEach { (domain, p) ->
+                val deep = rgbOf(p.deep)
+                val solidBackdrop = mixHex(argbOf(p.deep), argbOf(p.base), 0.35)
+                val solidRatio = ratio(solidInk, solidBackdrop)
+                assertTrue(
+                    solidRatio >= 3.0,
+                    "$domain 实底档：入口墨 #%06X 压渐变亮端 #%06X 只有 %.2f:1，不足非文本 3:1".format(
+                        solidInk, solidBackdrop, solidRatio
+                    )
+                )
+                val tintBackdrop = mixHex(surface, deep, 0.16)
+                val tintRatio = ratio(deep, tintBackdrop)
+                assertTrue(
+                    tintRatio >= 3.0,
+                    "$domain 弱档：deep 字形 #%06X 压 surface 混 16%% 的底 #%06X 只有 %.2f:1，不足非文本 3:1".format(
+                        deep, tintBackdrop, tintRatio
+                    )
+                )
+                // 两档必须真的是两档：底色相同就说明弱档坍回了实底口径。
+                assertNotEquals(solidBackdrop, tintBackdrop, "$domain 两档混出同一个底：R-10.2 的两档强度名存实亡")
+            }
+        }
+        val ai = DomainLight.getValue(AppDomain.AiSpeech)
+        val lightSurface = argbOf(AppColorLight.surface)
+        // 反空转（混色分数承重）：fraction 推到 1.0 时底 == 字形，比值必须掉到 1.00，
+        // 否则「≥3.0」跟分数无关，上面 28 条全是空转。
         assertEquals(
-            1,
-            countMatches(entryGlyphCallSegments(explicitDuotone).single(), explicitLayerArgument),
-            "合成负片段被放行：入口显式写 layer = 也当成「保持默认两层」",
+            1.0,
+            ratio(rgbOf(ai.deep), mixHex(lightSurface, rgbOf(ai.deep), 1.0)),
+            0.001,
+            "亮度公式失控：底与字形同色竟不算 1:1",
+        )
+        // 反空转（阈值抓得住取错字段）：同一枚弱档底上换用装饰性细线（浅套 outline）必须不合格。
+        val decoy = ratio(rgbOf(AppColorLight.outline), mixHex(lightSurface, rgbOf(ai.deep), 0.16))
+        assertTrue(
+            decoy < 3.0,
+            "合成负例被放行：装饰性细线压弱档混色底竟也过非文本 3:1（%.2f:1），阈值或公式失控".format(decoy)
         )
     }
 
