@@ -103,9 +103,9 @@
   `on-brand #04241C`（`on-mint` 压末端仅 4.07），§2.2 表内 `OnMintForeground`「≈4.6:1」与 `OnBrandDeep`
   「唯一替代」两行旧措辞以此为准、随批 1 token 校准改写。裁决全文见
   `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`。
-- 禁止在页面里现场调色（裸 `Color(0xFF…)`）。**本文档不再抄写残留站点的文件名与行号**（批 1 终审 F8/D-I-6：
-  原先用行号点名的 5 处早已漂移，真实分布是 `ui/` 内 6 个文件 13 处 + `ui/` 外 1 个文件 3 处，
-  而行号会随任何一次改动失效）。权威台账两张表：
+- 禁止在页面里现场调色（裸 `Color(0xFF…)`）。**本文档不抄写残留站点的文件名、行号与处数**（批 1 终审 F8/D-I-6
+  ＋窄复评 N-2：原先用行号点名的站点早已漂移，而「几个文件几处」这类快照数同样会随任何一次改动失效，
+  写进文档就等于再造一份会漂的副本）。权威台账两张表：
   `RawColorLiteralRatchetTest.kt` 的 `RawColorSeedAllowlist`（相对 `ui` 根的按文件计数）、
   `RawColorSeedSiteLines`（行级站点原文，棘轮就吃它作 allowlist）与 `BrandLaunchSeedAllowlist`（`ui/` 外
   唯一携带裸 hex 的 `launch/BrandLaunchActivity.kt`，品牌渐变三段）。

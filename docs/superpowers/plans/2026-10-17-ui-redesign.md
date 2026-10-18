@@ -1300,6 +1300,8 @@ internal val MintBackground: Color
 分支：`stage-5-ui-r2-learning-path`（批 1 合入 `main` 后切出）。
 批 2 只碰四屏 + 学习壳（裁决补 1）：词书选取 / 今日计划 / 词卡 / 词卡详情 + `AppScreen`/`AppBottomBar`。每屏任务的固定收尾三步：**① `grep -n 'testTag'` 本屏并把清单贴进报告；② 迁完本屏静态 `AppPalette.`/`DomainColors.` 读点并递减 `DarkTokenConsumptionRatchetTest` seed；③ connected 跑本屏既有用例类**（类名以现场 `ls app/src/androidTest/.../ui` 为准，不猜）。
 
+**批 2 开工判据（批 1 终审 F7 / D-I-1，控制者侧登记）：`SharedComponentUniquenessRatchetTest` 族 1/2/4 的判定面各带一个「本文件调了共享组件即整体合规」出口，接线后它同时是一只失明面——同一屏残留的私有 forbidden 形态会整体隐形。所以删四族 seed 行的判据是「该屏 forbidden 读点清零」（`AppScreenHeader` 那族 = 本屏 `MaterialTheme.typography.headline` 读点为 0；提示条族 = `AppPalette.ErrorText|colorScheme.error` 读点为 0；词行族 = 顶层私有 `*Row*` 窗口内「lemma 词头 Text + 第二枚 Text」为 0），绝不是「补一行 `AppScreenHeader(` 就准删」。语义由 `family_compliance_exits_are_a_declared_known_blindness_surface` 双向钉住；改成「每屏读点计数」的收紧属计划修订事项，批 2 不做。**
+
 - [ ] **Step 1（每屏通用）: 先跑该屏 connected 基线**，记录改动前通过数；改动后必须全绿。
 
 ---
