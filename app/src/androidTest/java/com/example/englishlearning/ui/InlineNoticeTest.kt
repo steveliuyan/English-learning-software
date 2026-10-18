@@ -126,8 +126,8 @@ class InlineNoticeTest {
             composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size,
         )
         assertEquals(
-            "未合并树里也只能有一枚可点节点：提示条本体与槽内装饰都不得长出第二处 clickable" +
-                "（合并树会把它并进动作节点、数不出来，R-10.7②）",
+            "未合并树里也只能有一枚可点节点：提示条本体与槽内装饰都不得长出第二处可点源" +
+                "（这条把「原始语义树里只有一枚可点」钉成契约；合并树能否看见第二枚按 `EntryRowTest` 用例 ⑩ 的实测口径处理，别照机制推断写死，R-10.7②）",
             1,
             composeRule.onAllNodes(hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes().size,
         )

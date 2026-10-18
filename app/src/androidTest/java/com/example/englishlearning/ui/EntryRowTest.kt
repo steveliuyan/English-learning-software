@@ -96,7 +96,8 @@ class EntryRowTest {
             composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size,
         )
         assertEquals(
-            "未合并树里也只能有一枚可点节点：徽标/chevron/尾部值都不得长出第二处 clickable（合并树会把它并进整行、数不出来）",
+            "未合并树里也只能有一枚可点节点：徽标/chevron/尾部值都不得长出第二处可点源" +
+                "（合并型 clickable 两棵树都数得出，这条守的是非合并型 `semantics { onClick = … }` 那一类，见本用例 KDoc 的实测口径）",
             1,
             composeRule.onAllNodes(hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes().size,
         )
