@@ -1163,7 +1163,14 @@ internal val MintBackground: Color
 
 - [ ] **Step 2: 写 `NotConfiguredCardTest`（connected）**：断言「一句现状 + 一个『去配置 ›』出口」，出口可点且 `testTag("not_configured_goto")`；**死屏禁令**用源码契约表达：四个消费屏（`SentenceAnalysisScreen`/`WordAiQaScreen`/`PhotoTranslationScreen`/`ImageStudioScreen`）重排后必须调用 `NotConfiguredCard(` ——该断言在批 3 才有对象，本任务先测组件自身，批 3 收口时补屏侧断言。
 
-- [ ] **Step 3: 实现三组件**，全部 `appColors()`；`ConfirmDestructiveDialog` 确认按钮容器色 `errorFill` + 白字（`Color.White` on `#FF3B30` = 4.0，属图形/大字口径；若正文则改用深字——按钮文字 17sp SemiBold 属大字 ≥18sp? 17sp 不达 18 大字豁免线，因此**按钮前景取 `AppColorLight.onBrand` 同族深色 `#3B0000`？** 不——按 spec 与既有裁决：红底白字滑动删除已判合规（`#B3261E` 真机取证）。这里为一致，`errorFill` 填充上的按钮文字**取 `Color.White` 且字号 ≥17sp SemiBold**，并在测试里断言 `ratio(white, errorFill) >= 3.0`（大字非文本口径），注释写明与滑动删除同族、不宣称 4.5:1。
+- [ ] **Step 3: 实现三组件**，全部走 `appColors()`，不引裸字面量。`ConfirmDestructiveDialog` 确认按钮的容器/前景墨色**按下面 R-11.1 执行**，本任务原稿那句「容器 `errorFill` + 白字」已作废。
+
+  **R-11.1（控制者在 Task 11 派发前裁掉本步的摇摆）**：破坏性确认按钮的墨色**不写成本段原来那句「`errorFill` 填充 + 白字」**。三个理由，均已实算（WCAG 相对亮度，同一套线性化）：
+  ① 浅套 `Color.White` on `errorFill #FF3B30` 实测 **3.547**，不是本段原稿写的 4.0；② 深套 `errorFill #FF6B61` 上白字只有 **2.790**，连 3:1 的图形口径都不过——「白字」这条在深套根本不能用，而原稿把它当成跨模式统一规则；
+  ③ 17sp 换算约 12.75pt，够不到 WCAG 大字豁免线（14pt bold / 18pt regular），所以「按大字口径享受 3:1」这个前提本身不成立。
+  裁决：确认按钮容器取 `set.error`、前景取 `set.surface`——浅套 `#FFFFFF` on `#B30000` = **7.200**，深套 `#17201C` on `#FF8177` = **6.873**，两套都真 ≥4.5:1，且只用既有 token、不新增裸字面量（`RawColorLiteralRatchet` 覆盖 `src/main`）。
+  `errorFill` 保持它现有的职责（`InlineNotice` 的 Error 背景与描边、Material `errorContainer`），**不得**被用作按钮容器。要与既有取证挂上钩：滑动删除那枚判合规的是 `#B3261E`（白字 6.5:1 量级），与这里同族的是「深底浅字/浅底深字按套分叉」，不是「红底一律白字」。
+  用例：新增 JVM 对比度契约（可仿 `EntryRowInkTest` / `noticeInk` 的写法）钉两套各 ≥4.5，并钉一条**会被拒的候选**——`ratioOf(Color.White, AppColorLight.errorFill) < 4.5` 与 `ratioOf(Color.White, AppColorDark.errorFill) < 4.5` 都为真，把「白字 on errorFill」这条错配方永久钉死在不能回潮的位置。
 
 - [ ] **Step 4: 跑测试通过 + 门控 + 提交**
 
