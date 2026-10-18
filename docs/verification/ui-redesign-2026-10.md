@@ -69,7 +69,7 @@ adb shell am instrument -w -e class com.example.englishlearning.ui.<类名> \
 | AC-R-07 | `fontScale = 2.0` 的 connected 用例覆盖六屏重排后的标题与卡片 | 批 2/批 3 逐屏补（护栏口径沿用 `CheckInScreenTest`） | 未开始 |
 | AC-R-08 | §3 每个共享组件有「全站唯一实现」的静态检查；被替换的私有份数降到 1 | `SharedComponentUniquenessRatchetTest`：四族（页头 / 错误提示条 / 未配置卡 / 词行）按形态规则逐族**精确集合相等**，seed 是债务台账（只减不增，接线一屏删一行）；批 1 组件文件按「点名文件必须存在 + 公开组件在 `ui/` 扫描面恰一处顶层定义」钉；预登记豁免（本棘轮不管「就地改既有组件取值面」，Task 14 改 `PillButton` 本体不受挡）由 `the_ratchet_blocks_a_second_component_but_never_an_in_place_value_edit` 双向证明。**批 1 终审 F7 登记的第三条边界**：族 1/2/4 的判定面各带「本文件调了共享组件即整体合规」出口，出口同时是**已知失明面**——接线后同屏残留的私有 forbidden 形态会整体隐形；`family_compliance_exits_are_a_declared_known_blindness_surface` 双向钉住该语义，批 2 的删 seed 判据因此是「该屏 forbidden 读点清零」而不是「补一行调用就准删」，收紧（seed 改读点计数）属计划修订事项 | 通过（存量私有份未清零，清零归批 2/批 3；见「本族规则形状的已知边界」） |
 | AC-R-10 | 六屏 360dp 真机浅/深两套截图逐屏比对设计稿 | 批 2/批 3 逐屏补 | 未开始 |
-| AC-R-11 | 玻璃层与域色容器在深色下文字可读性实测 | **覆盖方式（批 1 终审登记，状态不动）**：本行的实测面 = 全站 `AppPalette.GlassFill` 的四个消费点 `ui/components/glass/GlassDialog.kt:46`、`ui/components/glass/GlassOverlay.kt:69`、`ui/AiProfileSettingsScreen.kt:499`、`ui/SpeechSettingsScreen.kt:234`（可重算：`grep -rn 'AppPalette\.GlassFill' app/src/main/java --include=*.kt`；`ConfirmDestructiveDialog.kt:45` 那条是 KDoc 说明不是消费点，别计入）。批 1 只把口径纠正为「容器填充与面板内前景墨色必须同批迁移」（目标值 `appColors().surfaceGlass`），四处一律**未迁**，故深色可读性仍无人眼/像素证据。批 2/批 3 逐屏补，且必须与那四处的填充迁移同时收。 | 未开始 |
+| AC-R-11 | 玻璃层与域色容器在深色下文字可读性实测 | **覆盖方式（批 1 终审登记，状态不动）**：本行的实测面 = 全站 `AppPalette.GlassFill` 的四个消费点 `ui/components/glass/GlassDialog.kt:46`、`ui/components/glass/GlassOverlay.kt:69`、`ui/AiProfileSettingsScreen.kt:499`、`ui/SpeechSettingsScreen.kt:234`（可重算：`grep -rn 'AppPalette\.GlassFill' app/src/main/java --include=*.kt`；`ConfirmDestructiveDialog.kt:45` 那条是 KDoc 说明不是消费点，别计入）。批 1 只把口径纠正为「容器填充与面板内前景墨色必须同批迁移」（目标值 `appColors().surfaceGlass`），四处一律**未迁**，故深色可读性仍无人眼/像素证据。批 2/批 3 逐屏补，且必须与那四处的填充迁移同时收。<br>**2026-10-19 真机实勘补充（见末节）**：深色缺陷面不止 `GlassFill` 一族——业务屏的静态容器读点 `AppPalette.Surface`（`AppPalette.kt:12` 写死白）与已改组合期读取的 `Mint*` 墨色配对，在深色下直接产出「白底 + 主题浅墨」的近不可读文案（今日计划屏进度卡实测）。本行状态仍为「未开始」（未迁、未收口），但**优先级证据已到手**。 | 未开始（真机已有半迁移态缺陷证据） |
 | AC-R-12 | TalkBack 走查重做一遍 | 批 2/批 3 逐屏补 | 未开始 |
 
 ## 图标一览目视清单（AC-R-05b 的呈现侧，缺项不得放行）
@@ -164,3 +164,21 @@ adb -s emulator-5574 shell dumpsys user | grep 'State:'      # 期望 RUNNING_UN
 ② 排印换档的整体观感（逐屏看有没有被撑破或挤扁的头部）；
 ③ M3 控件默认色由库紫转薄荷 + Card 圆角 20→18dp、`colorScheme.outline` 换成 `text2` 是否可接受；
 ④ 跟随系统的深色档与 `fontScale 2.0` 下底导与设置页不裁。
+
+## 真机深色实勘（2026-10-19 批 1 里程碑装机，`bf353dda`）
+
+装的是本分支 debug 包（`adb install -r`，未跑 `am instrument`、未装测试包），系统深色用 `cmd uimode night yes` 切换、
+看完即恢复 `night no`。**结论：主题层深色链路在真机上成立**（根底、页头、卡片容器随系统深色整体翻深，
+`rememberAppThemeMode()` 活链路无需重启），但**业务屏处于半迁移态，今日计划屏深色下有一处可读性缺陷**：
+
+- **现象**：「今日学习进度」卡深色下呈**白底 + 极浅文字**，三行文案几乎看不清；同屏「今日新增/今日复习」两枚计数卡仍是白底深字（浅档外观）。
+- **机理（已核到定义行）**：Task 3 把 `Mint*` 中性令牌改成组合期读取（`MintPalette.kt:58` 的 `MintPrimaryDark` 现在是带 getter 的动态值），
+  于是**墨色侧跟主题走了**；而该屏容器仍写 `AppPalette.Surface`，它是 `AppPalette.kt:12` 的**静态** `Color(0xFFFFFFFF)`，不跟主题走
+  → 深色下变成「浅容器 + 主题浅墨」。可重算：
+  `grep -n 'val Surface' app/src/main/java/com/example/englishlearning/ui/theme/AppPalette.kt`（应为静态 `Color(0xFFFFFFFF)`）、
+  `grep -n 'AppPalette\.Surface' app/src/main/java/com/example/englishlearning/ui/TodayPlanScreen.kt`（该屏容器读点）。
+- **口径**：这正是 `DarkTokenConsumptionRatchetTest` 台账在册的深色令牌消费债，也是 AC-R-11 判「未开始」的原因 —— 批 1 只交付底座，
+  逐屏容器迁移按计划在批 2（今日计划屏 = Task 14）/批 3 收。**批 1 不越界补迁移**（那会同时改动 seed 台账与业务屏版面，属批 2 的评审面）。
+- **对用户的实际影响（必须知道再决定推进顺序）**：**开系统深色的用户在批 2 收完核心屏之前会看到半深色的界面**，
+  浅色档无此问题。合 main 与对外分发前，要么先完成批 2，要么把「全站静态容器读点一次性改读 `appColors()`」提到批 2 最前面做（控制者建议后者，见交接报告 §5）。
+- 截图证据按红线**不入库**（含真实词书与进度数据），留在本机忽略区；本节的判定以「现象 + 定义行 + 重算命令」为准，不依赖截图。

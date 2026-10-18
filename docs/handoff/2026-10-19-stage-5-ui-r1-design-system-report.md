@@ -60,6 +60,12 @@
 - 终审修复轮复跑：`AppScreenHeaderTest` OK(4)、`EntryRowTest` OK(5)，新增 `WordRowTest` OK(1)
   （大字号右列宽度上限；**变异态先红**：摘掉 `widthIn(max = 120.dp)` 后实测 meta 195.05dp / lemma 177.52dp）。
 
+**真机里程碑装机（用户授权的观察面，非测试面）**
+- `adb -s bf353dda install -r app/build/outputs/apk/debug/app-debug.apk` → `Success`；`monkey` 注入启动后
+  `dumpsys window | grep mCurrentFocus` 校验落在 `com.example.englishlearning/.MainActivity`；**未跑 `am instrument`、未装测试包**。
+- 系统深色用 `cmd uimode night yes` 切换取证、看完恢复 `night no`。**主题层深色链路在真机成立**（根底/页头/卡片随系统翻深，活链路无需重启），
+  但业务屏半迁移态暴露出一处可读性缺陷 —— 现象、机理（定义行）与重算命令记在验证文档末节，判读见 §5。
+
 **RED→GREEN 与变异证据（本棒新钉的判据全部做过「不改生产就永远绿」的反证）**
 - F7 失明面用例：族 1 :550 / 族 2 :572 / 族 4 :595 分别由「摘掉出口条件」的定向变异打红；
   夹具自检（族 1/2 各 `assertEquals(1, countMatches(…))`）保证不是空转。
@@ -72,7 +78,8 @@
 ## 4. Git 状态
 
 - 分支：`stage-5-ui-r1-design-system`，基线 = `main` 的 tip `46f4dee`（分支从计划提交处切出，与 main 无分叉）。
-- 提交数：`git log --oneline main..HEAD | wc -l` = **68**；本地 tip = **`837f28a`**（上一枚 `eaebb34` 为测试侧收口）。
+- 提交数：`git log --oneline main..HEAD | wc -l`（本棒未写绝对数，该命令即权威）；本地 tip 以
+  `git rev-parse HEAD` 为准（关键三枚：测试侧收口 `eaebb34`、文档回填 `837f28a`、本报告 `b3f54b8`）。
 - **未推送**：`git ls-remote --heads origin` 只有 `main`（`46f4dee`）与 `stage-1-f1-02-new-word-ordering`（`7c16ec1`），
   本分支不在远端。推送与否属用户拍板项（R-12.2：推送从不自主执行）。
 - 未提交遗留文件：**无**（工作树干净；`.superpowers/sdd/` 下的台账、简报、报告与评审包是 git-ignored 的本地产物，不入库）。
@@ -89,11 +96,19 @@
   **本文件不写这些台账的绝对条数** —— 它们由测试当场做双向精确相等断言，写进文档就是一份会漂的副本。清零归批 2 逐屏接线、批 3 收口。
 
 **需要用户拍板 / 人眼判定的**
-- **推送与否**（本地 68 枚提交目前只有本机一份，AGENTS.md 要求阶段收口推送作异地备份）。
+- **推送与否**（本分支全部提交目前只有本机一份，AGENTS.md 要求阶段收口推送作异地备份）。
 - 装真机后的四项目视（`docs/verification/ui-redesign-2026-10.md` §仍待用户目视）：① 六档 `AppType` 摘掉 `lineHeight` 后正文是否偏紧
   （判「太紧」则批 2 在装配点补，并把取值先写进规格 §2.2）；② 排印换档整体观感；③ M3 控件默认色由库紫转薄荷 +
   Card 圆角 20→18dp + `colorScheme.outline` 换 `text2` 是否可接受；④ 跟随系统的深色档与 `fontScale 2.0` 下底导/设置页不裁。
 - AC-R-11 的深色玻璃前景：批 1 只把口径纠正为「容器填充与面板内前景墨色必须**同批**迁移」，四个 `AppPalette.GlassFill` 消费点一律**未迁**。
+- **深色半迁移态已在真机肉眼可见，需要用户拍推进顺序**（2026-10-19 里程碑装机实勘，`bf353dda`，只 `install -r`、未跑 instrument；
+  详见验证文档末节「真机深色实勘」）：Task 3 让 `Mint*` 墨色改成组合期读取后**跟主题走了**，而业务屏容器仍写
+  `AppPalette.Surface`（`AppPalette.kt:12` 写死 `Color(0xFFFFFFFF)`）**不跟主题走** → 系统深色下今日计划屏的
+  「今日学习进度」卡呈**白底 + 主题浅墨**，三行文案几乎看不清，两枚计数卡仍是浅档外观。
+  这是台账在册的深色消费债（不是新缺陷类别），但**开系统深色的用户在批 2 收完核心屏之前都会看到半深色界面**。
+  控制者建议：**批 2 开工第一步先把全站静态容器读点（`AppPalette.Surface`/`Background`/`TextPrimary`…）一次性改读 `appColors()`**，
+  让深色立刻整体可用，再逐屏做版面；替代方案是按原计划逐屏迁（深色要到 Task 14/16 才在核心屏可用）。**未拍板前不越界改**——
+  它会同时动 seed 台账与业务屏，属批 2 评审面。
 
 **登记在册的技术债（批 2 派单时必须带上，勿当已完成）**
 - **批 2 开工判据（F7 / D-I-1）**：`SharedComponentUniquenessRatchetTest` 族 1/2/4 各带「本文件调了共享组件即整体合规」出口，
@@ -115,7 +130,7 @@
 
 **第一步**：读 `docs/verification/ui-redesign-2026-10.md`（口径 + AC-R 表 + 重算命令）与
 `.superpowers/sdd/2026-10-17-ui-redesign/progress.md`（**七轮**台账，含批 2 开工判据与结转清单），
-再读计划批 2 段（Task 13–18，`:1298` 起）。批 2 从 `stage-5-ui-r1-design-system` 的 tip `837f28a` 切
+再读计划批 2 段（标题「批 2 · 核心学习路径五屏（Task 13–18）」，勿按行号定位）。批 2 从 `stage-5-ui-r1-design-system` 的当前 tip 切
 `stage-5-ui-r2-learning-path`（用户若不推不合 main，则批 2 分支基线仍是批 1 tip，不是 main）。
 每屏任务的固定收尾三步（贴 tag 清单 / 迁本屏静态读点并递减 seed / 跑本屏 connected）+ 上面那条「删 seed 判据」必须一起走。
 
