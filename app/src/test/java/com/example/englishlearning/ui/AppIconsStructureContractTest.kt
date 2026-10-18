@@ -47,7 +47,7 @@ class AppIconsStructureContractTest {
         "Bell", "Shield", "Warning", "Trash", "Upload", "Download",
     )
 
-    /** 两层豁免表：这五枚只有描边骨架，不得建填充层，也不得进入 ≥40dp 入口容器。 */
+    /** 两层豁免表：这五枚只有描边骨架，不得建填充层，也不得进入 `EntryIconBadge` 一族的域渐变入口容器（页头 `.back` 的 surface 容器除外）。 */
     private val expectedStrokeOnly = setOf("Back", "ChevronRight", "ChevronDown", "Close", "Check")
 
     // ---------- 规则形状 ----------

@@ -892,6 +892,8 @@ internal val MintBackground: Color
       title.assertExists()                                   // 语义节点存在（注意：Clip 与 Ellipsis 都不改语义，此条不足以判裁切）
       val box = title.getUnclippedBoundsInRoot()
       assertTrue("fontScale=2.0 下标题不得塌成 0 宽，实际=$box", box.right - box.left >= 48.dp)
+      assertTrue("两行标题不得是 0 高（仅作哨兵，不充当裁切判定：同 style 同 fontScale 的节点高实测 41.90dp vs 34.29dp）",
+          box.bottom - box.top > 24.dp)
       // 裁切判定必须读 TextLayoutResult，dp 常数门限不可靠（实测 fontScale=2f 下同款单行节点高
       // 在页头是 41.90dp、在同宿主参考 Text 是 34.29dp → 「> 24.dp」恒真，变异 maxLines=1 不红）。
       // 口径抄本仓库既有的 WordBookWordsScreenTest.kt:179-186，生产代码零改动。
