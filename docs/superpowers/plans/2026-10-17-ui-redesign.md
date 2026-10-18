@@ -1042,7 +1042,12 @@ internal val MintBackground: Color
     另注意：`rawBaseEndpoint` 与 `gradientFromRule` 两条正则在两档实现下仍然成立（弱档底色是 `lerp(colors.surface, palette.deep, 0.16f)`，不含裸 `.base`，也不新增渐变），不要顺手改它们。
   - **R-10.4 入口行墨色走纯表 `entryRowInks(set)`**：`AppGlyph`/`Text` 的颜色不是语义节点能读的东西，connected 侧「断言 chevron 颜色 == `text2`」根本取不到色（Task 9 实测口径）。把墨色抽成纯函数在 JVM 侧钉，`EntryRow` 只读这张表：`title = text1`、`subtitle = text2`、`trailing = text2`、`chevron = text2`、`divider = outlineSoft`。**chevron 用 `text2` 不用 `text3`**（控制者复算：`text3` 压浅套 `tint` 恰 **3.00:1**、压白 3.40，`text2` 压 `tint` **4.55**、压白 5.15；非文本 3:1 线卡在边界上不可靠，Task 1 裁决 #1 也禁 `text-3` 作前景）。用例里同时钉「`chevron != set.text3`」，防止有人「按稿改回 text3」。
   - **R-10.5 行间发丝线归组件、用 `topDivider: Boolean = false`**：稿 `.entry + .entry { border-top:1px outline-soft }` 是「除首行外每行一条顶线」。不新增 `EntryRowGroup`（撞份数棘轮），也不留给各屏手搓 `HorizontalDivider`（批 2 有 5 屏 × 3~8 行要抄 30 余次）；`topDivider == true` 时在内容行**外侧**画一条 1dp `entryRowInks(set).divider` 顶线（`drawBehind` 或外层 `Column` 皆可），**不得**把 56dp 最小内容高吃成 55/57。
-  `EntryRow` 布局：`Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 8.dp).clickable(role = Role.Button, onClick = onClick), spacedBy(12.dp), CenterVertically)` = `EntryIconBadge(icon, domain, tone = iconTone)` + `Column(weight = 1f)`（`title` 取 `AppType.Body` + `text1` + `maxLines = 1` + `Ellipsis`；`subtitle` 取 `AppType.Footnote` + `text2` + `padding(top = 1.dp)` + `maxLines = 1` + `Ellipsis`——入口行的标题/副标题都是提示性内容，与页标题不同档，允许省略号，稿 `.en`/`.ed` 各一行）+ `trailing`（`AppType.Footnote` + `text2`）+ `AppGlyph(AppIcon.ChevronRight, text2, 16.dp, layer = StrokeOnly)`（`showChevron` 为真时）。
+  - **R-10.6 可证性两条（Task 10 评审轮由控制者补，批 2 起同样适用）**：
+    ① **几何值必须在 JVM 侧有契约面**：connected 只能钉「下限」（`assertHeightIsAtLeast(48.dp)`、`≥40dp`），钉不住稿面的**取值**（徽标容器 40dp、行 56dp/间隙 12dp/padding 8dp、提示条 padding 14×12dp、间隙 10dp、字形 18dp、1dp 描边）。取值漂移（把 40 改成 48、把 12 改成 8）在 connected 全绿，只有源码契约能挡——用共享夹具 `uiFiles()` + `stripComments`（`SourceRatchet.kt`，`IconBadgeContrastContractTest` 同一读法）在 `app/src/test/.../ui/SharedComponentGeometryContractTest.kt` 里逐枚钉字面量，并配合成正/负片段自证正则承重（本仓 glyph 尺寸锚的先例口径）。
+    ② **墨色「防回潮」必须是可判红的断言**：`assertTrue(inks.chevron != set.text3)` 这类写法在 `assertEquals(set.text2, inks.chevron)` 之后**永远不会单独红**（两枚 token 取值不同，等值成立即不等式成立）——它是文档不是闸。要留裁决就得留它的**依据**：把被拒候选当场复算成不合格（`ratioOf(AppColorLight.text3, AppColorLight.tint) < 3.1`：浅套 text3 压 tint 恰 3.00，卡在 3:1 线上没有余量；`ratioOf(AppColorLight.errorFill, 浅套 Error 底) < 4.5`：实测 3.01）。装饰档阈值因此从 `≥3.0` 收紧为 `≥3.1`（「边界上的合格不算合格」的算术写法，与被拒依据同一条线）。同族先例：`InlineNoticeKindTest` 里 R-10.1b 的 `mockActionRatio < 4.5` 就是这种承重写法，不抄数值、只写进断言消息，token 漂移时当场提示重议。
+  `EntryRow` 布局（**Task 10 实测后修订，修饰符顺序就是契约，别再按稿面顺序「顺手调回去」**）：`Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).then(顶线装饰).heightIn(min = 56.dp).padding(vertical = 8.dp), spacedBy(12.dp), CenterVertically)` = `EntryIconBadge(icon, domain, modifier = Modifier.testTag("entry_row_icon"), tone = iconTone)`
+  —— 计划原稿写的 `.heightIn(…).padding(…).clickable(…)` 在真机上量到的可点面只有 **40dp**：`clickable` 排在 padding 之后时，上下 8dp padding 与那条 1dp 顶线都留在可点面**外侧**，可点区塌成内容盒，直接撞 F5-03 的 48dp 硬下限（connected 用例 `entry_row_clears_the_48dp_touch_floor` 首跑实测 `Actual height is 40.0.dp` 红，改成上面的顺序后 56dp 绿）。几何等价：整盒仍是 1dp 线 + 56dp（内含 8+8 padding、内容下限 40dp），行的外框不因线而缩。
+  行内内容：`Column(weight = 1f)`（`title` 取 `AppType.Body` + `text1` + `maxLines = 1` + `Ellipsis`；`subtitle` 取 `AppType.Footnote` + `text2` + `padding(top = 1.dp)` + `maxLines = 1` + `Ellipsis`——入口行的标题/副标题都是提示性内容，与页标题不同档，允许省略号，稿 `.en`/`.ed` 各一行）+ `trailing`（`AppType.Footnote` + `text2`）+ `AppGlyph(AppIcon.ChevronRight, text2, 16.dp, layer = StrokeOnly)`（`showChevron` 为真时）。**省略号必须可证**：`hasVisualOverflow == true` 判不出 `Ellipsis` 与 `Clip`（两种都报 true），所以钉省略号的用例要加 `layout.isLineEllipsized(0)`（R-10.6，Task 10 评审轮补）。
   排印按 token 近似的两处要写进 KDoc：稿 `.en` 是 15px/**600**，六档 `Body` 是 15sp/400；稿 `.ed` 是 12px/400，六档无 12sp Regular 档（同 Task 9 副标题，取 `Footnote` 13sp）。**不引新档、不 `copy(fontWeight = …)`**（spec §2.2 六档锁）。
 
 - [ ] **Step 3: 写 connected 用例（`EntryRowTest` + `InlineNoticeTest`）**
@@ -1088,7 +1093,12 @@ internal val MintBackground: Color
     -e class com.example.englishlearning.ui.InlineNoticeTest \
     com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner
   ```
-  Expected: 两个类各自 `OK (n tests)`。**反向变异自证**（R-10.3 要求）：把 `EntryIconBadge` 的字形改回 `24.dp` → `IconBadgeContrastContractTest` 必须红；把 `entryRowInks` 的 `chevron` 改回 `text3` → `EntryRowInkTest` 必须红。两次变异各跑一次、贴输出、然后改回。
+  Expected: 两个类各自 `OK (n tests)`。**反向变异自证清单（本任务唯一一份，跑满五条、逐条贴输出、每条改回；R-10.3 段与 Task 10 评审轮补的两条合并在此）**：
+  ① 生产实底档字形改回 `24.dp` → `IconBadgeContrastContractTest` 红（`entryGlyphCallSegments` 计数 2→1 + `legacyEntryGlyphSize` 不归零，双锚）；
+  ② 生产弱档删掉 `layer = StrokeOnly` → 分档计数 1→0 红；
+  ③ 生产弱档补上一条渐变（多一处 `linearGradient`）→ `gradientFromRule` 的「恰好一处」红；
+  ④ `entryRowInks` 的 `chevron` 改回稿面 `text3` → `EntryRowInkTest` 红；
+  ⑤ **（R-10.6，Task 10 评审轮补）** 把 `EntryRow` 标题的 `TextOverflow.Ellipsis` 改成 `TextOverflow.Clip` → `entry_row_truncates_title_and_subtitle_with_ellipsis_not_clipping` 必须红（红点必须是 `isLineEllipsized(0)` 那条，不是 `lineCount`/`hasVisualOverflow`——那两条在 `Clip` 下同样成立，抓不住「裁掉 vs 省略号」）。
 
   ```bash
   git add app/src/main/java/com/example/englishlearning/ui/components/InlineNotice.kt \
