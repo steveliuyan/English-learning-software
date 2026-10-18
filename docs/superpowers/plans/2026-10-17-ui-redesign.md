@@ -1125,9 +1125,19 @@ internal val MintBackground: Color
 > 动作本体（`Text` + `clickable` + `FontWeight.Bold` + `noticeInk(kind, appColors()).action`）**留给调用方**——批 2/3 收 11 份提示的同时会长出 11 份链接配方，
 > 而 Task 12 的份数棘轮按**文件**数「不走 `InlineNotice(` 的错误渲染站点」，自排动作链接既不是错误 Text 站点也不新增文件，抓不住。
 > 裁决：Task 11 的第一步就是在 **`InlineNotice.kt` 同文件**里加公开 `InlineNoticeAction(kind: InlineNoticeKind, label: String, onClick: () -> Unit, modifier: Modifier = Modifier)`
-> （内部就是那四件套 + `fillMaxHeight()` 承接 48dp），调用方写成 `action = { InlineNoticeAction(InlineNoticeKind.Error, "重试") { … } }`。
+> （内部就是那四件套 + ~~`fillMaxHeight()` 承接 48dp~~ **见下 R-11.0a 订正**），调用方写成 `action = { InlineNoticeAction(InlineNoticeKind.Error, "重试", onClick = { … }) }`。
 > 同文件新增 → 不撞份数棘轮；墨色/字重/触控只有一处真值。先写失败用例（connected：槽内可点节点 ≥48dp 且未合并树计数仍为 1；JVM：源码契约钉 `FontWeight.Bold` 与 `noticeInk(…).action` 各恰 1 处、
 > 且禁止调用方文件里出现 `color = noticeInk(` 自取动作墨），再实现。R-10.7① 的那条 48dp 断言在本任务起改打在 `InlineNoticeAction` 的可点节点上。
+
+> **R-11.0a（实现期实测订正，2026-10-19 控制者追认）**：上条裁决写的「内部就是那四件套 + `fillMaxHeight()` 承接 48dp」**机制上不成立**，作废。
+> `fillMaxHeight()` 吃的是**最大**高约束而非最小：在有界宿主（组件级 `createComposeRule()`）里它把可点面撑到 **635.0476dp**（整条提示被拉成半屏空白，实测断言消息 `expected:<48.0.dp> but was:<635.0476.dp>`）；
+> 在无界宿主（`LazyColumn` 一类可滚动容器）里它是**空操作**，48dp 仍旧得靠别的机制交付。
+> 正确交付机制（即 R-10.7① 已落地的那条）：48dp 钉在 [InlineNotice] 动作槽的**包裹层**上——
+> `Modifier.heightIn(min = 48.dp)` + `propagateMinConstraints = true`，包裹层把 48dp 的**最小高约束**传进槽内，槽内 `Text` 量出 48dp，`clickable` 的可点面随之 48dp。
+> 故 `InlineNoticeAction` 本体**不写任何尺寸修饰符**，且「本文件 0 处 `fillMaxHeight`」钉进 `InlineNoticeActionContractTest`；
+> 槽内自己另写一条 `heightIn(min = 48.dp)` 也不行——那会让「48dp 恰一处」的源码锚变成两处（`SharedComponentGeometryContractTest` 会红）。
+> 附带订正：`InlineNoticeAction` 末位形参是 `modifier`，**不能用尾随 lambda**，回调必须具名写 `onClick = { … }`（裁决原文的示例写法编译不过：`No value passed for parameter 'onClick'`）。
+> 批 2/批 3 各屏接入时一律照 `InlineNotice.kt:195-199` 的示例写法。
 
 **Files:**
 - Create: `app/src/main/java/com/example/englishlearning/ui/components/NotConfiguredCard.kt`
@@ -1215,7 +1225,16 @@ internal val MintBackground: Color
 - [ ] **Step 2: 实现 `WordRow` 与 `SpeakerButton`**
   `SpeakerButton` 触控：药片 `heightIn(min = 48.dp)` + `AppGlyph(Speaker, …)` + 文字；`WordRow`：lemma `AppType.Body` `text1`、gloss `AppType.Footnote` `text2`（可 `maxLines = 2`）、status/meta 右对齐 `text2`、`role` 按 `onClick` 是否为空取 `Role.Button`/无。
 
-- [ ] **Step 3: 写 `SharedComponentUniquenessRatchetTest`**（规则与 seed 见 Task 8 Step 4 四条），此时九个组件文件都存在，目录守卫与 seed 只减不增口径同 Task 8。
+- [ ] **Step 3: 写 `SharedComponentUniquenessRatchetTest`**（规则与 seed 见 Task 8 Step 4 四条），~~此时九个组件文件都存在~~（**R-12.3 订正：Task 11 落地后是 10 枚，本任务再加 `WordRow.kt`/`SpeakerButton.kt` = 12 枚；断言按「点名文件必须存在」写，不按总数写——总数会随后续批次漂移**），目录守卫与 seed 只减不增口径同 Task 8。
+  **R-12.3（Task 8 Step 4 四条规则的实现期订正，控制者本席 grep 实测；详表见 `.superpowers/sdd/2026-10-17-ui-redesign/task-12-precheck.md`）**：
+  ① **`NotConfiguredCard` 份数 = 4，已核实**（`ImageStudioScreen.kt:250`/`PhotoTranslationScreen.kt:706`/`SentenceAnalysisScreen.kt:209`/`WordAiQaScreen.kt:264` 各一份 `private fun NotConfiguredCard(`），共享份在 `components/NotConfiguredCard.kt:117`。
+  注意**同名遮蔽**：私有份与共享份同名，所以「文件里出现 `NotConfiguredCard(`」不能当合规证据——规则必须是「出现 `private fun NotConfiguredCard(` 即违规」+「`components/NotConfiguredCard.kt` 恰 1 处 `fun NotConfiguredCard(`」。
+  ② **页头规则的「14」在批 1 时点断不出东西**：`grep -rl 'AppScreenHeader(' .` 只命中组件自身（批 1 不接线业务屏，接线在批 2/3），Task 8 Step 4 那条「出现 `AppScreenHeader(` 的文件数 == 使用它的屏数」两侧都是 0/1。
+  本任务只钉两条：`components/AppScreenHeader.kt` 存在且恰 1 处 `fun AppScreenHeader(`；私有页头形态（同文件含 `MaterialTheme.typography.headline` 却不调 `AppScreenHeader(`）的**文件数** seed = 实测值、只减不增。14 → 0 的兑现归批 3，本任务不宣称清零。
+  ③ **`InlineNotice` 的 seed 文件清单与 Task 8 Step 4 写的不符**：实测 `grep -rln 'AppPalette.ErrorText\|colorScheme.error'` 得 **12 个文件**（`AppScreen`/`ArticleImportScreen`/`BackupExportScreen`/`BackupPairingExportScreen`/`BackupRestoreScreen`/`CardDetailScreen`/`ReadingAccessScreen`/`ReminderSettingsScreen`/`SpeechSettingsScreen`/`WordAiQaScreen`/`WordCardScreen`/`WorksheetSettingsScreen`），
+  Task 8 点名的 `LearningRecordsScreen.kt` 与 `SettingsScreen.kt` **不在其中**。Task 8 已写「现场枚举」，故以实测 12 为 seed，清零归批 3。
+  ④ **`WordRow` 私有份不能只搜函数名**：私有实现多是 `Row { Text(lemma); Text(gloss) }` 这类无名裸组合，规则按「同文件出现 lemma+gloss 两枚 Text 且不调 `WordRow(`」的形态写。
+  ⑤ **预登记豁免照 Task 12 Step 3 原文写进棘轮注释与 seed 说明**：本棘轮管「同一形态不得有第二份组件」，不管「就地改既有组件的取值面」——Task 14 修 `PillButton` 必须改本体，不得被本棘轮挡。
   **预登记豁免（Task 9 评审裁决 4.3 前置②）**：本棘轮管「同一形态不得有第二份组件」，**不管「就地改既有组件的取值面」**——Task 14 修 `PillButton` 的静态 ink / 档位差时必须改 `PillButton` 本体而不是新建按钮，这条路径不得被本棘轮挡；写进测试注释与 seed 说明，避免批 2 为绕门再造一枚按钮。
 
 - [ ] **Step 4: 建 AC-R 证据文档**
