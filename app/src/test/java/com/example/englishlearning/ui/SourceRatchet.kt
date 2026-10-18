@@ -17,9 +17,16 @@ import kotlin.test.assertTrue
  *  - 注释文本不计入契约：`stripComments` 形状沿用 `AccessibilityColorTokenContractTest` 里的同名纯函数。
  *    实现文件的 KDoc 会合法复述同一批 hex（如「取值来自 spec §2.1」），不先剥注释的正则会被
  *    注释满足，契约就成空转——所有源码断言必须先过 stripComments 再匹配。
- *  - 已知仓库陷阱：含「块注释闭合序列」（星号紧跟斜杠）的字符串字面量会吞掉块注释正则。
- *    测试文件本体不在扫描范围（扫描对象是 main 源码），故 `stripComments` 自身的块注释正则
- *    字面量安全；后续任务勿在这些测试文件的注释或字面量里写出该闭合序列本体。
+ *  - **字符串字面量里的注释标记不得当注释剥**（Task 12 修复轮 1 的 Fix 1）：SAF 的 MIME 数组写字面量
+ *    「星号、斜杠、星号、斜杠」那一枚（`ui/BackupRestoreScreen.kt`、`ui/AppScreen.kt` 各一处），
+ *    其中「斜杠紧跟星号」是合法的块注释起始序列，旧的纯正则剥法会从这一行一路吞到下一条行尾注释的
+ *    「星号紧跟斜杠」闭合序列，把中间几十行真代码删掉，令「剥注释后才匹配」的源码棘轮读不到那几十行里的违规
+ *    （本仓 skill `android-repo-session-handoff` §3.1 记过的同一枚陷阱）。故本函数是**字符串感知的扫描式实现**：
+ *    双引号单行串、三引号原始串、单引号字符字面量整段原样保留，只有在字符串外才识别行注释（到行尾，保留换行）
+ *    与块注释（惰性到闭合序列）；未闭合的块注释吞到文末。
+ *    这条修复由 `SharedComponentUniquenessRatchetTest` 的合成夹具钉 + 真实文件锚双重钉住，勿改回正则版。
+ *    （本条注释本身刻意不写出那两个序列的本体——写进块注释里会当场把本注释关掉。）
+ *  - 测试文件本体不在扫描范围（扫描对象是 main 源码）。
  *  - `walkTopDown()` 对缺失路径返回空序列（静默空扫），故目录守卫必须内置在 `uiFiles`，
  *    并由 `violations` 复用同一入口而不是再写一份扫描。
  */
@@ -68,10 +75,88 @@ internal fun uiFiles(dir: File = File(UI_MAIN_SOURCE_PATH), expectedHint: String
     return files
 }
 
-/** 剥注释样板（沿用禁令1/禁令2/禁令3）：注释里的示例代码不计入契约。 */
-internal fun stripComments(text: String): String = text
-    .replace(Regex("/\\*[\\s\\S]*?\\*/"), "")
-    .replace(Regex("//.*"), "")
+/** 块注释闭合序列（「星号紧跟斜杠」）与三引号：只在代码里按字符序列比较，绝不写进任何注释本体。 */
+private const val BLOCK_COMMENT_CLOSE = "*/"
+private const val BLOCK_COMMENT_START = "/*"
+private const val TRIPLE_QUOTE = "\"\"\""
+
+/**
+ * 剥注释样板（沿用禁令1/禁令2/禁令3：注释里的示例代码不计入契约），**字符串感知**的扫描式实现。
+ *
+ * 为什么不用两条正则：见文件头 Fix 1 —— 字符串字面量里合法出现的「斜杠紧跟星号」会让
+ * 块注释正则从那一行一路吞到下一条行尾注释的闭合序列，把中间几十行真代码当成注释删掉，
+ * 所有源码棘轮随之读不到那几十行（假绿）。故这里逐字符走：
+ *  - 三引号原始串、双引号单行串（认反斜杠转义、遇换行即判非法）、单引号字符字面量（含 `'\''` 与「单引号包双引号」）
+ *    **整段原样保留**；
+ *  - 只有在字符串外才识别行注释（剥到行尾但**保留换行**，行号与 `(?m)^` 锚点口径不变）
+ *    与块注释（惰性到下一个闭合序列；未闭合则吞到文末）。
+ */
+internal fun stripComments(text: String): String {
+    val out = StringBuilder(text.length)
+    var i = 0
+    while (i < text.length) {
+        val c = text[i]
+        val next = if (i + 1 < text.length) text[i + 1] else ' '
+        when {
+            c == '"' && next == '"' && i + 2 < text.length && text[i + 2] == '"' -> {
+                val end = text.indexOf(TRIPLE_QUOTE, i + 3)
+                if (end == -1) {
+                    out.append(text, i, text.length)
+                    i = text.length
+                } else {
+                    out.append(text, i, end + TRIPLE_QUOTE.length)
+                    i = end + TRIPLE_QUOTE.length
+                }
+            }
+
+            c == '"' -> {
+                val end = singleQuotedStringEnd(text, i)
+                if (end == -1) { out.append(c); i++ } else { out.append(text, i, end); i = end }
+            }
+
+            c == '\'' -> {
+                val end = charLiteralEnd(text, i)
+                if (end == -1) { out.append(c); i++ } else { out.append(text, i, end); i = end }
+            }
+
+            c == '/' && next == '/' -> {
+                val newline = text.indexOf('\n', i)
+                // 不 append 注释本体；把换行留给下一轮 append，行数与旧实现逐字一致。
+                i = if (newline == -1) text.length else newline
+            }
+
+            c == '/' && next == '*' -> {
+                val end = text.indexOf(BLOCK_COMMENT_CLOSE, i + BLOCK_COMMENT_START.length)
+                i = if (end == -1) text.length else end + BLOCK_COMMENT_CLOSE.length
+            }
+
+            else -> { out.append(c); i++ }
+        }
+    }
+    return out.toString()
+}
+
+/** 双引号单行串（认反斜杠转义）的收尾下标（闭合引号的下一位）；跨行即非法，返回 -1 让调用方按普通字符处理。 */
+private fun singleQuotedStringEnd(text: String, start: Int): Int {
+    var j = start + 1
+    while (j < text.length) {
+        when (text[j]) {
+            '\\' -> j += 2
+            '"' -> return j + 1
+            '\n' -> return -1
+            else -> j++
+        }
+    }
+    return -1
+}
+
+/** 单引号字符字面量（`'a'`、转义 `'X'`、「单引号包单引号」）的收尾下标；形状不合法返回 -1。 */
+private fun charLiteralEnd(text: String, start: Int): Int {
+    var j = start + 1
+    if (j >= text.length) return -1
+    j = if (text[j] == '\\') j + 2 else j + 1
+    return if (j < text.length && text[j] == '\'') j + 1 else -1
+}
 
 /** 剥注释后的命中计数（锚点唯一性守卫与 Task 8 的裸 hex / 份数棘轮共用此入口）。 */
 internal fun countMatches(source: String, regex: Regex): Int = regex.findAll(stripComments(source)).count()
