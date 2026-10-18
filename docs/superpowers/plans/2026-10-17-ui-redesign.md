@@ -854,45 +854,77 @@ internal val MintBackground: Color
 - Test: `app/src/androidTest/java/com/example/englishlearning/ui/AppScreenHeaderTest.kt`
 
 **Interfaces:**
-- Consumes: `appColors()`、`AppType.Headline/Body`、`AppIcon.Back`、`appImageVector`。
+- Consumes: `appColors()`、`AppType.Title/Footnote`、`AppIcon.Back/Info`、既有唯一按钮 `PillButton`（`ui/components/glass/GlassButton.kt`）。
 - Produces:
   - `@Composable fun AppScreenHeader(title: String, modifier: Modifier = Modifier, subtitle: String? = null, onBack: (() -> Unit)? = null, action: @Composable (() -> Unit)? = null)`
   - `@Composable fun ScreenUnavailable(reason: String, actionLabel: String, onAction: () -> Unit, modifier: Modifier = Modifier, icon: AppIcon = AppIcon.Info)`
 
 - [ ] **Step 1: 写 connected 测试（失败）**
 
+  控制者派前核对（原Step 1 的伪 API 全部换成本仓库已实测的口径，依据 `CheckInScreenTest.kt` 既有两条护栏）：
+  - 规则用 `createComposeRule()`（组件级，无需 Activity；既有 `CheckInScreenTest` 就是这一种），**不用** `rule.activity.setContent`；
+  - 48dp 量法用**双口径**：`assertHeightIsAtLeast(48.dp)` / `assertWidthIsAtLeast(48.dp)`（读裁剪后矩形，先 `performScrollTo()` + `assertIsDisplayed()`）+ `getUnclippedBoundsInRoot()` 断真实尺寸；**不用** `getSemanticsNode().layoutNode.height` / `captureRegionInRoot`（本仓库无此用法）；
+  - 大字号护栏用既有写法：`setContent` 内 `val base = LocalDensity.current` 后 `CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 2f)) { … }`；
+  - 「只有一个可点出口」用 `onAllNodes(hasClickAction()).fetchSemanticsNodes()` 的长度断言，不用 `onLast()`（`onLast()` 不判数量，恒真）。
+
   三条（每方法一次 `setContent`，绝不复用）：
   ```kotlin
   @Test fun header_back_is_a_48dp_target_with_a_readable_description() {
-      rule.setContent { MintGlassTheme { AppScreenHeader("学习记录", onBack = { backed = true }) } }
-      rule.onAllNodesWithContentDescription("返回").onFirst().assert(hasClickAction())
-        .assert(hasAnyChild())
-      val node = rule.onAllNodesWithContentDescription("返回").onFirst()
-      val h = node.getSemanticsNode().layoutNode.height  // 用 captureRegionInRoot / bounds 换算，见下
-      assertTrue(h >= (48 * density).toInt(), "返回可点区应 ≥48dp，实际 $h px")
+      composeRule.setContent { MintGlassTheme { AppScreenHeader("学习记录", onBack = { backed = true }) } }
+      val back = composeRule.onAllNodesWithContentDescription("返回").onFirst()
+      back.assertHasClickAction()
+      back.performScrollTo(); back.assertIsDisplayed()
+      back.assertHeightIsAtLeast(48.dp); back.assertWidthIsAtLeast(48.dp)
+      val b = back.getUnclippedBoundsInRoot()
+      assertTrue("返回可点区应 ≥48dp，实际=$b", b.bottom - b.top >= 48.dp && b.right - b.left >= 48.dp)
+      backed = false; back.performClick(); assertTrue(backed)
   }
   @Test fun header_survives_font_scale_2_without_clipping_the_title() {   // F5-03 移交账
-      rule.activity.setContent { MintGlassTheme { AppScreenHeader("学习记录与复习统计（长标题用）", subtitle = "本周新增 128 词") } }
-      // 在 fontScale=2.0 下：标题不得被裁（断言文本完整 + 高度 > 单行）
+      composeRule.setContent {
+          val base = LocalDensity.current
+          CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 2f)) {
+              MintGlassTheme { AppScreenHeader("学习记录与复习统计（长标题用）", subtitle = "本周新增 128 词", onBack = {}) }
+          }
+      }
+      val title = composeRule.onNodeWithText("学习记录与复习统计（长标题用）")
+      title.assertExists()                                   // maxLines=2 且不省略号 → 文本节点完整存在
+      val box = title.getUnclippedBoundsInRoot()
+      assertTrue("fontScale=2.0 下标题不得塌成 0 宽，实际=$box", box.right - box.left >= 48.dp)
+      assertTrue("两行标题应真的长出高度，实际=$box", box.bottom - box.top > 24.dp)
   }
   @Test fun screen_unavailable_offers_exactly_one_action() {
-      rule.setContent { MintGlassTheme { ScreenUnavailable(reason = "AI 尚未配置", actionLabel = "去配置 ›", onAction = { tapped = true }) } }
-      rule.onNodeWithText("去配置 ›").assertIsDisplayed().performClick()
+      composeRule.setContent {
+          MintGlassTheme { ScreenUnavailable(reason = "AI 尚未配置", actionLabel = "去配置", onAction = { tapped = true }) }
+      }
+      composeRule.onNodeWithTag("screen_unavailable_action").assertIsDisplayed().performClick()
       assertTrue(tapped)
-      rule.onAllNodes(hasClickAction()).onLast()  // 只有一个可点出口
+      assertEquals("整屏不可用态只能有一个可点出口",
+          1, composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size)
   }
   ```
-  实现口径按仓库既有 connected 样板落地（`CheckInScreenTest` 的 fontScale 护栏与 48dp 量法直接沿用——**先读该文件确认量法名称再写**，别自创 API）。
 
 - [ ] **Step 2: 跑 connected 确认失败**（组件不存在 → 编译失败即 RED 证据，写进报告）。
 
 - [ ] **Step 3: 实现两个组件**
 
-  `AppScreenHeader`：`Row(verticalAlignment = CenterVertically)`，返回按钮为 `Box(Modifier.size(48.dp).clip(CircleShape).clickable(onBack).semantics { contentDescription = "返回" })` + `AppGlyph(AppIcon.Back, appColors().text1, 22.dp)`；`title` 用 `AppType.Headline` + `maxLines = 2`（**不省略号**：页标题裁掉即丢信息），`subtitle` 用 `AppType.Body` + `appColors().text2`；无 `onBack` 时不渲染返回位（首屏用），标题左对齐位置不变（用同宽占位 `Spacer(48.dp)`）。整行 `heightIn(min = 56.dp)` 且 `Modifier.testTag("app_screen_header")`。
-  `ScreenUnavailable`：`tint` 底卡片 + `InlineIconBadge` 位（或 `AppGlyph`）+ 原因文案 + **一个**动作按钮，`testTag("screen_unavailable_action")`。
-  两者颜色全部走 `appColors()`，零裸 hex（Task 8 棘轮会挡）。
+  几何一律以视觉稿 `docs/design/2026-10-17-ui-redesign-mockups.html` 的 §页头（`.appheader`，119–126 行）与 §骨架/空态（`.card .empty`，196–198 + 610 行）为准；下列三处与本计划原表述不同，是控制者派前对照稿子的裁决（R-9.1/R-9.2/R-9.3），稿子是权威。
 
-- [ ] **Step 4: 跑 connected 通过 + 门控**（emulator-5574，命令见 Task 5 Step 5）。
+  `AppScreenHeader`（= 稿子 `.appheader`：`Row`、`gap 10dp`、`align-items:center`、`min-height 48dp`）：
+  - **R-9.1 返回位取稿子的 40dp 视觉容器 + 48dp 可点区**（原计划写 `size(48.dp).clip(CircleShape)` 与稿不符）。外层 `Box(Modifier.size(48.dp).clip(AppShape.Icon).clickable(onExactly = onBack).semantics { contentDescription = "返回" }, contentAlignment = Center)`，内层视觉 `Box(Modifier.size(40.dp).clip(AppShape.Icon).background(appColors().surface).border(1.dp, appColors().outlineSoft, AppShape.Icon))` 内放 `AppGlyph(AppIcon.Back, appColors().text1, 22.dp)`（稿子 `.back` 未单独给字形尺寸，沿同族 `.ic svg {22px}` 的 40dp 容器→22dp 口径）。F5-03 的「真 48dp」由外层可点节点满足，Step 1 第一条用例钉的正是它。
+  - 标题用 **`AppType.Title`**（稿子 `.ht` = 17px/700，六档里对应 `Title` 17sp SemiBold；原计划写 `Headline` 24sp 是首屏 `.page-title` 那一档，不属于带返回键的页头）+ `color = appColors().text1` + `maxLines = 2` + **不省略号**（页标题裁掉即丢信息）。副标题 `AppType.Footnote` + `color = appColors().text2`（稿 `.hs` 是 12px/400，六档无 12sp Regular——`Label` 是 12sp Medium，引新档会破 spec §2.2 的六档锁，故取同族 `.page-sub` 的 13sp/400 `Footnote`，登记为按 token 近似）。
+  - **R-9.2 无 `onBack` 时不渲染占位**（原计划写「同宽 `Spacer(48.dp)` 保持对齐」）。稿子里不带返回键的首屏标题是贴左的 `.page-title`，插一个 48dp 空占位是稿子里不存在的排印。`action` 槽仍在行尾（稿 `.tr { margin-left:auto }`）。
+  - 行 `heightIn(min = 48.dp)`（稿 min-height 48px；原计划写 56dp 是入口行 `.entry` 的档，不是页头），`Modifier.testTag("app_screen_header")`；**组件内部不写 `padding(bottom = 6.dp)`**——稿子的 `margin-bottom:6px` 归各屏的列节奏，写进组件会与 `Column(verticalArrangement = spacedBy(…))` 叠成幽灵间距（F5-03 移交账点过名）。
+
+  `ScreenUnavailable`（= 稿子 `.card` 里嵌 `.empty`）：`Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(appColors().surface).border(1.dp, appColors().outlineSoft, MaterialTheme.shapes.medium).padding(24.dp), horizontalAlignment = CenterHorizontally)` + `AppGlyph(icon, appColors().text2, 24.dp)` + 原因文案 `AppType.Footnote` `text2` + **一个**动作 = 复用既有 `PillButton(text = actionLabel, onClick = onAction, style = PillStyle.Secondary, testTag = "screen_unavailable_action")`。
+  - **R-9.3 卡片底色取稿子的 `surface` + 1dp `outlineSoft` 描边**（原计划写「`tint` 底卡片」；稿子里 tint 底是 `.banner`/`.card-sel`，`.empty` 所在的是 `.card`＝surface）。圆角走 `MaterialTheme.shapes.medium`——Task 4 已把该 M3 槽校准到 spec §2.3 的 18dp，而 `AppShape.Card` 仍是旧值 20dp（Task 4 明确留给逐屏迁移批），**新组件不得读 `AppShape.Card`**。
+  - 动作不新建按钮组件：批 1 唯一按钮是 `PillButton`，再造一个「不可用态专用按钮」会直接撞上 Task 12 的组件份数棘轮。
+  两者颜色全部走 `appColors()`，零裸 hex（Task 8 棘轮会挡），且不新增 `AppPalette.` / `DomainColors.` 静态读点（`Text` 用 `style = AppType.X, color = appColors().…` 的既有写法，照 `GlassButton.kt:93`）。
+
+  本轮登记两处**计划缺口**（不在本任务补，避免接口膨胀；派到各自 owner 时必须先裁决）：
+  - 首屏三件套（稿 `.page-title` 24sp + `.page-sub` 13sp + 可选 meta 行，见稿 899/1015/1065/1103 行）无 owner → 归批 2 Task 13/14 派工前裁决是否落成 `AppPageHeader`；
+  - 稿子按钮族（`.btn-primary` 54dp/r-btn 14/16sp、`.btn-secondary` 48dp/15sp、`.btn-ghost`、`.btn-pill` 40dp）与 `PillButton`（Pill 50%、min 48dp、`AppType.Title` 17sp、Secondary 描边用 `Separator`）不同档 → 归批 2 Task 14（1 CTA 改版）派工前一并裁决，含 `PillButton` 白字压域色的既有问题。
+
+- [ ] **Step 4: 跑 connected 通过 + 门控**（只准 `emulator-5574`，命令口径照 Task 5 Step 5：`assembleDebug` + `assembleDebugAndroidTest` → 两次 `adb install -r` → `adb shell am instrument -w -e class com.example.englishlearning.ui.AppScreenHeaderTest com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`；**绝禁 `connectedDebugAndroidTest`**，绝不在真机 `bf353dda` 装测试包或跑 instrument）。JVM 门控基线：**214 suites / 1599 tests / 0 失败 / 0 跳过**（本任务只加 androidTest，JVM 总数持平即合格）。
 
 - [ ] **Step 5: 提交**
 
