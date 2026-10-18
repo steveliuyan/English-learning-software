@@ -30,9 +30,10 @@ import com.example.englishlearning.ui.theme.LocalIsDark
  *
  * `CircleFill(cx, cy, r)` 是 `AppIcons.kt` 里唯一非 SVG path 的形状（视觉稿的 `<circle>` 转录成标记串），
  * 由本文件的 [circleFillPathData] 解释成**过上下极点的两段绝对圆弧**（`A` 命令）再走同一个解析器。
- * 前缀命中却解析不出三个正数就当场 `require` 抛错并带上原始串——不回落给 SVG 解析器：
+ * 前缀命中却拿不到「有限的圆心 + 正的有限半径」就当场 `require` 抛错并带上原始串——不回落给 SVG 解析器：
  * 回落得到的只是解析器自己的 `Unknown command for: i`（开头的 `C` 被当成立方贝塞尔命令），
  * 消息里既没有字形名也没有坐标，认不出坏在哪一枚圆形，等于把几何错误推迟到运行时才炸。
+ * 圆心两轴不要求为正：与画布边相切（`cx` 或 `cy` 为 0）是 24dp 栅格里的正常造型，正数约束只属于半径。
  *
  * 描边重量：视觉描边 2 随 [appImageVector] 的 `strokeScale` 缩放，圆头与圆角连接由渲染端统一给
  * （`StrokeCap.Round` / `StrokeJoin.Round`），路径数据里不写画笔参数——那是 Task 6 的度量基准。
@@ -135,8 +136,11 @@ internal fun isCircleFillMarker(path: String): Boolean = path.startsWith(CIRCLE_
 /**
  * `CircleFill(cx, cy, r)` → 过上下极点 `(cx, cy-r)` / `(cx, cy+r)` 的两段绝对圆弧（同一个圆的 path 形）。
  *
- * 坏标记一律 `require` 抛错，消息里带原始串：静默返回 null 让调用方回落，等于把「圆形根本没画出来」
- * 留给肉眼验收；这里抛错则让任何一枚解释不了的圆形在第一次组装时就暴露。
+ * 坏标记一律 `require` 抛错，消息里带原始串并点明哪一段缺什么条件：静默返回 null 让调用方回落，
+ * 等于把「圆形根本没画出来」留给肉眼验收；这里抛错则让任何一枚解释不了的圆形在第一次组装时就暴露。
+ *
+ * 约束按位置分档：圆心两轴只要求**有限**（`cx` / `cy` 为 0 即与画布边相切，负值即部分出界，都是合法几何），
+ * 只有半径（第 3 段）额外要求**为正**——半径为 0 时上下极点重合、两段弧退化成同一个点，画不出圆。
  */
 internal fun circleFillPathData(path: String): String {
     require(isCircleFillMarker(path)) { "不是 $CIRCLE_FILL_PREFIX 标记串，无从展开成圆弧：$path" }
@@ -145,10 +149,14 @@ internal fun circleFillPathData(path: String): String {
     val values = body.removeSuffix(")")
         .split(',')
         .map { it.trim().toDoubleOrNull() }
-    require(values.size == 3 && values.all { it != null && it.isFinite() && it > 0.0 }) {
-        "$CIRCLE_FILL_PREFIX 需要 (cx, cy, 正半径) 三个有限数值：$path"
+    require(values.size == 3 && values.all { it != null }) {
+        "$CIRCLE_FILL_PREFIX 需要 (cx, cy, 半径) 三个可解析的有限数值（前两段是圆心、第 3 段是半径）：$path"
     }
     val (cx, cy, radius) = values.map { requireNotNull(it) }
+    // 「为正」只约束半径：圆心两轴允许 0 或负值（与画布边相切、或部分出界都是合法几何，视口自然裁掉）。
+    require(cx.isFinite() && cy.isFinite() && radius.isFinite() && radius > 0.0) {
+        "$CIRCLE_FILL_PREFIX 的圆心（前两段）必须有限、半径（第 3 段）必须是正的有限数：$path"
+    }
     val top = cy - radius
     val bottom = cy + radius
     return "M ${plain(cx)} ${plain(top)}" +

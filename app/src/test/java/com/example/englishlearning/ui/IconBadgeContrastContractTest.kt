@@ -50,7 +50,9 @@ import kotlin.test.fail
  *  - 每条源码正则都用合成正片段与合成负片段当场证明「抓得住且不越界」；文本正则只守「写法」，
  *    写法背后能不能真画出东西由组装用例判定——[buildAppImageVector] 是纯函数，JVM 侧直接读
  *    返回的 `ImageVector` 节点表与画笔参数（修复轮 I-1：只钉「文本里出现过 CircleFill」曾恒真，
- *    删掉标记解释也不会有任何一条红）。
+ *    删掉标记解释也不会有任何一条红）。入口字形那条文本钉在修复轮 2 改成**否定式**：
+ *    [entryGlyphCallSegment] 只负责找出 24dp 调用整段（允许批 2 追加合法实参），
+ *    口径由「段内 [explicitLayerArgument] 出现 0 次」把守，两份入口写法真值合并成一条。
  *
  * [mixArgb] 是本测试自带的第二份混色实现（int 域），与生产的 `gradientStartForDomain` 不共享一行代码：
  * 这是**有意的重复**——两端点必须算出同一个颜色才算契约成立（逐通道比对见
@@ -123,15 +125,26 @@ class IconBadgeContrastContractTest {
     /** 行内徽标：17dp 字形必须显式只要描边层——填充层在 30dp 浅底上没有信息量，只会把字形糊成一坨。 */
     private val strokeOnlyGlyphCall = Regex("""size\s*=\s*17\.dp\s*,\s*layer\s*=\s*AppGlyphLayer\.StrokeOnly""")
 
-    // 首轮那条 `size = 24.dp)` 把「不带 layer 实参」与「size 是最后一个实参」混为一谈（评审 M-2），
-    // 已换成下面这条把整段调用写死的精确形状，行为面另由组装用例
+    // 首轮那条 `size = 24.dp)` 把「不带 layer 实参」与「size 是最后一个实参」混为一谈（评审 M-2）；
+    // 修复轮 1 换成「整段调用字面量写死」又留下反向脆弱（复评 N-3：批 2 加一个合法实参就报不相干理由）。
+    // 本轮（修复轮 2）改成否定式：先用 entryGlyphCallSegment 把入口那段调用找出来，再断言段内 `layer` 出现 0 次；
+    // 行为面另由组装用例
     // [assembled_vector_keeps_both_layers_for_duotone_and_only_the_skeleton_for_stroke_only] 真断言。
 
     /** 禁止形状：把描边-only 开关用到入口字形上（两种呈现的差异就坍缩成一种）。 */
     private val strokeOnlyOnEntryGlyph = Regex("""size\s*=\s*24\.dp\s*,\s*layer\s*=\s*AppGlyphLayer\.StrokeOnly""")
 
-    /** 入口字形的两层口径 = 不传 `layer` 实参（走默认值）；写死实参或换行排版都算改口径，本形状当场不匹配。 */
-    private val entryGlyphDefaultCall = Regex("""AppGlyph\(icon = icon, tint = ink, size = 24\.dp\)""")
+    /**
+     * 入口字形的 24dp `AppGlyph` 调用**整段**——本文件唯一的入口形状真值，源码断言只走这一条：
+     * 只负责「把那段调用找出来」，允许批 2 接线时增补合法实参（`modifier = …`、`strokeScale = …`）与换序，
+     * 实参里再嵌一层括号（`Modifier.padding(4.dp)` 一类）也不截断；行内的 17dp 调用不含 `size = 24.dp`，
+     * 因此不会被认成入口段（那条本就该显式带 `layer`）。
+     */
+    private val entryGlyphCallSegment =
+        Regex("""AppGlyph\((?:[^()]|\([^()]*\))*?size\s*=\s*24\.dp(?:[^()]|\([^()]*\))*?\)""")
+
+    /** 禁止形状：入口调用段里显式写 `layer =`——两层口径靠默认值承载，写死即改口径。 */
+    private val explicitLayerArgument = Regex("""layer\s*=""")
 
     /** 豁免表强制：入口容器开头必须由纯函数判定挡住豁免枚。 */
     private val entryRequire = Regex("""require\(allowsInEntryContainer\(icon\)\)""")
@@ -201,6 +214,10 @@ class IconBadgeContrastContractTest {
     /** 源码文本 → 其中内联的 SVG path 字面量（空表 = 渲染码没有第二套几何）。 */
     private fun inlinedGeometryLiterals(text: String): List<String> =
         quotedLiteral.findAll(text).map { it.groupValues[1] }.filter { svgPathShape.matches(it) }.toList()
+
+    /** 入口 24dp 调用的整段命中：段内再做「不得含 `layer =`」的否定式判定，源码断言与本用例片段共用同一条正则。 */
+    private fun entryGlyphCallSegments(text: String): List<String> =
+        entryGlyphCallSegment.findAll(text).map { it.value }.toList()
 
     // ---------- 用例：对比契约（计划 Step 1 的四组数，阈值与注释数值逐字保留） ----------
 
@@ -463,6 +480,57 @@ class IconBadgeContrastContractTest {
         )
     }
 
+    /**
+     * 圆心落在 0 是合法几何（与画布左/上边缘相切，24dp 栅格里的正常造型需求）：
+     * 「为正」这条约束只属于半径（标记串的第 3 段），圆心两轴只要求有限。
+     */
+    @Test
+    fun circle_fill_marker_accepts_a_center_coordinate_of_zero() {
+        val arc = circleFillPathData("CircleFill(0, 12, 12)")
+        assertTrue(arc.startsWith("M 0 0"), "cx = 0、cy = 12、半径 12 的圆应从顶极点 (0, 0) 起锚，实际：$arc")
+        assertTrue(arc.contains(" 0 24"), "下极点 (0, 24) 必须原样落在产物里，实际：$arc")
+        assertEquals(2, Regex("""[Aa]\s""").findAll(arc).count(), "相切圆同样要两段首尾相接的圆弧才闭合成整圆，实际：$arc")
+        assertFalse(arc.contains("CircleFill"), "产物里仍留着标记串：说明解释分支根本没跑")
+        assertTrue(nodesOf(arc).isNotEmpty(), "相切圆的产物解析后没有节点：图标静默不画，$arc")
+
+        // 同一条口径的另一侧：cy 为 0 也合法（极点可以为负，视口外的部分由画布裁掉）。
+        val topEdge = circleFillPathData("CircleFill(12, 0, 4)")
+        assertTrue(
+            topEdge.startsWith("M 12 -4") && topEdge.contains("12 4"),
+            "cy = 0、半径 4 的上下极点应为 -4 / 4，实际：$topEdge",
+        )
+        assertTrue(nodesOf(topEdge).isNotEmpty(), "上边缘相切圆的产物解析后没有节点，$topEdge")
+
+        // 合成反例（证明本用例的极点判据抓得住「圆心被写歪」）：把 cx 当成 12 的产物必须不满足上面两条判据。
+        val wrongCenter = "M 12 0 A 12 12 0 0 1 12 24 A 12 12 0 0 1 12 0"
+        assertFalse(wrongCenter.startsWith("M 0 0"), "合成反例失控：圆心写歪的产物也满足本用例的起锚判据")
+        assertFalse(wrongCenter.contains(" 0 24"), "合成反例失控：极点 (0, 24) 不在场也算命中")
+    }
+
+    /** 收紧的是圆心的过严约束，不是半径的下界：坏半径与非有限圆心仍必须各自抛错并带上原文。 */
+    @Test
+    fun circle_fill_marker_still_rejects_a_bad_radius_and_a_non_finite_center() {
+        // 每条坏输入配一个消息关键词：半径不合格要指名「半径」，圆心不合格要指名「有限」——
+        // 消息只笼统给一个总条件时，读错误的人分不清是三段里的哪一段写歪了。
+        listOf(
+            "CircleFill(0, 12, 0)" to "半径",        // 半径 0：上下极点重合，画不出圆
+            "CircleFill(12, 12, -4)" to "半径",      // 负半径
+            "CircleFill(12, 12, NaN)" to "半径",     // 非有限半径（Double 字面量认 "NaN"）
+            "CircleFill(12, 12, Infinity)" to "半径", // 非有限半径
+            "CircleFill(NaN, 12, 4)" to "有限",      // 非有限圆心：半径合格也定不出位置
+        ).forEach { (bad, keyword) ->
+            val thrown = assertFailsWith<IllegalArgumentException> { circleFillPathData(bad) }
+            assertTrue(
+                thrown.message?.contains(bad) == true,
+                "抛错消息没有带上原始串，无法归因到具体圆形：message=${thrown.message}，输入=$bad",
+            )
+            assertTrue(
+                thrown.message?.contains(keyword) == true,
+                "抛错消息没点明是哪一段、缺什么条件（$keyword）：message=${thrown.message}，输入=$bad",
+            )
+        }
+    }
+
     /** 层开关是组装期的真分支：Duotone 两层都在、StrokeOnly 只剩骨架。 */
     @Test
     fun assembled_vector_keeps_both_layers_for_duotone_and_only_the_skeleton_for_stroke_only() {
@@ -607,23 +675,58 @@ class IconBadgeContrastContractTest {
         val badge = uiComponentSource(BADGE_SOURCE_NAME)
         assertEquals(1, countMatches(badge, strokeOnlyGlyphCall), "行内 17dp 字形必须显式取描边-only 层")
         assertEquals(0, countMatches(badge, strokeOnlyOnEntryGlyph), "入口 24dp 字形被降级成单层：两种呈现坍缩成一种")
+
+        // 入口字形：否定式判定。段匹配只负责「把那枚 24dp 调用找出来」（恰一处），
+        // 口径由「段内 layer 出现 0 次」把守——批 2 追加 modifier / strokeScale 一类合法实参不会报红，
+        // 把 layer 写死进去口才红，红的原因与契约要守的东西一致（复评 N-3 要消除的「报不相干理由」）。
+        val entryCalls = entryGlyphCallSegments(badge)
         assertEquals(
             1,
-            countMatches(badge, Regex("""AppGlyph\(icon = icon, tint = ink, size = 24\.dp\)""")),
-            "入口字形必须保持「不传 layer 实参」的两层默认（写死 layer = Duotone 也算改口径）",
+            entryCalls.size,
+            "入口必须恰好一枚 24dp `AppGlyph` 调用：0 处 = 接线把形状改到本契约失去对象，2 处 = 两套入口口径",
         )
+        entryCalls.forEach { call ->
+            assertEquals(
+                0,
+                countMatches(call, explicitLayerArgument),
+                "入口 24dp 字形把 layer 实参写死了：默认两层口径被改成显式口径（追加 modifier 等合法实参不在禁止范围）",
+            )
+        }
 
         val good = "AppGlyph(icon = icon, tint = palette.deep, size = 17.dp, layer = AppGlyphLayer.StrokeOnly)"
         assertEquals(1, countMatches(good, strokeOnlyGlyphCall), "合成正片段漏判：行内单层形状抓不住")
+        assertEquals(0, entryGlyphCallSegments(good).size, "合成正片段越界：行内 17dp 调用被当成入口段（layer 禁令会打错对象）")
         val unlayered = "AppGlyph(icon = icon, tint = palette.deep, size = 17.dp)"
         assertEquals(0, countMatches(unlayered, strokeOnlyGlyphCall), "合成负片段被放行：行内没关填充层也算合格")
         val wrongBadge = "AppGlyph(icon = icon, tint = ink, size = 24.dp, layer = AppGlyphLayer.StrokeOnly)"
         assertEquals(1, countMatches(wrongBadge, strokeOnlyOnEntryGlyph), "合成负片段被放行：入口字形被降级没被抓")
-        val explicitDuotone = "AppGlyph(icon = icon, tint = ink, size = 24.dp, layer = AppGlyphLayer.Duotone)"
+
+        // 入口段匹配与 layer 禁令各自的合成正/负片段。
+        val defaultEntry = "AppGlyph(icon = icon, tint = ink, size = 24.dp)"
+        assertEquals(0, countMatches(defaultEntry, strokeOnlyOnEntryGlyph), "合成正片段越界：不传 layer 的合法入口被判成降级")
+        assertEquals(1, entryGlyphCallSegments(defaultEntry).size, "合成正片段漏判：默认两层的入口调用没被认出来")
         assertEquals(
             0,
-            countMatches(explicitDuotone, entryGlyphDefaultCall),
-            "合成负片段被放行：入口显式写 layer 也当成「保持默认两层」",
+            countMatches(entryGlyphCallSegments(defaultEntry).single(), explicitLayerArgument),
+            "合成正片段越界：不传 layer 的入口调用被判成写死 layer",
+        )
+        val augmentedEntry = "AppGlyph(icon = icon, tint = ink, size = 24.dp, modifier = Modifier.padding(4.dp))"
+        assertEquals(1, entryGlyphCallSegments(augmentedEntry).size, "合成正片段漏判：批 2 给入口加 modifier 后调用段认不出来")
+        assertEquals(
+            0,
+            countMatches(entryGlyphCallSegments(augmentedEntry).single(), explicitLayerArgument),
+            "合成正片段越界：追加合法实参被算成改口径",
+        )
+        val explicitDuotone = "AppGlyph(icon = icon, tint = ink, size = 24.dp, layer = AppGlyphLayer.Duotone)"
+        assertEquals(
+            1,
+            entryGlyphCallSegments(explicitDuotone).size,
+            "合成负片段失控：写死 layer 的入口调用连段都认不出（否定式判定失去对象）",
+        )
+        assertEquals(
+            1,
+            countMatches(entryGlyphCallSegments(explicitDuotone).single(), explicitLayerArgument),
+            "合成负片段被放行：入口显式写 layer = 也当成「保持默认两层」",
         )
     }
 
@@ -656,12 +759,23 @@ class IconBadgeContrastContractTest {
 
         val bad = "Box(modifier = Modifier.size(36.dp).clip(AppShape.Card).background(AppPalette.Tint))"
         assertEquals(0, countMatches(bad, entryContainerSize), "合成负片段被放行：非 40dp 容器没被抓")
+        assertEquals(0, countMatches(bad, inlineContainerSize), "合成负片段被放行：非 30dp 容器也算行内")
         assertEquals(0, countMatches(bad, inlineTintBackdrop), "合成负片段被放行：底色取自静态 AppPalette 没被抓")
         assertEquals(0, countMatches(bad, entryShapeClip), "合成负片段被放行：圆角用了别的档位没被抓")
         // 两档合并（行内也裁 Icon 档）必须让 inlineShapeClip 归零：这正是「共用一档」的错误表述落成代码的形状。
         val mergedTier = "Box(modifier = Modifier.size(30.dp).clip(AppShape.Icon).background(appColors().tint))"
         assertEquals(0, countMatches(mergedTier, inlineShapeClip), "合成负片段被放行：行内复用入口档没被抓")
         assertEquals(1, countMatches(mergedTier, entryShapeClip), "合成负片段失控：档位在文本里都不存在")
+
+        // 复评 N-4 点名的单侧规则在这里补齐另一侧：写法被改写一点点就必须归零，否则计数契约形同虚设。
+        assertEquals(1, countMatches(good, inlineTintBackdrop), "合成正片段漏判：行内底色取主题 tint")
+        val thinBorder = "Modifier.border(2.dp, AppPalette.GlassHighlight, AppShape.Icon)"
+        assertEquals(0, countMatches(thinBorder, glassHighlightBorder), "合成负片段被放行：高光描边重量被改成 2dp 还算合格")
+        val softRequire = "if (allowsInEntryContainer(icon)) { renderEntryBadge() }"
+        assertEquals(0, countMatches(softRequire, entryRequire), "合成负片段被放行：require 换成 if 分支也算准入强制")
+        val otherMessage = "require(allowsInEntryContainer(icon)) { \"X 只作行内指示\" }"
+        assertEquals(0, countMatches(otherMessage, entryRequireMessage), "合成负片段被放行：拒绝理由换成别的措辞也算按计划原文写全")
+        assertEquals(1, countMatches(good, entryRequireMessage), "合成正片段漏判：require 的拒绝理由")
     }
 
     /** 两档圆角的数值本身（源码文本即契约，不渲染）：12dp 与 9dp 各恰一处，谁被改掉都红。 */
