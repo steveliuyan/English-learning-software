@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,7 +23,12 @@ import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 
 /**
- * 批 1 Task 12：词行（spec §3「一行 lemma + 释义 + 状态/时间 + 右侧动作」，现状 7 份私有实现、0 复用）。
+ * 批 1 Task 12：词行（spec §3「一行 lemma + 释义 + 状态/时间 + 右侧动作」）。
+ *
+ * 私有份数不在本文件抄写（Global Constraint 16：绝对数会随接线进度漂移）——权威口径是
+ * `SharedComponentUniquenessRatchetTest.componentFamilySeeds` 里「词行（应调 WordRow）」那一族的台账，
+ * 重算命令：`"$GRADLE" :app:testDebugUnitTest --offline --no-daemon --no-build-cache --tests com.example.englishlearning.ui.SharedComponentUniquenessRatchetTest`
+ * （`each_family_offender_set_equals_its_seed_exactly` 会逐族打印实际违规文件集与 seed 的双向差异）。
  *
  * 收的是 spec §3 点名的那批裸组合（`WordBookWordsScreen`/`LearningRecordsScreen`/
  * `GlobalVocabularySearchScreen` 两变体/`VocabularyScreen`/`WrongWordsScreen`/`FavoritesScreen`）：
@@ -76,9 +82,11 @@ fun wordRowInks(set: AppColorSet): WordRowInk = WordRowInk(
  * 几何：`Row` 间隙 12dp（与 [EntryRow] 同一档横向节奏）、`heightIn(min = 48.dp)`（spec §2.3 触控下限；
  * 词行在列表里就是触控目标，不给它钉下限等于把 F5-03 的账留给批 3 逐屏再还一次）、
  * `padding(vertical = 8.dp)`（内容上下留白，与入口行同档）。行本体不铺底色、不描边：
- * 卡面与描边归调用方的容器（现网 6 份私有实现都是「Card 里塞一行」，批 3 接线时保留各屏容器）。
+ * 卡面与描边归调用方的容器（现状的私有实现都是「Card 里塞一行」，批 3 接线时保留各屏容器；
+ * 私有份数与重算口径统一见 `SharedComponentUniquenessRatchetTest` 的 `componentFamilySeeds` 台账，
+ * 本文件不抄绝对数——抄了会随接线进度漂移，撞 Global Constraint 16）。
  *
- * **修饰符顺序就是契约**（Task 10/11 的实测教训，别按稿面顺序「顺手调回去」）：可点面由两条共同交付——
+ * **可点面的两条共同交付**（Task 10/11 的实测教训，别按稿面顺序「顺手调回去」）：
  * ① 链上存在 `heightIn(min = 48.dp)`；② `clickable` 排在任何 `padding` **之前**。
  * 这里 `clickable` 经 [touchModifier] 落在 `fillMaxWidth()` 之后、`heightIn`/`padding` 之前，
  * 所以可点面是整盒；把 `padding` 写到 `clickable` 前面就会退化成内容盒
@@ -104,6 +112,10 @@ fun wordRowInks(set: AppColorSet): WordRowInk = WordRowInk(
  * [actions] 是尾部动作槽（`RowScope` 收件，调用方可直接写 `actions = { SpeakerButton(...) }` 一类），
  * 两槽都可空；槽内的触控目标由调用方自己给 48dp 下限（本行只保证自己这一枚可点面达标）。
  * [status] 与 [meta] 右对齐成一小列（稿面词表行的「状态 / 时间」两行右栏），两者都为空时整列不占位。
+ * 这一列带 `widthIn(max = 120.dp)` 的**宽度上限**：`Row` 先量**无权重**的孩子，右列既无 weight 又无上限时，
+ * 120dp 是给 lemma 列在 360dp 宽 + fontScale 2.0 下留出可站住的宽度而定的（超出的内容由列内
+ * `maxLines = 1` + [TextOverflow.Ellipsis] 省略）；**这是上限不是期望宽**，窄内容照旧按内容收，
+ * 实际能否站住由 connected 的 `WordRowTest` 在 fontScale 2.0 下量 lemma 宽度（≥48dp）证明。
  */
 @Composable
 fun WordRow(
@@ -156,7 +168,10 @@ fun WordRow(
             }
         }
         if (status != null || meta != null) {
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                modifier = Modifier.widthIn(max = 120.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
                 if (status != null) {
                     Text(
                         text = status,

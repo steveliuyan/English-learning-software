@@ -92,8 +92,11 @@ fun noticeInk(kind: InlineNoticeKind, set: AppColorSet): NoticeInk = when (kind)
 }
 
 /**
- * 三态用图：逐枚取 `AppIcons.kt` 文件头清单里已登记的落点——Info→`Info`、Error→`Warning`（`:30` 钉死）、
- * Success→`Check`（`:5`）。
+ * 三态用图：逐枚取 `AppIcons.kt` 文件头清单里已登记的落点——Info→`Info`、
+ * Error→`Warning`（清单里 `Warning` 那一枚，登记用途「警示与破坏性操作行（`InlineNoticeKind.Error`、删除确认）」）、
+ * Success→`Check`（清单里 `Check` 那一枚，登记用途「完成与成功回显对勾（`InlineNoticeKind.Success` 行）」）。
+ * 锚点一律用**枚名**而不是行号 / 清单序号（批 1 终审 m3：旧的「`:30` / `:5`」既不是行号也不是符号名，
+ * 文件一动就指错地方）。
  */
 internal val InlineNoticeKind.glyph: AppIcon
     get() = when (this) {
@@ -145,7 +148,8 @@ internal val InlineNoticeKind.glyphLayer: AppGlyphLayer
  * 行本体标签 `inline_notice_${kind.name.lowercase()}`：三态各一条，供 connected 用例逐条 `assertExists`。
  *
  * 已登记的偏离（不是随手替换）：稿 `.err` 画的是「圆圈 + 叉」，本仓 B 案 31 枚字形里没有这一枚，
- * 扩一枚要重走图标决策 + 许可登记，故按 `AppIcons.kt:30` 的登记用 `Warning` 三角承载 Error 态；
+ * 扩一枚要重走图标决策 + 许可登记，故按 `AppIcons.kt` 逐枚清单里 `Warning` 那一枚的登记用途（警示与破坏性
+ * 操作行）用 `Warning` 三角承载 Error 态；
  * Success 态稿面无样张，依据是 spec §组件表把本组件定义为「错误 / 回执行统一样式」+ `Check` 已登记为
  * 成功回显，墨色复用既有 `success` token、按稿 `.warn` 同式（12% 混底 + 34% alpha 边），不是新造色。
  */

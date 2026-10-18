@@ -29,7 +29,10 @@ object AppPalette {
 
     /**
      * 批 1 补齐的浅套静态源（深色由 AppColorDark/LocalAppColors 提供）。
-     * TextTertiary 按 2026-10-18 裁决 1 只可用于 ≥24sp 大数字/装饰与纯图标描边，不得作正文前景。
+     * TextTertiary 按 2026-10-18 裁决 1（该裁决已于批 1 终审 Seat A I-2 收窄底限定）只可用于
+     * `surface`/`background` 底上的 ≥24sp 大数字/装饰与纯图标描边；**不得作任何正文或标签前景**，
+     * 亦不得作图标描边压 `tint`/`tint-2`/`tint-3`（实测 3.00/2.74/2.71，后两枚连非文本 3:1 都不过，
+     * `tint` 只过 3.0 不过计划 :1047 的装饰档 ≥3.1）。
      */
     val Tint = Color(0xFFDDF7E8)
     val Tint2 = Color(0xFFDCEAE1)

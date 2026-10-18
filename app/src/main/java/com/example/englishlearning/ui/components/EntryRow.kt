@@ -48,6 +48,9 @@ data class EntryRowInk(
  * 恰好落在非文本 3:1 线上（边界上的合格不算合格），批 1 Task 1 的裁决 #1 又禁止 `text-3` 作前景；
  * 这条偏离连同「不得回到 text3」由 `EntryRowInkTest.chevron_is_pinned_to_text2_and_explicitly_not_to_text3`
  * 双向守着。比值与等值都不写在注释里（抄了会随 token 取值漂移），算式在测试端复算。
+ * 「不取 text3」这一面如今不止本行单点防守：批 1 终审 Seat A I-2 把裁决 #1 的授权底收窄成
+ * `surface`/`background`，并由 `DesignTokenContractTest` 的三条图形禁配（text3 压 tint / tint-2 / tint-3）
+ * 兜住整个 token 族，chevron 这类图标描边再也拿不到浅薄荷底。
  */
 fun entryRowInks(set: AppColorSet): EntryRowInk = EntryRowInk(
     title = set.text1,
@@ -67,12 +70,18 @@ fun entryRowInks(set: AppColorSet): EntryRowInk = EntryRowInk(
  * `entry_row_is_one_click_target_whole_row_with_button_role` 钉可点节点数恰为 1）。
  * 图标容器走 [EntryIconBadge] 的两档 [EntryIconTone]（R-10.2：批 2「今日计划」的三条入口行全部用弱档）。
  *
- * **修饰符顺序就是契约，别按稿面顺序「顺手调回去」**：`clickable` 排在 `fillMaxWidth()` 之后、
- * 顶线与 `heightIn`/`padding` 之前（即整条链的最外层可点面）。计划原文写的
+ * **可点面的两条共同交付**（批 1 终审 F1 定下的口径，别按稿面顺序「顺手调回去」）：
+ * ① 链上存在 `heightIn(min = 56.dp)`（稿面档，高于 spec §2.3 的 48dp 水线）；
+ * ② `clickable` 排在任何 `padding` **之前**——本行链上它落在 `fillMaxWidth()` 之后、顶线与 `padding` 之前，
+ * 于是可点面是整盒。把 `padding` 写到 `clickable` 前面就会退化成内容盒：计划原文写的
  * `.heightIn(...).padding(...).clickable(...)` 在真机上量到的是 **40dp** 的可点面（padding 与线被留在
  * 可点面**之外**，只剩内容盒），直接撞 F5-03 的 48dp 下限——`entry_row_clears_the_48dp_touch_floor`
  * 就是抓这条的 connected 用例（首次实现按计划原文写，真机实测 `Actual height is 40.0.dp` 红，
- * 改成本顺序后 56dp 通过）。几何等价：整盒仍是 1dp 线 + 56dp（内含 8+8 padding、内容下限 40dp）。
+ * 改成本顺序后 56dp 通过）。
+ * ①与②**谁先入链是尺寸中性的**：`clickable` 不参与测量，所以 `heightIn` 排在 `clickable` 之前或之后都合法
+ * （两处先例：`DialogButton` 的 heightIn 在前、`NotConfiguredCard` 出口的 heightIn 在后，
+ * 两处 connected 都实测 ≥48dp）——契约只问「链上有下限」与「clickable 在 padding 之前」这两条。
+ * 几何等价：整盒仍是 1dp 线 + 56dp（内含 8+8 padding、内容下限 40dp）。
  *
  * 排印按六档 token 落，两处差异按 **token 近似**登记（spec §2.2 六档锁：不引新档、不
  * `copy(fontWeight = …)`）：稿 `.en` 是 15px、字重 600，[AppType.Body] 是 15sp/400；稿 `.ed` 是 12px/400，
