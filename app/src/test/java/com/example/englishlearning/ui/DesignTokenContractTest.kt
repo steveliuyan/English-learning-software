@@ -1,7 +1,6 @@
 package com.example.englishlearning.ui
 
 import java.io.File
-import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -29,8 +28,8 @@ import kotlin.test.assertEquals
  *
  * 取值断言以 Long（0xRRGGBBAA 无符号位形）比较剥段后 hex，alpha 位一并钉住
  * （`surfaceGlass 0xEFFFFFFF` / 深色 `0xE617201C` 的口径差异就在 alpha 位上）。
- * 比值注释只写 ADR/brief 已钉数值（复算口径见决策文档「背景」节公式，本文件 `luminance`
- * 即该公式的实现，测试运行时现算，注释数值仅是可读性标注）。
+ * 比值注释只写 ADR/brief 已钉数值（复算口径见决策文档「背景」节公式，实现见共享夹具
+ * `SourceRatchet.luminance`/`ratio`，测试运行时现算，注释数值仅是可读性标注）。
  */
 class DesignTokenContractTest {
     private val themeDir = File(THEME_SOURCE_PATH)
@@ -119,21 +118,11 @@ class DesignTokenContractTest {
 
     // ---------- WCAG 计算（决策 2026-10-18 背景节公式的实现，运行时现算） ----------
 
-    /** WCAG 相对亮度（Global Constraints #7 的公式，逐分量实现，注释写明口径）。 */
-    private fun luminance(rgb: Int): Double {
-        fun lin(c: Int): Double {
-            val s = (c and 0xFF) / 255.0
-            return if (s <= 0.04045) s / 12.92 else ((s + 0.055) / 1.055).pow(2.4)
-        }
-        return 0.2126 * lin(rgb shr 16) + 0.7152 * lin(rgb shr 8) + 0.0722 * lin(rgb)
-    }
-
-    private fun ratio(fg: Int, bg: Int): Double {
-        val hi = maxOf(luminance(fg), luminance(bg))
-        val lo = minOf(luminance(fg), luminance(bg))
-        return (hi + 0.05) / (lo + 0.05)
-    }
-
+    /**
+     * 亮度与比值的纯函数住在共享夹具 `SourceRatchet.kt`（`luminance`/`ratio`，int 域，逐分量复算）：
+     * Task 7 的 `IconBadgeContrastContractTest` 按同一口径复算容器对比，公式只能有一份
+     * （批 1 Task 7 控制者裁决：从本文件的私有成员搬过去，函数体逐字未动）。
+     */
     private fun assertAtLeast(label: String, fg: Int, bg: Int, floor: Double) {
         val r = ratio(fg, bg)
         assertTrue(r >= floor, "$label 实测 %.2f:1 低于 %.1f:1".format(r, floor))

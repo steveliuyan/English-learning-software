@@ -1,10 +1,12 @@
 package com.example.englishlearning.ui
 
 import java.io.File
+import kotlin.math.pow
 import kotlin.test.assertTrue
 
 /**
- * 批 1 源码级契约测试共享夹具（计划 Task 2 建 `uiFiles`/`stripComments`/`countMatches` 三件；
+ * 批 1 源码级契约测试共享夹具（计划 Task 2 建 `uiFiles`/`stripComments`/`countMatches` 三件，
+ * Task 7 起再加 `luminance`/`ratio` 亮度复算一对；
  * `violations` 棘轮入口由计划 Task 8「三件棘轮测试上线」在本文件补，届时不要另起第二份夹具）。
  *
  * 口径（有意为之，勿「顺手加严」）：
@@ -42,3 +44,28 @@ internal fun stripComments(text: String): String = text
 
 /** 剥注释后的命中计数（锚点唯一性守卫与 Task 8 的裸 hex / 份数棘轮共用此入口）。 */
 internal fun countMatches(source: String, regex: Regex): Int = regex.findAll(stripComments(source)).count()
+
+/**
+ * WCAG 相对亮度，int 域（0xRRGGBB / 0xAARRGGBB 都只看低三字节，与 `DesignTokenContractTest` 的
+ * hex 取值口径一致）；Global Constraints #7 的公式实现，逐分量复算，禁止估。
+ *
+ * 搬家说明（批 1 Task 7 控制者裁决）：这两个纯函数原先是 `DesignTokenContractTest` 的私有成员，
+ * Task 7 的 `IconBadgeContrastContractTest` 要按同一口径复算容器对比，计划原文即要求「用 Task 2 的
+ * luminance/ratio」——公式再抄一份就是两套亮度口径，故搬成共享夹具，函数体逐字未动。
+ * `MaterialThemeAssemblyContractTest` 里那一对是 **Color 域**（读活符号的浮点分量）的另一份实现，
+ * 按裁决保持私有、不在本次搬家范围内。
+ */
+internal fun luminance(rgb: Int): Double {
+    fun lin(c: Int): Double {
+        val s = (c and 0xFF) / 255.0
+        return if (s <= 0.04045) s / 12.92 else ((s + 0.055) / 1.055).pow(2.4)
+    }
+    return 0.2126 * lin(rgb shr 16) + 0.7152 * lin(rgb shr 8) + 0.0722 * lin(rgb)
+}
+
+/** 前景压背景的对比比值（`(L1 + 0.05) / (L2 + 0.05)`，WCAG 2.1 contrast ratio 同式）。 */
+internal fun ratio(fg: Int, bg: Int): Double {
+    val hi = maxOf(luminance(fg), luminance(bg))
+    val lo = minOf(luminance(fg), luminance(bg))
+    return (hi + 0.05) / (lo + 0.05)
+}
