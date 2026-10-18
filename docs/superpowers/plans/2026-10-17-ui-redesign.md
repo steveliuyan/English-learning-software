@@ -857,13 +857,14 @@ internal val MintBackground: Color
 - Consumes: `appColors()`、`AppType.Title/Footnote`、`AppIcon.Back/Info`、既有唯一按钮 `PillButton`（`ui/components/glass/GlassButton.kt`）。
 - Produces:
   - `@Composable fun AppScreenHeader(title: String, modifier: Modifier = Modifier, subtitle: String? = null, onBack: (() -> Unit)? = null, action: @Composable (() -> Unit)? = null)`
-  - `@Composable fun ScreenUnavailable(reason: String, actionLabel: String, onAction: () -> Unit, modifier: Modifier = Modifier, icon: AppIcon = AppIcon.Info)`
+  - `@Composable fun ScreenUnavailable(title: String? = null, reason: String, actionLabel: String, onAction: () -> Unit, modifier: Modifier = Modifier, icon: AppIcon = AppIcon.Info)`
+    （`title` 是 Task 9 返工轮按裁决 R-9.4 补的可选层，默认 `null` 时卡内只有 `reason` 一层；批 2 消费屏按稿 `.card.empty` 的两层形态传 `title`。）
 
 - [ ] **Step 1: 写 connected 测试（失败）**
 
   控制者派前核对（原Step 1 的伪 API 全部换成本仓库已实测的口径，依据 `CheckInScreenTest.kt` 既有两条护栏；下列三条已由 Task 9 在 emulator-5574 实测坐实）：
   - 规则用 `createComposeRule()`（组件级，无需 Activity；既有 `CheckInScreenTest` 就是这一种），**不用** `rule.activity.setContent`；
-  - 48dp 量法用**双口径**：`assertIsDisplayed()` + `assertHeightIsAtLeast(48.dp)` / `assertWidthIsAtLeast(48.dp)`（读裁剪后矩形）+ `getUnclippedBoundsInRoot()` 断真实尺寸；**不用** `getSemanticsNode().layoutNode.height` / `captureRegionInRoot`（本仓库无此用法）。**`performScrollTo()` 只适用于身处可滚动容器内的节点**（`CheckInScreenTest` 的文字链在 `horizontalScroll` 行里），组件级宿主没有滚动祖先，Task 9 实测该方法在此直接抛 `Semantic Node has no parent layout with a Scroll SemanticsAction` → 组件级用例不写这一步；
+  - 48dp 量法（评审轮按 ui-test 1.10.0 实测纠正口径）：`assertIsDisplayed()` 是唯一读**裁剪后**矩形的断言、只钉可见性；`assertHeightIsAtLeast(48.dp)` / `assertWidthIsAtLeast(48.dp)` 内部走 `withUnclippedBoundsInRoot`，与末尾手写的 `getUnclippedBoundsInRoot()` 是**同一份 unclipped 测量**（各钉一轴 + 一条可读失败消息兜底），**不是两套口径**。**不用** `getSemanticsNode().layoutNode.height` / `captureRegionInRoot`（本仓库无此用法）。**`performScrollTo()` 只适用于身处可滚动容器内的节点**（`CheckInScreenTest` 的文字链在 `horizontalScroll` 行里），组件级宿主没有滚动祖先，Task 9 实测该方法在此直接抛 `Semantic Node has no parent layout with a Scroll SemanticsAction` → 组件级用例不写这一步；
   - 大字号护栏用既有写法：`setContent` 内 `val base = LocalDensity.current` 后 `CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 2f)) { … }`；
   - 「只有一个可点出口」用 `onAllNodes(hasClickAction()).fetchSemanticsNodes()` 的长度断言，不用 `onLast()`（`onLast()` 不判数量，恒真）；
   - **ui-test 1.10.0（BOM 2025.12.00）没有 `SemanticsNodeInteractionCollection.onFirst()/onLast()`**——`javap` 实测该类只剩 `get(int)` 与 `fetchSemanticsNodes()`；单节点取 `onNodeWithContentDescription(...)` / `onNodeWithTag(...)`，`assertExists` 是成员不是顶层函数（不得 import）。
@@ -888,10 +889,17 @@ internal val MintBackground: Color
           }
       }
       val title = composeRule.onNodeWithText("学习记录与复习统计（长标题用）")
-      title.assertExists()                                   // maxLines=2 且不省略号 → 文本节点完整存在
+      title.assertExists()                                   // 语义节点存在（注意：Clip 与 Ellipsis 都不改语义，此条不足以判裁切）
       val box = title.getUnclippedBoundsInRoot()
       assertTrue("fontScale=2.0 下标题不得塌成 0 宽，实际=$box", box.right - box.left >= 48.dp)
-      assertTrue("两行标题应真的长出高度，实际=$box", box.bottom - box.top > 24.dp)
+      // 裁切判定必须读 TextLayoutResult，dp 常数门限不可靠（实测 fontScale=2f 下同款单行节点高
+      // 在页头是 41.90dp、在同宿主参考 Text 是 34.29dp → 「> 24.dp」恒真，变异 maxLines=1 不红）。
+      // 口径抄本仓库既有的 WordBookWordsScreenTest.kt:179-186，生产代码零改动。
+      val layouts = mutableListOf<TextLayoutResult>()
+      title.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+      val layout = layouts.single()
+      assertTrue("标题必须真的换到两行且无字形裁切：lineCount=${layout.lineCount} overflow=${layout.hasVisualOverflow} size=${layout.size}",
+          layout.lineCount >= 2 && !layout.hasVisualOverflow)
   }
   @Test fun screen_unavailable_offers_exactly_one_action() {
       composeRule.setContent {
@@ -911,7 +919,7 @@ internal val MintBackground: Color
   几何一律以视觉稿 `docs/design/2026-10-17-ui-redesign-mockups.html` 的 §页头（`.appheader`，119–126 行）与 §骨架/空态（`.card .empty`，196–198 + 610 行）为准；下列三处与本计划原表述不同，是控制者派前对照稿子的裁决（R-9.1/R-9.2/R-9.3），稿子是权威。
 
   `AppScreenHeader`（= 稿子 `.appheader`：`Row`、`gap 10dp`、`align-items:center`、`min-height 48dp`）：
-  - **R-9.1 返回位取稿子的 40dp 视觉容器 + 48dp 可点区**（原计划写 `size(48.dp).clip(CircleShape)` 与稿不符）。外层 `Box(Modifier.size(48.dp).clip(AppShape.Icon).clickable(onClick = onBack).semantics { contentDescription = "返回" }, contentAlignment = Center)`，内层视觉 `Box(Modifier.size(40.dp).clip(AppShape.Icon).background(appColors().surface).border(1.dp, appColors().outlineSoft, AppShape.Icon))` 内放 `AppGlyph(AppIcon.Back, appColors().text1, 22.dp)`（稿子 `.back` 未单独给字形尺寸，沿同族 `.ic svg {22px}` 的 40dp 容器→22dp 口径）。F5-03 的「真 48dp」由外层可点节点满足，Step 1 第一条用例钉的正是它。
+  - **R-9.1 返回位取稿子的 40dp 视觉容器 + 48dp 可点区**（原计划写 `size(48.dp).clip(CircleShape)` 与稿不符）。外层 `Box(Modifier.size(48.dp).clip(AppShape.Icon).clickable(onClick = onBack).semantics { contentDescription = "返回" }, contentAlignment = Center)`，内层视觉 `Box(Modifier.size(40.dp).clip(AppShape.Icon).background(appColors().surface).border(1.dp, appColors().outlineSoft, AppShape.Icon))` 内放 `AppGlyph(AppIcon.Back, appColors().text1, 22.dp)`（字形 22dp 是稿 `mockups.html:528` 的定稿散文**直写**值——「40dp 容器 + 22dp 字形，触控区仍 ≥48dp（外扩 padding）」，与同族 `.ic svg {22px}` 一致；评审轮纠正了此前「稿未单独给尺寸、仅沿 `.ic` 口径」的错误引据，几何不变）。F5-03 的「真 48dp」由外层可点节点满足，Step 1 第一条用例钉的正是它。
   - 标题用 **`AppType.Title`**（稿子 `.ht` = 17px/700，六档里对应 `Title` 17sp SemiBold；原计划写 `Headline` 24sp 是首屏 `.page-title` 那一档，不属于带返回键的页头）+ `color = appColors().text1` + `maxLines = 2` + **不省略号**（页标题裁掉即丢信息）。副标题 `AppType.Footnote` + `color = appColors().text2`（稿 `.hs` 是 12px/400，六档无 12sp Regular——`Label` 是 12sp Medium，引新档会破 spec §2.2 的六档锁，故取同族 `.page-sub` 的 13sp/400 `Footnote`，登记为按 token 近似）。
   - **R-9.2 无 `onBack` 时不渲染占位**（原计划写「同宽 `Spacer(48.dp)` 保持对齐」）。稿子里不带返回键的首屏标题是贴左的 `.page-title`，插一个 48dp 空占位是稿子里不存在的排印。`action` 槽仍在行尾（稿 `.tr { margin-left:auto }`）。
   - 行 `heightIn(min = 48.dp)`（稿 min-height 48px；原计划写 56dp 是入口行 `.entry` 的档，不是页头），`Modifier.testTag("app_screen_header")`；**组件内部不写 `padding(bottom = 6.dp)`**——稿子的 `margin-bottom:6px` 归各屏的列节奏，写进组件会与 `Column(verticalArrangement = spacedBy(…))` 叠成幽灵间距（F5-03 移交账点过名）。
@@ -919,7 +927,8 @@ internal val MintBackground: Color
   `ScreenUnavailable`（= 稿子 `.card` 里嵌 `.empty`）：`Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(appColors().surface).border(1.dp, appColors().outlineSoft, MaterialTheme.shapes.medium).padding(24.dp), horizontalAlignment = CenterHorizontally)` + `AppGlyph(icon, appColors().text2, 24.dp)` + 原因文案 `AppType.Footnote` `text2` + **一个**动作 = 复用既有 `PillButton(text = actionLabel, onClick = onAction, style = PillStyle.Secondary, testTag = "screen_unavailable_action")`。
   - **R-9.3 卡片底色取稿子的 `surface` + 1dp `outlineSoft` 描边**（原计划写「`tint` 底卡片」；稿子里 tint 底是 `.banner`/`.card-sel`，`.empty` 所在的是 `.card`＝surface）。圆角走 `MaterialTheme.shapes.medium`——Task 4 已把该 M3 槽校准到 spec §2.3 的 18dp，而 `AppShape.Card` 仍是旧值 20dp（Task 4 明确留给逐屏迁移批），**新组件不得读 `AppShape.Card`**。
   - 动作不新建按钮组件：批 1 唯一按钮是 `PillButton`，再造一个「不可用态专用按钮」会直接撞上 Task 12 的组件份数棘轮。
-  - **按钮静态 ink 债（控制者实测登记，Task 9 只登记不修）**：`PillButton` 的 Secondary 档容器读 `AppPalette.Surface`（浅套白）、文字读 `accent.deep`（默认 `DomainColors.AiSpeech.deep` = `#188F76`），两者都是静态浅套值 → 深色模式下整屏会浮出一枚白药片。WCAG 相对亮度比值（与 `SourceRatchet` 同式）：`#188F76` 压白 **4.02:1**（`AppType.Title` 17sp SemiBold 不达 WCAG large-text 口径，故 4.5 线以下）、压深套 `surface #17201C` **4.15:1**；同族对照：深套 `text2 #9FB3AA` 压深套 `surface` **7.54:1**、浅套 `text2 #4E756A` 压白 **5.15:1**。该债属 Task 8 台账「组件层静态读点」一类，修点归批 2 Task 14 的按钮族档位裁决（同批解决白字压域色的既有问题）。
+  - **R-9.4（Task 9 返工轮裁决）`ScreenUnavailable` 补可选 `title` 层**：稿 `.card .empty`（`mockups.html:610-619`）是 **`.t`（15px/700）+ `.d`（13px/400）两层**，Task 9 出厂签名只有 `reason` 一层，间隙 12dp 被错配给了 `.d`（稿里 12 是「插画→`.t`」的 margin，`.d` 自身是 4px）。评审给的两个选项中选 ①：加 `title: String? = null`（`title != null` 时按稿 `.t` 呈现：`AppType.Body`（15sp 与稿同档）+ `color = appColors().text1`，稿的字重 700 与 `Body` 的 400 之差按 token 近似登记，不引新档、不 `copy(fontWeight=…)`（六档锁）），默认 `null` 保持批 1 现有调用不变。选 ②（卡外自排标题）会让 12/4px 两层间隙各屏各抄，正是 Task 12 份数棘轮要挡的形态。副标题/标题的行数上限**不加**（spec §3「不裁文字」硬于稿 panel 散文「副标题只给一行」）。
+  - **按钮静态 ink 债（控制者实测登记，Task 9 只登记不修）**：`PillButton` 的 Secondary 档容器读 `AppPalette.Surface`（浅套白）、文字读 `accent.deep`（默认 `DomainColors.AiSpeech.deep` = `#188F76`），两者都是静态浅套值 → 深色模式下整屏会浮出一枚白药片。WCAG 相对亮度比值（与 `SourceRatchet` 同式）：`#188F76` 压白 **4.02:1**（`AppType.Title` 17sp SemiBold 不达 WCAG large-text 口径，故 4.5 线以下）、压深套 `surface #17201C` **4.15:1**；同族对照：深套 `text2 #9FB3AA` 压深套 `surface` **7.54:1**、浅套 `text2 #4E756A` 压白 **5.15:1**。该债属 Task 8 台账「组件层静态读点」一类，修点归批 2 Task 14 的按钮族档位裁决（同批解决白字压域色的既有问题）。**放行前置两条**（Task 9 评审裁决 4.3）：① `ScreenUnavailable` 的动作处 KDoc 必须点明「本卡按钮不随主题翻色、深套下浮白片」这个具体后果，别写成纯视觉档位问题；② 该债是 **Task 14 的硬项**（不是顺带看），且 Task 12 的份数棘轮预先豁免「改 `PillButton`、不新建组件」这条路径，否则两个门互相咬。
   两者颜色全部走 `appColors()`，零裸 hex（Task 8 棘轮会挡），且不新增 `AppPalette.` / `DomainColors.` 静态读点（`Text` 用 `style = AppType.X, color = appColors().…` 的既有写法，照 `GlassButton.kt:93`）。
 
   本轮登记两处**计划缺口**（不在本任务补，避免接口膨胀；派到各自 owner 时必须先裁决）：
@@ -1070,6 +1079,7 @@ internal val MintBackground: Color
   `SpeakerButton` 触控：药片 `heightIn(min = 48.dp)` + `AppGlyph(Speaker, …)` + 文字；`WordRow`：lemma `AppType.Body` `text1`、gloss `AppType.Footnote` `text2`（可 `maxLines = 2`）、status/meta 右对齐 `text2`、`role` 按 `onClick` 是否为空取 `Role.Button`/无。
 
 - [ ] **Step 3: 写 `SharedComponentUniquenessRatchetTest`**（规则与 seed 见 Task 8 Step 4 四条），此时九个组件文件都存在，目录守卫与 seed 只减不增口径同 Task 8。
+  **预登记豁免（Task 9 评审裁决 4.3 前置②）**：本棘轮管「同一形态不得有第二份组件」，**不管「就地改既有组件的取值面」**——Task 14 修 `PillButton` 的静态 ink / 档位差时必须改 `PillButton` 本体而不是新建按钮，这条路径不得被本棘轮挡；写进测试注释与 seed 说明，避免批 2 为绕门再造一枚按钮。
 
 - [ ] **Step 4: 建 AC-R 证据文档**
 
@@ -1159,6 +1169,7 @@ internal val MintBackground: Color
 
 - [ ] **Step 1: 写失败测试**：Ready 态下整宽主按钮数 == 1，入口行数 ≥3；断言「今日新词/到期数」在屏幕上只出现一处 `Display` 尺寸节点。
 - [ ] **Step 2: 实现**：主 CTA 唯一（继续学习），其余动作换 `EntryRow`；`TodayPlanScreen.kt:160-161/247/343-344` 五处裸 hex（`#68BDA6`/`#C7A47D`/`#795B36`）token 化并**从 `RawColorLiteralRatchetTest` seed 删除对应条目**；Workload 三档色改取域色（复习 `Review` 系）。
+  **硬项（Task 9 评审裁决 4.3 前置②，不是「顺带看」）**：`PillButton` 的静态 ink 债必须在本任务裁决并落地——Secondary 档容器读 `AppPalette.Surface`（浅套白）、文字读 `accent.deep`（默认 `DomainColors.AiSpeech.deep` = `#188F76`）、描边读 `AppPalette.Separator`，深套下整屏浮白药片（压白 4.02:1 / 压深套 surface 4.15:1，数字与推论见 Task 9 登记）。同批一起处理稿按钮族档位差与「白字压域色」，修法走**改 `PillButton` 本体**（Task 12 棘轮已预登记豁免该路径），消费面含 `ScreenUnavailable` 的动作位。
 - [ ] **Step 3: 规则零改动自检**：解锁条件、快照不可变性相关代码一行不动；跑该屏业务单测（`grep -rln TodayPlan app/src/test` 全跑）。
 - [ ] **Step 4: 门控 + connected + 提交**（`feat(ui-learning): 今日计划收成单一主按钮与入口行，今日数字一处权威`）。
 
