@@ -385,6 +385,17 @@ class TodayPlanNumberAuthorityTest {
             countMatches(source, Regex("""FontWeight\.""")),
             "字重由六档 token 承载，屏侧不得再 copy 字重（spec §2.2 六档锁）",
         )
+        // N-1（Task 14B 复评席的新洞，控制者当场补门）：上面三道全文件计数门判的是 `AppType.*` 的**字面量**，
+        // 对「间接升档」全盲——`AppType.Footnote.copy(fontSize = 22.sp)`、裸 `TextStyle(fontSize = 30.sp)`、
+        // `LocalTextStyle.merge(...)` 都能长出第二枚大号数字而一个字面量都不动
+        // （复评席 JVM 实测：`.copy(fontSize = 22.sp)` 下 6 tests 全绿，13–15.3sp 区间双门皆盲）。
+        // 本屏的排印面只许由六档 token 承载：任何字号/行高覆写即绕过 AC-R-20 的「一处权威尺寸」。
+        assertEquals(
+            0,
+            countMatches(source, Regex("""\b(?:fontSize|lineHeight)\b|\bTextStyle\(|\.merge\(""")),
+            "今日计划屏不得覆写字号/行高，也不得自造 TextStyle/merge 排印：六档 token 之外的一切排印改动" +
+                "都会让「大字号读点恰一处」那三道计数门失明",
+        )
     }
 
     /**
