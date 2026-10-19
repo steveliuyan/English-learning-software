@@ -1652,6 +1652,29 @@ internal val MintBackground: Color
   14A 算 Text/Secondary 档「深套前景改读 `accent.base`」时，**深套的 base/deep 是同一个值**这条会直接改变结论，
   按 `AppColors.kt` 的深套实值重算，别照 R-14.1 里引的浅套 `AppPalette` 数字推。
 
+**R-14.4（控制者按深套实值复算后，对 R-14.1 的订正；14A-i 派发前写入，执行者照本条不走回头路）**：
+
+- **`PillButton` 必须改签名**（`accent: DomainAccent` → `domain: AppDomain = AppDomain.AiSpeech`，组件内读 `appDomain(domain)` + `appColors()` + `LocalIsDark.current`）。
+  理由：深套 `base == deep` 且是**亮色**（`DomainDark` 七枚 `#35E0AC`/`#5AC0FF`/`#FFB340`/`#DA8CFF`/`#FF7A93`/`#FF6B61`/`#B0B0B5`），
+  R-14.1 ①「前景保持白色、不许改 `set.surface`」那句是**拿浅套静态 `DomainColors` 推的**，成立前提是容器为浅套深值。
+  改读 `appDomain()` 后深套容器是亮色，白字压它 1.692~2.790 全线崩，而 `set.surface` 压它 5.975~9.850 全线过 ⇒
+  **B 档前景按套分叉：浅套 `Color.White`、深套 `appColors().surface`**（不是 `set.text1`，深套 `text1 = #E9F2EC` 是亮墨，压亮容器只有 1.5~2.4）。
+- **R-14.1 ② 的「浅 `deep` / 深 `base`」分叉塌成一条**：深套 `base` 与 `deep` 同值，所以落地公式统一 `palette.deep`，
+  唯一的例外仍是浅套 AiSpeech（`#188F76` 压 `#FFFFFF` 4.016）→ 取 `set.onMint`（9.751 / 压浅套 background 9.220）。
+  残口取证按「未显式传 accent」数：控制者括号配平解析 36 枚调用点（不含定义行）得 20 显式 / 16 默认，
+  Secondary|Text 档的 AiSpeech 站点共 **8 处**（默认 3：`SpeechSettingsScreen.kt:148/197`、`components/ScreenUnavailable.kt:88`；
+  显式 5：`AiProfileSettingsScreen.kt:120/234/250/288/356`）⇒ 例外分支必须真落地，不能只在测试注释里记边界。
+- **禁用态一并主题化**（本席把 `AppPalette.TextSecondary`/`Surface`/`Separator` 三枚静态读点清掉）：
+  前景 `set.text2`、Primary 容器 `set.tint2`、Secondary 容器 `set.surface` + 描边 `set.outlineSoft`。
+  复算 4.146（浅 text2/tint2）~8.375（深 text2/background）；WCAG 1.4.3 豁免正文 4.5，契约按 **≥3.0** 断（不写 4.1——浅套只剩 0.046 余量，
+  与 14B 那条零余量高度代理同病）。
+- **归属债（结转批 3 Task 26 Step 3）**：品牌分支前景 `AppPalette.OnMintPrimary` 是**刻意主题无关**的读点
+  （品牌渐变两套同三段，深套 `onMint = #DFF6EC` 压薄荷渐变会塌），14A 后它成为 `GlassButton.kt` 唯一 `AppPalette.` 读点、seed 留 1。
+  它既不是蒙版成员（`ThemeInvariantMaskReadLedger` 按 `{GlassHighlight, Scrim}` 成员名分流，塞进去会污染那条合成探针用例），
+  也不是形参默认值（`ParameterDefaultStaticReadLedger` 的 PillButton 条目随签名改造消失），
+  所以批 3 收口时二选一：把品牌三端 + 这枚墨一起搬成 `theme/MintPalette.kt` 的 `internal val`（棘轮看不见 theme/ 内的裸 hex 与 `AppPalette.`），
+  或为「与主题无关的容器-墨对」新开一张逐站点注记表。**14A 不许现场造第三张表。**
+
 
 ---
 
