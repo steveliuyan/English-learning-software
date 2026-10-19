@@ -1,10 +1,8 @@
 package com.example.englishlearning.ui
 
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,12 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,7 +23,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,6 +50,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.wordqa.WordAiNote
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.SpeakerButton
+import com.example.englishlearning.ui.components.SpeakerState
+import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
@@ -119,22 +117,12 @@ fun CardDetailScreen(
             .testTag("card_detail_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .widthIn(min = 48.dp)
-                    .testTag("card_detail_back")
-                    .semantics { contentDescription = "返回" },
-                colors = ButtonDefaults.textButtonColors(contentColor = MintPrimaryDark),
-            ) { Text("←", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-            Text(
-                text = "词义详情",
-                style = AppType.Headline,
-                modifier = Modifier.semantics { heading() },
-            )
-        }
+        // 页头交给统一组件承载（spec §3 页头族）：标题 + 返回位的几何与墨色一处定义，
+        // 本屏只传标题和导航回调。
+        AppScreenHeader(
+            title = "词义详情",
+            onBack = onBack,
+        )
 
         WordHeroCard(
             card = card,
@@ -236,21 +224,24 @@ fun CardDetailScreen(
             }
         }
 
+        // 关联词三节的行归一到共享词行（spec §3「一行 lemma + 释义」族）：私有那一枚行件用
+        // 加粗 + 拼字符串把三栏塞进同一枚 Text，词头、词性、释义在读屏与深色模式下都分不开；
+        // 词行的四枚槽位墨由组件的墨色纯表给，层级靠 text1 / text2 的落差而不是字重。
         if (card.derived.isNotEmpty()) {
             DetailSection(title = "派生词", tag = "card_detail_derived") {
-                card.derived.forEach { RelationLine(it.lemma, it.partOfSpeech, it.meaningZh) }
+                card.derived.forEach { WordRow(lemma = it.lemma, gloss = it.meaningZh, meta = it.partOfSpeech) }
             }
         }
 
         if (card.phrases.isNotEmpty()) {
             DetailSection(title = "关联短语", tag = "card_detail_phrases") {
-                card.phrases.forEach { RelationLine(it.text, null, it.meaningZh) }
+                card.phrases.forEach { WordRow(lemma = it.text, gloss = it.meaningZh) }
             }
         }
 
         if (card.synonyms.isNotEmpty()) {
             DetailSection(title = "近义词", tag = "card_detail_synonyms") {
-                card.synonyms.forEach { RelationLine(it.lemma, it.partOfSpeech, it.meaningZh) }
+                card.synonyms.forEach { WordRow(lemma = it.lemma, gloss = it.meaningZh, meta = it.partOfSpeech) }
             }
         }
 
@@ -300,19 +291,21 @@ private fun WordHeroCard(
                 )
             }
             Spacer(Modifier.width(4.dp))
-            // 发音入口：喇叭 + 口音标注。默认美式；英式仅在调用方提供时出现。
-            AccentSpeakerButton(
+            // 发音入口归一到共享药片（spec §3「两套同构几何」的详情页那一半）：
+            // 喇叭字形、48dp 触控下限、三态可见文案都由组件一处交付，本屏只给态、动作、tag 与口音尾缀。
+            // 默认美式；英式仅在调用方提供时出现，两口音靠尾缀分档，屏侧不写任何朗读定语。
+            SpeakerButton(
+                state = SpeakerState.Idle,
+                onClick = { onSpeak() },
+                modifier = Modifier.testTag("card_detail_speak"),
                 accentLabel = "美",
-                accentDescription = "播放 ${card.lemma} 发音",
-                tag = "card_detail_speak",
-                onClick = onSpeak,
             )
             onSpeakBritish?.let { speakBritish ->
-                AccentSpeakerButton(
+                SpeakerButton(
+                    state = SpeakerState.Idle,
+                    onClick = { speakBritish() },
+                    modifier = Modifier.testTag("card_detail_speak_british"),
                     accentLabel = "英",
-                    accentDescription = "播放 ${card.lemma} 英式发音",
-                    tag = "card_detail_speak_british",
-                    onClick = speakBritish,
                 )
             }
         }
@@ -345,14 +338,13 @@ private fun WordHeroCard(
         if (pronunciationControlsEnabled && speakingOrPaused) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (pauseResumeSupported) {
-                    OutlinedButton(
-                        onClick = onPauseResume,
-                        modifier = Modifier
-                            .testTag("card_detail_pronunciation_toggle")
-                            .semantics { contentDescription = if (pronunciationStatus == PronunciationStatus.Paused) "继续播放发音" else "暂停发音" },
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MintPrimaryDark),
-                    ) { Text(if (pronunciationStatus == PronunciationStatus.Paused) "继续" else "暂停") }
+                    // 暂停-继续同样走共享药片（口径同词卡屏 Task 15）：三态文案由组件的可见文字承载
+                    // （clickable 会把子孙合并进同一枚语义节点），屏侧不再另写一份朗读文案。
+                    SpeakerButton(
+                        state = cardDetailSpeakerState(pronunciationStatus),
+                        onClick = { onPauseResume() },
+                        modifier = Modifier.testTag("card_detail_pronunciation_toggle"),
+                    )
                 }
                 OutlinedButton(
                     onClick = onStopPronunciation,
@@ -531,91 +523,15 @@ private fun PersonalNotesDialog(
 }
 
 /**
- * 发音按钮：Material 风格喇叭（自绘，24dp）+ 口音标注字（美/英）。
+ * 宿主呈现态 → 药片三态（详情页的映射，口径同词卡屏 Task 15 的 `wordCardSpeakerState`）。
  *
- * 不引 material-icons 库（依赖锁定决策见 AppBottomBar 注释），喇叭按 Material Icons
- * `volume_up` 的几何比例自绘：喇叭主体 + 两道声波弧线。
+ * 播控组只在 Playing / Paused 这一档窗口里长出来（F3-02 决策 §2），所以这里只有两态有意义：
+ * Paused 才是 Paused（点下去是「继续」那一档），其余一律按 Playing 处理（点下去是「暂停」那一档）。
+ * 文案与字形都由组件那侧分派，本函数不分派第三套——它只回答「宿主这一档对应组件哪一态」。
+ * 抽成 `internal` 纯函数是为了让这档映射能在 JVM 侧逐态点名（connected 读不到 `SpeakerState`）。
  */
-@Composable
-private fun AccentSpeakerButton(
-    accentLabel: String,
-    accentDescription: String,
-    tag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .clip(AppShape.Pill)
-            .background(MintTint)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-            // F5-03 / Task 10：美/英喇叭原本只有 ~36dp 高（connected RED 实测 36.19dp），
-            // 补到 48dp 触控下限。`minimumInteractiveComponentSize()` 加在 `padding` **内侧**，
-            // 药片底色块随节点一起放大（≈60dp），字形与标注字尺寸不变。
-            .minimumInteractiveComponentSize()
-            .testTag(tag)
-            .semantics { contentDescription = accentDescription },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        SpeakerGlyph()
-        Text(
-            text = accentLabel,
-            style = AppType.Footnote.copy(color = MintPrimaryDark, fontWeight = FontWeight.SemiBold),
-        )
-    }
-}
-
-/** Material `volume_up` 比例的自绘喇叭，24dp 视觉尺寸。 */
-@Composable
-private fun SpeakerGlyph(modifier: Modifier = Modifier) {
-    // Canvas 的绘制 lambda 是 DrawScope（组合期外），中性令牌必须先在外层组合期读好再带进去。
-    val glyph = MintPrimaryDark
-    Canvas(modifier = modifier.size(24.dp)) {
-        val w = size.width
-        val h = size.height
-        // 喇叭箱体：小矩形 + 向左张开的梯形号角
-        val boxLeft = w * 0.14f
-        val boxRight = w * 0.34f
-        val boxTop = h * 0.40f
-        val boxBottom = h * 0.60f
-        drawRect(
-            color = glyph,
-            topLeft = androidx.compose.ui.geometry.Offset(boxLeft, boxTop),
-            size = androidx.compose.ui.geometry.Size(boxRight - boxLeft, boxBottom - boxTop),
-        )
-        drawPath(
-            path = androidx.compose.ui.graphics.Path().apply {
-                moveTo(boxRight, boxTop)
-                lineTo(w * 0.52f, h * 0.24f)
-                lineTo(w * 0.52f, h * 0.76f)
-                lineTo(boxRight, boxBottom)
-                close()
-            },
-            color = glyph,
-        )
-        // 两道声波弧线
-        drawArc(
-            color = glyph,
-            startAngle = -45f,
-            sweepAngle = 90f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-            topLeft = androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.32f),
-            size = androidx.compose.ui.geometry.Size(w * 0.24f, h * 0.36f),
-        )
-        drawArc(
-            color = glyph,
-            startAngle = -45f,
-            sweepAngle = 90f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-            topLeft = androidx.compose.ui.geometry.Offset(w * 0.56f, h * 0.20f),
-            size = androidx.compose.ui.geometry.Size(w * 0.36f, h * 0.60f),
-        )
-    }
-}
+internal fun cardDetailSpeakerState(status: PronunciationStatus): SpeakerState =
+    if (status == PronunciationStatus.Paused) SpeakerState.Paused else SpeakerState.Playing
 
 @Composable
 private fun SenseRow(
@@ -672,19 +588,6 @@ private fun DetailSection(title: String, tag: String? = null, content: @Composab
         Text(text = title, style = AppType.Title, modifier = Modifier.semantics { heading() })
         content()
     }
-}
-
-/** 一行关联词：英文加粗在前，词性浅色小字，中文释义正文色。 */
-@Composable
-private fun RelationLine(word: String, partOfSpeech: String?, meaningZh: String) {
-    val line = buildAnnotatedString {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MintPrimaryDark)) { append(word) }
-        if (!partOfSpeech.isNullOrBlank()) {
-            withStyle(SpanStyle(color = MintTextMuted, fontSize = 13.sp)) { append("  $partOfSpeech") }
-        }
-        append("  $meaningZh")
-    }
-    Text(text = line, style = AppType.Body)
 }
 
 /** 例句里把单词加粗、用品牌深绿标出，其余保持正文样式。 */

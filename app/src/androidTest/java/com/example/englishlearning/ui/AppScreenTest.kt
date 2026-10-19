@@ -202,7 +202,9 @@ class AppScreenTest {
         composeRule.onNodeWithTag("card_detail_screen").assertExists()
         composeRule.onNodeWithText("wonder").assertExists()
 
-        composeRule.onNodeWithTag("card_detail_back").performClick()
+        // Task 16：详情私有页头已归一到共享 AppScreenHeader——`card_detail_back` 这枚屏侧 tag
+        // 随私有件一起删除，返回位只由组件的「返回」朗读定语承载（全页唯一节点）。
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("wordbook_words_screen").assertExists()

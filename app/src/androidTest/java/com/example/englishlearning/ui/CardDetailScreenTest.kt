@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -233,11 +235,18 @@ class CardDetailScreenTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("播放 ability 发音").assertExists().performClick()
-        composeRule.onNodeWithContentDescription("播放 ability 英式发音").assertExists().performClick()
+        // 两口音靠共享药片的 tag 分档，屏上可见文字是「状态档 + 口音尾缀」（Task 16 归一）。
+        composeRule.onNodeWithTag("card_detail_speak").assertExists().assertHasClickAction().performClick()
+        composeRule.onNodeWithTag("card_detail_speak_british").assertExists().assertHasClickAction().performClick()
 
         assertEquals(1, american)
         assertEquals(1, british)
+
+        composeRule.onAllNodesWithText("美", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("英", substring = true).assertCountEquals(1)
+        // 旧私有件把词头拼进朗读定语那一套已废：屏侧不再有这两条描述。
+        composeRule.onNodeWithContentDescription("播放 ability 发音").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("播放 ability 英式发音").assertDoesNotExist()
     }
 
     @Test
@@ -267,7 +276,8 @@ class CardDetailScreenTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
+        // 发音入口归一到共享药片后，屏侧不再有「播放 ability 发音」这条朗读定语，点它只认 tag。
+        composeRule.onNodeWithTag("card_detail_speak").performClick()
         composeRule.onNodeWithContentDescription("重新学习 ability").performClick()
         assertEquals("ability", spokenLemma)
         assertEquals(1, spoken)
@@ -372,7 +382,7 @@ class CardDetailScreenTest {
         composeRule.setContent { CardDetailScreen(card = card(), onBack = {}) }
 
         val ipa = composeRule.onNodeWithTag("card_detail_ipa").getUnclippedBoundsInRoot()
-        val speak = composeRule.onNodeWithContentDescription("播放 ability 发音").getUnclippedBoundsInRoot()
+        val speak = composeRule.onNodeWithTag("card_detail_speak").getUnclippedBoundsInRoot()
         val ipaCenter = (ipa.top + ipa.bottom) / 2
         assertTrue("发音按钮应紧跟音标", speak.top <= ipaCenter && ipaCenter <= speak.bottom)
     }
@@ -442,8 +452,17 @@ class CardDetailScreenTest {
         assertTrue("例句中的单词应加粗", example.isBold(start until start + "ability".length))
     }
 
+    /**
+     * 关联词三节的行是共享词行（Task 16）：词头、释义、词性各是**独立节点**，
+     * 不再由私有行件拼成一整条 `AnnotatedString`。
+     *
+     * 这处口径换掉了原来的「英文加粗」断言：词行的层级按六档锁交给墨色落差
+     * （lemma `text1` / gloss+meta `text2`，`WordRow.kt` 的 `wordRowInks` 纯表），
+     * 组件不 `copy(fontWeight = …)`；而 connected 读不到颜色（Task 9 实测口径），
+     * 所以设备侧能证、也该证的是「三栏各自成节点、拼接那一行已消失」。
+     */
     @Test
-    fun relationLinesBoldTheEnglishWord() {
+    fun relationRowsRenderAsThreeSeparateWordRowColumns() {
         composeRule.setContent {
             CardDetailScreen(
                 card = card(lemma = "surf", derived = listOf(DerivedWord("surfer", "n.", "冲浪者；网虫"))),
@@ -451,8 +470,13 @@ class CardDetailScreenTest {
             )
         }
 
-        val line = composeRule.onNodeWithText("surfer", substring = true).annotatedText()
-        assertTrue("派生词的英文应加粗", line.isBold(0 until "surfer".length))
+        composeRule.onNodeWithText("surfer").assertIsDisplayed()
+        composeRule.onNodeWithText("冲浪者；网虫").assertIsDisplayed()
+        // 「n.」恰两枚独立节点：单词卡词性小标签一枚 + 词行 meta 栏一枚（connected 实测口径）。
+        // 若词行回退成整条拼接文本，这里会掉回 1 枚并当场红——比单点存在断言更强的钉法。
+        composeRule.onAllNodesWithText("n.").assertCountEquals(2)
+        // 私有行件那一整条拼接文本不再存在（三栏各一枚节点，读屏与省略号都按栏走）。
+        composeRule.onNodeWithText("surfer  n.  冲浪者；网虫").assertDoesNotExist()
     }
 
     // ---------------------------------------------------------------- 我的笔记展示栏（2026-10-13 真机反馈两轮迭代）

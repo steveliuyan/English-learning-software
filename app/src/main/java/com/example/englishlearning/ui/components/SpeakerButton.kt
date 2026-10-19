@@ -119,12 +119,22 @@ fun speakerButtonInk(set: AppColorSet): SpeakerButtonInk = SpeakerButtonInk(
  *
  * [onClick] 收**当前状态**（`(SpeakerState) -> Unit`）：调用方拿到的是「用户点的是哪一枚态」，
  * 不必再在屏侧读一遍状态机，也不会长出「屏侧 when(state) 决定回调」的第二份分派。
+ *
+ * [accentLabel] 是**口音尾缀**槽（视觉稿 `.spk` 的「口音标注改文字尾缀」，`mockups.html:956-957`）：
+ * 详情页的美式 / 英式两口音共用同一枚药片几何，只在文字末尾多一枚标注字，
+ * 于是「同构几何」只剩这一份——屏侧不必再写第二枚私有药片，也就不必先读朗读文案再拼口音。
+ * 标注字与状态文字同墨（[SpeakerButtonInk.label]）、同档（[AppType.Body]），
+ * 它是**附加信息**而不是第二份文案：朗读文案那一处定义仍在 [speakerContentDescription]，
+ * 本槽只收「美」/「英」这一枚字符，缺省 `null` 即整段不渲染（词卡屏与播控档都不带标注）。
+ * 尾缀与状态文字并排成两枚 `Text`，`clickable` 的 `MergeDescendants` 把它们并进同一枚语义节点，
+ * 读屏一次念完「状态文案 + 口音标注」这一句，不需要屏侧再补任何定语。
  */
 @Composable
 fun SpeakerButton(
     state: SpeakerState,
     onClick: (SpeakerState) -> Unit,
     modifier: Modifier = Modifier,
+    accentLabel: String? = null,
 ) {
     // 三枚墨一律从纯表取（源码契约钉「本文件恰一处 speakerButtonInk(appColors())」）。
     val ink = speakerButtonInk(appColors())
@@ -149,5 +159,12 @@ fun SpeakerButton(
             style = AppType.Body,
             color = ink.label,
         )
+        if (accentLabel != null) {
+            Text(
+                text = accentLabel,
+                style = AppType.Body,
+                color = ink.label,
+            )
+        }
     }
 }

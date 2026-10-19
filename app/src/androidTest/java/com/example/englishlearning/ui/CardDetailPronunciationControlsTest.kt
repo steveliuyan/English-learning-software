@@ -35,8 +35,9 @@ import org.junit.runner.RunWith
  *     收藏浮层/搜索卡详情保持纯浏览（决策 §2），防「永远显示」的伪修；
  *  2. 系统 TTS（`pauseResumeSupported = false`）下只有「停止」，状态文案走
  *     `PronunciationStatus.message()` 映射（Playing→「正在播放发音…」）；
- *  3. 支持暂停时 toggle 的 contentDescription 在「暂停发音」/「继续播放发音」之间翻转，
- *     点停止后整组离开组合且委托恰为一次。
+ *  3. 支持暂停时 toggle 的可见文字在「暂停发音」/「继续发音」之间翻转（Task 16 归一共享药片：
+ *     文案由组件 `speakerContentDescription` 一处定义、可见文字与朗读同源，旧私有文案
+ *     「继续播放发音」钉其缺席），点停止后整组离开组合且委托恰为一次。
  *
  * Task 10（T9 复评 N-4）追加两例：发音状态文字改由**常驻 live region 容器**
  * `card_detail_status_live_region` 承载（决策 §4 详情页口径，与阅读页同形），
@@ -119,14 +120,18 @@ class CardDetailPronunciationControlsTest {
         val harness = showControls(PronunciationStatus.Playing, pauseResumeSupported = true)
 
         composeRule.onNodeWithTag("card_detail_pronunciation_toggle").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("暂停发音").assertIsDisplayed()
+        // Task 16：播控药片归一共享组件后，档位文案由可见文字承载（clickable 合并子孙），
+        // 断言口径从 contentDescription 换成 onNodeWithText——与 `WordCardPronunciationControlsTest` 同源同口径。
+        composeRule.onNodeWithText("暂停发音").assertIsDisplayed()
 
         // 点一次暂停：宿主（harness）把状态推进到 Paused，文案随之翻转。
         composeRule.onNodeWithTag("card_detail_pronunciation_toggle").performClick()
         composeRule.waitForIdle()
         assertEquals(1, harness.pauseResumeCalls)
         assertEquals(PronunciationStatus.Paused, harness.status.value)
-        composeRule.onNodeWithContentDescription("继续播放发音").assertIsDisplayed()
+        composeRule.onNodeWithText("继续发音").assertIsDisplayed()
+        // 旧私有件的「继续播放发音」不得回流（屏侧第二份真值，Task 15 已由组件「继续发音」取代）。
+        composeRule.onNodeWithContentDescription("继续播放发音").assertDoesNotExist()
 
         composeRule.onNodeWithTag("card_detail_pronunciation_stop").performClick()
         composeRule.waitForIdle()
