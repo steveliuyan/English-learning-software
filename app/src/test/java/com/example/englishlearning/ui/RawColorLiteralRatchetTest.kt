@@ -54,7 +54,6 @@ import kotlin.test.assertTrue
  */
 internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
     "AppScreen.kt" to 2,
-    "TodayPlanScreen.kt" to 5,
     "ArticleReadingScreen.kt" to 1,
     "CheckInScreen.kt" to 1,
     "components/glass/GlassButton.kt" to 1,
@@ -72,11 +71,6 @@ internal val RawColorSeedSiteLines: List<String> = listOf(
     "AppScreen.kt: inactiveTrackColor = Color(0xFFCDEFE1),",
     "ArticleReadingScreen.kt: style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF17342A)),",
     "CheckInScreen.kt: drawArc(color = Color(0xFFFFF1DB), startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))",
-    "TodayPlanScreen.kt: CountCard(\"今日新增 \${state.newTarget} 词\", \"今日新增 \${state.newTarget} 词\", \"today_plan_new_count\", Color(0xFF68BDA6))",
-    "TodayPlanScreen.kt: CountCard(\"今日复习 \${state.dueTarget} 词\", \"今日复习 \${state.dueTarget} 词\", \"today_plan_due_count\", Color(0xFFC7A47D))",
-    "TodayPlanScreen.kt: colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = Color(0xFF795B36)),",
-    "TodayPlanScreen.kt: private val WorkloadReviewColor = Color(0xFFC7A47D)",
-    "TodayPlanScreen.kt: private val WorkloadNewColor = Color(0xFF68BDA6)",
     "GlassButton.kt: Brush.verticalGradient(listOf(AppleMintStart, AppleMintMiddle, Color(0xFF65D3B9)))",
     "AiMascot.kt: private val EyeColor: Color = Color(0xFF188F76)",
 )

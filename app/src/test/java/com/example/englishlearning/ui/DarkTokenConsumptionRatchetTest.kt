@@ -73,7 +73,6 @@ internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     "PhotoTranslationScreen.kt" to 6,
     "ReadingAccessScreen.kt" to 6,
     "theme/AppType.kt" to 6,
-    "TodayPlanScreen.kt" to 5,
     "WordAiQaScreen.kt" to 5,
     "ImageStudioScreen.kt" to 4,
     "AiFeatureScreen.kt" to 3,

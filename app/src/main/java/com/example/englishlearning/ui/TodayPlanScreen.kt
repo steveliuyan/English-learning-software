@@ -3,10 +3,9 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,7 +27,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,22 +36,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.WordBookProgress
+import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.EntryIconTone
+import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
-import com.example.englishlearning.ui.theme.DomainColors
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
+import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
 
+/**
+ * 批 2 Task 14B（AC-R-20）：就绪态收成「1 枚主 CTA + 一组入口行」，今日数字只留一处权威尺寸。
+ *
+ * 三条版面裁决（稿 `mockups.html:893-940`、内容审计 `docs/design/2026-10-17-content-placement-audit.md:116`）：
+ *  1. **数字的权威只有一处**：`AppType.Display` 全屏恰好一枚，落在进度卡的「今日完成数」那一格；
+ *     词书百分比、卡上的两个计数、明细行、工作量图例全部降到 `AppType.Footnote`，且一律取中性墨
+ *     （`text1`/`text2`）不带强调色——「今天到底做了多少」只有一个视觉重量，其余数字是同一条信息的注脚。
+ *  2. **八枚整宽按钮收成 1 CTA + 入口行组**：只有「继续学习/复习」回答「今天做什么」，它留在主操作位；
+ *     阅读文章是**受解锁态约束**的支撑动作（enabled 态与解锁文案都要留在行为面上，批 3 才并成状态点），
+ *     故保持本屏唯一一枚 M3 `Button`；其余 6 个目录型动作与页首常驻搜索条一起收进 [TodayPlanEntryGroup]。
+ *  3. **取色只读动态 token**：中性色 `appColors()`、域色 `appDomain(...)`，本屏不再有裸 hex、静态令牌读点、
+ *     `Mint*` 快捷名与库内排印档。三形裸 hex 的域色对位与各自行由写在 [WorkloadKind.color] 与
+ *     [TodayPlanEntryGroup] 上。
+ *
+ * 业务规则一行未动：解锁条件、每日快照不可变性、计数口径与 ViewModel 都在本文件之外。
+ */
 @Composable
 fun TodayPlanScreen(
     state: TodayPlanUiState,
@@ -69,47 +79,69 @@ fun TodayPlanScreen(
     onOpenSearch: () -> Unit = {},
     vocabularyCount: Int? = null,
 ) {
+    val colors = appColors()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MintBackground)
-            // 底部导航会吃掉 64dp，这里必须可滚动，否则小屏上最后一排按钮会被裁掉。
+            .background(colors.background)
+            // 底部导航会吃掉 64dp，这里必须可滚动，否则小屏上最后一排入口会被裁掉。
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp)
             .testTag("today_plan_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("今日学习计划", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.semantics { contentDescription = "今日学习计划" })
-        SearchEntry(onClick = onOpenSearch)
+        AppScreenHeader(title = "今日学习计划")
         when (state) {
             TodayPlanUiState.Loading -> {
-                CircularProgressIndicator(color = DomainColors.AiSpeech.deep, modifier = Modifier.size(48.dp).testTag("today_plan_loading"))
-                Text("正在准备今日计划…", color = MintTextMuted)
+                CircularProgressIndicator(
+                    color = appDomain(AppDomain.AiSpeech).deep,
+                    modifier = Modifier.size(48.dp).testTag("today_plan_loading"),
+                )
+                Text("正在准备今日计划…", style = AppType.Footnote, color = colors.text2)
             }
             TodayPlanUiState.MissingSetup -> {
-                Text("先选择词书并设置每日目标", color = MintTextMuted, modifier = Modifier.testTag("today_plan_missing_setup"))
-                Button(
+                Text(
+                    "先选择词书并设置每日目标",
+                    style = AppType.Body,
+                    color = colors.text2,
+                    modifier = Modifier.testTag("today_plan_missing_setup"),
+                )
+                PillButton(
+                    text = "去设置词书",
                     onClick = onOpenSetup,
-                    modifier = Modifier.testTag("today_plan_open_setup").semantics { contentDescription = "去设置词书" },
-                    colors = ButtonDefaults.buttonColors(containerColor = DomainColors.AiSpeech.deep, contentColor = Color.White),
-                ) { Text("去设置词书") }
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "today_plan_open_setup",
+                    contentDescription = "去设置词书",
+                )
             }
             TodayPlanUiState.Unavailable -> {
-                Text("今日计划暂时无法读取，请稍后重试", color = MintTextMuted, modifier = Modifier.testTag("today_plan_unavailable"))
-                Button(
+                Text(
+                    "今日计划暂时无法读取，请稍后重试",
+                    style = AppType.Body,
+                    color = colors.text2,
+                    modifier = Modifier.testTag("today_plan_unavailable"),
+                )
+                PillButton(
+                    text = "重试",
                     onClick = onRetry,
-                    modifier = Modifier.testTag("today_plan_retry").semantics { contentDescription = "重试" },
-                    colors = ButtonDefaults.buttonColors(containerColor = DomainColors.AiSpeech.deep, contentColor = Color.White),
-                ) { Text("重试") }
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "today_plan_retry",
+                    contentDescription = "重试",
+                )
             }
             is TodayPlanUiState.Ready -> {
-                Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(24.dp)).testTag("today_plan_summary")) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = colors.surface),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth().border(1.dp, colors.outlineSoft, RoundedCornerShape(24.dp)).testTag("today_plan_summary"),
+                ) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(state.wordBookName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-                        Text("应用内学习分组，不是官方考试大纲", style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
-                        Text("计划日期：${state.localDateLabel}", style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
+                        Text(state.wordBookName, style = AppType.Title, color = colors.text1)
+                        Text("应用内学习分组，不是官方考试大纲", style = AppType.Footnote, color = colors.text2)
+                        Text("计划日期：${state.localDateLabel}", style = AppType.Footnote, color = colors.text2)
                         // 参考竞品词书卡：左边给百分比，右边给「已学/总数 词」，条子在下，
-                        // 再补一行「未学」——用户要的是一眼看出这本还剩多少没碰。
+                        // 再补一行「未学」。AC-R-20 之后这一组全部是注脚尺寸——整册进度不是
+                        // 「今天做了多少」，它不许跟今日完成数抢同一个视觉重量。
                         state.bookProgress?.let { progress ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -118,15 +150,14 @@ fun TodayPlanScreen(
                             ) {
                                 Text(
                                     text = learnedPercentLabel(progress),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MintPrimaryDark,
+                                    style = AppType.Footnote,
+                                    color = colors.text2,
                                     modifier = Modifier.testTag("today_plan_learned_percent"),
                                 )
                                 Text(
                                     text = "${progress.learned}/${progress.total} 词",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MintTextMuted,
+                                    style = AppType.Footnote,
+                                    color = colors.text2,
                                     modifier = Modifier.testTag("today_plan_book_words"),
                                 )
                             }
@@ -136,59 +167,68 @@ fun TodayPlanScreen(
                                     .fillMaxWidth()
                                     .padding(top = 2.dp)
                                     .testTag("today_plan_book_progress"),
-                                color = MintPrimary,
-                                trackColor = MintOutline.copy(alpha = 0.35f),
+                                // 整册进度属于「学习材料」这一域，与下方「今日新增」色点同源。
+                                // 取 deep 不取 base：这是压 `surface` 的图形，spec §2.1 的 base 端
+                                // （学习域 #0A84FF）只有 3.6:1，deep 端 6.4:1 才稳过非文本 3:1 线。
+                                color = appDomain(AppDomain.Learn).deep,
+                                trackColor = colors.outlineSoft,
                             )
                             Text(
                                 text = "未学 ${progress.unlearned} 词",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MintTextMuted,
+                                style = AppType.Footnote,
+                                color = colors.text2,
                                 modifier = Modifier.testTag("today_plan_book_unlearned"),
                             )
                         }
                     }
                 }
-                Button(
-                    onClick = onOpenSetup,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 54.dp)
-                        .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-                        .testTag("today_plan_open_setup_entry")
-                        .semantics { contentDescription = "调整词书与目标" },
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                ) { Text("调整词书与目标", fontWeight = FontWeight.Bold) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    CountCard("今日新增 ${state.newTarget} 词", "今日新增 ${state.newTarget} 词", "today_plan_new_count", Color(0xFF68BDA6))
-                    CountCard("今日复习 ${state.dueTarget} 词", "今日复习 ${state.dueTarget} 词", "today_plan_due_count", Color(0xFFC7A47D))
+                    CountCard("今日新增 ${state.newTarget} 词", "今日新增 ${state.newTarget} 词", "today_plan_new_count", appDomain(AppDomain.Learn).deep)
+                    CountCard("今日复习 ${state.dueTarget} 词", "今日复习 ${state.dueTarget} 词", "today_plan_due_count", appDomain(AppDomain.Review).deep)
                 }
                 val totalDone = state.newDone + state.dueDone
                 val totalTarget = state.newTarget + state.dueTarget
+                // 这张卡的容器/描边/前景是同批迁移的（Task 12.5 那轮），且**不得**给它显式
+                // `tonalElevation`：主题把 `surfaceTint` 设成 `set.onMint`，叠加 alpha 一旦到 ≥3dp
+                // 就会把 ThemeModeSwitchTest 那 ±2 逐通道容差撑破（判据与实测见该用例 KDoc）。
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = appColors().surface),
+                    colors = CardDefaults.cardColors(containerColor = colors.surface),
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, appColors().outlineSoft, RoundedCornerShape(18.dp))
+                        .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
                         .testTag("today_plan_progress_summary"),
                 ) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (state.totalTasks == 0) {
-                            Text("今天暂无学习任务", color = MintTextMuted, modifier = Modifier.testTag("today_plan_empty"))
+                            Text("今天暂无学习任务", style = AppType.Footnote, color = colors.text2, modifier = Modifier.testTag("today_plan_empty"))
                         } else {
-                            Text("今日学习进度", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_task_total"))
-                            Text("$totalDone/$totalTarget 项已完成", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("today_plan_total_progress"))
-                            Text("新增 ${state.newDone}/${state.newTarget} · 复习 ${state.dueDone}/${state.dueTarget}", color = MintTextMuted, modifier = Modifier.testTag("today_plan_progress"))
+                            Text("今日学习进度", style = AppType.Label, color = colors.text2, modifier = Modifier.testTag("today_plan_task_total"))
+                            // 全屏唯一的权威数字：今日完成数。后缀「项已完成」留在注脚档，
+                            // 否则这枚尺寸的重量会被复制到一行说明上。
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    "$totalDone/$totalTarget",
+                                    style = AppType.Display,
+                                    color = colors.text1,
+                                    modifier = Modifier.testTag("today_plan_total_progress"),
+                                )
+                                Text("项已完成", style = AppType.Footnote, color = colors.text2, modifier = Modifier.padding(bottom = 8.dp))
+                            }
+                            Text("新增 ${state.newDone}/${state.newTarget} · 复习 ${state.dueDone}/${state.dueTarget}", style = AppType.Footnote, color = colors.text2, modifier = Modifier.testTag("today_plan_progress"))
                         }
                     }
                 }
-                val unlockText = if (state.isUnlocked) "已解锁：文章已解锁" else "未解锁"
-                Text(unlockText, color = if (state.isUnlocked) DomainColors.AiSpeech.deep else MintTextMuted, modifier = Modifier.testTag("today_plan_unlock_status"))
+                Text(
+                    if (state.isUnlocked) "已解锁：文章已解锁" else "未解锁",
+                    style = AppType.Footnote,
+                    color = if (state.isUnlocked) colors.success else colors.text2,
+                    modifier = Modifier.testTag("today_plan_unlock_status"),
+                )
                 // 这里原本是「优先复习 N 个到期词，再学习新增词」的文字提示。
                 // 按用户要求改成图解：一条分段条把「已学 / 今日复习 / 今日新学」各画成一节，
                 // 精确数字下沉到条下的图例里。所以这一段不再保留对应文案——同一件事
-                // 既画条又写句子只会让主操作上方变得啰嗦。
+                // 既画条又写句子只会让主操作上方变得啰嗦。图例数字同样按注脚档走（AC-R-20）。
                 val workload = TodayWorkload.of(
                     bookProgress = state.bookProgress,
                     newTarget = state.newTarget,
@@ -206,6 +246,9 @@ fun TodayPlanScreen(
                     testTag = "today_plan_start_learning",
                     contentDescription = learningAction,
                 )
+                // 本屏唯一保留的 M3 Button：阅读文章是支撑动作，但它的 `enabled` 态、禁用墨色与
+                // 「完成新词与复习后解锁文章」那条说明共同承载解锁语义，入口行组件没有「禁用态」这一档
+                // （EntryRow 契约只有可点语义），所以这一站点不符 EntryRow 契约，保持按钮形状不动。
                 Button(
                     onClick = onOpenReading,
                     enabled = state.isUnlocked,
@@ -215,105 +258,165 @@ fun TodayPlanScreen(
                         .testTag("today_plan_open_reading")
                         .semantics { contentDescription = "阅读文章" },
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, appColors().outlineSoft),
+                    border = BorderStroke(1.dp, colors.outlineSoft),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = appColors().surface,
-                        // 容器已随主题换套，前景必须同批改读动态域色：静态 DomainColors.Reading.deep 是浅套
-                        // 深红，压深底只有 2.96:1（Task 12.5 修复轮 I-2）。浅套侧 appDomain(Reading).deep
-                        // 与 DomainColors.Reading.deep 逐字相同（#C81E46，由域色双钉用例保证），浅色像素零变化。
+                        containerColor = colors.surface,
+                        // 容器随主题换套，前景同批改读动态域色：静态域色是浅套深红，压深底只有 2.96:1
+                        // （Task 12.5 修复轮 I-2）。浅套侧 `appDomain(Reading).deep` 与静态值逐字相同
+                        // （#C81E46，由域色双钉用例保证），浅色像素零变化。
                         contentColor = appDomain(AppDomain.Reading).deep,
-                        disabledContainerColor = appColors().surface,
-                        disabledContentColor = appColors().text2,
+                        disabledContainerColor = colors.surface,
+                        disabledContentColor = colors.text2,
                     ),
-                ) { Text("阅读文章", fontWeight = FontWeight.Medium) }
+                ) { Text("阅读文章") }
                 if (!state.isUnlocked) {
                     Text(
                         "完成新词与复习后解锁文章",
-                        color = MintTextMuted,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = AppType.Footnote,
+                        color = colors.text2,
                         modifier = Modifier.testTag("today_plan_reading_status"),
                     )
                 }
-                Button(
-                    onClick = onOpenLearningTools,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 50.dp)
-                        .testTag("today_plan_learning_tools")
-                        .semantics { contentDescription = "学习工具与设置" },
-                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                ) { Text("学习工具与设置", fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = onOpenCheckIn,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 50.dp)
-                        .testTag("today_plan_open_check_in")
-                        .semantics { contentDescription = "查看打卡与成就" },
-                    // 容器回退静态（Task 12.5 修复轮 I-2）：前景是那枚在册裸 hex 棕 #795B36（打卡/成就强调色，
-                    // RawColorLiteralRatchetTest 的站点行台账），浅套里没有可逐字等价的动态对应值，
-                    // 单迁容器会让深色档只有 2.67:1。按钮族容器—前景配对归批 2 Task 14（R-14.1）。
-                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = Color(0xFF795B36)),
-                ) { Text("查看打卡与成就", fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = onOpenLearningRecords,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 50.dp)
-                        .testTag("today_plan_open_learning_records")
-                        .semantics { contentDescription = "学习记录" },
-                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = MintPrimaryDark),
-                ) { Text("学习记录", fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = onOpenWordBookWords,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 50.dp)
-                        .testTag("today_plan_open_wordbook_words")
-                        .semantics { contentDescription = "词书单词" },
-                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = MintPrimaryDark),
-                ) { Text("词书单词", fontWeight = FontWeight.Bold) }
-                Button(
-                    onClick = onOpenVocabulary,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).testTag("today_plan_open_vocabulary")
-                        .semantics {
-                            contentDescription = if (vocabularyCount == null) {
-                                "生词本"
-                            } else {
-                                "生词本，共 ${vocabularyCount} 个词"
-                            }
-                        },
-                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = MintPrimaryDark),
-                ) {
-                    Text(
-                        if (vocabularyCount == null) "生词本" else "生词本（${vocabularyCount}个）",
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                TodayPlanEntryGroup(
+                    vocabularyCount = vocabularyCount,
+                    onOpenSearch = onOpenSearch,
+                    onOpenWordBookWords = onOpenWordBookWords,
+                    onOpenVocabulary = onOpenVocabulary,
+                    onOpenLearningRecords = onOpenLearningRecords,
+                    onOpenCheckIn = onOpenCheckIn,
+                    onOpenLearningTools = onOpenLearningTools,
+                    onOpenSetup = onOpenSetup,
+                )
             }
         }
     }
 }
 
+/**
+ * 入口行组（AC-R-20 的「一组入口行」）：原先 6 枚整宽按钮 + 页首常驻搜索条收成一张卡里的 7 条共享
+ * [EntryRow]，除首行外每条一条顶线（R-10.5）。
+ *
+ * 域色对位（每枚都有来历，不是凑色）：
+ *  - 查词 → `Library`、词书单词 → `Learn`、生词本 → `Reading`：逐字对应稿 `mockups.html:911-916` 的
+ *    `--d-library` / `--d-learn` / `--d-reading` 三行；
+ *  - 学习记录 → `Learn`（它记的是学习行为本身，与「词书单词」同一域，本屏不给它第二种颜色）；
+ *  - 打卡与成就 → `Review`：稿「连续与记录」那一组用的就是 `--d-review`（`mockups.html:930`），
+ *    打卡页自身的强调色也是复习域（`CheckInScreen.kt` 通体 `DomainColors.Review.deep`）。**这一枚同时
+ *    了结了那处无对应令牌的棕色裸 hex `#795B36`**：它的语义是「打卡/成就」，最近且成体系的对应值就是
+ *    复习域 `deep`（浅套 #AB5700，压白 5.13:1），不是随便挑一枚像棕色的色（登记优于蒙混）；
+ *  - 学习工具与设置 / 调整词书与目标 → `Settings`：`onOpenLearningTools` 落的是设置 tab
+ *    （`AppScreen.kt:1536`），`调整词书与目标` 打开的是学习设置，稿也把它并进设置页同名条目。
+ *
+ * 图标容器一律 [EntryIconTone.Tint]（R-10.2）：本屏的饱和底归主 CTA 一处，入口行用弱档底色，
+ * 免得七行渐变把「今天做什么」压下去。
+ *
+ * `contentDescription` 留在调用方传进的 `modifier` 上（与行本身同一枚可点节点），既保住既有用例
+ * （`AppScreenTest` 按「学习记录」「调整词书与目标」这些描述点导航）也不为了迁就组件签名丢无障碍语义。
+ */
 @Composable
-private fun SearchEntry(onClick: () -> Unit) {
-    Row(
+private fun TodayPlanEntryGroup(
+    vocabularyCount: Int?,
+    onOpenSearch: () -> Unit,
+    onOpenWordBookWords: () -> Unit,
+    onOpenVocabulary: () -> Unit,
+    onOpenLearningRecords: () -> Unit,
+    onOpenCheckIn: () -> Unit,
+    onOpenLearningTools: () -> Unit,
+    onOpenSetup: () -> Unit,
+) {
+    val colors = appColors()
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(18.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .background(MintSurface, RoundedCornerShape(16.dp))
-            .border(1.dp, MintOutline, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-            .testTag("today_plan_search_entry")
-            .semantics { contentDescription = "搜索单词或短语" },
-        verticalAlignment = Alignment.CenterVertically,
+            .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
+            .testTag("today_plan_entry_group"),
     ) {
-        Text("⌕", style = MaterialTheme.typography.headlineSmall, color = MintPrimary)
-        Spacer(Modifier.width(10.dp))
-        Text("搜索单词或短语", color = MintTextMuted)
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            EntryRow(
+                icon = AppIcon.Search,
+                domain = AppDomain.Library,
+                title = "查词",
+                iconTone = EntryIconTone.Tint,
+                modifier = Modifier.testTag("today_plan_search_entry").semantics { contentDescription = "搜索单词或短语" },
+                onClick = onOpenSearch,
+            )
+            EntryRow(
+                icon = AppIcon.BookOpen,
+                domain = AppDomain.Learn,
+                title = "词书单词",
+                subtitle = "整册浏览",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("today_plan_open_wordbook_words").semantics { contentDescription = "词书单词" },
+                onClick = onOpenWordBookWords,
+            )
+            EntryRow(
+                icon = AppIcon.Bookmark,
+                domain = AppDomain.Reading,
+                title = "生词本",
+                trailing = vocabularyCount?.let { "$it 个" },
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier
+                    .testTag("today_plan_open_vocabulary")
+                    .semantics {
+                        contentDescription = if (vocabularyCount == null) {
+                            "生词本"
+                        } else {
+                            "生词本，共 ${vocabularyCount} 个词"
+                        }
+                    },
+                onClick = onOpenVocabulary,
+            )
+            EntryRow(
+                icon = AppIcon.Clock,
+                domain = AppDomain.Learn,
+                title = "学习记录",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("today_plan_open_learning_records").semantics { contentDescription = "学习记录" },
+                onClick = onOpenLearningRecords,
+            )
+            EntryRow(
+                icon = AppIcon.Star,
+                domain = AppDomain.Review,
+                title = "打卡与成就",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("today_plan_open_check_in").semantics { contentDescription = "查看打卡与成就" },
+                onClick = onOpenCheckIn,
+            )
+            EntryRow(
+                icon = AppIcon.Gear,
+                domain = AppDomain.Settings,
+                title = "学习工具与设置",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("today_plan_learning_tools").semantics { contentDescription = "学习工具与设置" },
+                onClick = onOpenLearningTools,
+            )
+            EntryRow(
+                icon = AppIcon.List,
+                domain = AppDomain.Settings,
+                title = "调整词书与目标",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("today_plan_open_setup_entry").semantics { contentDescription = "调整词书与目标" },
+                onClick = onOpenSetup,
+            )
+        }
     }
 }
 
+/**
+ * 两张计数卡（今日新增 / 今日复习）。
+ *
+ * 数字降到 `AppType.Footnote` + `text1` 中性墨：这两个数说的是「今天排了多少」，
+ * 与进度卡里的「今天做了多少」是同一件事的两端，尺寸上不许压过后者；
+ * 卡自己的强调色载体是 [marker] 那枚圆点（[WorkloadKind.color] 同一套域色，同一概念在本屏只一套颜色）。
+ */
 @Composable
 private fun RowScope.CountCard(text: String, description: String, tag: String, marker: Color) {
     val shape = RoundedCornerShape(18.dp)
@@ -329,7 +432,7 @@ private fun RowScope.CountCard(text: String, description: String, tag: String, m
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(Modifier.size(7.dp).background(marker, CircleShape))
-            Text(text, style = MaterialTheme.typography.bodyMedium, color = appColors().text1)
+            Text(text, style = AppType.Footnote, color = appColors().text1)
         }
     }
 }
@@ -348,19 +451,26 @@ private fun learnedPercentLabel(progress: WordBookProgress): String {
     return "已学 ${tenths / 10}.${tenths % 10}%"
 }
 
-/** 与两张计数卡上的圆点同色，避免「今日复习」在同一个屏幕里出现两套颜色。 */
-private val WorkloadReviewColor = Color(0xFFC7A47D)
-private val WorkloadNewColor = Color(0xFF68BDA6)
-
 /**
- * 色表本体。Task 3 之后 `MintPrimary` 是组合期 getter，所以这张表必须本身是组合期函数：
- * 两个调用点（`TodayWorkloadBar` 的分段条与图例圆点）都在组合期内，无需改动。
+ * 工作量三档的域色表（brief Step 2「复习 `Review` 系」）。
+ *
+ * Task 3 之后这些色值都是组合期读点，所以这张表本身必须是组合期函数：两个调用点
+ * （`TodayWorkloadBar` 的分段条与图例圆点）都在组合期内。原先那两枚顶层 `private val ... Color`
+ * 是「非可组合上下文」的静态读点（深色档浮浅套值），已随本轮清掉。
+ *
+ * 取值口径：
+ *  - `LEARNED` → `AiSpeech`（已学 = 品牌薄荷，与「继续学习」的品牌主色同族）；
+ *  - `REVIEW` → `Review`（复习域；与「今日复习」色点、打卡入口同一颜色）；
+ *  - `NEW` → `Learn`（学习域；与「今日新增」色点、词书单词入口同一颜色）。
+ * 三档一律取 `deep` 不取 `base`：它们是压在 `surface`/`outlineSoft` 底上的小面积图形，
+ * spec §2.1 的 `base` 端（复习 #FF9F0A、AI #2EC99C）只有 2.06–2.11:1，进不了非文本 3:1 线，
+ * `deep` 端 4.02–6.42:1 才成立；深色档 `deep == base`，观感仍是亮色分段。
  */
 @Composable
 private fun WorkloadKind.color(): Color = when (this) {
-    WorkloadKind.LEARNED -> MintPrimary
-    WorkloadKind.REVIEW -> WorkloadReviewColor
-    WorkloadKind.NEW -> WorkloadNewColor
+    WorkloadKind.LEARNED -> appDomain(AppDomain.AiSpeech).deep
+    WorkloadKind.REVIEW -> appDomain(AppDomain.Review).deep
+    WorkloadKind.NEW -> appDomain(AppDomain.Learn).deep
 }
 
 private fun WorkloadKind.label(): String = when (this) {
@@ -376,9 +486,11 @@ private fun WorkloadKind.tag(): String = "today_plan_workload_${name.lowercase()
  *
  * 宽度全在 [TodayWorkload] 里算好了——那里是纯 Kotlin，语义由 JVM 单元测试钉住；
  * 这里只负责把 [WorkloadSegment] 画出来，以及把三行图例写全（含计数为 0 的那些）。
+ * 图例里的数字是注脚档：分段条负责形状，精确数下沉成注脚，不再长出第二种尺寸。
  */
 @Composable
 private fun TodayWorkloadBar(workload: TodayWorkload) {
+    val colors = appColors()
     val shape = RoundedCornerShape(5.dp)
     Column(modifier = Modifier.fillMaxWidth().testTag("today_plan_workload")) {
         Row(
@@ -386,7 +498,7 @@ private fun TodayWorkloadBar(workload: TodayWorkload) {
                 .fillMaxWidth()
                 .height(10.dp)
                 .clip(shape)
-                .background(MintOutline.copy(alpha = 0.35f)),
+                .background(colors.outlineSoft.copy(alpha = 0.35f)),
         ) {
             workload.segments.forEach { segment ->
                 Box(
@@ -415,8 +527,8 @@ private fun TodayWorkloadBar(workload: TodayWorkload) {
                     Spacer(Modifier.width(5.dp))
                     Text(
                         text = "${kind.label()} ${workload.countOf(kind)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MintTextMuted,
+                        style = AppType.Footnote,
+                        color = colors.text2,
                         modifier = Modifier.testTag(kind.tag() + "_label"),
                     )
                 }
