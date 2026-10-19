@@ -291,8 +291,9 @@ class PillButtonInkTest {
      *  - **组件体消费点（修复 I-1 / 评审 M3）**：只钉「取用一次」不钉「消费形状」时，组件可一边把纯表算得漂亮、
      *    一边在 `Surface` 上写死墨色（`contentColor = ink.foreground` → `Color.White`），全部 JVM 门绿。故追加四条
      *    正向判据，钉死容器/前景/描边/渐变必须逐字写 `color = ink.container` / `contentColor = ink.foreground` /
-     *    `border = ink.border?.let` / `val gradient = ink.gradient?.let`；再加两条反向判据灭掉「命名色常量」
-     *    （`Color.<A-Za-z>`）与「组件侧自挂品牌渐变」（`BrandMintGradientStops`）这两族绕过路径。
+     *    `border = ink.border?.let` / `val gradient = ink.gradient?.let`；再加反向判据灭掉「命名色常量与 Color 构造器凑色」
+     *    （`Color.` 成员访问与 `Color(` 构造调用，后者为 R-14A-i.1 扩面）与「组件侧自挂品牌渐变」（`BrandMintGradientStops`）
+     *    这两族绕过路径。
      *    被钉形状只存在于被测源码 `GlassButton.kt` 的代码行（`stripComments` 后），测试文件注释/消息里的这些字样不参与计数。
      */
     @Test
@@ -327,8 +328,10 @@ class PillButtonInkTest {
         assertEquals(1, countMatches(pillButtonBody, Regex("""contentColor = ink\.foreground""")), "Surface 前景色必须逐字接自 ink.foreground（写成 Color.White 等常量即判红，封 M3）")
         assertEquals(1, countMatches(pillButtonBody, Regex("""border = ink\.border\?\.let""")), "Surface 描边必须逐字接自 ink.border?.let（改成 null 或别的来源即判红）")
         assertEquals(1, countMatches(pillButtonBody, Regex("""val gradient = ink\.gradient\?\.let""")), "组件渐变必须逐字接自 ink.gradient?.let（改成常亮或组件侧自挂品牌渐变即判红）")
-        // 反向兜底：即便有人避开上面的字面形状，也不许在组件体里落下命名色常量或自挂品牌渐变这两族绕过路径。
-        assertEquals(0, countMatches(pillButtonBody, Regex("""Color\.[A-Za-z]""")), "组件体不得出现任何 Color.<命名色> 常量：White/Transparent 等都算绕过纯表")
+        // 反向兜底：即便有人避开上面的字面形状，也不许在组件体里落下命名色常量/Color 构造器凑色/自挂品牌渐变这几族绕过路径。
+        // R-14A-i.1（14A-i 窄复评实测）：原判据只写 Color\.[A-Za-z]，漏拦 Color(0.5f,0.5f,0.5f) 这类浮点构造器凑色——
+        // 判据扩为同时拦一切 Color( 构造调用（生产组件体内零处 Color(，收紧无既有命中）。
+        assertEquals(0, countMatches(pillButtonBody, Regex("""Color\.[A-Za-z]|Color\(""")), "组件体不得出现任何 Color.<命名色> 常量或 Color( 构造调用：White/Transparent 与浮点参数凑色都算绕过纯表")
         assertEquals(0, countMatches(pillButtonBody, Regex("""BrandMintGradientStops""")), "组件体不得自挂 BrandMintGradientStops：品牌渐变只能来自 ink.gradient")
     }
 }
