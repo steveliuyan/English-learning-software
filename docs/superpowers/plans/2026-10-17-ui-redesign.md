@@ -1435,16 +1435,73 @@ internal val MintBackground: Color
 ### Task 13: 词书选取屏（`VocabularyScreen` 词书列表 / 首页入口）
 
 **Files:**
-- Modify: 词书选取相关屏文件（现场以 `grep -rln "词书" app/src/main/java/com/example/englishlearning/ui | sort` 定位，锁定真实文件名后再动）
-- Test: 该屏既有 connected 类 + 新增 `WordbookPickerHeaderTest.kt`
+- Modify: `app/src/main/java/com/example/englishlearning/ui/AppScreen.kt`（`LearningSetupScreen` 段与其私有组件，见 R-13.0 的行号清单）
+- Create: `app/src/main/java/com/example/englishlearning/ui/components/Skeleton.kt`
+- Test: `app/src/androidTest/.../ui/SetupScreenScreenshotTest.kt`、`WordBookSwipeRowTest.kt`（既有，须全绿）+ 新增 `WordbookPickerHeaderTest.kt`
 
 **Interfaces:**
 - Consumes: `AppScreenHeader`、`EntryRow`、`Skeleton`（本任务新建 `ui/components/Skeleton.kt`）。
 - Produces: `@Composable fun ListSkeleton(rows: Int, rowHeight: Dp, modifier: Modifier = Modifier)`（骨架高度预留，spec §3 与 F5-03 移交账「每册骨架」）。
 
-- [ ] **Step 1: 写失败测试**：列表首帧渲染时骨架行数 == 上次已知的册数或固定 3，且加载完成后不整体跳动（断言骨架与真实行同高）。
-- [ ] **Step 2: 实现**：页头换 `AppScreenHeader`；每册行换 `EntryRow`（域色 `Library`）；`Arrangement.spacedBy` 造成的幽灵间距换成真实 `outlineSoft` 分隔线（spec §2.3 禁令）。
+**开工前裁决（R-13.0，控制者现场核码后据 AGENTS.md「范围变化先改计划再实施」写入；实施者按本节执行，不再自行判断落点）**：
+
+- **落点澄清**：标题里的 `VocabularyScreen` 是**生词本列表**（`ui/VocabularyScreen.kt`，页头文案「生词本」），不是词书选取屏，
+  本任务不动它。词书选取屏的真实落点是 `ui/AppScreen.kt` 的 `LearningSetupScreen`（`:1851` 起）：
+  页头两行排印 `:1950-1960`、`SetupIntroductionCard`（`:2059`）、首帧骨架 `WordBookListPlaceholder`（`:2098`）
+  + `PlaceholderBar`（`:2138`）+ 共用版面常量 `WORD_BOOK_PLACEHOLDER_ROWS` / `WordBookCardShape` /
+  `WordBookCardMinHeight` / `WordBookCardContentPadding`（`:2077-2085`）、词书行 `SwipableWordBookCard`（`:2154`）。
+  connected 侧既有类是 `SetupScreenScreenshotTest`、`WordBookSwipeRowTest`。
+- **「每册行换 `EntryRow`」按字面执行不可行，改判**：`EntryRow`（`components/EntryRow.kt:111-122`）的契约只有
+  `icon/domain/title/subtitle/trailing/showChevron/topDivider/onClick`，**没有选中态、进度条、滑动删除，
+  也没有 trailing 组合槽**。硬换会删掉「当前选中哪套词书」「已学/总数 + 进度条」「删除词书的
+  `customActions`」这些业务信息与无障碍语义，撞 Global Constraints #3（不动业务规则）与 #9（既有
+  `testTag`/`contentDescription`/`stateDescription` 不得改名或删除）。
+  裁决：词书行**保留 `SwipableWordBookCard` 的结构与语义**，本任务对它只做三件事——
+  ①容器与前景按 `appColors()` **同批配对**迁移（浅色档取值必须逐字等价；判据是新增的
+  `ContainerInkPairingContractTest`：同一段里容器读了 `appColors().surface`，段内 `Text(style = AppType.*)`
+  就必须带显式 `color =`）；②册与册之间的 `Arrangement.spacedBy` 幽灵间距换成真实 `appColors().outlineSoft`
+  分隔线（spec §2.3 禁令）；③复验触控下限（该行现 72dp 下限，不得因换分隔线掉到 48dp 以下）。
+  `EntryRow` 若在本屏无处可放（`SetupIntroductionCard` 里没有纯跳转入口），就**不出现**，
+  报告里写一句「本屏无符合 `EntryRow` 契约的入口行」即可，不为了用组件而改业务信息层级。
+- **页头换 `AppScreenHeader` 的边界**：`AppScreenHeader` 的 `onBack` 位写死 `contentDescription = "返回"`
+  （`components/AppScreenHeader.kt:83-89`，裁决 R-9.1），而本屏的返回入口是 `← 返回上一层`
+  （`:1941-1948`）——那句中性表述是既有决策（该屏既能从「学习」栏也能从「设置」栏打开），
+  改名会撞 Global Constraints #9。裁决：用 `AppScreenHeader(title, subtitle, onBack = null)` 承载
+  标题与副标题两档排印，**返回位保留现有 `TextButton`**；不给组件新增 `backContentDescription` 形参
+  （那属批 1 组件契约变更，需要自己的用例与评审）。
+- **骨架共享化的既有偏差必须原样带走**：`WordBookCardShape` 是 18dp 而非 `AppShape.Card` 的 20dp，
+  注释（`:2080-2082`）写明理由：滑动删除底、描边与卡片必须同角，换 `AppShape` 会让红底从四角渗出
+  （`WordBookSwipeRowTest` 钉这一点）。所以 `ListSkeleton` 的圆角/行高/内边距走**形参**，
+  不许在组件里写死成 `AppShape.Card`；该屏继续传 18dp 那组参数，并**保留既有
+  `testTag("wordbook_placeholder_$row")`**（connected 判据依赖它）。骨架保持零文案零数字
+  （F1-01 无障碍口径：占位期播报「已学 0 词」比什么都不念更糟）。
+
+
+- [ ] **Step 1（先红）: 写失败测试**（新增 `app/src/androidTest/.../ui/WordbookPickerHeaderTest.kt`，一个 `@Test` 只 `setContent` 一次）：
+  ①页头由 `AppScreenHeader` 承载——`testTag("app_screen_header")` 存在，标题节点文案「选好词书，开始今天的积累」、
+  副标题节点文案「每天一点点，学习会自然变成习惯。」；返回入口仍是现有 `← 返回上一层`（`contentDescription` 原样）。
+  ②首帧骨架：`wordbook_placeholder_0..2` 三行齐全，每行实测高度 ≥ `WordBookCardMinHeight`（72dp）。
+  **不**断言骨架与真实卡逐像素同高——真卡带进度条约 130dp、骨架按最小行高约 74dp，是 `:2088-2096`
+  注释里写明并刻意保留的取舍（首帧要「立刻有东西」，不是复刻终版面），把它判成同高等于推翻既有裁决。
+  ③册与册之间必须是**真实分隔线**而不只是 `spacedBy` 空白：取相邻两卡之间那条缝的中点像素，
+  按当前主题档断言它等于 `appColors().outlineSoft`（浅套 `#E5EFE9` / 深套 `#233029`，容差与
+  `ThemeModeSwitchTest` 同为逐通道 2），并写明变异证据——把画线调用删掉本条必须变红。
+  取样按 `captureToImage()` + alpha ≥250 过滤（界外是透明像素，不筛就会把 0x000000 当成命中的颜色）。
+- [ ] **Step 2: 实现**：按 R-13.0 落地——页头换 `AppScreenHeader(title, subtitle, onBack = null)`（返回位保留）；
+  把 `WordBookListPlaceholder` / `PlaceholderBar` 的版面参数抽进新建 `ui/components/Skeleton.kt` 的
+  `ListSkeleton(rows: Int, rowHeight: Dp, shape: Shape, contentPadding: PaddingValues, modifier: Modifier = Modifier)`
+  （圆角/行高/内边距走形参，不写死 `AppShape.Card`；沿用 18dp 那组参数与 `wordbook_placeholder_$row` tag；零文案零数字）；
+  词书行保留 `SwipableWordBookCard` 结构与语义，只做「容器-墨同批配对迁移 + 幽灵间距换真实 `outlineSoft` 分隔线 + 触控下限复验」；
+  容器迁 `appColors().surface` 时同段内每处 `Text(style = AppType.*)` 必须补显式 `color = appColors().text1/text2`
+  （`ContainerInkPairingContractTest` 会当场挡），且 `DarkTokenConsumptionRatchetTest` / `RawColorLiteralRatchetTest`
+  的 seed 台账按实际迁移点同步。`EntryRow` 在本屏没有符合其契约的纯跳转入口时**不出现**，理由写进报告。
 - [ ] **Step 3: 门控 + 本屏 connected + 提交**（`feat(ui-learning): 词书选取屏接入统一页头与入口行并预留骨架高度`）。
+  门控三任务（`assembleDebug → testDebugUnitTest → compileDebugAndroidTestKotlin`，本机 gradle 8.13-bin 路径见
+  `android-repo-session-handoff`，注意其 glob 少了哈希目录，实测用
+  `$HOME/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle.bat`）；
+  connected 只走 `adb install -r` + `am instrument`（`emulator-5574`），
+  跑 `WordbookPickerHeaderTest` + 既有 `SetupScreenScreenshotTest` + `WordBookSwipeRowTest`，全绿才算收口。
+
 
 ---
 
