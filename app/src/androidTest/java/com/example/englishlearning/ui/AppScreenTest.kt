@@ -2,8 +2,10 @@ package com.example.englishlearning.ui
 
 import android.view.KeyEvent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -557,8 +559,9 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
-        composeRule.onNodeWithContentDescription("播放 ability 英式发音").performClick()
+        assertDetailLemma("ability")
+        detailSpeakSlot("card_detail_speak", "美").performClick()
+        detailSpeakSlot("card_detail_speak_british", "英").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 3 }
 
         assertEquals(listOf("ability", "ability", "ability"), provider.spokenTexts)
@@ -615,8 +618,9 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
-        composeRule.onNodeWithContentDescription("播放 ability 英式发音").performClick()
+        assertDetailLemma("ability")
+        detailSpeakSlot("card_detail_speak", "美").performClick()
+        detailSpeakSlot("card_detail_speak_british", "英").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 2 }
 
         assertEquals(listOf("ability", "ability"), provider.spokenTexts)
@@ -654,7 +658,8 @@ class AppScreenTest {
         composeRule.onNodeWithTag("coverage_popup_close").performClick()
         composeRule.onNodeWithTag("article_english").performClick()
         composeRule.onNodeWithTag("card_detail_screen").assertExists()
-        composeRule.onNodeWithContentDescription("播放 apple 发音").performClick()
+        assertDetailLemma("apple")
+        detailSpeakSlot("card_detail_speak", "美").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("发音播放失败，请重试。").fetchSemanticsNodes().isNotEmpty()
         }
@@ -845,6 +850,35 @@ class AppScreenTest {
     }
 
     /**
+     * 详情页发音槽的取样面（修复轮 1 / C 组，Task 16 `0414334` 的波及收口）。
+     *
+     * 旧形状靠 `onNodeWithContentDescription("播放 ability 发音")` / `("播放 ability 英式发音")` 找节点：
+     * 那两句是把 lemma 与口音拼进朗读定语的**屏侧私有文案**。Task 16 把详情发音件归一到共享药片后，
+     * 屏侧不再写任何朗读定语（`git grep "播放 \$" HEAD -- app/src/main` 为空），取样面随之消失——
+     * 本 helper 把取样面搬到**同一枚节点的实参与可见文字**上，三条语义逐条对等、不放宽：
+     *  - 「哪一槽可点」：`card_detail_speak` = 美式默认槽、`card_detail_speak_british` = 英式槽，
+     *    且必须 `assertExists()` + `assertHasClickAction()`（旧形状里 performClick 隐含「可点」，这里显式钉）；
+     *  - 「口音归属」：旧 CD 的「英式」二字现在是药片尾缀槽的可见文字「美」/「英」
+     *    （clickable 的 MergeDescendants 把它并进同一枚语义节点），逐槽点名；
+     *  - 「状态文案」：待播档的可见文字「播放发音」必须在槽上（三态唯一真值口径，见 SpeakerButton KDoc）。
+     *
+     * 「朗读归属（哪个词）」这一维旧形状靠 CD 里的 lemma 承载，现由 [assertDetailLemma] 逐字钉回详情词头。
+     * 先例：`CardDetailScreenTest.detailOffersAmericanByDefaultAndSeparateBritishAction`（Task 16 同款换面）、
+     * `CardDetailPronunciationControlsTest`（私有 CD → 组件可见文字）。
+     */
+    private fun detailSpeakSlot(tag: String, accentSuffix: String) =
+        composeRule.onNodeWithTag(tag)
+            .assertExists()
+            .assertHasClickAction()
+            .assert(hasText("播放发音", substring = true))
+            .assert(hasText(accentSuffix, substring = true))
+
+    /** 旧 CD 里那句「播放 <lemma> 发音」的 lemma 维：换成药片所在详情的词头可见文字逐字钉。 */
+    private fun assertDetailLemma(lemma: String) {
+        composeRule.onNodeWithTag("card_detail_lemma").assertTextEquals(lemma)
+    }
+
+    /**
      * I-3：系统返回键关闭阅读生词详情时必须清**共享详情状态**（detailPronunciation*）。
      * 屏内 onBack/onNext 与记录宿主都清了，唯独 BackHandler(selectedArticleCard) 漏了。
      * 「另一处详情」选学习流宿主：记录/词书宿主打开详情时会顺手复位（掩盖缺陷），
@@ -863,7 +897,8 @@ class AppScreenTest {
             )
         }
         openReadingWordDetail()
-        composeRule.onNodeWithContentDescription("播放 apple 发音").performClick()
+        assertDetailLemma("apple")
+        detailSpeakSlot("card_detail_speak", "美").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_pronunciation_message").fetchSemanticsNodes().isNotEmpty()
         }
@@ -984,7 +1019,8 @@ class AppScreenTest {
             )
         }
         openReadingWordDetail()
-        composeRule.onNodeWithContentDescription("播放 apple 发音").performScrollTo().performClick()
+        assertDetailLemma("apple")
+        detailSpeakSlot("card_detail_speak", "美").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_pronunciation_toggle").fetchSemanticsNodes().isNotEmpty()
         }
@@ -1022,7 +1058,8 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription("播放 ability 发音").performClick()
+        assertDetailLemma("ability")
+        detailSpeakSlot("card_detail_speak", "美").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_pronunciation_stop").fetchSemanticsNodes().isNotEmpty()
         }
