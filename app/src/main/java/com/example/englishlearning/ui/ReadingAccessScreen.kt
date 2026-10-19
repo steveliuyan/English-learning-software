@@ -38,9 +38,9 @@ import com.example.englishlearning.reading.domain.ReadingPreference
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -308,7 +308,7 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
                 onClick = { onConfirmOutbound(false) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Secondary,
-                accent = DomainColors.Reading,
+                domain = AppDomain.Reading,
                 testTag = "outbound_cancel",
             )
             PillButton(
@@ -316,7 +316,7 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
                 onClick = { onConfirmOutbound(true) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Primary,
-                accent = DomainColors.Reading,
+                domain = AppDomain.Reading,
                 testTag = "outbound_confirm",
             )
         }

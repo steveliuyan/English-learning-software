@@ -45,8 +45,8 @@ import com.example.englishlearning.reading.domain.ArticleSource
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -204,7 +204,7 @@ fun ArticleReadingScreen(
                         .padding(top = 12.dp)
                         .fillMaxWidth(),
                     style = PillStyle.Primary,
-                    accent = DomainColors.Reading,
+                    domain = AppDomain.Reading,
                     testTag = "coverage_popup_close",
                 )
             }

@@ -45,6 +45,7 @@ import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.components.glass.frosted
 import com.example.englishlearning.ui.components.glass.pressableScale
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
@@ -121,7 +122,7 @@ private fun AiProfileList(
             text = "← 返回上一层",
             onClick = onBack,
             style = PillStyle.Text,
-            accent = DomainColors.AiSpeech,
+            domain = AppDomain.AiSpeech,
             // 这一层有两个入口：「设置 · AI 服务与密钥」和「AI 学」功能页的「去配置 AI 服务」。
             // 从后者进来时底部选中的仍是 AI 学栏，写死「返回设置」就会指错地方，所以用中性的表述。
             contentDescription = "返回上一层",
@@ -172,7 +173,7 @@ private fun AiProfileList(
             onClick = onAdd,
             modifier = Modifier.fillMaxWidth(),
             style = PillStyle.Primary,
-            accent = DomainColors.AiSpeech,
+            domain = AppDomain.AiSpeech,
             testTag = "ai_profiles_add",
             contentDescription = "新增 AI 配置",
         )
@@ -235,7 +236,7 @@ private fun AiProfileRow(
                     text = "设为文章默认",
                     onClick = { onSetDefaultTextProfile(item.profile.profileId) },
                     style = PillStyle.Text,
-                    accent = DomainColors.AiSpeech,
+                    domain = AppDomain.AiSpeech,
                     modifier = Modifier.testTag("ai_profile_set_default_${item.profile.profileId}"),
                     contentDescription = "将 ${item.profile.displayName} 设为文章默认",
                 )
@@ -251,7 +252,7 @@ private fun AiProfileRow(
                     text = "设为生图默认",
                     onClick = { onSetDefaultImageProfile(item.profile.profileId) },
                     style = PillStyle.Text,
-                    accent = DomainColors.AiSpeech,
+                    domain = AppDomain.AiSpeech,
                     modifier = Modifier.testTag("ai_profile_set_image_default_${item.profile.profileId}"),
                     contentDescription = "将 ${item.profile.displayName} 设为生图默认",
                 )
@@ -289,7 +290,7 @@ private fun AiProfileEditor(
                 text = "← 返回 AI 服务",
                 onClick = onClose,
                 style = PillStyle.Text,
-                accent = DomainColors.AiSpeech,
+                domain = AppDomain.AiSpeech,
                 contentDescription = "返回 AI 服务",
             )
 
@@ -357,7 +358,7 @@ private fun AiProfileEditor(
                         text = if (draft.voice.isBlank()) "自动（推荐）  ▾" else "${draft.voice}  ▾",
                         onClick = { voiceOverlayVisible = true },
                         style = PillStyle.Secondary,
-                        accent = DomainColors.AiSpeech,
+                        domain = AppDomain.AiSpeech,
                         testTag = "ai_profile_voice",
                         contentDescription = "选择语音角色",
                     )
@@ -405,7 +406,7 @@ private fun AiProfileEditor(
                         text = "清除已保存的密钥",
                         onClick = { onDeleteKey(state.profileId) },
                         style = PillStyle.Text,
-                        accent = DomainColors.Reading,
+                        domain = AppDomain.Reading,
                         testTag = "ai_profile_key_clear",
                         contentDescription = "清除已保存的密钥",
                     )
@@ -432,7 +433,7 @@ private fun AiProfileEditor(
                     .fillMaxWidth()
                     .semantics { if (state.saving) disabled() },
                 style = PillStyle.Primary,
-                accent = DomainColors.AiSpeech,
+                domain = AppDomain.AiSpeech,
                 testTag = "ai_profile_save",
                 contentDescription = "保存 AI 配置",
             )
@@ -443,7 +444,7 @@ private fun AiProfileEditor(
                     onClick = { onDeleteProfile(state.profileId) },
                     modifier = Modifier.fillMaxWidth(),
                     style = PillStyle.Text,
-                    accent = DomainColors.Reading,
+                    domain = AppDomain.Reading,
                     testTag = "ai_profile_delete",
                     contentDescription = "删除这套配置",
                 )

@@ -64,27 +64,26 @@ import kotlin.test.assertTrue
  * （[ThemeInvariantMaskReadLedger]、[ParameterDefaultStaticReadLedger]）承载其理由，本表仍是「还欠多少」的唯一权威。
  */
 internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
-    "AiProfileSettingsScreen.kt" to 28,
+    "AiProfileSettingsScreen.kt" to 19,
     "SettingsScreen.kt" to 10,
     "SpeechSettingsScreen.kt" to 8,
-    "components/glass/GlassButton.kt" to 7,
+    "components/glass/GlassButton.kt" to 1,
     "CheckInScreen.kt" to 7,
     "WordCardScreen.kt" to 7,
-    "PhotoTranslationScreen.kt" to 6,
-    "ReadingAccessScreen.kt" to 6,
+    "PhotoTranslationScreen.kt" to 4,
+    "ReadingAccessScreen.kt" to 4,
     "theme/AppType.kt" to 6,
-    "WordAiQaScreen.kt" to 5,
-    "ImageStudioScreen.kt" to 4,
+    "WordAiQaScreen.kt" to 3,
+    "ImageStudioScreen.kt" to 2,
     "AiFeatureScreen.kt" to 3,
     "AppScreen.kt" to 3,
-    "SentenceAnalysisScreen.kt" to 3,
+    "SentenceAnalysisScreen.kt" to 1,
     "components/glass/GlassOverlay.kt" to 3,
     "AiLearningScreen.kt" to 2,
     "BackupExportScreen.kt" to 2,
     "components/glass/GlassDialog.kt" to 2,
     "AppBottomBar.kt" to 1,
     "ArticleImportScreen.kt" to 1,
-    "ArticleReadingScreen.kt" to 1,
     "CardDetailScreen.kt" to 1,
     "GlobalVocabularySearchScreen.kt" to 1,
     "LearningRecordsScreen.kt" to 1,
@@ -186,14 +185,16 @@ internal val ThemeInvariantMaskReadLedger: Map<String, Int> = mapOf(
  * `parameter default ledger excludes object member initializer by design` 用合成片段钉住这一排除不是靠运气。
  *
  * 计数仍以 [DarkTokenSeedAllowlist] 为准，本表只是注记，修掉一处时两张表一起减 1；两张表都由「精确相等」守着，
- * 新增未登记即红。登记内容：`components/glass/GlassButton.kt` 的 `PillButton` 形参默认值
- * `accent: DomainAccent = DomainColors.AiSpeech`（计划 Task 3 现场撞出、brief Step 3 点名要「一并列入并注明」的那一类）。
+ * 新增未登记即红。**历史站点（批 2 Task 14A-i 已消失）**：`components/glass/GlassButton.kt` 的 `PillButton`
+ * 形参默认值 `accent: DomainAccent = DomainColors.AiSpeech`（计划 Task 3 现场撞出、brief Step 3 点名要
+ * 「一并列入并注明」的那一类）——Task 14A 按 R-14.4 把签名迁成 `domain: AppDomain = AppDomain.AiSpeech`，
+ * 组件内得以就地读 `appDomain(domain)` + `appColors()` + `LocalIsDark.current`，该形态随之不存在，本表清空。
+ * 表空不等于闸空：`parameter default ledger excludes object member initializer by design` 仍拿合成目录
+ * 同时跑主规则取样与独立书写的交叉规则取样，两套站点集必须逐条相等，故「取样正则与 rule 漂移」照样判红。
  * 顶层 `Brush.linearGradient(...)`（数量可用 `grep -rn` 于 `ui/` 现算）读的是保持静态的 `AppleMint*`，不含
  * `AppPalette.` / `DomainColors.`，本规则看不见它们，也不归本棘轮管——见类 KDoc 的「品牌渐变模式不变」口径。
  */
-internal val ParameterDefaultStaticReadLedger: Map<String, Int> = mapOf(
-    "components/glass/GlassButton.kt" to 1,
-)
+internal val ParameterDefaultStaticReadLedger: Map<String, Int> = emptyMap()
 
 class DarkTokenConsumptionRatchetTest {
     private val uiDir = File(UI_MAIN_SOURCE_PATH)
@@ -603,6 +604,22 @@ class DarkTokenConsumptionRatchetTest {
             assertTrue(
                 detected.none { it.contains("val myStyle = TextStyle") },
                 "可就地迁移的 @Composable 体内局部 val 必须被排除（否则反向假阳把债务误标成注记）：$detected"
+            )
+            // 14A-i 之后真实源码的注记表已空，`ledger sites are a subset...` 在真实面上失去样本，
+            // 所以这里用同一份合成目录把「主规则取样」与「独立书写的交叉规则取样」逐条对齐：
+            // 形态正则一旦与 rule 漂移（丢锚点 / 换成员字符类 / 改前缀名单），本条立刻红，交叉断言不空转。
+            assertTrue(
+                parameterDefaultShapedSites(dir).isNotEmpty(),
+                "合成目录取样为空：下面的两套取样相等就成了空对空的重言，Probe.kt 的两种行形态必须先修"
+            )
+            assertEquals(
+                parameterDefaultShapedSites(dir).sorted(),
+                parameterDefaultShapedSites(
+                    dir,
+                    crossTopLevelDeclarationRead,
+                    crossTypedDeclarationRead,
+                ).sorted(),
+                "同一份源码上主规则取样与独立书写的交叉规则取样不再同源：形态正则与 rule 漂移了",
             )
         } finally {
             dir.deleteRecursively()

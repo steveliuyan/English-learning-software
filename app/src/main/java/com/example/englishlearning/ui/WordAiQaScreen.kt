@@ -34,9 +34,9 @@ import com.example.englishlearning.ai.AiFailureUiText
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -245,7 +245,7 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
                 onClick = { onConfirmOutbound(false) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Secondary,
-                accent = DomainColors.Learn,
+                domain = AppDomain.Learn,
                 testTag = "word_qa_decline_outbound",
             )
             PillButton(
@@ -253,7 +253,7 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
                 onClick = { onConfirmOutbound(true) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Primary,
-                accent = DomainColors.Learn,
+                domain = AppDomain.Learn,
                 testTag = "word_qa_confirm_outbound",
             )
         }

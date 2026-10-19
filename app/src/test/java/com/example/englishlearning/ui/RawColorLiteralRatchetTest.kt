@@ -65,13 +65,19 @@ internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
  * 与 [RawColorSeedAllowlist] 必须互相吻合（本测试当场核验）。吻合断言同时是「两条站点折叠后同文」
  * 的探测器：真出现同文站点，Set 形状的 allowlist 会静默少计一条，那条断言当场红——届时必须把这张表
  * 换成「行内容 → 应有次数」的 Map，而不是删掉重复条目蒙混过去。
+ *
+ * 行内容随书写形状走，不随债务走（批 2 Task 14A-i 实例）：`GlassButton.kt` 的品牌渐变末端仍是同一枚
+ * 裸 hex（计数 seed 保持 1），但着色逻辑被抽成纯表后，它从 `Brush.verticalGradient(listOf(…))` 那一行
+ * 搬到 `BrandMintGradientStops` 的三端列表里，本站点行的折叠文本随之只剩 `Color(0xFF65D3B9),`。
+ * 这种「同债务、换行形」只准改行内容，不准改计数；计数变化必须由 `DarkTokenConsumptionRatchetTest`
+ * 与本轮验收一起裁决。
  */
 internal val RawColorSeedSiteLines: List<String> = listOf(
     "AppScreen.kt: colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = Color(0xFFCDEFE1)),",
     "AppScreen.kt: inactiveTrackColor = Color(0xFFCDEFE1),",
     "ArticleReadingScreen.kt: style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF17342A)),",
     "CheckInScreen.kt: drawArc(color = Color(0xFFFFF1DB), startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))",
-    "GlassButton.kt: Brush.verticalGradient(listOf(AppleMintStart, AppleMintMiddle, Color(0xFF65D3B9)))",
+    "GlassButton.kt: Color(0xFF65D3B9),",
     "AiMascot.kt: private val EyeColor: Color = Color(0xFF188F76)",
 )
 
