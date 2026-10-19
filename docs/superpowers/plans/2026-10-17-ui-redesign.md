@@ -1743,6 +1743,13 @@ internal val MintBackground: Color
 - [ ] **Step 3: 底导对比断言**：`text2` 未选中态压 `MintSurface` 底 ≥4.5 —— 若底仍是 `MintSurface`（白）则 5.15 合格；把这条写进 `IconBadgeContrastContractTest` 或新 `AppBottomBarContrastTest`。
 - [ ] **Step 4: 门控 + connected（含底导走查 + TalkBack 朗读四 tab）+ 提交**。
 
+**R-17.1（控制者拆席裁决，沿用 R-14.2 口径；AGENTS.md「范围变化先改计划」）**：本任务两面可独立评审——
+**17A**＝`AppBottomBar.kt`（156 行自包含）duotone 重写 + Step 1/3 判据 + 底导 connected（含 TalkBack 四 tab 朗读）；
+**17B**＝`AppScreen.kt`（2447 行）页头/浮层容器版式接入（不做宿主拆分）。一席吞两面必超 150 轮预算
+（Task 14/15/16 三连证），顺序取 17A 先：17B 不依赖 17A 的渲染细节但 connected 底导走查要在最终形态上做，
+且 17B 现场要顺带核底导接入点。各自走完整循环（实现→独立评审→至多一轮修复→窄复评）。
+17B 派发前由控制者现场清点「页头/浮层容器统一」的具体落点清单，避免大文件漫游。
+
 ---
 
 ### Task 18: 批 2 收口
