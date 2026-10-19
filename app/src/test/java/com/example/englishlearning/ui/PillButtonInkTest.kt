@@ -287,7 +287,13 @@ class PillButtonInkTest {
      *  - `fun pillButtonInk(` 恰 2 处（纯表 + 组合期壳），`pillButtonInk(` 恰 4 处（2 定义 + 壳转调 + 组件取用）；
      *  - 壳必须把 `appColors()` / `appDomain(domain)` / `LocalIsDark.current` 三样一起转给纯表，且任何地方都不许
      *    把 `isDark` 写成布尔常量——否则两套分叉在组合期塌回浅套，JVM 表再绿也没用；
-     *  - `PillButton`（本文件最后一个顶层 fun）体内恰一次取用这张表、零处自凑色。
+     *  - `PillButton`（本文件最后一个顶层 fun）体内恰一次取用这张表、零处自凑色；
+     *  - **组件体消费点（修复 I-1 / 评审 M3）**：只钉「取用一次」不钉「消费形状」时，组件可一边把纯表算得漂亮、
+     *    一边在 `Surface` 上写死墨色（`contentColor = ink.foreground` → `Color.White`），全部 JVM 门绿。故追加四条
+     *    正向判据，钉死容器/前景/描边/渐变必须逐字写 `color = ink.container` / `contentColor = ink.foreground` /
+     *    `border = ink.border?.let` / `val gradient = ink.gradient?.let`；再加两条反向判据灭掉「命名色常量」
+     *    （`Color.<A-Za-z>`）与「组件侧自挂品牌渐变」（`BrandMintGradientStops`）这两族绕过路径。
+     *    被钉形状只存在于被测源码 `GlassButton.kt` 的代码行（`stripComments` 后），测试文件注释/消息里的这些字样不参与计数。
      */
     @Test
     fun glass_button_takes_its_ink_only_from_the_pure_table() {
@@ -314,5 +320,15 @@ class PillButtonInkTest {
             countMatches(pillButtonBody, Regex("""\bAppPalette\.|\bDomainColors\.|Color\(0x|appColors\(\)|appDomain\(|LocalIsDark""")),
             "PillButton 体内不许出现第二处取色：容器/前景/描边/渐变一律来自 ink",
         )
+        // 修复 I-1（评审 M3 实测全绿）：上面只钉「体内取用一次 + 零处自凑色符号」，不钉组件体对 ink 五个成员的消费点。
+        // 于是有人可把 contentColor = ink.foreground 改成 contentColor = Color.White（命名色常量、零字面量、零 token 读取），
+        // 既绕开正向「取用一次」，也不触任何既有正则——纯表算得再对，Surface 却写死墨色。以下四条正向钉死消费形状。
+        assertEquals(1, countMatches(pillButtonBody, Regex("""color = ink\.container""")), "Surface 容器色必须逐字接自 ink.container（改自其它来源即绕过纯表）")
+        assertEquals(1, countMatches(pillButtonBody, Regex("""contentColor = ink\.foreground""")), "Surface 前景色必须逐字接自 ink.foreground（写成 Color.White 等常量即判红，封 M3）")
+        assertEquals(1, countMatches(pillButtonBody, Regex("""border = ink\.border\?\.let""")), "Surface 描边必须逐字接自 ink.border?.let（改成 null 或别的来源即判红）")
+        assertEquals(1, countMatches(pillButtonBody, Regex("""val gradient = ink\.gradient\?\.let""")), "组件渐变必须逐字接自 ink.gradient?.let（改成常亮或组件侧自挂品牌渐变即判红）")
+        // 反向兜底：即便有人避开上面的字面形状，也不许在组件体里落下命名色常量或自挂品牌渐变这两族绕过路径。
+        assertEquals(0, countMatches(pillButtonBody, Regex("""Color\.[A-Za-z]""")), "组件体不得出现任何 Color.<命名色> 常量：White/Transparent 等都算绕过纯表")
+        assertEquals(0, countMatches(pillButtonBody, Regex("""BrandMintGradientStops""")), "组件体不得自挂 BrandMintGradientStops：品牌渐变只能来自 ink.gradient")
     }
 }
