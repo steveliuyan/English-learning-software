@@ -1344,6 +1344,65 @@ internal val MintBackground: Color
 - [ ] **Step 6**: 提交（`fix(ui-theme): 业务屏中性容器改读 appColors()，深色不再出现白底配浅墨`）+
       把「哪些文件的 seed 行已删、删了几行」写进 `.superpowers/sdd/2026-10-17-ui-redesign/progress.md`（**报告里不写绝对余量**，以台账与重算命令为准）。
 
+**修复轮记录（R-12.5-F，2026-10-19 独立评审 spec FAIL / quality FAIL 后据其 最小返工清单 落地；先改本节再实施，AGENTS.md「范围变化先更新 Spec/brief」）**：
+
+- **本任务的立论前提被证伪了一半**：原文第 3–5 行称「批 1 已把墨色侧改成组合期读取，容器补齐即整体可用」，这对
+  `MintPalette.kt` 的动态 getter 与摘色后的 `MaterialTheme.typography.*` 成立，对 `style = AppType.*` **直读不成立**
+  （`theme/AppType.kt:12-17` 六档仍钉 `AppPalette.TextPrimary/TextSecondary`，摘色只发生在装配路径 `neutralForTheme()`）。
+  于是「只迁容器」在四个位置造出深色档 1.0–3.0:1 的**反向不可读**。裁决口径：**配得上就同批改墨，配不上就把容器回退**，
+  两种都不动版面；回退项连同理由交给批 2 Task 14（按钮族）与批 3（`GlassFill` 面板族）。
+- **新增判据（I-5）**：`app/src/test/java/com/example/englishlearning/ui/ContainerInkPairingContractTest.kt`
+  —— 顶层函数段内既有 `appColors().surface` 容器读点、又有无 `color =` 的 `Text(style = AppType.*)` 即判红；
+  含合成正/反夹具防空转。该判据不声明覆盖全部配对缺陷（域色 `deep` 墨与玻璃面板前景仍由同批理由台账与批 3 负责）。
+- **C-1 前修**：`AiProfileSettingsScreen.kt` 的 `AiProfileRow` 三处排印点补显式 `color = appColors().text1/text2`
+  （浅套取值与 `AppType` 原静态墨逐字相同 → 浅色像素零变化）。
+- **C-2 回退**：同文件 `VoiceOverlayOption` 的前景回退 `AppPalette.TextPrimary`——它渲染在未迁的 `GlassOverlay`
+  白玻璃面板里；理由并入 `DarkTokenConsumptionRatchetTest.GlassFillBackdropDebtLedger` 的该屏条目。
+- **I-1 整族回退**：`components/glass/GlassButton.kt` 的 `PillButton` 四处读点（禁用墨 / 描边 / Secondary 容器 / 禁用底）
+  全部回退基线静态值。它在 `accent: DomainAccent` 静态色对形参上无法就地改读 `appDomain(...)`，配对必须连着签名改，
+  归 Task 14（R-14.1）；下游 7+ 个屏本轮不该被动改色。
+- **I-2 分治**：今日计划屏「阅读文章」按钮前景改 `appDomain(AppDomain.Reading).deep`（浅套与 `DomainColors.Reading.deep`
+  逐字同值，由域色双钉用例保证 → 浅色零变化）；「查看打卡与成就」按钮容器回退 `AppPalette.Surface`
+  （其棕色前景 `#795B36` 是在册裸 hex、无可逐字等价的动态对应值，`RawColorSeedSiteLines` 同步回退）。
+- **权威清单偏离（I-3）**：原文按三类排除算出的真迁面是 35 处，实迁 34 处。差的 `ui/AiLearningScreen.kt:177`
+  （`AppPalette.TextSecondary`，存量 `0a6d63ac`）**判定为不该迁**：它压在 `AiLearningScreen.kt:168` 未迁的
+  `Color.White.copy(alpha = 0.85f)` 白药片上，单独迁墨会复刻 C-2。本节即该收窄的正式偏离说明，
+  同屏另有存量缺陷 `AiLearningScreen.kt:156/161`（品牌渐变上白字）结转批 3。
+- **Step 5 走查面（I-4）**：一级四 tab 不足以验收本任务，必须补走「AI 服务列表 / 编辑 / 试听浮层」与
+  `PillButton` Secondary 的下游屏（生图、阅读入口、拍照翻译、例句分析、语音设置、AI 问答、不可用屏）。
+- **I-4 走查结果（2026-10-19，真机 `bf353dda` 深色档，截图只落本地忽略区 `qa-scratch/`，一律不入库）**：
+  补走 13 屏（AI 服务列表 / 编辑 / 试听浮层 + 生图 / 阅读入口 / 拍照翻译 / 例句分析 / 语音设置 / AI 问答 /
+  今日计划 / 词书 / 词卡 / 首页）。**本任务动过的每一对容器-墨都可读**；仍可辨识但**存量**不可读的两族被再次实拍确认：
+  ①`AppType.*` 直读的静态浅套墨（语音设置屏页头「语音合成」+ 四个区块标题最刺眼，该屏仅此一族约 25 处）；
+  ②`AppPalette.GlassFill` 白玻璃面板压主题浅墨（四处在册站点）。另实拍到 `AiLearningScreen.kt:156/162`
+  品牌渐变上的白字（I-3 已登记）。裁决：**不在本轮扩面**——把 `AppType` 中心摘色会让未迁的白玻璃面板
+  当场翻成「浅墨压白底」，正是 AC-R-11 禁的那一侧；摘色必须与 `GlassFill` 批同批做，已写入批 3 账。
+- **connected 取样点（I-5 后半）**：`ThemeModeSwitchTest` 由 3 例增至 4 例，新增
+  `the_ai_profile_row_paints_theme_ink_on_the_migrated_container_in_dark_mode`——同一行内先取容器众数像素
+  （必须等于深套 `surface`，容差 2），再取标题墨核像素（压容器必须 ≥ 正文 AA 4.5:1）。
+  两条坑都实测踩过并写进了注释：`captureToImage()` 的位图在节点界外是**透明**像素，不筛 alpha 就会把
+  0x000000 当墨核；按文案取样会命中 `clickable` 合并语义后的**整行**，位图里混进副标题那档 `text2`
+  （实测 7.54:1 假绿），必须 `useUnmergedTree = true` 才拿得到那一段标题字。
+  判据有效性按 RED/GREEN 双向实跑：删掉 `AiProfileRow` 标题的显式 `color` → 墨核 `0x1B1B1E`、比值 1.023 → 红；
+  恢复 → 4 例全绿（emulator-5574）。静态判据 `ContainerInkPairingContractTest` 同一 Mutation 下报 2 例红
+  （全量真文件例 + 新增的真形状例），4 例中另 2 例是合成夹具。
+- **m-1 到 m-7 逐条处置**：
+  m-1 **修**：像素容差 24 → 2（`captureToImage` 是离屏位图、不经显示链，实测逐通道差 0），并加自检③
+  「容差必须容不下深套相邻填充档」（`background` 11 / `tint` 12 / `outlineSoft` 16，门槛 4）——
+  原口径下「容器漏画、透出页底」会被判成通过，这条把该盲区钉成判据。
+  m-2 **修**：自检消息与算式同名（写的是「最大逐通道间距」，算的是 `maxChannelDelta`）。
+  m-3 **修（改判据，不改字体档）**：`composeRule` 没有钉 `fontScale` 的公开口子（`setDensity` 只管密度），
+  故按「默认档为判据、非默认档允许判红并转人工」写进 KDoc，另加自检②「取样像素必须离该套正文墨 ≥32 档」
+  作为「量到的是容器而不是字身」的硬判据（门槛不再挂钩容差，否则容差收到 2 后这条就没判据了）。
+  m-4 **修**：`tonalElevation` 与 `surfaceTint = set.onMint` 的前提、以及「≥3dp 时必须改用
+  `surfaceColorAtElevation` 重算而不是放大容差」都写进了注释。
+  m-5 **修（文档）**：报告 §3 补一行说明 Step 2 的 RED 形态被替换成更强的「旧生产码 + 递减 seed」双向绑定形态。
+  m-6 **登记交批 2**：`CheckInScreen` 零完成空柱 `appColors().outlineSoft` 压 `MintSurface` 卡底 1.21:1
+  （深套）/1.06:1（浅套）——弱描边档按定义就是低对比，属 token 意图；是否把图表「轨道」换成 `outline`(#2E4238, 1.6:1)
+  或 `tint3`，由 Task 15（打卡屏版面）裁决。
+  m-7 **登记收口时处置**：`.superpowers/` 台账目录在 `.gitignore` 内，AGENTS.md「阶段文档推送」在文档层落不了地；
+  批 2 收口时一并决定（要么把计划/评审记录转成 `docs/handoff/` 入库件，要么在验证文档里记这条口径张力）。
+
 ---
 
 - [ ] **Step 1（每屏通用）: 先跑该屏 connected 基线**，记录改动前通过数；改动后必须全绿。
