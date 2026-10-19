@@ -1772,16 +1772,17 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
         modifier = Modifier.fillMaxSize().background(MintBackground).imePadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            text = "先认识一下你",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MintPrimaryDark,
-        )
-        Text(
-            text = "填写一个称呼，学习记录只保存在这台设备上。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MintTextMuted,
+        // R-13.1 / C-1：这一屏的页头同样交统一组件承载，把本文件最后一处 M3 `typography` 的 headline 档
+        // 裸读数清零——页头族 seed 摘行的判据是「该屏 forbidden 读点清零」，不是「补一行统一页头调用就准删」
+        // （族判定面带「本文件调了共享页头即整体合规」出口，残余读数会跟着永久隐形，见 SharedComponentUniquenessRatchetTest）。
+        // 色值安全：组件标题读 `colors.text1`、副标题读 `colors.text2`，与本屏原先的
+        // `MintPrimaryDark` / `MintTextMuted` 是同一个 `LocalAppColors` getter 桥的两侧（MintPalette.kt），
+        // 浅套逐字不变；字号字重按统一组件档变（24sp Bold → `AppType.Title` 17sp SemiBold），属预期。
+        // 首启流程没有「上一层」可返回，故 `onBack = null`（R-9.2：不渲染返回位、不留占位）。
+        AppScreenHeader(
+            title = "先认识一下你",
+            subtitle = "填写一个称呼，学习记录只保存在这台设备上。",
+            onBack = null,
         )
         TextField(
             value = name,
@@ -2065,14 +2066,18 @@ private fun SetupIntroductionCard() {
 }
 
 /** 首帧骨架的行数：够填满「选择词书」下方一屏，又不至于让真实列表到位后滚动位置大幅跳动。 */
-private const val WORD_BOOK_PLACEHOLDER_ROWS = 3
+internal const val WORD_BOOK_PLACEHOLDER_ROWS = 3
 
 // 词书卡与它的骨架共用同一份版面参数，两边改一处就一起改，不会各漂各的。
 // 圆角沿用该卡既有的 18dp，不是 `AppShape.Card` 的 20dp：滑动删除底、描边与卡片必须同角，
-// 换成 AppShape 会让红底从四角渗出（WordBookSwipeRowTest 正是钉这一点），故在此记录偏差。
-private val WordBookCardShape = RoundedCornerShape(18.dp)
-private val WordBookCardMinHeight = 72.dp
-private val WordBookCardContentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+// 换成 AppShape 会让红底从四角渗出。同角这件事由「卡身与删除底共用同一份 [WordBookCardShape]」保证
+// （两者一起读同一个值、一起改），`WordBookSwipeRowTest` 钉的是另一件事——静止时不露红底，
+// 它按整行捕获，把两处一起改成 20dp 它照样绿，所以它不是同角约束的守卫（R-13.1 / m-6 措辞订正）。
+// 声明为 internal 是给 connected 侧的：骨架高度与行数的判据必须读生产真值，
+// 不该在测试里另抄一份、靠巧合对齐（R-13.1 / m-4）。
+internal val WordBookCardShape = RoundedCornerShape(18.dp)
+internal val WordBookCardMinHeight = 72.dp
+internal val WordBookCardContentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
 
 /**
  * 词书列表的呈现层：首帧读盘时铺三行共享骨架（[ListSkeleton]），列表到位后逐册渲染，
@@ -2225,8 +2230,12 @@ private fun WordBookCard(
 ) {
     // 容器与前景同批迁到 appColors()：这张卡的底色、描边、文字、徽标底全部走主题 token，
     // 浅色档取值逐字等价（tint/tint2/tint3/outlineSoft/text1/text2 的浅套值与迁移前的 Mint*/裸 hex 相同，
-    // 由 DesignTokenContractTest 钉住），深色档才随主题换套。段内 `Text` 用的是 `MaterialTheme.typography.*`
-    // （已被 `appTypography()` 摘色），不是 `AppType.*` 直读，故不触发 `ContainerInkPairingContractTest`。
+    // 由 DesignTokenContractTest 钉住），深色档才随主题换套。
+    // R-13.1 / I-1 的事实口径（别再写成「规避字面正则所以通过」）：本卡的容器是**别名形**
+    // （`val colors = appColors()` + `colors.surface`），旧容器谓词只认字面 `appColors().surface`，
+    // 于是本卡原先根本不在 `ContainerInkPairingContractTest` 的视野里——判据抓不到 ≠ 契约放行。
+    // 谓词已扩到别名形，本卡现在是被看见的：它不报红的原因是段内 `Text` 全读摘色后的
+    // `MaterialTheme.typography.*`（`appTypography()` 装配路径），`AppType.*` 直读为 0 处。
     val colors = appColors()
     val cardColor by animateColorAsState(
         targetValue = if (selected) colors.tint else colors.surface,

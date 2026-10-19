@@ -4,6 +4,8 @@ import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.learning.AppendEventResult
 import com.example.englishlearning.learning.EventIdFactory
 import com.example.englishlearning.learning.LearningEventRepository
+import com.example.englishlearning.learning.LearningProfile
+import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.LearningSettings
 import com.example.englishlearning.learning.LearningSettingsRepository
 import com.example.englishlearning.learning.LearningSettingsRepositoryResult
@@ -12,6 +14,7 @@ import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
+import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.learning.domain.CardReviewState
 import com.example.englishlearning.learning.domain.LearningEvent
 import com.example.englishlearning.learning.domain.WordCard
@@ -90,6 +93,48 @@ internal class NoopLearningSettingsRepository : LearningSettingsRepository {
 
     override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> =
         LearningSettingsRepositoryResult.Success(Unit)
+}
+
+/**
+ * 有状态的学习档案假仓库（R-13.1 / m-3：`SetupScreenScreenshotTest` 与 `WordbookPickerHeaderTest` 原先各带
+ * 一份**逐字相同**的私有副本，本条按本包既有约定把它们上移到共享落点，两边只留调用）。
+ *
+ * 与 [NoopLearningEventRepository] 那一族的区别：这一族**会记住**写入，所以 `SeedWordBooksUseCase`
+ * 种下的册能在 `listWordBooks` 里读回来——词书选取屏的 connected 判据依赖这个行为。
+ */
+internal class FakeLearningProfileRepository : LearningProfileRepository {
+    private var profile: LearningProfile? = null
+    private val wordBooks = mutableListOf<WordBook>()
+
+    override suspend fun current(profileId: String) = RepositoryResult.Success(profile)
+
+    override suspend fun save(profile: LearningProfile): RepositoryResult<Unit> {
+        this.profile = profile
+        return RepositoryResult.Success(Unit)
+    }
+
+    override suspend fun listWordBooks() = RepositoryResult.Success(wordBooks)
+
+    override suspend fun findWordBook(id: String) = RepositoryResult.Success(wordBooks.find { it.id == id })
+
+    override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> {
+        wordBooks.removeAll { it.id == wordBook.id }
+        wordBooks += wordBook
+        return RepositoryResult.Success(Unit)
+    }
+}
+
+/** 有状态的学习设置假仓库（同上：`save` 写得进、`find` 读得出，永不失败）。 */
+internal class FakeLearningSettingsRepository : LearningSettingsRepository {
+    private val stored = mutableMapOf<String, LearningSettings>()
+
+    override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
+        LearningSettingsRepositoryResult.Success(stored[profileId])
+
+    override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> {
+        stored[settings.profileId] = settings
+        return LearningSettingsRepositoryResult.Success(Unit)
+    }
 }
 
 /**

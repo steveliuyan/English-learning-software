@@ -36,6 +36,11 @@ import kotlin.test.assertTrue
  * **批 2 的接线判据因此是「该屏 forbidden 读点清零」，不是「出现共享调用即准删 seed 行」**。
  * 收紧路径（本轮不做，属计划修订事项）：把 seed 从「文件级 0/1」改成「每屏读点计数」，
  * 并同步四族台账与 `each_family_offender_set_equals_its_seed_exactly` 的差集口径。
+ * **例外（R-13.1 / C-1 已落地）**：Task 13 首版正是从这条判据失守——页头族 seed 摘了 `AppScreen.kt`
+ * 一行，而该文件的 headline 读数还在。所以页头族先单独把「摘行的合法性」补成可执行的门：
+ * [removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared] 只盯
+ * 「`ui/` 根屏 + 已摘本族 seed 行 + 已调用 `AppScreenHeader(`」这一形态，要求 headline 读点为 0；
+ * 提示条族与词行族的同款收紧仍属计划修订事项，归批 3。
  *
  * 三条实现口径（前几棒踩过的坑）：
  *  - **先剥注释再匹配**：`components/InlineNotice.kt` 的 KDoc 里逐字复述了本棘轮那条 grep 命令
@@ -508,6 +513,56 @@ class SharedComponentUniquenessRatchetTest {
     }
 
     /**
+     * **R-13.1 / C-1：把「删 seed 行的合法性」钉成可执行判据 —— 摘了 seed 行的屏，本族 forbidden 读点必须已清零。**
+     *
+     * 同族的形状自证用例 [family_compliance_exits_are_a_declared_known_blindness_surface] 只**声明**了失明面与
+     * 批 2 的接线判据（计划 `:1303`「删四族 seed 行的判据是该屏 forbidden 读点清零……绝不是『补一行
+     * `AppScreenHeader(` 就准删』」），但判据本身没有门。Task 13 首版正从这里失守：
+     * 它删了页头族 seed 的 `"AppScreen.kt"` 一行，而该文件里 `ProfileCreationScreen` 的
+     * `MaterialTheme.typography.headlineSmall` 读点还在（首版 `:1777`），
+     * 只是被同文件词书选取屏那枚 `AppScreenHeader(` 合规出口整体遮蔽 —— 于是「摘行」与「清零」被当成同一件事。
+     * 本条补上这道门。
+     *
+     * 覆盖面刻意收得很窄，只判**「已按摘行声明自己接线完毕」的那一形态**（三条都得成立）：
+     *  ① 文件在 `ui/` **根**（路径不含 `/`；组件文件是各族唯一真值，不参与屏侧账）；
+     *  ② 它**不在**页头族 seed 里（在册 = 登记中的债务，清零时机归批 3，本条不得抢先判红）；
+     *  ③ 它调用了 `AppScreenHeader(`（这正是合规出口被激活的那个动作）。
+     * 三条同时成立时，headline 读点必须为 0。
+     *
+     * 与本条一同落地的是 C-1 的处置本身：`ProfileCreationScreen` 的两行裸页头改由 `AppScreenHeader` 承载，
+     * 而不是给残余读点补一枚「点名 == 1」的锚 —— 裁决写明那等于给批 3 留一件要拆的东西。
+     * 收口判据（计划 R-13.1 逐字一致）：`AppScreen.kt` 的 headline 读点数 == 0，本条末尾单独点名钉住。
+     */
+    @Test
+    fun removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared() {
+        val headerSeed = componentFamilySeeds.getValue("页头（应调 AppScreenHeader）")
+        val wiredRootScreens = scannedSources().filter { (path, source) ->
+            !path.contains('/') && path !in headerSeed && source.contains("AppScreenHeader(")
+        }
+        assertTrue(
+            wiredRootScreens.isNotEmpty(),
+            "本条空转：扫描面上没有一枚「已摘页头族 seed 行且调用 AppScreenHeader(」的根屏文件 —— " +
+                "覆盖面为空时本门对「摘行未清零」永远绿，等于没有门（页头族 seed 现况 $headerSeed）",
+        )
+        val notCleared = wiredRootScreens.mapNotNull { (path, source) ->
+            val reads = countMatches(source, headlineRead)
+            if (reads > 0) "$path（headline 读点 $reads 处，seed 行已摘）" else null
+        }
+        assertTrue(
+            notCleared.isEmpty(),
+            "页头族 seed 行被摘，但本文件的 headline 读点没清零：$notCleared —— " +
+                "族判定面带「本文件调了 AppScreenHeader( 即整体合规」出口，残余读点会跟着永久隐形（批 1 终审 F7）。" +
+                "要么把这些读点改调 AppScreenHeader（R-13.1 的清零路线），要么把 seed 行放回去并说明理由；" +
+                "不许给残余读点补「点名读点数」锚 —— 那是给批 3 留一件要拆的东西。",
+        )
+        assertEquals(
+            0,
+            countMatches(uiScreenSource("AppScreen.kt"), headlineRead),
+            "R-13.1 的收口判据：AppScreen.kt 清零后的 headline 读点数应为 0（Task 13 首版残余 :1777 一处，被遮蔽至隐形）",
+        )
+    }
+
+    /**
      * **F7（批 1 终审 D-I-1）：把「本文件调了共享组件即整体合规」的出口钉成显式契约。**
      *
      * 出口的形状是裁决**保留**的（族 1 [isHeaderOffender] 的 `&& !source.contains("AppScreenHeader(")`、
@@ -522,6 +577,8 @@ class SharedComponentUniquenessRatchetTest {
      * **批 2 一接线即激活**。因此接线判据是「该屏 forbidden 读点清零」，**不是**
      * 「补一行 `AppScreenHeader(` 就准删 seed 行」（已同步写进计划批 2 的开工判据）。
      * 收紧路径 = 把 seed 形状从「文件级 0/1」改成「读点计数」并同步四族台账，属计划修订事项，本轮不做。
+     * 页头族那一格已由 [removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared] 提前钉上
+     * （R-13.1 / C-1：Task 13 首版摘行未清零正是从本条声明的失明面漏走的），本条仍是**形状自证**，两条不互相替代。
      *
      * 断言的写法本身要防「恒真」：正反向只在**那枚共享调用是否存在**上不同，forbidden 读点两侧逐字相同，
      * 所以先用 `countMatches` 钉住「片段里确有 forbidden 读点且两侧等量」，再判合规翻转 ——

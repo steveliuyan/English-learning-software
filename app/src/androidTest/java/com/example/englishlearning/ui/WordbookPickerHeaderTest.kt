@@ -12,12 +12,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.BundledWordBookIdSource
 import com.example.englishlearning.learning.GetLearningSettingsUseCase
-import com.example.englishlearning.learning.LearningProfile
-import com.example.englishlearning.learning.LearningProfileRepository
-import com.example.englishlearning.learning.LearningSettings
-import com.example.englishlearning.learning.LearningSettingsRepository
-import com.example.englishlearning.learning.LearningSettingsRepositoryResult
-import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
@@ -36,7 +30,9 @@ import org.junit.runner.RunWith
  * 词书选取屏接入统一页头与骨架（批 2 Task 13）的 connected 像素/语义判据。
  *
  * 三条各一个 `@Test`、每个只 `setContent` 一次（本仓真机怪癖：同一测试内两次 setContent 必崩）。
- * 期望像素一律取 [AppColorLight] 的 token，不重抄 hex；本主题显式锁 `ThemeMode.Light`，
+ * 期望像素一律取 [AppColorLight] 的 token，不重抄 hex（R-13.1 / m-1：浅套 `outlineSoft` 的权威值是
+ * `AppColors.kt` 里的 `0xFFE4EFE9`，brief 抄成了 `#E5EFE9`——取 token 才不会被这种抄录漂移带偏）；
+ * 本主题显式锁 `ThemeMode.Light`，
  * 与 `ThemeModeSwitchTest` 同套取样口径（`captureToImage()` 离屏、alpha ≥ 250 过滤、逐通道容差 2）。
  */
 @RunWith(AndroidJUnit4::class)
@@ -67,14 +63,18 @@ class WordbookPickerHeaderTest {
     }
 
     /**
-     * ②首帧骨架：三行 `wordbook_placeholder_0..2` 齐全，每行实测高度 ≥ `WordBookCardMinHeight`（72dp）。
+     * ②首帧骨架：`wordbook_placeholder_0..<WORD_BOOK_PLACEHOLDER_ROWS>` 行齐全，每行实测高度
+     * ≥ 生产的 `WordBookCardMinHeight`。
+     *
+     * 行数与下限高度都读**生产真值**（R-13.1 / m-4）：测试里另抄一份 `3` / `72f` 的话，
+     * 生产把行数改成 4、或把最小行高改成 80dp 时本例照样绿，判据与被测对象只剩巧合对齐。
      *
      * 刻意不判「骨架与真实卡逐像素同高」：真卡带进度条约 130dp、骨架按最小行高约 74dp，
      * 是 `AppScreen.kt` 里写明并刻意保留的取舍（首帧要「立刻有东西」，不是复刻终版面）。
      */
     @Test
     fun first_frame_reserves_placeholder_rows_at_the_card_minimum_height() {
-        val minHeightPx = WORD_BOOK_CARD_MIN_HEIGHT_DP * composeRule.density.density
+        val minHeightPx = WordBookCardMinHeight.value * composeRule.density.density
         composeRule.setContent {
             MintGlassTheme(themeMode = ThemeMode.Light) {
                 WordBookList(
@@ -89,12 +89,12 @@ class WordbookPickerHeaderTest {
                 )
             }
         }
-        for (row in 0 until PLACEHOLDER_ROWS) {
+        for (row in 0 until WORD_BOOK_PLACEHOLDER_ROWS) {
             val node = composeRule.onNodeWithTag("wordbook_placeholder_$row")
             node.assertExists()
             val heightPx = node.fetchSemanticsNode().boundsInRoot.height
             assertTrue(
-                "骨架第 $row 行高度不足 $WORD_BOOK_CARD_MIN_HEIGHT_DP dp（实测 ${heightPx / composeRule.density.density}dp）",
+                "骨架第 $row 行高度不足 ${WordBookCardMinHeight.value} dp（实测 ${heightPx / composeRule.density.density}dp）",
                 heightPx >= minHeightPx - 1f,
             )
         }
@@ -198,45 +198,9 @@ class WordbookPickerHeaderTest {
             bundledIds = BundledWordBookIdSource { setOf("cet4") },
         )
     }
-
-    private class FakeLearningProfileRepository : LearningProfileRepository {
-        private var profile: LearningProfile? = null
-        private val wordBooks = mutableListOf<WordBook>()
-
-        override suspend fun current(profileId: String) = RepositoryResult.Success(profile)
-
-        override suspend fun save(profile: LearningProfile): RepositoryResult<Unit> {
-            this.profile = profile
-            return RepositoryResult.Success(Unit)
-        }
-
-        override suspend fun listWordBooks() = RepositoryResult.Success(wordBooks)
-
-        override suspend fun findWordBook(id: String) = RepositoryResult.Success(wordBooks.find { it.id == id })
-
-        override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> {
-            wordBooks.removeAll { it.id == wordBook.id }
-            wordBooks += wordBook
-            return RepositoryResult.Success(Unit)
-        }
-    }
-
-    private class FakeLearningSettingsRepository : LearningSettingsRepository {
-        private val stored = mutableMapOf<String, LearningSettings>()
-
-        override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
-            LearningSettingsRepositoryResult.Success(stored[profileId])
-
-        override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> {
-            stored[settings.profileId] = settings
-            return LearningSettingsRepositoryResult.Success(Unit)
-        }
-    }
 }
 
 private const val LIST_TAG = "wordbook_list_probe"
-private const val PLACEHOLDER_ROWS = 3
-private const val WORD_BOOK_CARD_MIN_HEIGHT_DP = 72f
 private const val SEAM_SAMPLE_WINDOW_DP = 4f
 private const val CHANNEL_TOLERANCE = 2
 private const val OPAQUE_ALPHA_FLOOR = 250

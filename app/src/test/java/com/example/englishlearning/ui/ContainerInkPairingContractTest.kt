@@ -17,7 +17,10 @@ import kotlin.test.assertTrue
  * 判据形状（有意按**顶层函数段**取样，不做 AST/缩进窗口）：
  *  ① 段落 = 一条 `fun` 声明起、到下一条 `fun` 声明前（本仓 Composable 一律是 `@Composable` 标注的顶层函数，
  *     段内即该组件自己画容器 + 画前景的范围）；
- *  ② 段落含中性容器迁移读点 `appColors().surface` → 该段容器已随主题换套；
+ *  ② 段落含中性容器迁移读点 → 该段容器已随主题换套。**两种形状都算**（R-13.1 / I-1）：
+ *     字面形 `appColors().surface`，与别名形「同段先 `val colors = appColors()` 提读、又点用 `colors.surface`」——
+ *     批 2 迁的容器基本走别名形，只认字面形时本判据对批 2 的真实交付一枪未发（`AppScreen.kt` 词书卡、
+ *     `components/Skeleton.kt` 都从这张网里漏过）；别名形两半缺一不判，玻璃填充族 `surfaceGlass` 两形都不判；
  *  ③ 该段内任一 `Text(…)` 实参含 `style = AppType.*` 而不含 `color =` → 违规（浅套静态墨压换套深底）。
  *  段落级足够：本轮 5 处违规（`AiProfileRow` 三处、`CapabilityToggle` 两处）全在「同一段既画迁移容器、
  *  又画静态墨前景」这一形状上；而同一文件里压在**未迁**玻璃面板（`AppPalette.GlassFill`）与页底上的
@@ -32,8 +35,24 @@ import kotlin.test.assertTrue
  */
 private val TopLevelFunDecl = Regex("""^(?:private |internal |public )?fun [A-Za-z_]""")
 
-/** 中性容器迁移读点。`\b` 同时排除 `appColors().surfaceGlass`（玻璃填充族，批 3 专项，形状不同）。 */
+/** 中性容器迁移读点（**字面形**）。`\b` 同时排除 `appColors().surfaceGlass`（玻璃填充族，批 3 专项，形状不同）。 */
 private val MigratedNeutralContainer = Regex("""appColors\(\)\.surface\b""")
+
+/**
+ * 迁移读点的**别名形**两半（R-13.1 / I-1）：批 2 的容器基本不写字面 `appColors().surface`，而是
+ * `val colors = appColors()` 提读一次、段内各处点用 `colors.surface` / `colors.tint` / `colors.text1`
+ * （`AppScreen.kt` 词书卡、`components/Skeleton.kt` 占位卡、`components/ScreenUnavailable.kt` 都是这形状）。
+ * 只认字面形时，本判据对**批 2 全部真实迁移**一枪未发，于是「已迁容器 + 未补色 `AppType` 前景」这一形
+ * 在别名容器下重新变成失明面。裁决口径：两半**同时**成立才算已迁容器 ——
+ * 单有 `appColors()` 绑定不算（那可能只是读前景色/描边，容器并没随主题换套），单有 `.surface` 读取也不算。
+ */
+private val AppColorsAliasBinding = Regex("""val\s+[A-Za-z0-9_]+\s*=\s*appColors\(\)""")
+private val SurfaceRead = Regex("""\.surface\b""")
+
+/** 已迁中性容器：字面形，或别名形（同段同时出现 `appColors()` 绑定与 `.surface` 读取）。 */
+private fun hasMigratedNeutralContainer(segment: String): Boolean =
+    MigratedNeutralContainer.containsMatchIn(segment) ||
+        (AppColorsAliasBinding.containsMatchIn(segment) && SurfaceRead.containsMatchIn(segment))
 
 /** 排印档直读：只有六档本体，`MaterialTheme.typography.*` 已被摘色，不属本判据。 */
 private val AppTypeStyleRead = Regex("""style\s*=\s*AppType\.(?:Display|Headline|Title|Body|Footnote|Label)\b""")
@@ -92,7 +111,7 @@ private fun textCallArguments(segment: String): List<String> {
 /** 扫描入口：返回「文件: 折叠后的 style 行」条目，口径与 [violations] 一致（剥注释、不带行号）。 */
 private fun pairingViolationsIn(text: String, fileName: String): List<String> =
     topLevelSegments(stripComments(text))
-        .filter { MigratedNeutralContainer.containsMatchIn(it) }
+        .filter { hasMigratedNeutralContainer(it) }
         .flatMap { segment -> textCallArguments(segment) }
         .filter { AppTypeStyleRead.containsMatchIn(it) && !ExplicitInkArgument.containsMatchIn(it) }
         .map { args ->
@@ -148,6 +167,44 @@ class ContainerInkPairingContractTest {
     }
 
     @Test
+    fun `the pairing scan catches an alias bound appColors() container with an uncolored AppType style`() {
+        // R-13.1 / I-1：批 2 迁的容器多数走「先 `val colors = appColors()` 提读、再点用 `colors.surface`」
+        // 这一别名形（`AppScreen.kt` 的词书卡、`components/Skeleton.kt` 的占位卡都是这个写法）。
+        // 只认字面 `appColors().surface` 的旧谓词对别名形一枪未发 —— 判据对本次交付失明。
+        // 本例先把这个形状钉住：别名形已迁容器 + 未补色 `AppType` 前景必须报红。
+        val aliasMigrated = """
+            private fun Card(title: String) {
+                val colors = appColors()
+                Surface(color = colors.surface) {
+                    Text(title, style = AppType.Title)
+                }
+            }
+        """.trimIndent()
+        assertEquals(
+            listOf("Fake.kt: title, style = AppType.Title"),
+            pairingViolationsIn(aliasMigrated, "Fake.kt"),
+            "别名形（`val colors = appColors()` + `colors.surface`）没被抓到 = 本判据对批 2 的真实迁移形状失明（R-13.1 / I-1）",
+        )
+
+        // 反例（判据不许因为「段里有 appColors()」就泛化）：同段提读了别名，但读的是描边与前景、
+        // **没有** `.surface` 容器读点 —— 容器没随主题换套，段里那枚未补色的 `AppType` 前景压的还是原底，
+        // 不属本判据（把 SurfaceRead 那一半从谓词里删掉，本例当场报红，所以它不是恒真断言）。
+        val aliasWithoutContainer = """
+            private fun Note(title: String) {
+                val colors = appColors()
+                Box(modifier = Modifier.border(1.dp, colors.outlineSoft)) {
+                    Text(title, style = AppType.Title)
+                }
+            }
+        """.trimIndent()
+        assertEquals(
+            emptyList(),
+            pairingViolationsIn(aliasWithoutContainer, "Fake.kt"),
+            "只提读 appColors() 而没有 surface 容器读点的段被报红 = 容器谓词写宽了，会把未迁容器的排印点拉进本判据",
+        )
+    }
+
+    @Test
     fun `the pairing scan stays blind to segments without a migrated container`() {
         val staticBackdrop = """
             private fun Panel(title: String) {
@@ -173,6 +230,13 @@ class ContainerInkPairingContractTest {
                 !MigratedNeutralContainer.containsMatchIn("containerColor = appColors().surfaceGlass,"),
             "容器谓词必须区分 surface 与 surfaceGlass：后者是批 3 的玻璃填充族",
         )
+        // 别名形同一条边界（R-13.1 / I-1 扩展带来的新面）：`colors.surfaceGlass` 不得算已迁容器，
+        // 否则玻璃填充族会被本判据提前拉进账（那批前景与容器必须同批迁，归批 3）。
+        assertTrue(
+            hasMigratedNeutralContainer("val colors = appColors()\nCard(color = colors.surface)") &&
+                !hasMigratedNeutralContainer("val colors = appColors()\nCard(color = colors.surfaceGlass)"),
+            "别名形容器谓词必须同样区分 surface 与 surfaceGlass",
+        )
     }
 
     @Test
@@ -184,7 +248,7 @@ class ContainerInkPairingContractTest {
         // 第一条全量真文件用例照样绿，本例照样绿，判据却已经对着一个不存在的形状空转。
         val source = uiScreenSource("AiProfileSettingsScreen.kt")
         val rowSegment = topLevelSegments(source).firstOrNull {
-            it.contains("fun AiProfileRow") && MigratedNeutralContainer.containsMatchIn(it)
+            it.contains("fun AiProfileRow") && hasMigratedNeutralContainer(it)
         }
         assertTrue(
             rowSegment != null,

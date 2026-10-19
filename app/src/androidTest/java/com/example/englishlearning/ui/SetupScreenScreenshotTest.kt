@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -12,18 +13,11 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.core.time.FixedClockProvider
-import com.example.englishlearning.learning.LearningProfile
-import com.example.englishlearning.learning.LearningProfileRepository
-import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.GetLearningSettingsUseCase
-import com.example.englishlearning.learning.LearningSettings
-import com.example.englishlearning.learning.LearningSettingsRepository
-import com.example.englishlearning.learning.LearningSettingsRepositoryResult
 import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.TodayPlanResult
-import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
 import com.example.englishlearning.profile.InMemoryLocalProfileRepository
 import java.io.File
@@ -42,6 +36,13 @@ import org.junit.runner.RunWith
  * this artifact, and only the statically composed structure is asserted here.
  * Authoritative visual evidence for the word-book list comes from the real device
  * screenshots `verification-logs/real-0*.png`.
+ *
+ * Not a pixel guard (R-13.1 / I-2): this class asserts node existence and writes one PNG for a
+ * human to look at. It compares against no baseline, so it cannot prove the light palette stayed
+ * byte-identical. The light-side equivalence chain is `DesignTokenContractTest` plus the
+ * `MintPalette.kt` getter bridge (`Mint*` reading `LocalAppColors`) and the `AppColors.kt` values
+ * that equal the deleted bare hexes; the header *layout* does change on purpose (24sp Bold ->
+ * `AppType.Title` 17sp SemiBold, bodyMedium -> `AppType.Footnote`).
  */
 @RunWith(AndroidJUnit4::class)
 class SetupScreenScreenshotTest {
@@ -60,6 +61,12 @@ class SetupScreenScreenshotTest {
                 wordCardViewModel = wordCardFixtureViewModel(),
             )
         }
+        // R-13.1 / C-1：首启创建资料页的页头同样由统一组件承载（这一屏与词书选取屏同属核心学习路径，
+        // 页头族 seed 摘行的判据是「本文件 headline 读点清零」，残余裸页头必须一并换掉）。
+        // 断言按新组件形状走：testTag 是 `AppScreenHeader` 的承载证据，两行文案逐字命中。
+        composeRule.onNodeWithTag("app_screen_header").assertExists()
+        composeRule.onNodeWithText("先认识一下你").assertExists()
+        composeRule.onNodeWithText("填写一个称呼，学习记录只保存在这台设备上。").assertExists()
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
@@ -96,39 +103,5 @@ class SetupScreenScreenshotTest {
                 setOf("cet4", "cet6", "kaoyan")
             },
         )
-    }
-
-    private class FakeLearningProfileRepository : LearningProfileRepository {
-        private var profile: LearningProfile? = null
-        private val wordBooks = mutableListOf<WordBook>()
-
-        override suspend fun current(profileId: String) = RepositoryResult.Success(profile)
-
-        override suspend fun save(profile: LearningProfile): RepositoryResult<Unit> {
-            this.profile = profile
-            return RepositoryResult.Success(Unit)
-        }
-
-        override suspend fun listWordBooks() = RepositoryResult.Success(wordBooks)
-
-        override suspend fun findWordBook(id: String) = RepositoryResult.Success(wordBooks.find { it.id == id })
-
-        override suspend fun upsertWordBook(wordBook: WordBook): RepositoryResult<Unit> {
-            wordBooks.removeAll { it.id == wordBook.id }
-            wordBooks += wordBook
-            return RepositoryResult.Success(Unit)
-        }
-    }
-
-    private class FakeLearningSettingsRepository : LearningSettingsRepository {
-        private val stored = mutableMapOf<String, LearningSettings>()
-
-        override suspend fun find(profileId: String): LearningSettingsRepositoryResult<LearningSettings?> =
-            LearningSettingsRepositoryResult.Success(stored[profileId])
-
-        override suspend fun save(settings: LearningSettings): LearningSettingsRepositoryResult<Unit> {
-            stored[settings.profileId] = settings
-            return LearningSettingsRepositoryResult.Success(Unit)
-        }
     }
 }
