@@ -64,9 +64,10 @@ import kotlin.test.assertTrue
  * （[ThemeInvariantMaskReadLedger]、[ParameterDefaultStaticReadLedger]）承载其理由，本表仍是「还欠多少」的唯一权威。
  */
 internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
-    "AiProfileSettingsScreen.kt" to 25,
+    "AiProfileSettingsScreen.kt" to 28,
     "SettingsScreen.kt" to 10,
     "SpeechSettingsScreen.kt" to 8,
+    "components/glass/GlassButton.kt" to 7,
     "CheckInScreen.kt" to 7,
     "WordCardScreen.kt" to 7,
     "PhotoTranslationScreen.kt" to 6,
@@ -78,7 +79,6 @@ internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     "AiFeatureScreen.kt" to 3,
     "AppScreen.kt" to 3,
     "SentenceAnalysisScreen.kt" to 3,
-    "components/glass/GlassButton.kt" to 3,
     "components/glass/GlassOverlay.kt" to 3,
     "AiLearningScreen.kt" to 2,
     "BackupExportScreen.kt" to 2,
@@ -143,7 +143,10 @@ internal val ThemeInvariantMaskMembers: List<String> = listOf("GlassHighlight", 
 internal val GlassFillBackdropDebtLedger: Map<String, String> = mapOf(
     "components/glass/GlassDialog.kt" to "玻璃对话框容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass",
     "components/glass/GlassOverlay.kt" to "玻璃遮罩面板容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass",
-    "AiProfileSettingsScreen.kt" to "屏内玻璃面板容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass",
+    "AiProfileSettingsScreen.kt" to "屏内玻璃面板容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass" +
+        "（Task 12.5 修复轮 C-2 实测：试听浮层选项行 VoiceOverlayOption 曾被单独迁成 appColors().text1，" +
+        "回退为静态浅套墨；能力开关 CapabilityToggle 的容器曾被单独迁深，回退为 AppPalette.Surface/Separator。" +
+        "两侧都必须连着这层白玻璃面板同批迁）",
     "SpeechSettingsScreen.kt" to "屏内玻璃面板容器填充（试听卡）：与面板内前景墨色同批迁成 appColors().surfaceGlass",
 )
 

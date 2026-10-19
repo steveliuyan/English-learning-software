@@ -42,6 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.WordBookProgress
 import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -50,6 +52,7 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 
 @Composable
 fun TodayPlanScreen(
@@ -215,7 +218,10 @@ fun TodayPlanScreen(
                     border = BorderStroke(1.dp, appColors().outlineSoft),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = appColors().surface,
-                        contentColor = DomainColors.Reading.deep,
+                        // 容器已随主题换套，前景必须同批改读动态域色：静态 DomainColors.Reading.deep 是浅套
+                        // 深红，压深底只有 2.96:1（Task 12.5 修复轮 I-2）。浅套侧 appDomain(Reading).deep
+                        // 与 DomainColors.Reading.deep 逐字相同（#C81E46，由域色双钉用例保证），浅色像素零变化。
+                        contentColor = appDomain(AppDomain.Reading).deep,
                         disabledContainerColor = appColors().surface,
                         disabledContentColor = appColors().text2,
                     ),
@@ -244,7 +250,10 @@ fun TodayPlanScreen(
                         .heightIn(min = 50.dp)
                         .testTag("today_plan_open_check_in")
                         .semantics { contentDescription = "查看打卡与成就" },
-                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = Color(0xFF795B36)),
+                    // 容器回退静态（Task 12.5 修复轮 I-2）：前景是那枚在册裸 hex 棕 #795B36（打卡/成就强调色，
+                    // RawColorLiteralRatchetTest 的站点行台账），浅套里没有可逐字等价的动态对应值，
+                    // 单迁容器会让深色档只有 2.67:1。按钮族容器—前景配对归批 2 Task 14（R-14.1）。
+                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = Color(0xFF795B36)),
                 ) { Text("查看打卡与成就", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenLearningRecords,

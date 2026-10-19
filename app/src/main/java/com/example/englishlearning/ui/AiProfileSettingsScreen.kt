@@ -127,7 +127,10 @@ private fun AiProfileList(
             contentDescription = "返回上一层",
         )
 
-        Text("AI 服务", style = AppType.Headline)
+        // 页面大标题直接压在 MintBackground（批 1 已改成组合期读取）上，`AppType.Headline` 的静态浅套深墨
+        // 在深色档≈1.05:1、当场不可读（真机 bf353dda 深色走查实证）。批 3 的 AppType 摘色统一处理全站那一族，
+        // 本轮只补这枚被走查证明不可读的标题；浅套 text1 与 AppType 原静态墨逐字相同，浅色像素零变化。
+        Text("AI 服务", style = AppType.Headline, color = appColors().text1)
         Text(
             text = "可以配置多套 OpenAI 兼容服务。密钥保存在本机系统安全区，不写进数据库、日志或备份。",
             style = AppType.Footnote,
@@ -196,10 +199,14 @@ private fun AiProfileRow(
             .semantics { contentDescription = "编辑配置 ${item.profile.displayName}" },
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(item.profile.displayName, style = AppType.Title)
+            // 本卡的容器已迁 `appColors().surface`（随主题换套），排印档必须补显式前景：
+            // `AppType.*` 直读带着浅套硬编码深墨，深色档里就是近黑压近黑（Task 12.5 修复轮 C-1，
+            // 判据见 ContainerInkPairingContractTest）。
+            Text(item.profile.displayName, style = AppType.Title, color = appColors().text1)
             Text(
                 text = "${item.profile.model} · ${hostOf(item.profile.endpoint)}",
                 style = AppType.Footnote,
+                color = appColors().text2,
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -214,6 +221,7 @@ private fun AiProfileRow(
                 Text(
                     text = capabilitiesLabel(item.profile.capabilities),
                     style = AppType.Label,
+                    color = appColors().text2,
                 )
             }
             when {
@@ -285,9 +293,12 @@ private fun AiProfileEditor(
                 contentDescription = "返回 AI 服务",
             )
 
+            // 与列表页大标题同一枚缺陷、同一处置（见本文件「AI 服务」标题上的注释）：
+            // 真机 bf353dda 深色走查 `fix-r-02-ai-editor.png` 实证这一行深色档不可读。
             Text(
                 text = if (state.profileId == null) "新增 AI 配置" else "编辑 AI 配置",
                 style = AppType.Headline,
+                color = appColors().text1,
             )
 
             SectionCard {
@@ -487,7 +498,10 @@ private fun VoiceOverlayOption(
         Text(
             label,
             style = AppType.Body,
-            color = if (selected) DomainColors.AiSpeech.deep else appColors().text1,
+            // 这一行渲染在未迁的 `GlassOverlay` 面板里（面板填充 = AppPalette.GlassFill，94% 白、主题不变），
+            // 前景必须与容器同批迁：只把墨迁成 appColors().text1 会让深色档出现「浅墨压白玻璃」（≈1.14:1），
+            // 正是 AC-R-11 禁止的那一侧（Task 12.5 修复轮 C-2；理由登记见 GlassFillBackdropDebtLedger）。
+            color = if (selected) DomainColors.AiSpeech.deep else AppPalette.TextPrimary,
         )
     }
 }
@@ -547,8 +561,12 @@ private fun EditorField(
 
 @Composable
 private fun CapabilityToggle(capability: AiCapability, selected: Boolean, onToggle: (Boolean) -> Unit) {
-    val background = if (selected) DomainColors.AiSpeech.base.copy(alpha = 0.12f) else appColors().surface
-    val border = if (selected) DomainColors.AiSpeech.base else appColors().outlineSoft
+    // 容器回退为静态浅套（Task 12.5 修复轮 C-1 的第二半）：本行渲染在未迁的 `SectionCard` 白玻璃里，
+    // 且选中档的填充本身是静态 `DomainColors.AiSpeech.base.copy(alpha = 0.12f)`——把未选中档单独迁深会造出
+    // 「浅墨压浅玻璃」的选中档与「深底压静态墨」的未选中档两种不可读，属容器—墨必须同批的形状。
+    // 整卡随批 3 的 GlassFill 族一起迁（GlassFillBackdropDebtLedger 已登记本屏面板）。
+    val background = if (selected) DomainColors.AiSpeech.base.copy(alpha = 0.12f) else AppPalette.Surface
+    val border = if (selected) DomainColors.AiSpeech.base else AppPalette.Separator
     Row(
         modifier = Modifier
             .fillMaxWidth()

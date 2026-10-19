@@ -57,17 +57,22 @@ fun PillButton(
     if (contentDescription != null) m = m.semantics { this.contentDescription = contentDescription }
     // 品牌 CTA 以浅薄荷到柔和青绿渐变搭配深青字；其他域色维持原语义。
     val usesBrandGradient = accent == DomainColors.AiSpeech
+    // Task 12.5 修复轮 I-1：药片族整族回退基线，交回批 2 Task 14 的按钮族裁决。
+    // 只迁容器（Secondary 填充 / 描边 / 禁用底）而留下 `accent.deep` 与 `AppPalette.TextSecondary` 两枚静态墨，
+    // 会在深色档造出 2.6–3.0:1 的前景与消失的描边，而 `PillButton` 的下游是 7+ 个本轮没走查的屏。
+    // 形参 `accent: DomainAccent` 是静态色对、不是 `AppDomain`，组件内无法就地改读 `appDomain(...)`，
+    // 所以配对必须连着签名一起改（R-14.1），本轮不动。
     val contentColor = when {
-        !enabled -> appColors().text2
+        !enabled -> AppPalette.TextSecondary
         style == PillStyle.Primary && usesBrandGradient -> AppPalette.OnMintPrimary
         style == PillStyle.Primary -> Color.White
         else -> accent.deep
     }
-    val border = if (style == PillStyle.Secondary) BorderStroke(1.dp, appColors().outlineSoft) else null
+    val border = if (style == PillStyle.Secondary) BorderStroke(1.dp, AppPalette.Separator) else null
     val containerColor = when (style) {
         // Surface 无 brush 重载的等价写法：透明容器 + Modifier.background(brush, shape)
         PillStyle.Primary -> Color.Transparent
-        PillStyle.Secondary -> appColors().surface
+        PillStyle.Secondary -> AppPalette.Surface
         PillStyle.Text -> Color.Transparent
     }
     if (style == PillStyle.Primary) {
@@ -79,7 +84,7 @@ fun PillButton(
             }
             m.background(gradient, AppShape.Pill)
         } else {
-            m.background(appColors().outlineSoft, AppShape.Pill)
+            m.background(AppPalette.Separator, AppShape.Pill)
         }
     }
     Surface(
