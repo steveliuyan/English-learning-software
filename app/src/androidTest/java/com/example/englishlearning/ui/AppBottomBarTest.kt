@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -89,5 +91,63 @@ class AppBottomBarTest {
         }
         composeRule.waitForIdle()
         assertEquals(AppTab.entries.toList(), received)
+    }
+
+    /**
+     * brief「TalkBack 朗读四 tab」的验收形态：模拟器上没有 TalkBack 引擎可赌，改为直接读语义树——
+     * 每个 slot 节点必须同时给出 Tab 角色、可读的 contentDescription 与双值 stateDescription，
+     * 这正是 TalkBack 合成播报所需的全部输入；选中态轮转一遍，四枚 slot 在两种状态下逐一核验。
+     */
+    @Test fun talk_back_can_read_every_slot_as_a_tab_with_its_selection_state() {
+        var selectedTab by mutableStateOf(AppTab.LEARNING)
+        composeRule.setContent { AppBottomBar(selected = selectedTab, onSelect = {}) }
+        AppTab.entries.forEach { focused ->
+            composeRule.runOnIdle { selectedTab = focused }
+            AppTab.entries.forEach { tab ->
+                val config = composeRule
+                    .onNodeWithTag("app_tab_${tab.name.lowercase()}", useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .config
+                assertTrue("${tab.name} 缺 Tab 角色", config.contains(SemanticsProperties.Role))
+                assertEquals(
+                    "${tab.name} 的角色必须是 Tab（读屏才会念「标签页」）",
+                    Role.Tab,
+                    config[SemanticsProperties.Role],
+                )
+                assertTrue("${tab.name} 缺 contentDescription，读屏无从念出目的地", config.contains(SemanticsProperties.ContentDescription))
+                assertEquals(
+                    "${tab.name} 的播报文本应恰为枚举里的中文文案",
+                    listOf(tab.contentDescription),
+                    config[SemanticsProperties.ContentDescription],
+                )
+                assertTrue("${tab.name} 缺 stateDescription，选中/未选中进不了播报", config.contains(SemanticsProperties.StateDescription))
+                assertEquals(
+                    "${tab.name} 在选中 tab=${focused.name} 时的状态播报",
+                    if (tab == focused) "已选中" else "未选中",
+                    config[SemanticsProperties.StateDescription],
+                )
+            }
+        }
+    }
+
+    /** 底导走查：逐枚点过去，选中态跟随点击迁移，四枚 slot 与四枚标签始终成齐（duotone 重写后整栏读得通）。 */
+    @Test fun walking_the_bar_moves_the_selection_and_keeps_every_slot_and_label() {
+        var selectedTab by mutableStateOf(AppTab.LEARNING)
+        composeRule.setContent { AppBottomBar(selected = selectedTab, onSelect = { selectedTab = it }) }
+        AppTab.entries.forEach { tab ->
+            composeRule.onNodeWithTag("app_tab_${tab.name.lowercase()}").performClick()
+            composeRule.waitForIdle()
+            assertEquals(tab, selectedTab)
+            AppTab.entries.forEach { slot ->
+                composeRule.onNodeWithTag("app_tab_${slot.name.lowercase()}").assertExists().assertHasClickAction()
+            }
+            AppTab.entries.forEach { label ->
+                composeRule.onNodeWithText(label.label).assertExists()
+            }
+            val stateOf = composeRule
+                .onNodeWithTag("app_tab_${tab.name.lowercase()}", useUnmergedTree = true)
+                .fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+            assertEquals("点过 $tab 之后它必须自己念出已选中", "已选中", stateOf)
+        }
     }
 }
