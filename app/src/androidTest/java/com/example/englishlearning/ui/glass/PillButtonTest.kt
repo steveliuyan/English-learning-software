@@ -31,8 +31,9 @@ import org.junit.runner.RunWith
  * `PillButton` 的设备侧取色取证（Task 14A-ii）。
  *
  * JVM 侧 `PillButtonInkTest` 的纯表契约只有「表自身合规」的证据；本类证明**渲染时真的是这张表在供色**：
- *  - 禁用底按 token 取样 `AppColorLight.tint2`（14A 前旧实现渲染 `AppPalette.Separator`，更早的版本
- *    写死过 `#E5E5EA`——逐位等值断言在 14A 后必红，14A-ii 基线取证已实测该红样，故改为容差取样）；
+ *  - 禁用底按 token 取样 `AppColorLight.tint2`（逐位 `== 0xFFE5E5EA` 旧断言由 `0a6d63a` 引入，与其时禁用底
+ *    实际渲染的 `AppPalette.Separator` 字面量一致；`bc256fd` 将该 token 改为 `#E4EFE9`、`42e9c14` 又把禁用底
+ *    改接 `tint2`，逐位等值自此必红，14A-ii 基线取证已实测该红样，故改为容差取样）；
  *  - 非品牌 Primary 浅套「容器收窄到 deep、base 端不上屏」的设备侧唯一证据；
  *  - Secondary 浅套 AiSpeech 的 `set.onMint` 例外分支（4.016 残口的真实修复）；
  *  - 非品牌 Primary 深套 knockout 前景（R-14.4 ① 的设备侧证据）。
@@ -157,7 +158,7 @@ class PillButtonTest {
      *
      * 铺 `AppColorDark.outline` 深色页底再取样的原因：`createComposeRule` 宿主 Activity 的窗口底近白，
      * 药片圆角 shape 之外的四角像素会把窗口底采进位图，误触「白字」负向（14A-ii 首跑实测）；
-     * 该底色与 knockout 墨（48.6）/ 域色 / 纯白两两距离均 >18，取样面不歧义。
+     * 该底色与 knockout 墨（距离 49.7）/ 域色 / 纯白两两距离均 >18，取样面不歧义。
      */
     @Test fun primary_non_brand_dark_uses_dark_knockout_ink() {
         composeRule.setContent {
