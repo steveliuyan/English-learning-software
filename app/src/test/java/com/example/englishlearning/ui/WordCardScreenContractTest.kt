@@ -22,8 +22,10 @@ import kotlin.test.assertTrue
  * 不剥注释就把契约写空了。按 14A 的书写坑口径，注释里**也不内嵌**被钉的精确调用形状，
  * 免得判据面哪天改成读原文时自我命中。
  *
- * 「文案一处定义」（spec §3）的口径按 14B R-14.3 走**全文件级计数**，并另配
- * [callWindows] 的实参窗口取样钉 tag 归属——两条都是防「上提 / 拼接」间接路径的（Task 14B C-1 同型坑）。
+ * 「文案一处定义」（spec §3）的口径按 14B R-14.3 走**全文件级计数**，另配两条窗口判据：
+ *  - [callWindows] 的实参窗口取样钉 **tag 归属**（防「上提」，Task 14B C-1 同型坑）；
+ *  - 同一批窗口内钉 **`contentDescription =` 整体缺席**（防「拼接 / 模板 / copy」等一切复述形态，
+ *    修复轮 1 的 I-2：字面量计数抓不住 `"暂停" + "发音"` 那种两半拼出来的定语）。
  */
 class WordCardScreenContractTest {
 
@@ -59,6 +61,21 @@ class WordCardScreenContractTest {
     private val updatedStateRead = Regex("""rememberUpdatedState\(""")
 
     /**
+     * 要件②的**消费点**：守卫构造那一枚 lambda 实参的体内必须现读 [WIRING_START] 那个 `stopIntent`。
+     *
+     * 为什么光钉上一条「声明在场」不够（修复轮 1 的 I-1）：把守卫改成直闭首次组合那版回调后，
+     * `rememberUpdatedState` 那一行会留成摆设、其余各锚（DisposableEffect / onDispose 体形状 / 守卫类定义）
+     * 全部照旧绿，而退出时转发的是旧闭包——宿主的代次自增与状态清零都写在闭包里，旧值等于漏清。
+     * 于是形状钉成「守卫构造的实参必须是一枚体内现读 `stopIntent.value()` 的 lambda」，两种合法书写各一条分支：
+     * 尾随 lambda（现文件写法）与具名 `onStop = { … }` / 括号内 lambda。同族三种退化都判红：
+     * 直接闭 `onStopPronunciation`、把守卫整个换成方法引用、以及在 `remember` 里当场取值后直传（那仍是首版）。
+     * 变量名与 [WIRING_START] 是一对耦合：哪天 `stopIntent` 改名，两条锚必须同批改。
+     */
+    private val guardReadsUpdatedStateAtDispose = Regex(
+        """WordCardExitStopGuard\s*\{\s*stopIntent\.value\(\s*\)\s*\}|WordCardExitStopGuard\(\s*(?:onStop\s*=\s*)?\{\s*stopIntent\.value\(\s*\)\s*\}\s*\)"""
+    )
+
+    /**
      * 反面锚：停播接线被「状态门控」包住（`if (state is …) { DisposableEffect(…) }`）。
      *
      * 这种形状在 Ready 之外的态（提交中 / 讲评 / 复习完成 / Loading）根本不会挂守卫，那一路离开屏幕就不停播；
@@ -88,6 +105,21 @@ class WordCardScreenContractTest {
 
     /** 屏侧连 `speakerContentDescription(` 都不必调：文案由药片自己的可见文字承载（clickable 合并子孙）。 */
     private val readoutFunctionCall = Regex("""speakerContentDescription\(""")
+
+    /**
+     * 药片**实参窗口内**的定语禁令（修复轮 1 的 I-2）：`contentDescription =` 一出现即判红，不看右边怎么写。
+     *
+     * 选型理由（三条路里为什么取「按窗口整体禁令」而非「全文件拼接形状禁令 / 朗读词族碎片计数」）：
+     *  - 三态朗读文案的第二份真值只可能长在药片那一枚语义节点上（组件内那句既是朗读文案也是可见文字，
+     *    `clickable` 又把子孙合并进同一节点），所以取样面就该是药片的调用窗口，而不是整个屏文件；
+     *  - 拼接形状禁令只认 `+` 这一种写法，改走模板、`buildString` 或先赋给局部 val 照样躲得过；
+     *    词族碎片计数要绕开本屏有意保留的那一处停止档朗读文案与屏上文字，豁免越写越脆；
+     *  - 本屏另有十余处合法 contentDescription（返回计划、进度、音标、词性、释义、例句、重试等），
+     *    全文件禁令会逼生产把那些正当定语改成畸形写法——窗口禁令一次封死整族，且不动任何合法形状。
+     * 已知残余边界（登记、不在本锚内扩大范围）：先在本窗外构造好定语再 `.then(…)` 挪进药片 modifier，
+     * 本锚读不到；那一族形状在屏侧没有正当用途，批 3 复审可再决定是否为它另加一条。
+     */
+    private val pillContentDescriptionAssignment = Regex("""contentDescription\s*=""")
 
     /** 三套私有播放件（本 Task 的替换对象）：私有定义 + 自绘字形 + 私有凑底 + 私有触控凑数。 */
     private val privatePlaybackWidgets = Regex("""private fun (?:WordCardSpeakerButton|DetailSpeakerIcon)\(""")
@@ -205,6 +237,7 @@ class WordCardScreenContractTest {
      * `rememberUpdatedState` 与守卫类都是判据的一部分，不是风格问题：
      * 少了前者，退出时转发的可能是首次组合那版闭包（宿主的代次计数器与状态写入都在闭包里，旧值等于漏清）；
      * 少了守卫类，JVM 侧就没有可计数的假播放器落点（Compose 组合期在 JVM 跑不出来）。
+     * 前者还要钉到**消费点**（[guardReadsUpdatedStateAtDispose]），只数声明行等于给「声明在场但没人读」留门。
      */
     @Test
     fun exit_disposal_forwards_the_stop_to_the_guard_exactly_once() {
@@ -220,6 +253,13 @@ class WordCardScreenContractTest {
         assertEquals(1, countMatches(source, guardClassDefinition), "退出停播守卫必须恰一处定义")
         assertEquals(1, countMatches(source, guardBodyInvokesStop), "守卫的 onDispose 体必须转调 onStop()")
         assertEquals(1, countMatches(source, updatedStateRead), "守卫必须经 rememberUpdatedState 读宿主回调的最新值")
+        assertEquals(
+            1,
+            countMatches(source, guardReadsUpdatedStateAtDispose),
+            "守卫构造那一枚 lambda 实参必须**在 dispose 时**现读 stopIntent.value（要件②的消费点）：" +
+                "把宿主的 onStopPronunciation 直接闭进 remember、或提前在 remember 里取值再直传，" +
+                "拿到的都是首次组合那版回调，rememberUpdatedState 会退化成摆设",
+        )
 
         val whenIndex = source.indexOf(WHEN_STATE)
         assertTrue(whenIndex >= 0, "找不到 $WHEN_STATE（本屏的状态分派结构变了，本判据的「整屏级」取样前提失效，须先改判据口径）")
@@ -279,6 +319,13 @@ class WordCardScreenContractTest {
         assertTrue(
             windows.any { it.contains(toggleTagLiteral) && it.contains(statusMappingCall) },
             "暂停-继续药片必须自带 $toggleTagLiteral 且态经 $statusMappingCall 从宿主呈现态映射",
+        )
+        assertEquals(
+            0,
+            windows.sumOf { countMatches(it, pillContentDescriptionAssignment) },
+            "屏侧不得给共享药片另设 contentDescription（直写、模板、拼接、局部 val 皆算，见 I-2 选型）：" +
+                "三态朗读文案只在组件一处定义，药片的可见文字已由 clickable 合并进同一枚语义节点，" +
+                "屏侧再补一句定语就是第二份真值 + 读屏重复朗读",
         )
     }
 
@@ -341,6 +388,39 @@ class WordCardScreenContractTest {
         assertEquals(1, countMatches(guardBody, guardBodyInvokesStop), "正控：守卫体内转调 onStop() 命中（前面允许有幂等位）")
         assertEquals(0, countMatches("class WordCardExitStopGuard(onStop: () -> Unit) {\n    fun onDispose() = Unit\n}", guardBodyInvokesStop), "负控：空实现的 onDispose 不得命中")
 
+        assertEquals(1, countMatches(wired, guardReadsUpdatedStateAtDispose), "正控：守卫经尾随 lambda 现读末版回调必须命中")
+        assertEquals(
+            1,
+            countMatches("val g = remember { WordCardExitStopGuard(onStop = { stopIntent.value() }) }", guardReadsUpdatedStateAtDispose),
+            "正控：同一形状的具名实参写法不得被误判（换写法不是换语义）",
+        )
+        assertEquals(
+            1,
+            countMatches("val g = remember { WordCardExitStopGuard({ stopIntent.value() }) }", guardReadsUpdatedStateAtDispose),
+            "正控：括号内传实参 lambda（不具名）同样命中——本锚认的是「体内现读」，不是括号长相",
+        )
+        assertEquals(
+            0,
+            countMatches("val g = remember { WordCardExitStopGuard(onStopPronunciation) }", guardReadsUpdatedStateAtDispose),
+            "负控（评审 M1 形状）：守卫直闭首次组合那版回调时必须判红——此时 rememberUpdatedState 声明行原样还在，" +
+                "其余各锚（DisposableEffect / onDispose 体 / 守卫类定义 / 声明计数）全绿，只有本锚认得出来",
+        )
+        assertEquals(
+            0,
+            countMatches("val g = remember { WordCardExitStopGuard(stopIntent.value()) }", guardReadsUpdatedStateAtDispose),
+            "负控：在 remember 里当场取值后直传拿到的同样是首次组合那版，不得命中",
+        )
+        assertEquals(
+            0,
+            countMatches("val g = remember { WordCardExitStopGuard { staleIntent.value() } }", guardReadsUpdatedStateAtDispose),
+            "负控：改读别的 state 句柄不得算成消费了本接线区那枚 rememberUpdatedState（与 WIRING_START 的耦合口径）",
+        )
+        assertEquals(
+            0,
+            countMatches("// WordCardExitStopGuard { stopIntent.value() }", guardReadsUpdatedStateAtDispose),
+            "负控：注释里的复述不得算成消费点（先剥注释）",
+        )
+
         val sharedPill = "SpeakerButton(state = SpeakerState.Idle, onClick = { onSpeak(lemma) }, modifier = Modifier.testTag(\"word_card_speak\"))"
         assertEquals(1, countMatches(sharedPill, sharedPillCall), "正控：共享药片调用命中")
         assertEquals(0, countMatches("WordCardSpeakerButton(lemma = lemma)", sharedPillCall), "负控：私有同族名不得算成共享调用")
@@ -370,6 +450,37 @@ class WordCardScreenContractTest {
         assertEquals(0, callWindows("Text(\"没有药片\")", "SpeakerButton(").size, "负控：没有调用时窗口集为空")
         assertTrue(callWindows(sharedPill, "SpeakerButton(").single().contains(speakTagLiteral), "正控：窗口内含本节点的 testTag")
         assertFalse(callWindows(hoistedTag, "SpeakerButton(").single().contains(speakTagLiteral), "负控（14B C-1 同型）：tag 上提到包裹容器时必须被窗口判在窗外")
+
+        val pillWithConcatReadout = "SpeakerButton(\n" +
+            "    state = wordCardSpeakerState(pronunciationStatus),\n" +
+            "    onClick = { onPauseResume() },\n" +
+            "    modifier = Modifier.testTag(\"word_card_pronunciation_toggle\")\n" +
+            "        .semantics { contentDescription = \"暂停\" + \"发音\" },\n" +
+            ")"
+        assertEquals(
+            1,
+            callWindows(pillWithConcatReadout, "SpeakerButton(").size,
+            "负控（评审 M2 形状）：往药片 modifier 链尾追加定语仍落在同一枚实参窗口内，不许被算成窗外",
+        )
+        assertEquals(
+            1,
+            callWindows(pillWithConcatReadout, "SpeakerButton(").sumOf { countMatches(it, pillContentDescriptionAssignment) },
+            "负控（评审 M2 形状）：两半拼出来的朗读文案必须被窗口定语锚点名——四串字面量计数抓不到它",
+        )
+        assertEquals(
+            0,
+            callWindows(sharedPill, "SpeakerButton(").sumOf { countMatches(it, pillContentDescriptionAssignment) },
+            "正控：现网药片只给 tag 与动作，本锚不得误伤",
+        )
+        assertEquals(
+            0,
+            callWindows(
+                "$sharedPill\nOutlinedButton(modifier = Modifier.testTag(\"word_card_pronunciation_stop\")" +
+                    ".semantics { contentDescription = \"停止播放发音\" })",
+                "SpeakerButton(",
+            ).sumOf { countMatches(it, pillContentDescriptionAssignment) },
+            "正控：播控组里那枚「停止」按钮是同窗外的兄弟节点，屏侧合法定语不得被本锚牵连",
+        )
 
         val legacyFocus = "val meaningFocusRequester = remember { FocusRequester() }\n" +
             "LaunchedEffect(revealed) { runCatching { meaningFocusRequester.requestFocus() } }\n" +
