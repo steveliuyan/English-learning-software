@@ -1297,10 +1297,54 @@ internal val MintBackground: Color
 
 ## 批 2 · 核心学习路径五屏（Task 13–18）
 
-分支：`stage-5-ui-r2-learning-path`（批 1 合入 `main` 后切出）。
+分支：`stage-5-ui-r2-learning-path`（**从批 1 分支 `stage-5-ui-r1-design-system` 的当前 tip 切出，不是从 `main`** —— 用户裁决「不用合 main，先停在分支上」，R-12.2）。
 批 2 只碰四屏 + 学习壳（裁决补 1）：词书选取 / 今日计划 / 词卡 / 词卡详情 + `AppScreen`/`AppBottomBar`。每屏任务的固定收尾三步：**① `grep -n 'testTag'` 本屏并把清单贴进报告；② 迁完本屏静态 `AppPalette.`/`DomainColors.` 读点并递减 `DarkTokenConsumptionRatchetTest` seed；③ connected 跑本屏既有用例类**（类名以现场 `ls app/src/androidTest/.../ui` 为准，不猜）。
 
 **批 2 开工判据（批 1 终审 F7 / D-I-1，控制者侧登记）：`SharedComponentUniquenessRatchetTest` 族 1/2/4 的判定面各带一个「本文件调了共享组件即整体合规」出口，接线后它同时是一只失明面——同一屏残留的私有 forbidden 形态会整体隐形。所以删四族 seed 行的判据是「该屏 forbidden 读点清零」（`AppScreenHeader` 那族 = 本屏 `MaterialTheme.typography.headline` 读点为 0；提示条族 = `AppPalette.ErrorText|colorScheme.error` 读点为 0；词行族 = 顶层私有 `*Row*` 窗口内「lemma 词头 Text + 第二枚 Text」为 0），绝不是「补一行 `AppScreenHeader(` 就准删」。语义由 `family_compliance_exits_are_a_declared_known_blindness_surface` 双向钉住；改成「每屏读点计数」的收紧属计划修订事项，批 2 不做。**
+
+---
+
+### Task 12.5（批 2 前置，用户 2026-10-19 拍板）: 全站静态容器读点一次性改读 `appColors()`，先让深色整体可用
+
+**为什么排在批 2 最前面（不是缺陷，是半迁移态）**：批 1 Task 3 把 `Mint*` 中性令牌改成组合期读取
+（`MintPalette.kt:58` `MintPrimaryDark` = `LocalAppColors.current.text1`），**墨色侧已经跟主题走**；
+而业务屏的容器仍写 `AppPalette.Surface`（`AppPalette.kt:12` 静态 `Color(0xFFFFFFFF)`），**不跟主题走**。
+真机 `bf353dda` 深色档实勘（`docs/verification/ui-redesign-2026-10.md` 末节「真机深色实勘」）：
+今日计划屏「今日学习进度」卡呈**白底 + 主题浅墨**，三行文案几乎看不清。逐屏迁（原计划）会让这个状态一直持续到 Task 14/16，
+用户拍板改为**先一次性把容器面补齐，再逐屏排版面**。
+
+**Files:**
+- Modify: 本任务的**权威清单是棘轮自己的采样**，不是裸 `grep`：`grep -rln 'AppPalette\.\(Surface\|Background\|TextPrimary\|TextSecondary\|Separator\)' app/src/main/java/com/example/englishlearning/ui | sort`
+      实跑列出 9 个文件、44 处，但其中 `theme/MintPalette.kt:32` 与 `components/ScreenUnavailable.kt:42` 是**注释**、
+      `theme/AppType.kt:12-17` 是装配路径经 `neutralForTheme()` 摘色的**源值**（`AppType.kt:30`），三类都不该算进迁移面。
+      所以动谁、删谁，以 Step 2 那次 RED 运行点名的 `unseeded` 文件与 `DarkTokenSeedAllowlist` 在册站点为准。
+- Modify: `app/src/test/java/com/example/englishlearning/ui/DarkTokenConsumptionRatchetTest.kt`（`DarkTokenSeedAllowlist` 相应行**只删本次真迁掉的**）。
+- Test: `app/src/androidTest/java/com/example/englishlearning/ui/ThemeModeSwitchTest.kt`（既有类内增一条代表屏像素用例；类名现场核实）。
+
+**Interfaces:**
+- Consumes: `appColors()`（批 1 Task 2 交付的 `LocalAppColors` 读取口）、`AppColorLight`/`AppColorDark` 的 `surface`/`background`/`text1`/`text2`/`outlineSoft` 字段。
+- Produces: 无新公共 API；本任务只把**读点**从静态源换成组合期源，并让深色 seed 台账递减。
+
+**边界（越界即评审打回）**：
+- **不碰 `AppPalette.GlassFill` 四个消费点**（`ui/components/glass/GlassDialog.kt:46`、`ui/components/glass/GlassOverlay.kt:69`、
+  `ui/AiProfileSettingsScreen.kt:499`、`ui/SpeechSettingsScreen.kt:234`）——玻璃容器必须与其面板内前景墨色**同批**迁移（AC-R-11 口径），
+  归批 3「深色清零专项」；本任务只迁**不透明中性容器与中性文字读点**。
+- **不碰主题不变蒙版族**（`DarkTokenConsumptionRatchetTest` 的蒙版色台账在册站点），它们深浅两套都合法。
+- **不改任何版面**：不重排 modifier 链、不换组件、不动间距。版面改动归 Task 13–18。
+
+- [ ] **Step 1（RED）**: 先跑一次门禁确认基线绿（命令见 `docs/verification/ui-redesign-2026-10.md`「门禁与基线」，含 `:app:testDebugUnitTest --rerun`）。
+- [ ] **Step 2（RED）**: 把本批要迁的文件的 `DarkTokenSeedAllowlist` 行**删掉**，跑 `:app:testDebugUnitTest --rerun --tests '*DarkTokenConsumptionRatchetTest*'`。
+      期望 **FAIL**：报 `unseeded`（读点还在、seed 已撤），逐条点名本任务要迁的站点。这一步是「先看到红」，不许跳过。
+- [ ] **Step 3（RED→GREEN 的行为面）**: 在 `ThemeModeSwitchTest` 增一条代表屏用例：`ThemeMode.Dark` 下取今日计划屏进度卡容器像素，
+      断言其亮度落在深色档（沿用该类既有的像素取样与阈值口径，别新造判据）；先跑到 **FAIL**（当前是白底）。
+- [ ] **Step 4（GREEN）**: 逐文件把静态中性容器/文字读点改读 `appColors()`（`@Composable` 站点内取，`DrawScope`/字段初始化器这类组合期外站点
+      先在组合期读好再带入 —— 批 1 Task 3 在 `CardDetailScreen.kt` 已确立该写法）。重跑 Step 2/3 的两条，期望 **PASS**。
+- [ ] **Step 5**: 全量门禁（五元组只增不减、lockfile 零变化）+ 真机 `bf353dda` `adb install -r` 里程碑包，
+      系统深色下逐屏走查（**只观察，不跑 instrument、不装测试包**），截图留本机忽略区不入库。
+- [ ] **Step 6**: 提交（`fix(ui-theme): 业务屏中性容器改读 appColors()，深色不再出现白底配浅墨`）+
+      把「哪些文件的 seed 行已删、删了几行」写进 `.superpowers/sdd/2026-10-17-ui-redesign/progress.md`（**报告里不写绝对余量**，以台账与重算命令为准）。
+
+---
 
 - [ ] **Step 1（每屏通用）: 先跑该屏 connected 基线**，记录改动前通过数；改动后必须全绿。
 
