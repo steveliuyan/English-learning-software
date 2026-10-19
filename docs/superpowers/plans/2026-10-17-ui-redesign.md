@@ -1529,6 +1529,24 @@ internal val MintBackground: Color
   （`:1824/:1846/:2028`）——评审确认**不迁才对**：`:2028` 压在保持静态的 `AppleMintGradient` 上，
   迁 `appColors().onMint`（深套 `#DFF6EC` 浅墨）会立刻造出「浅墨压浅渐变」不可读对。
 
+**修复轮复评补记（R-13.2，窄复评判定 C-1/I-1/I-2/m-1/2/3/4/6 全 ADDRESSED，修复轮关闭）**：
+
+- **口径不对称必须写明**：R-13.1 那条收口判据 `grep -c "MaterialTheme.typography.headline"` 是**含注释**的粗口径，
+  而棘轮与新增的机检门 `removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared`
+  都按**剥注释**口径（`uiScreenSource()` → `stripComments`）判定。**权威判据是那道 JVM 门，不是这条 grep**；
+  注释里逐字复述该串会计债于 grep、不会判红。谁将来把两者当同一件事，会误判「门漏了」。
+- **`ProfileCreationScreen` 换页头组件的连带版面变化**（裁决只点名了字号字重）：标题↔副标题间隙
+  由列节奏 `spacedBy(14.dp)` 变成组件内 `padding(top = 2.dp)`，并引入 `heightIn(min = 48.dp)`。
+  色值两档逐字不变（`MintPrimaryDark`/`MintTextMuted` 与 `colors.text1`/`text2` 是同一枚 getter 桥的两侧）。
+  **批 2 收口（Task 18）目检确认这一屏观感**，不留到批 3。
+- **新门的意图**：`wiredRootScreens.isNotEmpty()` 防空转断言意味着「把 `AppScreen.kt` 放回页头 seed」
+  在批 2 后续屏接线之前会当场判红（响亮失败）。批 3 若有执行者把这当 bug 拆掉，等于拆掉 F7 失明面的封堵——
+  本条即意图说明。
+- 复评另发现实现者自报的 `R-13.2` 悬空编号（`AppScreen.kt:1954-1955` 引用了当时还不存在的裁决号）已由控制者
+  就地改指 `R-13.0`，纯注释、逻辑零变化；报告 §八 的「230 insertions」实为 233（报告不入 git，仅记账）。
+- 复评独立补验了首启屏暴露面：`AppScreenTest` connected **OK (45 tests)**（实现者未跑该类）。
+
+
 
 ---
 

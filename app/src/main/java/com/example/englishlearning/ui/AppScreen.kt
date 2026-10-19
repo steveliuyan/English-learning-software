@@ -1951,8 +1951,8 @@ internal fun LearningSetupScreen(
                 modifier = Modifier.semantics { contentDescription = "返回上一层" },
             ) { Text("← 返回上一层", fontWeight = FontWeight.Bold) }
         }
-        // 页头两档排印交统一组件承载（R-13.2）：`onBack = null`——本屏返回入口是既有的
-        // `← 返回上一层` TextButton（上方保留），它的中性表述不能改成页头写死的「返回」（R-13.2 / 全局约束 9）。
+        // 页头两档排印交统一组件承载（R-13.0「页头换 AppScreenHeader 的边界」）：`onBack = null`——本屏返回入口是既有的
+        // `← 返回上一层` TextButton（上方保留），它的中性表述不能改成页头写死的「返回」（同一条裁决 / 全局约束 9）。
         AppScreenHeader(
             title = "选好词书，开始今天的积累",
             subtitle = "每天一点点，学习会自然变成习惯。",
