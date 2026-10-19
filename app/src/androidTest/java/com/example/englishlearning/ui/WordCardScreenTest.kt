@@ -1,9 +1,16 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -11,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.domain.CardFeedback
@@ -237,5 +245,81 @@ class WordCardScreenTest {
 
         composeRule.onNodeWithTag("word_card_no_cards").assertExists()
         composeRule.onNodeWithContentDescription("返回今日计划").assertExists()
+    }
+
+    /**
+     * Task 15 Step 1（F5-03 移交账「退出学习不停播」的屏侧证据）：屏幕离开组合时，
+     * 必须把停播**恰好一次**委托给宿主（`onStopPronunciation`），且组合期一次都不许误转。
+     *
+     * 为什么在屏侧也钉一条（宿主侧另有 `AppScreenTest.leavingLearningStopsTheStillPlayingAudioAtTheProvider`）：
+     * 屏侧这条把「谁该收到 stop」与「几轮组合该收几次」钉成契约——守卫若做成跨组合共享的单例，
+     * 重进学习流时第二次离开就不再补停播（读屏用户重新进屏后照样听得到上一轮的音），
+     * 本用例最后两步即红；停播若被写进 `when (state)` 的某个分支里，切卡/翻态会误停播，
+     * 第一步的 `assertEquals(0, stopCalls)` 即红。计数断言不可被「节点存在」这类恒真形状替代。
+     *
+     * 离开组合由 `showCard` 翻假驱动（本屏没有滚动祖先，`setContent` 的语义也不该被依赖来 dispose 子树）。
+     */
+    @Test
+    fun leavingTheScreenForwardsTheStopActionExactlyOnce() {
+        val showCard = mutableStateOf(true)
+        var stopCalls = 0
+        composeRule.setContent {
+            if (showCard.value) {
+                WordCardScreen(state = ready(), onStopPronunciation = { stopCalls++ })
+            } else {
+                Box(Modifier.testTag("word_card_screen_gone"))
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("word_card_screen").assertIsDisplayed()
+        assertEquals("停播只能发生在离开组合时：组合期一次都不许转给宿主", 0, stopCalls)
+
+        showCard.value = false
+        composeRule.waitForIdle()
+
+        assertEquals("离开组合必须把停播恰好委托给宿主一次", 1, stopCalls)
+        composeRule.onNodeWithTag("word_card_speak").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_screen").assertDoesNotExist()
+
+        showCard.value = true
+        composeRule.waitForIdle()
+        assertEquals("重进屏幕不该补停播", 1, stopCalls)
+
+        showCard.value = false
+        composeRule.waitForIdle()
+        assertEquals("每轮组合是一枚新守卫：重进后再离开仍要补一次停播", 2, stopCalls)
+    }
+
+    /**
+     * Task 15 Step 3 大字号护栏：Android「字体大小」上限档（`fontScale = 2.0`）下，
+     * 主词与已揭晓释义必须**完整可见**（写法口径照 `CheckInScreenTest.headerKeepsLinksReachableAndTitleReadableAtMaximumLargeFontScale`）。
+     *
+     * 两条取样纪律（14B 复评 N-2 的教训：connected 取样串没有换行余量时会假红）：
+     *  - 本屏根容器是 `fillMaxSize` 的 Column、**没有滚动祖先**，`performScrollTo()` 在这里会自己报错，
+     *    所以只用「可见性 + 边界包含」，不引入 `assertHeightIsAtLeast` 那类尺寸阈值；
+     *  - 主词在 2.0 下**会换行**（displaySmall 翻倍后一行站不住七个字母），故判「没被裁掉」而不是「单行高度」——
+     *    裸高度阈值会把合法换行判成假红。
+     * `assertIsDisplayed()` 只保证「有像素在屏上」，`getUnclippedBoundsInRoot()` 对比屏幕根才判得出「完整」，
+     * 两条并立（释义被挤出可视区时前者照绿、后者必红）。
+     */
+    @Test
+    fun lemmaAndRevealedMeaningStayFullyVisibleAtMaximumLargeFontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 2f)) {
+                WordCardScreen(state = ready(meaningRevealed = true))
+            }
+        }
+
+        val root = composeRule.onNodeWithTag("word_card_screen").getUnclippedBoundsInRoot()
+        listOf("word_card_lemma" to "ability", "word_card_meaning" to "能力；才能").forEach { (tag, text) ->
+            val node = composeRule.onNodeWithTag(tag)
+            node.assertIsDisplayed()
+            node.assertTextContains(text)
+            val bounds = node.getUnclippedBoundsInRoot()
+            assertTrue("$tag 在 fontScale=2.0 下被纵向裁出屏幕：节点=$bounds 屏幕根=$root", bounds.top >= root.top && bounds.bottom <= root.bottom)
+            assertTrue("$tag 在 fontScale=2.0 下被横向裁出卡片：节点=$bounds 屏幕根=$root", bounds.left >= root.left && bounds.right <= root.right)
+        }
     }
 }

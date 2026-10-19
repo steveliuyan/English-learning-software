@@ -2,8 +2,6 @@ package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,14 +18,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -41,6 +40,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.CardFeedback
+import com.example.englishlearning.ui.components.SpeakerButton
+import com.example.englishlearning.ui.components.SpeakerState
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
@@ -80,6 +81,18 @@ fun WordCardScreen(
     onStartNewPhase: () -> Unit = {},
     onBackToPlan: () -> Unit = {},
 ) {
+    // F5-03 移交账「退出学习不停播」的还账点：本屏离开组合（退出学习浮层、切走学习流、宿主销毁整屏）
+    // 时把停播恰好委托给宿主一次。三个要件缺一不可，都被 `WordCardScreenContractTest` 钉住：
+    //  - 挂在 `when (state)` **之外**：停播只跟「整屏离开组合」绑定，切卡 / 揭晓 / 提交翻态都不许误停播；
+    //  - [rememberUpdatedState]：离开组合那一刻要拿到宿主**最后一版**回调（代次自增与状态清零都在闭包里，
+    //    拿首次组合那版等于漏清），所以不能把 `onStopPronunciation` 直接闭进 `remember`；
+    //  - [WordCardExitStopGuard]：转发至多一次，并让「收到过停播」这件事在 JVM 侧有可计数的落点。
+    // 屏侧绝不直接对播放器下手（既有红线）——走的就是「停止」按钮那同一个回调。
+    val stopIntent = rememberUpdatedState(onStopPronunciation)
+    val exitStopGuard = remember { WordCardExitStopGuard { stopIntent.value() } }
+    DisposableEffect(exitStopGuard) {
+        onDispose { exitStopGuard.onDispose() }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -263,11 +276,12 @@ fun WordCardScreen(
                                 ),
                             ) { Text("显示释义", fontWeight = FontWeight.Bold) }
                         }
-                        WordCardSpeakerButton(
-                            lemma = state.card.lemma,
-                            modifier = Modifier
-                                .testTag("word_card_speak")
-                                .clickable { onSpeak(state.card.lemma) },
+                        // Task 15：私有喇叭药片换成共享药片组件（F5-03「喇叭药片放大」的屏侧落地）。
+                        // 48dp 触控下限、底色与三态朗读文案都由组件交付，屏侧只给 tag 与动作。
+                        SpeakerButton(
+                            state = SpeakerState.Idle,
+                            onClick = { onSpeak(state.card.lemma) },
+                            modifier = Modifier.testTag("word_card_speak"),
                         )
                         // F3-02 播控组：只在 Playing / Paused 窗口呈现（决策 §2）。
                         // 重播 = 再点上面那个喇叭（系统 TTS 走 QUEUE_FLUSH 天然打断，音频路径重走播放）。
@@ -280,14 +294,13 @@ fun WordCardScreen(
                         if (speakingOrPaused) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (pauseResumeSupported) {
-                                    OutlinedButton(
-                                        onClick = onPauseResume,
-                                        modifier = Modifier
-                                            .testTag("word_card_pronunciation_toggle")
-                                            .semantics { contentDescription = if (pronunciationStatus == PronunciationStatus.Paused) "继续播放发音" else "暂停发音" },
-                                        shape = RoundedCornerShape(18.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MintPrimaryDark),
-                                    ) { Text(if (pronunciationStatus == PronunciationStatus.Paused) "继续" else "暂停") }
+                                    // 暂停-继续同样走共享药片：三态文案由组件的可见文字承载
+                                    // （clickable 会把子孙合并进同一枚语义节点），屏侧不再另写一份朗读文案。
+                                    SpeakerButton(
+                                        state = wordCardSpeakerState(pronunciationStatus),
+                                        onClick = { onPauseResume() },
+                                        modifier = Modifier.testTag("word_card_pronunciation_toggle"),
+                                    )
                                 }
                                 OutlinedButton(
                                     onClick = onStopPronunciation,
@@ -407,67 +420,36 @@ private fun BackToPlanButton(onBackToPlan: () -> Unit) {
     ) { Text("返回今日计划", fontWeight = FontWeight.Bold) }
 }
 
-/** 学习词卡的发音按钮：小圆片底 + Material 风格自绘喇叭，与详情页发音按钮同族。 */
-@Composable
-private fun WordCardSpeakerButton(lemma: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .background(MintTint, RoundedCornerShape(50))
-            .padding(6.dp)
-            // F5-03 / Task 10：20dp 喇叭 + 6dp padding 只有 ~32dp 见方，读屏/粗手指都够不到
-            // 48dp 下限（connected RED 实测 32.38dp 高）。`minimumInteractiveComponentSize()` 加在
-            // `padding` **内侧**，药片底色块随节点一起放大（≈60dp），字形尺寸不变。
-            .minimumInteractiveComponentSize()
-            .semantics { contentDescription = "播放 $lemma 发音" },
-    ) {
-        DetailSpeakerIcon()
-    }
-}
+/**
+ * 宿主呈现态 → 药片三态（Task 15 Step 2「文案一处定义」的屏侧映射）。
+ *
+ * 播控组只在 Playing / Paused 窗口里长出来（决策 §2），所以这里只有两档有意义：Paused 才是 Paused
+ * （点下去是「继续」），其余一律按 Playing 处理（点下去是「暂停」）。文案与字形仍由组件那侧分派，
+ * 本函数不写第三套 when——它只回答「宿主这一档对应组件哪一态」。
+ * 抽成 `internal` 纯函数是为了让这档映射能在 JVM 侧逐态点名（connected 读不到 `SpeakerState`）。
+ */
+internal fun wordCardSpeakerState(status: PronunciationStatus): SpeakerState =
+    if (status == PronunciationStatus.Paused) SpeakerState.Paused else SpeakerState.Playing
 
-/** Material `volume_up` 比例的自绘喇叭（详情页 AccentSpeakerButton 同款几何，20dp）。 */
-@Composable
-private fun DetailSpeakerIcon() {
-    // Canvas 的绘制 lambda 是 DrawScope（组合期外），中性令牌必须先在外层组合期读好再带进去。
-    val glyph = MintPrimaryDark
-    Canvas(modifier = Modifier.size(20.dp)) {
-        val w = size.width
-        val h = size.height
-        val boxLeft = w * 0.14f
-        val boxRight = w * 0.34f
-        val boxTop = h * 0.40f
-        val boxBottom = h * 0.60f
-        drawRect(
-            color = glyph,
-            topLeft = androidx.compose.ui.geometry.Offset(boxLeft, boxTop),
-            size = androidx.compose.ui.geometry.Size(boxRight - boxLeft, boxBottom - boxTop),
-        )
-        drawPath(
-            path = androidx.compose.ui.graphics.Path().apply {
-                moveTo(boxRight, boxTop)
-                lineTo(w * 0.52f, h * 0.24f)
-                lineTo(w * 0.52f, h * 0.76f)
-                lineTo(boxRight, boxBottom)
-                close()
-            },
-            color = glyph,
-        )
-        drawArc(
-            color = glyph,
-            startAngle = -45f,
-            sweepAngle = 90f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-            topLeft = androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.32f),
-            size = androidx.compose.ui.geometry.Size(w * 0.24f, h * 0.36f),
-        )
-        drawArc(
-            color = glyph,
-            startAngle = -45f,
-            sweepAngle = 90f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.06f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-            topLeft = androidx.compose.ui.geometry.Offset(w * 0.56f, h * 0.20f),
-            size = androidx.compose.ui.geometry.Size(w * 0.36f, h * 0.60f),
-        )
+/**
+ * 退出停播守卫（F5-03 移交账「退出学习不停播」的还账本体）。
+ *
+ * 为什么是一枚独立的类、而不是在 dispose 回调里直接写那句 lambda：本仓 JVM 单测没有 Compose 渲染能力
+ * （`ui-test-junit4` 只在 androidTestImplementation），组合期与销毁时机在 JVM 里根本跑不出来，
+ * 「播放器收到过停播、而且每轮组合只收一次」这条断言就没地方落。守卫本体是无组合依赖的纯 Kotlin，
+ * 假播放器能在 JVM 侧把次数钉死（`WordCardScreenContractTest`）；「接线确实被触发」另由 connected 两侧证：
+ * 屏侧 `WordCardScreenTest.leavingTheScreenForwardsTheStopActionExactlyOnce`（含重进屏幕的第二轮组合）、
+ * 宿主侧 `AppScreenTest.leavingLearningStopsTheStillPlayingAudioAtTheProvider`（真实退出导航打到播放器上）。
+ *
+ * 幂等位挡的是「同一枚守卫被 dispose 两次」（测试里替换组合、宿主 teardown 与返回键退出撞进同一次运行）。
+ * 每次进入学习流都新建一枚守卫，所以重进屏幕后的那次离开照常补一次停播——这点也被上面那条用例钉住。
+ */
+internal class WordCardExitStopGuard(private val onStop: () -> Unit) {
+    private var stopped = false
+
+    fun onDispose() {
+        if (stopped) return
+        stopped = true
+        onStop()
     }
 }

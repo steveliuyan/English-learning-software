@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -32,8 +33,13 @@ import org.junit.runner.RunWith
  *     照常可达；准确口径如上，见 AppScreen.kt 的 N-3 注释与决策 §2。）
  *
  * 防假绿口径：呈现/消失用 `assertIsDisplayed()` 与 `assertDoesNotExist()` 断真实组合，
- * 委托次数用调用计数（不是「节点存在」这种恒真断言）；暂停态文案另断
- * `contentDescription = 继续播放发音`，写成「暂停发音」的单一常量过不去。
+ * 委托次数用调用计数（不是「节点存在」这种恒真断言）。
+ *
+ * Task 15 的文案口径订正：暂停-继续那枚已从屏内私有按钮换成共享喇叭药片，三态文案只在
+ * `SpeakerButton.kt` 的 `speakerContentDescription` 一处定义（spec §3），并由药片的**可见文字**承载
+ * ——`clickable` 会把子孙并进同一枚语义节点，屏侧再另设一份朗读文案就是让同一句话念两遍，
+ * 所以取样探针从 `onNodeWithContentDescription` 换成 `onNodeWithText`，同时反向断旧私有文案
+ * 「继续播放发音」已经不在组合里（写成常量硬钉、或让屏侧另写一份，都会在这里红）。
  *
  * fixture 复用 `LearningFlowFixtures.kt` 的 internal 顶层 `ready()`，与
  * `WordCardRevealFocusTest` 同一张占位词卡，避免两个测试族对同一个 Ready 态口径分叉。
@@ -94,19 +100,20 @@ class WordCardPronunciationControlsTest {
         // 背书，但 Idle 下按钮组根本不组合，证伪力为零。）
         composeRule.onNodeWithTag("word_card_status_live_region").onChildren().assertCountEquals(0)
 
-        // 暂停：委托恰好一次，宿主把状态改成 Paused 后按钮文案翻成「继续播放发音」。
+        // 暂停：委托恰好一次，宿主把状态改成 Paused 后药片文字翻成「继续发音」（一处定义的那一处）。
         composeRule.onNodeWithTag("word_card_pronunciation_toggle").performClick()
         composeRule.waitForIdle()
         assertEquals(1, harness.pauseResumeCalls)
         assertEquals(PronunciationStatus.Paused, harness.status.value)
-        composeRule.onNodeWithContentDescription("继续播放发音").assertIsDisplayed()
+        composeRule.onNodeWithText("继续发音").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("继续播放发音").assertDoesNotExist()
 
         // 再点一次是「继续」：仍走同一个 toggle，委托次数累加到 2，状态回 Playing。
         composeRule.onNodeWithTag("word_card_pronunciation_toggle").performClick()
         composeRule.waitForIdle()
         assertEquals(2, harness.pauseResumeCalls)
         assertEquals(PronunciationStatus.Playing, harness.status.value)
-        composeRule.onNodeWithContentDescription("暂停发音").assertIsDisplayed()
+        composeRule.onNodeWithText("暂停发音").assertIsDisplayed()
 
         // 停止：状态由宿主收回 Idle，整组随之离开组合（不是隐藏，是不存在）。
         composeRule.onNodeWithTag("word_card_pronunciation_stop").performClick()
@@ -142,7 +149,7 @@ class WordCardPronunciationControlsTest {
         val harness = showControls(PronunciationStatus.Playing, pauseResumeSupported = false)
 
         composeRule.onNodeWithTag("word_card_pronunciation_toggle").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("暂停发音").assertDoesNotExist()
+        composeRule.onNodeWithText("暂停发音").assertDoesNotExist()
         composeRule.onNodeWithTag("word_card_pronunciation_stop").assertIsDisplayed()
 
         composeRule.onNodeWithTag("word_card_pronunciation_stop").performClick()

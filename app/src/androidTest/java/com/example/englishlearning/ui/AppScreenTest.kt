@@ -703,6 +703,50 @@ class AppScreenTest {
     }
 
     /**
+     * Task 15 Step 1（F5-03 移交账「退出学习不停播」在此关闭）：朗读仍在进行时退出学习流，
+     * 停播必须打到 provider 上**恰好一次**，且退出后屏上不残留任何语播控件。
+     *
+     * 与 I-1（`leavingAndReenteringLearningClearsTheWordCardPronunciationState`）的分工：I-1 只清**呈现状态**
+     * （status/message 归 Idle/null），旧形状下退出后界面是干净的、声音却还在放——那正是移交账点名的缺陷。
+     * 本用例断播放器层真收到停播：`HangingPronunciationProvider.stopCalls` 是计数假播放器，
+     * 「停播逻辑存在但永不触发」那一族变异（写进永假分支、挪去别处、只清状态不碰播放器）都会在这里红；
+     * 屏侧的形状与每轮组合次数由 `WordCardScreenTest.leavingTheScreenForwardsTheStopActionExactlyOnce` 负责。
+     *
+     * 全程走真实导航与真实宿主：自动发音关掉 → 点药片 → provider 挂起在发声里（呈现态钉在 Playing）→
+     * 系统返回（`BackHandler(enabled = showLearning)` → `exitLearning` → `showLearning = false` →
+     * 词卡屏离开组合 → 退出停播守卫转调宿主的 onStopPronunciation → 播放器收到停播）。
+     */
+    @Test
+    fun leavingLearningStopsTheStillPlayingAudioAtTheProvider() {
+        val provider = HangingPronunciationProvider()
+        val speech = speechFixture(autoSpeakOnCardReady = false)
+        composeRule.setContent { readyAppScreen(pronunciationProvider = provider, speechSettingsViewModel = speech.speech) }
+        createProfile()
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_speak").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_speak").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_pronunciation_stop").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals("退出之前不该有任何停播，否则本用例断的是别处的停播", 0, provider.stopCalls)
+
+        pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        assertEquals("退出学习流必须让仍在播的音停下来，且恰好一次", 1, provider.stopCalls)
+        // F5-03「退出后无语播焦点」：三枚语播控件与药片朗读文字都不许残留。
+        composeRule.onNodeWithTag("word_card_speak").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_pronunciation_toggle").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_pronunciation_stop").assertDoesNotExist()
+        composeRule.onNodeWithText("播放发音").assertDoesNotExist()
+        provider.release()
+    }
+
+    /**
      * I-2：阅读页三元组（message/status/request）在**任何**退出路径都必须清场。
      * 三条路径逐一验证：①屏内「返回」按钮（onBack）；②系统返回退今日文章
      * （BackHandler readingTarget → closeArticle）；③系统返回退历史旧版（BackHandler historyArticle）。
