@@ -1403,6 +1403,29 @@ internal val MintBackground: Color
   m-7 **登记收口时处置**：`.superpowers/` 台账目录在 `.gitignore` 内，AGENTS.md「阶段文档推送」在文档层落不了地；
   批 2 收口时一并决定（要么把计划/评审记录转成 `docs/handoff/` 入库件，要么在验证文档里记这条口径张力）。
 
+**窄复评记录（R-12.5-R1，2026-10-19，范围 = `a4b5bbf..a50eabe` 三条提交）**：
+
+- 复评独立复算了取值等价（浅套 `text1/text2` ≡ `AppPalette.TextPrimary/TextSecondary`、
+  `DomainLight[Reading].deep` ≡ `DomainColors.Reading.deep`）、seed 台账（`AiProfileSettingsScreen` 28 /
+  `GlassButton` 3→7 / `TodayPlanScreen` 5 净 0）、对比度（变异墨核 `0x1B1B1E` 压 `0x17201C` ≈1.026:1）
+  与三条自检的间距数值（11/12/16 与 210/136），结论与报告数字自洽。
+- **七条 finding 全判 ADDRESSED**，无新增 Critical/Important：C-1/C-2/I-1/I-2 按「配得上前修、配不上回退 + 登记」
+  实质消灭本轮新造的深色不可读对且浅色逐字节等价；I-3/I-4 以偏离说明 + 口径订正收口；I-6 登记批 3。
+  复评同时确认裁决未被越界执行（`AppType.kt` 与四处 `GlassFill` 消费点未动）也未执行不彻底（无逐字等价对应物的站点都走了回退）。
+- 复评点名的两处「差一小半」予以登记，不再起第二轮：I-3 的机检理由表行（该站点是 `Color.White.copy` 白药片、
+  不是 `GlassFill`，塞进那张按文件键的表语义不符，理由落在本节散文即正式落点）；
+  I-5 的第二枚 connected 取样点（试听浮层已随 C-2 回退成静态白玻璃前景，「迁移容器-墨配对」的像素点不再存在）。
+- 三条新增 Minor 的处置：**①注释前提写反**（把「`Card` 默认 `tonalElevation` 1dp」当成不混色的原因）——**当场修**，
+  注释改为实测口径：这张卡没显式传 `tonalElevation`（`TodayPlanScreen.kt:168-175` 只给 colors/shape/modifier），
+  叠加 alpha 为 0、取样逐通道差实测 0；并写明混色通道没被关掉（主题把 M3 `surface` 也设成同一枚 `set.surface`，
+  `isSurfaceColor` 按数值成立），故加 `tonalElevation` 到 ≥3dp 必须改用 `surfaceColorAtElevation` 重算。
+  **②静态判据对 `val set = appColors()` 间接写法失明**（只匹配字面量 `appColors().surface`）——**结转批 3**：
+  与 `AppType` 摘色同批把谓词扩到 `set.surface` / `colors.surface`，届时全树一起收敛，现在扩会漏报变误报。
+  **③同族处置不一致**（页头两枚标题 `:133/:301` 因走查实证 1.05:1 被补色，紧邻副标题 `:134` 留在原地 ≈3.6:1）——
+  **结转批 3**，与 `MintBackground` 上的 `AppType` 直读一族（全树未补色直读 88 处）一起摘色；
+  本轮不给它单独补色：判据的容器谓词只盯 `appColors().surface`，页底一族没有任何自动化保护，
+  补一枚就欠一枚，半吊子扩面比统一留给批 3 更糟。
+
 ---
 
 - [ ] **Step 1（每屏通用）: 先跑该屏 connected 基线**，记录改动前通过数；改动后必须全绿。
