@@ -30,6 +30,7 @@ import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.InlineIconBadge
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.appColors
@@ -41,6 +42,7 @@ import com.example.englishlearning.ui.theme.appDomain
  * 字形走批 1 定稿的共享 duotone 图标族（`AppIcon` 冻结路径 + [AppGlyph]/[InlineIconBadge] 渲染），
  * 不再自绘画布：自绘分支既绕开图标台账，也拿不到按主题的填充层不透明度。
  * 选中态是行内徽标一档（tint 药片 + 域 `deep` 字形 + 加粗标签），未选中退化为 `text2` 单层描边——
+ * 字形腿与标签腿分档不同（图形 vs 正文），所以选中标签的墨在浅套另取 `onMint`，不沿用 `deep`（见 `TabSlot`）；
  * 深浅两套的墨色与底色都经 `appColors()` / `appDomain()` 现取，本文件不留静态浅套读点。
  *
  * 内容区高度**下限**保持 64dp 档（F5-03 Task 11 成果：大字号下可增高不裁字），
@@ -83,6 +85,14 @@ private val AppTab.glyph: AppIcon
 @Composable
 private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) -> Unit) {
     val tint = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text2
+    // 选中态是三条腿，墨不是一枚通吃：
+    //  - 字形腿走 `InlineIconBadge`（tint 药片底 + 域 `deep` 描边），非文本图形档；
+    //  - 标签文字腿铺在底导容器的 `surface` 上，是**正文档**——浅套那腿不能沿用 `deep`，
+    //    按 R-14.4 的 AiSpeech 例外取 `appColors().onMint`（与 `SpeakerButton` 的浅薄荷底前景同族）；
+    //    深套 `deep` 与 `base` 合一、压深底本就是亮墨，维持原值。
+    // 未选中档两套同用 `text2`。各腿比值一律由 `AppBottomBarContrastTest` 按真实底当场复算，
+    // 这里不抄数字（抄进注释就会随 token 取值漂移）。
+    val labelInk = if (selected && !LocalIsDark.current) appColors().onMint else tint
     Column(
         modifier = Modifier
             .weight(1f)
@@ -106,7 +116,7 @@ private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) 
             text = tab.label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            color = tint,
+            color = labelInk,
             modifier = Modifier.padding(top = 4.dp),
         )
     }

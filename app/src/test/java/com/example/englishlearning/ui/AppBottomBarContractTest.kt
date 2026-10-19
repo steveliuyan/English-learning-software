@@ -14,6 +14,10 @@ import kotlin.test.fail
  * 「死分支/幽灵函数里塞一份假调用」骗不过「体内恰一处 + 体外零处」这一对（Task 15/16 decoy 教训）。
  * 整函数体内的假调用残留（`.takeIf{false}?.let` 族）与批 3 AC-R-12 整族结转同口径，本席不另造。
  *
+ * 修复轮 1（评审 I-2）：两枚字形锚从「只钉调用字面」升格为**实参级**逐字形状（字形来源、墨、度量、图层一起钉），
+ * 并加「体内字形调用恰一处 + 显式 StrokeOnly 层恰一处」这一对，把评审 M2 的两条偷换路径
+ * （`StrokeOnly`→`Duotone`、省略 `layer` 塌回默认 `Duotone`）都逼到当场见红；反空转探针逐形状钉住。
+ *
  * 选中态墨色必须走 `appDomain(...)` / `appColors()` 主题路径且文件内静态读点归零，
  * 与 `DarkTokenConsumptionRatchetTest` 删 seed 行互为两侧闸（seed 残留由棘轮红，回退静态由本契约红）。
  *
@@ -89,10 +93,20 @@ class AppBottomBarContractTest {
     private val slotMinHeightAnchor = "heightIn(min = 64.dp)"
     private val themedInkAnchor =
         "if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text2"
-    private val selectedBadgeAnchor = "InlineIconBadge("
-    private val unselectedGlyphAnchor = "AppGlyph("
 
-    /** 三件齐 + 墨线：这些形状钉在 TabSlot 体内「恰一处」，且同一形状在体外「零处」。 */
+    /**
+     * 实参级锚（修复轮 1 / 评审 I-2）：旧形状只钉 `InlineIconBadge(` / `AppGlyph(` 两枚字面，
+     * 于是把未选中档的 `layer = AppGlyphLayer.StrokeOnly` 偷换成 `Duotone`（spec §4.3 的行内层口径反过来改）
+     * 46 例全绿存活——与 14A I-1「只钉转调声明、不钉实参消费点」同族。故这里钉**整条实参形状**：
+     * 字形来自 `tab.glyph`、墨来自那枚主题化 `tint`、度量 22dp、层必须显式 `StrokeOnly`。
+     */
+    private val selectedBadgeAnchor = "InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech)"
+    private val unselectedGlyphAnchor =
+        "AppGlyph(icon = tab.glyph, tint = tint, size = 22.dp, layer = AppGlyphLayer.StrokeOnly)"
+    private val strokeOnlyLayerAnchor = "AppGlyphLayer.StrokeOnly"
+    private val glyphCallAnchor = "AppGlyph("
+
+    /** 三件齐 + 墨线 + 两枚实参级字形锚：这些形状钉在 TabSlot 体内「恰一处」，且同一形状在体外「零处」。 */
     private val inBodyExactlyOne = listOf(
         testTagAnchor,
         contentDescriptionAnchor,
@@ -110,6 +124,8 @@ class AppBottomBarContractTest {
         contentDescriptionAnchor,
         roleAnchor,
         stateAnchor,
+        selectedBadgeAnchor,
+        unselectedGlyphAnchor,
     )
 
     // ---------- 用例：自绘字形族归零 ----------
@@ -156,6 +172,30 @@ class AppBottomBarContractTest {
         // 反空转（近miss）：常量播报必须不满足双值形状。
         val constantState = """stateDescription = "已选中""""
         assertEquals(0, count(constantState, stateAnchor), "反空转失控：常量 stateDescription 竟满足双值锚点")
+
+        // ---------- 字形层的实参级牙齿（修复轮 1 / 评审 I-2）----------
+        // 一枚共享字形调用 + 一枚显式 StrokeOnly 层，两条同时恰一处：
+        // 「省略 layer 实参」会塌回 AppGlyph 的默认 Duotone，调用计数照旧为 1，但层计数掉到 0 ⇒ 红。
+        assertEquals(1, count(body, glyphCallAnchor), "TabSlot 体内的共享字形调用必须恰一处（多一处即长出第二份渲染路径）")
+        assertEquals(
+            1, count(body, strokeOnlyLayerAnchor),
+            "未选中档必须显式只要描边层（AppGlyphLayer.StrokeOnly）：省略 layer 会静默取默认的 Duotone",
+        )
+        assertEquals(
+            0, count(bar, "AppGlyphLayer.Duotone"),
+            "底导不得显式请求 Duotone 层：选中档走 InlineIconBadge（内部即单层描边），未选档按 spec §4.3 只显描边",
+        )
+        // 反空转（评审 M2 那发变异的两条形状）：换成 Duotone、或整段省略 layer，都必须让实参级锚归零，
+        // 否则上面那批断言只是「字面在不在文件里」的摆设。
+        val duotoneSwap = unselectedGlyphAnchor.replace("AppGlyphLayer.StrokeOnly", "AppGlyphLayer.Duotone")
+        assertEquals(0, count(duotoneSwap, unselectedGlyphAnchor), "反空转失控：StrokeOnly→Duotone 的偷换形状仍满足实参级锚")
+        assertEquals(0, count(duotoneSwap, strokeOnlyLayerAnchor), "反空转失控：偷换成 Duotone 后层锚竟还有命中")
+        val layerOmitted = "AppGlyph(icon = tab.glyph, tint = tint, size = 22.dp)"
+        assertEquals(0, count(layerOmitted, unselectedGlyphAnchor), "反空转失控：省略 layer（默认 Duotone）竟满足实参级锚")
+        assertEquals(0, count(layerOmitted, strokeOnlyLayerAnchor), "反空转失控：省略 layer 后层锚竟还有命中")
+        val reordered = "AppGlyph(icon = tab.glyph, tint = tint, layer = AppGlyphLayer.StrokeOnly, size = 22.dp)"
+        assertEquals(0, count(reordered, unselectedGlyphAnchor), "反空转失控：实参换序的形状竟满足逐字锚（锚点没钉到实参段）")
+        assertEquals(1, count(unselectedGlyphAnchor, unselectedGlyphAnchor), "反空转失控：正向形状不满足自身锚点，锚点写歪了")
     }
 
     // ---------- 用例：版式承重（F5-03 Task 11 成果） ----------
