@@ -50,6 +50,39 @@ class TodayPlanScreenTest {
         composeRule.onNodeWithContentDescription("重试").assertExists()
     }
 
+    /**
+     * F3（修复轮 1 / 评审 I-1）：查词入口必须**四态常驻**。14B 把它收进了只在 Ready 分支渲染的
+     * `TodayPlanEntryGroup`，于是缺配置 / 不可用两态下学习 tab 内没有任何查词出口
+     * （`AppTab` 四枚里没有查词 tab），与 `AGENTS.md`「无网络或无 AI Key 时……离线查词仍应可用」相抵。
+     *
+     * 拆成两条 `@Test` 而不是在一条里渲染两个态：本仓 Compose connected 测试一台设备一个用例只
+     * `setContent` 一次（同一次测试里第二次 `setContent` 会让测试宿主崩），这是既有约束。
+     */
+    @Test fun search_entry_is_reachable_in_non_ready_state_missing_setup() {
+        var opened = 0
+        composeRule.setContent { TodayPlanScreen(TodayPlanUiState.MissingSetup, onOpenSearch = { opened++ }) }
+        composeRule.onNodeWithTag("today_plan_search_entry")
+            .assertExists()
+            .assertHasClickAction()
+            .performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, opened)
+        composeRule.onNodeWithContentDescription("搜索单词或短语").assertExists()
+    }
+
+    /** F3 的另一半：计划读取失败（`Unavailable`）时「查一个词」这条出路仍然在。 */
+    @Test fun search_entry_is_reachable_in_non_ready_state_unavailable() {
+        var opened = 0
+        composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Unavailable, onOpenSearch = { opened++ }) }
+        composeRule.onNodeWithTag("today_plan_search_entry")
+            .assertExists()
+            .assertHasClickAction()
+            .performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, opened)
+        composeRule.onNodeWithContentDescription("搜索单词或短语").assertExists()
+    }
+
     @Test fun ready_renders_task_counts_and_start_learning_entry() {
         var started = 0
         composeRule.setContent {
@@ -216,9 +249,26 @@ class TodayPlanScreenTest {
      *
      * 「今天完成了几项」那一格用 `AppType.Display`（34sp），其余数字（小标题、整册百分比、整册词数、
      * 未学、明细、工作量图例）只能是它的注脚。compose-ui 1.10 的语义节点里**没有** FontSize 属性
-     * （`SemanticsProperties.FontSize` 在这个 BOM 上不存在），所以这里按「渲染高度」复算尺寸：
-     * 34sp 对 13/12sp 的实测行高比约 2.6 倍，判据取「不足一半」，既足够宽松又不会放过
-     * 「把某行注脚又升回 Title/Headline」这类回退（那会立刻超过一半）。
+     * （`SemanticsProperties.FontSize` 在这个 BOM 上不存在），所以这里按「渲染高度」复算尺寸。
+     *
+     * **阈值为什么是 0.45（修复轮 1 的 F2，`emulator-5574` @ 420dpi 实测）**：
+     *  | 档 | sp | 本用例实测渲染高度 | 对 Display 的行高比 |
+     *  |---|---|---|---|
+     *  | `Display`（今日完成数） | 34 | 105.0px | 1.000 |
+     *  | `Footnote`（本用例采样的 7 行注脚） | 13 | 40.0px | **0.381** |
+     *  | `Label`（`today_plan_task_total` 小标题） | 12 | 37.0px | 0.352 |
+     *  | `Title`（词书名那一处，实测探针） | 17 | 52.0px | **0.495** |
+     *  | `Headline`（推算：行高随字号线性） | 24 | ≈74.1px | ≈0.706 |
+     *
+     * 旧判据写作 `h * 2f < displayHeight`，即阈值 0.5——代入实测：`52 × 2 = 104 < 105` **成立**，
+     * 也就是说「把注脚升回 `Title`」这一形在旧判据下是绿的（余量只有 1px，评审 C-1 的代数边界分析被实测证实）。
+     * 改成显式双阈值后：`0.45` 相对实测注脚上限 `0.381` 留 0.069 余量（字体度量/动态字体缩放的一般抖动），
+     * 又相对 `Title` 的 `0.495` 留出 0.045 的**判红**空间；`Headline` 及以上更是远超。
+     * 覆盖声明也要订正（旧 KDoc 自称「不会放过升回 Title/Headline」，实测对 Title 是失守的）：
+     * **本条兜住 ≥ `Title`（17sp）的所有升档**，`AppType.Title` 只许出现在词书名那一处由
+     * `TodayPlanNumberAuthorityTest.display_is_used_exactly_once_and_anchors_the_total_progress_slot`
+     * 的全文件读数钉死；「屏内新增第二枚大字号数字」这一形同样由该条源码判据负责（本条只采样固定标签，
+     * 新标签天然不在名单里）。
      */
     @Test fun ready_presents_todays_numbers_with_one_display_authority() {
         composeRule.setContent {
@@ -245,21 +295,28 @@ class TodayPlanScreenTest {
             "today_plan_workload_new_label",
         ).forEach { tag ->
             val node = composeRule.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode()
+            val ratio = node.boundsInRoot.height / displayHeight
             assertTrue(
-                "$tag 的渲染高度 ${node.boundsInRoot.height}px 不小于权威数字 ${displayHeight}px 的一半——它没降到注脚档",
-                node.boundsInRoot.height * 2f < displayHeight,
+                "$tag 的渲染高度 ${node.boundsInRoot.height}px 对权威数字 ${displayHeight}px 的比值=$ratio，" +
+                    "超过注脚上限阈值 $MaxFootnoteToDisplayRatio——它没降到注脚档" +
+                    "（实测：Footnote 40.0/105.0=0.381，Label 37.0/105.0=0.352，Title 52.0/105.0=0.495）",
+                ratio <= MaxFootnoteToDisplayRatio,
             )
         }
     }
 
     /**
-     * AC-R-20 的版面侧：就绪态收成「1 枚主 CTA + 一组入口行」。
+     * AC-R-20 的版面侧：就绪态收成「1 枚主 CTA + 一组入口行」+ 一条常驻查词。
      *
-     * 三条判据：① 整屏可点目标从「8 枚整宽按钮 + 常驻搜索条」收成 9 枚（主 CTA、受解锁态约束的
-     * 阅读文章、7 条入口行），这个数字是**闭合集合**，多一枚少一枚都红；
-     * ② 7 条入口行都在同一个组容器里、都是可点目标、都不低于 48dp 触控下限（F5-03），
-     * 且组高 = 行高之和（分组是真的，不是「贴了个 tag 的空壳」）；
-     * ③ 组内不得出现品牌渐变的两个端点色——渐变归主 CTA 一处，入口行是弱档 tint 底。
+     * 判据四条：① 整屏可点目标恰为 **9** 枚——1 主 CTA（`today_plan_start_learning`）+ 1 受解锁态约束的
+     * 阅读文章 + 1 **常驻**查词 + 6 条组内入口行。这个 9 是 AC-R-20 的**闭合集合**，多一枚少一枚都红；
+     * 批 3（Task 19–26「其余屏与入口分组重排」）若增删入口，必须**同时**改这条判据，并在
+     * `docs/superpowers/plans/2026-10-17-ui-redesign.md` 里留名说明改动理由——红因与 AC-R-20 无关时，
+     * 计划里那一行就是免责凭据（评审 I-6/I-7 预告的「删两条切 tab 入口」正落在这条上）。
+     * ② 组内 6 行都在同一个组容器里、都可点、都不低于 48dp 触控下限（F5-03），且组高 = 6 行之和
+     * （分组是真的，不是「贴了个 tag 的空壳」）；
+     * ③ 查词那一行**必须落在组容器之外**（F3：它四态常驻，跟着组走就只在 Ready 态出现）；
+     * ④ 组内不得出现品牌渐变的两个端点色——渐变归主 CTA 一处，入口行是弱档 tint 底。
      */
     @Test fun ready_groups_entry_actions_and_keeps_one_primary_cta() {
         composeRule.setContent {
@@ -269,7 +326,6 @@ class TodayPlanScreenTest {
             )
         }
         val rowTags = listOf(
-            "today_plan_search_entry",
             "today_plan_open_wordbook_words",
             "today_plan_open_vocabulary",
             "today_plan_open_learning_records",
@@ -277,7 +333,23 @@ class TodayPlanScreenTest {
             "today_plan_learning_tools",
             "today_plan_open_setup_entry",
         )
-        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1 + 1 + rowTags.size)
+        val persistentSearchTag = "today_plan_search_entry"
+        // ① 闭合集合 = 1 主 CTA + 1 阅读文章 + 1 常驻查词 + 6 组内行 = 9。
+        //    用 fetchSemanticsNodes().size + assertEquals 而不是 assertCountEquals，是为了把「为什么是 9」
+        //    与改法流程写进失败消息（compose 1.10 的 assertCountEquals 没有自定义消息形参）。
+        val clickable = composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes()
+        assertEquals(
+            "本屏可点节点的**闭合集合**必须是 9 = 1 主 CTA(today_plan_start_learning) + 1 受解锁态约束的" +
+                "阅读文章(today_plan_open_reading) + 1 常驻查词($persistentSearchTag) + 6 条入口组内行。" +
+                "这是 AC-R-20 的收成结果，多一枚（新的整宽按钮 / 第二枚主 CTA）少一枚（把查词又收进组里 / " +
+                "删掉某条出口）都红。批 3（Task 19–26「其余屏与入口分组重排」，含内容审计预告的" +
+                "「删两条切 tab 入口」）若增删本屏入口，必须**同时**改这条判据，并在 " +
+                "docs/superpowers/plans/2026-10-17-ui-redesign.md 的批 3 段落里留名说明改动理由；" +
+                "静态口径（EntryRow 份数、PillButton 唯一、标签白名单）由 " +
+                "TodayPlanNumberAuthorityTest.the_screen_keeps_one_primary_cta_and_entry_rows_for_every_other_action 负责。",
+            1 + 1 + 1 + rowTags.size,
+            clickable.size,
+        )
 
         val group = composeRule.onNodeWithTag("today_plan_entry_group")
         group.performScrollTo()
@@ -297,15 +369,42 @@ class TodayPlanScreenTest {
             )
         }
         assertTrue(
-            "入口组高 ${groupBox.height}px 与 7 条行之和 ${rowsHeight}px 对不上——分组不是逐条相接的行",
+            "入口组高 ${groupBox.height}px 与 6 条行之和 ${rowsHeight}px 对不上——分组不是逐条相接的行",
             kotlin.math.abs(groupBox.height - rowsHeight) <= with(composeRule.density) { 2.dp.toPx() },
         )
-        // 品牌渐变只许留在主 CTA 一处：组容器**可见部分**内不得出现渐变两端色
+        // ③ 常驻查词在组**外**：它跟着 `when (state)` 走，四个态都要能看见（F3 / 评审 I-1）。
+        //    写进组里 = 只在 Ready 态存在，本条判据正是用来拦住那次回退的。
+        val searchRow = composeRule.onNodeWithTag(persistentSearchTag)
+        searchRow.performScrollTo().assertHasClickAction()
+        val searchBounds = searchRow.fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "$persistentSearchTag 被收进了入口组容器（组 $groupBox / 行 $searchBounds）——" +
+                "查词入口必须四态常驻，收进组里等于只在就绪态提供查词出口",
+            !(searchBounds.top >= groupBox.top - 1f && searchBounds.bottom <= groupBox.bottom + 1f &&
+                searchBounds.left >= groupBox.left - 1f && searchBounds.right <= groupBox.right + 1f),
+        )
+        assertTrue(
+            "$persistentSearchTag 的行高 ${searchBounds.height}px 低于 48dp 触控下限（${minTouchPx}px）",
+            searchBounds.height >= minTouchPx,
+        )
+        // ④ 品牌渐变只许留在主 CTA 一处：组容器**可见部分**内不得出现渐变两端色
         // （#A8F3C8 / #65D3B9，见 GlassButton.kt:81 与 MintPalette.kt:78）。
         // 组比视口高，captureToImage 只能拿到可见区，所以这条是「可见部分」判据，
         // 静态全量判据由 TodayPlanNumberAuthorityTest 的源码口径负责。
         assertNoRenderedColor("today_plan_entry_group", 0xFFA8F3C8.toInt())
         assertNoRenderedColor("today_plan_entry_group", 0xFF65D3B9.toInt())
+    }
+
+    private companion object {
+        /**
+         * 注脚行高对权威数字（`AppType.Display`）的上限阈值。
+         *
+         * 选取理由与实测数据见 [ready_presents_todays_numbers_with_one_display_authority] 的 KDoc：
+         * `emulator-5574` @ 420dpi 实测 Footnote/Display = 40.0/105.0 = 0.381，
+         * Title/Display = 52.0/105.0 = 0.495，故 0.45 既放过注脚与 `Label`（0.352），
+         * 又能判红「升回 Title」这一档（旧判据 `h*2 < H` 的 0.5 阈值在这一档只有 1px 余量，实测放过）。
+         */
+        const val MaxFootnoteToDisplayRatio = 0.45f
     }
 
     private fun contrastRatio(a: Int, b: Int): Double {

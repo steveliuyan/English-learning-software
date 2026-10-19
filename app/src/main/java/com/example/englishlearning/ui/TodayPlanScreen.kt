@@ -57,7 +57,12 @@ import com.example.englishlearning.ui.theme.appDomain
  *     （`text1`/`text2`）不带强调色——「今天到底做了多少」只有一个视觉重量，其余数字是同一条信息的注脚。
  *  2. **八枚整宽按钮收成 1 CTA + 入口行组**：只有「继续学习/复习」回答「今天做什么」，它留在主操作位；
  *     阅读文章是**受解锁态约束**的支撑动作（enabled 态与解锁文案都要留在行为面上，批 3 才并成状态点），
- *     故保持本屏唯一一枚 M3 `Button`；其余 6 个目录型动作与页首常驻搜索条一起收进 [TodayPlanEntryGroup]。
+ *     故保持本屏唯一一枚 M3 `Button`；其余 6 个目录型动作收进 [TodayPlanEntryGroup]。
+ *     **查词条例外**（修复轮 1 的 F3）：它是四态常驻的出口，留在 `when (state)` **之前**的独立卡里，
+ *     跟着入口组走会让缺配置 / 不可用 / 加载态失去查词出口，与 `AGENTS.md` 的离线可用口径相抵。
+ *     于是本屏可点节点的**闭合集合 = 9**：1 主 CTA + 1 阅读文章 + 1 常驻查词 + 6 条组内行
+ *     （判据在 `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta`，
+ *     增删入口要同时改那条判据并在批 3 计划里留名）。
  *  3. **取色只读动态 token**：中性色 `appColors()`、域色 `appDomain(...)`，本屏不再有裸 hex、静态令牌读点、
  *     `Mint*` 快捷名与库内排印档。三形裸 hex 的域色对位与各自行由写在 [WorkloadKind.color] 与
  *     [TodayPlanEntryGroup] 上。
@@ -91,6 +96,31 @@ fun TodayPlanScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         AppScreenHeader(title = "今日学习计划")
+        // F3（修复轮 1 / 评审 I-1）：查词入口**四态常驻**，位置在 `when (state)` 之前。
+        // 上一版把它收进了只在 Ready 分支渲染的 [TodayPlanEntryGroup]，于是缺配置 / 不可用 / 加载
+        // 三态下学习 tab 内没有任何查词出口（四个 tab 里也没有查词 tab），与 `AGENTS.md`
+        // 「无网络或无 AI Key 时……离线查词仍应可用」相抵：计划读不出来时，用户连「查一个词」都做不到。
+        // 内容审计只要求「查词条**移出页首**」（不是移出本屏），所以这里把它留在页头下方第一张卡，
+        // 单套一张与入口组同规格的卡（`surface` 容器 + 1dp `outlineSoft` 描边 + 18dp 圆角），
+        // 保住「常驻搜索条」的视觉独立性，不与目录型动作混进同一张卡。
+        Card(
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp)),
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                EntryRow(
+                    icon = AppIcon.Search,
+                    domain = AppDomain.Library,
+                    title = "查词",
+                    iconTone = EntryIconTone.Tint,
+                    modifier = Modifier.testTag("today_plan_search_entry").semantics { contentDescription = "搜索单词或短语" },
+                    onClick = onOpenSearch,
+                )
+            }
+        }
         when (state) {
             TodayPlanUiState.Loading -> {
                 CircularProgressIndicator(
@@ -167,9 +197,17 @@ fun TodayPlanScreen(
                                     .fillMaxWidth()
                                     .padding(top = 2.dp)
                                     .testTag("today_plan_book_progress"),
-                                // 整册进度属于「学习材料」这一域，与下方「今日新增」色点同源。
-                                // 取 deep 不取 base：这是压 `surface` 的图形，spec §2.1 的 base 端
-                                // （学习域 #0A84FF）只有 3.6:1，deep 端 6.4:1 才稳过非文本 3:1 线。
+                                // 整册进度属于「学习材料」这一域，与下方「今日新增」色点、工作量 NEW 分段、
+                                // 词书单词入口行同源。
+                                // F5（修复轮 1 / 评审 I-4）订正说辞：**取 deep 不是为了「过 3:1 线」**——
+                                // 压 `surface` 的图形对比度学习域 base（浅套 #0A84FF）实测 3.647:1、
+                                // deep（浅套 #075EB4）6.424:1，**两端都已过非文本 3:1 线**（旧注释把 base
+                                // 描述成「只有 3.6:1 所以不过线」是错的，照抄这条推理会把合法的 base 站点
+                                // 当缺陷去改）。真理由是**同一概念在本屏只许一套颜色**：这条填充与
+                                // 「今日新增」色点、`TodayWorkloadBar` 的 NEW 分段、词书单词入口行读同一个
+                                // `appDomain(Learn).deep`，所以这里也读 deep（spec §2.1 讲的「base 端 2.06–2.11
+                                // 不过 3:1」是**白字/白描边压 base 填充**那一族，对位用法见下方 [WorkloadKind.color]）。
+                                // 轨道同样用全值 `colors.outlineSoft`（与分段条同源，见 [TodayWorkloadBar] 的 F4 说明）。
                                 color = appDomain(AppDomain.Learn).deep,
                                 trackColor = colors.outlineSoft,
                             )
@@ -279,7 +317,6 @@ fun TodayPlanScreen(
                 }
                 TodayPlanEntryGroup(
                     vocabularyCount = vocabularyCount,
-                    onOpenSearch = onOpenSearch,
                     onOpenWordBookWords = onOpenWordBookWords,
                     onOpenVocabulary = onOpenVocabulary,
                     onOpenLearningRecords = onOpenLearningRecords,
@@ -293,12 +330,16 @@ fun TodayPlanScreen(
 }
 
 /**
- * 入口行组（AC-R-20 的「一组入口行」）：原先 6 枚整宽按钮 + 页首常驻搜索条收成一张卡里的 7 条共享
- * [EntryRow]，除首行外每条一条顶线（R-10.5）。
+ * 入口行组（AC-R-20 的「一组入口行」）：原先 6 枚整宽按钮收成一张卡里的 **6 条**共享 [EntryRow]，
+ * 除首行外每条一条顶线（R-10.5）。
+ *
+ * **查词不在本组里**（修复轮 1 的 F3 / 评审 I-1）：它原先是本组首行，而本组只在 `is TodayPlanUiState.Ready`
+ * 分支渲染，导致缺配置 / 不可用 / 加载三态下学习 tab 内没有任何查词出口。查词现在是页头下方那张
+ * **常驻**卡里的一行（见 [TodayPlanScreen] 里 `when (state)` 之前那段），域色对位（`Library`）不变。
  *
  * 域色对位（每枚都有来历，不是凑色）：
- *  - 查词 → `Library`、词书单词 → `Learn`、生词本 → `Reading`：逐字对应稿 `mockups.html:911-916` 的
- *    `--d-library` / `--d-learn` / `--d-reading` 三行；
+ *  - 词书单词 → `Learn`、生词本 → `Reading`：逐字对应稿 `mockups.html:911-916` 的
+ *    `--d-library` / `--d-learn` / `--d-reading` 三行（`--d-library` 那一行现在由常驻查词条读）；
  *  - 学习记录 → `Learn`（它记的是学习行为本身，与「词书单词」同一域，本屏不给它第二种颜色）；
  *  - 打卡与成就 → `Review`：稿「连续与记录」那一组用的就是 `--d-review`（`mockups.html:930`），
  *    打卡页自身的强调色也是复习域（`CheckInScreen.kt` 通体 `DomainColors.Review.deep`）。**这一枚同时
@@ -308,7 +349,7 @@ fun TodayPlanScreen(
  *    （`AppScreen.kt:1536`），`调整词书与目标` 打开的是学习设置，稿也把它并进设置页同名条目。
  *
  * 图标容器一律 [EntryIconTone.Tint]（R-10.2）：本屏的饱和底归主 CTA 一处，入口行用弱档底色，
- * 免得七行渐变把「今天做什么」压下去。
+ * 免得七条行（6 组内 + 1 常驻）都上渐变底，把「今天做什么」压下去。
  *
  * `contentDescription` 留在调用方传进的 `modifier` 上（与行本身同一枚可点节点），既保住既有用例
  * （`AppScreenTest` 按「学习记录」「调整词书与目标」这些描述点导航）也不为了迁就组件签名丢无障碍语义。
@@ -316,7 +357,6 @@ fun TodayPlanScreen(
 @Composable
 private fun TodayPlanEntryGroup(
     vocabularyCount: Int?,
-    onOpenSearch: () -> Unit,
     onOpenWordBookWords: () -> Unit,
     onOpenVocabulary: () -> Unit,
     onOpenLearningRecords: () -> Unit,
@@ -335,20 +375,11 @@ private fun TodayPlanEntryGroup(
     ) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             EntryRow(
-                icon = AppIcon.Search,
-                domain = AppDomain.Library,
-                title = "查词",
-                iconTone = EntryIconTone.Tint,
-                modifier = Modifier.testTag("today_plan_search_entry").semantics { contentDescription = "搜索单词或短语" },
-                onClick = onOpenSearch,
-            )
-            EntryRow(
                 icon = AppIcon.BookOpen,
                 domain = AppDomain.Learn,
                 title = "词书单词",
                 subtitle = "整册浏览",
                 iconTone = EntryIconTone.Tint,
-                topDivider = true,
                 modifier = Modifier.testTag("today_plan_open_wordbook_words").semantics { contentDescription = "词书单词" },
                 onClick = onOpenWordBookWords,
             )
@@ -462,9 +493,14 @@ private fun learnedPercentLabel(progress: WordBookProgress): String {
  *  - `LEARNED` → `AiSpeech`（已学 = 品牌薄荷，与「继续学习」的品牌主色同族）；
  *  - `REVIEW` → `Review`（复习域；与「今日复习」色点、打卡入口同一颜色）；
  *  - `NEW` → `Learn`（学习域；与「今日新增」色点、词书单词入口同一颜色）。
- * 三档一律取 `deep` 不取 `base`：它们是压在 `surface`/`outlineSoft` 底上的小面积图形，
- * spec §2.1 的 `base` 端（复习 #FF9F0A、AI #2EC99C）只有 2.06–2.11:1，进不了非文本 3:1 线，
- * `deep` 端 4.02–6.42:1 才成立；深色档 `deep == base`，观感仍是亮色分段。
+ *
+ * 三档一律取 `deep` 不取 `base`，但**两域的理由不同**（F5 / 评审 I-4 的订正，别一锅烩）：
+ *  - `Review` 与 `AiSpeech` 的 base 端（浅套 #FF9F0A、#2EC99C）压 `surface` 实测只有 **2.06:1 / 2.11:1**，
+ *    真进不了非文本 3:1 线（spec §2.1 给的就是这一族数字），所以必须 `deep`（浅套 5.128 / 4.016:1）；
+ *  - `Learn` 的 base 端（浅套 #0A84FF）压 `surface` 实测 **3.647:1，本身已经过线**——它取 `deep`
+ *    （6.424:1）是为了与整册进度条、「今日新增」色点、词书单词入口行**同源一套颜色**，
+ *    不是因为它不合规。把这条写成「base 不过线」会误导后续屏去「修」合法的 base 站点。
+ * 深色档 `deep == base`，观感仍是亮色分段。
  */
 @Composable
 private fun WorkloadKind.color(): Color = when (this) {
@@ -498,7 +534,13 @@ private fun TodayWorkloadBar(workload: TodayWorkload) {
                 .fillMaxWidth()
                 .height(10.dp)
                 .clip(shape)
-                .background(colors.outlineSoft.copy(alpha = 0.35f)),
+                // F4（修复轮 1 / 评审 I-3）：轨道色用**全值** `colors.outlineSoft`，与本页上方整册进度条
+                // （`trackColor = colors.outlineSoft`）同一概念同一值；稿 `mockups.html:171/174/877/951/977`
+                // 五处的未填充段也一律是全值 `var(--outline-soft)`。原先这里做 `.copy(alpha = 0.35f)`
+                // 是把稿要求的轨道擦掉（浅套压 surface 只剩 1.05:1、深套 1.07:1），属 off-token 自配稀释。
+                // 轨道本身属**装饰**：进度信息由填充段长度 + 条下的图例数字承载，不许后续席次把它当
+                // 3:1 图形对比债务去改（WCAG 1.4.11 只约束传达信息的图形）。
+                .background(colors.outlineSoft),
         ) {
             workload.segments.forEach { segment ->
                 Box(
