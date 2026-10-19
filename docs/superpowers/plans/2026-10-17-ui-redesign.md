@@ -1575,6 +1575,37 @@ internal val MintBackground: Color
 
 - [ ] **Step 4: 门控 + connected + 提交**（`feat(ui-learning): 今日计划收成单一主按钮与入口行，今日数字一处权威`）。
 
+**拆席裁决（R-14.2，控制者据首任实现者中断现场写入；AGENTS.md「范围变化先改计划」）**：
+
+首任实现者在 150 轮上限处中断，现场只留下一份未入库的 JVM 契约草案
+`app/src/test/.../ui/TodayPlanNumberAuthorityTest.kt`（254 行，6 条用例 + 一条防空转自证；生产码零改动，
+`git status` 除该文件外干净）。复盘结论：**Task 14 是两个可独立评审的面**——
+①共享组件 `PillButton` 的三档配对（消费面 15 个文件、波及 11 屏 connected）；
+②`TodayPlanScreen` 一屏的版面收成与 token 清扫（该屏现存量：裸 hex 5 处、`Mint*` 读点 40、
+`FontWeight.` 12、`MaterialTheme.typography.` 11、`Button(` 10）。一席吞下两头必然超轮次预算。
+裁决：**拆成 Task 14A / Task 14B，各走一遍实现 → 独立评审 → 至多一轮修复 → 一次窄复评**。
+
+- **顺序 14B → 14A**（不是 14A 优先）。理由很实际：14B 的 RED 判据就是那份草案，
+  它必须在 14B 收尾时转绿，否则 `testDebugUnitTest` 全量跑不动；若先做 14A，
+  就得把这份未入库草案挪出源码树暂存，多一道「测试文件搬家」的不可追溯动作。
+  先 14B 还有一条产品侧理由：`TodayPlanScreen.kt:202` 那枚 `PillButton` 走默认 accent（品牌渐变分支，
+  R-14.1 ① 判定现状已合规），所以本屏不依赖 14A 就能深色可用；14A 随后统一改组件本体，
+  把包括这枚 CTA 在内的全部消费面一起复算。
+- **Task 14B 范围**：`TodayPlanScreen.kt` 版面收成 1 主 CTA + 入口行组、今日数字单一权威、
+  五处裸 hex 与 Workload/计数卡色点改域色、该屏 `Mint*`/`FontWeight.`/`MaterialTheme.typography.` 清扫、
+  seed 同步递减；**不碰** `GlassButton.kt`/`PillButton` 本体。既有判据草案可修订，
+  但**每条修订必须在报告里写明理由**（草案与 brief 冲突时以 brief + R-14.1 为准）。
+- **Task 14A 范围**：`components/glass/GlassButton.kt` 三档按 R-14.1 落地（Primary 非品牌域容器收窄到
+  `accent.deep` 或 `deep→lerp(deep,Black,0.15f)`；Text/Secondary 前景按套分叉 浅 `deep`/深 `base`；
+  容器与描边从 `AppPalette.Surface`/`Separator` 迁 `appColors()`）+ 新增七域 × 两套 × 三档 JVM 对比度契约
+  （仿 `EntryRowInkTest`，含 brief ③ 点名两条「会被拒的候选」）+ accent 默认值残口取证
+  （按「未显式传 accent」数，不能只搜 `AiSpeech` 字样）+ 15 个消费文件的 connected 复跑。
+- **`today_plan_progress_summary` 那张卡的三条保命项**（14B 重构本屏时必须保住，`ThemeModeSwitchTest`
+  的深色像素取样依赖它）：tag 名不变、容器继续读 `appColors().surface`、**不得**新增显式 `tonalElevation`
+  （主题把 `surfaceTint` 设成 `set.onMint`，混色通道是开着的，加到 ≥3dp 就把逐通道容差 2 撑破）。
+  这条口径写在 `ThemeModeSwitchTest.kt` 的 KDoc 里（提交 `0dd83bb`），别当注释忽略。
+
+
 ---
 
 ### Task 15: 词卡屏（回忆-揭晓流程 + 退出停播）
