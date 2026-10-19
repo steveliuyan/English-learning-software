@@ -41,7 +41,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.WordBookProgress
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
@@ -50,6 +49,7 @@ import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
+import com.example.englishlearning.ui.theme.appColors
 
 @Composable
 fun TodayPlanScreen(
@@ -163,11 +163,11 @@ fun TodayPlanScreen(
                 val totalDone = state.newDone + state.dueDone
                 val totalTarget = state.newTarget + state.dueTarget
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = AppPalette.Surface),
+                    colors = CardDefaults.cardColors(containerColor = appColors().surface),
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, AppPalette.Separator, RoundedCornerShape(18.dp))
+                        .border(1.dp, appColors().outlineSoft, RoundedCornerShape(18.dp))
                         .testTag("today_plan_progress_summary"),
                 ) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -212,12 +212,12 @@ fun TodayPlanScreen(
                         .testTag("today_plan_open_reading")
                         .semantics { contentDescription = "阅读文章" },
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, AppPalette.Separator),
+                    border = BorderStroke(1.dp, appColors().outlineSoft),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AppPalette.Surface,
+                        containerColor = appColors().surface,
                         contentColor = DomainColors.Reading.deep,
-                        disabledContainerColor = AppPalette.Surface,
-                        disabledContentColor = AppPalette.TextSecondary,
+                        disabledContainerColor = appColors().surface,
+                        disabledContentColor = appColors().text2,
                     ),
                 ) { Text("阅读文章", fontWeight = FontWeight.Medium) }
                 if (!state.isUnlocked) {
@@ -244,7 +244,7 @@ fun TodayPlanScreen(
                         .heightIn(min = 50.dp)
                         .testTag("today_plan_open_check_in")
                         .semantics { contentDescription = "查看打卡与成就" },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = Color(0xFF795B36)),
+                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = Color(0xFF795B36)),
                 ) { Text("查看打卡与成就", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenLearningRecords,
@@ -253,7 +253,7 @@ fun TodayPlanScreen(
                         .heightIn(min = 50.dp)
                         .testTag("today_plan_open_learning_records")
                         .semantics { contentDescription = "学习记录" },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = MintPrimaryDark),
+                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = MintPrimaryDark),
                 ) { Text("学习记录", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenWordBookWords,
@@ -262,7 +262,7 @@ fun TodayPlanScreen(
                         .heightIn(min = 50.dp)
                         .testTag("today_plan_open_wordbook_words")
                         .semantics { contentDescription = "词书单词" },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = MintPrimaryDark),
+                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = MintPrimaryDark),
                 ) { Text("词书单词", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenVocabulary,
@@ -274,7 +274,7 @@ fun TodayPlanScreen(
                                 "生词本，共 ${vocabularyCount} 个词"
                             }
                         },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppPalette.Surface, contentColor = MintPrimaryDark),
+                    colors = ButtonDefaults.buttonColors(containerColor = appColors().surface, contentColor = MintPrimaryDark),
                 ) {
                     Text(
                         if (vocabularyCount == null) "生词本" else "生词本（${vocabularyCount}个）",
@@ -309,9 +309,9 @@ private fun SearchEntry(onClick: () -> Unit) {
 private fun RowScope.CountCard(text: String, description: String, tag: String, marker: Color) {
     val shape = RoundedCornerShape(18.dp)
     Card(
-        colors = CardDefaults.cardColors(containerColor = AppPalette.Surface),
+        colors = CardDefaults.cardColors(containerColor = appColors().surface),
         shape = shape,
-        modifier = Modifier.weight(1f).border(1.dp, AppPalette.Separator, shape).testTag(tag)
+        modifier = Modifier.weight(1f).border(1.dp, appColors().outlineSoft, shape).testTag(tag)
             .semantics { contentDescription = description },
     ) {
         Row(
@@ -320,7 +320,7 @@ private fun RowScope.CountCard(text: String, description: String, tag: String, m
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(Modifier.size(7.dp).background(marker, CircleShape))
-            Text(text, style = MaterialTheme.typography.bodyMedium, color = AppPalette.TextPrimary)
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = appColors().text1)
         }
     }
 }

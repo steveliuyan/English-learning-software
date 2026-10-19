@@ -58,16 +58,16 @@ fun PillButton(
     // 品牌 CTA 以浅薄荷到柔和青绿渐变搭配深青字；其他域色维持原语义。
     val usesBrandGradient = accent == DomainColors.AiSpeech
     val contentColor = when {
-        !enabled -> AppPalette.TextSecondary
+        !enabled -> appColors().text2
         style == PillStyle.Primary && usesBrandGradient -> AppPalette.OnMintPrimary
         style == PillStyle.Primary -> Color.White
         else -> accent.deep
     }
-    val border = if (style == PillStyle.Secondary) BorderStroke(1.dp, AppPalette.Separator) else null
+    val border = if (style == PillStyle.Secondary) BorderStroke(1.dp, appColors().outlineSoft) else null
     val containerColor = when (style) {
         // Surface 无 brush 重载的等价写法：透明容器 + Modifier.background(brush, shape)
         PillStyle.Primary -> Color.Transparent
-        PillStyle.Secondary -> AppPalette.Surface
+        PillStyle.Secondary -> appColors().surface
         PillStyle.Text -> Color.Transparent
     }
     if (style == PillStyle.Primary) {
@@ -79,7 +79,7 @@ fun PillButton(
             }
             m.background(gradient, AppShape.Pill)
         } else {
-            m.background(AppPalette.Separator, AppShape.Pill)
+            m.background(appColors().outlineSoft, AppShape.Pill)
         }
     }
     Surface(

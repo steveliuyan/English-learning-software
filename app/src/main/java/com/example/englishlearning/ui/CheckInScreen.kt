@@ -39,13 +39,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.DailyLearningStats
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
+import com.example.englishlearning.ui.theme.appColors
 import java.time.DayOfWeek
 import java.time.YearMonth
 
@@ -116,7 +116,7 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
                     state.recentDays.forEachIndexed { index, day ->
                         val ratio = day.completionRatio
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(Modifier.fillMaxWidth().height((56 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) DomainColors.Review.deep else AppPalette.Separator).testTag("check_in_recent_bar_$index").semantics { contentDescription = "${day.localDate} 完成率 ${(ratio * 100).toInt()}%" })
+                            Box(Modifier.fillMaxWidth().height((56 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) DomainColors.Review.deep else appColors().outlineSoft).testTag("check_in_recent_bar_$index").semantics { contentDescription = "${day.localDate} 完成率 ${(ratio * 100).toInt()}%" })
                             Text(day.localDate.dayOfMonth.toString(), color = MintTextMuted, style = MaterialTheme.typography.labelSmall)
                         }
                     }
@@ -131,7 +131,7 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
                 state.week.take(7).forEachIndexed { index, day ->
                     val ratio = if (day.targetTaskCount > 0) (day.completedTaskCount.toFloat() / day.targetTaskCount).coerceIn(0f, 1f) else 0f
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) DomainColors.Review.deep else AppPalette.Separator).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
+                        Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) DomainColors.Review.deep else appColors().outlineSoft).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
                         Text(day.localDate.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA), color = MintTextMuted, style = MaterialTheme.typography.labelSmall)
                     }
                 }

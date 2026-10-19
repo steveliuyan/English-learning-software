@@ -50,6 +50,7 @@ import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
+import com.example.englishlearning.ui.theme.appColors
 
 /**
  * 「设置 · AI」下的 AI 服务管理页（二级全屏层）。
@@ -133,11 +134,11 @@ private fun AiProfileList(
         )
 
         when (state) {
-            AiProfileListUiState.Loading -> Text("正在读取本地配置…", style = AppType.Body, color = AppPalette.TextSecondary)
+            AiProfileListUiState.Loading -> Text("正在读取本地配置…", style = AppType.Body, color = appColors().text2)
             AiProfileListUiState.Unavailable -> Text(
                 text = "本机配置暂时读不出来，稍后再试。",
                 style = AppType.Body,
-                color = AppPalette.TextSecondary,
+                color = appColors().text2,
                 modifier = Modifier.testTag("ai_profiles_unavailable"),
             )
             is AiProfileListUiState.Ready -> {
@@ -148,7 +149,7 @@ private fun AiProfileList(
                     Text(
                         text = "还没有任何 AI 配置。添加一套之后，「AI 学」里的功能才有可以调用的服务。",
                         style = AppType.Body,
-                        color = AppPalette.TextSecondary,
+                        color = appColors().text2,
                         modifier = Modifier.testTag("ai_profiles_empty"),
                     )
                 }
@@ -185,8 +186,8 @@ private fun AiProfileRow(
     val interaction = remember { MutableInteractionSource() }
     Surface(
         shape = AppShape.Card,
-        color = AppPalette.Surface,
-        border = BorderStroke(1.dp, AppPalette.Separator),
+        color = appColors().surface,
+        border = BorderStroke(1.dp, appColors().outlineSoft),
         modifier = Modifier
             .fillMaxWidth()
             .pressableScale(interaction)
@@ -486,7 +487,7 @@ private fun VoiceOverlayOption(
         Text(
             label,
             style = AppType.Body,
-            color = if (selected) DomainColors.AiSpeech.deep else AppPalette.TextPrimary,
+            color = if (selected) DomainColors.AiSpeech.deep else appColors().text1,
         )
     }
 }
@@ -531,23 +532,23 @@ private fun EditorField(
             .testTag(tag)
             .semantics { contentDescription = label },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = AppPalette.Surface,
-            unfocusedContainerColor = AppPalette.Surface,
+            focusedContainerColor = appColors().surface,
+            unfocusedContainerColor = appColors().surface,
             focusedIndicatorColor = DomainColors.AiSpeech.base,
-            unfocusedIndicatorColor = AppPalette.Separator,
+            unfocusedIndicatorColor = appColors().outlineSoft,
             cursorColor = DomainColors.AiSpeech.base,
             focusedLabelColor = DomainColors.AiSpeech.deep,
-            unfocusedLabelColor = AppPalette.TextSecondary,
-            focusedTextColor = AppPalette.TextPrimary,
-            unfocusedTextColor = AppPalette.TextPrimary,
+            unfocusedLabelColor = appColors().text2,
+            focusedTextColor = appColors().text1,
+            unfocusedTextColor = appColors().text1,
         ),
     )
 }
 
 @Composable
 private fun CapabilityToggle(capability: AiCapability, selected: Boolean, onToggle: (Boolean) -> Unit) {
-    val background = if (selected) DomainColors.AiSpeech.base.copy(alpha = 0.12f) else AppPalette.Surface
-    val border = if (selected) DomainColors.AiSpeech.base else AppPalette.Separator
+    val background = if (selected) DomainColors.AiSpeech.base.copy(alpha = 0.12f) else appColors().surface
+    val border = if (selected) DomainColors.AiSpeech.base else appColors().outlineSoft
     Row(
         modifier = Modifier
             .fillMaxWidth()
