@@ -121,6 +121,39 @@ class WordRowSpeakerContractTest {
      */
     private val duplicateReadout = Regex("""contentDescription\s*=""")
 
+    // ---------- I-1（Task 16 修复轮 1，评审 M2 当席实证）：两枚文字的墨消费点 ----------
+
+    /**
+     * 主状态文字墨链：以朗读文案取内容的那枚 `Text`，必须在**自己的实参段内**接墨表的文案槽
+     * （[SpeakerButtonInk.label]）。`[^)]` 上界是「命中的那枚就是生效渲染路径」的承重：
+     * 没有它，主文字换墨后链会跨过主 `Text` 的闭合括号去吃尾缀槽的墨，绕墨照样绿（负控见探针）。
+     * 槽名后的负向前瞻灭掉「消费点写成对槽值的加工调用」这一族假形（`.copy(alpha = …)` 等）。
+     */
+    private val stateLabelInkChain = Regex(
+        """Text\(\s*text = speakerContentDescription\(state\),[^)]{0,120}?color = ink\.label(?![A-Za-z0-9_.])"""
+    )
+
+    /**
+     * 尾缀槽墨链（I-1 主受体）：从口音标注非空分支的**活分支头**起，分支体内的尾缀文字
+     * 必须在自己的实参段内接墨表文案槽。链认分支头字面形状 = 别的函数里、死分支前的同形墨不算数
+     * （Task 15 / 14B「锚必须绑生效路径」口径）；分支体**内部可达性**的残余边界登记在用例 KDoc，归批 3 结转族。
+     */
+    private val accentSuffixInkChain = Regex(
+        """if \(accentLabel != null\) \{[^)]{0,120}?Text\(\s*text = accentLabel,[^)]{0,120}?color = ink\.label(?![A-Za-z0-9_.])"""
+    )
+
+    /**
+     * 文案槽消费总账：**恰 2**——主状态文字 + 口音尾缀共用同一枚文案槽是设计（同墨同档），
+     * 本锚不是把「两处」当重复打；它打的是反向：把第三份同形墨塞进死分支/别处来喂上面两条窗口锚。
+     */
+    private val labelSlotConsumers = Regex("""color = ink\.label(?![A-Za-z0-9_.])""")
+
+    /** 绕墨直接形状（M2 本体族）：任何文字前景不得改接字形槽或药片底色槽（改后者即 1:1 隐形）。 */
+    private val textColorFromOtherInkSlot = Regex("""color = ink\.(?:glyph|backdrop)(?![A-Za-z0-9_.])""")
+
+    /** 命名色常量与 Color 构造调用凑色族（PillButtonInkTest R-14A-i.1 同口径的绕墨路径）。 */
+    private val textColorFromConstant = Regex("""Color\.[A-Za-z]|Color\(""")
+
     // ---------- WordRow.kt 规则形状 ----------
 
     /** 组件定义恰一处（第二处 = 同文件长出第二份词行）。 */
@@ -349,6 +382,61 @@ class WordRowSpeakerContractTest {
         }
     }
 
+    /**
+     * Task 16 修复轮 1（I-1 / 评审 M2 当席实证）：药片两枚文字的墨消费点补锚，封「尾缀槽绕墨」回归。
+     *
+     * 盲区成因：connected 读颜色不可行（Task 9 口径——`Text` 的着色不进语义树），而 M2 那发变异
+     * （尾缀前景从文案槽改成药片底色槽，标注当场 1:1 隐形）零新增符号、零字面量，
+     * 既不过静态令牌/裸 hex 锚，也不触文案与几何锚——两类既有 JVM 契约全绿存活。
+     * 故本用例把「哪枚 `Text` 消费哪枚墨槽」钉成消费形状（先例：PillButtonInkTest 的 I-1/M3 同族修复）：
+     *  - 两条**窗口链**（[stateLabelInkChain] / [accentSuffixInkChain]）各恰一次命中，且各自把
+     *    「实参段内」写进判据：墨必须长在渲染那枚文字的同一 `Text(...)` 调用里；尾缀链从
+     *    非空分支的**活分支头字面**起步，分支体外补的同形墨一律不吃（14B/Task 15 生效路径口径）；
+     *  - [labelSlotConsumers] 总账恰 2：主状态文字与尾缀共用文案槽是**设计**（同墨同档），
+     *    本账打的是第三份冒充——死分支/别处塞同形墨来喂窗口锚，总账当场失守；
+     *  - 两条反面锚（[textColorFromOtherInkSlot] / [textColorFromConstant]）把「换接自家另两枚槽」
+     *    与「命名色/构造器凑色」两族绕墨路径点名报错（配合既有的静态令牌/裸 hex 文件级 0 计数，
+     *    M2、AppPalette 静态墨、`Color.White`、浮点构造器四种退化形状各有受体，见探针自证）。
+     *
+     * 残余边界（登记，与 Task 15 复评 m-1 同族、整族结转批 3）：源码锚钉的是**形状与所在分支**，
+     * 钉不了分支体**内部**的可达性——若有人在尾缀分支体内再套一层恒假条件并把被拦文字的墨保持为
+     * 文案槽，本锚照绿；该形状同时违反本文件多条前提（实参段紧邻、总账恰 2），要绕全锚只能改渲染结构，
+     * 而设备侧「尾缀真实可见」的兜底归 connected/批 3 AC-R-12 走查。锚的取样前提是分支头保持现形状：
+     * 生产侧若合法重构该分支（如条件加严），本用例以「链计数掉 0」响亮红提示契约随形状联动更新，不许静默失焦。
+     */
+    @Test
+    fun pill_texts_consume_the_label_ink_on_their_live_paths() {
+        val source = uiComponentSource(SPEAKER_BUTTON)
+        assertEquals(
+            1,
+            countMatches(source, stateLabelInkChain),
+            "以朗读文案为内容的那枚文字必须在自己的实参段内接墨表文案槽作前景" +
+                "（换墨、把墨挪出本 Text、或加工槽值都判红——M2 同型的主文字侧一并封死）",
+        )
+        assertEquals(
+            1,
+            countMatches(source, accentSuffixInkChain),
+            "口音标注非空分支体内的尾缀文字必须在自己实参段内接墨表文案槽：" +
+                "评审 M2 的绕墨受体——换接底色槽（1:1 隐形）、静态令牌、命名色任一种，本链立即失守",
+        )
+        assertEquals(
+            2,
+            countMatches(source, labelSlotConsumers),
+            "文案槽消费恰两处：主状态文字 + 口音尾缀（同墨同档是设计，不是两份实现；" +
+                "第三份同形墨 = 喂窗口锚的死分支/别处冒充）",
+        )
+        assertEquals(
+            0,
+            countMatches(source, textColorFromOtherInkSlot),
+            "两枚文字前景都不得改接字形槽或药片底色槽（M2 直接形状点名）",
+        )
+        assertEquals(
+            0,
+            countMatches(source, textColorFromConstant),
+            "组件文件不得出现 Color.<命名色> 常量或 Color( 构造调用：绕墨同族路径（PillButtonInkTest R-14A-i.1 口径）",
+        )
+    }
+
     // ---------- 源码契约：WordRow.kt ----------
 
     /** 词行几何与可点面顺序：定义恰一处、48dp 下限恰一处、`clickable` 在 `padding` 之外、role 跟着可点性走、裁切档。 */
@@ -459,6 +547,38 @@ class WordRowSpeakerContractTest {
         assertEquals(0, countMatches("Text(text = \"播放发音\",", labelFromReadout), "负控：组件里另抄一份字面量不得命中")
         assertEquals(1, countMatches("semantics { contentDescription = label }", duplicateReadout), "正控：另设朗读文案必须被抓到")
         assertEquals(0, countMatches("Text(text = speakerContentDescription(state))", duplicateReadout), "负控：只靠可见文字承载语义不得被误判")
+
+        // I-1（评审 M2 当席实证）消费点锚的承重自证：现网形状两条链各命中一次、总账恰 2；
+        // M2 / 对调 / 静态墨 / 命名色四族退化形状各自有专属受体。片段用工厂拼两枚文字的取墨，避免手抄漂移。
+        fun pillTextBlocks(stateInk: String, suffixInk: String) =
+            "Text(\n    text = speakerContentDescription(state),\n    style = AppType.Body,\n    color = $stateInk,\n)\n" +
+            "if (accentLabel != null) {\n    Text(\n        text = accentLabel,\n        style = AppType.Body,\n        color = $suffixInk,\n    )\n}"
+        val liveTextBlocks = pillTextBlocks("ink.label", "ink.label")
+        assertEquals(1, countMatches(liveTextBlocks, stateLabelInkChain), "正控：主状态文字在自己实参段内接文案槽墨")
+        assertEquals(1, countMatches(liveTextBlocks, accentSuffixInkChain), "正控：活分支体内的尾缀文字接文案槽墨")
+        assertEquals(2, countMatches(liveTextBlocks, labelSlotConsumers), "正控：两枚文字同墨同档，总账恰 2（不是把两处判成重复）")
+
+        val m2Blocks = pillTextBlocks("ink.label", "ink.backdrop")
+        assertEquals(0, countMatches(m2Blocks, accentSuffixInkChain), "负控（评审 M2 本形）：尾缀墨换接底色槽，尾缀链必须失守——这就是当席红样")
+        assertEquals(1, countMatches(m2Blocks, labelSlotConsumers), "负控（评审 M2）：绕墨后文案槽总账从 2 掉到 1，总账锚同样有牙")
+        assertEquals(1, countMatches(m2Blocks, textColorFromOtherInkSlot), "负控（评审 M2）：错槽消费必须被反面锚点名，报错直指成因")
+
+        val swappedBlocks = pillTextBlocks("ink.backdrop", "ink.label")
+        assertEquals(
+            0,
+            countMatches(swappedBlocks, stateLabelInkChain),
+            "负控：主文字换墨后，链不得跨过自己 Text 的闭合去吃尾缀槽的墨——[^)] 上界的反空转自证",
+        )
+        assertEquals(1, countMatches(swappedBlocks, accentSuffixInkChain), "正控：尾缀链与主文字链互不牵连，对调只红主链与错槽锚")
+
+        val staticInkBlocks = pillTextBlocks("ink.label", "com.example.englishlearning.ui.theme.AppPalette.TextPrimary")
+        assertEquals(0, countMatches(staticInkBlocks, accentSuffixInkChain), "负控：尾缀换静态令牌墨，链失守")
+        assertEquals(1, countMatches(staticInkBlocks, staticPaletteRead), "负控：尾缀换 AppPalette 静态墨必须同时被既有静态读点锚抓到（双受体）")
+
+        assertEquals(0, countMatches(pillTextBlocks("ink.label", "Color.White"), accentSuffixInkChain), "负控：命名色常量不得算成接槽消费")
+        assertEquals(1, countMatches(pillTextBlocks("ink.label", "Color.White"), textColorFromConstant), "负控：Color.<命名色> 必须命中常量反面锚")
+        assertEquals(1, countMatches(pillTextBlocks("ink.label", "Color(0.5f, 0.5f, 0.5f)"), textColorFromConstant), "负控：浮点参数 Color( 构造凑色也命中（R-14A-i.1 口径）")
+        assertEquals(0, countMatches(pillTextBlocks("ink.label.copy(alpha = 0.5f)", "ink.label"), stateLabelInkChain), "负控：把直接取槽换成对槽值的加工调用不得算成消费点（前瞻收紧自证）")
 
         val goodRow = """
             val touchModifier = if (onClick == null) {
