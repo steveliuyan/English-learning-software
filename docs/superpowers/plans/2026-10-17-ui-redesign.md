@@ -1470,8 +1470,9 @@ internal val MintBackground: Color
   标题与副标题两档排印，**返回位保留现有 `TextButton`**；不给组件新增 `backContentDescription` 形参
   （那属批 1 组件契约变更，需要自己的用例与评审）。
 - **骨架共享化的既有偏差必须原样带走**：`WordBookCardShape` 是 18dp 而非 `AppShape.Card` 的 20dp，
-  注释（`:2080-2082`）写明理由：滑动删除底、描边与卡片必须同角，换 `AppShape` 会让红底从四角渗出
-  （`WordBookSwipeRowTest` 钉这一点）。所以 `ListSkeleton` 的圆角/行高/内边距走**形参**，
+  注释（`:2080-2082`）写明理由：滑动删除底、描边与卡片必须**同角**（卡身与删除底共用同一 `shape`
+  才是约束本身；`WordBookSwipeRowTest` 钉的是「静止时不露红底」，两者一起改成 20dp 它照样绿——
+  别把它当成 18dp 这个具体数值的守卫）。所以 `ListSkeleton` 的圆角/行高/内边距走**形参**，
   不许在组件里写死成 `AppShape.Card`；该屏继续传 18dp 那组参数，并**保留既有
   `testTag("wordbook_placeholder_$row")`**（connected 判据依赖它）。骨架保持零文案零数字
   （F1-01 无障碍口径：占位期播报「已学 0 词」比什么都不念更糟）。
@@ -1484,7 +1485,8 @@ internal val MintBackground: Color
   **不**断言骨架与真实卡逐像素同高——真卡带进度条约 130dp、骨架按最小行高约 74dp，是 `:2088-2096`
   注释里写明并刻意保留的取舍（首帧要「立刻有东西」，不是复刻终版面），把它判成同高等于推翻既有裁决。
   ③册与册之间必须是**真实分隔线**而不只是 `spacedBy` 空白：取相邻两卡之间那条缝的中点像素，
-  按当前主题档断言它等于 `appColors().outlineSoft`（浅套 `#E5EFE9` / 深套 `#233029`，容差与
+  按当前主题档断言它等于 `appColors().outlineSoft`（浅套 `#E4EFE9`（`AppColors.kt:52`，
+  控制者订正：本行原写 `#E5EFE9` 是笔误，测试取 token 不取 hex）/ 深套 `#233029`，容差与
   `ThemeModeSwitchTest` 同为逐通道 2），并写明变异证据——把画线调用删掉本条必须变红。
   取样按 `captureToImage()` + alpha ≥250 过滤（界外是透明像素，不筛就会把 0x000000 当成命中的颜色）。
 - [ ] **Step 2: 实现**：按 R-13.0 落地——页头换 `AppScreenHeader(title, subtitle, onBack = null)`（返回位保留）；
@@ -1501,6 +1503,31 @@ internal val MintBackground: Color
   `$HOME/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle.bat`）；
   connected 只走 `adb install -r` + `am instrument`（`emulator-5574`），
   跑 `WordbookPickerHeaderTest` + 既有 `SetupScreenScreenshotTest` + `WordBookSwipeRowTest`，全绿才算收口。
+
+**修复轮裁决（R-13.1，控制者据独立评审 `dab01a2`  findings 写入；AGENTS.md「范围变化先改计划」）**：
+
+- **C-1（Critical）本任务范围扩到 `ProfileCreationScreen` 页头**：`dab01a2` 从
+  `SharedComponentUniquenessRatchetTest` 页头族 seed 删了 `"AppScreen.kt"` 一行，但 `AppScreen.kt:1777`
+  仍有 `MaterialTheme.typography.headlineSmall` 读点——族判据是「读点存在 **且** 本文件没调
+  `AppScreenHeader(`」，`:1955` 接线后整个 `AppScreen.kt` 对这族永久隐形，正是批 2 开工判据
+  （本文 `:1303`）明文禁止的「补一行组件就准删 seed」。裁决走**清零**路线：同批把
+  `ProfileCreationScreen` 的两行裸页头换成 `AppScreenHeader(title = "先认识一下你", subtitle = "填写一个称呼，学习记录只保存在这台设备上。", onBack = null)`
+  （`AppScreenHeader.kt:105-118` 前景为 `colors.text1` / `colors.text2`，与 `MintPrimaryDark`/`MintTextMuted`
+  同源同值，浅套逐字不变；字号字重按统一组件变，属预期）。不采「补一枚点名读点数的锚」方案——
+  那等于给批 3 留一件要拆的东西，且批 2 开工判据已写明收紧属计划修订、批 2 不做。**收口判据**：
+  `grep -c "MaterialTheme.typography.headline" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt` == 0。
+- **I-1 `ContainerInkPairingContractTest` 对别名形失明**：`MigratedNeutralContainer` 只认字面
+  `appColors().surface`，本轮容器全走 `val colors = appColors()` + `colors.surface`，判据对本次交付一枪未发。
+  裁决：**先测再定**——扩谓词到别名形后跑真实扫描，绿则保留并补合成正反片段；红（批次外存量站点）则回退扩展
+  并把命中清单登记进批 3 账（本任务无权给别人的屏还债）。两种结果都必须把报告里「规避正则……通过」
+  改成事实描述：**判据抓不到 ≠ 契约放行**。
+- **I-2 浅色等价证据指错测试**：`SetupScreenScreenshotTest` 只做节点存在断言 + 落 PNG 供人看，
+  无基线比对，不能当像素守卫。真证据链是 `MintPalette.kt:42-72`（`Mint*` 本就是 `LocalAppColors` getter 桥，
+  迁移是纯改名，浅/深两档逐字不变）+ `AppColors.kt:49-50`（`tint2`/`tint3` 与被删两枚裸 hex 逐字相同）。
+- **登记不修**：m-5（无 connected 用例钉「屏级 wiring → 骨架」这条 loading 分支）、
+  `AppScreen.kt` 余 2 处裸 hex（`:2383` Switch / `:2427` Slider）与 3 处 `AppPalette.OnMintPrimary`
+  （`:1824/:1846/:2028`）——评审确认**不迁才对**：`:2028` 压在保持静态的 `AppleMintGradient` 上，
+  迁 `appColors().onMint`（深套 `#DFF6EC` 浅墨）会立刻造出「浅墨压浅渐变」不可读对。
 
 
 ---
