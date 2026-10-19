@@ -184,9 +184,13 @@ class ThemeModeSwitchTest {
      *    卡内排版重排都可能把取样点挪到笔画上，动态字体 2.0 档正是这条兜住的方向，见下）；
      *    ③相邻档判别力（容差必须容不下深套相邻填充，证「漏画容器」会在本用例判红而不是蒙过）。
      *    **①的前提写在主题侧**：本主题把 `surfaceTint` 设为 `set.onMint`（`MintGlassTheme.kt:113/151`），
-     *    它与 `surface` 逐通道差 200 上下；M3 `Card` 默认 `tonalElevation` 1dp 时 `DefaultElevationOverlay`
-     *    叠加 alpha 为 0，所以当前不混色——一旦有人给这张卡加到 ≥3dp，十几个百分点的 tint 会立刻把
-     *    2 档容差撑破，届时必须重算期望值（改用 `surfaceColorAtElevation`）而不是放大容差。
+     *    它与 `surface` 逐通道差 200 上下；当前不混色是**实测事实**——这张卡没显式传 `tonalElevation`
+     *    （`TodayPlanScreen.kt:168-175` 只给了 colors/shape/modifier），`DefaultElevationOverlay`
+     *    的叠加 alpha 因此为 0，取样与 token 的逐通道差实测 0。注意混色通道并没有被关掉：主题把 M3
+     *    `surface` 也设成了同一枚 `set.surface`
+     *    （`MintGlassTheme.kt:109/147`），`isSurfaceColor` 按数值成立，所以一旦有人给这张卡显式加
+     *    `tonalElevation` 到 ≥3dp，十几个百分点的 tint 会立刻把 2 档容差撑破——
+     *    届时必须重算期望值（改用 `surfaceColorAtElevation`）而不是放大容差。
      *
      * 期望值取自 [AppColorDark] / [AppColorLight] 的 `surface` token，不重抄 hex（同前两例的口径）。
      * 一个 `@Test` 只 `setContent` 一次（本仓真机怪癖：同一测试内两次 `setContent` 必崩）。
