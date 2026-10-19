@@ -135,7 +135,7 @@ fun SpeakerButton(
             .background(ink.backdrop)
             .clickable(role = Role.Button, onClick = { onClick(state) })
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppGlyph(
