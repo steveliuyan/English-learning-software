@@ -53,7 +53,7 @@ import kotlin.test.assertTrue
  * 批 2/批 3 每屏迁移的收口证据就是这张表对应行减到 0；批 3 收口时清零，或只剩经计划修订确认的不可迁移站点。
  */
 internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
-    "AppScreen.kt" to 4,
+    "AppScreen.kt" to 2,
     "TodayPlanScreen.kt" to 5,
     "ArticleReadingScreen.kt" to 1,
     "CheckInScreen.kt" to 1,
@@ -68,8 +68,6 @@ internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
  * 换成「行内容 → 应有次数」的 Map，而不是删掉重复条目蒙混过去。
  */
 internal val RawColorSeedSiteLines: List<String> = listOf(
-    "AppScreen.kt: targetValue = if (selected) MintPrimary else Color(0xFFDCEAE1),",
-    "AppScreen.kt: .background(Color(0xFFCDEDD9), RoundedCornerShape(50))",
     "AppScreen.kt: colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = Color(0xFFCDEFE1)),",
     "AppScreen.kt: inactiveTrackColor = Color(0xFFCDEFE1),",
     "ArticleReadingScreen.kt: style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF17342A)),",

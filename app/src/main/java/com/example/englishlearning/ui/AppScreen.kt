@@ -82,7 +82,10 @@ import com.example.englishlearning.export.WorksheetShareLauncher
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.ListSkeleton
 import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintLight
 import com.example.englishlearning.ui.theme.AppleMintMiddle
@@ -1848,7 +1851,7 @@ internal fun ErrorScreen(onRetry: () -> Unit) {
 }
 
 @Composable
-private fun LearningSetupScreen(
+internal fun LearningSetupScreen(
     profileId: String,
     viewModel: LearningSetupViewModel,
     onSaved: () -> Unit,
@@ -1947,16 +1950,12 @@ private fun LearningSetupScreen(
                 modifier = Modifier.semantics { contentDescription = "返回上一层" },
             ) { Text("← 返回上一层", fontWeight = FontWeight.Bold) }
         }
-        Text(
-            text = "选好词书，开始今天的积累",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MintPrimaryDark,
-        )
-        Text(
-            text = "每天一点点，学习会自然变成习惯。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MintTextMuted,
+        // 页头两档排印交统一组件承载（R-13.2）：`onBack = null`——本屏返回入口是既有的
+        // `← 返回上一层` TextButton（上方保留），它的中性表述不能改成页头写死的「返回」（R-13.2 / 全局约束 9）。
+        AppScreenHeader(
+            title = "选好词书，开始今天的积累",
+            subtitle = "每天一点点，学习会自然变成习惯。",
+            onBack = null,
         )
         SetupIntroductionCard()
         Text(
@@ -1972,28 +1971,20 @@ private fun LearningSetupScreen(
             color = MintTextMuted,
             modifier = Modifier.padding(bottom = 2.dp),
         )
-        // 册列表还在读盘时先立三行同尺寸骨架，让这一屏的第一帧就不是空的：
+        // 册列表还在读盘时先立三行同尺寸骨架，让这一屏的第一帧就不是空的；真实列表到位后逐册渲染，
+        // 册与册之间画一条真实 outlineSoft 分隔线，替换原先靠 Arrangement.spacedBy 撑出来的「幽灵间距」
+        // （spec §2.3 禁令）。只在列表为空时占位——删除词书后的重载不得把已有列表顶掉闪一次。
         // 用户投诉的是「打开选取词书先卡一下，然后整列突然蹦出来」（spec F1-01，决策 2026-10-17）。
-        // 只在列表为空时占位——删除词书后的重载不得把已有列表顶掉闪一次。
-        if (state.wordBooksLoading && state.wordBooks.isEmpty()) {
-            repeat(WORD_BOOK_PLACEHOLDER_ROWS) { row -> WordBookListPlaceholder(row) }
-        }
-        state.wordBooks.forEach { book ->
-            key(book.id) {
-                SwipableWordBookCard(
-                    book = book,
-                    selected = book.id == state.selectedWordBookId,
-                    progress = state.progressByBook[book.id],
-                    progressLoading = state.progressLoading,
-                    onSelect = { viewModel.selectWordBook(book.id) },
-                    onDelete = if (state.canDelete(book.id)) {
-                        { viewModel.requestDelete(book) }
-                    } else {
-                        null
-                    },
-                )
-            }
-        }
+        WordBookList(
+            wordBooks = state.wordBooks,
+            loading = state.wordBooksLoading,
+            selectedId = state.selectedWordBookId,
+            progressByBook = state.progressByBook,
+            progressLoading = state.progressLoading,
+            canDelete = state::canDelete,
+            onSelect = viewModel::selectWordBook,
+            onRequestDelete = viewModel::requestDelete,
+        )
         DailyTargetCard(
             target = state.dailyNewTarget,
             onTargetChange = viewModel::updateDailyNewTarget,
@@ -2084,64 +2075,82 @@ private val WordBookCardMinHeight = 72.dp
 private val WordBookCardContentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
 
 /**
- * 词书列表首帧骨架：与真实卡片同圆角、同最小行高、同内边距的空壳。
+ * 词书列表的呈现层：首帧读盘时铺三行共享骨架（[ListSkeleton]），列表到位后逐册渲染，
+ * 册与册之间画一条真实 `outlineSoft` 分隔线。
  *
- * 刻意只有色块、没有任何文案和数字：占位行手里还没有数据，向 TalkBack 播报「已学 0 词 / 共 0 词」
- * 这种假数字比什么都不念更糟（spec F1-01 无障碍口径）。行距交给外层 Column 的 spacedBy，
- * 所以这里不额外加外层 padding。
- *
- * 只保证**横向**起点对齐（圆角、行高下限、内边距、单选钮盒与文字列起点照抄真卡）。纵向高度不承诺一致：
- * 真卡带进度文本 + 进度条 +「未学」时约 130dp，骨架按最小行高约 74dp，回填到位后卡片会长高——
- * 这是刻意的取舍：首帧要的是「立刻有东西」，不是逐像素复刻最终版面。
+ * 从 `LearningSetupScreen` 里抽出为可独立渲染的层，是为了让 connected 侧能脱离 ViewModel 的 `load`
+ * 派发（在测试宿主里永不执行）直接喂真实卡片来验分隔线像素——整屏路径只能停在骨架那一态。
+ * 词书行的结构与语义（[SwipableWordBookCard] 的选中态 / 进度 / 滑动删除 / customActions）不在此改动，
+ * 本层只落「幽灵间距换真实分隔线」这一条（spec §2.3 禁令）。
  */
 @Composable
-private fun WordBookListPlaceholder(row: Int) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("wordbook_placeholder_$row"),
-        shape = WordBookCardShape,
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = WordBookCardMinHeight)
-                .padding(WordBookCardContentPadding),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // 40dp 的盒子里放 20dp 的圆点：真卡的 RadioButton 也是 40dp 触控尺寸、20dp 圆面，
-            // 照抄这层盒子，后面的文字条才能和真卡文字对齐。
-            Box(
-                modifier = Modifier.size(40.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .background(MintOutline.copy(alpha = 0.30f), RoundedCornerShape(percent = 50)),
-                )
-            }
-            Column(
-                modifier = Modifier.padding(start = 8.dp).weight(1f),
-                verticalArrangement = Arrangement.spacedBy(7.dp),
-            ) {
-                PlaceholderBar(fraction = 0.45f)
-                PlaceholderBar(fraction = 0.22f)
-                PlaceholderBar(fraction = 0.7f)
+internal fun WordBookList(
+    wordBooks: List<WordBook>,
+    loading: Boolean,
+    selectedId: String?,
+    progressByBook: Map<String, com.example.englishlearning.learning.WordBookProgress>,
+    progressLoading: Boolean,
+    canDelete: (String) -> Boolean,
+    onSelect: (String) -> Unit,
+    onRequestDelete: (WordBook) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        // 只在列表为空时用骨架占位——删除词书后的重载不得把已有列表顶掉闪一次。
+        if (loading && wordBooks.isEmpty()) {
+            ListSkeleton(
+                rows = WORD_BOOK_PLACEHOLDER_ROWS,
+                rowHeight = WordBookCardMinHeight,
+                shape = WordBookCardShape,
+                contentPadding = WordBookCardContentPadding,
+            )
+        } else {
+            wordBooks.forEachIndexed { index, book ->
+                // 首册上方不画线：它与「选择词书」标题之间的缝归外层 Column 的 spacedBy 节奏管，
+                // 本层只补册与册**之间**的分隔线。
+                if (index > 0) WordBookListDivider()
+                key(book.id) {
+                    SwipableWordBookCard(
+                        book = book,
+                        selected = book.id == selectedId,
+                        progress = progressByBook[book.id],
+                        progressLoading = progressLoading,
+                        onSelect = { onSelect(book.id) },
+                        onDelete = if (canDelete(book.id)) {
+                            { onRequestDelete(book) }
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
         }
     }
 }
 
+/**
+ * 册与册之间的真实分隔线（替换原先靠 `Arrangement.spacedBy` 撑出来的「幽灵间距」，spec §2.3 禁令）。
+ *
+ * 外层 14dp 带与骨架/真实列表的行间节奏同宽，1dp 的 `outlineSoft` 线居中——带心即线心，正好落在相邻两卡
+ * 之间那段缝的中点，[com.example.englishlearning.ui.WordbookPickerHeaderTest] ③ 按缝中点取样才取得到这条线。
+ * 把下面这层 `.background(appColors().outlineSoft)` 删掉，缝会退回纯透明，那条 connected 用例必须变红
+ * （变异证据）。读的是 `outlineSoft` 而非 `surface`，不触发 `ContainerInkPairingContractTest`，段内也无 `Text`。
+ */
 @Composable
-private fun PlaceholderBar(fraction: Float) {
+private fun WordBookListDivider() {
     Box(
         modifier = Modifier
-            .fillMaxWidth(fraction)
-            .height(12.dp)
-            .background(MintOutline.copy(alpha = 0.22f), RoundedCornerShape(6.dp)),
-    )
+            .fillMaxWidth()
+            .height(14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(appColors().outlineSoft),
+        )
+    }
 }
 
 /**
@@ -2214,13 +2223,18 @@ private fun WordBookCard(
     onSelect: () -> Unit,
     onDelete: (() -> Unit)? = null,
 ) {
+    // 容器与前景同批迁到 appColors()：这张卡的底色、描边、文字、徽标底全部走主题 token，
+    // 浅色档取值逐字等价（tint/tint2/tint3/outlineSoft/text1/text2 的浅套值与迁移前的 Mint*/裸 hex 相同，
+    // 由 DesignTokenContractTest 钉住），深色档才随主题换套。段内 `Text` 用的是 `MaterialTheme.typography.*`
+    // （已被 `appTypography()` 摘色），不是 `AppType.*` 直读，故不触发 `ContainerInkPairingContractTest`。
+    val colors = appColors()
     val cardColor by animateColorAsState(
-        targetValue = if (selected) MintTint else MintSurface,
+        targetValue = if (selected) colors.tint else colors.surface,
         animationSpec = tween(180),
         label = "wordBookColor",
     )
     val borderColor by animateColorAsState(
-        targetValue = if (selected) MintPrimary else Color(0xFFDCEAE1),
+        targetValue = if (selected) MintPrimary else colors.tint2,
         animationSpec = tween(180),
         label = "wordBookBorder",
     )
@@ -2272,12 +2286,12 @@ private fun WordBookCard(
             RadioButton(
                 selected = selected,
                 onClick = onSelect,
-                colors = RadioButtonDefaults.colors(selectedColor = MintPrimary, unselectedColor = MintOutline),
+                colors = RadioButtonDefaults.colors(selectedColor = MintPrimary, unselectedColor = colors.outlineSoft),
             )
             Column(Modifier.padding(start = 8.dp).weight(1f)) {
-                Text(book.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+                Text(book.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = colors.text1)
                 Spacer(Modifier.height(3.dp))
-                Text(book.level, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
+                Text(book.level, style = MaterialTheme.typography.bodySmall, color = colors.text2)
                 Spacer(Modifier.height(4.dp))
                 // 「已学」在左、「总数」在右：一眼能看出这套词书还有多少没碰。
                 Row(
@@ -2294,7 +2308,7 @@ private fun WordBookCard(
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MintPrimaryDark,
+                        color = colors.text1,
                         modifier = Modifier.testTag("wordbook_learned_${book.id}"),
                     )
                     // 词量是册自带的元数据，首发布列表时就在手里（spec F1-01：册列表读到即先发布，
@@ -2303,7 +2317,7 @@ private fun WordBookCard(
                     Text(
                         text = "共 ${book.totalWords} 词",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MintTextMuted,
+                        color = colors.text2,
                         modifier = Modifier.testTag("wordbook_total_${book.id}"),
                     )
                 }
@@ -2317,12 +2331,12 @@ private fun WordBookCard(
                             .padding(top = 5.dp)
                             .testTag("wordbook_progress_${book.id}"),
                         color = MintPrimary,
-                        trackColor = MintOutline.copy(alpha = 0.35f),
+                        trackColor = colors.outlineSoft.copy(alpha = 0.35f),
                     )
                     Text(
                         text = "未学 ${it.unlearned} 词",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MintTextMuted,
+                        color = colors.text2,
                         modifier = Modifier.padding(top = 5.dp),
                     )
                 }
@@ -2330,10 +2344,10 @@ private fun WordBookCard(
             if (selected) {
                 Text(
                     text = "已选",
-                    color = MintPrimaryDark,
+                    color = colors.text1,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier
-                        .background(Color(0xFFCDEDD9), RoundedCornerShape(50))
+                        .background(colors.tint3, RoundedCornerShape(50))
                         .padding(horizontal = 9.dp, vertical = 5.dp),
                 )
             }

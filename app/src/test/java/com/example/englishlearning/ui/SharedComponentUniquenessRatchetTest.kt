@@ -164,7 +164,6 @@ class SharedComponentUniquenessRatchetTest {
         "页头（应调 AppScreenHeader）" to setOf(
             "AiFeatureScreen.kt",
             "AiLearningScreen.kt",
-            "AppScreen.kt",
             "ArticleImportScreen.kt",
             "ArticleReadingScreen.kt",
             "CheckInScreen.kt",
