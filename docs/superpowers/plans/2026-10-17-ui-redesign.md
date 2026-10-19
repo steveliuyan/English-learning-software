@@ -1675,6 +1675,22 @@ internal val MintBackground: Color
   所以批 3 收口时二选一：把品牌三端 + 这枚墨一起搬成 `theme/MintPalette.kt` 的 `internal val`（棘轮看不见 theme/ 内的裸 hex 与 `AppPalette.`），
   或为「与主题无关的容器-墨对」新开一张逐站点注记表。**14A 不许现场造第三张表。**
 
+**14A 关闭记录与订正（R-14A-i.1 / R-14A-ii.1，控制者；提交链 `42e9c14`..`edacaae`）**：
+
+- **14A-i**（`42e9c14`+`51cf5f5`）：评审席变异 M3 证明源码门「只守表不守读表」——修复轮补组件体 ink 五成员
+  消费点判据（正向四条 + 反向 `Color.<命名色>`/`BrandMintGradientStops`），M3 现同点必红。
+  **R-14A-i.1**：复评实证反向判据漏拦 `Color(r,g,b)` 浮点构造器，扩面并入 14A-ii 落地（现 `PillButtonInkTest.kt:334` 拦全部 `Color(`）。
+  实测订正一条书写坑：`stripComments` 剥注释后计数，**KDoc 内嵌被钉形状不撞门**（此前「注释写全名撞红」口径因果写反，作废）。
+- **14A-ii**（`d4baf26`+`edacaae`）：三条设备取色用例上桩、评审席两发动码变异证明有牙（`onMint` 例外回退→残口用例红；
+  壳写死 `isDark=false`→knockout 用例红）；connected 14 类/176 用例/0 失败。
+  **R-14A-ii.1（历史订正）**：旧逐位 `== 0xFFE5E5EA` 断言由 `0a6d63a` 引入、**在其时确为绿**
+  （禁用底经 `f245874` 定义的 `AppPalette.Separator = Color(0xFFE5E5EA)` 真实渲染过）；`bc256fd` 改 token `#E4EFE9`、
+  `42e9c14` 禁用底改接 `tint2` 后逐位等值必红。正确口径是「**token 迁移未回写测试的陈旧断言**」，
+  而非派发词里流传的「生产从未渲染过该值」（全称历史断言必须当场 `git log -p` 取证，不得二手引用）。
+  后果评估：无——陈旧判定、基线取证在前处置、token 容差判据均不受影响。
+- 结转：`Text` 档设备侧无独立取色用例、`PhotoTranslationScreen` 无 connected 类 → Task 18 目检清单；
+  `<=18.0` 容差浅套 tint 族不可分辨（plan-mandated，负向断言兜底）与取样块四处逐字重复 → 终复审 triage。
+
 
 ---
 
