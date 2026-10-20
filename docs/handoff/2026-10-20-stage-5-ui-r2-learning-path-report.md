@@ -122,8 +122,25 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
   ③ 我把 `GlassDialogTest` 的 FQCN 少敲一层子包（`ui.` 而非 `ui.glass.`），instrument 回 `ClassNotFoundException`
   形状的 `initializationError`，一度被我当成「类失踪」；按现盘 `package` 行取真名复跑即 `OK (1)`——
   该类自建类提交 `aab770c` 起就在 `ui.glass` 下，18i 日志跑的也是这个全名。`-e class` 参数一律从现盘抄，不凭记忆拼。
-- **窄复评两席未落地（如实记）**：P1（`app/src/main` + `docs`）/P2（`app/src/test` + `app/src/androidTest`）两份评审包已生成
-  （`review-fix-P1.md` 104KB、`review-fix-P2.md` 236KB，BASE `04b6398`），派发时命中 CLI 日额度上限
-  （`You've reached your daily usage limit for Chat.`），两席没能起。改由控制者本人按同一清单自跑：五对浅套逐值相同、
-  `role` 在生效点击链上、`heightIn(max)+verticalScroll` 兜底在位、AA 归位形状与 `AppBottomBar.kt:95` 先例一致、
-  AC-R-12 未升通过、棘轮双向闸由门控绿背书。**独立性受限这一条必须随本批一起交代**，额度恢复后应由用户决定是否补派独立复评席。
+- **窄复评两席（额度恢复后真落地，2026-10-21）**：两份评审包（`review-fix-P1.md` 104KB = `app/src/main` + `docs`，
+  `review-fix-P2.md` 236KB = `app/src/test` + `app/src/androidTest`，BASE `04b6398`）第一轮派发时命中 CLI 日额度上限
+  （`You've reached your daily usage limit for Chat.`），当时**只有控制者本人按同一清单代跑**（当时已在下面这条交代过独立性受限）；
+  额度恢复后补派两席独立只读复评，现均已回话：
+  - **P1 席 SPEC ✅、Critical 0、Important 1、Minor 1**。它把 A 迁移完整性、B 浅色侧逐值不变、C 归位墨判据三项
+    独立复算为真（四枚容器实读点全在 `appColors().surfaceGlass`、浅套五对逐字相同、4.006/9.727/9.960 三枚比值与控制者自算逐位吻合）。
+    其 Important 打的是控制者本人：**文档里写了可重算命令却没跑命令**——§5.2.10/AC-R-11 把残留静态域色墨文字站点写成「10 枚」，
+    该命令实跑 **12**（漏 `AiLearningScreen.kt:177`、`CardDetailScreen.kt:598`）。已当场复算确认并订正（提交 `7973da0`）。
+    其 Minor 是「带 Scrim 底」两枚比值推导口径不成立（`AppPalette.Scrim` alpha≈0.4，src-over 浅玻璃得 ≈`#989898` 而非 `#F5F5F5`），
+    同笔删去无源注记。
+  - **P2 席 SPEC ✅、Critical 0、Important 0、Minor 1**，并给出一条**范围事实订正**：`84464c8` 实改 **3** 枚 JVM 契约
+    （`git show --stat 84464c8` = 3 files, +560/−38），任务书「四枚」不实——`AppScreenOverlayContainerContractTest.kt`
+    本 range 未触碰（是既有金标准参照），第四处取样器改动走 `0da5dc1`/`3a2f0a2` 的 `GlassPanelInkPairingContractTest`。
+    控制者对其关键坐标逐条抽验成立：`BODY_AA_RATIO = 4.5`（`GlassPanelThemeInkTest.kt:635`）、`DECOR_AA_RATIO` 全 `app/src` 零命中、
+    style 白名单门为「`styleArgs > 0` 反空转 + `assertEquals(styleArgs, whitelistedStyleArgs)` 离表即红且 `.copy` 被 `(?![.\w])` 挡在门外」、
+    滚动兜底锚对 `GlassDialog.kt:67-69` 在位、`Role.Button` 锚按「实参括号内」取形。其唯一 Minor 是正控样片字符串内容仍由探针
+    pattern 反解（弱自指），但负控③④把宽窄两头夹住 ⇒ 不产生假绿，登记批 3 夹具归并时一并收。
+  - **控制者自纠（派席纪律）**：P2 后台席未回话时，本席又补派了一枚同范围重跑席，该席撞 `Agent` 150 轮硬上限空手而归
+    （零改动、零提交）。与本批早前「并发两枚实现席」同源，属第二次犯；入台账为规程：**同一范围的后台席未回话前不得补派**。
+- **注释订正后的门控复跑**：`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin --no-daemon --no-build-cache --rerun-tasks`
+  ⇒ `BUILD SUCCESSFUL in 4m6s`、59/59 全执行、现盘 **232/1725/0/0/0**（与基线逐位相等，日志 `fix18c-controller-gate-final.log`）。
+  connected **未重跑**：`7973da0` 只删注释文本与文档枚数，契约夹具本就剥注释、取样类期望墨未动 ⇒ 拿旧日志冒充新改动才是虚报，此处如实标注未跑。

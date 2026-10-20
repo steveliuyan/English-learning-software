@@ -95,6 +95,13 @@ brief 点名但现场无 connected 侧此类：`AppTabTest`（仅存 JVM 侧 `ap
   `ui.glass.GlassDialogThemeInkTest` OK (3)、`ui.glass.GlassDialogTest` OK (1)、`ui.WordAiQaScreenTest` OK (8)、
   `ui.SentenceAnalysisScreenTest` OK (7)、`ui.WordbookPickerHeaderTest` OK (3)（本类随之从「点名未实跑」改为已覆盖）。
   用例数较 18i 只增不减：`PillButtonTest` 由 7 → 9（A 席为 `role` 与生效点击链新增两枚），其余各类与 18i 逐类等数。
+- **窄复评两席（独立只读席，额度恢复后落地 2026-10-21）**：P1（`app/src/main` + `docs`）**SPEC ✅ / Critical 0 / Important 1**，
+  其 Important 抓的是控制者本人「文档里写了可重算命令却没跑命令」——残留静态域色墨文字站点实为 **12 枚**（本席先写 10 枚，
+  漏 `AiLearningScreen.kt:177`、`CardDetailScreen.kt:598`），已当场复算订正；P2（`app/src/test` + `app/src/androidTest`）
+  **SPEC ✅ / Critical 0 / Important 0**，并订正范围事实：`84464c8` 实改 **3** 枚 JVM 契约（任务书「四枚」不实，
+  `AppScreenOverlayContainerContractTest.kt` 本 range 未触碰）。两席关键坐标由控制者逐条抽验成立
+  （`BODY_AA_RATIO = 4.5`、`DECOR_AA_RATIO` 全 `app/src` 零命中、style 白名单门「离表即红且 `.copy` 挡在门外」、
+  滚动兜底锚与 `Role.Button` 锚对现盘生产码在位）。详见交接报告 §8。
 - **两次自摆乌龙，如实记**：
   ① 首跑 `GlassPanelThemeInkTest` 报 `Tests run: 8, Failures: 1`
   （`SectionCard 密钥态墨（浅）：期望 #FF188F76，实测 #FF174C44`）。根因不是代码——门控里的
