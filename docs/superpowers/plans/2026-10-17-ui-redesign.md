@@ -688,7 +688,7 @@ internal val MintBackground: Color
 
   稿中未逐条转录到的其余字形（`ChevronRight`/`ChevronDown`/`Close`/`Check`/`List`/`Play`/`Pause`/`Stop`/`Mic`/`Translate`/`Image`/`Document`/`Newspaper`/`Gear`/`Person`/`Info`/`Clock`/`Book`/`Star`/`Spark`/`Shield`/`Trash` 的骨架层等），按下列度量**自绘补齐**，不得引第三方路径：
   - 画布 24×24，视觉描边重量 2px，圆头（渲染器统一 `StrokeCap.Round`/`StrokeJoin.Round`），优先无填充（填充只作层次暗示）；
-  - 关键几何留在 4–20 的安全区内（与 `AppBottomBar.kt` 里既有的 `drawTabGlyph` 同一 24 网格习惯，便于对照）；
+  - 关键几何留在 4–20 的安全区内（与批 1 时 `AppBottomBar.kt` 旧自绘字形 `drawTabGlyph` 的同一 24 网格习惯，便于对照；该函数已在 Task 17A 随底导 duotone 改造删除，本句为历史口径参照，见本计划 :1739）；
   - 方向类字形（chevron/back/check/close）笔画端点对称，17dp 行内尺寸下仍可辨；
   - 每枚补完在注释里标一行「原创自绘（B 案度量）」——许可台账 `app-authored-ui-icons` 的措辞依赖它（AC-R-05）。
 

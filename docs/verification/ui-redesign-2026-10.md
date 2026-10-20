@@ -26,11 +26,18 @@ grep -h -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' \
 git diff --name-only main..HEAD | grep -c lockfile   # 期望 0：依赖锁零变化
 ```
 
-本次实跑输出（2026-10-19 批 1 窄复评收口 `eaebb34`，`BUILD SUCCESSFUL`，用 `:app:testDebugUnitTest --rerun` 强制真跑）：
-`suites=223 tests=1654 skipped=0 failures=0 errors=0`，lockfile 变化数 `0`，`verifyThirdPartyNotices` 打印
-`Validated 76 third-party notice entries.`，结果 XML 文件数与 suite 数同为 223（无孤儿文件，五元组不虚高）。
-**用例数只增不减**（历史实跑值：批 1 终审修复轮 `223/1653`、Task 12 修复轮 1 `223/1646`），差值就是当轮新增的
+本次实跑输出（2026-10-20 批 2 收口 Task 18i，HEAD `0d60658`，`BUILD SUCCESSFUL in 4m 20s`，59/59 任务全执行；命令为上表三任务简版 `:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin`，同带 `--rerun-tasks --no-build-cache --offline --no-daemon`，日志 `.superpowers/sdd/2026-10-17-ui-redesign/t18-gate-full.log`）：
+`suites=231 tests=1708 skipped=0 failures=0 errors=0`，结果 XML 文件数与 suite 数同为 231（无孤儿文件，五元组不虚高）。
+**批 2 关账基线：231 类 / 1708 用例 / 0 失败 / 0 错误 / 0 跳过，只准增不准减。**
+**用例数只增不减**（批 2 实跑演进：14B `225/1666` → 14A-i/ii `226/1673` → 15 `227/1681` → 16 `228/1690` → 17A `230/1702` → 17B `231/1708`；批 1 历史值 223/1654），差值就是当轮新增的
 JVM 用例数——本行是**运行日志**不是规范值，别把它当分母去核对文档里的其它数字。
+
+三张棘轮 seed 现状（2026-10-20 Task 18i 实核，逐张确认、未迁移未改判据，绿由当次门控背书）：
+- `RawColorLiteralRatchetTest`：`"AppScreen.kt" to 2` 在册，形状台账同文件两行在册（Switch `uncheckedTrackColor` 与 `inactiveTrackColor` 两枚 `Color(0xFFCDEFE1)` 折叠行）；
+- `DarkTokenConsumptionRatchetTest`：`"AppScreen.kt" to 3` 在册（`OnMintPrimary` 归属债，批 3 Task 26 Step 3）；全表重算命令现跑：
+  `sed -n '/internal val DarkTokenSeedAllowlist/,/^)/p' app/src/test/java/com/example/englishlearning/ui/DarkTokenConsumptionRatchetTest.kt | grep -oE '"[^"]+" to [0-9]+' | awk -F'to ' '{s+=$2; n++} END{print "files="n" hits="s}'`
+  （本次输出快照 `files=29 hits=98`；判定以命令为准，本文档不写死站点数）；
+- `SharedComponentUniquenessRatchetTest`：页头族收口判据成立——`AppScreen.kt` 的 `MaterialTheme.typography.headline` 读点现场 grep 为 0，`removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared` 随门控绿。
 
 **`rm -rf app/build/test-results/testDebugUnitTest` 只在「本机此刻只有你一个跑者」时使用**（批 1 终审 Seat D M-4 登记）：
 它的用途是清掉改名/删除的测试类留下的陈旧 XML，否则五元组虚高。但多席/控制者并行时，别的会话正在读同一批
@@ -55,6 +62,12 @@ adb shell am instrument -w -e class com.example.englishlearning.ui.<类名> \
 `OutboundConfirmDialogTest` OK (18)、`ThemeModeSwitchTest` OK (2)。
 跑前先 `dumpsys user | grep State:` 确认 `RUNNING_UNLOCKED`（见「connected 环境债」）。
 
+2026-10-20 批 2 收口 connected 全清单（Task 18i，`emulator-5574`，双 APK `adb install -r` + `am instrument -e class`，逐类日志 `t18-connected-*.log`）：**25 类 / 278 用例 / 0 失败**。
+逐类末行：`AppScreenTest` OK (46)、`CardDetailScreenTest` OK (25)、`AiProfileSettingsScreenTest` OK (23)、`ArticleReadingScreenTest` OK (23)、`TodayPlanScreenTest` OK (21)、`WordCardScreenTest` OK (17)、`ReadingAccessScreenTest` OK (13)、`SpeechSettingsScreenTest` OK (13)、`AiLearningScreenTest` OK (12)、`ImageStudioScreenTest` OK (11)、`AppBottomBarTest` OK (8)、`WordAiQaScreenTest` OK (8)、`PillButtonTest` OK (7)、`CheckInScreenTest` OK (7)、`SentenceAnalysisScreenTest` OK (7)、`CardDetailPronunciationControlsTest` OK (5)、`ArticlePronunciationControlsTest` OK (5)、`WordCardRevealFocusTest` OK (4)、`AppScreenOverlayContainerTest` OK (4)、`ConfirmDestructiveDialogTest` OK (4)、`AppScreenHeaderTest` OK (4)、`ThemeModeSwitchTest` OK (4)、`OutboundConfirmDialogTest` OK (3)、`WordCardPronunciationControlsTest` OK (3)、`GlassDialogTest` OK (1)。
+两条规程证据：`AppScreenOverlayContainerTest` 两枚大字号用例的**外部前置**为设备级 `settings put system font_scale 2.0`（该前置下整类 OK (4)；未设前置自然 scale 整类 `Tests run: 4, Failures: 2` 为登记在案的响亮红样，护栏不空转，两份日志均留档）；每轮前后 `settings get system font_scale` 已回显进各日志，收工值 `1.0`。
+`AppScreenTest:1686`（`mandatorySetupOffersNoCancelEntry`，已登记 known-flaky 注入抖动）本轮未复现，整类一次 `OK (46 tests)`。
+brief 点名但现场无 connected 侧此类：`AppTabTest`（仅存 JVM 侧 `app/src/test/.../ui/AppTabTest.kt`，未拿别的类顶数）。
+
 ## 证据表
 
 | AC-R | 口径 | 证据 | 状态 |
@@ -66,11 +79,12 @@ adb shell am instrument -w -e class com.example.englishlearning.ui.<类名> \
 | AC-R-05 | `verifyThirdPartyNotices` 通过，台账含 `material-symbols-icon-paths`（仅参考度量）、`app-authored-ui-icons`、`app-authored-ui-illustrations` 三条且每条的必填字段均非空，描述与 `AppIcons.kt` 实际入库内容一致 | `verifyThirdPartyNotices`（门禁内已跑）+ `docs/third-party-notices.md` 三条目；本棒把 `app-authored-ui-icons` 的「用途」字段补齐为含 `ui/components/AppIcons.kt`（路径数据与豁免表所在地）、`AppIcon.kt`（运行时组装）、`IconBadge.kt`（容器呈现）的实际使用位置。必填字段口径的**权威是根 `build.gradle.kts:12` 的 `requiredNoticeFields`**（八项：名称/版本/许可证/用途/数据流/NOTICE 位置/替代方案/商业分发结论；可重算：`sed -n '12,15p' build.gradle.kts`）——`verifyThirdPartyNotices` 任务就注册在那里、`doLast` 里内联了完整解析器，这才是门禁实际执行的那份。`tools/verify-third-party-notices.main.kts` 的 `requiredFields` 只是同一清单的镜像，且只能用 `kotlinc -script` 跑、本机无 kotlinc（见 `docs/handoff/` 环境记录），**拿它当权威会把「跑不到的脚本」写成验收依据**。两份当前逐字一致，改动时须同步。本行的「三条」用只数这三条的命令核：`grep -cE '^## (material-symbols-icon-paths\|app-authored-ui-icons\|app-authored-ui-illustrations)$' docs/third-party-notices.md` 应打印 3（`grep -c '^## '` 数的是全台账 76 条，与本行断言无关，别拿它当这条的证据） | 通过 |
 | AC-R-05b | 除决策文档豁免表的 5 枚（Back/ChevronRight/ChevronDown/Close/Check，只描边不建填充层）外每枚两层；豁免枚不得进 ≥40dp 入口容器；清单以决策文档的 33 枚为准；`ui/` 下 `\bIcons\.` 引用为 0（由契约钉住）；不新增 `material-icons-extended` | **覆盖面口径**：两道契约都只扫 `ui/`（`SharedComponentUniquenessRatchetTest` 走 `uiFiles()`、`AppIconsStructureContractTest` 同），故「`ui/` 下 `\bIcons\.` 为 0」由契约当场钉住；全域覆盖靠可重算命令 `grep -rn '\bIcons\.' app/src/main/java \| wc -l`（本次实跑 0）。`AppIconsStructureContractTest`（结构 + 豁免表双向钉；禁令以 import 字符串形状钉）+ `SharedComponentUniquenessRatchetTest` 复述 `\bIcons\.` 用法口径 + lockfile 零变化；呈现侧 `IconGalleryRenderTest` connected **OK (3)**（2026-10-19，且在改动该类的 `b5947ef` **之后**重跑：先证 `packageDebugAndroidTest` 与 `compileDebugAndroidTestKotlin` 双双 UP-TO-DATE、设备侧 APK 输入与当前源码一致，再 `install -r` + `am instrument`，六张 PNG 全部按新断言重写），六张浅/深截图目视清单 ①–⑥ 全部见下表并已判 | JVM 与 connected 均通过；目视清单 ①–⑥ 已放行 |
 | AC-R-06 | `AppTabTest` 与既有业务规则测试零修改通过；JVM 基线只增不减（每次重算，不得引用陈旧数） | 门禁命令 + 上面的 awk 重算。零修改核验三条（本次实跑：第 1、2 条为空，第 3 条只列出 `MainActivity.kt`）：<br>`git diff --name-only main..HEAD -- app/src/test/java/com/example/englishlearning/ui/AppTabTest.kt app/src/main/java/com/example/englishlearning/di app/src/main/java/com/example/englishlearning/learning`<br>`git diff --name-only main..HEAD -- 'app/src/test/java/**' \| grep -v '/ui/'`（测试侧改动应全在 `ui/` 下）<br>`git diff --name-only main..HEAD -- 'app/src/main/**' \| grep -v '/ui/'`（生产侧越出 `ui/` 只允许 `MainActivity.kt`，它是主题装配点） | 通过（本次实跑：AppTabTest/di/learning 零改动；测试侧改动全在 `ui/`；生产侧仅 `MainActivity.kt`） |
-| AC-R-07 | `fontScale = 2.0` 的 connected 用例覆盖六屏重排后的标题与卡片 | 批 2/批 3 逐屏补（护栏口径沿用 `CheckInScreenTest`） | 未开始 |
+| AC-R-07 | `fontScale = 2.0` 的 connected 用例覆盖六屏重排后的标题与卡片 | **批 2 已覆盖（Task 18i 收口，2026-10-20 复跑在案）**：① `AppScreenOverlayContainerTest` 两枚大字号用例 `hostedWordBookDeletePanel…` / `hostedWordBookExportPicker…`——17B 修复轮口径：运行前置为**设备级** `font_scale=2.0` + 行高哨兵 `assertScaleTookEffect` 防「scale 1.0 空转」（自然 scale 整类 `Failures: 2` 响亮红样留档 `t18-connected-AppScreenOverlayContainerTest-scale1-naturalred.log`；前置 2.0 下整类 `OK (4 tests)`）；② `WordCardScreenTest.lemmaAndRevealedMeaningStayFullyVisibleAtMaximumLargeFontScale`（Task 15 Step 3 护栏，组合级 `fontScale = 2f` 下词卡主词与揭晓释义不被裁出卡片，`OK (17 tests)` 类内通过）；③ 护栏出处 `CheckInScreenTest.headerKeepsLinksReachableAndTitleReadableAtMaximumLargeFontScale`（`OK (7 tests)`）。**批 2 未覆盖，批 3 续**：今日计划屏主体卡、词卡详情屏正文、文章阅读、设置族、词典/词书族屏的大字号用例仍缺（本轮逐类 connected 全绿但未为其新增 scale 断言，不虚报） | 部分通过（批 2 覆盖屏证据齐；缺上列五族屏，批 3 续） |
 | AC-R-08 | §3 每个共享组件有「全站唯一实现」的静态检查；被替换的私有份数降到 1 | `SharedComponentUniquenessRatchetTest`：四族（页头 / 错误提示条 / 未配置卡 / 词行）按形态规则逐族**精确集合相等**，seed 是债务台账（只减不增，接线一屏删一行）；批 1 组件文件按「点名文件必须存在 + 公开组件在 `ui/` 扫描面恰一处顶层定义」钉；预登记豁免（本棘轮不管「就地改既有组件取值面」，Task 14 改 `PillButton` 本体不受挡）由 `the_ratchet_blocks_a_second_component_but_never_an_in_place_value_edit` 双向证明。**批 1 终审 F7 登记的第三条边界**：族 1/2/4 的判定面各带「本文件调了共享组件即整体合规」出口，出口同时是**已知失明面**——接线后同屏残留的私有 forbidden 形态会整体隐形；`family_compliance_exits_are_a_declared_known_blindness_surface` 双向钉住该语义，批 2 的删 seed 判据因此是「该屏 forbidden 读点清零」而不是「补一行调用就准删」，收紧（seed 改读点计数）属计划修订事项 | 通过（存量私有份未清零，清零归批 2/批 3；见「本族规则形状的已知边界」） |
 | AC-R-10 | 六屏 360dp 真机浅/深两套截图逐屏比对设计稿 | 批 2/批 3 逐屏补 | 未开始 |
 | AC-R-11 | 玻璃层与域色容器在深色下文字可读性实测 | **覆盖方式（批 1 终审登记，状态不动）**：本行的实测面 = 全站 `AppPalette.GlassFill` 的四个消费点 `ui/components/glass/GlassDialog.kt:46`、`ui/components/glass/GlassOverlay.kt:69`、`ui/AiProfileSettingsScreen.kt:499`、`ui/SpeechSettingsScreen.kt:234`（可重算：`grep -rn 'AppPalette\.GlassFill' app/src/main/java --include=*.kt`；`ConfirmDestructiveDialog.kt:45` 那条是 KDoc 说明不是消费点，别计入）。批 1 只把口径纠正为「容器填充与面板内前景墨色必须同批迁移」（目标值 `appColors().surfaceGlass`），四处一律**未迁**，故深色可读性仍无人眼/像素证据。批 2/批 3 逐屏补，且必须与那四处的填充迁移同时收。<br>**2026-10-19 真机实勘补充（见末节）**：深色缺陷面不止 `GlassFill` 一族——业务屏的静态容器读点 `AppPalette.Surface`（`AppPalette.kt:12` 写死白）与已改组合期读取的 `Mint*` 墨色配对，在深色下直接产出「白底 + 主题浅墨」的近不可读文案（今日计划屏进度卡实测）。本行状态仍为「未开始」（未迁、未收口），但**优先级证据已到手**。 | 未开始（真机已有半迁移态缺陷证据） |
-| AC-R-12 | TalkBack 走查重做一遍 | 批 2/批 3 逐屏补 | 未开始 |
+| AC-R-12 | TalkBack 走查重做一遍 | **批 2 做到的是「语义契约 + connected 走查」两件事**：① 语义契约——duotone 底导四 tab 的 `testTag("app_tab_*")` + `Role.Tab` + `stateDescription` 与字形锚由 JVM 契约钉（17A/17A 修复轮，`R-17A.2` 后升级为体内夹击形状）；② connected 走查——`AppBottomBarTest` `OK (8 tests)`、`AppScreenTest` `OK (46 tests)`（2026-10-20 Task 18i 全清单复跑在案）。**真 TalkBack 引擎下朗读四 tab 仍未做**（17A 评审 ⚠️1：以上全是语义树断言，不是引擎实测），连同底导选中态观感、标签墨设备取样缺口、深色像素期望失真项一并归 18-ii 用户侧真机走查（清单见 `task-18-brief.md` §一）。本行不虚报为通过 | 进行中（契约与走查侧完成；引擎实测未做） |
+| AC-R-20 | 今日计划屏「8 枚整宽按钮 → 1 CTA + 入口行组」重排（批 2 Task 14） | 实现 `4d3c2e8` + 修复轮 `02f84da`（I-1 查词出口回四态常驻、I-2 数字权威取样防空转）+ `920eabe`（排印覆写禁令堵 `copy(fontSize)` 间接升档）；数字一处权威判据防 tag 上提与第二枚大字号（`R-14.3`/`R-14.4` 裁决落地）。**现场证据（2026-10-20 Task 18i）**：`TodayPlanScreenTest` connected `OK (21 tests)`（`emulator-5574`，`t18-connected-TodayPlanScreenTest.log`）；相关词卡与详情改动见 Task 15（`369395b`，`WordCardScreenTest OK (17)`）与 Task 16（`0414334`，`CardDetailScreenTest OK (25)`）。入口组连排节奏与常驻查词卡的**观感判断归 18-ii 用户目检**（task-18-brief §一.2），本行不替人眼判定 | 通过（自动化侧；观感目检归用户侧） |
 
 ## 图标一览目视清单（AC-R-05b 的呈现侧，缺项不得放行）
 
