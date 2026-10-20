@@ -167,7 +167,7 @@ class GlassPanelThemeInkTest {
         assertContrastAtLeast("浅套正文墨压浅玻璃", ink, glass, BODY_AA_RATIO)
         // 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：音色浮层**选中档**那行是 `style = AppType.Body`
         // ⇒ 正文档，阈值线就是 [BODY_AA_RATIO]（4.5），曾被按装饰档 3.1 放行。修复前浅套域色墨 #188F76
-        // 压本行浅玻璃实底现算只有 4.006:1（压带 Scrim 底 3.683:1），两套都不达标；现换成 `appColors().onMint`
+        // 压本行浅玻璃实底现算只有 4.006:1，两套都不达标；现换成 `appColors().onMint`
         // （浅套 #174C44 压 #FEFFFE = 9.727:1）。浅套这一处观感有变（选中行薄荷绿墨→深墨），属修 AA 失败非回归。
         val selectedInk = inkOfText(OVERLAY_SELECTED_TEXT, glass)
         assertInkIs("浮层选中选项墨（浅，套内 onMint）", selectedInk, AppColorLight.onMint)
