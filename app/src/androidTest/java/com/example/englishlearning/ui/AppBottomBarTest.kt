@@ -50,6 +50,14 @@ class AppBottomBarTest {
         }
     }
 
+    /**
+     * 语义订正（修复轮 2 / 复评 C，判据逐字不动）：本用例的像素取样实际只锁得住**字形腿**——
+     * 选中槽里 `InlineIconBadge` 药片上的域 `deep` 单层描边必须仍近 `DomainColors.AiSpeech.deep`（nearest ≤ 18.0）。
+     * 轮 1 起浅套选中标签墨按 R-14.4 刻意不沿用 brand `deep` 而取 `onMint`，名字里的「同一枚 calm brand 色」
+     * 对标签墨而言已不成立；标签墨腿由 JVM 契约 `AppBottomBarContrastTest` 按真实底复算负责。
+     * 设备侧「标签墨取样」缺口（整槽截图无法把标签像素从字形像素里分离出来单测）结转 Task 18，
+     * 本席不新增取样、不放宽 `nearest ≤ 18.0`，也不删任何断言。
+     */
     @Test fun each_selected_slot_uses_the_same_calm_brand_color() {
         var selectedTab by mutableStateOf(AppTab.LEARNING)
         composeRule.setContent { AppBottomBar(selected = selectedTab, onSelect = {}) }

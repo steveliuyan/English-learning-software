@@ -9,6 +9,7 @@ import com.example.englishlearning.ui.theme.DomainDark
 import com.example.englishlearning.ui.theme.DomainLight
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -20,7 +21,9 @@ import kotlin.test.assertTrue
  *  1. **未选中档**：字形与标签共用同一枚 `text2`，铺在底导容器 `background(MintSurface)`
  *     （= 当前主题 `surface`）上。标签是正文档 → 判 ≥4.5。本轮实测：浅 5.151、深 7.543。
  *  2. **选中档字形腿**：走 `InlineIconBadge`，字形实际铺在该组件的 `background(appColors().tint)`
- *     药片底上（不是 `surface`），是非文本图形档 → 判 ≥3.0。本轮实测：浅 3.546、深 8.632。
+ *     药片底上（不是 `surface`），是非文本图形档 → 判 ≥3.1（修复轮 2 / 裁决 D：与房内
+ *     `EntryRowInkTest`、`NotConfiguredCardContractTest`、`WordRowSpeakerContractTest` 的 R-10.6 口径统一，
+ *     按 3:1 **加余量**、卡在边界不算合格；原 `floor = 3.0` 废止）。本轮实测：浅 3.546、深 8.632。
  *     旧契约按 `surface` 复算这一腿，而字形从不落在那个底上 ⇒ 真实腿零断言。
  *  3. **选中档标签文字腿**：铺在同一枚容器 `surface` 上，是正文档 → 判 ≥4.5。
  *     浅套按 R-14.4 的 AiSpeech 例外取 `appColors().onMint`（本轮实测 9.751），
@@ -28,8 +31,8 @@ import kotlin.test.assertTrue
  *     旧契约让浅套 `deep` 走这条腿（实测 4.016，够不上 4.5）却按图形 3.0 放行 ⇒ 档位用错；
  *     那枚 4.016 现在留在本契约里作**诱饵负例**，证明这条腿确实被 4.5 线判过。
  *
- * 上面那些实测数字只是本轮取证留痕，**判据一律是档位线本身**（4.5 / 3.0）加同底诱饵负例，
- * 不把实测值钉进判据（14A 零余量禁令）。本轮余量：浅文字 +5.25、深文字 +5.35、浅图形 +0.55、深图形 +5.63。
+ * 上面那些实测数字只是本轮取证留痕，**判据一律是档位线本身**（4.5 / 3.1）加同底诱饵负例，
+ * 不把实测值钉进判据（14A 零余量禁令）。本轮余量：浅文字 +5.25、深文字 +5.35、浅图形 +0.45、深图形 +5.53。
  *
  * 契约不只算数：最后一例把这三条复算的腿逐一绑回生效渲染路径——底导容器底 `background(MintSurface)`、
  * 未选中墨 `appColors().text2`、选中字形入口 `InlineIconBadge(icon, domain = AppDomain.AiSpeech)`
@@ -50,6 +53,9 @@ class AppBottomBarContrastTest {
         )
         return stripComments(file.readText())
     }
+
+    /** 逐字计数（修复轮 2 / 复评 B）：与 `AppBottomBarContractTest.count` 同一具 LITERAL 正则机制，不新造方言。 */
+    private fun count(hay: String, needle: String): Int = Regex(needle, RegexOption.LITERAL).findAll(hay).count()
 
     /** 反空转对：正例必须过线、同式取错字段必须掉线，否则「≥阈值」是公式失控的假象。 */
     private fun assertPairClears(fgName: String, fg: Int, bgName: String, bg: Int, floor: Double, decoy: Pair<String, Int>) {
@@ -90,21 +96,21 @@ class AppBottomBarContrastTest {
         )
     }
 
-    // ---------- 腿 2：选中档字形（deep 压 InlineIconBadge 的 tint 药片底，图形档） ----------
+    // ---------- 腿 2：选中档字形（deep 压 InlineIconBadge 的 tint 药片底，图形档 ≥3.1） ----------
 
     @Test
     fun `selected ai_speech glyph clears 3 to 1 on the inline badge tint backdrop`() {
         assertPairClears(
             fgName = "浅套 AiSpeech deep 字形", fg = aiSpeechLightDeep,
             bgName = "浅套 tint 药片底", bg = rgb(AppColorLight.tint),
-            floor = 3.0,
-            // 被拒候选：同一枚域色的 base 端压同一底——公式必须判得出它不够 3:1，否则 3.0 是摆设。
+            floor = 3.1,
+            // 被拒候选：同一枚域色的 base 端压同一底——公式必须判得出它不足 ≥3.1 线，否则 3.1 是摆设。
             decoy = "浅套 AiSpeech base" to rgb(DomainLight.getValue(AppDomain.AiSpeech).base),
         )
         assertPairClears(
             fgName = "深套 AiSpeech deep 字形", fg = aiSpeechDarkDeep,
             bgName = "深套 tint 药片底", bg = rgb(AppColorDark.tint),
-            floor = 3.0,
+            floor = 3.1,
             decoy = "深套装饰线 outline" to rgb(AppColorDark.outline),
         )
     }
@@ -173,11 +179,27 @@ class AppBottomBarContrastTest {
             badge.contains("background(appColors().tint)"),
             "InlineIconBadge 的底色不再取主题 tint：deep-on-tint 这条图形腿失去真实底",
         )
-        // 字形墨只钉「取的是域 deep」这一枚来源，不钉组件的几何字面量（那是 IconBadgeContrastContractTest 的地盘）。
-        assertTrue(
-            badge.contains("tint = palette.deep"),
-            "InlineIconBadge 的字形墨不再来自域 palette.deep：deep 压 tint 的复算对象已不是被渲染的那一枚字形",
+        // 字形墨锚（修复轮 2 / 复评 B）：旧 contains 只钉「tint = palette.deep」字面，而 IconBadge.kt 里有两处可满足
+        // （:146 EntryIconBadge 弱档 22dp、:173 InlineIconBadge 17dp）——:173 被换成 palette.base 时旧锚靠 :146 存活仍绿。
+        // 升格为 InlineIconBadge 独占的组合形状「域 deep + 17dp 度量」在剥注释源码里**恰一处**：
+        // 被渲染的那枚字形才作数，弱档那处的存亡不能给行内徽标的墨垫背。
+        assertEquals(
+            1, count(badge, BADGE_GLYPH_INK_ANCHOR),
+            "InlineIconBadge 的字形墨不再是域 palette.deep 的 17dp 独占形状（计数非恰一处）：deep 压 tint 的复算对象已不是被渲染的那一枚字形",
         )
+        // 负控（反空转）：EntryIconBadge 弱档的 22dp 单独形状必须判不到这枚锚；deep→base 的偷换形状同样必须判不到，
+        // 否则「:173 换成 base 必红」只是愿望；正向形状自命中。
+        assertEquals(
+            0,
+            count("AppGlyph(icon = icon, tint = palette.deep, size = 22.dp, layer = AppGlyphLayer.StrokeOnly)", BADGE_GLYPH_INK_ANCHOR),
+            "反空转失控：EntryIconBadge 弱档形状竟满足 InlineIconBadge 独占锚，锚点没钉到度量段",
+        )
+        assertEquals(
+            0,
+            count("AppGlyph(icon = icon, tint = palette.base, size = 17.dp, layer = AppGlyphLayer.StrokeOnly)", BADGE_GLYPH_INK_ANCHOR),
+            "反空转失控：deep→base 的偷换形状竟满足独占锚，「:173 换成 base 必红」不成立",
+        )
+        assertEquals(1, count(BADGE_GLYPH_INK_ANCHOR, BADGE_GLYPH_INK_ANCHOR), "反空转失控：正向形状不满足自身锚点，锚点写歪了")
         // 选中标签墨：浅套 onMint / 深套沿用 deep 的分主题表达式，且标签真的用它。
         assertTrue(
             bar.contains(SELECTED_LABEL_INK_ANCHOR) && bar.contains("color = labelInk"),
@@ -194,5 +216,8 @@ class AppBottomBarContrastTest {
         /** 与 `AppBottomBar.kt` 的选中标签取色逐字同源；生产改形状必须连同本契约一起改。 */
         const val SELECTED_LABEL_INK_ANCHOR =
             "if (selected && !LocalIsDark.current) appColors().onMint else tint"
+
+        /** InlineIconBadge 独占的字形墨组合形状（修复轮 2 / 复评 B）：域 `deep` 墨 + 17dp 度量，钉到「哪一枚调用点」而非「字面出现」。 */
+        const val BADGE_GLYPH_INK_ANCHOR = "tint = palette.deep, size = 17.dp"
     }
 }

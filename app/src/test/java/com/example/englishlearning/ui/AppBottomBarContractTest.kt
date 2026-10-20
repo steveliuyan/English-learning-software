@@ -18,6 +18,11 @@ import kotlin.test.fail
  * 并加「体内字形调用恰一处 + 显式 StrokeOnly 层恰一处」这一对，把评审 M2 的两条偷换路径
  * （`StrokeOnly`→`Duotone`、省略 `layer` 塌回默认 `Duotone`）都逼到当场见红；反空转探针逐形状钉住。
  *
+ * 修复轮 2（复评 A）：标签墨的「定义 + 消费」配对（`val labelInk = if (selected && !LocalIsDark.current)` /
+ * `color = labelInk`）进同一具「体内恰一处 + 体外零处」计数器——复评席的击穿形状
+ * 「生效定义换另一枚活 token + 体内不可达分支留原取色副本」喂不饱定义锚，也喂不进体外零处；
+ * 同名单影副本属纯计数机制天花板，与 `.takeIf{false}` 族同口径归批 3 AC-R-12 整族结转（见下）。
+ *
  * 选中态墨色必须走 `appDomain(...)` / `appColors()` 主题路径且文件内静态读点归零，
  * 与 `DarkTokenConsumptionRatchetTest` 删 seed 行互为两侧闸（seed 残留由棘轮红，回退静态由本契约红）。
  *
@@ -106,7 +111,19 @@ class AppBottomBarContractTest {
     private val strokeOnlyLayerAnchor = "AppGlyphLayer.StrokeOnly"
     private val glyphCallAnchor = "AppGlyph("
 
-    /** 三件齐 + 墨线 + 两枚实参级字形锚：这些形状钉在 TabSlot 体内「恰一处」，且同一形状在体外「零处」。 */
+    /**
+     * 标签墨夹击锚（修复轮 2 / 复评 A）：`AppBottomBarContrastTest` 的文件级 `contains` 只问「形状在不在文本里」，
+     * 于是「生效定义换成另一枚活 token（如 `val labelInk = appColors().text3`）+ 同一函数体的不可达分支原样保留
+     * `if (selected && !LocalIsDark.current) appColors().onMint else tint`」这发击穿能把文字腿 ≥4.5 变成对一枚
+     * 从未渲染的墨复算而全绿存活。这里把该配对的**定义形状**与**消费形状**钉进与三件套同一具
+     * 「体内恰一处 + 体外零处」计数器：死副本改名喂不到定义锚（近 miss 见探针），幽灵函数消费喂不进体外零处。
+     * 同名单影副本（`if (false) { val labelInk = <原定义> }`）是纯计数机制的已知天花板，
+     * 与文件头 KDoc 的 `.takeIf{false}` 族同口径归批 3 AC-R-12 整族结转，本席不另造作用域分析。
+     */
+    private val labelInkDefinitionAnchor = "val labelInk = if (selected && !LocalIsDark.current)"
+    private val labelInkConsumptionAnchor = "color = labelInk"
+
+    /** 三件齐 + 墨线 + 两枚实参级字形锚 + 标签墨定义/消费配对：这些形状钉在 TabSlot 体内「恰一处」，且同一形状在体外「零处」。 */
     private val inBodyExactlyOne = listOf(
         testTagAnchor,
         contentDescriptionAnchor,
@@ -116,6 +133,8 @@ class AppBottomBarContractTest {
         themedInkAnchor,
         selectedBadgeAnchor,
         unselectedGlyphAnchor,
+        labelInkDefinitionAnchor,
+        labelInkConsumptionAnchor,
     )
 
     /** 体外必须归零的那一组（假 tab/幽灵函数塞这些形状即被体外计数抓获）。 */
@@ -126,6 +145,7 @@ class AppBottomBarContractTest {
         stateAnchor,
         selectedBadgeAnchor,
         unselectedGlyphAnchor,
+        labelInkConsumptionAnchor,
     )
 
     // ---------- 用例：自绘字形族归零 ----------
@@ -196,6 +216,20 @@ class AppBottomBarContractTest {
         val reordered = "AppGlyph(icon = tab.glyph, tint = tint, layer = AppGlyphLayer.StrokeOnly, size = 22.dp)"
         assertEquals(0, count(reordered, unselectedGlyphAnchor), "反空转失控：实参换序的形状竟满足逐字锚（锚点没钉到实参段）")
         assertEquals(1, count(unselectedGlyphAnchor, unselectedGlyphAnchor), "反空转失控：正向形状不满足自身锚点，锚点写歪了")
+
+        // ---------- 标签墨夹击的近 miss 探针（修复轮 2 / 复评 A）----------
+        // 复评席给的击穿形状本身：生效定义换成另一枚活 token、体内死分支只留原取色表达式的改名副本。
+        // 定义锚必须判 0（副本没钉成 labelInk 的生效定义），否则「体内恰一处」对这类喂锚无效。
+        val breachProbe = "val labelInk = appColors().text3\n" +
+            "if (false) {\n    val deadInk = if (selected && !LocalIsDark.current) appColors().onMint else tint\n}\n" +
+            "Text(color = labelInk)\n"
+        assertEquals(0, count(breachProbe, labelInkDefinitionAnchor), "反空转失控：死分支的改名取色副本竟满足标签墨定义锚")
+        assertEquals(1, count(breachProbe, labelInkConsumptionAnchor), "反空转失控：击穿探针里的消费点计数异常，消费锚写歪了")
+        // 消费点被换成别的墨（color = tint）必须不满足消费锚；正向形状自命中。
+        val rebindingProbe = "val labelInk = if (selected && !LocalIsDark.current) appColors().onMint else tint\nText(color = tint)"
+        assertEquals(0, count(rebindingProbe, labelInkConsumptionAnchor), "反空转失控：标签没接 labelInk 竟满足消费锚")
+        assertEquals(1, count(rebindingProbe, labelInkDefinitionAnchor), "反空转失控：生效定义形状不满足自身定义锚，锚点写歪了")
+        assertEquals(1, count(labelInkConsumptionAnchor, labelInkConsumptionAnchor), "反空转失控：正向消费形状不满足自身锚点")
     }
 
     // ---------- 用例：版式承重（F5-03 Task 11 成果） ----------
