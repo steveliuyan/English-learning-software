@@ -515,8 +515,8 @@ private fun VoiceOverlayOption(
             // 批 2 终审修复席 C/C-1（控制者裁决，B 席 concerns ①）：本行是 `style = AppType.Body` 正文档 ⇒ 阈值就是 ≥4.5，
             // 不许按装饰档 3.1 放行。本席现算（WCAG 2.1，浅玻璃实底 = surfaceGlass #EFFFFFFF src-over 页底 #F1FBF5 = #FEFFFE，
             // 深玻璃实底 = #E617201C src-over #0E1512 = #161F1B）：修复前的浅套域色墨 #188F76 压 #FEFFFE 只有
-            // **4.006:1**（压带 Scrim 的 #F5F5F5 = 3.683:1），不达正文线；C-1 席按 `AppBottomBar.kt:95` 的形状按套归位后
-            // 浅套取 `appColors().onMint`：#174C44 压 #FEFFFE = **9.727:1**（带 Scrim 底 8.944:1），
+            // **4.006:1**，不达正文线；C-1 席按 `AppBottomBar.kt:95` 的形状按套归位后
+            // 浅套取 `appColors().onMint`：#174C44 压 #FEFFFE = **9.727:1**，
             // 深套沿用 `appDomain(AppDomain.AiSpeech).deep`：#35E0AC 压 #161F1B = **9.960:1**（本席 awk 现算），
             // 两套都远高于正文线，且浅档取的是房内既有 token：不新增静态色、不动文案与 testTag。
             // 浅套这一处观感有变（选中行由薄荷绿墨变深墨），属修 AA 失败而非回归，已列入 18-ii 用户目检；
