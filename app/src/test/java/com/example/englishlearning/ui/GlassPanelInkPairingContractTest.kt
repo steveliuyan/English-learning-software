@@ -509,11 +509,12 @@ class GlassPanelInkPairingContractTest {
             consumerIdentities = listOf("ai_profile_voice_auto"),
             helperSignatures = listOf("private fun VoiceOverlayOption("),
             pinnedInkLiterals = listOf(
-                // 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：本行 `style = AppType.Body` 属正文档，
-                // 阈值就是 4.5，不许按装饰档 3.1 放行；选中档前景两套同取 `appColors().onMint`
-                // （浅套 #174C44 压浅玻璃现算 9.727:1、深套 #DFF6EC 压深玻璃 14.873:1，与房内 R-14.4 例外同一枚 token）。
+                // 批 2 终审修复席 C/C-1（控制者裁决，B 席 concerns ①）：本行 `style = AppType.Body` 属正文档，
+                // 阈值就是 4.5，不许按装饰档 3.1 放行；选中档前景按 `AppBottomBar.kt:95` 的形状**按套钉死**：
+                // 浅套取 `appColors().onMint`（#174C44 压浅玻璃 #FEFFFE 现算 9.727:1），深套沿用 `deep`
+                // （#35E0AC 压深玻璃 #161F1B ≥4.5，由取样类深套腿当场钉），未选中两套同 `text1`。
                 // 现算与反空转见 [the_selected_voice_row_ink_clears_the_body_aa_gate_on_both_sets]。
-                "color = if (selected) appColors().onMint else appColors().text1",
+                "color = if (selected && !LocalIsDark.current) appColors().onMint else if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1",
             ),
         ),
         MigratedPanel(
@@ -533,7 +534,7 @@ class GlassPanelInkPairingContractTest {
             consumerIdentities = listOf("名称", "能力", "语音角色", "高级参数", "密钥"),
             helperSignatures = listOf("private fun CapabilityToggle(", "private fun EditorField("),
             pinnedInkLiterals = listOf(
-                "color = appDomain(AppDomain.AiSpeech).deep",
+                "color = if (!LocalIsDark.current) appColors().onMint else appDomain(AppDomain.AiSpeech).deep",
                 "val background = if (selected) appDomain(AppDomain.AiSpeech).base.copy(alpha = 0.12f) else appColors().surface",
                 "val border = if (selected) appDomain(AppDomain.AiSpeech).base else appColors().outlineSoft",
             ),
@@ -566,7 +567,7 @@ class GlassPanelInkPairingContractTest {
     /**
      * 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：`AiProfileSettingsScreen.kt` 的
      * 音色浮层选中行（`VoiceOverlayOption`，`style = AppType.Body`）选中档前景改取 `appColors().onMint`
-     * （与房内 R-14.4 例外同一枚 token：浅套 `#174C44`、深套 `#DFF6EC`），未选中档两套同 `text1`。
+     * （取值形状照 `AppBottomBar.kt:95` 按套钉死：浅套 `#174C44` 压浅玻璃、深套 `deep` `#35E0AC` 压深玻璃），未选中档两套同 `text1`。
      * 本用例把**正文档 ≥4.5** 这条线当场算给它看：
      *
      *  - 底取**该行的真实落底**：`surfaceGlass` 带 alpha，按 src-over 压在该套 `background` 上
@@ -588,8 +589,8 @@ class GlassPanelInkPairingContractTest {
                 "若它被降成装饰档，得先改控制者裁决再改本判据，不许就地换阈值（实测体：$option）",
         )
         assertTrue(
-            "color = if (selected) appColors().onMint else appColors().text1" in option,
-            "选中档前景必须两套同取 `appColors().onMint`（浅套 #174C44、深套 #DFF6EC，与本席现算合格的那枚 token 一致）：" +
+            "color = if (selected && !LocalIsDark.current) appColors().onMint else if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1" in option,
+            "选中档前景必须按 `AppBottomBar.kt:95` 的形状按套钉死（浅套 `appColors().onMint`、深套沿用 `deep`）：" +
                 "修复前的浅套域色墨 `#188F76` 压浅玻璃只有 4.006:1，不达正文 AA 4.5，" +
                 "按装饰档 3.1 放行即「为过判据放宽阈值」（实测体：$option）",
         )
@@ -603,7 +604,7 @@ class GlassPanelInkPairingContractTest {
         listOf(
             "浅套选中行 onMint 压浅玻璃" to rgbOf(AppColorLight.onMint) to lightGlass,
             "浅套未选中行 text1 压浅玻璃" to rgbOf(AppColorLight.text1) to lightGlass,
-            "深套选中行 onMint 压深玻璃" to rgbOf(AppColorDark.onMint) to darkGlass,
+            "深套选中行沿用域色 deep 压深玻璃" to rgbOf(DomainDark.getValue(AppDomain.AiSpeech).deep) to darkGlass,
             "深套未选中行 text1 压深玻璃" to rgbOf(AppColorDark.text1) to darkGlass,
         ).forEach { (inkPair, backdrop) ->
             val (label, ink) = inkPair
