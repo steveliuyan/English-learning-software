@@ -1750,6 +1750,31 @@ internal val MintBackground: Color
 且 17B 现场要顺带核底导接入点。各自走完整循环（实现→独立评审→至多一轮修复→窄复评）。
 17B 派发前由控制者现场清点「页头/浮层容器统一」的具体落点清单，避免大文件漫游。
 
+**R-17B.1（控制者清点 + 路由裁决，落点清单见 `.superpowers/sdd/2026-10-17-ui-redesign/task-17b-scope-audit.md`）**：
+现场实测把 Task 17 Step 2 那句「页头/浮层容器统一」拆成可执行的三件事，并推翻了控制者自己的两版误记：
+
+- **页头＝零落点**：`AppScreen.kt` 的页头已在批 1/批 2 接入共享 `components/AppScreenHeader.kt:67`
+  （调用点 `:1782`、`:1956`），且 `SharedComponentUniquenessRatchetTest:533/559` 已把该文件 headline 读点数钉为 0。
+  17B 再新增页头或另造标题即越界。
+- **浮层＝真落点，且分两路**：`AppScreen.kt` 内 6 枚裸 `AlertDialog(`（`:647/:1325/:1608/:1702/:1873/:1913`）。
+  房内有两枚共享浮层档，各管一路：**路 A** `components/ConfirmDestructiveDialog.kt:219`（批 1 Task 11 建档后
+  **消费者实数 0**，正文配方强制「级联 → 保留面 → 不可撤销」三要素、按钮走 `dialogButtonInk` 三档表）收 4 枚破坏性确认
+  （`:647` 清空搜索历史 / `:1325` 删除这一版 / `:1702` 删除全部学习数据 / `:1873` 删除词书）；
+  **路 B** `glass/GlassDialog.kt:31` + `PillButton` 按钮对（房内形状样板 `ReadingAccessScreen.kt:291-322`）收 2 枚非破坏选择
+  （`:1608` 导出词书选择器 / `:1913` 迁移二选一）。
+  理由：`ConfirmDestructiveDialog.kt:47-53` **逐字登记**了「刻意不复用 `GlassDialog`」——`AppPalette.GlassFill` 是静态浅套值，
+  深套墨字压上去读不出来；把破坏性确认迁到玻璃档等于绕开 R-11.1 的墨色裁决。
+- **迁移自由度取证**：8 枚站点私有 `testTag` 与旧措辞在 `androidTest`/JVM 中零引用（当场 grep），故 tag 收敛到组件固定
+  `confirm_destructive_*` 与「此操作不可撤销。」固定句不破坏任何用例；反面事实是这 6 枚浮层 **connected 覆盖为 0**，
+  故 17B 必须自建设备侧背书（不止编译门）。
+- **组件本体冻结**：不许为迁站点给 `ConfirmDestructiveDialog` 加参数（撞 Task 11 份数/几何棘轮）；塞不进去就停下回报。
+- **色债边界**：顺带可摘只有裸 hex 2 枚（`:2392/:2436`，`RawColorLiteralRatchetTest:56` seed 2 + `:76/:77` 在册，摘则 seed 与册同减）；
+  `AppPalette.OnMintPrimary` 3 处（= DarkToken seed `"AppScreen.kt" to 3`）归批 3 Task 26 Step 3；`Mint*` 族 66 处、
+  m-4 的 17/22dp 尺寸差、`AppType`/`GlassFill` 均不进 17B。
+- **诚实留痕**：本清点先后有两版错误（首版记成 `Modifier.surface(` 5 处 + `AppColorLight` 硬编码，实测两者皆 0；
+  次版把 6 枚一律路由 `GlassDialog`，被组件 KDoc 的登记偏离推翻），均在派发前被自查推翻重做。
+  口径升级：**清点即取证**，未经当场 grep 的结论不得写进派发词（与 R-14A-ii.1 同族）。
+
 ---
 
 ### Task 18: 批 2 收口
