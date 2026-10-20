@@ -41,7 +41,17 @@ import kotlin.test.fail
  *
  * 读法只走共享夹具 [uiScreenSource] / [uiComponentSource]（内置「文件恰一个 + 目录守卫 + 剥注释」），
  * 本文件不自写第二份剥注释实现（批 1 终审 F6）。配平取窗三个小夹具与 17A/17B 的同名私有实现同源：
- * 它们既不是 `stripComments` 也没进共享夹具，批 3 做测试夹具归并时应与那两处一起搬进 `SourceRatchet.kt`。
+ * 它们既不是 `stripComments` 也没进共享夹具，批 3 做测试夹具归并时应与那两处一起搬进 `SourceRatchet.kt`
+ * （席 B 扩展沿用同一批夹具，不再抄第四份）。
+ *
+ * **批 2 全分支终审修复席 B（task-18fix-b）的扩面**：判据 ⑤–⑦ 把同一条「容器与面板内前景同源」契约
+ * 推到余下三块玻璃面板——`components/glass/GlassOverlay.kt` 的浮层面板、`AiProfileSettingsScreen.kt` 的
+ * `SectionCard`、`SpeechSettingsScreen.kt` 的 `PreviewCard`。三块各自钉：容器 `appColors().surfaceGlass`
+ * 体内恰一处（体外零处、`.copy` 间接换形不算）、`AppPalette.GlassFill` 归零、主题无关蒙版描边恰一处、
+ * 公开签名与几何逐字不动；面板内容（消费者尾随 lambda 窗口 + 面板专属私有排印点函数体，如
+ * `VoiceOverlayOption` / `CapabilityToggle` / `EditorField`）逐枚按套取墨，禁止静态墨、裸 hex、
+ * 命名色常量与「把墨提读成变量再点用」。曾被单独回退成静态浅套墨的那几行，另用
+ * [MigratedPanel.pinnedInkLiterals] 逐字钉死取值形状。取样窗口同样绑生效调用点、未闭合即响亮 fail。
  */
 class GlassPanelInkPairingContractTest {
 
@@ -439,4 +449,465 @@ class GlassPanelInkPairingContractTest {
         val closed = "GlassDialog(onDismiss = {}) { Text(\"确认发送请求\", style = AppType.Headline, color = appColors().text1) }\n"
         assertEquals(1, windowsOf("ClosedScreen.kt", closed).size, "闭合样片取不到窗口：配平夹具本身坏了，上面的响亮报错也无从谈起")
     }
+
+    // ---------- 判据 ⑤–⑦：批 2 终审修复席 B 的三块玻璃面板 ----------
+
+    /**
+     * 席 B 面板契约描述。字段口径：
+     *  - [containerSignature] 定位容器函数体（`appColors().surfaceGlass` 必须写在这个体内恰一处）；
+     *  - [frozenAnchors] 是本席**只换墨、不改版面**的几何冻结（正则 + 期望处数）；
+     *  - [callAnchor] + [consumerFile] + [consumerIdentities] 描述面板内容在消费者侧的调用点与份数
+     *    （`null` = 内容内联在容器体内，如 `PreviewCard`）；
+     *  - [helperSignatures] 是「内容被拆进同文件私有 Composable」的那几枚（`VoiceOverlayOption` 等），
+     *    它们的体必须折进面板窗口，否则契约只看得到调用点、看不见真正画字的行（席 A 的八枚面板没有这一族，
+     *    本席三块面板全有）；
+     *  - [pinnedInkLiterals] 逐字钉曾被 Task 12.5 单独回退的那几行取墨形状（条件式墨无法用「字面 = appColors().textX」
+     *    一条覆盖，故按整行字面钉，改动即红并说明要同步本契约）。
+     */
+    private data class MigratedPanel(
+        val label: String,
+        val file: String,
+        val dirFragment: String?,
+        val containerSignature: String,
+        val frozenParameters: List<String>,
+        val frozenAnchors: List<Pair<Regex, Int>>,
+        val callAnchor: String?,
+        val consumerFile: String?,
+        val consumerIdentities: List<String>,
+        val helperSignatures: List<String>,
+        val pinnedInkLiterals: List<String>,
+    )
+
+    private val migratedPanels = listOf(
+        MigratedPanel(
+            label = "GlassOverlay 浮层面板",
+            file = "GlassOverlay.kt",
+            dirFragment = glassDialogComponentDir,
+            containerSignature = "fun BoxScope.GlassOverlay(",
+            frozenParameters = listOf(
+                "visible: Boolean",
+                "onDismiss: () -> Unit",
+                "modifier: Modifier = Modifier",
+                "content: @Composable ColumnScope.() -> Unit",
+            ),
+            frozenAnchors = listOf(
+                Regex("""shape = AppShape\.Dialog""") to 1,
+                Regex("""shadowElevation = 16\.dp""") to 1,
+                Regex("""padding\(horizontal = 32\.dp\)""") to 1,
+                Regex("""background\(AppPalette\.Scrim\)""") to 1,
+                Regex("""Column\(Modifier\.padding\(vertical = 8\.dp\), content = content\)""") to 1,
+            ),
+            callAnchor = "GlassOverlay",
+            consumerFile = "AiProfileSettingsScreen.kt",
+            consumerIdentities = listOf("ai_profile_voice_auto"),
+            helperSignatures = listOf("private fun VoiceOverlayOption("),
+            pinnedInkLiterals = listOf(
+                "color = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1",
+            ),
+        ),
+        MigratedPanel(
+            label = "AI 配置卡 SectionCard",
+            file = "AiProfileSettingsScreen.kt",
+            dirFragment = null,
+            containerSignature = "private fun SectionCard(",
+            frozenParameters = listOf("content: @Composable ColumnScope.() -> Unit"),
+            frozenAnchors = listOf(
+                Regex("""shape = AppShape\.Card""") to 1,
+                Regex("""Modifier\.fillMaxWidth\(\)""") to 1,
+                Regex("""Modifier\.padding\(16\.dp\)""") to 1,
+                Regex("""verticalArrangement = Arrangement\.spacedBy\(10\.dp\)""") to 1,
+            ),
+            callAnchor = "SectionCard",
+            consumerFile = "AiProfileSettingsScreen.kt",
+            consumerIdentities = listOf("名称", "能力", "语音角色", "高级参数", "密钥"),
+            helperSignatures = listOf("private fun CapabilityToggle(", "private fun EditorField("),
+            pinnedInkLiterals = listOf(
+                "color = appDomain(AppDomain.AiSpeech).deep",
+                "val background = if (selected) appDomain(AppDomain.AiSpeech).base.copy(alpha = 0.12f) else appColors().surface",
+                "val border = if (selected) appDomain(AppDomain.AiSpeech).base else appColors().outlineSoft",
+            ),
+        ),
+        MigratedPanel(
+            label = "语音试听卡 PreviewCard",
+            file = "SpeechSettingsScreen.kt",
+            dirFragment = null,
+            containerSignature = "private fun PreviewCard(",
+            frozenParameters = listOf("state: SpeechSettingsUiState", "onPreview: (String) -> Unit"),
+            frozenAnchors = listOf(
+                Regex("""shape = AppShape\.Card""") to 1,
+                Regex("""Modifier\.fillMaxWidth\(\)""") to 2,
+                Regex("""Modifier\.padding\(16\.dp\)""") to 1,
+                Regex("""verticalArrangement = Arrangement\.spacedBy\(10\.dp\)""") to 1,
+                Regex("""Hello! 你好，世界！""") to 1,
+            ),
+            callAnchor = null,
+            consumerFile = null,
+            consumerIdentities = emptyList(),
+            helperSignatures = emptyList(),
+            pinnedInkLiterals = listOf(
+                "focusedContainerColor = appColors().surface",
+                "unfocusedContainerColor = appColors().surface",
+                "unfocusedIndicatorColor = appDomain(AppDomain.AiSpeech).base.copy(alpha = 0.3f)",
+            ),
+        ),
+    )
+
+    /** 命名色常量（`Color.White` 那一族浅套硬编码）与裸 hex 构造：面板窗口内两者都不许出现。 */
+    private val namedStaticColorRead = Regex("""\bColor\.(?:White|Black|Gray|Grey|Red|Green|Blue|Yellow)\b""")
+    private val bareHexRead = Regex("""Color\(0x""")
+
+    /** 主题取墨的合法起点：`appColors().x` 或 `appDomain(...).base|deep`，且不许紧跟 `.copy` 之类的间接换形。 */
+    private val themeInkRead = Regex(
+        """^(?:if\s*\([^()]*\)\s*)?(?:appColors\(\)\.[A-Za-z0-9_]+|appDomain\([A-Za-z0-9_. ]*\)\.(?:base|deep))(?![.\w])""",
+    )
+
+    private fun migratedPanelSource(panel: MigratedPanel): String =
+        if (panel.dirFragment == null) uiScreenSource(panel.file) else uiComponentSource(panel.file, panel.dirFragment)
+
+    private fun skipWhitespaceOrFail(text: String, from: Int, site: String): Int =
+        firstNonWhitespace(text, from) ?: fail("$site：调用点之后文本直接结束，取不到面板窗口（未闭合或取样切歪）")
+
+    /**
+     * 形参左括号下标：夹具登记的 `containerSignature` 以 `(` 收尾（本席三块面板与席 A 同口径），
+     * 故取签名末尾那枚 `(`；签名不含 `(` 时退回到「签名之后第一枚非空白必须是 `(`」。
+     * 两种形状都不匹配即响亮失败——配对器不许猜。
+     */
+    private fun paramParenOf(source: String, signature: String, site: String): Int {
+        val start = source.indexOf(signature)
+        assertTrue(start >= 0, "$site：找不到容器签名 \"$signature\"，锚点搬家或改名，契约不许空转")
+        if (signature.endsWith("(")) return start + signature.length - 1
+        val next = skipWhitespaceOrFail(source, start + signature.length, "$site 签名")
+        assertTrue(source[next] == '(', "$site：签名之后第一枚字符不是 (（实测 '${source[next]}'），容器形状与本夹具口径不符")
+        return next
+    }
+
+    /** 调用点取窗：`Foo(…) {…}` 与 `Foo {…}` 两种形状都吃；配平失败由 [balancedRegion] 响亮 fail。 */
+    private fun regionOfCall(text: String, start: Int, name: String, site: String): String {
+        val after = start + name.length
+        val head = text.getOrNull(after)
+        assertTrue(
+            head == null || head == '(' || head == '{' || head.isWhitespace(),
+            "$site：$name 之后不是 ( 也不是 {，调用形状与本夹具口径不符，拒绝猜测",
+        )
+        var cursor = skipWhitespaceOrFail(text, after, site)
+        var end = cursor
+        if (text[cursor] == '(') {
+            val args = balancedRegion(text, cursor, '(', ')', "$site 实参括号")
+            end = args.second + 1
+            cursor = firstNonWhitespace(text, end) ?: return text.substring(start, end)
+        }
+        if (text.getOrNull(cursor) == '{') {
+            end = balancedRegion(text, cursor, '{', '}', "$site 尾随 lambda").second + 1
+        }
+        return text.substring(start, end)
+    }
+
+    /**
+     * 定义点（`fun SectionCard(`）与限定引用（`import …glass.GlassOverlay`）都不算消费窗口：
+     * 前者由 `endsWith("fun")` 排除，后者由前导 `.` 排除——只留真正的调用点。
+     */
+    private fun callSites(source: String, name: String): List<Int> = occurrencesOf(source, name).filter { index ->
+        val before = if (index == 0) ' ' else source[index - 1]
+        !before.isLetterOrDigit() && before != '_' && before != '.' &&
+            !source.substring(0, index).trimEnd().endsWith("fun")
+    }
+
+    private fun migratedWindows(panel: MigratedPanel, containerSource: String, consumerSource: String?): List<String> {
+        val regions = mutableListOf(functionBody(containerSource, panel.containerSignature, panel.label))
+        val anchor = panel.callAnchor
+        if (anchor != null && consumerSource != null) {
+            callSites(consumerSource, anchor).forEach { start ->
+                regions += regionOfCall(consumerSource, start, anchor, "${panel.label} 消费窗口")
+            }
+            panel.helperSignatures.forEach { signature ->
+                regions += functionBody(consumerSource, signature, "${panel.label} 内 $signature")
+            }
+        }
+        return regions
+    }
+
+    /** 容器判据（纯函数，真文件与合成样片走同一条）：填充归零、容器锚体内恰一处、蒙版恰一处、签名与几何冻结。 */
+    private fun migratedContainerOffenders(panel: MigratedPanel, source: String, label: String): List<String> {
+        val offenders = mutableListOf<String>()
+        val body = functionBody(source, panel.containerSignature, label)
+        if (countMatches(source, glassFillRead) != 0) {
+            offenders += "$label：仍有 ${countMatches(source, glassFillRead)} 处 AppPalette.GlassFill 静态玻璃填充读点"
+        }
+        val inBody = containerInkAnchor.findAll(body).count()
+        val inFile = containerInkAnchor.findAll(source).count()
+        if (inBody != 1) offenders += "$label：容器锚 color = appColors().surfaceGlass（不带任何间接换形）体内应恰一处，实测 $inBody"
+        if (inFile != inBody) offenders += "$label：容器锚有 ${inFile - inBody} 处落在容器函数体之外（窗外副本 = 死分支/幽灵容器）"
+        if (countMatches(source, maskBorderRead) != 1) {
+            offenders += "$label：主题无关蒙版描边 AppPalette.GlassHighlight 应恰一处（实测 ${countMatches(source, maskBorderRead)}）"
+        }
+        val maskMembers = setOf("AppPalette.GlassHighlight", "AppPalette.Scrim")
+        val badStaticReads = anyStaticRead.findAll(body).map { it.value }.toSet() - maskMembers
+        if (badStaticReads.isNotEmpty()) offenders += "$label：容器体内出现除蒙版（GlassHighlight/Scrim）以外的静态读点 $badStaticReads"
+        panel.frozenAnchors.forEach { (anchor, expected) ->
+            val actual = countMatches(body, anchor)
+            if (actual != expected) offenders += "$label：几何/形状锚 ${anchor.pattern} 应恰 $expected 处，实测 $actual（本席只换墨，不改面板版面）"
+        }
+        val signatureOpen = paramParenOf(source, panel.containerSignature, label)
+        val signature = splitParameters(
+            balancedRegion(source, signatureOpen, '(', ')', "$label 签名").let { (start, end) -> source.substring(start, end + 1) },
+        )
+        if (signature != panel.frozenParameters) {
+            offenders += "$label：容器签名必须逐字保持 $frozenMigratedParametersNote panel=${panel.frozenParameters}，实测 $signature"
+        }
+        return offenders
+    }
+
+    /** 面板窗口判据：窗口内零静态墨/零裸 hex/零命名色常量，每一枚 `AppType` 排印点的墨必须当场取自当前套。 */
+    private fun migratedWindowOffenders(label: String, window: String, inkTable: Map<String, String>): List<String> {
+        val offenders = mutableListOf<String>()
+        // 主题无关蒙版（GlassHighlight / Scrim）按台账口径留在静态读点，容器判据那一侧已钉它恰一处；
+        // 窗口这一侧只挡「浅套墨」那一族，否则面板体窗口与容器判据互相打架。
+        val maskMembers = setOf("AppPalette.GlassHighlight", "AppPalette.Scrim")
+        val staticReads = anyStaticRead.findAll(window).map { it.value }.toSet() - maskMembers
+        if (staticReads.isNotEmpty()) offenders += "$label：窗口内残留静态墨读点 $staticReads（容器迁了、前景留浅套 = 深色档近黑压近黑）"
+        if (bareHexRead.containsMatchIn(window)) offenders += "$label：窗口内出现裸 hex 构造"
+        if (namedStaticColorRead.containsMatchIn(window)) {
+            offenders += "$label：窗口内出现命名色常量 ${namedStaticColorRead.findAll(window).map { it.value }.toSet()}（浅套硬编码，不随主题换套）"
+        }
+        occurrencesOf(window, "AppType.").forEach { hit ->
+            val styleName = window.substring(hit + "AppType.".length).takeWhile { it.isLetterOrDigit() || it == '_' }
+            if (styleName !in inkTable) return@forEach
+            val args = textCallArgumentsOf(window, hit)
+                ?: run {
+                    offenders += "$label：AppType.$styleName 读点找不到所属 Text( 调用（取样窗口形状不合口径）"
+                    return@forEach
+                }
+            if (!Regex("""style\s*=\s*AppType\.$styleName\b""").containsMatchIn(args)) {
+                offenders += "$label：AppType.$styleName 读点不在任何 Text 的实参里（取样窗口切歪）"
+                return@forEach
+            }
+            val colorExpression = colorArgumentOf(args)
+            if (colorExpression == null) {
+                offenders += "$label：Text(style = AppType.$styleName) 缺显式 color=，仍吃 AppType 的浅套静态墨"
+                return@forEach
+            }
+            if (!themeInkRead.containsMatchIn(colorExpression)) {
+                offenders += "$label：Text(style = AppType.$styleName) 的墨不是当场取当前套（实测 \"$colorExpression\"；" +
+                    "变量提读、.copy 间接换形与另一套常量都不算）"
+            }
+        }
+        return offenders
+    }
+
+    /**
+     * 取 `Text(...)` 实参里的 `color =` 表达式（跳过嵌套括号里的逗号）；没有 `color =` 返回 null。
+     * 只认字面 `color =`（`contentColor =` / `focusedContainerColor =` 由前导边界排除），
+     * 于是「把墨提读成局部 val」会在下一步被 [themeInkRead] 的锚点判出。
+     */
+    private fun colorArgumentOf(args: String): String? {
+        val match = Regex("""(?<![A-Za-z])color\s*=\s*""").find(args) ?: return null
+        var depth = 0
+        var index = match.range.last + 1
+        while (index < args.length) {
+            val c = args[index]
+            when {
+                c in "([{" -> depth++
+                c in ")]}" -> if (depth == 0) break else depth--
+                c == ',' && depth == 0 -> break
+            }
+            index++
+        }
+        return args.substring(match.range.last + 1, index).trim()
+    }
+
+    /** 逐字钉住「曾被单独回退成静态浅套墨」那几行的取值形状（在容器文件 + 消费者文件的并集里找）。 */
+    private fun migratedPinnedLiteralsOffenders(panel: MigratedPanel, sources: List<String>): List<String> =
+        panel.pinnedInkLiterals.filterNot { literal -> sources.any { literal in it } }
+            .map { "$panel.label：登记在册的取墨行丢失或改写：\"$it\"（本席把它逐字钉死，改动必须同步本契约与理由）" }
+
+    @Test
+    fun `the three migrated glass panel containers take their fill from the theme set`() {
+        migratedPanels.forEach { panel ->
+            val source = migratedPanelSource(panel)
+            assertTrue(source.isNotBlank(), "${panel.file} 剥注释后为空：契约不许对空文件判绿")
+            val offenders = migratedContainerOffenders(panel, source, panel.label)
+            assertTrue(offenders.isEmpty(), "玻璃面板容器未与主题档同源：\n" + offenders.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `every foreground inside the three migrated glass panels is bound to a theme ink`() {
+        val inkTable = appTypeInkTable()
+        val sources = migratedPanels.map { it.file }.distinct().associateWith { file ->
+            migratedPanels.first { it.file == file }.let { panel ->
+                if (panel.dirFragment == null) uiScreenSource(file) else uiComponentSource(file, panel.dirFragment)
+            }.also { assertTrue(it.isNotBlank(), "$file 剥注释后为空：契约不许对空文件判绿") }
+        }
+        migratedPanels.forEach { panel ->
+            val containerSource = sources.getValue(panel.file)
+            val consumerSource = panel.consumerFile?.let { sources.getValue(it) }
+            val regions = migratedWindows(panel, containerSource, consumerSource)
+            val expectedRegions = 1 + panel.consumerIdentities.size + panel.helperSignatures.size
+            assertTrue(
+                regions.size == expectedRegions,
+                "${panel.label}：面板窗口应恰 $expectedRegions 枚（容器体 + ${panel.consumerIdentities.size} 枚消费窗口 + " +
+                    "${panel.helperSignatures.size} 枚私有排印点函数体），实测 ${regions.size} —— 少一枚就是有一处内容没进契约",
+            )
+            panel.consumerIdentities.forEach { identity ->
+                // 只认**带引号的字面量**那一枚：中文身份词常以子串混进别的窗口
+                // （如 `contentDescription = "${capability.label}能力"` 里的「能力」没有前引号），
+                // 放宽到裸子串会让「身份绑回调用点」这条判据失去唯一性。
+                val matched = regions.count { it.contains("\"$identity\"") }
+                assertTrue(
+                    matched == 1,
+                    "${panel.label}：身份字面「$identity」必须恰命中一枚窗口（实测 $matched）——窗口绑不回真实调用点，判据就是空转",
+                )
+            }
+            val offenders = mutableListOf<String>()
+            regions.forEachIndexed { index, region ->
+                offenders += migratedWindowOffenders("${panel.label} 窗口 #$index", region, inkTable)
+            }
+            offenders += migratedPinnedLiteralsOffenders(panel, listOf(containerSource) + listOfNotNull(consumerSource))
+            assertTrue(offenders.isEmpty(), "玻璃面板内前景未与容器同批迁主题档：\n" + offenders.joinToString("\n"))
+        }
+    }
+
+    @Test
+    fun `the migrated panel scan rejects a copy indirected fill, a hoisted ink and a themed mask`() {
+        val inkTable = appTypeInkTable()
+        val panel = MigratedPanel(
+            label = "合成 SectionCard",
+            file = "ProbeScreen.kt",
+            dirFragment = null,
+            containerSignature = "private fun SectionCard(",
+            frozenParameters = listOf("content: @Composable ColumnScope.() -> Unit"),
+            frozenAnchors = listOf(
+                Regex("""shape = AppShape\.Card""") to 1,
+                Regex("""Modifier\.fillMaxWidth\(\)""") to 1,
+                Regex("""Modifier\.padding\(16\.dp\)""") to 1,
+            ),
+            callAnchor = "SectionCard",
+            consumerFile = "ProbeScreen.kt",
+            consumerIdentities = listOf("能力"),
+            helperSignatures = emptyList(),
+            pinnedInkLiterals = listOf("color = appColors().text1"),
+        )
+        val compliantContainer = """
+            private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+                Surface(
+                    shape = AppShape.Card,
+                    color = appColors().surfaceGlass,
+                    border = BorderStroke(1.dp, AppPalette.GlassHighlight),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Column(Modifier.padding(16.dp), content = content) }
+            }
+        """.trimIndent()
+        assertEquals(
+            emptyList(),
+            migratedContainerOffenders(panel, compliantContainer, "合规容器样片"),
+            "反空转失控：合规容器样片被真判据误伤（判据恒假，主用例随之全假红）",
+        )
+
+        val copyDecoy = compliantContainer.replace(
+            "color = appColors().surfaceGlass",
+            "color = appColors().surfaceGlass.copy(alpha = 0.9f)",
+        )
+        assertTrue(
+            migratedContainerOffenders(panel, copyDecoy, "间接换形容器").isNotEmpty(),
+            "反空转失控：只加一层 .copy 的间接换形没被判出（席 A 变异 m1 的同族形状）",
+        )
+        val staticDecoy = compliantContainer.replace("color = appColors().surfaceGlass", "color = AppPalette.GlassFill")
+        assertTrue(
+            migratedContainerOffenders(panel, staticDecoy, "回退静态填充").isNotEmpty(),
+            "反空转失控：容器退回静态 AppPalette.GlassFill 没被判出（那正是 C-1 的根因）",
+        )
+        val maskDecoy = compliantContainer.replace("AppPalette.GlassHighlight", "appColors().outlineSoft")
+        assertTrue(
+            migratedContainerOffenders(panel, maskDecoy, "蒙版被主题化").isNotEmpty(),
+            "反空转失控：主题无关蒙版被主题化没被判出（会让 ThemeInvariantMaskReadLedger 漂）",
+        )
+        // 版面守卫的牙齿落在「冻结锚点逐枚恰中」上：改值/改名都会让某一枚锚的计数漂移，即刻判红。
+        // （只往链尾追加一段修饰、不动任何已登记锚形状，本机制看不见——这是显式口径，不假装全护。）
+        val geometryDecoy = compliantContainer.replace("Modifier.padding(16.dp)", "Modifier.padding(20.dp)")
+        assertTrue(
+            migratedContainerOffenders(panel, geometryDecoy, "版面被改").isNotEmpty(),
+            "反空转失控：面板几何锚被改值没被判出（本席只换墨，不改版面）",
+        )
+        val shapeDecoy = compliantContainer.replace("shape = AppShape.Card", "shape = AppShape.Dialog")
+        assertTrue(
+            migratedContainerOffenders(panel, shapeDecoy, "形状被改").isNotEmpty(),
+            "反空转失控：容器形状锚被改名没被判出（面板形状不属于本席的改动面）",
+        )
+
+        val compliantWindow = """
+            SectionCard {
+                Text("能力", style = AppType.Title, color = appColors().text1)
+                Text("声明这套服务支持的模态。", style = AppType.Footnote, color = appColors().text2)
+                CapabilityToggle(capability = capability, selected = true, onToggle = {})
+            }
+        """.trimIndent()
+        assertEquals(
+            emptyList(),
+            migratedWindowOffenders("合规窗口样片", compliantWindow, inkTable),
+            "反空转失控：合规窗口样片被真判据误伤",
+        )
+        val uncolored = compliantWindow.replace(", color = appColors().text1", "")
+        assertTrue(
+            migratedWindowOffenders("缺色样片", uncolored, inkTable).isNotEmpty(),
+            "反空转失控：补色被抹掉（回到 AppType 静态浅套墨）没被判出",
+        )
+        val hoisted = compliantWindow.replace("color = appColors().text1", "color = ink")
+        assertTrue(
+            migratedWindowOffenders("提读样片", hoisted, inkTable).isNotEmpty(),
+            "反空转失控：把主题墨提读成变量再点用没被判出",
+        )
+        val indirected = compliantWindow.replace("color = appColors().text1", "color = appColors().text1.copy(alpha = 1f)")
+        assertTrue(
+            migratedWindowOffenders("间接墨样片", indirected, inkTable).isNotEmpty(),
+            "反空转失控：字面量原封不动只加一层 .copy 的间接换形没被判出",
+        )
+        val staticWindow = compliantWindow.replace("appColors().text2", "AppPalette.TextSecondary")
+        assertTrue(
+            migratedWindowOffenders("静态墨样片", staticWindow, inkTable).isNotEmpty(),
+            "反空转失控：窗口内残留静态浅套墨没被判出",
+        )
+        val whiteField = compliantWindow + "\nTextField(focusedContainerColor = Color.White)\n"
+        assertTrue(
+            migratedWindowOffenders("命名色样片", whiteField, inkTable).isNotEmpty(),
+            "反空转失控：卡内写死的 Color.White 容器没被判出（深色档会在深玻璃里留一枚白输入框）",
+        )
+        val conditional = """
+            SectionCard {
+                Text(label, style = AppType.Body, color = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1)
+            }
+        """.trimIndent()
+        assertEquals(
+            emptyList(),
+            migratedWindowOffenders("条件墨样片", conditional, inkTable),
+            "反空转失控：VoiceOverlayOption 那行的条件式取墨形状被误伤（契约只认单值，判据就落不到真实面板上）",
+        )
+        val pinnedLoss = migratedPinnedLiteralsOffenders(panel, listOf(compliantWindow))
+        assertTrue(pinnedLoss.isEmpty(), "反空转失控：在册取墨行明明存在却被判丢：$pinnedLoss")
+        assertTrue(
+            migratedPinnedLiteralsOffenders(panel, listOf(compliantWindow.replace("color = appColors().text1", "color = AppPalette.TextPrimary"))).isNotEmpty(),
+            "反空转失控：在册取墨行被改回静态墨却没被点名（Task 12.5 那一族回退就这样悄悄回来）",
+        )
+    }
+
+    @Test
+    fun `an unclosed migrated panel call region fails loudly instead of scanning a truncated window`() {
+        val truncated = "SectionCard { Text(\"能力\", style = AppType.Title, color = appColors().text1\n"
+        assertFailsWith<AssertionError>(
+            "未闭合的尾随 lambda 必须响亮报错：静默截断窗口会把窗外文字算进窗内（批 2 seatC1 评审 I-1 同族教训）",
+        ) {
+            callSites(truncated, "SectionCard").forEach { regionOfCall(truncated, it, "SectionCard", "截断样片") }
+        }
+        val closed = "SectionCard { Text(\"能力\", style = AppType.Title, color = appColors().text1) }\n"
+        assertEquals(1, callSites(closed, "SectionCard").size, "闭合样片取不到调用点：取窗夹具本身坏了")
+        assertEquals(1, regionOfCall(closed, callSites(closed, "SectionCard").single(), "SectionCard", "闭合样片").count { it == '}' }, "取窗没收尾到尾随 lambda 的闭合花括号")
+        val definitionForm = "private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {}\n"
+        assertEquals(
+            emptyList(),
+            callSites(definitionForm, "SectionCard"),
+            "定义点被当成消费窗口：容器判据会在自己头上取窗，消费者侧反而失明",
+        )
+    }
 }
+
+/** [migratedContainerOffenders] 的报错文案里要的固定前缀（抽出来避免把整段中文塞进正则）。 */
+private const val frozenMigratedParametersNote = "的形参清单（实测不符即容器签名被动过）："

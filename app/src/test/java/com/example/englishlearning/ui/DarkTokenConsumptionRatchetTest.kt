@@ -29,8 +29,10 @@ import kotlin.test.assertTrue
  *  - **同族但性质不同的一枚**：`AppPalette.GlassFill`（玻璃容器**填充**）。批 1 终审 Seat A I-1 复算后把它移出
  *    蒙版成员表：`AppColors.kt` 里 `surfaceGlass` 浅套取值与它逐字相同（`0xEFFFFFFF`），说明目标 token 早已备好，
  *    这些站点是**待迁债务**而不是主题不变量；理由与逐文件站点见 [GlassFillBackdropDebtLedger]。
- *    seed 计数不因移出而改变（它们本来就照常计入 debt seed）。批 2 全分支终审修复席 A 已迁走
- *    `components/glass/GlassDialog.kt` 一处（容器 + 面板内前景同批迁，浅色侧逐值不变），本表随之剩三处。
+ *    seed 计数不因移出而改变（它们本来就照常计入 debt seed）。批 2 终审修复轮把四枚站点全部迁走：
+ *    席 A `components/glass/GlassDialog.kt`、席 B `components/glass/GlassOverlay.kt` +
+ *    `AiProfileSettingsScreen.kt`（`SectionCard`）+ `SpeechSettingsScreen.kt`（`PreviewCard`）——
+ *    每枚都是「容器 + 面板内前景同批迁」，浅色侧逐值不变，本表随之清空（取样链由合成探针承重，见该表 KDoc）。
  *  - 浅套硬编码：`AppPalette.TextPrimary` / `TextSecondary` / `Surface` / `Separator` /
  *    `OnMintPrimary` 与 `DomainColors` 各域的 `deep`。这些是浅底取值，深底压深字直接不可读，
  *    必须改成 `appColors().x` / `appDomain(AppDomain.X).deep`。`theme/AppType.kt` 的顶层 `TextStyle`
@@ -65,9 +67,9 @@ import kotlin.test.assertTrue
  * （[ThemeInvariantMaskReadLedger]、[ParameterDefaultStaticReadLedger]）承载其理由，本表仍是「还欠多少」的唯一权威。
  */
 internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
-    "AiProfileSettingsScreen.kt" to 19,
+    "AiProfileSettingsScreen.kt" to 8,
     "SettingsScreen.kt" to 10,
-    "SpeechSettingsScreen.kt" to 8,
+    "SpeechSettingsScreen.kt" to 5,
     "components/glass/GlassButton.kt" to 1,
     "CheckInScreen.kt" to 7,
     "WordCardScreen.kt" to 7,
@@ -79,7 +81,7 @@ internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     "AiFeatureScreen.kt" to 3,
     "AppScreen.kt" to 3,
     "SentenceAnalysisScreen.kt" to 1,
-    "components/glass/GlassOverlay.kt" to 3,
+    "components/glass/GlassOverlay.kt" to 2,
     "AiLearningScreen.kt" to 2,
     "BackupExportScreen.kt" to 2,
     "components/glass/GlassDialog.kt" to 1,
@@ -130,23 +132,21 @@ internal val ThemeInvariantMaskMembers: List<String> = listOf("GlassHighlight", 
 /**
  * 玻璃容器填充的待迁债务台账（批 1 终审 F4 补的第五张表，不是豁免）：
  * `AppPalette.GlassFill` 的**尚未迁走**的站点，key 为相对 `ui` 根的路径（与其余台账同一口径，精确相等）。
- * 批 1 记下四处，批 2 全分支终审修复席 A 迁走 `components/glass/GlassDialog.kt`（容器与面板内前景同批迁）后剩三处。
  *
- * 这些命中**照常计入** [DarkTokenSeedAllowlist]（本表不从中扣除，seed 计数一处不减），
- * 本表只回答「为什么批 1 不迁、要连着什么一起迁」：容器填充必须与面板内前景墨色同批迁移，
- * 墨色那一族（约 58 处无 `color=` 的排印点）已在 seed 里指定批 3；只迁填充会让深色下的面板从「意外可读」变成
- * 「当场不可读」，是净退化。目标值是 `appColors().surfaceGlass`（浅套取值与现值逐字相同，浅色侧像素零变化），
- * 验收由批 2/批 3 随屏 + connected 实测（`docs/verification/ui-redesign-2026-10.md` 的 AC-R-11 行）。
- * 迁走一处时：本表删行 + seed 减 1，两张表同减，谁单独漂移都会红。
+ * **批 2 终审修复轮已清空**（四枚站点全部连着面板前景同批迁成 `appColors().surfaceGlass`）：
+ * 席 A `components/glass/GlassDialog.kt`（task-18fix-a），席 B `components/glass/GlassOverlay.kt`、
+ * `AiProfileSettingsScreen.kt`（`SectionCard`）、`SpeechSettingsScreen.kt`（`PreviewCard`）（task-18fix-b）。
+ * 浅色侧逐值不变（`AppColorLight.surfaceGlass` 与旧静态值同为 `0xEFFFFFFF`），深色侧才拿到那套深玻璃；
+ * 面板内前景（含 `VoiceOverlayOption` / `CapabilityToggle` 这两族曾被单独回退的墨）同批按套取值，
+ * 判据见 `GlassPanelInkPairingContractTest` 与本批深色档 connected 取样。
+ *
+ * 本表空不等于闸空（口径同 [ParameterDefaultStaticReadLedger]）：`glass fill backdrop scan is not a no-op once the ledger is empty`
+ * 拿合成目录把「未登记站点」「残留台账行」「蒙版/待迁互斥」三种形状走**同一条**取样链
+ * （[glassFillCounts] / [glassFillOffenders]），真实面清零后取样链一旦漂移照样判红。
+ * `AppPalette.GlassFill` 这个常量本身仍留在浅套静态源里（`DesignTokenContractTest` 钉其取值），
+ * 删除它属批 3 的静态源收口，不在本表口径内。
  */
-internal val GlassFillBackdropDebtLedger: Map<String, String> = mapOf(
-    "components/glass/GlassOverlay.kt" to "玻璃遮罩面板容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass",
-    "AiProfileSettingsScreen.kt" to "屏内玻璃面板容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass" +
-        "（Task 12.5 修复轮 C-2 实测：试听浮层选项行 VoiceOverlayOption 曾被单独迁成 appColors().text1，" +
-        "回退为静态浅套墨；能力开关 CapabilityToggle 的容器曾被单独迁深，回退为 AppPalette.Surface/Separator。" +
-        "两侧都必须连着这层白玻璃面板同批迁）",
-    "SpeechSettingsScreen.kt" to "屏内玻璃面板容器填充（试听卡）：与面板内前景墨色同批迁成 appColors().surfaceGlass",
-)
+internal val GlassFillBackdropDebtLedger: Map<String, String> = emptyMap()
 
 /**
  * 主题不变蒙版色台账（不是豁免）：`DarkTokenSeedAllowlist` 里哪些命中是上面那族蒙版色，逐文件计数。
@@ -246,9 +246,56 @@ class DarkTokenConsumptionRatchetTest {
         .associate { it.relativeUiPath() to countMatches(it.readText(), rule) }
         .filterValues { it > 0 }
 
-    private fun maskCounts(): Map<String, Int> = uiFiles(uiDir)
-        .associate { it.relativeUiPath() to countMatches(it.readText(), maskRule) }
+    private fun maskCounts(dir: File = uiDir): Map<String, Int> = uiFiles(dir)
+        .associate { it.relativePathFrom(dir) to countMatches(it.readText(), maskRule) }
         .filterValues { it > 0 }
+
+    /** 玻璃容器填充站点，按 `dir` 取样（真实面与合成探针对走同一条链，dir 缺省为 ui 根）。 */
+    private fun glassFillCounts(dir: File = uiDir): Map<String, Int> = uiFiles(dir)
+        .associate { it.relativePathFrom(dir) to countMatches(it.readText(), glassFillRead) }
+        .filterValues { it > 0 }
+
+    /**
+     * 待迁债务取样链的**纯判据**（真实面与合成样片共用，返回 offender 列表，空 = 合规）：
+     * 未登记 → 红、台账残留 → 红、一站点两处填充 → 红、站点不在 seed 或 seed 少于填充数 → 红、
+     * 同文件蒙版计数与蒙版台账漂移 → 红。
+     */
+    private fun glassFillOffenders(
+        label: String,
+        actual: Map<String, Int>,
+        ledger: Map<String, String>,
+        seed: Map<String, Int>,
+        maskActual: Map<String, Int>,
+        maskLedger: Map<String, Int>,
+    ): List<String> {
+        val offenders = mutableListOf<String>()
+        val unregistered = actual.filterKeys { it !in ledger }
+        if (unregistered.isNotEmpty()) {
+            offenders += "$label：出现未登记的 AppPalette.GlassFill 容器填充站点 $unregistered —— 玻璃填充是待迁债务，" +
+                "必须逐条登记进 GlassFillBackdropDebtLedger 写明「与面板前景同批迁」的理由，别把它塞回蒙版台账"
+        }
+        val stale = ledger.keys.filterNot { it in actual }
+        if (stale.isNotEmpty()) {
+            offenders += "$label：GlassFill 待迁台账里的站点已无该读点（已随屏迁成 appColors().surfaceGlass 或改了名）：$stale —— " +
+                "删本表行的同时要把 DarkTokenSeedAllowlist 的对应 seed 一并减 1"
+        }
+        val counts = actual.filterKeys { it in ledger.keys }
+        if (counts.values.any { it != 1 }) {
+            offenders += "$label：每一处玻璃填充待迁站点应各恰一处 GlassFill 读点（多一处 = 第二份容器填充口径）：$counts"
+        }
+        counts.forEach { (path, count) ->
+            val seedCount = seed[path]
+            if (seedCount == null || seedCount < count) {
+                offenders += "$label：GlassFill 待迁站点 $path 不在 debt seed 里或 seed 少于其填充读点数（$seedCount）——" +
+                    "移出蒙版表不减少债务，两处台账必须同时看得见这一处"
+            }
+            if (path in maskLedger.keys && maskActual[path] != maskLedger[path]) {
+                offenders += "$label：$path 的蒙版计数 ${maskActual[path]} 与其台账 ${maskLedger[path]} 不符——" +
+                    "蒙版与待迁债务两套取样必须在同一文件上各自闭合"
+            }
+        }
+        return offenders
+    }
 
     /**
      * 命中「形参默认值 / 文件顶层 val」两种行形态的站点，返回「相对 `dir` 路径: 折叠行」；dir 缺省为 ui 根。
@@ -516,59 +563,116 @@ class DarkTokenConsumptionRatchetTest {
      * 三段承重（缺一即恒真）：
      *  ① 逐文件 GlassFill 命中数与 [GlassFillBackdropDebtLedger] **双向精确相等**（新增未登记 → 红，
      *     迁走一处而台账残留 → 也红），台账 key 与其余台账同为相对 `ui` 根的精确路径；
+     *     批 2 终审修复轮后真实面已清零，取样链的空转守卫见
+     *     `glass fill backdrop scan is not a no-op once the ledger is empty`；
      *  ② 每一处 GlassFill 站点都必须同时落在 [DarkTokenSeedAllowlist] 里，且 seed 不减
      *     ——移出蒙版表**不等于**移出债务台账，本表只是理由的另一面；
-     *  ③ 蒙版规则与 GlassFill 取样互斥（同一枚读点不会既算蒙版又算待迁债务），
-     *     且真实源码里 GlassFill 恰好四处（变异证据：把 `AppColorDark.surfaceGlass` 改成与浅套逐字相同不影响本条，
-     *     但把任一站点主题化后本条会红——那正是批 2/批 3 该同步删行的动作）。
+     *  ③ 蒙版规则与 GlassFill 取样互斥（同一枚读点不会既算蒙版又算待迁债务）。
      */
     @Test
     fun `glass fill backdrop reads are migratable debt registered apart from the mask ledger`() {
-        val glassFillRule = Regex("""\bAppPalette\.GlassFill\b""")   // 字面写死，不随 ThemeInvariantMaskMembers 漂移
-        val actual = uiFiles(uiDir)
-            .associate { it.relativeUiPath() to countMatches(it.readText(), glassFillRule) }
-            .filterValues { it > 0 }
-        val unregistered = actual.filterKeys { it !in GlassFillBackdropDebtLedger }
-        assertTrue(
-            unregistered.isEmpty(),
-            "出现未登记的 AppPalette.GlassFill 容器填充站点：$unregistered —— 玻璃填充是待迁债务，" +
-                "必须逐条登记进 GlassFillBackdropDebtLedger 写明「与面板前景同批迁」的理由，别把它塞回蒙版台账"
+        val actual = glassFillCounts()
+        val offenders = glassFillOffenders(
+            "真实源码",
+            actual,
+            GlassFillBackdropDebtLedger,
+            DarkTokenSeedAllowlist,
+            maskCounts(),
+            ThemeInvariantMaskReadLedger,
         )
-        val stale = GlassFillBackdropDebtLedger.keys.filterNot { it in actual }
         assertTrue(
-            stale.isEmpty(),
-            "GlassFill 待迁台账里的站点已无该读点（已随屏迁成 appColors().surfaceGlass 或改了名）：$stale —— " +
-                "删本表行的同时要把 DarkTokenSeedAllowlist 的对应 seed 一并减 1"
+            offenders.isEmpty(),
+            "GlassFill 待迁债务的两张表不同步：\n" + offenders.joinToString("\n") +
+                "\n迁走一处 = 本表删行 + DarkTokenSeedAllowlist 同文件 seed 减 1；只动一张都会漂。" +
+                "台账已清空后取样链是否空转，另见 `glass fill backdrop scan is not a no-op once the ledger is empty`。",
         )
-        val counts = actual.filterKeys { it in GlassFillBackdropDebtLedger.keys }
-        assertTrue(
-            counts.values.all { it == 1 },
-            "每一处玻璃填充待迁站点应各恰一处 GlassFill 读点（多一处 = 第二份容器填充口径）：$counts"
-        )
-        val seed = DarkTokenSeedAllowlist
-        counts.keys.forEach { path ->
-            val seedCount = seed[path]
-            assertTrue(
-                seedCount != null && seedCount >= counts.getValue(path),
-                "GlassFill 待迁站点 $path 不在 debt seed 里或 seed 少于其填充读点数（$seedCount）——" +
-                    "移出蒙版表不减少债务，两处台账必须同时看得见这一处"
-            )
-            assertTrue(
-                path !in ThemeInvariantMaskReadLedger.keys ||
-                    maskCounts()[path] == (ThemeInvariantMaskReadLedger[path] ?: 0),
-                "$path 的蒙版计数与其台账不符：蒙版与待迁债务两套取样必须在同一文件上各自闭合"
-            )
-        }
         // ③ 互斥：蒙版规则抓不到 GlassFill，待迁规则抓不到蒙版成员——同一段文本两份取样不得重叠。
         val both = "val a = AppPalette.GlassFill\nval b = AppPalette.GlassHighlight\nval c = AppPalette.Scrim\n"
         val stripped = stripComments(both)
-        assertEquals(1, glassFillRule.findAll(stripped).count(), "待迁取样必须只认出 GlassFill 那一枚")
+        assertEquals(1, glassFillRead.findAll(stripped).count(), "待迁取样必须只认出 GlassFill 那一枚")
         assertEquals(2, maskRule.findAll(stripped).count(), "蒙版取样必须只认出 GlassHighlight 与 Scrim 两枚")
         assertTrue(
-            glassFillRule.findAll(stripped).map { it.value }.toSet()
+            glassFillRead.findAll(stripped).map { it.value }.toSet()
                 .intersect(maskRule.findAll(stripped).map { it.value }.toSet()).isEmpty(),
             "两份取样重叠 = 同一枚读点被登记两次，seed 递减时会有一张表漂不掉"
         )
+    }
+
+    /**
+     * **台账清空后的空转守卫（批 2 终审修复席 B）**：[GlassFillBackdropDebtLedger] 现为空表，
+     * 上面那条判据在真实面上失去样本。空表不等于闸空——本用例拿合成目录把**同一条**取样链
+     * （[glassFillCounts] + [glassFillOffenders]）的四种形状逐一点名：
+     *  ① 合成站点必须被取样到（否则后面三条全是空对空）；
+     *  ② 站点存在而台账没登记 → 红（新增即挡）；
+     *  ③ 登记了但 seed 没同步看见这一处 → 红（「只减债务表、不动 seed」那条漂移）；
+     *  ④ 站点已迁走而台账行残留 → 红（「迁完不删行」那条漂移）；登记齐全时 → 放行（证明②③④不是恒真）。
+     * 另钉真实面：源码里 GlassFill 容器填充站点确已归零，且空表里没有任何残留 key。
+     */
+    @Test
+    fun `glass fill backdrop scan is not a no-op once the ledger is empty`() {
+        val dir = java.nio.file.Files.createTempDirectory("glass-fill-debt-ratchet").toFile()
+        try {
+            File(dir, "PanelProbe.kt").writeText(
+                """
+                @Composable
+                fun PanelProbe() {
+                    Surface(color = AppPalette.GlassFill, border = BorderStroke(1.dp, AppPalette.GlassHighlight))
+                }
+                """.trimIndent() + "\n"
+            )
+            val probePath = "PanelProbe.kt"
+            val actual = glassFillCounts(dir)
+            assertEquals(
+                mapOf(probePath to 1),
+                actual,
+                "合成目录没被 GlassFill 取样链抓到：真实面清零后这条链就成了空转（取样正则或扫描根漂了）",
+            )
+            val maskProbe = maskCounts(dir)
+            assertEquals(
+                mapOf(probePath to 1),
+                maskProbe,
+                "合成目录的蒙版取样没抓到 GlassHighlight：下面那条「蒙版与待迁各自闭合」的判据会失去对象",
+            )
+            assertTrue(
+                glassFillOffenders("未登记样片", actual, emptyMap(), mapOf(probePath to 2), maskProbe, emptyMap()).isNotEmpty(),
+                "反空转失控：新增未登记的 GlassFill 站点没被点名（债务表不再挡新增）",
+            )
+            assertTrue(
+                glassFillOffenders("seed 漂移样片", actual, mapOf(probePath to "理由"), emptyMap(), maskProbe, emptyMap()).isNotEmpty(),
+                "反空转失控：登记了债务行却没同步 debt seed，这条漂移没被点名",
+            )
+            assertTrue(
+                glassFillOffenders("残留台账样片", emptyMap(), mapOf(probePath to "理由"), mapOf(probePath to 1), maskProbe, emptyMap()).isNotEmpty(),
+                "反空转失控：站点已迁走而台账行残留，这条漂移没被点名（残留行会让下一处同类站点蒙过去）",
+            )
+            assertTrue(
+                glassFillOffenders("合规样片", actual, mapOf(probePath to "理由"), mapOf(probePath to 2), maskProbe, emptyMap()).isEmpty(),
+                "反空转失控：登记齐全（债务行 + seed + 蒙版闭合）的样片也被判红，上面三条就成了恒真",
+            )
+            assertTrue(
+                glassFillOffenders(
+                    "蒙版漂移样片",
+                    actual,
+                    mapOf(probePath to "理由"),
+                    mapOf(probePath to 2),
+                    maskProbe,
+                    mapOf(probePath to 2),
+                ).isNotEmpty(),
+                "反空转失控：同文件的蒙版计数与蒙版台账不符时没被点名——两张表的「各自闭合」没有牙齿",
+            )
+            assertTrue(
+                glassFillCounts().isEmpty(),
+                "真实源码仍有 AppPalette.GlassFill 容器填充站点：${glassFillCounts()} —— 批 2 已四处全迁，" +
+                    "新增玻璃填充必须直接写 appColors().surfaceGlass",
+            )
+            assertEquals(
+                emptyMap<String, Int>(),
+                glassFillCounts().filterKeys { it in DarkTokenSeedAllowlist.keys },
+                "GlassFill 债务台账清空后，真实面必须同时是零站点（否则 seed 里藏着一条没有台账理由的填充读点）",
+            )
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 
     @Test

@@ -52,6 +52,7 @@ import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 
 /**
  * 「设置 · AI」下的 AI 服务管理页（二级全屏层）。
@@ -333,8 +334,8 @@ private fun AiProfileEditor(
             }
 
             SectionCard {
-                Text("能力", style = AppType.Title)
-                Text("声明这套服务支持的模态；生成文章至少要有「文本」。", style = AppType.Footnote)
+                Text("能力", style = AppType.Title, color = appColors().text1)
+                Text("声明这套服务支持的模态；生成文章至少要有「文本」。", style = AppType.Footnote, color = appColors().text2)
                 AiCapability.entries.forEach { capability ->
                     CapabilityToggle(
                         capability = capability,
@@ -349,10 +350,11 @@ private fun AiProfileEditor(
 
             if (AiCapability.Speech in draft.capabilities) {
                 SectionCard {
-                    Text("语音角色", style = AppType.Title)
+                    Text("语音角色", style = AppType.Title, color = appColors().text1)
                     Text(
                         text = "留空 = 自动：MiMo 按语言选冰糖/Mia，OpenAI 兼容走服务默认。",
                         style = AppType.Footnote,
+                        color = appColors().text2,
                     )
                     PillButton(
                         text = if (draft.voice.isBlank()) "自动（推荐）  ▾" else "${draft.voice}  ▾",
@@ -366,10 +368,11 @@ private fun AiProfileEditor(
             }
 
             SectionCard {
-                Text("高级参数", style = AppType.Title)
+                Text("高级参数", style = AppType.Title, color = appColors().text1)
                 Text(
                     text = "可选范围：temperature 0–2、top_p 0–1、max_tokens 1–4096、超时 5–120 秒。",
                     style = AppType.Footnote,
+                    color = appColors().text2,
                 )
                 EditorField("temperature", draft.temperature, "ai_profile_temperature", numeric = true) {
                     onDraftChange(draft.copy(temperature = it))
@@ -386,11 +389,11 @@ private fun AiProfileEditor(
             }
 
             SectionCard {
-                Text("密钥", style = AppType.Title)
+                Text("密钥", style = AppType.Title, color = appColors().text1)
                 Text(
                     text = if (state.hasStoredKey) "已设置密钥" else "还没有设置密钥",
                     style = AppType.Body,
-                    color = DomainColors.AiSpeech.deep,
+                    color = appDomain(AppDomain.AiSpeech).deep,
                     modifier = Modifier.testTag("ai_profile_key_state"),
                 )
                 EditorField(
@@ -499,20 +502,26 @@ private fun VoiceOverlayOption(
         Text(
             label,
             style = AppType.Body,
-            // 这一行渲染在未迁的 `GlassOverlay` 面板里（面板填充 = AppPalette.GlassFill，94% 白、主题不变），
-            // 前景必须与容器同批迁：只把墨迁成 appColors().text1 会让深色档出现「浅墨压白玻璃」（≈1.14:1），
-            // 正是 AC-R-11 禁止的那一侧（Task 12.5 修复轮 C-2；理由登记见 GlassFillBackdropDebtLedger）。
-            color = if (selected) DomainColors.AiSpeech.deep else AppPalette.TextPrimary,
+            // 容器与前景已于批 2 终审修复席 B 同批迁：`GlassOverlay` 面板底现在是 `appColors().surfaceGlass`
+            // （浅套逐值 = 旧的 `AppPalette.GlassFill`，深色档才换成套深玻璃），所以这一行的墨必须跟着按套取值，
+            // 否则深色档就是「浅墨压白玻璃 → 深墨压深玻璃」两侧各错一次（Task 12.5 修复轮 C-2 当年回退的前提
+            // 「面板未迁」已随本批消失；登记见 DarkTokenConsumptionRatchetTest 的 GlassFillBackdropDebtLedger 收口）。
+            color = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1,
         )
     }
 }
 
-/** 玻璃卡分节容器：对齐 SpeechSettingsScreen 的 PreviewCard 写法。 */
+/**
+ * 玻璃卡分节容器：对齐 SpeechSettingsScreen 的 PreviewCard 写法。
+ * 批 2 终审修复席 B：容器底 `appColors().surfaceGlass` 随主题换套（浅套逐值 = 旧 `AppPalette.GlassFill`），
+ * 卡内前景同批迁（`CapabilityToggle` / `EditorField` / 各排印点逐枚按套取墨）；
+ * 描边 `AppPalette.GlassHighlight` 是主题无关蒙版，按台账口径不动。
+ */
 @Composable
 private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = AppShape.Card,
-        color = AppPalette.GlassFill,
+        color = appColors().surfaceGlass,
         border = BorderStroke(1.dp, AppPalette.GlassHighlight),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -549,10 +558,10 @@ private fun EditorField(
         colors = TextFieldDefaults.colors(
             focusedContainerColor = appColors().surface,
             unfocusedContainerColor = appColors().surface,
-            focusedIndicatorColor = DomainColors.AiSpeech.base,
+            focusedIndicatorColor = appDomain(AppDomain.AiSpeech).base,
             unfocusedIndicatorColor = appColors().outlineSoft,
-            cursorColor = DomainColors.AiSpeech.base,
-            focusedLabelColor = DomainColors.AiSpeech.deep,
+            cursorColor = appDomain(AppDomain.AiSpeech).base,
+            focusedLabelColor = appDomain(AppDomain.AiSpeech).deep,
             unfocusedLabelColor = appColors().text2,
             focusedTextColor = appColors().text1,
             unfocusedTextColor = appColors().text1,
@@ -562,12 +571,12 @@ private fun EditorField(
 
 @Composable
 private fun CapabilityToggle(capability: AiCapability, selected: Boolean, onToggle: (Boolean) -> Unit) {
-    // 容器回退为静态浅套（Task 12.5 修复轮 C-1 的第二半）：本行渲染在未迁的 `SectionCard` 白玻璃里，
-    // 且选中档的填充本身是静态 `DomainColors.AiSpeech.base.copy(alpha = 0.12f)`——把未选中档单独迁深会造出
-    // 「浅墨压浅玻璃」的选中档与「深底压静态墨」的未选中档两种不可读，属容器—墨必须同批的形状。
-    // 整卡随批 3 的 GlassFill 族一起迁（GlassFillBackdropDebtLedger 已登记本屏面板）。
-    val background = if (selected) DomainColors.AiSpeech.base.copy(alpha = 0.12f) else AppPalette.Surface
-    val border = if (selected) DomainColors.AiSpeech.base else AppPalette.Separator
+    // 批 2 终审修复席 B：容器与前景同批迁（Task 12.5 修复轮 C-1 第二半的前提已消失）。
+    // 本行所在的 `SectionCard` 已换成 `appColors().surfaceGlass`，选中档的填充与未选中档的底/描边
+    // 一起按套取值：浅套 `surface` / `outlineSoft` / `AiSpeech.base` 与旧静态值逐字相同 ⇒ 浅色侧零变化，
+    // 深色档得到「深玻璃 + 浅墨 + 亮域色」这一对（判据见 GlassPanelInkPairingContractTest）。
+    val background = if (selected) appDomain(AppDomain.AiSpeech).base.copy(alpha = 0.12f) else appColors().surface
+    val border = if (selected) appDomain(AppDomain.AiSpeech).base else appColors().outlineSoft
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -580,10 +589,11 @@ private fun CapabilityToggle(capability: AiCapability, selected: Boolean, onTogg
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.fillMaxWidth()) {
-            Text(capability.label, style = AppType.Title)
+            Text(capability.label, style = AppType.Title, color = appColors().text1)
             Text(
                 text = if (selected) "已启用" else "未启用",
                 style = AppType.Footnote,
+                color = appColors().text2,
             )
         }
     }

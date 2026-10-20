@@ -28,7 +28,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -39,12 +38,15 @@ import com.example.englishlearning.language.domain.PronunciationEngine
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.components.glass.pressableScale
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
+import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 
 @Composable
 fun SpeechSettingsScreen(
@@ -226,12 +228,20 @@ private fun detailFor(state: SpeechSettingsUiState, engine: PronunciationEngine,
     return "${bound.displayName} · $keyState"
 }
 
+/**
+ * 试听卡（玻璃面板）。批 2 终审修复席 B（task-18fix-b）容器与卡内前景同批迁：
+ *  - 容器底 `appColors().surfaceGlass` 随主题换套（浅套取值与旧 `AppPalette.GlassFill` 逐字相同 ⇒ 浅色侧零变化），
+ *    描边 `AppPalette.GlassHighlight` 是主题无关蒙版，按台账口径不动；
+ *  - 卡内每一枚排印点显式接当前套的墨，输入框容器与指示线一起按套取值——
+ *    原来写死的 `Color.White` 与浅套 `surface` 逐字相同，深色档不再出现「深玻璃里的白底输入框」。
+ * 判据见 `GlassPanelInkPairingContractTest`（容器—前景同源契约）与本批深色档 connected 取样。
+ */
 @Composable
 private fun PreviewCard(state: SpeechSettingsUiState, onPreview: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf("Hello! 你好，世界！") }
     Surface(
         shape = AppShape.Card,
-        color = AppPalette.GlassFill,
+        color = appColors().surfaceGlass,
         border = BorderStroke(1.dp, AppPalette.GlassHighlight),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -239,8 +249,8 @@ private fun PreviewCard(state: SpeechSettingsUiState, onPreview: (String) -> Uni
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("试听", style = AppType.Title)
-            Text("用当前选中的朗读服务播放这段文字。", style = AppType.Footnote)
+            Text("试听", style = AppType.Title, color = appColors().text1)
+            Text("用当前选中的朗读服务播放这段文字。", style = AppType.Footnote, color = appColors().text2)
             TextField(
                 value = text,
                 onValueChange = { text = it },
@@ -250,10 +260,10 @@ private fun PreviewCard(state: SpeechSettingsUiState, onPreview: (String) -> Uni
                 minLines = 2,
                 placeholder = { Text("输入要试听的内容") },
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedIndicatorColor = DomainColors.AiSpeech.base,
-                    unfocusedIndicatorColor = DomainColors.AiSpeech.base.copy(alpha = 0.3f),
+                    focusedContainerColor = appColors().surface,
+                    unfocusedContainerColor = appColors().surface,
+                    focusedIndicatorColor = appDomain(AppDomain.AiSpeech).base,
+                    unfocusedIndicatorColor = appDomain(AppDomain.AiSpeech).base.copy(alpha = 0.3f),
                 ),
             )
             PillButton(
@@ -265,7 +275,9 @@ private fun PreviewCard(state: SpeechSettingsUiState, onPreview: (String) -> Uni
                 testTag = "speech_preview_button",
                 contentDescription = "试听",
             )
-            state.previewMessage?.let { Text(it, style = AppType.Footnote, modifier = Modifier.testTag("speech_preview_message")) }
+            state.previewMessage?.let {
+                Text(it, style = AppType.Footnote, color = appColors().text2, modifier = Modifier.testTag("speech_preview_message"))
+            }
         }
     }
 }

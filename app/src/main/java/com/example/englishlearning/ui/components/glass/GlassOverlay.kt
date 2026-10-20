@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.ui.theme.appColors
 
 /** active 时对下层页面内容做真模糊（API 31+；以下版本 Modifier.blur 自动无效）。 */
 fun Modifier.frosted(active: Boolean): Modifier = if (active) this.blur(8.dp) else this
@@ -35,6 +36,15 @@ fun Modifier.frosted(active: Boolean): Modifier = if (active) this.blur(8.dp) el
  * 页内玻璃浮层（下拉菜单替代品）：全屏 scrim + 居中玻璃面板，点击 scrim 关闭。
  * `modifier` 应用于全屏 scrim（不用于浮层面板本体）。
  * visible=false 时不组合任何内容。
+ *
+ * 批 2 全分支终审修复席 B（task-18fix-b，与席 A 的 `GlassDialog` 同一条裁决）：
+ *  - **容器底随主题换套**：原来读静态浅套 `AppPalette.GlassFill`（`0xEFFFFFFF`），现读
+ *    `appColors().surfaceGlass`——浅套取值与之逐字相同 ⇒ 浅色侧像素零变化，深色侧才拿到那套深玻璃。
+ *  - **面板内前景必须同批**：本浮层唯一消费者是 `ui/AiProfileSettingsScreen.kt` 的音色浮层，
+ *    其选项行 `VoiceOverlayOption` 的墨随本批一起迁回按套取值（容器—前景同源，判据见
+ *    `GlassPanelInkPairingContractTest`；否则深色档就是「深玻璃压浅套深墨」的当场不可读）。
+ *  - `AppPalette.Scrim` 与描边 `AppPalette.GlassHighlight` 是**主题无关的 alpha 蒙版**（两套同值，
+ *    见 `DarkTokenConsumptionRatchetTest` 的 `ThemeInvariantMaskMembers`），按台账口径保持静态读点不动。
  */
 @Composable
 fun BoxScope.GlassOverlay(
@@ -66,7 +76,7 @@ fun BoxScope.GlassOverlay(
         ) {
             Surface(
                 shape = AppShape.Dialog,
-                color = AppPalette.GlassFill,
+                color = appColors().surfaceGlass,
                 border = BorderStroke(1.dp, AppPalette.GlassHighlight),
                 shadowElevation = 16.dp,
                 modifier = Modifier
