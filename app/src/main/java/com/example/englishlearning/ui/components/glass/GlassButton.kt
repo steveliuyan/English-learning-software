@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -199,7 +200,17 @@ fun PillButton(
         color = ink.container,
         contentColor = ink.foreground,
         border = ink.border?.let { BorderStroke(1.dp, it) },
-        modifier = m.clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick),
+        // 批 2 终审修复席 A（评审 I-1）：点击必须带 role —— `Modifier.clickable` 的 role 默认 null，
+        // 缺它则语义节点只有「可点按」而无「按钮」，无障碍三元组（testTag + Role + 状态）断一环；
+        // 房内其余 7 处生产点击都是 clickable(role = Role.Button, …)，本枚对齐同一条口径。
+        // 禁用态仍走 enabled 参数（clickable 自行维护语义可用性），不额外塞 stateDescription。
+        modifier = m.clickable(
+            interactionSource = interaction,
+            indication = null,
+            enabled = enabled,
+            role = Role.Button,
+            onClick = onClick,
+        ),
     ) {
         Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
             Text(text, style = AppType.Title, color = ink.foreground, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))

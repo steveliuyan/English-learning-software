@@ -44,6 +44,7 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.wordqa.WordQaKind
 import com.example.englishlearning.wordqa.WordQaNotConfiguredReason
@@ -226,13 +227,14 @@ private fun AnsweredContent(
 @Composable
 private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean) -> Unit) {
     GlassDialog(onDismiss = { onConfirmOutbound(false) }) {
-        Text("确认发送请求", style = AppType.Headline)
+        Text("确认发送请求", style = AppType.Headline, color = appColors().text1)
         Text(
             "你的问题与该服务的密钥将发送给 $host，并可能产生费用。",
             modifier = Modifier
                 .padding(top = 8.dp)
                 .testTag("word_qa_outbound_confirmation_text"),
             style = AppType.Body,
+            color = appColors().text1,
         )
         Row(
             modifier = Modifier

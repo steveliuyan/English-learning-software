@@ -12,6 +12,7 @@ import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintStart
 import com.example.englishlearning.ui.theme.AppColorDark
@@ -23,6 +24,10 @@ import com.example.englishlearning.ui.theme.MintGlassTheme
 import com.example.englishlearning.ui.theme.ThemeMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -187,5 +192,52 @@ class PillButtonTest {
             "Learn primary (dark) must not render white text on bright container",
             pixels.any { colorDistance(it, white) <= 18.0 },
         )
+    }
+
+    /**
+     * 批 2 全分支终审评审 I-1 的**设备侧**背书：`Modifier.clickable` 的 `role` 默认 `null`，
+     * 缺它则语义树只有「可点按」而无「按钮」，无障碍三元组（testTag + Role + 状态）断一环。
+     * JVM 侧 `PillButtonInkTest` 那条只钉源码形状（体内恰一处 `clickable(… role = Role.Button …)`），
+     * 本例钉**渲染面**：角色真的挂在那枚唯一的可点节点上。
+     *
+     * 三条判据一起才有牙：
+     *  - 正向：带 tag 的节点必须 `expectValue(Role, Role.Button)`（合并树与未合并树各钉一次——
+     *    只钉合并树时，角色由父级合并上来的写法也会算过）；
+     *  - 份数：整棵树里 `Role.Button` 恰一枚，且可点节点也恰一枚，两枚是同一个节点
+     *      （角色漏挂、或长到正文/面板上多出一枚可点源，都当场红）；
+     *  - 反向：标签 `Text` 节点自己**不带** Role——这条证明正向断言不是「任何节点都算命中」的空转。
+     */
+    @Test
+    fun pill_button_carries_the_button_role_on_its_clickable_node() {
+        composeRule.setContent { PillButton("试听", onClick = {}, testTag = "glass_btn") }
+        val roleMatcher = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)
+        composeRule.onNodeWithTag("glass_btn").assert(roleMatcher)
+        composeRule.onNodeWithTag("glass_btn", useUnmergedTree = true).assert(roleMatcher)
+        assertEquals(
+            "整棵树恰一枚 Button 角色节点（多挂 = 面板长出第二个按钮语义）",
+            1,
+            composeRule.onAllNodes(roleMatcher).fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            "可点节点也必须恰一枚，且就是带角色的那一枚",
+            composeRule.onAllNodes(roleMatcher).fetchSemanticsNodes().map { it.id },
+            composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().map { it.id },
+        )
+        val label = composeRule.onNodeWithText("试听", useUnmergedTree = true).fetchSemanticsNode()
+        assertTrue(
+            "标签 Text 节点自身不得带 Role（否则上面的正向断言可能是自证）：实测 ${label.config.getOrNull(SemanticsProperties.Role)}",
+            label.config.getOrNull(SemanticsProperties.Role) == null,
+        )
+    }
+
+    /**
+     * 禁用档同一条角色的取证：`enabled = false` 只改可点性，角色必须**仍在**——
+     * TalkBack 用户要靠「按钮，已停用」判断处境，禁用即丢角色等于把控件种类一起抹掉。
+     * （禁用不触发回调已由 [disabledButtonDoesNotFire] 钉过，本例不重复点击。）
+     */
+    @Test
+    fun disabled_pill_button_keeps_the_button_role() {
+        composeRule.setContent { PillButton("试听", onClick = {}, enabled = false, testTag = "glass_btn") }
+        composeRule.onNodeWithTag("glass_btn").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
     }
 }

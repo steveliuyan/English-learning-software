@@ -51,6 +51,7 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appColors
 
 /**
  * AI 生图功能页（AI 学 → AI 生图）。
@@ -185,7 +186,7 @@ private fun PromptCard(prompt: String, onGenerateImage: () -> Unit) {
 @Composable
 private fun ConfirmationDialog(state: ImageStudioUiState.AwaitingConfirmation, onConfirm: (Boolean) -> Unit) {
     GlassDialog(onDismiss = { onConfirm(false) }) {
-        Text("确认发送请求", style = AppType.Headline)
+        Text("确认发送请求", style = AppType.Headline, color = appColors().text1)
         val message = when (state.stage) {
             ImageStudioConfirmationStage.Prompt ->
                 "你的主题与该服务的密钥将发送给 ${state.host}，并可能产生费用。同一域名只需确认一次。"
@@ -198,6 +199,7 @@ private fun ConfirmationDialog(state: ImageStudioUiState.AwaitingConfirmation, o
                 .padding(top = 8.dp)
                 .testTag("image_studio_outbound_confirmation_text"),
             style = AppType.Body,
+            color = appColors().text1,
         )
         Row(
             modifier = Modifier

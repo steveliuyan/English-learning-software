@@ -52,6 +52,7 @@ import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
+import com.example.englishlearning.ui.theme.appColors
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -179,6 +180,7 @@ fun ArticleReadingScreen(
                     "本文覆盖你已背的 ${current.article.coveredLemmas.size} 个词",
                     modifier = Modifier.testTag("coverage_popup_count"),
                     style = AppType.Headline,
+                    color = appColors().text1,
                 )
                 Column(
                     Modifier
@@ -194,6 +196,7 @@ fun ArticleReadingScreen(
                                 .testTag("coverage_chip_$lemma")
                                 .padding(vertical = 3.dp),
                             style = AppType.Body,
+                            color = appColors().text1,
                         )
                     }
                 }

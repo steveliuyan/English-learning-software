@@ -28,8 +28,9 @@ import kotlin.test.assertTrue
  *    深色下的面板糊成一团，正是 AC-R-11 要防的）。
  *  - **同族但性质不同的一枚**：`AppPalette.GlassFill`（玻璃容器**填充**）。批 1 终审 Seat A I-1 复算后把它移出
  *    蒙版成员表：`AppColors.kt` 里 `surfaceGlass` 浅套取值与它逐字相同（`0xEFFFFFFF`），说明目标 token 早已备好，
- *    这四处是**待迁债务**而不是主题不变量；理由与逐文件站点见 [GlassFillBackdropDebtLedger]。
- *    seed 计数不因移出而改变（四处本来就照常计入 debt seed）。
+ *    这些站点是**待迁债务**而不是主题不变量；理由与逐文件站点见 [GlassFillBackdropDebtLedger]。
+ *    seed 计数不因移出而改变（它们本来就照常计入 debt seed）。批 2 全分支终审修复席 A 已迁走
+ *    `components/glass/GlassDialog.kt` 一处（容器 + 面板内前景同批迁，浅色侧逐值不变），本表随之剩三处。
  *  - 浅套硬编码：`AppPalette.TextPrimary` / `TextSecondary` / `Surface` / `Separator` /
  *    `OnMintPrimary` 与 `DomainColors` 各域的 `deep`。这些是浅底取值，深底压深字直接不可读，
  *    必须改成 `appColors().x` / `appDomain(AppDomain.X).deep`。`theme/AppType.kt` 的顶层 `TextStyle`
@@ -81,7 +82,7 @@ internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     "components/glass/GlassOverlay.kt" to 3,
     "AiLearningScreen.kt" to 2,
     "BackupExportScreen.kt" to 2,
-    "components/glass/GlassDialog.kt" to 2,
+    "components/glass/GlassDialog.kt" to 1,
     "ArticleImportScreen.kt" to 1,
     "CardDetailScreen.kt" to 1,
     "GlobalVocabularySearchScreen.kt" to 1,
@@ -128,7 +129,8 @@ internal val ThemeInvariantMaskMembers: List<String> = listOf("GlassHighlight", 
 
 /**
  * 玻璃容器填充的待迁债务台账（批 1 终审 F4 补的第五张表，不是豁免）：
- * `AppPalette.GlassFill` 的四处真实站点，key 为相对 `ui` 根的路径（与其余台账同一口径，精确相等）。
+ * `AppPalette.GlassFill` 的**尚未迁走**的站点，key 为相对 `ui` 根的路径（与其余台账同一口径，精确相等）。
+ * 批 1 记下四处，批 2 全分支终审修复席 A 迁走 `components/glass/GlassDialog.kt`（容器与面板内前景同批迁）后剩三处。
  *
  * 这些命中**照常计入** [DarkTokenSeedAllowlist]（本表不从中扣除，seed 计数一处不减），
  * 本表只回答「为什么批 1 不迁、要连着什么一起迁」：容器填充必须与面板内前景墨色同批迁移，
@@ -138,7 +140,6 @@ internal val ThemeInvariantMaskMembers: List<String> = listOf("GlassHighlight", 
  * 迁走一处时：本表删行 + seed 减 1，两张表同减，谁单独漂移都会红。
  */
 internal val GlassFillBackdropDebtLedger: Map<String, String> = mapOf(
-    "components/glass/GlassDialog.kt" to "玻璃对话框容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass",
     "components/glass/GlassOverlay.kt" to "玻璃遮罩面板容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass",
     "AiProfileSettingsScreen.kt" to "屏内玻璃面板容器填充：与面板内前景墨色同批迁成 appColors().surfaceGlass" +
         "（Task 12.5 修复轮 C-2 实测：试听浮层选项行 VoiceOverlayOption 曾被单独迁成 appColors().text1，" +
@@ -542,7 +543,7 @@ class DarkTokenConsumptionRatchetTest {
         val counts = actual.filterKeys { it in GlassFillBackdropDebtLedger.keys }
         assertTrue(
             counts.values.all { it == 1 },
-            "四处玻璃填充站点应各恰一处 GlassFill 读点（多一处 = 第二份容器填充口径）：$counts"
+            "每一处玻璃填充待迁站点应各恰一处 GlassFill 读点（多一处 = 第二份容器填充口径）：$counts"
         )
         val seed = DarkTokenSeedAllowlist
         counts.keys.forEach { path ->

@@ -1592,7 +1592,7 @@ fun AppScreen(
                                     // 路 B（非破坏性选择）：容器交房内共享玻璃档，取消走共享 PillButton；
                                     // 列表项是本枚自渲染的（tag 供 connected 逐项定位），原地保留不改口径。
                                     GlassDialog(onDismiss = { showWordBookExportPicker = false }) {
-                                        Text(text = "选择要导出的词书", style = AppType.Headline)
+                                        Text(text = "选择要导出的词书", style = AppType.Headline, color = appColors().text1)
                                         Column(
                                             modifier = Modifier.padding(top = 12.dp),
                                             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1601,6 +1601,7 @@ fun AppScreen(
                                                 Text(
                                                     text = bookId,
                                                     style = AppType.Body,
+                                                    color = appColors().text1,
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .clickable {
@@ -1883,13 +1884,14 @@ internal fun LearningSetupScreen(
     state.pendingMigration?.let { preview ->
         // 路 B（非破坏、二选一）：容器交共享玻璃档，两枚动作走共享 PillButton（不手搓裸按钮）。
         GlassDialog(onDismiss = { viewModel.resolveMigration(profileId, apply = false) }) {
-            Text(text = "发现已学过的单词", style = AppType.Headline)
+            Text(text = "发现已学过的单词", style = AppType.Headline, color = appColors().text1)
             Text(
                 text = "目标词书里有 ${preview.candidates.size} 个单词你之前已经学过，要把它们标记为已学习吗？原词书的学习记录会原样保留。",
                 modifier = Modifier
                     .padding(top = 8.dp)
                     .testTag("wordbook_migration_message"),
                 style = AppType.Body,
+                color = appColors().text1,
             )
             Row(
                 modifier = Modifier

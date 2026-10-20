@@ -310,6 +310,67 @@ class AppScreenOverlayContainerTest {
         }
     }
 
+    /**
+     * 席 A 落点 1 的**宿主级第二腿**：十二册导入词书 + 设备字号 2.0 时，面板底部的「取消」仍必须可达。
+     *
+     * 与上面那条两册短列表用例的分工：两册在 560.dp 上限之内，**根本不触发滚动**，
+     * 所以它只证「短列表一屏可见」，证不了兜底；十二册 × 2.0 缩放行高远超上限，
+     * 修复前（`GlassDialog` 内容无高度上限、无滚动）面板按内容长到窗口外，
+     * 「取消」既不在视口内、树侧也到不了（`performScrollTo()` 找不到可滚祖先会当场抛）——
+     * 这正是 F5-03 那一族「看得见点不着」的宿主侧现形。
+     *
+     * 列表项**只断存在、绝不点击**：`settings_export_book_*` 一点就拉起 SAF 系统文件选择界面
+     * （同一口径见本类路 B 的既有说明）。收场只点「取消」。
+     */
+    @Test
+    fun hostedWordBookExportPickerKeepsTheCancelPillReachableWhenDozensOfBooksOverflowAtDoubleFontScale() {
+        val bookIds = (1..12).map { index -> "overlay-pack-%02d".format(index) }
+        val books = prepareImportedWordBookDirectories(*bookIds.toTypedArray())
+        try {
+            val repository = RecordingProfileRepository()
+            composeRule.setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                    AppScreen(
+                        viewModel = appViewModel(),
+                        learningSetupViewModel = setupViewModel(repository, RecordingDeletionPreview(WordBookDeletionPreview(1, 1, 1))),
+                        todayPlanViewModel = TodayPlanViewModel({ placeholderCardPlan() }, RecordingProfileRepository()),
+                        wordCardViewModel = wordCardFixtureViewModel(),
+                        wordBookTransferViewModel = transferViewModel(repository),
+                    )
+                }
+            }
+            createProfile()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("app_tab_settings").performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag("settings_export_word_book").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("settings_export_word_book").performScrollTo().performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isNotEmpty()
+            }
+            // 哨兵先行：设备字号没真的到 2.0 就当场红，护栏不许退化成 scale 1.0 复读。
+            assertScaleTookEffect("选择要导出的词书", expectMinHeightPx = 100)
+            // 十二册逐项在树（只证存在，绝不点击）；首册必须落在面板首屏内。
+            bookIds.forEach { bookId -> composeRule.onNodeWithTag("settings_export_book_$bookId").assertExists() }
+            composeRule.onNodeWithTag("settings_export_book_${bookIds.first()}").assertIsDisplayed()
+            // 「取消」被内容推出视口后必须靠滚动可达（兜底的唯一判据），且仍可点。
+            val cancel = composeRule.onNodeWithTag("wordbook_export_cancel")
+            cancel.performScrollTo()
+            cancel.assertIsDisplayed().assertHasClickAction()
+            // 收场：点取消关掉选择器（不碰 SAF）。
+            cancel.performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isEmpty()
+            }
+        } finally {
+            books.forEach { it.deleteRecursively() }
+        }
+    }
+
     // ---------- 宿主驱动 ----------
 
     /**

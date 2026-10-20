@@ -334,4 +334,60 @@ class PillButtonInkTest {
         assertEquals(0, countMatches(pillButtonBody, Regex("""Color\.[A-Za-z]|Color\(""")), "组件体不得出现任何 Color.<命名色> 常量或 Color( 构造调用：White/Transparent 与浮点参数凑色都算绕过纯表")
         assertEquals(0, countMatches(pillButtonBody, Regex("""BrandMintGradientStops""")), "组件体不得自挂 BrandMintGradientStops：品牌渐变只能来自 ink.gradient")
     }
+
+    /**
+     * **批 2 全分支终审修复席 A（task-18fix 落地面 3）**：`PillButton` 的点击必须把 `Role.Button` 写进语义树。
+     *
+     * 缺陷形状（批 2 seatA1 评审 I-1 实测）：`PillButton` 用
+     * `m.clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)`
+     * 而没有 `role`，`Modifier.clickable` 的 `role` 默认 `null`，语义节点因此不带角色——TalkBack 只念得出
+     * 「可点按」而念不出「按钮」，无障碍三元组（testTag + Role + 状态）缺中间一环。房内其余 7 处生产点击
+     * （`EntryRow`、`WordRow`、`SpeakerButton`、`NotConfiguredCard`、`ConfirmDestructiveDialog` 等）都写的是
+     * `clickable(role = Role.Button, …)`，本席把药片对齐同一条口径。
+     *
+     * 判据必须钉在**生效渲染路径**上，否则两种绕过都会绿着走过：
+     *  - 「把 `role = Role.Button` 塞进 `if (false)` 死分支里的第二枚 `Modifier.semantics{…}`」：文件级字面计数不变，
+     *    但生效链没带角色（变异 m2 的形状）；故先钉「体内 `m.clickable(` 恰一枚」（唯一生效链），再钉
+     *    「那一枚的实参括号里出现 `role = Role.Button`」——`[^()]*` 不许跨过闭合括号，写在 clickable 之外的角色进不来；
+     *  - 「角色常量搬到不可达分支 / 换成 `Role` 变量」：同上，字面量计数由体内恰一处守着。
+     * 反空转对拍走同一条谓词：生效形状样片放行、死分支样片判红，两缺一不判。
+     */
+    @Test
+    fun `pill button carries Role Button on its effective clickable path`() {
+        val source = uiComponentSource("GlassButton.kt", "/components/glass/")
+        val pillButtonBody = source.substringAfter("fun PillButton(")
+        val clickableChain = Regex("""m\.clickable\(""")
+        assertEquals(
+            1,
+            countMatches(pillButtonBody, clickableChain),
+            "PillButton 体内必须恰一枚生效点击链 m.clickable(（两枚 = 其中一枚是死分支幽灵副本）",
+        )
+        val roleInChain = Regex("""m\.clickable\([^()]*\brole = Role\.Button""")
+        assertEquals(
+            1,
+            countMatches(pillButtonBody, roleInChain),
+            "生效点击链必须逐字带 role = Role.Button：缺它则语义节点没有角色，TalkBack 念不出「按钮」（评审 I-1）。" +
+                "写成 Role 变量、或塞进 clickable(…) 之外的 semantics 块都不算",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex("""import androidx\.compose\.ui\.semantics\.Role""")),
+            "Role 必须由本文件显式导入（通配导入会让「角色」这一符号的来源漂走）",
+        )
+        // 反向兜底：角色不许长在 clickable 区间之外（死分支 semantics 块那一族绕过）。
+        assertEquals(
+            0,
+            countMatches(pillButtonBody, Regex("""semantics\s*\{[^{}]*role\s*=""")),
+            "PillButton 体内不许另起一枚 semantics 块挂角色：角色只能来自生效点击链",
+        )
+
+        // 反空转（同一条谓词的双边对拍）：生效形状放行、死分支换形判红。
+        val liveShape = "modifier = m.clickable(interactionSource = i, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),"
+        assertEquals(1, countMatches(liveShape, roleInChain), "对拍失控：生效形状没被 roleInChain 认出，上面那条 ==1 是恒假的")
+        assertEquals(1, countMatches(liveShape, clickableChain), "对拍失控：生效形状没被取样到（体内恰一枚那条会恒假）")
+        val deadBranchShape = "modifier = m.clickable(interactionSource = i, indication = null, enabled = enabled, onClick = onClick),\n" +
+            "if (false) Modifier.semantics { role = Role.Button }\n"
+        assertEquals(0, countMatches(deadBranchShape, roleInChain), "对拍失控：角色挪进不可达分支后 roleInChain 仍命中（判据没牙齿，变异 m2 打不红）")
+        assertEquals(1, countMatches(deadBranchShape, Regex("""role = Role\.Button""")), "对拍构造失败：死分支样片里字面量必须仍在（变异走的是不动字面量的间接路径）")
+    }
 }
