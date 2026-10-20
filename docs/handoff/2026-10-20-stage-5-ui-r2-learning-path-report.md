@@ -77,6 +77,9 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
 8. 路 A 面板 busy 期置灰（组件裁决候选 `confirmEnabled`）；`CardDetailScreen.kt` 的 `SenseRow` `.background(MintTint)` 静态底、例句高亮 `DomainColors.AiSpeech.deep`（seed 1 在册）、播控组「停止」屏侧 CD 形状（F3-02 既有）→ 批 3。
 9. **过期注释**（控制者批 2 收口时现场发现，未动码）：`components/ScreenUnavailable.kt:42-46` 的 KDoc 仍写「`PillButton` 的 Secondary 档容器/文字/描边读的是**静态浅套值**（`AppPalette.Surface`、`AppPalette.Separator`），不随主题翻色」——`pillButtonInk` 已在 Task 14 按套取 `set.surface`/`set.outlineSoft`，该段描述与现码不符；`app/src/main` 里 `AppPalette.Surface` 的实读点也已归零（仅剩这条注释命中）。批 3 顺手改注释，勿当行为缺陷重报。
 
+10. **残留静态域色墨文字站点（批 2 终审盘点时现算入册，批 3 摘色族必须一起收）**：`grep -rn 'DomainColors\.\(AiSpeech\|Reading\)\.deep' app/src/main/java --include=*.kt` 现盘 10 枚，全是 `AppType.Label`／`AppType.Body` **文字**（不是图形档），落点 `AiProfileSettingsScreen.kt:152/218/234/250/429/434`、`SpeechSettingsScreen.kt:111/142/181/312`。本席 WCAG 现算（awk，可重算）：`#188F76` 压浅页底 `#F1FBF5` **3.797:1**、压浅玻璃 `#FEFFFE` 4.006、压深卡底 `#17201C` 4.151、压深页底 `#0E1512` 4.609；`#C81E46` 压浅页底 5.324（达标）、压深页底 **3.287**、压深卡底 **2.961**（连装饰 3.1 都不达）。**归批 3 而非批 2 的理由**：这些行的容器底都不是批 2 迁的四枚玻璃面板（`PreviewCard` 之外的行；`SectionCard` 块在 :423 已闭合），比值劣化不是批 2 造成的，而 `Mint*` 页底族 + `AppType` 直读墨的摘色本来就是批 3 任务面（§5.2.3）。批 3 落值规则与验证文档 AC-R-11 行同一条：浅侧文字取 `appColors().onMint` 系、深侧取 `appDomain(...).deep`，**不得再迁成静态 `deep`**，收完每枚站点浅深两套各自 ≥4.5（用 `GlassPanelThemeInkTest` 的 `assertContrastAtLeast` 同款腿，禁止按 3.1 放行正文）。
+
+
 ### 5.3 仍待用户目视（18-ii，十项，本席未判）
 
 ① `ProfileCreationScreen` 页头 14dp→2dp；② 今日计划常驻查词卡+入口组连排节奏；③ `PillButton` Secondary 浅套发丝线观感；④ `PhotoTranslationScreen` 目检或补类二选一；⑤ 底导选中层级（浅套 `onMint` 9.751 vs `text2` 5.151 明度差小，选中感由药片+粗体承载）；⑥ 选中 17dp vs 未选 22dp 字形尺寸跳动；⑦ 17B 后 6 枚浮层路 A/路 B 深浅两套可读性；⑧ `AppBottomBarTest` 标签墨设备取样缺口；⑨ **真 TalkBack 引擎朗读四 tab（AC-R-12 未完成部分）**；⑩ 深色下底导 connected 像素期望失真项（`AppBottomBarTest:53-69` 浅套静态值）；⑪ **浅套 AI 配置页两处文字观感变化**（终审修复轮 C/C-1 按 R-18-R1 附带裁决归位）：「已设置密钥 / 还没有设置密钥」那行与音色浮层的选中行，浅套墨由薄荷绿 `#188F76`（压浅玻璃现算 4.006:1，正文档不达 4.5）改为 `appColors().onMint` `#174C44`（≈9.727:1）——像素确实会变，是否读作「更稳重」还是「丢了域色识别」归人眼判。另：F5-03 焦点级直采补一次真机走查（task-18-brief §二）；busy 期「点了没反应」是否被读作卡死（17B Important-2 交用户知情）。
@@ -106,10 +109,21 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
   `84464c8`（终审 C1 席 5 条 Important：契约取样器按花括号配平闭窗、正控改异写、锚点在位守卫、
   Ready 分支绑体、style 实参白名单门；纯 JVM 测试面，零生产码）。
 - **控制者串行复跑**：门控 `BUILD SUCCESSFUL 4m22s`、现盘 **232/1725/0/0/0**；
-  connected（`emulator-5574`，`RUNNING_UNLOCKED`，`font_scale` 前后 `1.0`）
-  `GlassPanelThemeInkTest OK (8)`、`GlassDialogThemeInkTest OK (3)`、`AiProfileSettingsScreenTest OK (23)`、
-  补跑 `WordbookPickerHeaderTest OK (3)`（该类真实 3 枚 `@Test`，本席先前记 4 枚是数法错误，已在验证文档订正）。
-- **控制者两条自纠**：① 我按「≈3.61/3.19」驳回 B 席的 4.01 是**我自己算错了**，席报值与实测像素都对；
+  connected（`emulator-5574`，`RUNNING_UNLOCKED`，`font_scale` 前后 `1.0`，双 APK `install -r` + `am instrument`）
+  修复轮受体面全清单 **11 类 / 109 用例 / 0 失败**——
+  `AiProfileSettingsScreenTest` 23、`ArticleReadingScreenTest` 23、`GlassPanelThemeInkTest` 8、`PillButtonTest` 9、
+  `ImageStudioScreenTest` 11、`ReadingAccessScreenTest` 13、`GlassDialogThemeInkTest` 3、`GlassDialogTest` 1、
+  `WordAiQaScreenTest` 8、`SentenceAnalysisScreenTest` 7、`WordbookPickerHeaderTest` 3
+  （最后一类从「点名未实跑」转为已覆盖；`PillButtonTest` 7 → 9 是 A 席为 `role` 新增两枚，无类用例数下降）。
+- **控制者三条自纠**：① 我按「≈3.61/3.19」驳回 B 席的 4.01 是**我自己算错了**，席报值与实测像素都对；
   裁决仍成立，但理由换成「正文档不得按装饰档 3.1 放行」。② 门控里的 `:app:compileDebugAndroidTestKotlin` **只编译不产 APK**，
   我第一次 connected 复跑装的是上一棒的陈旧测试包，导致「新 app 包 + 旧测试包」自打自红；
   补 `:app:assembleDebugAndroidTest` 重装后立刻绿。复跑 connected 前先看 `app/build/outputs/apk/androidTest/debug/` 的 mtime。
+  ③ 我把 `GlassDialogTest` 的 FQCN 少敲一层子包（`ui.` 而非 `ui.glass.`），instrument 回 `ClassNotFoundException`
+  形状的 `initializationError`，一度被我当成「类失踪」；按现盘 `package` 行取真名复跑即 `OK (1)`——
+  该类自建类提交 `aab770c` 起就在 `ui.glass` 下，18i 日志跑的也是这个全名。`-e class` 参数一律从现盘抄，不凭记忆拼。
+- **窄复评两席未落地（如实记）**：P1（`app/src/main` + `docs`）/P2（`app/src/test` + `app/src/androidTest`）两份评审包已生成
+  （`review-fix-P1.md` 104KB、`review-fix-P2.md` 236KB，BASE `04b6398`），派发时命中 CLI 日额度上限
+  （`You've reached your daily usage limit for Chat.`），两席没能起。改由控制者本人按同一清单自跑：五对浅套逐值相同、
+  `role` 在生效点击链上、`heightIn(max)+verticalScroll` 兜底在位、AA 归位形状与 `AppBottomBar.kt:95` 先例一致、
+  AC-R-12 未升通过、棘轮双向闸由门控绿背书。**独立性受限这一条必须随本批一起交代**，额度恢复后应由用户决定是否补派独立复评席。
