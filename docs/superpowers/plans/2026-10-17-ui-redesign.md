@@ -1783,6 +1783,31 @@ internal val MintBackground: Color
 - [ ] **Step 2:** 更新 `docs/verification/ui-redesign-2026-10.md`：AC-R-07（本批覆盖的屏）、AC-R-20（今日计划）证据行；真机截图存本地忽略区（不入库）。
 - [ ] **Step 3:** 按 `docs/handoff/REPORT-TEMPLATE.md` 写批 2 报告；提交 + 推送 + `ls-remote` 核验。
 
+**R-18-R1（批 2 全分支终审 Critical 的处置裁决，用户拍板「同批迁容器」）**：终审六席（A 拆 A1/A2）坐实一条 Critical——
+`AppPalette.GlassFill` 的四枚容器消费点在深色下仍是写死的 94% 白，面板内无 `color=` 的静态档排印点是「深墨压白玻璃」，
+两套主题各抄一遍同一个值；`DarkTokenConsumptionRatchetTest` 的 `GlassFillBackdropDebtLedger` 把「批 1 不迁」的理由登记为
+「容器填充必须与面板内前景墨色同批迁，否则深色下由意外可读翻成当场不可读」，而这个「同批」一直悬在批 3。
+
+- **决定**：把 AC-R-11 的迁移侧从批 3 提前到批 2 收口——四枚容器填充迁 `appColors().surfaceGlass`，**面板内前景同批迁**，
+  两处逐类 connected 深色取样 + 浅套像素腿同时立。
+- **依据（可重算，浅套侧像素零变化）**：`AppColorLight.surfaceGlass = 0xEFFFFFFF` 与 `AppPalette.GlassFill` 逐字相同；
+  `TextPrimary`↔`text1`（`0xFF1C1C1E`）、`Surface`↔`surface`（`0xFFFFFFFF`）、`Separator`↔`outlineSoft`（`0xFFE4EFE9`）、
+  `TextSecondary`↔`text2`（`0xFF4E756A`）四对同源 ⇒ 迁移只解锁深色档，浅套逐值不变。
+- **代价与约束**：① `GlassHighlight` / `Scrim` 属主题不变蒙版族（`ThemeInvariantMaskMembers`）**不迁**，不随本轮扩表；
+  ② 每迁一处 `GlassFillBackdropDebtLedger` 删行 + `DarkTokenSeedAllowlist` 同文件计数减 1，两张表同减、谁单独漂移都会红，
+  台账清空后必须留合成探针防「空表即空闸」；③ 破坏性浮层的路由仍按 `R-11.1` / `R-17B.1`，不为迁色改路由。
+- **落地**：修复轮 A `2c08792`（`GlassDialog` + 八枚消费者 16 处前景 + `PillButton` 可点 role），修复轮 B `ce1e188`
+  （`GlassOverlay` / `AiProfileSettingsScreen.SectionCard` / `SpeechSettingsScreen.PreviewCard` 三块面板同批迁）。
+  `app/src/main` 里 `AppPalette.GlassFill` 实读点归零。
+- **附带裁决（正文档不得按装饰档放行）**：浅套 `AiSpeech.deep`（`#188F76`）压玻璃合成实底，B 席报 4.01:1 并按非正文 3.1 钉进取样类
+  （`GlassPanelThemeInkTest` 的 `DECOR_AA_RATIO`）。控制者一度复算成 ≈3.61（压近白）/≈3.19（压 `0xEFFFFFFF` 合成底）并据此驳回席报——
+  **那是控制者算错，席报的 4.01 与实测像素 `#FEFFFE` 都对**，该条驳回理由作废（`srgbToLinear(0x18,0x8F,0x76)` 的 L ≈ 0.2114 ⇒ `1.05/0.2614 = 4.016`）。
+  **但裁决本身成立，理由换成另一条**：那两行是 `style = AppType.Body` 正文档，阈值线就是 4.5，4.006 不过线，
+  把它标成装饰档即「为过判据放宽判据」。修法照房内先例 `AppBottomBar.kt:95`（17A 修复轮 `0ed3984`：字形腿走 `deep`、
+  标签文字腿浅套走 `onMint`）按套归位——浅 `#174C44` ≈9.727:1、深 `#35E0AC` 压 `#161F1B` ≈9.960:1，
+  `DECOR_AA_RATIO` 常量随之删除，并留「修复前那枚墨喂 4.5 闸必须判红」的反空转腿。
+  浅套这一处观感会变（密钥态与浮层选中行由薄荷绿墨变深墨），列入 18-ii 用户目检。
+
 ---
 
 ## 批 3 · 其余屏与入口分组重排（Task 19–26）
