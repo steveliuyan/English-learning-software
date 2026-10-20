@@ -92,14 +92,22 @@ class GlassPanelThemeInkTest {
         val glass = modeOf(bandLeftOfTag(SECTION_CARD_INK_TAG, CARD_BAND_INSET_DP, CARD_BAND_WIDTH_DP))
         val ink = inkOfTag(SECTION_CARD_INK_TAG, glass)
         assertGlassIs("SectionCard 容器（浅）", glass, AppPalette.GlassFill, AppColorLight.background)
-        assertInkIs("SectionCard 密钥态墨（浅）", ink, DomainColors.AiSpeech.deep)
-        // 浅套 `AiSpeech.deep`(#188F76) 压浅玻璃实测 ≈4.01:1：迁前迁后**逐值相同**（浅套 surfaceGlass == GlassFill、
-        // DomainLight.deep == DomainColors.AiSpeech.deep），是既有 AA 债而不是本批引入的回归；
-        // 合格形状是 `GlassButton.domainInkOnLightSurface` 那一族的 `set.onMint`(#174C44 ≈8.9:1)，
-        // 但本席被「浅色侧逐值不变」硬约束，不得为了让这条腿变绿去改浅套取值。
-        // ⇒ 这条腿按非正文档下限 [DECOR_AA_RATIO] 钉住并在报告里登记债务给批 3；
-        //   C-1 那枚深套正文档 ≥4.5 的裁决与 [BODY_AA_RATIO] 一个字节都没动。
-        assertContrastAtLeast("浅套域色墨压浅玻璃（既有 AA 债，按非正文档下限）", ink, glass, DECOR_AA_RATIO)
+        // 批 2 终审修复席 C-1（控制者裁决）：密钥态那行 `style = AppType.Body` 是正文档，本腿由
+        // 「装饰档 3.1 放行」归位到 [BODY_AA_RATIO]。生产行按 `AppBottomBar.kt:95` 的形状按套钉死后，
+        // 浅套这枚墨是 `AppColorLight.onMint`（#174C44，压本底 9.727:1，本席现算）；玻璃容器腿仍与迁移前逐值相同，
+        // 浅套侧观感变化只剩前景这一枚（薄荷绿墨→深墨），已列入 18-ii 用户目检。
+        assertInkIs("SectionCard 密钥态墨（浅，套内 onMint）", ink, AppColorLight.onMint)
+        assertInkIsFarFromTheOtherSet("SectionCard 密钥态墨（浅）", ink, DomainColors.AiSpeech.deep)
+        assertContrastAtLeast("浅套密钥态正文墨压浅玻璃（Body = 正文档，阈值 4.5）", ink, glass, BODY_AA_RATIO)
+        // 反空转：修复前那枚浅套域色墨（#188F76，现算 4.006:1）喂进同一条 4.5 闸必须不合格——
+        // 它若 ≥4.5，说明本行的 4.5 闸没有对象或阈值被写宽，归位裁决须重议。
+        val preFixInk = DomainColors.AiSpeech.deep.toArgb()
+        val preFixRatio = contrastRatio(preFixInk, glass)
+        assertTrue(
+            "反空转失控：修复前的浅套域色墨 ${preFixInk.hex()} 压本行浅玻璃 ${glass.hex()} 实测 ${preFixRatio.r2()}，" +
+                "已 ≥$BODY_AA_RATIO——那这条正文闸对这行没有对象，换墨与阈值归位的裁决都必须重议",
+            preFixRatio < BODY_AA_RATIO,
+        )
     }
 
     @Test
@@ -157,11 +165,29 @@ class GlassPanelThemeInkTest {
         assertGlassIs("GlassOverlay 容器（浅）", glass, AppPalette.GlassFill, scrimOver(AppColorLight.background))
         assertInkIs("浮层未选中选项墨（浅）", ink, AppPalette.TextPrimary)
         assertContrastAtLeast("浅套正文墨压浅玻璃", ink, glass, BODY_AA_RATIO)
+        // 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：音色浮层**选中档**那行是 `style = AppType.Body`
+        // ⇒ 正文档，阈值线就是 [BODY_AA_RATIO]（4.5），曾被按装饰档 3.1 放行。修复前浅套域色墨 #188F76
+        // 压本行浅玻璃实底现算只有 4.006:1（压带 Scrim 底 3.683:1），两套都不达标；现换成 `appColors().onMint`
+        // （浅套 #174C44 压 #FEFFFE = 9.727:1）。浅套这一处观感有变（选中行薄荷绿墨→深墨），属修 AA 失败非回归。
+        val selectedInk = inkOfText(OVERLAY_SELECTED_TEXT, glass)
+        assertInkIs("浮层选中选项墨（浅，套内 onMint）", selectedInk, AppColorLight.onMint)
+        assertInkIsFarFromTheOtherSet("浮层选中选项墨（浅）", selectedInk, DomainDark.getValue(AppDomain.AiSpeech).deep)
+        assertContrastAtLeast("浅套选中行正文墨压浅玻璃（Body = 正文档，阈值 4.5）", selectedInk, glass, BODY_AA_RATIO)
+        // 反空转：把修复前那枚浅套域色墨喂进同一条 4.5 闸，必须不合格——它若被判 ≥4.5，
+        // 说明这条正文闸对这行没有对象或阈值被写宽，本席的换墨与归位裁决都必须重议。
+        val preFixInk = DomainColors.AiSpeech.deep.toArgb()
+        val preFixRatio = contrastRatio(preFixInk, glass)
+        assertTrue(
+            "反空转失控：修复前的浅套域色墨 ${preFixInk.hex()} 压本行浅玻璃 ${glass.hex()} 实测 ${preFixRatio.r2()}，" +
+                "已 ≥$BODY_AA_RATIO —— 那这条正文闸对这行没有对象，换墨与阈值归位的裁决都要重议",
+            preFixRatio < BODY_AA_RATIO,
+        )
     }
 
     /**
      * 深色档：证「暗玻璃 + 主题浅墨」这一对。容器 = `AppColorDark.surfaceGlass` 压「深页底 + Scrim」的实底；
-     * 未选中选项墨 = `AppColorDark.text1`，选中那档 = 深套域色墨。
+     * 未选中选项墨 = `AppColorDark.text1`，选中那档 = 深套 `onMint`（批 2 修复席 C 与浅套同一枚 token，
+     * 现算 #DFF6EC 压深玻璃 #161F1B = 14.873:1，远高于正文档 4.5）。
      * 迁移前的形状（静态白玻璃 + 静态浅套墨）在这一例的容器腿与反向墨腿各自当场判红。
      */
     @Test
@@ -174,10 +200,11 @@ class GlassPanelThemeInkTest {
         composeRule.onNodeWithTag(OVERLAY_SELECTED_TAG).assertExists()
         assertGlassIs("GlassOverlay 容器（深）", glass, AppColorDark.surfaceGlass, scrimOver(AppColorDark.background))
         assertInkIs("浮层未选中选项墨（深）", unselectedInk, AppColorDark.text1)
-        assertInkIs("浮层选中选项墨（深，域色）", selectedInk, DomainDark.getValue(AppDomain.AiSpeech).deep)
+        assertInkIs("浮层选中选项墨（深，沿用域色 deep）", selectedInk, DomainDark.getValue(AppDomain.AiSpeech).deep)
         assertInkIsFarFromTheOtherSet("浮层未选中选项墨（深）", unselectedInk, AppPalette.TextPrimary)
+        assertInkIsFarFromTheOtherSet("浮层选中选项墨（深，须是深套 deep 而非浅套那枚 onMint）", selectedInk, AppColorLight.onMint)
         assertContrastAtLeast("深套浅墨压深玻璃", unselectedInk, glass, BODY_AA_RATIO)
-        assertContrastAtLeast("深套域色墨压深玻璃", selectedInk, glass, BODY_AA_RATIO)
+        assertContrastAtLeast("深套选中行正文墨压深玻璃（Body = 正文档，阈值 4.5）", selectedInk, glass, BODY_AA_RATIO)
     }
 
     // ---------- ③ SpeechSettingsScreen 试听卡 PreviewCard ----------
@@ -606,9 +633,3 @@ private const val PAPER_PIXEL_RATIO_TOLERANCE = 0.6
 
 /** 正文 AA 阈值（与席 A / JVM 侧同档，本席不许放宽）。 */
 private const val BODY_AA_RATIO = 4.5
-
-/**
- * 非正文档（装饰/图形）AA 下限：只用于「浅套域色墨压浅玻璃」那枚**迁移前后逐值相同**的既有 AA 债
- * （#188F76 压 #FEFFFE ≈4.01:1，登记给批 3）；深套正文档一律用 [BODY_AA_RATIO]。
- */
-private const val DECOR_AA_RATIO = 3.1

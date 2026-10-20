@@ -1,5 +1,12 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.example.englishlearning.ui.theme.AppColorDark
+import com.example.englishlearning.ui.theme.AppColorLight
+import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.DomainColors
+import com.example.englishlearning.ui.theme.DomainDark
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -502,7 +509,11 @@ class GlassPanelInkPairingContractTest {
             consumerIdentities = listOf("ai_profile_voice_auto"),
             helperSignatures = listOf("private fun VoiceOverlayOption("),
             pinnedInkLiterals = listOf(
-                "color = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1",
+                // 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：本行 `style = AppType.Body` 属正文档，
+                // 阈值就是 4.5，不许按装饰档 3.1 放行；选中档前景两套同取 `appColors().onMint`
+                // （浅套 #174C44 压浅玻璃现算 9.727:1、深套 #DFF6EC 压深玻璃 14.873:1，与房内 R-14.4 例外同一枚 token）。
+                // 现算与反空转见 [the_selected_voice_row_ink_clears_the_body_aa_gate_on_both_sets]。
+                "color = if (selected) appColors().onMint else appColors().text1",
             ),
         ),
         MigratedPanel(
@@ -551,6 +562,110 @@ class GlassPanelInkPairingContractTest {
             ),
         ),
     )
+
+    /**
+     * 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：`AiProfileSettingsScreen.kt` 的
+     * 音色浮层选中行（`VoiceOverlayOption`，`style = AppType.Body`）选中档前景改取 `appColors().onMint`
+     * （与房内 R-14.4 例外同一枚 token：浅套 `#174C44`、深套 `#DFF6EC`），未选中档两套同 `text1`。
+     * 本用例把**正文档 ≥4.5** 这条线当场算给它看：
+     *
+     *  - 底取**该行的真实落底**：`surfaceGlass` 带 alpha，按 src-over 压在该套 `background` 上
+     *    （浅套合成 ≈ `#FEFFFE`、深套合成 ≈ `#161F1B`），不是拿半透明 token 的字节直接算；
+     *  - 两套 × 选中/未选中四对墨全部 ≥ 4.5；
+     *  - 反空转（评审红线「不许为过判据放宽阈值」）：把**修复前那枚域色墨**（本席现算 4.006:1）与
+     *    一枚 3.6 档诱饵墨 `#1E987C`（本席现算 3.589:1）喂进同一条 4.5 闸，两枚都必须不合格——
+     *    它们若被判 ≥4.5，说明本条把阈值写宽了；它们若被判 <3.1，说明本行压根该按装饰档走，
+     *    两种情况这条用例都会红，逼下一次改动来复评裁决本身。
+     */
+    @Test
+    fun the_selected_voice_row_ink_clears_the_body_aa_gate_on_both_sets() {
+        val bodyAa = 4.5
+        val profile = uiScreenSource("AiProfileSettingsScreen.kt")
+        val option = functionBody(profile, "private fun VoiceOverlayOption(", "音色浮层选中行")
+        assertTrue(
+            "style = AppType.Body" in option,
+            "音色浮层选项行必须仍是 `AppType.Body`（正文档）：本条 4.5 闸的立论就是「这一行是正文」；" +
+                "若它被降成装饰档，得先改控制者裁决再改本判据，不许就地换阈值（实测体：$option）",
+        )
+        assertTrue(
+            "color = if (selected) appColors().onMint else appColors().text1" in option,
+            "选中档前景必须两套同取 `appColors().onMint`（浅套 #174C44、深套 #DFF6EC，与本席现算合格的那枚 token 一致）：" +
+                "修复前的浅套域色墨 `#188F76` 压浅玻璃只有 4.006:1，不达正文 AA 4.5，" +
+                "按装饰档 3.1 放行即「为过判据放宽阈值」（实测体：$option）",
+        )
+
+        val lightGlass = glassBackdrop(AppColorLight.surfaceGlass, AppColorLight.background)
+        val darkGlass = glassBackdrop(AppColorDark.surfaceGlass, AppColorDark.background)
+        assertTrue(
+            lightGlass != darkGlass,
+            "两套玻璃合成底必须真的不同值，否则本用例的换套判据没有对象（浅 #${hexOf(lightGlass)}）",
+        )
+        listOf(
+            "浅套选中行 onMint 压浅玻璃" to rgbOf(AppColorLight.onMint) to lightGlass,
+            "浅套未选中行 text1 压浅玻璃" to rgbOf(AppColorLight.text1) to lightGlass,
+            "深套选中行 onMint 压深玻璃" to rgbOf(AppColorDark.onMint) to darkGlass,
+            "深套未选中行 text1 压深玻璃" to rgbOf(AppColorDark.text1) to darkGlass,
+        ).forEach { (inkPair, backdrop) ->
+            val (label, ink) = inkPair
+            val measured = ratio(ink, backdrop)
+            assertTrue(
+                measured >= bodyAa,
+                "$label：#${hexOf(ink)} 压 #${hexOf(backdrop)} WCAG 实测 ${fmt(measured)}:1，未达正文 AA $bodyAa" +
+                    "（正文档下限，本席不许放宽；达不到就换合格墨或改容器档）",
+            )
+        }
+
+        listOf(
+            "修复前那枚浅套域色墨（AiSpeech.deep）" to rgbOf(DomainColors.AiSpeech.deep),
+            "3.6 档诱饵墨 #1E987C" to (0xFF1E987C.toInt() and 0xFFFFFF),
+        ).forEach { (label, ink) ->
+            val measured = ratio(ink, lightGlass)
+            assertTrue(
+                measured < bodyAa,
+                "$label 压浅玻璃 #${hexOf(lightGlass)} 实测 ${fmt(measured)}:1——本条要求它**低于**正文阈值 $bodyAa" +
+                    "（反空转：它若 ≥$bodyAa 说明 4.5 闸对这行没有对象；若连装饰档 3.1 都不到，" +
+                    "说明这行的档位归属需要重新裁决）",
+            )
+            assertTrue(
+                measured >= 3.1,
+                "$label 实测 ${fmt(measured)}:1 也不得低于装饰档 3.1：诱饵墨应当**正好落在**「装饰过、正文不过」这一档，" +
+                    "否则它证明不了本条判据卡的是 4.5 而不是 3.1",
+            )
+        }
+    }
+
+    /** `Color` → 不透明 RGB（丢掉 alpha 字节，与 [ratio] 的入参口径一致）。 */
+    private fun rgbOf(color: Color): Int = color.toArgb() and 0xFFFFFF
+
+    /** 半透明玻璃 `glass` src-over 压在 `under` 上的合成实底（逐通道，四舍五入）。 */
+    private fun glassBackdrop(glass: Color, under: Color): Int {
+        val a = (glass.toArgb() ushr 24) and 0xFF
+        val top = rgbOf(glass)
+        val bottom = rgbOf(under)
+        fun channel(shift: Int): Int =
+            (a * ((top shr shift) and 0xFF) + (255 - a) * ((bottom shr shift) and 0xFF) + 127) / 255
+        return (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+    }
+
+    private fun hexOf(rgb: Int): String = String.format("%06X", rgb)
+
+    private fun fmt(value: Double): String = String.format("%.2f", value)
+
+    /** WCAG 相对亮度（sRGB 逐通道线性化；入参为不透明 RGB，与 [rgbOf] 同口径）。 */
+    private fun luminance(rgb: Int): Double {
+        fun lin(channel: Int): Double {
+            val s = (channel and 0xFF) / 255.0
+            return if (s <= 0.04045) s / 12.92 else Math.pow((s + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * lin(rgb shr 16) + 0.7152 * lin(rgb shr 8) + 0.0722 * lin(rgb)
+    }
+
+    /** WCAG 对比度现算（席 C 起草本用例时引用而未落定义，C-1 席补齐，公式与取样类逐字同档）。 */
+    private fun ratio(ink: Int, backdrop: Int): Double {
+        val hi = maxOf(luminance(ink), luminance(backdrop))
+        val lo = minOf(luminance(ink), luminance(backdrop))
+        return (hi + 0.05) / (lo + 0.05)
+    }
 
     /** 命名色常量（`Color.White` 那一族浅套硬编码）与裸 hex 构造：面板窗口内两者都不许出现。 */
     private val namedStaticColorRead = Regex("""\bColor\.(?:White|Black|Gray|Grey|Red|Green|Blue|Yellow)\b""")
@@ -873,7 +988,7 @@ class GlassPanelInkPairingContractTest {
         )
         val conditional = """
             SectionCard {
-                Text(label, style = AppType.Body, color = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1)
+                Text(label, style = AppType.Body, color = if (selected && !LocalIsDark.current) appColors().onMint else if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1)
             }
         """.trimIndent()
         assertEquals(

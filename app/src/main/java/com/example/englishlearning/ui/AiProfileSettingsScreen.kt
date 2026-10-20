@@ -50,6 +50,7 @@ import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
+import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
@@ -393,7 +394,12 @@ private fun AiProfileEditor(
                 Text(
                     text = if (state.hasStoredKey) "已设置密钥" else "还没有设置密钥",
                     style = AppType.Body,
-                    color = appDomain(AppDomain.AiSpeech).deep,
+                    // 批 2 终审修复席 C-1（控制者裁决）：本行 `style = AppType.Body` 是正文档，浅套 `AiSpeech.deep`
+                    // （#188F76）压浅套玻璃合成底（#FEFFFE）本席现算只有 4.006:1，不达 4.5 正文线，不许按装饰档放行。
+                    // 按房内先例 `AppBottomBar.kt:95` 的形状按套钉死：浅套正文档取 `appColors().onMint`
+                    // （#174C44，压同底 9.727:1），深套沿用 `deep`（压深玻璃 ≥4.5，由 GlassPanelThemeInkTest 深套腿当场钉）。
+                    // 浅套观感有变（薄荷绿墨→深墨）属修 AA 失败，列入 18-ii 目检。
+                    color = if (!LocalIsDark.current) appColors().onMint else appDomain(AppDomain.AiSpeech).deep,
                     modifier = Modifier.testTag("ai_profile_key_state"),
                 )
                 EditorField(
@@ -506,7 +512,14 @@ private fun VoiceOverlayOption(
             // （浅套逐值 = 旧的 `AppPalette.GlassFill`，深色档才换成套深玻璃），所以这一行的墨必须跟着按套取值，
             // 否则深色档就是「浅墨压白玻璃 → 深墨压深玻璃」两侧各错一次（Task 12.5 修复轮 C-2 当年回退的前提
             // 「面板未迁」已随本批消失；登记见 DarkTokenConsumptionRatchetTest 的 GlassFillBackdropDebtLedger 收口）。
-            color = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1,
+            // 批 2 终审修复席 C/C-1（控制者裁决，B 席 concerns ①）：本行是 `style = AppType.Body` 正文档 ⇒ 阈值就是 ≥4.5，
+            // 不许按装饰档 3.1 放行。现算（WCAG 2.1，浅玻璃实底 = surfaceGlass #EFFFFFFF src-over 页底 #F1FBF5 = #FEFFFE）：
+            // 修复前的浅套域色墨 #188F76 压 #FEFFFE = **4.006:1**，不达 4.5；换按套钉死后浅套 #174C44 压 #FEFFFE =
+            // **9.727:1**。深套那腿沿用 `deep`（#35E0AC 压深玻璃 #161F1B 由 JVM 现算闸与深套像素腿钉 ≥4.5），
+            // 取值形状照 `AppBottomBar.kt:95`：浅套选中档 `appColors().onMint`、深套选中档 `deep`、未选中两套同 `text1`，
+            // 不新增静态色、不动文案与 testTag。浅套这一处观感有变（选中行由薄荷绿墨变深墨），属修 AA 失败而非回归，
+            // 已列入 18-ii 用户目检；判据见 GlassPanelInkPairingContractTest 的现算闸与 GlassPanelThemeInkTest 两套像素腿。
+            color = if (selected && !LocalIsDark.current) appColors().onMint else if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1,
         )
     }
 }
