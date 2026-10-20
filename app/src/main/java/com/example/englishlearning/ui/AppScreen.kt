@@ -24,7 +24,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -83,13 +82,19 @@ import androidx.compose.ui.unit.dp
 import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
+import com.example.englishlearning.ui.components.glass.GlassDialog
+import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.components.ListSkeleton
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintLight
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
+import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -643,35 +648,23 @@ fun AppScreen(
                 // F4-01 Spec L18：清空搜索历史=不可逆操作，先报级联条数再二次确认；
                 // 「清空搜索历史」按钮只做 request，仓储 clear 只从「确认清空」进入。
                 val pendingClear = globalSearch?.pendingClear?.collectAsState()?.value
-                if (pendingClear != null) {
-                    AlertDialog(
-                        onDismissRequest = { globalSearch?.cancelClearHistory() },
-                        title = { Text("清空搜索历史？") },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    if (pendingClear.recordCount != null) {
-                                        "将删除本机全部 ${pendingClear.recordCount} 条搜索记录。"
-                                    } else {
-                                        "将删除本机全部搜索记录（暂时读不到具体条数）。"
-                                    },
-                                )
-                                Text("收藏、文章与学习记录不受影响。", color = MintTextMuted)
-                                Text("清空不可撤销。", fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-                            }
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = { globalSearch?.clearHistory() },
-                                modifier = Modifier.testTag("search_history_clear_confirm"),
-                            ) { Text("确认清空") }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = { globalSearch?.cancelClearHistory() },
-                                modifier = Modifier.testTag("search_history_clear_cancel"),
-                            ) { Text("取消") }
-                        },
+                pendingClear?.let { pending ->
+                    ConfirmDestructiveDialog(
+                        state = true,
+                        title = "清空搜索历史？",
+                        cascadeLines = listOf(
+                            if (pending.recordCount != null) {
+                                "将删除本机全部 ${pending.recordCount} 条搜索记录。"
+                            } else {
+                                "将删除本机全部搜索记录（暂时读不到具体条数）。"
+                            },
+                        ),
+                        // 保留面逐字沿用站点原文；「不可撤销」声明交组件固定句承载（AGENTS.md 业务规则）。
+                        keepLines = listOf("收藏、文章与学习记录不受影响。"),
+                        irreversible = true,
+                        confirmLabel = "确认清空",
+                        onConfirm = { globalSearch?.clearHistory() },
+                        onDismiss = { globalSearch?.cancelClearHistory() },
                     )
                 }
             } else if (selectedRelearnCard != null) {
@@ -1321,30 +1314,21 @@ fun AppScreen(
                 )
                 // F4-01 决策 §8：删除前二次确认，并明列级联影响条数；不点「确认删除」零写入。
                 val pendingDelete = versionState.pending
-                if (pendingDelete != null) {
-                    AlertDialog(
-                        onDismissRequest = { articleVersionViewModel?.cancelDelete() },
-                        title = { Text("删除这一版？") },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("将删除《${pendingDelete.article.title}》第 ${pendingDelete.article.version} 版（${pendingDelete.article.localDate}）。")
-                                Text("级联影响：该版阅读完成记录 ${pendingDelete.impact.removedCompletionCount} 条将一并删除；同组剩余 ${pendingDelete.impact.remainingVersionCount} 个版本可读。")
-                                Text("删除不可撤销。", fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-                            }
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = { articleVersionViewModel?.confirmDelete() },
-                                enabled = !versionState.busy,
-                                modifier = Modifier.testTag("version_delete_confirm"),
-                            ) { Text("确认删除") }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = { articleVersionViewModel?.cancelDelete() },
-                                modifier = Modifier.testTag("version_delete_cancel"),
-                            ) { Text("取消") }
-                        },
+                pendingDelete?.let { pending ->
+                    ConfirmDestructiveDialog(
+                        state = true,
+                        title = "删除这一版？",
+                        // 这一枚的保留面（「同组剩余 N 个版本可读」）本来就写在级联句里，
+                        // 拆成两行会改动措辞，所以按逐字保留红线整句归 cascadeLines、保留面档留空。
+                        cascadeLines = listOf(
+                            "将删除《${pending.article.title}》第 ${pending.article.version} 版（${pending.article.localDate}）。",
+                            "级联影响：该版阅读完成记录 ${pending.impact.removedCompletionCount} 条将一并删除；同组剩余 ${pending.impact.remainingVersionCount} 个版本可读。",
+                        ),
+                        keepLines = emptyList(),
+                        irreversible = true,
+                        confirmLabel = "确认删除",
+                        onConfirm = { articleVersionViewModel?.confirmDelete() },
+                        onDismiss = { articleVersionViewModel?.cancelDelete() },
                     )
                 }
             } else if (showArticleImport) {
@@ -1605,31 +1589,41 @@ fun AppScreen(
                                 }
                                 LaunchedEffect(Unit) { wordBookTransferViewModel?.refresh() }
                                 if (showWordBookExportPicker) {
-                                    AlertDialog(
-                                        onDismissRequest = { showWordBookExportPicker = false },
-                                        title = { Text("选择要导出的词书") },
-                                        text = {
-                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                transferState?.books.orEmpty().forEach { bookId ->
-                                                    Text(
-                                                        text = bookId,
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clickable {
-                                                                exportWordBookId = bookId
-                                                                showWordBookExportPicker = false
-                                                                exportLauncher.launch("$bookId.wbpack")
-                                                            }
-                                                            .padding(vertical = 14.dp)
-                                                            .testTag("settings_export_book_$bookId"),
-                                                    )
-                                                }
+                                    // 路 B（非破坏性选择）：容器交房内共享玻璃档，取消走共享 PillButton；
+                                    // 列表项是本枚自渲染的（tag 供 connected 逐项定位），原地保留不改口径。
+                                    GlassDialog(onDismiss = { showWordBookExportPicker = false }) {
+                                        Text(text = "选择要导出的词书", style = AppType.Headline)
+                                        Column(
+                                            modifier = Modifier.padding(top = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            transferState?.books.orEmpty().forEach { bookId ->
+                                                Text(
+                                                    text = bookId,
+                                                    style = AppType.Body,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable {
+                                                            exportWordBookId = bookId
+                                                            showWordBookExportPicker = false
+                                                            exportLauncher.launch("$bookId.wbpack")
+                                                        }
+                                                        .padding(vertical = 14.dp)
+                                                        .testTag("settings_export_book_$bookId"),
+                                                )
                                             }
-                                        },
-                                        confirmButton = {
-                                            TextButton(onClick = { showWordBookExportPicker = false }) { Text("取消") }
-                                        },
-                                    )
+                                        }
+                                        PillButton(
+                                            text = "取消",
+                                            onClick = { showWordBookExportPicker = false },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 16.dp),
+                                            style = PillStyle.Secondary,
+                                            domain = AppDomain.Settings,
+                                            testTag = "wordbook_export_cancel",
+                                        )
+                                    }
                                 }
                                 SettingsScreen(
                                     profileName = state.profile.displayName,
@@ -1697,39 +1691,26 @@ fun AppScreen(
                                 )
                                 // F4-01 Spec 04 L18：删除全部学习数据先报级联条数、再二次确认；
                                 // 「删除全部学习数据」入口只做 request，仓储删除只从「确认删除」进入。
-                                val pendingWipe = learningDataDeletionUi.pending
-                                if (pendingWipe != null) {
-                                    AlertDialog(
-                                        onDismissRequest = { learningDataDeletionViewModel?.cancelDelete() },
-                                        title = { Text("删除全部学习数据？") },
-                                        text = {
-                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                Text(
-                                                    "将删除学习记录 ${pendingWipe.eventCount} 条、复习调度 " +
-                                                        "${pendingWipe.reviewStateCount} 条、每日计划 ${pendingWipe.planCount} 天、" +
-                                                        "阅读完成 ${pendingWipe.completionCount} 条、迁移审计 ${pendingWipe.migrationAuditCount} 条。",
-                                                )
-                                                Text(
-                                                    "文章 ${pendingWipe.keptArticleCount} 篇与收藏 ${pendingWipe.keptFavoriteCount} 条保留；" +
-                                                        "词书、搜索历史与设置不受影响。",
-                                                    color = MintTextMuted,
-                                                )
-                                                Text("删除不可撤销。", fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-                                            }
-                                        },
-                                        confirmButton = {
-                                            Button(
-                                                onClick = { learningDataDeletionViewModel?.confirmDelete(state.profile.id) },
-                                                enabled = !learningDataDeletionUi.busy,
-                                                modifier = Modifier.testTag("delete_all_learning_data_confirm"),
-                                            ) { Text("确认删除") }
-                                        },
-                                        dismissButton = {
-                                            TextButton(
-                                                onClick = { learningDataDeletionViewModel?.cancelDelete() },
-                                                modifier = Modifier.testTag("delete_all_learning_data_cancel"),
-                                            ) { Text("取消") }
-                                        },
+                                val pending = learningDataDeletionUi.pending
+                                if (pending != null) {
+                                    ConfirmDestructiveDialog(
+                                        state = true,
+                                        title = "删除全部学习数据？",
+                                        // 条数与保留面逐字沿用站点原文（F4-01 Spec 04 L18 的口径）；
+                                        // 自写的「删除不可撤销。」交组件固定句承载。
+                                        cascadeLines = listOf(
+                                            "将删除学习记录 ${pending.eventCount} 条、复习调度 " +
+                                                "${pending.reviewStateCount} 条、每日计划 ${pending.planCount} 天、" +
+                                                "阅读完成 ${pending.completionCount} 条、迁移审计 ${pending.migrationAuditCount} 条。",
+                                        ),
+                                        keepLines = listOf(
+                                            "文章 ${pending.keptArticleCount} 篇与收藏 ${pending.keptFavoriteCount} 条保留；" +
+                                                "词书、搜索历史与设置不受影响。",
+                                        ),
+                                        irreversible = true,
+                                        confirmLabel = "确认删除",
+                                        onConfirm = { learningDataDeletionViewModel?.confirmDelete(state.profile.id) },
+                                        onDismiss = { learningDataDeletionViewModel?.cancelDelete() },
                                     )
                                 }
                             }
@@ -1870,68 +1851,70 @@ internal fun LearningSetupScreen(
     // 删除导入词书：删除前必须二次确认，内置册根本不会进入这里。
     // 文案口径按 F4-01 决策 §6 反转：删的是词书内容与词条，学习历史与文章**保留**。
     state.pendingDelete?.let { book ->
-        AlertDialog(
-            onDismissRequest = viewModel::cancelDelete,
-            title = { Text("删除《${book.displayName}》？") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val preview = state.deletePreview
-                    Text(
-                        if (preview != null) {
-                            "将删除这册导入词书的词卡文件与词条 ${preview.entryCount} 条。"
-                        } else {
-                            "将删除这册导入词书的词卡文件与全部词条内容。"
-                        },
-                    )
-                    Text(
-                        if (preview != null) {
-                            "学习历史与文章保留：该册学习记录 ${preview.keptEventCount} 条、文章 ${preview.keptArticleCount} 篇仍可翻阅（复习状态与生词笔记同保留）。"
-                        } else {
-                            "本机学习历史与文章保留，仍可翻阅；暂时读不到具体条数。"
-                        },
-                    )
-                    Text("其他词书不受影响。", color = MintTextMuted)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.confirmDelete(profileId) },
-                    modifier = Modifier.testTag("wordbook_delete_confirm"),
-                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = viewModel::cancelDelete,
-                    modifier = Modifier.testTag("wordbook_delete_cancel"),
-                ) { Text("取消") }
-            },
+        val preview = state.deletePreview
+        ConfirmDestructiveDialog(
+            state = true,
+            title = "删除《${book.displayName}》？",
+            // 级联（删什么）与保留面（留什么）各按原站点的两档逐字给；「其他词书不受影响」属保留面档，
+            // 原样跟着第二行下来。自写「不可撤销」声明由组件固定句承载。
+            cascadeLines = listOf(
+                if (preview != null) {
+                    "将删除这册导入词书的词卡文件与词条 ${preview.entryCount} 条。"
+                } else {
+                    "将删除这册导入词书的词卡文件与全部词条内容。"
+                },
+            ),
+            keepLines = listOf(
+                if (preview != null) {
+                    "学习历史与文章保留：该册学习记录 ${preview.keptEventCount} 条、文章 ${preview.keptArticleCount} 篇仍可翻阅（复习状态与生词笔记同保留）。"
+                } else {
+                    "本机学习历史与文章保留，仍可翻阅；暂时读不到具体条数。"
+                },
+                "其他词书不受影响。",
+            ),
+            irreversible = true,
+            confirmLabel = "删除",
+            onConfirm = { viewModel.confirmDelete(profileId) },
+            onDismiss = viewModel::cancelDelete,
         )
     }
 
     // 切书时发现已学过的同词：由用户决定是否标记为已学习，不静默迁移。
     state.pendingMigration?.let { preview ->
-        AlertDialog(
-            onDismissRequest = { viewModel.resolveMigration(profileId, apply = false) },
-            title = { Text("发现已学过的单词") },
-            text = {
-                Text(
-                    "目标词书里有 ${preview.candidates.size} 个单词你之前已经学过，要把它们标记为已学习吗？" +
-                        "原词书的学习记录会原样保留。",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.resolveMigration(profileId, apply = true) },
-                    modifier = Modifier.testTag("wordbook_migration_confirm"),
-                ) { Text("标记为已学习") }
-            },
-            dismissButton = {
-                TextButton(
+        // 路 B（非破坏、二选一）：容器交共享玻璃档，两枚动作走共享 PillButton（不手搓裸按钮）。
+        GlassDialog(onDismiss = { viewModel.resolveMigration(profileId, apply = false) }) {
+            Text(text = "发现已学过的单词", style = AppType.Headline)
+            Text(
+                text = "目标词书里有 ${preview.candidates.size} 个单词你之前已经学过，要把它们标记为已学习吗？原词书的学习记录会原样保留。",
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .testTag("wordbook_migration_message"),
+                style = AppType.Body,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                PillButton(
+                    text = "暂不标记",
                     onClick = { viewModel.resolveMigration(profileId, apply = false) },
-                    modifier = Modifier.testTag("wordbook_migration_skip"),
-                ) { Text("暂不标记") }
-            },
-        )
+                    modifier = Modifier.weight(1f),
+                    style = PillStyle.Secondary,
+                    domain = AppDomain.Library,
+                    testTag = "wordbook_migration_skip",
+                )
+                PillButton(
+                    text = "标记为已学习",
+                    onClick = { viewModel.resolveMigration(profileId, apply = true) },
+                    modifier = Modifier.weight(1f),
+                    style = PillStyle.Primary,
+                    domain = AppDomain.Library,
+                    testTag = "wordbook_migration_confirm",
+                )
+            }
+        }
     }
 
     Column(

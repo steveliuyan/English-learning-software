@@ -17,7 +17,8 @@ package com.example.englishlearning.ui.components
  *
  * 度量基准：24×24 画布；视觉描边重量 2px；圆头与圆角连接（`StrokeCap.Round` / `StrokeJoin.Round`
  * 由渲染器统一给，故本文件不写任何画笔参数）；优先无填充，填充只作层次暗示；关键几何留在 4–20
- * 安全区内，与 `AppBottomBar.kt` 的 `drawTabGlyph` 同一 24 网格习惯。仅参考 Material Symbols 的
+ * 安全区内——这套网格习惯由本文件自身与渲染方 [AppGlyph] 共同成立（消费方一律经 `AppGlyph` 取形，
+ * 没有任何一方自带私有字形），不依赖任何已删除的历史绘制函数。仅参考 Material Symbols 的
  * 24dp 网格与 2px 重量，未内嵌其路径数据。
  *
  * 圆形填充写作 `CircleFill(cx, cy, r)` 标记串：该标记由 `AppGlyph` 渲染器（Task 7）解释，

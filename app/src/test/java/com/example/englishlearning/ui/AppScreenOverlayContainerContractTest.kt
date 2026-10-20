@@ -1,0 +1,487 @@
+package com.example.englishlearning.ui
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.fail
+
+/**
+ * Task 17B 浮层容器契约（批 2 UI 重设计）：`AppScreen.kt` 里那 6 枚裸 `AlertDialog` 必须迁到房内两路共享浮层档，
+ * 并且**只能**迁到这两路：
+ *  - 路 A（破坏性确认 4 枚）→ `components/ConfirmDestructiveDialog.kt`，正文三要素（级联 → 保留面 → 不可撤销）
+ *    由组件的 `destructiveDialogBody` 承载，站点只许逐字给 `cascadeLines` / `keepLines` 与动作；
+ *  - 路 B（非破坏选择 2 枚）→ `components/glass/GlassDialog.kt` + 共享 `PillButton`，
+ *    自渲染的列表项 tag（`settings_export_book_$bookId`）必须原地保留。
+ *
+ * 判据形状沿用 17A 的成例（`AppBottomBarContractTest` 的 `stripComments` + `extractFunctionBody`
+ * 「体内恰一处 / 体外零处」夹击）：本席按同一口径读源码，再按**调用区间**取窗——
+ * 「一枚 `AlertDialog(` 藏在 `if (false)` 死分支里」与「只迁 3 枚留 3 枚」两形都必须当场判红；
+ * 只数函数声明、或只问字面在不在文件里，都挡不住这两发（Task 15/16/17A 三处同源的教训）。
+ *
+ * 逐枚的**实参形状 + 信息要素逐字**一起钉：级联条数、保留面、词书名与日期的插值本体都按字面命中，
+ * 因此改措辞、丢条数、丢保留面、把动作换成另一枚调用都会打掉某一条锚。站点自写的
+ * 「清空不可撤销。」「删除不可撤销。」一类由组件固定句「此操作不可撤销。」取代，
+ * 所以那两枚旧措辞在本文件必须归零（AGENTS.md 业务规则，`ConfirmDestructiveWordingTest` 已在册），
+ * 而组件固定句本身也不许被站点重写（重写 = 绕过 `destructiveDialogBody` 配方，措辞契约就管不到它）。
+ *
+ * 读法只走共享夹具 [uiScreenSource] / [uiComponentSource]（内置「文件恰一个 + 目录守卫 + 剥注释」），
+ * 本文件不自写第二份剥注释实现（批 1 终审 F6 的防复发闸盯着这件事）。
+ * [extractFunctionBody] / [extractCallRegion] / [balancedRegion] 与 `AppBottomBarContractTest` 的同名私有
+ * 夹具同源：那一份是 17A 的**私有**夹具、跨文件不可见，本席按 brief「沿用 17A 成例」在本席重写一份，
+ * 而不是改动已关账的 17A；批 3 若做测试夹具归并，两处一起搬进 `SourceRatchet.kt`。
+ */
+class AppScreenOverlayContainerContractTest {
+
+    // ---------- 锚点 ----------
+
+    private val appScreenSignature = "fun AppScreen("
+    private val learningSetupSignature = "internal fun LearningSetupScreen("
+
+    private val destructiveCall = "ConfirmDestructiveDialog("
+    private val glassCall = "GlassDialog("
+    private val alertDialogCall = "AlertDialog("
+    private val alertDialogImport = "androidx.compose.material3.AlertDialog"
+
+    /** 路 A 实参形状：一枚调用内恰一处，缺一枚就是「少说一件」（级联 / 保留面 / 不可撤销旗标 / 标签 / 动作）。 */
+    private val destructiveArgShapes = listOf(
+        "state = true,",
+        "title = ",
+        "cascadeLines = ",
+        "keepLines = ",
+        "irreversible = true,",
+        "confirmLabel = ",
+        "onConfirm = ",
+        "onDismiss = ",
+    )
+
+    /** 只有路 A 用得着的形状：窗口内计数之和必须等于全文件计数（多出的一份就是窗外死分支/幽灵调用塞的）。 */
+    private val routeAOnlyShapes = listOf(
+        "state = true,",
+        "cascadeLines = ",
+        "keepLines = ",
+        "irreversible = true,",
+        "confirmLabel = ",
+    )
+
+    /** 退役的站点私有 tag（路 A 迁完后随组件固定 tag `confirm_destructive_*` 收敛；控制者实测零测试引用）。 */
+    private val retiredDestructiveTags = listOf(
+        "search_history_clear_confirm",
+        "search_history_clear_cancel",
+        "version_delete_confirm",
+        "version_delete_cancel",
+        "delete_all_learning_data_confirm",
+        "delete_all_learning_data_cancel",
+        "wordbook_delete_confirm",
+        "wordbook_delete_cancel",
+    )
+
+    /** 站点自写的「不可撤销」句（迁移前实测三处：`:660`、`:1332`、`:1717`），一律交组件固定句承载。 */
+    private val selfWrittenIrreversibleLines = listOf("清空不可撤销。", "删除不可撤销。")
+
+    /** 组件的固定句：站点重写它 = 绕过 `destructiveDialogBody` 配方。 */
+    private val componentIrreversibleLine = "此操作不可撤销。"
+
+    /** 路 A 组件签名的 8 枚形参（本体冻结，不许为迁站点加第 9 枚）。 */
+    private val routeAParameters = listOf(
+        "state: Boolean",
+        "title: String",
+        "cascadeLines: List<String>",
+        "keepLines: List<String>",
+        "irreversible: Boolean = true",
+        "confirmLabel: String",
+        "onConfirm: () -> Unit",
+        "onDismiss: () -> Unit",
+    )
+
+    // ---------- 读取 ----------
+
+    /**
+     * `AppScreen.kt` 剥注释后的源码。共享夹具内置「屏文件形状 + 恰一个文件 + 父目录恰为 `ui/` 根」三道守卫，
+     * 缺失 / 改名 / 搬家都会当场点名，而不是让下面的 `== 0` 断言静默空转。
+     */
+    private fun appScreenSource(): String {
+        val source = uiScreenSource("AppScreen.kt")
+        assertTrue(
+            source.isNotBlank(),
+            "AppScreen.kt 剥注释后为空：契约不许对空文件判绿（文件被搬空 == 没有契约）",
+        )
+        return source
+    }
+
+    // ---------- 配平取窗夹具（与 17A 同口径：字符串感知、未闭合即 fail） ----------
+
+    /**
+     * 从 [signature] 锚定函数的花括号体（不含最外层括号）。
+     * 字符串字面量整体跳过（串里的 `${…}` 花括号不参与配对）；未闭合直接 fail——
+     * 配对器失准时「体外计数」会把体内锚算成体外，必须响亮报错而不是静默切歪。
+     */
+    private fun extractFunctionBody(stripped: String, signature: String): String {
+        val start = stripped.indexOf(signature)
+        assertTrue(start >= 0, "找不到函数签名 \"$signature\"：锚点搬家或改名，契约不许空转")
+        val open = stripped.indexOf('{', start)
+        assertTrue(open >= 0, "$signature 之后找不到函数体起始花括号")
+        val region = balancedRegion(stripped, open, '{', '}')
+        return stripped.substring(region.first + 1, region.second)
+    }
+
+    /**
+     * 一枚调用的**完整调用区间**：从 `(` 起配平到 `)`，再并上紧随其后的尾随 lambda 块。
+     * 路 B 的 `GlassDialog(onDismiss = …) { 内容 }` 内容长在尾随 lambda 里，只取实参括号
+     * 会把 `PillButton(` 与列表项 tag 算到窗外，那些锚就没人管了。
+     */
+    private fun extractCallRegion(stripped: String, callStart: Int, anchor: String): String {
+        val paren = callStart + anchor.length - 1
+        assertTrue(
+            stripped[paren] == '(',
+            "$anchor 之后第 ${paren - callStart} 位不是左括号：调用形状与本夹具口径不符，拒绝猜测",
+        )
+        val args = balancedRegion(stripped, paren, '(', ')')
+        var end = args.second + 1
+        val nextBrace = firstNonWhitespace(stripped, end)
+        if (nextBrace != null && stripped[nextBrace] == '{') {
+            end = balancedRegion(stripped, nextBrace, '{', '}').second + 1
+        }
+        return stripped.substring(callStart, end)
+    }
+
+    /** 从 [open]（必为 [openChar]）配平到同名闭合字符，返回闭合两端下标；字符串整段跳过，未闭合即 fail。 */
+    private fun balancedRegion(text: String, open: Int, openChar: Char, closeChar: Char): Pair<Int, Int> {
+        assertTrue(text[open] == openChar, "取窗起点不是 $openChar：本夹具只接受指向 $openChar 的下标")
+        var depth = 0
+        var i = open
+        var inString = false
+        var escaped = false
+        while (i < text.length) {
+            val c = text[i]
+            when {
+                inString -> when {
+                    escaped -> escaped = false
+                    c == '\\' -> escaped = true
+                    c == '"' -> inString = false
+                }
+
+                c == '"' -> inString = true
+                c == openChar -> depth++
+                c == closeChar -> {
+                    depth--
+                    if (depth == 0) return Pair(open, i)
+                }
+            }
+            i++
+        }
+        fail("从下标 $open 起的 $openChar…$closeChar 未闭合：配对器无法界定区间，本契约拒绝猜测")
+    }
+
+    private fun firstNonWhitespace(text: String, from: Int): Int? {
+        var i = from
+        while (i < text.length) {
+            if (!text[i].isWhitespace()) return i
+            i++
+        }
+        return null
+    }
+
+    private fun count(hay: String, needle: String): Int = Regex(needle, RegexOption.LITERAL).findAll(hay).count()
+
+    private fun occurrencesOf(hay: String, needle: String): List<Int> {
+        val out = mutableListOf<Int>()
+        var index = hay.indexOf(needle)
+        while (index >= 0) {
+            out += index
+            index = hay.indexOf(needle, index + needle.length)
+        }
+        return out
+    }
+
+    // ---------- 浮层调用取样 ----------
+
+    private enum class OverlayKind { Destructive, Glass }
+
+    private data class OverlayCall(val kind: OverlayKind, val start: Int, val region: String)
+
+    /** 按出现顺序取出全部浮层调用的完整区间（两类锚点互不为前缀，计数不会互相吞）。 */
+    private fun overlayCalls(source: String): List<OverlayCall> {
+        val found = mutableListOf<OverlayCall>()
+        listOf(destructiveCall to OverlayKind.Destructive, glassCall to OverlayKind.Glass).forEach { (anchor, kind) ->
+            occurrencesOf(source, anchor).forEach { start ->
+                found += OverlayCall(kind = kind, start = start, region = extractCallRegion(source, start, anchor))
+            }
+        }
+        return found.sortedBy { it.start }
+    }
+
+    private fun destructiveCallsIn(source: String): List<OverlayCall> =
+        overlayCalls(source).filter { it.kind == OverlayKind.Destructive }
+
+    /** 按路 A 标题字面认枚：标题是「这一枚是谁」的唯一真值，换站点或改标题都只会判不出窗口，不会被别的窗口蒙中。 */
+    private fun destructiveRegionByTitle(source: String, titleLiteral: String): String {
+        val matches = destructiveCallsIn(source).filter { it.region.contains("title = \"$titleLiteral\"") }
+        assertEquals(
+            1,
+            matches.size,
+            "路 A 站点「$titleLiteral」必须恰一枚且标题逐字为 title = \"$titleLiteral\"，实际 ${matches.size} 枚",
+        )
+        return matches.single().region
+    }
+
+    private fun glassRegionContaining(source: String, literal: String): String {
+        val matches = overlayCalls(source).filter { it.kind == OverlayKind.Glass && it.region.contains(literal) }
+        assertEquals(1, matches.size, "路 B 站点（含字面「$literal」）必须恰一枚，实际 ${matches.size} 枚")
+        return matches.single().region
+    }
+
+    // ---------- 用例 1：裸 `AlertDialog` 族与其实导入、旧措辞一起归零 ----------
+
+    @Test
+    fun `bare alert dialog family, its import and the self written irreversible lines are gone`() {
+        val source = appScreenSource()
+        assertEquals(0, count(source, alertDialogCall), "AppScreen.kt 仍有 ${count(source, alertDialogCall)} 处裸 AlertDialog(：容器必须交两路共享档承载")
+        assertEquals(0, count(source, alertDialogImport), "AppScreen.kt 仍导入 material3 AlertDialog（容器已由共享组件承载）")
+        selfWrittenIrreversibleLines.forEach { literal ->
+            assertEquals(0, count(source, literal), "站点仍自写「$literal」：不可撤销声明必须交组件固定句承载")
+        }
+        assertEquals(0, count(source, componentIrreversibleLine), "站点重写组件固定句 = 绕过 destructiveDialogBody 配方，措辞契约将管不到这一行")
+        retiredDestructiveTags.forEach { tag ->
+            assertEquals(0, count(source, tag), "路 A 站点私有 tag「$tag」未随组件固定 tag 收敛（实测零测试引用，可直接退役）")
+        }
+        listOf("confirm_destructive_confirm", "confirm_destructive_dismiss").forEach { tag ->
+            assertEquals(
+                0,
+                count(source, tag),
+                "站点不许自写组件固定 tag「$tag」：那是 ConfirmDestructiveDialog.kt 的资产，抄过来就是第二份标签口径",
+            )
+        }
+        // 反空转（M1 的击穿形状）：同一具计数器必须数得出「死分支里塞一份」的副本，否则上面那个 0 是恒真。
+        val ghost = "if (false) { $alertDialogCall onDismissRequest = {} } }"
+        assertEquals(1, count(ghost, alertDialogCall), "反空转失控：死分支里的 AlertDialog( 副本没被数出来")
+        assertEquals(
+            1,
+            count("import androidx.compose.material3.AlertDialog\n", alertDialogImport),
+            "反空转失控：合成导入行没被数出来（导入腿是恒真的）",
+        )
+        assertEquals(1, count("Text(\"删除不可撤销。\", fontWeight = FontWeight.Bold)", "删除不可撤销。"), "反空转失控：旧措辞样片没被数出来")
+    }
+
+    // ---------- 用例 2：逐位钉数 —— 路 A 恰 4 枚、路 B 恰 2 枚，且都长在生效宿主函数体内 ----------
+
+    @Test
+    fun `six overlays route to exactly four destructive confirmations and two glass pickers`() {
+        val source = appScreenSource()
+        assertEquals(4, count(source, destructiveCall), "ConfirmDestructiveDialog( 必须恰 4 枚（清空搜索历史 / 删除这一版 / 删除全部学习数据 / 删除词书），实际 ${count(source, destructiveCall)}")
+        assertEquals(2, count(source, glassCall), "GlassDialog( 必须恰 2 枚（导出词书选择器 / 发现已学过的单词），实际 ${count(source, glassCall)}")
+        val calls = overlayCalls(source)
+        assertEquals(6, calls.size, "浮层调用取样必须恰 6 枚（迁 3 留 3、或多迁一枚都会掉在这里）")
+        assertEquals(4, calls.count { it.kind == OverlayKind.Destructive }, "路 A 取样份数不对")
+        assertEquals(2, calls.count { it.kind == OverlayKind.Glass }, "路 B 取样份数不对")
+
+        // 体内/体外夹击：3+1 枚属于 AppScreen 宿主，1+1 枚属于 LearningSetupScreen 宿主，两体之外一枚都不许有。
+        val appScreenBody = extractFunctionBody(source, appScreenSignature)
+        val setupBody = extractFunctionBody(source, learningSetupSignature)
+        assertEquals(3, count(appScreenBody, destructiveCall), "AppScreen 函数体内应有 3 枚破坏性确认（清空搜索历史 / 删除这一版 / 删除全部学习数据）")
+        assertEquals(1, count(appScreenBody, glassCall), "AppScreen 函数体内应有 1 枚玻璃选择器（导出词书）")
+        assertEquals(1, count(setupBody, destructiveCall), "LearningSetupScreen 函数体内应有 1 枚破坏性确认（删除词书）")
+        assertEquals(1, count(setupBody, glassCall), "LearningSetupScreen 函数体内应有 1 枚玻璃选择器（发现已学过的单词）")
+        assertEquals(
+            4,
+            count(appScreenBody, destructiveCall) + count(setupBody, destructiveCall),
+            "路 A 有一枚不在两个宿主函数体内：幽灵函数或窗外死分支里的假调用不算生效渲染路径",
+        )
+        assertEquals(
+            2,
+            count(appScreenBody, glassCall) + count(setupBody, glassCall),
+            "路 B 有一枚不在两个宿主函数体内（同上）",
+        )
+
+        // 取窗器自证：两枚宿主体切歪时上面的体内计数只是巧合，所以切割点必须单独钉。
+        assertTrue(
+            appScreenBody.contains("learningDataDeletionViewModel?.cancelDelete()"),
+            "取窗器切歪：AppScreen 体内读不到「删除全部学习数据」的动作，函数体在站点之前就被截断",
+        )
+        assertTrue(
+            !appScreenBody.contains(learningSetupSignature),
+            "取窗器切歪：AppScreen 体吞进了 LearningSetupScreen 的定义（右括号配平错位）",
+        )
+        assertTrue(
+            setupBody.contains("WordBookList("),
+            "取窗器切歪：LearningSetupScreen 体没覆盖到词书列表调用",
+        )
+
+        // 反空转（M2 的击穿形状）：少迁一枚（4 变 3）必须被这套份数逻辑判出来。
+        val shortByOne = "$destructiveCall state = true, title = \"a\")\n" +
+            "$destructiveCall state = true, title = \"b\")\n" +
+            "$destructiveCall state = true, title = \"c\")\n" +
+            "$glassCall onDismiss = {}) {}\n"
+        val sampled = overlayCalls(shortByOne).count { it.kind == OverlayKind.Destructive }
+        assertEquals(3, sampled, "反空转失控：三枚路 A 的样片被取样成 $sampled 枚，份数判据没有牙齿")
+        assertTrue(sampled != 4, "反空转失控：份数判据恒真")
+    }
+
+    // ---------- 用例 3：路 A 每枚调用的实参形状恰一处 + 窗外零处 ----------
+
+    @Test
+    fun `each destructive confirmation carries the full argument shape exactly once`() {
+        val source = appScreenSource()
+        val routeA = destructiveCallsIn(source)
+        assertEquals(4, routeA.size, "路 A 取样份数不对，形状判据无从谈起")
+        routeA.forEach { call ->
+            destructiveArgShapes.forEach { shape ->
+                assertEquals(
+                    1,
+                    count(call.region, shape),
+                    "路 A 调用（起于下标 ${call.start}）内「$shape」必须恰一处，实际 ${count(call.region, shape)} 次",
+                )
+            }
+            assertEquals(0, count(call.region, alertDialogCall), "路 A 调用区间内不得残留 AlertDialog(")
+            assertEquals(0, count(call.region, glassCall), "一枚路 A 调用区间内不得嵌 GlassDialog(（两路不混用）")
+        }
+        // 体内恰一处 ⇒ 体外零处：全文件计数 == 4 == 四枚窗口之和。
+        routeAOnlyShapes.forEach { shape ->
+            val inWindows = routeA.sumOf { count(it.region, shape) }
+            assertEquals(4, count(source, shape), "「$shape」全文件计数不等于 4：窗外多出来的一份 = 死分支/幽灵调用塞的假形状")
+            assertEquals(4, inWindows, "「$shape」有命中落在四枚路 A 调用区间之外")
+        }
+        // 反空转：路 A 少给 keepLines 的那一枚必须被形状判据打掉（brief 点名的变异形状）。
+        val missingKeep = "$destructiveCall state = true,\n    title = \"删除这一版？\",\n    cascadeLines = listOf(\"a\"),\n" +
+            "    irreversible = true,\n    confirmLabel = \"确认删除\",\n    onConfirm = { vm.confirm() },\n    onDismiss = { vm.cancel() },\n)"
+        assertEquals(0, count(missingKeep, "keepLines = "), "反空转失控：缺 keepLines 的样片竟满足形状锚")
+        assertEquals(1, count(missingKeep, "cascadeLines = "), "反空转失控：样片连级联行都没数出来，形状锚是恒假的")
+        assertEquals(1, count(missingKeep, "irreversible = true,"), "反空转失控：样片的不可撤销旗标没被数出来")
+    }
+
+    // ---------- 用例 4：六枚的信息要素、tag 与动作逐字保留 ----------
+
+    @Test
+    fun `each migrated overlay keeps its own numbers, kept surfaces, tags and actions verbatim`() {
+        val source = appScreenSource()
+
+        // 站点 1（迁移前 `:647`）清空搜索历史。
+        val searchClear = destructiveRegionByTitle(source, "清空搜索历史？")
+        listOf(
+            "将删除本机全部 \${pending.recordCount} 条搜索记录。",
+            "将删除本机全部搜索记录（暂时读不到具体条数）。",
+            "收藏、文章与学习记录不受影响。",
+            "confirmLabel = \"确认清空\"",
+            "onConfirm = { globalSearch?.clearHistory() }",
+            "onDismiss = { globalSearch?.cancelClearHistory() }",
+        ).forEach { literal ->
+            assertEquals(1, count(searchClear, literal), "「清空搜索历史」一枚的要素/动作变了（逐字保留是红线）：$literal")
+        }
+
+        // 站点 2（迁移前 `:1325`）删除这一版。
+        val versionDelete = destructiveRegionByTitle(source, "删除这一版？")
+        listOf(
+            "将删除《\${pending.article.title}》第 \${pending.article.version} 版（\${pending.article.localDate}）。",
+            "级联影响：该版阅读完成记录 \${pending.impact.removedCompletionCount} 条将一并删除；" +
+                "同组剩余 \${pending.impact.remainingVersionCount} 个版本可读。",
+            "confirmLabel = \"确认删除\"",
+            "onConfirm = { articleVersionViewModel?.confirmDelete() }",
+            "onDismiss = { articleVersionViewModel?.cancelDelete() }",
+        ).forEach { literal ->
+            assertEquals(1, count(versionDelete, literal), "「删除这一版」一枚的条数/动作变了：$literal")
+        }
+
+        // 站点 3（迁移前 `:1702`）删除全部学习数据。
+        val wipeAll = destructiveRegionByTitle(source, "删除全部学习数据？")
+        listOf(
+            "将删除学习记录 \${pending.eventCount} 条、复习调度 ",
+            "\${pending.reviewStateCount} 条、每日计划 \${pending.planCount} 天、",
+            "阅读完成 \${pending.completionCount} 条、迁移审计 \${pending.migrationAuditCount} 条。",
+            "文章 \${pending.keptArticleCount} 篇与收藏 \${pending.keptFavoriteCount} 条保留；",
+            "词书、搜索历史与设置不受影响。",
+            "confirmLabel = \"确认删除\"",
+            "onConfirm = { learningDataDeletionViewModel?.confirmDelete(state.profile.id) }",
+            "onDismiss = { learningDataDeletionViewModel?.cancelDelete() }",
+        ).forEach { literal ->
+            assertEquals(1, count(wipeAll, literal), "「删除全部学习数据」一枚的条数/保留面/动作变了：$literal")
+        }
+
+        // 站点 4（迁移前 `:1873`）删除词书（标题带词书名插值）。
+        val wordBookDelete = destructiveRegionByTitle(source, "删除《\${book.displayName}》？")
+        listOf(
+            "将删除这册导入词书的词卡文件与词条 \${preview.entryCount} 条。",
+            "将删除这册导入词书的词卡文件与全部词条内容。",
+            "学习历史与文章保留：该册学习记录 \${preview.keptEventCount} 条、文章 \${preview.keptArticleCount} 篇仍可翻阅（复习状态与生词笔记同保留）。",
+            "本机学习历史与文章保留，仍可翻阅；暂时读不到具体条数。",
+            "其他词书不受影响。",
+            "confirmLabel = \"删除\"",
+            "onConfirm = { viewModel.confirmDelete(profileId) }",
+            "onDismiss = viewModel::cancelDelete",
+        ).forEach { literal ->
+            assertEquals(1, count(wordBookDelete, literal), "「删除词书」一枚的级联/保留面/动作变了：$literal")
+        }
+
+        // 站点 5（迁移前 `:1608`）导出词书选择器（路 B）：列表项 tag 原地保留，取消动作逐字不变。
+        val exportPicker = glassRegionContaining(source, "选择要导出的词书")
+        listOf(
+            "GlassDialog(onDismiss = { showWordBookExportPicker = false })",
+            "text = \"选择要导出的词书\"",
+            "AppType.Headline",
+            "AppType.Body",
+            "settings_export_book_\$bookId",
+            "exportWordBookId = bookId",
+            "exportLauncher.launch(\"\$bookId.wbpack\")",
+            "testTag = \"wordbook_export_cancel\"",
+            "text = \"取消\"",
+        ).forEach { literal ->
+            assertEquals(1, count(exportPicker, literal), "「选择要导出的词书」一枚的要素/tag/动作变了：$literal")
+        }
+        assertEquals(1, count(exportPicker, "PillButton("), "导出选择器只有「取消」一枚动作，必须走共享 PillButton 且不得长出第二枚")
+        assertEquals(
+            count(exportPicker, "PillButton("),
+            count(exportPicker, "Button("),
+            "路 B 正文按钮不许手搓 Button(：`Button(` 计数必须全部由共享 PillButton 贡献（PillButton 含 Button 子串，两数相等才说明没有裸按钮）",
+        )
+
+        // 站点 6（迁移前 `:1913`）发现已学过的单词（路 B）：二选一两个动作逐字保留。
+        val migration = glassRegionContaining(source, "发现已学过的单词")
+        listOf(
+            "GlassDialog(onDismiss = { viewModel.resolveMigration(profileId, apply = false) })",
+            "text = \"发现已学过的单词\"",
+            "目标词书里有 \${preview.candidates.size} 个单词你之前已经学过，要把它们标记为已学习吗？原词书的学习记录会原样保留。",
+            "testTag = \"wordbook_migration_confirm\"",
+            "testTag = \"wordbook_migration_skip\"",
+            "viewModel.resolveMigration(profileId, apply = true)",
+        ).forEach { literal ->
+            assertEquals(1, count(migration, literal), "「发现已学过的单词」一枚的条数/tag/动作变了：$literal")
+        }
+        // `apply = false` 这枚动作本来就有两处落点（返回手势的 onDismiss + 「暂不标记」按钮），
+        // 迁移后仍是两处：一枚进容器形参、一枚进 PillButton 的 onClick，谁也不许多一份或少一份。
+        assertEquals(
+            2,
+            count(migration, "viewModel.resolveMigration(profileId, apply = false)"),
+            "「暂不标记」语义的动作必须恰两处（容器 onDismiss + 第二枚按钮）：少一处 = 按返回即静默标记，多一处 = 幽灵动作",
+        )
+        assertEquals(2, count(migration, "PillButton("), "迁移弹窗是一对二选一按钮，两枚都必须走共享 PillButton")
+        assertEquals(1, count(migration, "AppType.Body"), "路 B 正文必须走 AppType.Body（房内约定形状，见 ReadingAccessScreen.kt:291-322）")
+
+        // 路 B 自渲染 tag 不许跟着路 A 一起退役：窗外零处复核。
+        listOf("settings_export_book_\$bookId", "wordbook_migration_confirm", "wordbook_migration_skip").forEach { tag ->
+            assertEquals(1, count(source, tag), "路 B 自渲染 tag「$tag」必须恰一处保留（它不是路 A 的组件固定 tag，不许收敛）")
+        }
+        assertEquals(3, count(source, "PillButton("), "AppScreen.kt 的药片调用必须恰 3 枚（导出取消 1 + 迁移二选一 2），不得手搓按钮")
+    }
+
+    // ---------- 用例 5：路 A 组件本体冻结（不许为迁站点加参数） ----------
+
+    @Test
+    fun `the frozen route A component keeps its eight parameter signature`() {
+        val component = uiComponentSource("ConfirmDestructiveDialog.kt")
+        val signatureAnchor = "fun ConfirmDestructiveDialog"
+        val signatureStart = component.indexOf(signatureAnchor)
+        assertTrue(signatureStart >= 0, "ConfirmDestructiveDialog 定义找不到：组件改名等于四枚站点全断")
+        val parens = balancedRegion(component, signatureStart + signatureAnchor.length, '(', ')')
+        val signature = component.substring(parens.first, parens.second + 1)
+        // 按「切枚 + 逐枚比对名单」判，不按逗号计数判：本仓签名带尾逗号，逗号数会把尾逗号也算成一枚参数。
+        val parameters = signature.removePrefix("(").removeSuffix(")").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        assertEquals(routeAParameters, parameters, "路 A 组件签名被改动（本体冻结：参数名、顺序与默认值都不许为迁站点改动）")
+        routeAParameters.forEach { parameter ->
+            assertEquals(1, count(signature, parameter), "路 A 组件签名里的「$parameter」应恰一处（不许把两枚参数并成一枚）")
+        }
+        // 反空转：给样片加一枚 `enabled` 必须被上面那条名单判据打掉，否则「恰 8 枚」是恒真的。
+        val grownByOne = parameters + "enabled: Boolean = true"
+        assertTrue(
+            grownByOne != routeAParameters && grownByOne.size == routeAParameters.size + 1,
+            "反空转失控：加一枚参数的样片仍满足既定名单，份数判据没有牙齿",
+        )
+    }
+}
