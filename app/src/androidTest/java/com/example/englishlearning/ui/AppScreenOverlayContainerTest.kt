@@ -356,9 +356,19 @@ class AppScreenOverlayContainerTest {
      * 的 `!hasVisualOverflow` 口径只在**折行文本**（行宽 < 盒宽）上可靠；收口取证
      * （emulator-5574、设备 `font_scale=2.0`）实测「其他词书不受影响。」这类**行宽恰撞内容宽**的
      * 单行会出亚像素假阳性——`lineRight=585.0 == size.width` 仍报 `true`，而 `getLineEnd` 证明
-     * 9/9 字符全部在布局内、节点完整在视口内，画面上没有任何一个字被吃掉。所以这里判**两枚真截断信号**：
-     *  ① `getLineEnd(末行) == text.length`——maxLines/Ellipsis 截断时末行必然布局不到文本末尾；
-     *  ② `getLineRight(末行) <= 节点盒宽`——任何一行伸出自己的盒就是真裁切。
+     * 9/9 字符全部在布局内、节点完整在视口内，画面上没有任何一个字被吃掉。所以这里判**两枚真截断信号**，
+     * 两腿各管各的方向：
+     *  ① **纵向腿** `getLineEnd(末行) == text.length`——maxLines/Ellipsis 截断时末行必然布局不到文本末尾；
+     *  ② **横向腿（修复轮 1 起逐行）** 每一行都判 `getLineRight(line) <= 节点盒宽 + 1dp`——
+     *     任何一行伸出自己的盒就是真裁切。旧版只取末行：ragged-right 正文的末行是**最短**的一行，
+     *     多行正文上这条腿近乎恒真（红样探针 `fix17b-item1-oldshape-passes-probe.log` 演示了
+     *     「首行伸出 40dp 盒、末行稳稳在盒内」被旧判据原样放过）；且收口取证显示它是靠**等号**过的
+     *     （`lineRight=585.0 == 盒宽 585.0`，零余量，而 `hasVisualOverflow` 假阳性的根因正是分数
+     *     advance 向下整化——同一边界，换设备/换密度极可能反向假红）。
+     * 加 1dp 容差**不算放宽**：纵向腿独立承担「有字没画出来」，横向腿容差挡的是整化噪声，
+     * 而「只查末行」变「逐行查」是净收紧。容差按 dp 写：节点 bounds 与行坐标都是窗口像素，
+     * Dialog 窗口与宿主共用同一 dp→px 基准密度（窗口间只差 fontScale，不动 density 分量），
+     * 故 `displayMetrics.density` 即窗口 `LocalDensity.density`，换算成 **1dp** 而不是裸像素。
      * 「被挤出屏幕」那半边仍由 `assertIsDisplayed()`（节点 ≥90% 落在视口内、且已按父级裁剪算过）承担。
      */
     private fun assertBodyLineSurvivesTheScale(text: String) {
@@ -368,17 +378,22 @@ class AppScreenOverlayContainerTest {
         node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
         val bounds = node.fetchSemanticsNode().boundsInRoot
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val tolerancePx = with(Density(density, fontScale = 1f)) { 1.dp.toPx() }
         assertEquals(
             "fontScale=2.0 下「$text」必须整句被布局（末行没到文本末尾 = 有字没画出来）：" +
                 "lineCount=${layout.lineCount} overflow=${layout.hasVisualOverflow} size=${layout.size}",
             text.length,
             layout.getLineEnd(layout.lineCount - 1),
         )
-        assertTrue(
-            "fontScale=2.0 下「$text」末行不得伸出文本盒（真裁切信号）：" +
-                "lineRight=${layout.getLineRight(layout.lineCount - 1)} size=${layout.size} bounds=$bounds",
-            layout.getLineRight(layout.lineCount - 1) <= bounds.width,
-        )
+        for (line in 0 until layout.lineCount) {
+            assertTrue(
+                "fontScale=2.0 下「$text」第 $line 行不得伸出文本盒 +1dp（逐行真裁切信号）：" +
+                    "lineRight=${layout.getLineRight(line)} lineCount=${layout.lineCount} " +
+                    "boxWidth=${bounds.width} tolerancePx=$tolerancePx size=${layout.size} bounds=$bounds",
+                layout.getLineRight(line) <= bounds.width + tolerancePx,
+            )
+        }
     }
 
     /**

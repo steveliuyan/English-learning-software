@@ -2,6 +2,7 @@ package com.example.englishlearning.ui
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -230,6 +231,66 @@ class AppScreenOverlayContainerContractTest {
         return matches.single().region
     }
 
+    // ---------- 可达性锚判据（修复轮 1，Minor-6） ----------
+
+    /** 一枚浮层在其宿主内的可达锚：守卫字面 + 所属路的调用锚 + 身份逐字。 */
+    private data class GuardSite(val label: String, val guard: String, val anchor: String, val identity: String)
+
+    /** 守卫块开口到调用之间不许出现的控制流关键字（`if (false) { … }` 那一族的共同特征）。 */
+    private val branchKeyword = Regex("""\b(?:if|else|when|for|while|do|try|catch|finally)\b""")
+
+    /**
+     * 「浮层直接长在守卫的活分支下」四道判据（对任意 source 成立，真树与合成样片走同一条）：
+     *  ① 守卫字面全文件**恰一处**——0 处 = 调用不在守卫块里（搬去死分支/别处）；≥2 处 = 第二枚同文守卫冒充；
+     *  ② 守卫配平块从开口到该调用之间**没有控制流关键字**——整枚再套一层 `if (false)` 会在这段留下 `if`，
+     *     当场红；普通取值声明（`val preview = state.deletePreview`）与 lambda 形参表不放行关键字，不误伤；
+     *  ③ 块内本路调用**恰一枚**且另一路浮层零枚——同守卫下塞幽灵副本、或两路互套都判红；
+     *  ④ 块内命中该枚的身份逐字——「恰一枚」不许被别的浮层顶替。
+     */
+    private fun assertOverlayGuardedUnderLiveBranch(source: String, site: GuardSite) {
+        val guards = occurrencesOf(source, site.guard)
+        assertEquals(
+            1,
+            guards.size,
+            "站点「${site.label}」的守卫字面「${site.guard}」必须全文件恰一处（实测 ${guards.size} 处）：" +
+                "0 处 = 这枚浮层不在守卫的活分支里；≥2 处 = 有同文守卫冒充，或整枚被搬进死分支后原地留了影子",
+        )
+        val guardPos = guards.single()
+        val brace = site.guard.lastIndexOf('{')
+        assertTrue(brace >= 0, "守卫字面「${site.guard}」不带左花括号：可达性锚只服务「守卫 → 块」形状")
+        val block = balancedRegion(source, guardPos + brace, '{', '}')
+        val blockText = source.substring(block.first + 1, block.second)
+        val otherAnchor = if (site.anchor == destructiveCall) glassCall else destructiveCall
+        assertEquals(0, count(blockText, otherAnchor), "站点「${site.label}」的守卫块里混进了另一路浮层「$otherAnchor」：两路不许互套")
+        assertEquals(
+            1,
+            count(blockText, site.anchor),
+            "站点「${site.label}」的守卫块内「${site.anchor}」必须恰一枚（实测 ${count(blockText, site.anchor)} 枚：两枚 = 死分支幽灵副本也塞在同一守卫下）",
+        )
+        val callOffset = blockText.indexOf(site.anchor)
+        assertTrue(
+            !branchKeyword.containsMatchIn(blockText.substring(0, callOffset)),
+            "站点「${site.label}」没直接长在守卫「${site.guard}」的活分支上：调用之前出现了控制流关键字" +
+                "（模式 ${branchKeyword.pattern}）——整枚再套一层 if (false)/when 就是死分支，份数/形状/逐字三例都看不见",
+        )
+        assertTrue(
+            site.identity in blockText,
+            "守卫「${site.guard}」块内的调用不是站点「${site.label}」：身份逐字「${site.identity}」没命中",
+        )
+    }
+
+    /** 从 [anchor] 之后配平取出**实参括号窗口**（含两端括号）；锚缺失即 fail，不许静默给空窗。 */
+    private fun signatureWindow(declaration: String, anchor: String): String {
+        val start = declaration.indexOf(anchor)
+        assertTrue(start >= 0, "找不到签名锚 \"$anchor\"：解析链不许对缺锚的输入空转")
+        val parens = balancedRegion(declaration, start + anchor.length, '(', ')')
+        return declaration.substring(parens.first, parens.second + 1)
+    }
+
+    /** 实参括号窗口 → 逐枚形参名单（按逗号切、trim、滤空；本仓签名带尾逗号，尾逗号不许成枚）。 */
+    private fun splitParameters(signature: String): List<String> =
+        signature.removePrefix("(").removeSuffix(")").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+
     // ---------- 用例 1：裸 `AlertDialog` 族与其实导入、旧措辞一起归零 ----------
 
     @Test
@@ -340,12 +401,26 @@ class AppScreenOverlayContainerContractTest {
             assertEquals(4, count(source, shape), "「$shape」全文件计数不等于 4：窗外多出来的一份 = 死分支/幽灵调用塞的假形状")
             assertEquals(4, inWindows, "「$shape」有命中落在四枚路 A 调用区间之外")
         }
-        // 反空转：路 A 少给 keepLines 的那一枚必须被形状判据打掉（brief 点名的变异形状）。
+        // 反空转（修复轮 1，Important-3）：路 A 缺 keepLines 的那一枚必须被**真判据**打掉。旧版只验
+        // 「计数器能数出 needle」（`assertEquals(0, count(missingKeep, "keepLines = "))` 由样片构造必真，
+        // 取窗器歪了、形状循环写错了，锚都不咬）。现在两枚样片走主判据同一条谓词——
+        // extractCallRegion 取窗 + 逐形参「恰一处」（与用例 2 那枚取样器反空转同族写法）：
+        // 缺 keepLines 的样片必须**恰被点名 keepLines 这一枚**；完整样片必须零违例（判据不恒假）。
         val missingKeep = "$destructiveCall state = true,\n    title = \"删除这一版？\",\n    cascadeLines = listOf(\"a\"),\n" +
             "    irreversible = true,\n    confirmLabel = \"确认删除\",\n    onConfirm = { vm.confirm() },\n    onDismiss = { vm.cancel() },\n)"
-        assertEquals(0, count(missingKeep, "keepLines = "), "反空转失控：缺 keepLines 的样片竟满足形状锚")
-        assertEquals(1, count(missingKeep, "cascadeLines = "), "反空转失控：样片连级联行都没数出来，形状锚是恒假的")
-        assertEquals(1, count(missingKeep, "irreversible = true,"), "反空转失控：样片的不可撤销旗标没被数出来")
+        val completeShape = "$destructiveCall state = true,\n    title = \"删除这一版？\",\n    cascadeLines = listOf(\"a\"),\n" +
+            "    keepLines = listOf(\"b\"),\n    irreversible = true,\n    confirmLabel = \"确认删除\",\n" +
+            "    onConfirm = { vm.confirm() },\n    onDismiss = { vm.cancel() },\n)"
+        fun shapeViolations(region: String) = destructiveArgShapes.filter { count(region, it) != 1 }
+        assertEquals(
+            listOf("keepLines = "),
+            shapeViolations(extractCallRegion(missingKeep, 0, destructiveCall)),
+            "反空转失控：缺 keepLines 的样片没被真判据**恰点名 keepLines 这一枚**（取窗或形状循环是坏的）",
+        )
+        assertTrue(
+            shapeViolations(extractCallRegion(completeShape, 0, destructiveCall)).isEmpty(),
+            "反空转失控：完整样片被真判据误伤（判据恒假，主用例随之全是假红）",
+        )
     }
 
     // ---------- 用例 4：六枚的信息要素、tag 与动作逐字保留 ----------
@@ -467,21 +542,75 @@ class AppScreenOverlayContainerContractTest {
     fun `the frozen route A component keeps its eight parameter signature`() {
         val component = uiComponentSource("ConfirmDestructiveDialog.kt")
         val signatureAnchor = "fun ConfirmDestructiveDialog"
-        val signatureStart = component.indexOf(signatureAnchor)
-        assertTrue(signatureStart >= 0, "ConfirmDestructiveDialog 定义找不到：组件改名等于四枚站点全断")
-        val parens = balancedRegion(component, signatureStart + signatureAnchor.length, '(', ')')
-        val signature = component.substring(parens.first, parens.second + 1)
+        val signature = signatureWindow(component, signatureAnchor)
         // 按「切枚 + 逐枚比对名单」判，不按逗号计数判：本仓签名带尾逗号，逗号数会把尾逗号也算成一枚参数。
-        val parameters = signature.removePrefix("(").removeSuffix(")").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        val parameters = splitParameters(signature)
         assertEquals(routeAParameters, parameters, "路 A 组件签名被改动（本体冻结：参数名、顺序与默认值都不许为迁站点改动）")
         routeAParameters.forEach { parameter ->
             assertEquals(1, count(signature, parameter), "路 A 组件签名里的「$parameter」应恰一处（不许把两枚参数并成一枚）")
         }
-        // 反空转：给样片加一枚 `enabled` 必须被上面那条名单判据打掉，否则「恰 8 枚」是恒真的。
-        val grownByOne = parameters + "enabled: Boolean = true"
-        assertTrue(
-            grownByOne != routeAParameters && grownByOne.size == routeAParameters.size + 1,
-            "反空转失控：加一枚参数的样片仍满足既定名单，份数判据没有牙齿",
+        // 反空转（修复轮 1，Important-3）：旧写法是 `parameters + "enabled…"` 的 List 拼接——由构造必真，
+        // 解析链整体坏掉（取窗歪、分隔符错、trim/filter 吞枚）它照样绿，注释承诺的「走一遍解析+比对」根本没发生。
+        // 现在合成一枚**九参签名字符串**，用与主判据**同一条** signatureWindow + splitParameters 解析它：
+        // 解析出的名单必须与八参名单**不等**、且恰 9 枚。再补同链正向自证：把八参名单原样拼回签名解析，
+        // 必须逐枚相等——证明上面那条「不等」是第九枚参数造成的，不是解析链本来就对不上名单。
+        val nineParamSample = "fun ConfirmDestructiveDialog(" + routeAParameters.joinToString(", ") + ", enabled: Boolean = true,)"
+        val parsedNine = splitParameters(signatureWindow(nineParamSample, "fun ConfirmDestructiveDialog"))
+        assertEquals(
+            routeAParameters.size + 1,
+            parsedNine.size,
+            "反空转失控：九参样片没被解析成 9 枚（实测 ${parsedNine.size} 枚——解析链与主判据不是同一条，或样片形状不合）",
         )
+        assertTrue(
+            parsedNine != routeAParameters,
+            "反空转失控：九参样片经同链解析后仍等于八参名单，名单比对这条腿是恒真的",
+        )
+        val eightParamSample = "fun ConfirmDestructiveDialog(" + routeAParameters.joinToString(", ") + ",)"
+        assertEquals(
+            routeAParameters,
+            splitParameters(signatureWindow(eightParamSample, "fun ConfirmDestructiveDialog")),
+            "反空转失控：同链解析连合法八参样片都对不上名单，上一条「不等」就没有意义（解析链坏了要走响亮报错，不是靠假不等）",
+        )
+    }
+
+    // ---------- 用例 6（修复轮 1，Minor-6）：可达性锚——六枚浮层必须直接长在活分支守卫下 ----------
+
+    /**
+     * 补的洞：用例 1/2/3/4 全是**字符串判据**，分不清活分支与死分支——评审点名形状「整枚浮层塞进
+     * `if (false) { … }`」时份数、形状、逐字三例照绿，而设备侧只有 2 枚有背书（路 A 删词书、路 B 导出选择器），
+     * 其余 4 枚可以「死着绿」。本用例按现树实际形状逐枚钉守卫字面（六枚各恰一处）：
+     *  `pendingClear?.let { pending ->` / `pendingDelete?.let { pending ->` / `if (pending != null) {` /
+     *  `state.pendingDelete?.let { book ->` / `if (showWordBookExportPicker) {` / `state.pendingMigration?.let { preview ->`
+     * 四道判据见 [assertOverlayGuardedUnderLiveBranch]。红样留档（修复轮 1）：把站点 4 整枚塞进
+     *  `if (false)` 后，旧五例照绿（`fix17b-item4-oldshape-passes.log`）、本例判红
+     *  （`fix17b-item4-deadbranch-red.log`）；撤变异复绿。合成对拍：同一条判据拒 `if (false)` 包裹样片、
+     *  放裸守卫样片——本例自己也不许是恒真式。
+     */
+    @Test
+    fun `every overlay sits directly under its own live-branch guard`() {
+        val source = appScreenSource()
+        listOf(
+            GuardSite("清空搜索历史？（路 A）", "pendingClear?.let { pending ->", destructiveCall, "title = \"清空搜索历史？\""),
+            GuardSite("删除这一版？（路 A）", "pendingDelete?.let { pending ->", destructiveCall, "title = \"删除这一版？\""),
+            GuardSite("删除全部学习数据？（路 A）", "if (pending != null) {", destructiveCall, "title = \"删除全部学习数据？\""),
+            GuardSite("删除《词书名》？（路 A，LearningSetupScreen 体内）", "state.pendingDelete?.let { book ->", destructiveCall, "title = \"删除《\${book.displayName}》？\""),
+            GuardSite("选择要导出的词书（路 B）", "if (showWordBookExportPicker) {", glassCall, "text = \"选择要导出的词书\""),
+            GuardSite("发现已学过的单词（路 B）", "state.pendingMigration?.let { preview ->", glassCall, "text = \"发现已学过的单词\""),
+        ).forEach { site -> assertOverlayGuardedUnderLiveBranch(source, site) }
+
+        // 合成对拍（反空转）：判据必须咬住「守卫活着、浮层被 if (false) 包了一层」的形状——
+        // 这正是「旧五例放过」的那一发，若本例对它也绿，本例就是第二个恒真式。
+        val site = GuardSite(
+            "合成样片",
+            "if (showWordBookExportPicker) {",
+            glassCall,
+            "text = \"选择要导出的词书\"",
+        )
+        val deadBranchGhost = "if (showWordBookExportPicker) {\n    if (false) {\n        GlassDialog(onDismiss = {}) { Text(text = \"选择要导出的词书\") }\n    }\n}\n"
+        assertFailsWith<AssertionError>(
+            "反空转失控：整枚套进 if (false) 的幽灵样片没被可达性锚咬住——本例与旧三例同病",
+        ) { assertOverlayGuardedUnderLiveBranch(deadBranchGhost, site) }
+        val liveShape = "if (showWordBookExportPicker) {\n    GlassDialog(onDismiss = {}) { Text(text = \"选择要导出的词书\") }\n}\n"
+        assertOverlayGuardedUnderLiveBranch(liveShape, site)
     }
 }
