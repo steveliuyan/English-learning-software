@@ -512,12 +512,13 @@ private fun VoiceOverlayOption(
             // （浅套逐值 = 旧的 `AppPalette.GlassFill`，深色档才换成套深玻璃），所以这一行的墨必须跟着按套取值，
             // 否则深色档就是「浅墨压白玻璃 → 深墨压深玻璃」两侧各错一次（Task 12.5 修复轮 C-2 当年回退的前提
             // 「面板未迁」已随本批消失；登记见 DarkTokenConsumptionRatchetTest 的 GlassFillBackdropDebtLedger 收口）。
-            // 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：本行是 `style = AppType.Body` 正文档 ⇒ 阈值就是 ≥4.5，
+            // 批 2 终审修复席 C/C-1（控制者裁决，B 席 concerns ①）：本行是 `style = AppType.Body` 正文档 ⇒ 阈值就是 ≥4.5，
             // 不许按装饰档 3.1 放行。本席现算（WCAG 2.1，浅玻璃实底 = surfaceGlass #EFFFFFFF src-over 页底 #F1FBF5 = #FEFFFE，
             // 深玻璃实底 = #E617201C src-over #0E1512 = #161F1B）：修复前的浅套域色墨 #188F76 压 #FEFFFE 只有
-            // **4.006:1**（压带 Scrim 的 #F5F5F5 = 3.683:1），不达正文线；选中档两套同取 `appColors().onMint` 后
-            // 浅套 #174C44 压 #FEFFFE = **9.727:1**（带 Scrim 底 8.944:1）、深套 #DFF6EC 压 #161F1B = **14.873:1**，
-            // 两套都远高于正文线，且与房内 R-14.4 例外同一枚 token：不新增静态色、不动文案与 testTag。
+            // **4.006:1**（压带 Scrim 的 #F5F5F5 = 3.683:1），不达正文线；C-1 席按 `AppBottomBar.kt:95` 的形状按套归位后
+            // 浅套取 `appColors().onMint`：#174C44 压 #FEFFFE = **9.727:1**（带 Scrim 底 8.944:1），
+            // 深套沿用 `appDomain(AppDomain.AiSpeech).deep`：#35E0AC 压 #161F1B = **9.960:1**（本席 awk 现算），
+            // 两套都远高于正文线，且浅档取的是房内既有 token：不新增静态色、不动文案与 testTag。
             // 浅套这一处观感有变（选中行由薄荷绿墨变深墨），属修 AA 失败而非回归，已列入 18-ii 用户目检；
             // 判据见 GlassPanelInkPairingContractTest 的现算闸（含 3.6 档诱饵反空转）与 GlassPanelThemeInkTest 两套像素腿。
             color = if (selected && !LocalIsDark.current) appColors().onMint else if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text1,
