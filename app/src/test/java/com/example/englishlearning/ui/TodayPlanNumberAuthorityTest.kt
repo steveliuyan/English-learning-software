@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * 批 2 Task 14（AC-R-20）：今日计划屏的「一处权威数字」与「1 主 CTA + 入口行组」的**源码侧**契约。
@@ -38,9 +39,23 @@ import kotlin.test.assertTrue
  *  #5 [textCallContaining] 改为 [textWindows] 枚举 + 归属判定（判据在「tag 上提到包裹容器」这一形下失守，
  *    评审用 `/tmp/mut.py` 的 M1 变异证得 JVM 六条窗口判据 + Display 计数全绿）；
  *  #6 [display_is_used_exactly_once_and_anchors_the_total_progress_slot] 补全文件大字号读数
- *    （`Display` + `Headline` 合计恰 1、`Title` 恰 1），封掉「新增一枚自带新 tag 的大字号数字」这一形（M2）；
+ *    （`Display` + `Headline` 合计恰 1、`Title` 恰 1），封掉「新增一枚自带新 tag 的大字号数字」这一**本文件字面量**形（M2）；
  *  #7 [the_number_slot_window_extractor_is_not_vacuous] 兑现 KDoc 早先的声明：**真调用**取样器打三枚合成源
  *    （命中 1 / 命中 0 / 命中 2），不再只对正则谓词做合成断言。
+ *
+ * **批 2 终审修复席 C（评审 C1 的 I-3 / I-4 / I-5；只动本契约文件，生产码零改动）**：
+ *  #8 [bodyOf]：取样**先钉锚在位、再按花括号配平取体**，缺锚与未闭合一律响亮红
+ *    （评审 I-3：旧 `substringAfter(...).substringBefore("\n}")` 缺锚时返回整份原文，
+ *    本屏 `TodayPlanScreen.kt` 第一枚顶层闭括号在 `fun TodayPlanScreen` 收尾处，回退取样面里
+ *    同时含 Review/Learn 两枚域色 ⇒ `WorkloadKind.color()` 被改名/删除后那条配色同源判据照样绿）；
+ *  #9 [the_screen_keeps_one_primary_cta_and_entry_rows_for_every_other_action]：Ready 分支改成真区间
+ *    （评审 I-4：旧 `readyBranch` 自称分支、实为无界尾切片，主 CTA 从未绑到分支体），
+ *    药片计数、主 CTA 的 `today_plan_start_learning` tag 与本分支的进度卡标签都在体内判；
+ *  #10 [the_screen_reads_only_dynamic_tokens_for_color_and_typography] 末尾补 `style =` 实参**白名单负判据**
+ *    （评审 I-5：三道计数门只认本文件字面量，跨文件 style 符号可整体绕过 AC-R-20）——
+ *    #6 的口径同时收窄为「封掉本文件字面量形，跨文件 style 符号由 #10 这条白名单封」；
+ *  #11 [samplers_fail_loudly_when_the_anchor_is_missing_or_the_region_cannot_be_closed]：
+ *    缺锚 / 未闭合 / 形参表未闭合三条合成负控，钉住 #8/#9 的「响亮红而不是静默降级」。
  */
 class TodayPlanNumberAuthorityTest {
 
@@ -183,6 +198,76 @@ class TodayPlanNumberAuthorityTest {
     private fun isWordChar(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9' || c == '_'
 
     /**
+     * 从 [open]（必为 `{`）做字符串/字符字面量感知的花括号配平，返回配对 `}` 的下标。
+     * 未闭合或长度为 0 一律 `fail`（批 2 终审 C1 评审 I-1 的口径：取样面无法闭合必须响亮报错，
+     * 不许像旧版 `substringAfter`/`indexOf("\n}")` 那样静默回退成「锚点之后的整份原文」——
+     * 那会把分支级/函数体级判据悄悄降级成整文件判据而照常绿）。
+     */
+    private fun balancedBrace(src: String, open: Int, site: String): Int {
+        assertTrue(
+            open in 0 until src.length && src[open] == '{',
+            "$site：取窗起点不是 `{`（open=$open），本夹具只接受指向花括号的区间",
+        )
+        var depth = 0
+        var i = open
+        while (i < src.length) {
+            val c = src[i]
+            if (c == '"' || c == '\'') {
+                val next = skipLiteral(src, i)
+                assertTrue(next > i, "$site：字面量扫描器在 $i 处原地不动，配平无法继续（拒绝猜测）")
+                i = next
+                continue
+            }
+            when (c) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return i
+                }
+            }
+            i++
+        }
+        fail(
+            "$site：从下标 $open 起的 `{…}` 未闭合（长度 0 或扫描被带偏）——分支体/函数体区间无法界定，" +
+                "本契约拒绝把它降级成「锚点之后到文末」的整份原文取样",
+        )
+    }
+
+    /**
+     * 按**锚点字面**取一段体（函数体 / `when` 分支体），返回不含最外层花括号的体内文本。
+     *
+     * 三道响亮守卫（评审 I-3 / I-4：旧写法 `source.substringAfter(anchor).substringBefore("\n}")`
+     * 在锚缺失时返回整份原文、在未闭合时吞到文末，两条都静默降级成整文件判据）：
+     *  - 锚不在位 ⇒ 红（消息点名「锚缺失即回退整份原文」）；
+     *  - 锚以 `(` 收尾时先把形参表配平到 `)`，再取体内第一枚 `{`（形参默认值里的 `{` 不算体起始）；
+     *  - 花括号未闭合 ⇒ 由 [balancedBrace] 红。
+     */
+    private fun bodyOf(src: String, anchor: String, site: String): String {
+        val at = src.indexOf(anchor)
+        assertTrue(
+            at >= 0,
+            "$site：取样锚 \"$anchor\" 不在位（被改名/删除/换形）——旧写法会静默回退成整份原文，判据当场失明，" +
+                "故本夹具先钉锚在位再取样",
+        )
+        var cursor = at + anchor.length
+        if (anchor.endsWith("(")) {
+            val closeParen = matchingParen(src, at + anchor.length - 1)
+            assertTrue(
+                closeParen >= cursor,
+                "$site：锚 \"$anchor\" 的形参表括号未闭合（close=$closeParen），无法定位函数体起点",
+            )
+            cursor = closeParen + 1
+        }
+        val open = if (src.getOrNull(cursor - 1) == '{') cursor - 1 else src.indexOf('{', cursor)
+        assertTrue(
+            open >= 0,
+            "$site：锚 \"$anchor\" 之后找不到体起始花括号 `{`（本屏的这段形状与本夹具口径不符，拒绝猜测）",
+        )
+        val close = balancedBrace(src, open, site)
+        return src.substring(open + 1, close)
+    }
+
+    /**
      * 标签字面量的**带引号**定界写法（沿用修订 #1）：本屏存在互为前缀的标签
      * （`today_plan_progress` ⊂ `today_plan_progress_summary`），只有闭合引号能让枚举不再把两者混为一谈。
      */
@@ -264,7 +349,7 @@ class TodayPlanNumberAuthorityTest {
                 "$tag 不该再带强调色（数字的权威只有一处），实际窗口：$window",
             )
         }
-        val countCard = source.substringAfter("private fun RowScope.CountCard(").substringBefore("\n}")
+        val countCard = bodyOf(source, "private fun RowScope.CountCard(", "计数卡排印取样")
         assertTrue(
             "AppType.Footnote" in countCard && NeutralInk.containsMatchIn(countCard),
             "计数卡里的数值行必须降到 Footnote + 中性墨（色点才是该卡的强调色载体），实际段：$countCard",
@@ -291,22 +376,26 @@ class TodayPlanNumberAuthorityTest {
             countMatches(source, Regex("""(?<![A-Za-z0-9_])Button\(""")),
             "整宽 M3 Button 只许留下「阅读文章」那一枚支撑动作，其余动作一律换成 EntryRow / PillButton",
         )
-        val readyAnchor = "is TodayPlanUiState.Ready"
+        // 评审 I-4：旧写法 `source.substringAfter("is TodayPlanUiState.Ready")` 自称「Ready 分支」，
+        // 实为**无界尾切片**（吞到文件末，把 `TodayPlanEntryGroup`/`CountCard`/`TodayWorkloadBar` 全算进分支），
+        // 于是「把主 CTA 抽进分支锚点之后新加的未被调用的私有组合件」这种写法 tail 计数仍是 1、全绿，
+        // 而 Ready 分支实际渲染出空。现按花括号配平取**分支体本身**，药片计数、主 CTA 的 tag 与
+        // 本分支自己的进度卡标签都在体内判；缺锚或未闭合由 [bodyOf] 响亮红。
+        val readyBranch = bodyOf(source, "is TodayPlanUiState.Ready -> {", "Ready 分支取样")
         assertTrue(
-            source.contains(readyAnchor),
-            "Ready 分支取样失效（源码里找不到锚点 \"$readyAnchor\"）：分支写法被改，下面的按分支计数会对着整份文件判，" +
-                "把「缺配置/不可用态不在本条约束内」这一层判据抹掉",
-        )
-        val readyBranch = source.substringAfter(readyAnchor)
-        assertTrue(
-            readyBranch.contains("today_plan_summary"),
-            "Ready 分支切片为空或不含本分支自己的呈现位（substringAfter 命中锚点后应当读到进度卡标签），" +
-                "实际切片起头：${readyBranch.take(80)}",
+            readyBranch.contains(quoted("today_plan_summary")),
+            "Ready 分支体内读不到本分支自己的进度卡标签 ${quoted("today_plan_summary")}——" +
+                "分支区间没界定到渲染体（或该呈现位被挪出分支），实际体起头：${readyBranch.take(80)}",
         )
         assertEquals(
             1,
             countMatches(readyBranch, Regex("""PillButton\(""")),
-            "Ready 态里带强调底的主按钮只许一枚（继续学习 CTA）；缺配置/不可用态在别的分支，不受本条约束",
+            "Ready 分支体里带强调底的主按钮只许一枚（继续学习 CTA）；缺配置/不可用态在别的分支，不受本条约束",
+        )
+        assertTrue(
+            readyBranch.contains(quoted("today_plan_start_learning")),
+            "主 CTA 的 testTag ${quoted("today_plan_start_learning")} 必须长在 Ready 分支体内：把它抽进" +
+                "分支之后另写的私有组合件（哪怕同名 tag）会让分支渲染为空、而 tail 计数照旧绿（评审 I-4 的变异形）",
         )
         // F3（修复轮 1 / 评审 I-1）：**查词条必须常驻**。上一版把它收进只在 Ready 分支渲染的
         // `TodayPlanEntryGroup`，于是缺配置 / 不可用 / 加载三态下学习 tab 内没有任何查词出口
@@ -396,6 +485,33 @@ class TodayPlanNumberAuthorityTest {
             "今日计划屏不得覆写字号/行高，也不得自造 TextStyle/merge 排印：六档 token 之外的一切排印改动" +
                 "都会让「大字号读点恰一处」那三道计数门失明",
         )
+        // 评审 I-5：上面五道门判的都是**本文件字面量**，跨文件的 style 符号能整体绕过 AC-R-20——
+        // 在 `ui/` 别处写一枚顶层 `fun bigNumberStyle()`（或 `val`），屏侧只写 `style = bigNumberStyle()`，
+        // 五道门一字不动全绿，屏上照样长出第二枚大字号数字。
+        // 零误伤白名单口径：本屏每一枚 `style =` 实参必须**逐字**是 AppType 六档 token 之一，
+        // 白名单外（符号上提、`.copy` 换形、跨文件 helper、形参默认值）一律红。
+        // 判据写成「两侧计数相等」而不是「正则命中为零」：Java 正则里 `\s*` 会回溯，
+        // 单个带否定前瞻的正则会把每一枚合规实参都数进来（本席实测假红 18 处），
+        // 换成「全部 style 实参数 == 白名单逐字数」后同一处逃逸仍能单独判红。
+        // 可重算：`grep -o 'style = [A-Za-z0-9_.()]*' app/src/main/java/com/example/englishlearning/ui/TodayPlanScreen.kt | sort | uniq -c`
+        val styleArgs = countMatches(source, Regex("""(?<![A-Za-z0-9_])style\s*=\s*"""))
+        val whitelistedStyleArgs = countMatches(
+            source,
+            Regex("""(?<![A-Za-z0-9_])style\s*=\s*AppType\.(?:Display|Headline|Title|Body|Label|Footnote)\b(?![.\w])"""),
+        )
+        assertTrue(
+            styleArgs > 0,
+            "反空转：本屏一处 `style =` 实参也没取到，说明取样器或本屏排印面整体失效，" +
+                "白名单门此刻没有任何对象（实测取到 $styleArgs 处）",
+        )
+        assertEquals(
+            styleArgs,
+            whitelistedStyleArgs,
+            "本屏的 style = 实参只许逐字写 AppType 六档 token（Display/Headline/Title/Body/Label/Footnote）：" +
+                "全项 $styleArgs 处、白名单内只有 $whitelistedStyleArgs 处，差额就是白名单外的写法。" +
+                "换成别处定义的样式符号（顶层 val/fun、跨文件 helper、`.copy` 换形）就是「大字号读点恰一处」" +
+                "那三道字面量门的跨文件逃逸口（评审 I-5）",
+        )
     }
 
     /**
@@ -416,10 +532,18 @@ class TodayPlanNumberAuthorityTest {
             countMatches(source, Regex("""private val Workload\w+Color""")),
             "工作量色表不得再以顶层裸色常量存在（顶层 val 是「非可组合上下文」静态读点那一族）",
         )
-        val colorFun = source.substringAfter("private fun WorkloadKind.color()").substringBefore("\n}")
+        // 评审 I-3：旧写法 `source.substringAfter("private fun WorkloadKind.color()").substringBefore("\n}")`
+        // 缺锚时 Kotlin 返回**整份原文**，再截到第一枚第 0 列闭括号 ⇒ 取样面换成主屏函数体
+        // （`TodayPlanScreen.kt` 的 `:224/:225` 已含 Review/Learn 两枚域色读点），本条照旧绿而分段条失去保护。
+        // 现走 [bodyOf]：先钉锚在位、再按花括号配平取 `when` 体本身。
+        val colorFun = bodyOf(source, "private fun WorkloadKind.color()", "分段条配色取样")
         assertTrue(
             colorFun.contains("AppDomain.Review") && colorFun.contains("AppDomain.Learn"),
             "分段条的 REVIEW/NEW 两档必须读 Review/Learn 域色，实际：$colorFun",
+        )
+        assertTrue(
+            colorFun.contains("AppDomain.AiSpeech"),
+            "分段条的已学档必须与页头色点同源（AiSpeech 域色），不得另调一套静态色，实际：$colorFun",
         )
     }
 
@@ -505,6 +629,49 @@ class TodayPlanNumberAuthorityTest {
         assertTrue(
             AccentInk.containsMatchIn("color = appDomain(AppDomain.Review).deep"),
             "强调色谓词抓不到动态域色 = 「数字不带强调色」那条是空转",
+        )
+    }
+
+    /**
+     * 取样器自身的三条响亮负控（批 2 终审 C1 评审 I-1 / I-3 / I-4：旧写法在**缺锚**与**未闭合**时
+     * 都不报错，只是静默换取样面——`substringAfter` 回退整份原文、`substringBefore("\n}")` 吞到文末）：
+     *  ① 锚缺失 ⇒ [bodyOf] 红并点名「不在位」；
+     *  ② 花括号未闭合 ⇒ 红并点名「未闭合」，而不是给出吞到文末的区间；
+     *  ③ 锚以 `(` 收尾而形参表未闭合 ⇒ 红并点名「形参表」。
+     * 开头另喂一枚合法闭合样片作正控：证明失败来自区间界定，而不是夹具读不了源码。
+     */
+    @Test
+    fun samplers_fail_loudly_when_the_anchor_is_missing_or_the_region_cannot_be_closed() {
+        val closed = "private fun WorkloadKind.color(): Color = when (this) {\n" +
+            "    WorkloadKind.REVIEW -> appDomain(AppDomain.Review).deep\n}"
+        val positive = bodyOf(closed, "private fun WorkloadKind.color()", "合成自检：闭合样片")
+        assertTrue(
+            "AppDomain.Review" in positive,
+            "正控：闭合样片的取体失败——夹具本身坏了，下面三条响亮报错也就无从谈起（实测体：$positive）",
+        )
+
+        val missingFailure = assertFailsWith<AssertionError> {
+            bodyOf("private fun WorkloadKind.paint(): Color = Color.Red", "private fun WorkloadKind.color()", "合成自检：缺锚")
+        }
+        assertTrue(
+            "不在位" in (missingFailure.message ?: ""),
+            "① 锚缺失时取样器没有响亮判红（旧 `substringAfter` 会静默回退整份原文）：实际消息「${missingFailure.message}」",
+        )
+
+        val unclosedFailure = assertFailsWith<AssertionError> {
+            bodyOf("is TodayPlanUiState.Ready -> {\n    Column { Text(\"x\") }", "is TodayPlanUiState.Ready -> {", "合成自检：未闭合")
+        }
+        assertTrue(
+            "未闭合" in (unclosedFailure.message ?: ""),
+            "② 分支体未闭合时取样器没有响亮判红（旧写法会吞到文末并照常判绿）：实际消息「${unclosedFailure.message}」",
+        )
+
+        val paramFailure = assertFailsWith<AssertionError> {
+            bodyOf("private fun RowScope.CountCard(text: String, tag: String", "private fun RowScope.CountCard(", "合成自检：形参表")
+        }
+        assertTrue(
+            "形参表" in (paramFailure.message ?: ""),
+            "③ 形参表括号未闭合时必须响亮判红（否则体起点会猜错位置）：实际消息「${paramFailure.message}」",
         )
     }
 

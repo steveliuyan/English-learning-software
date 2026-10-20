@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import com.example.englishlearning.ui.components.SpeakerState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -27,6 +28,21 @@ import kotlin.test.assertTrue
  * 压成 1 处只有「再造一枚私有包装件」这一条路——那正是本任务要拆的东西。
  * 故按控制者「以现场形状选最小可红写法」的授权钉成 `== 3` + 逐枚窗口归属 + 渲染路径归属，
  * 并配一条「计数被死函数喂饱但渲染路径只剩两枚」的合成负控自证这条判据不是摆设。
+ *
+ * **批 2 终审修复席 C（评审 C1 的 I-1 / I-2；只动本契约文件，生产码零改动）**：
+ *  - 评审 I-1：[heroBodyRange] 旧写法的 `indexOf("\n}", start).let { if (it == -1) source.length else it + 2 }`
+ *    与 [callWindows] 的非字符串感知配平，都是**解析失败时静默换取样面**（区间退化成「锚点之后到文末」，
+ *    窗口退化成「调用点到文末」）——两条承重腿 `windows.count { it.first in hero } == 3` 与
+ *    `countMatches(windowText(source, hero), pillBackdrop) == 0` 会同时降级成整文件判据而照常绿。
+ *    现统一改走花括号/圆括号**配平 + 未闭合即 fail**（口径同文件 4 的 `balancedRegion`），
+ *    并由 [the_samplers_fail_loudly_when_a_region_cannot_be_closed] 打三条合成负控
+ *    （其中一枚就是评审点名的「收尾花括号不再落在第 0 列」那一形）。
+ *  - 评审 I-2：[probes_match_their_target_and_reject_the_near_miss] 里 `literalReadouts` 的旧正控
+ *    把探针自己的 pattern 字符串拼进样片 ⇒ 恒真；现改手写两形正控 + 两形负控，
+ *    并补组件侧正向对偶 [the_shared_component_holds_the_playback_wording_exactly_once]（组件恰一处 / 屏侧零处）。
+ *  - 顺带（评审 Minor 3，同族夹具口径不齐）：[callWindows] 的窗口起点由「正则命中起点」
+ *    （前缀组会吃掉一枚字符，归属判断实际落在调用点前一个字符上）改为**回退到 callee 名起点**，
+ *    与文件 2 的 `indexOf(callee)` 口径一致。
  */
 class CardDetailScreenContractTest {
 
@@ -120,26 +136,126 @@ class CardDetailScreenContractTest {
      * 的两条独立计数照旧绿（Task 14B C-1 同族）。窗口判据再配函数体 / 小节区间的
      * **渲染路径归属**，才能挡住「在死函数里补一枚同形调用」这种把计数喂饱的写法。
      */
-    private fun callWindows(source: String, anchor: Regex): List<IntRange> =
-        anchor.findAll(source).map { match ->
-            val open = match.range.first + match.value.indexOf('(')
-            var index = open + 1
-            var depth = 1
-            while (index < source.length && depth > 0) {
-                depth += when (source[index]) { '(' -> 1; ')' -> -1; else -> 0 }
-                index++
-            }
-            match.range.first until index
-        }.toList()
-
     private fun windowText(source: String, window: IntRange): String = source.substring(window)
 
-    /** 单词卡函数体区间（顶层函数的右花括号写在第 0 列，与本仓既有形状一致）。 */
+    private fun callWindows(source: String, anchor: Regex): List<IntRange> =
+        anchor.findAll(source).map { match ->
+            val openParen = match.range.first + match.value.indexOf('(')
+            var calleeStart = openParen
+            while (calleeStart > 0 && (source[calleeStart - 1].isLetterOrDigit() || source[calleeStart - 1] == '_')) {
+                calleeStart--
+            }
+            val close = matchingParen(source, openParen)
+            assertTrue(
+                close > openParen,
+                "调用窗口无法闭合（锚 ${anchor.pattern} 命中于 $openParen，close=$close）：旧写法在非字符串感知的配平" +
+                    "走到文件尾时会**静默把窗口扩成「调用点到文末」**，把「tag / 口音标注挂在这枚调用上」与" +
+                    "「窗口起点落在渲染路径区间内」两条归属判据降级成整文件判据而照常绿（批 2 终审 C1 评审 I-1；" +
+                    "口径同 AppScreenOverlayContainerContractTest 的 balancedRegion「未闭合即 fail」）。" +
+                    "本夹具已感知双引号/三引号/字符字面量。",
+            )
+            calleeStart until close + 1
+        }.toList()
+
+    /**
+     * 从 [open]（指向 `(`）做**字符串感知**的括号配平，返回配对 `)` 下标；扫不到返回 -1（由调用方响亮报错）。
+     * 与文件 1 / 文件 2 同族私有实现（跨文件归并到 `SourceRatchet` 记在批 3，见 progress.md 跨席观察 1）。
+     */
+    private fun matchingParen(src: String, open: Int): Int {
+        var depth = 0
+        var i = open
+        while (i < src.length) {
+            val c = src[i]
+            if (c == '"' || c == '\'') {
+                i = skipLiteral(src, i)
+                continue
+            }
+            when (c) {
+                '(' -> depth++
+                ')' -> {
+                    depth--
+                    if (depth == 0) return i
+                }
+            }
+            i++
+        }
+        return -1
+    }
+
+    /** 从 [start]（指向 `"` 或 `'`）跳过一枚字面量，返回闭合引号之后的下标；形状不合法时只前进一位，绝不吃掉后面的括号。 */
+    private fun skipLiteral(src: String, start: Int): Int {
+        if (src[start] == '\'') {
+            var j = if (start + 1 < src.length && src[start + 1] == '\\') start + 2 else start + 1
+            return if (j < src.length && src[j] == '\'') j + 1 else start + 1
+        }
+        if (src.startsWith("\"\"\"", start)) {
+            val end = src.indexOf("\"\"\"", start + 3)
+            return if (end < 0) src.length else end + 3
+        }
+        var j = start + 1
+        while (j < src.length) {
+            when (src[j]) {
+                '\\' -> j += 2
+                '"' -> return j + 1
+                '\n' -> return start + 1
+                else -> j++
+            }
+        }
+        return src.length
+    }
+
+    /**
+     * 单词卡函数体区间：从签名起、把形参表配平到 `)`，再按**花括号配平**取体本身。
+     *
+     * 评审 I-1 的旧写法是 `source.indexOf("\n}", start).let { if (it == -1) source.length else it + 2 }`——
+     * 收尾花括号一旦不再落在第 0 列（今天 `CardDetailScreen.kt` 正落在第 0 列，所以牙齿还在），
+     * `-1` 分支会把「渲染路径归属」的区间静默换成「本锚点之后的整份文件」，
+     * `windows.count { it.first in hero } == 3` 与 `countMatches(windowText(source, hero), pillBackdrop) == 0`
+     * 两腿同时降级成整文件判据而照常绿。现：找不到收尾花括号一律响亮 `fail`，绝不降级取样面。
+     */
     private fun heroBodyRange(source: String): IntRange {
         val start = source.indexOf(HERO_FUNCTION_START)
         assertTrue(start >= 0, "找不到 $HERO_FUNCTION_START：本屏的单词卡取样前提变了，须先改判据口径")
-        val end = source.indexOf("\n}", start).let { if (it == -1) source.length else it + 2 }
-        return start until end
+        val paramOpen = start + HERO_FUNCTION_START.length - 1
+        val paramClose = matchingParen(source, paramOpen)
+        assertTrue(
+            paramClose > paramOpen,
+            "$HERO_FUNCTION_START 的形参表括号未闭合（paramClose=$paramClose）：函数体起点无法定位，" +
+                "本契约拒绝把区间降级成「锚点之后到文末」",
+        )
+        val bodyOpen = source.indexOf('{', paramClose + 1)
+        assertTrue(
+            bodyOpen >= 0,
+            "$HERO_FUNCTION_START 形参表之后找不到函数体起始花括号：本屏单词卡的形状与本夹具口径不符，拒绝猜测",
+        )
+        val bodyClose = balancedBrace(source, bodyOpen)
+        assertTrue(
+            bodyClose > bodyOpen,
+            "$HERO_FUNCTION_START 的函数体花括号未闭合：渲染路径归属区间无法界定，拒绝整文件降级取样",
+        )
+        return start until bodyClose + 1
+    }
+
+    /** 从 [open]（必为 `{`）做字符串感知的花括号配平，返回配对 `}` 下标；未闭合返回 -1（由调用方响亮失败）。 */
+    private fun balancedBrace(src: String, open: Int): Int {
+        var depth = 0
+        var i = open
+        while (i < src.length) {
+            val c = src[i]
+            if (c == '"' || c == '\'') {
+                i = skipLiteral(src, i)
+                continue
+            }
+            when (c) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return i
+                }
+            }
+            i++
+        }
+        return -1
     }
 
     /** 某一小节（起锚到下一小节锚）的源码区间：词行调用必须落在这里才算长在渲染路径上。 */
@@ -339,6 +455,93 @@ class CardDetailScreenContractTest {
         assertEquals(6, PronunciationStatus.entries.size, "呈现态枚数变了：上面那句 filter 的遍历前提要复评（是否需要第三态）")
     }
 
+    /**
+     * 「文案一处定义」的**正向对偶**（评审 I-2 / 跨席观察 4）：本文件的缺席判据只证「屏侧没有」，
+     * 从不证「那份真值确实长在组件里」——组件哪天丢文案，屏侧只会更绿。这里把让位关系两侧一起钉：
+     *  - 组件侧：`SpeakerButton.kt`（剥注释）里三态朗读文案各**恰一处**；
+     *  - 消费者侧：同四串（含被 Task 15 废掉的旧私有「继续播放发音」）在本屏**恰 0 处**。
+     * 变异自证：从组件删掉任一句 ⇒ 本用例红；把该句抄回屏侧 ⇒ 主用例 [the_screen_restates_no_playback_wording] 红。
+     */
+    @Test
+    fun the_shared_component_holds_the_playback_wording_exactly_once() {
+        val component = uiComponentSource("SpeakerButton.kt")
+        listOf(
+            Regex("\"播放发音\"") to "待播档",
+            Regex("\"暂停发音\"") to "暂停档",
+            Regex("\"继续发音\"") to "继续档",
+        ).forEach { (probe, label) ->
+            assertEquals(
+                1,
+                countMatches(component, probe),
+                "${label}朗读文案必须在组件里恰一处：0 处 = 屏侧那族缺席判据失去让位对象（假对偶），" +
+                    "2 处 = 组件内部长出第二份真值；pattern=${probe.pattern}",
+            )
+        }
+        val screen = uiScreenSource(CARD_DETAIL_SCREEN)
+        listOf(
+            Regex("\"播放发音\""),
+            Regex("\"暂停发音\""),
+            Regex("\"继续发音\""),
+            Regex("\"继续播放发音\""),
+        ).forEach { probe ->
+            assertEquals(0, countMatches(screen, probe), "消费者侧不得有 ${probe.pattern} 的字面量（真值只在组件那一处）")
+        }
+    }
+
+    /**
+     * 取样器无法闭合时的响亮失败（评审 I-1 要求的合成负控）：
+     *  - ① `heroBodyRange`：单词卡体没有收尾花括号 ⇒ 红并点名「未闭合」，
+     *    旧写法（`indexOf("\n}")` 的 `-1` 分支 → `source.length`）会把渲染路径区间静默换成整份剩余文件；
+     *  - ② 同一条夹具对**收尾花括号不落在第 0 列**的合法缩进形状仍取到真体（旧写法在这种形状下必然降级）；
+     *  - ③ `callWindows`：实参括号未闭合 ⇒ 红；串内左括号不得把配平带偏。
+     */
+    @Test
+    fun the_samplers_fail_loudly_when_a_region_cannot_be_closed() {
+        val pillLine = "    SpeakerButton(state = SpeakerState.Idle, onClick = {}, modifier = Modifier.testTag(\"card_detail_speak\"))"
+        val unclosedHero = "private fun WordHeroCard(card: String) {\n$pillLine\n" +
+            "private fun UnusedBlock() {\n    Text(\"appDomain(AppDomain.Review)\")\n}\n"
+        val unclosedFailure = assertFailsWith<AssertionError> { heroBodyRange(unclosedHero) }
+        assertTrue(
+            "未闭合" in (unclosedFailure.message ?: ""),
+            "① 单词卡体未闭合时取样器没有响亮判红（旧写法会吞到文末照常绿）：实际消息「${unclosedFailure.message}」",
+        )
+
+        val indentedCloseHero = "private fun WordHeroCard(card: String) {\n$pillLine\n    }\n" +
+            "private fun DeadCard() {\n" +
+            "    SpeakerButton(state = SpeakerState.Idle, onClick = {}, modifier = Modifier.testTag(\"dead_tag\"))\n" +
+            "    Row(modifier.background(MintTint, AppShape.Pill))\n}"
+        val hero = heroBodyRange(indentedCloseHero)
+        assertEquals(
+            1,
+            callWindows(indentedCloseHero, sharedPillCall).count { it.first in hero },
+            "② 收尾花括号缩进（不落第 0 列）时体区间仍必须只罩住单词卡自己——" +
+                "死函数里那枚同形调用不许算进渲染路径（旧写法此时已把区间扩成整份尾巴）",
+        )
+        assertEquals(
+            0,
+            countMatches(windowText(indentedCloseHero, hero), pillBackdrop),
+            "② 同条腿：凑底色长在死函数里时不许被算进单词卡体内（旧写法降级成整文件判据后这里恰好假红，" +
+                "而把违规放进尾巴更远处就假绿）",
+        )
+
+        val unclosedCall = "SpeakerButton(state = SpeakerState.Idle, onClick = { onSpeak(card.lemma)"
+        val callFailure = assertFailsWith<AssertionError> { callWindows(unclosedCall, sharedPillCall) }
+        assertTrue(
+            "无法闭合" in (callFailure.message ?: ""),
+            "③ 调用实参括号未闭合时必须响亮判红：实际消息「${callFailure.message}」",
+        )
+        val parenInsideString = "SpeakerButton(state = SpeakerState.Idle, accentLabel = \"(\", onClick = {})"
+        assertEquals(
+            1,
+            callWindows(parenInsideString, sharedPillCall).size,
+            "③ 串内左括号不得把配平带偏（本样片只应取出一枚窗口）",
+        )
+        assertTrue(
+            windowText(parenInsideString, callWindows(parenInsideString, sharedPillCall).single()).endsWith(")"),
+            "③ 窗口必须回含调用自己的收尾右括号（取样面切歪 = 归属判据失去对象）",
+        )
+    }
+
     // ---------- 正则自证（正片段 + 负片段） ----------
 
     /**
@@ -369,8 +572,19 @@ class CardDetailScreenContractTest {
         assertEquals(0, countMatches("Card(colors = CardDefaults.cardColors(containerColor = MintSurface))", pillBackdrop), "负控：卡片容器色不得命中")
 
         literalReadouts.forEach { (probe, _) ->
-            assertEquals(1, countMatches("""semantics { contentDescription = ${probe.pattern} }""", probe), "正控：屏侧另写 ${probe.pattern} 必须被抓到")
-            assertEquals(0, countMatches("Text(text = speakerContentDescription(state))", probe), "负控：经组件取文案不得被误判")
+            // 评审 I-2：旧正控写成 `countMatches("""semantics { contentDescription = ${probe.pattern} }""", probe)`——
+            // 样片由**被测探针自己的 pattern 字符串**拼出来，四枚探针都是纯字面量，拼进去必然命中，
+            // 该断言在任何仓库状态下恒成立（探针写宽/写窄/拼错档位都不红）。
+            // 现改为手写、且与被测判据**不同书写**的两形正控（可见文字位 / 局部 val 位）+ 两形负控
+            // （前缀加字、经组件取文案）；组件侧的正向对偶见 [the_shared_component_holds_the_playback_wording_exactly_once]。
+            val wording = probe.pattern.removeSurrounding("\"")
+            val visibleTextSample = """Text("$wording", style = AppType.Body)"""
+            val localValSample = """    val readout = "$wording"\n    Text(readout, style = AppType.Body)"""
+            val prefixedWordingSample = """semantics { contentDescription = "再$wording" }"""
+            assertEquals(1, countMatches(visibleTextSample, probe), "正控①（手写可见文字位）：屏侧另写 $wording 必须被抓到")
+            assertEquals(1, countMatches(localValSample, probe), "正控②（手写局部 val 位，书写与判据不同形）：$wording 藏在 val 里也要被抓到")
+            assertEquals(0, countMatches(prefixedWordingSample, probe), "负控③：近似但不同档的文案（\"再$wording\"）不得命中本探针")
+            assertEquals(0, countMatches("Text(text = speakerContentDescription(state))", probe), "负控④：经组件取文案不得被误判")
         }
         assertEquals(1, countMatches(LEGACY_TEMPLATE_READOUT, templateReadout), "正控：旧私有件的模板朗读文案必须被本探针抓到")
         assertEquals(0, countMatches("""semantics { contentDescription = "停止播放发音" }""", templateReadout), "负控：「停止」那枚屏侧合法定语不许被模板探针牵连")
