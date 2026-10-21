@@ -104,17 +104,25 @@ fun wordRowInks(set: AppColorSet): WordRowInk = WordRowInk(
  * 层级靠 `text1` 与 `text2` 的墨色落差承担）、gloss/status/meta [AppType.Footnote]（13sp/400）。
  *
  * 省略号口径与 [EntryRow] 同族、与 [InlineNotice] 相反：词行四槽都是**提示性内容**
- * （行本身是入口，点进详情才读全量），故 lemma/status/meta 各 `maxLines = 1`、
- * gloss `maxLines = 2`（释义比 lemma 长，两行是稿面词表行的实际高度预算），一律 [TextOverflow.Ellipsis]
+ * （行本身是入口，点进详情才读全量），故 lemma/status 各 `maxLines = 1`、gloss `maxLines = 2`
+ * （释义比 lemma 长，两行是稿面词表行的实际高度预算），一律 [TextOverflow.Ellipsis]
  * ——不给 `Clip`（裁掉字形不是省略）。fontScale 2.0 下靠省略号退化，不靠裁切。
+ * **meta 例外（Task 20-D 裁定 R-20D.2）**：`meta` 是自由文本承载位（`收藏于 yyyy-MM-dd` /
+ * `加入于 <日期时间>` / 出处串；站点清单不抄行号（抄了必漂），重算命令
+ * `grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/`），
+ * 截断即用户可见的信息丢失，故 `maxLines = 2`（Ellipsis 留作第三行兜底）。
+ * **代价**：meta 换行时该行行高增高、右列不再与左列首行等高（`verticalAlignment = CenterVertically`
+ * 下整行随之变高）；口径以 connected 的布局级判据验收，不以观感验收。右列 `widthIn(max = 120.dp)`
+ * **不加宽**——加宽挤压左列 lemma/gloss 阅读主体，是比截断更坏的取舍。
  *
  * [leading] 是前导槽（调用方组合 [InlineIconBadge]、勾选框或序号），
  * [actions] 是尾部动作槽（`RowScope` 收件，调用方可直接写 `actions = { SpeakerButton(...) }` 一类），
  * 两槽都可空；槽内的触控目标由调用方自己给 48dp 下限（本行只保证自己这一枚可点面达标）。
  * [status] 与 [meta] 右对齐成一小列（稿面词表行的「状态 / 时间」两行右栏），两者都为空时整列不占位。
  * 这一列带 `widthIn(max = 120.dp)` 的**宽度上限**：`Row` 先量**无权重**的孩子，右列既无 weight 又无上限时，
- * 120dp 是给 lemma 列在 360dp 宽 + fontScale 2.0 下留出可站住的宽度而定的（超出的内容由列内
- * `maxLines = 1` + [TextOverflow.Ellipsis] 省略）；**这是上限不是期望宽**，窄内容照旧按内容收，
+ * 120dp 是给 lemma 列在 360dp 宽 + fontScale 2.0 下留出可站住的宽度而定的（装不下的内容：`status` 仍按
+ * `maxLines = 1` + [TextOverflow.Ellipsis] 省略，`meta` 先在两行内折行、第三行才省略）；
+ * **这是上限不是期望宽**，窄内容照旧按内容收，
  * 实际能否站住由 connected 的 `WordRowTest` 在 fontScale 2.0 下量 lemma 宽度（≥48dp）证明。
  */
 @Composable
@@ -186,7 +194,8 @@ fun WordRow(
                         text = meta,
                         style = AppType.Footnote,
                         color = inks.meta,
-                        maxLines = 1,
+                        // R-20D.2（Task 20-D）：meta 是自由文本承载位，两行；status 仍单行、右列上限不放宽。
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
