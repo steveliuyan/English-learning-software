@@ -48,6 +48,14 @@ import org.junit.runners.model.MultipleFailureException
 class WordBookWordsScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /**
+     * `getUnclippedBoundsInRoot()` 把每条边**各自** px→dp 换算后再相减，48dp 见方的芯片会算成
+     * `47.999962dp`（emulator-5574 density 2.625 实测：`DpRect(left=219.80952, right=267.8095)`，
+     * 而像素侧 126px 是精确的 48dp）。尺寸下限比较因此允许 0.05dp 的**换算**容差；
+     * 要挡的红是旧竖排压缩槽的 24×18dp（差 24dp 量级），容差不构成放行空间。
+     */
+    private val dpConversionTolerance = 0.05.dp
+
     /** D2 验收：词书单词页按字母分组，组头可见、行可见。 */
     @Test
     fun letterGroupsRenderWithStickyHeadersAndRows() {
@@ -104,7 +112,8 @@ class WordBookWordsScreenTest {
                 val hit = chip.getUnclippedBoundsInRoot()
                 assertTrue(
                     "字母 $letter 的命中区必须 ≥48dp 见方（AC-R-04 钉的是可点区，不是视觉高度），实测 $hit",
-                    hit.bottom - hit.top >= 48.dp && hit.right - hit.left >= 48.dp,
+                    hit.bottom - hit.top >= 48.dp - dpConversionTolerance &&
+                        hit.right - hit.left >= 48.dp - dpConversionTolerance,
                 )
             }
         }
