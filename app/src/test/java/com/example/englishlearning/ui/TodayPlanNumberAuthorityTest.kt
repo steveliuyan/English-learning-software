@@ -426,7 +426,6 @@ class TodayPlanNumberAuthorityTest {
         )
         listOf(
             "today_plan_open_wordbook_words",
-            "today_plan_open_vocabulary",
             "today_plan_open_my_words",
             "today_plan_open_learning_records",
             "today_plan_open_check_in",

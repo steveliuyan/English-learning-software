@@ -60,7 +60,9 @@ import kotlinx.coroutines.flow.first
  * （26 枚 `hiltViewModel()` 在 `MainActivity.kt` 同一装配点注入 `AppScreen`，`AppScreen` 同一组合里
  * 已同时收集 `VocabularyUiState` 与 `FavoritesUiState`），所以本屏不需要新的宿主形态，也不需要宿主拆分（R-20A.1）。
  *
- * 只建不摘：本屏是**新增**入口，收藏页 / 错词页 / 生词本页三条老路由仍在册（摘除归 Task 22）。
+ * 摘除进度（按 R-22.1 的两席拆分）：本屏是**新增**入口；三条老路由里生词本页那条
+ * （`today_plan_open_vocabulary` / `showVocabulary` / `VocabularyScreen` 挂载）已由 **Task 22-A** 摘除，
+ * 本屏的生词本段自此是这条通路的全站唯一出口；收藏页与错词页另两条仍在册，摘除归 **Task 22-B**。
  *
  * 词行一律调共享 [WordRow]（词行族：本屏是新屏，不在 `SharedComponentUniquenessRatchetTest` 的词行 seed 台账里，
  * 写私有词行即判新增债务）；页头调共享 [AppScreenHeader]；段内降级调共享 [ScreenUnavailable]；

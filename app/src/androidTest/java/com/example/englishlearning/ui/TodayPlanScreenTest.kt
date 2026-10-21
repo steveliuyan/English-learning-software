@@ -308,12 +308,15 @@ class TodayPlanScreenTest {
     /**
      * AC-R-20 的版面侧：就绪态收成「1 枚主 CTA + 一组入口行」+ 一条常驻查词。
      *
-     * 判据四条：① 整屏可点目标恰为 **10** 枚——1 主 CTA（`today_plan_start_learning`）+ 1 受解锁态约束的
-     * 阅读文章 + 1 **常驻**查词 + 7 条组内入口行。这个 10 是 AC-R-20 的**闭合集合**，多一枚少一枚都红；
+     * 判据四条：① 整屏可点目标恰为 **`1 + 1 + 1 + rowTags.size`** 枚——1 主 CTA（`today_plan_start_learning`）
+     * + 1 受解锁态约束的阅读文章 + 1 **常驻**查词 + 组内入口行全部。枚数由 `rowTags` 现算，本注释不抄绝对数
+     * （Task 22-A 摘掉「生词本」老行时，抄死的 10 / 7 就是这里最先漂移的地方，现改成表达式口径；
+     * 重算：`grep -n "\"today_plan_open" app/src/androidTest/java/com/example/englishlearning/ui/TodayPlanScreenTest.kt`）。
+     * 这个闭合集合是 AC-R-20 的**闭合集合**，多一枚少一枚都红；
      * 批 3（Task 19–26「其余屏与入口分组重排」）若增删入口，必须**同时**改这条判据，并在
      * `docs/superpowers/plans/2026-10-17-ui-redesign.md` 里留名说明改动理由——红因与 AC-R-20 无关时，
      * 计划里那一行就是免责凭据（评审 I-6/I-7 预告的「删两条切 tab 入口」正落在这条上）。
-     * ② 组内 7 行都在同一个组容器里、都可点、都不低于 48dp 触控下限（F5-03），且组高 = 7 行之和
+     * ② 组内每一行都在同一个组容器里、都可点、都不低于 48dp 触控下限（F5-03），且组高 = 各行之和
      * （分组是真的，不是「贴了个 tag 的空壳」）；
      * ③ 查词那一行**必须落在组容器之外**（F3：它四态常驻，跟着组走就只在 Ready 态出现）；
      * ④ 组内不得出现品牌渐变的两个端点色——渐变归主 CTA 一处，入口行是弱档 tint 底。
@@ -322,12 +325,10 @@ class TodayPlanScreenTest {
         composeRule.setContent {
             TodayPlanScreen(
                 TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, isUnlocked = true),
-                vocabularyCount = 12,
             )
         }
         val rowTags = listOf(
             "today_plan_open_wordbook_words",
-            "today_plan_open_vocabulary",
             "today_plan_open_my_words",
             "today_plan_open_learning_records",
             "today_plan_open_check_in",
@@ -335,15 +336,21 @@ class TodayPlanScreenTest {
             "today_plan_open_setup_entry",
         )
         val persistentSearchTag = "today_plan_search_entry"
-        // ① 闭合集合 = 1 主 CTA + 1 阅读文章 + 1 常驻查词 + 7 组内行 = 10。
-        //    第 7 行是 Task 20-A 依裁决①新增的「我的词」（只建不摘，老行一条没减）；
+        // ① 闭合集合 = 1 主 CTA + 1 阅读文章 + 1 常驻查词 + 组内行 `rowTags.size` 枚。
+        //    枚数的**唯一权威是这个表达式本身**（`1 + 1 + 1 + rowTags.size`），下面的散文只是注脚——
+        //    重算命令 `grep -c 'today_plan_open' app/src/androidTest/java/com/example/englishlearning/ui/TodayPlanScreenTest.kt`
+        //    或直接把本用例跑一遍，失败消息会打出实际节点数。
+        //    第 7 枚「生词本」老行（today_plan_open_vocabulary）已随 Task 22-A 摘掉老路由一起减行
+        //    （新入口「我的词」在册且能力齐备是摘旧入口的前置，铁律见 plan Task 22 Step 1）；
         //    留名见 docs/superpowers/plans/2026-10-17-ui-redesign.md 批 3 段落。
-        //    用 fetchSemanticsNodes().size + assertEquals 而不是 assertCountEquals，是为了把「为什么是 10」
+        //    用 fetchSemanticsNodes().size + assertEquals 而不是 assertCountEquals，是为了把「为什么是这个数」
         //    与改法流程写进失败消息（compose 1.10 的 assertCountEquals 没有自定义消息形参）。
         val clickable = composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes()
         assertEquals(
-            "本屏可点节点的**闭合集合**必须是 10 = 1 主 CTA(today_plan_start_learning) + 1 受解锁态约束的" +
-                "阅读文章(today_plan_open_reading) + 1 常驻查词($persistentSearchTag) + 7 条入口组内行。" +
+            "本屏可点节点的**闭合集合**必须是 ${1 + 1 + 1 + rowTags.size} = 1 主 CTA(today_plan_start_learning) + " +
+                "1 受解锁态约束的" +
+                "阅读文章(today_plan_open_reading) + 1 常驻查词($persistentSearchTag) + " +
+                "${rowTags.size} 条入口组内行。" +
                 "这是 AC-R-20 的收成结果，多一枚（新的整宽按钮 / 第二枚主 CTA）少一枚（把查词又收进组里 / " +
                 "删掉某条出口）都红。批 3（Task 19–26「其余屏与入口分组重排」，含内容审计预告的" +
                 "「删两条切 tab 入口」）若增删本屏入口，必须**同时**改这条判据，并在 " +
@@ -372,7 +379,7 @@ class TodayPlanScreenTest {
             )
         }
         assertTrue(
-            "入口组高 ${groupBox.height}px 与 7 条行之和 ${rowsHeight}px 对不上——分组不是逐条相接的行",
+            "入口组高 ${groupBox.height}px 与 ${rowTags.size} 条行之和 ${rowsHeight}px 对不上——分组不是逐条相接的行",
             kotlin.math.abs(groupBox.height - rowsHeight) <= with(composeRule.density) { 2.dp.toPx() },
         )
         // ③ 常驻查词在组**外**：它跟着 `when (state)` 走，四个态都要能看见（F3 / 评审 I-1）。

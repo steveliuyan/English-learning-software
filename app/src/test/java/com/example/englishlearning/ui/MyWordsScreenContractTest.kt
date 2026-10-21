@@ -143,7 +143,13 @@ class MyWordsScreenContractTest {
         )
     }
 
-    /** 入口挂载（R-20A.3「只建不摘」）：新入口挂进词汇域入口面，且旧入口一行不摘。 */
+    /**
+     * 入口挂载（R-20A.3「只建不摘」→ Task 22-A 已摘第一条）：新入口挂进词汇域入口面。
+     * 本条里的两份「老入口仍在册」反向控已按 R-22.1 的两席拆分**收敛到剩余枚数**：
+     *  `today_plan_open_vocabulary` 与 `VocabularyScreen(` 已由 22-A 摘除（从名单里删行，不是把断言改松），
+     *  另两条老路由（`showFavorites` / `showWrongWords` 及其屏挂载）连同打卡页那两条裸文字链归 22-B。
+     * 断言本体保留，枚数权威就是下面两份名单自己（本注释不抄枚数）。
+     */
     @Test
     fun the_new_entry_is_mounted_in_the_vocabulary_domain_surface() {
         val todayPlan = uiScreenSource("TodayPlanScreen.kt")
@@ -155,13 +161,14 @@ class MyWordsScreenContractTest {
             countMatches(todayPlan, Regex(Regex.escape("\"我的词\""))) >= 1,
             "入口行标题必须是「我的词」（与查词 / 词表并列的三入口文案，裁决①）",
         )
-        // 只建不摘：旧入口的标签与标题仍在原处，摘除动作归 Task 22 / 批 3 收口。
+        // 老入口标签的反向控（只建不摘期遗留的形状，按 22-A/22-B 拆分收敛到剩余枚数）：
+        // `today_plan_open_vocabulary` 已于 22-A 随老路由一起摘除，这里不再钉它；剩余两枚仍不得被摘，
+        // 它们的摘除归 22-B / 批 3 收口。
         listOf(
-            "today_plan_open_vocabulary",
             "today_plan_open_wordbook_words",
             "today_plan_search_entry",
         ).forEach { tag ->
-            assertTrue(tag in todayPlan, "旧入口标签 $tag 不得被摘（本席只建不摘，摘除归 Task 22）")
+            assertTrue(tag in todayPlan, "旧入口标签 $tag 不得被摘（本席只建不摘，摘除归 22-B）")
         }
 
         val appScreen = uiScreenSource("AppScreen.kt")
@@ -201,11 +208,14 @@ class MyWordsScreenContractTest {
             countMatches(appScreen, Regex("""myWordsSummaryOf\(""")),
             "AppScreen 必须恰一处调用纯函数 myWordsSummaryOf（0 = 规则没接线或在别处内联了第二份，2 = 两处真源）",
         )
-        // 只建不摘：收藏页、错词页、生词本页三条老路由仍在册。
-        listOf("FavoritesScreen(", "WrongWordsScreen(", "VocabularyScreen(").forEach { call ->
+        // 老屏挂载点的反向控，按 R-22.1 的两席拆分收敛：`VocabularyScreen(` 那条老路由已由 22-A 摘除
+        // （合并页生词本段自此是这条通路的全站唯一出口，结果反馈面见上面
+        // the_merged_page_consumes_and_resets_the_mastery_state 与 connected 的宿主端到端用例）；
+        // 收藏页与错词页两枚挂载仍在册，摘除归 22-B。
+        listOf("FavoritesScreen(", "WrongWordsScreen(").forEach { call ->
             assertTrue(
                 call in appScreen,
-                "旧屏挂载点 $call 不得被摘（摘除归 Task 22）",
+                "旧屏挂载点 $call 不得被摘（摘除归 22-B）",
             )
         }
     }
@@ -214,7 +224,8 @@ class MyWordsScreenContractTest {
      * I-4（修复轮 1，登记见 fix1 报告 §1「摘除前必须补齐的能力」）：合并页的生词本段必须补上
      * 旧生词页独有的两枚能力——段头「开始重新学习」与逐行「标记为已掌握」（共享
      * [com.example.englishlearning.ui.components.ConfirmDestructiveDialog] 二次确认）。
-     * Task 22 摘 `today_plan_open_vocabulary` / `showVocabulary` 老路由的前置条件就是这两枚先在册；
+     * Task 22-A 摘 `today_plan_open_vocabulary` / `showVocabulary` 老路由的前置条件就是这两枚先在册
+     * （该摘除已于 22-A 落地，本用例因此同时是「摘除当时成立」的凭据）；
      * 「点了真的通到重学页 / 真的把该行移出」的行为面由 connected
      * `MyWordsScreenTest.wordbook_offers_relearn_and_mastered_behind_confirmation` 承重。
      */

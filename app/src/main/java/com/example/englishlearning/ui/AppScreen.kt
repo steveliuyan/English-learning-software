@@ -200,14 +200,14 @@ fun AppScreen(
             // F4-01 决策⑤错词本：同级叠层；点词复用学习记录详情宿主（selectedLearningRecordCard）。
             var showWrongWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词本 · 错词 一页三段，与上面三页同级叠层。
-            // 本批**只建不摘**：showFavorites / showWrongWords / showVocabulary 三条老路由一行不动，摘除归 Task 22。
+            // 三条老路由的摘除按 R-22.1 拆成两席：`showVocabulary`（生词本页）已由 **Task 22-A** 摘除，
+            // `showFavorites` / `showWrongWords` 另两条仍在册，归 **Task 22-B**（连同打卡页那两条裸文字链）。
             var showMyWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             val wordBookWordsListState = key(state.profile.id, showWordBookWords) {
                 rememberLazyListState()
             }
-            var showVocabulary by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showVocabularyRelearn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var selectedRelearnCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             var showGlobalVocabularySearch by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -502,12 +502,8 @@ fun AppScreen(
                 showVocabularyRelearn = false
                 vocabularyViewModel?.load(state.profile.id)
             }
-            BackHandler(enabled = showVocabulary && selectedSearchCard == null) { showVocabulary = false }
             LaunchedEffect(showVocabularyRelearn, state.profile.id) {
                 if (showVocabularyRelearn) vocabularyRelearnViewModel?.load(state.profile.id, todayReady?.activeWordBookId)
-            }
-            LaunchedEffect(showVocabulary, state.profile.id) {
-                if (showVocabulary) vocabularyViewModel?.load(state.profile.id)
             }
             LaunchedEffect(selectedTab, state.profile.id) {
                 if (selectedTab == AppTab.LEARNING) vocabularyViewModel?.load(state.profile.id)
@@ -837,20 +833,6 @@ fun AppScreen(
                         showVocabularyRelearn = false
                         vocabularyViewModel?.load(state.profile.id)
                     },
-                )
-            } else if (showVocabulary) {
-                VocabularyScreen(
-                    state = vocabularyState,
-                    onBack = { showVocabulary = false },
-                    onStartRelearn = { showVocabularyRelearn = true },
-                    onRetry = { vocabularyViewModel?.load(state.profile.id) },
-                    onOpenCard = {
-                        detailSource = DetailSource.VOCABULARY
-                        selectedSearchCard = it
-                    },
-                    onRemove = { vocabularyViewModel?.markMastered(state.profile.id, it) },
-                    masteryState = vocabularyMasteryState,
-                    onDismissMasteryMessage = { vocabularyViewModel?.clearMasteryMessage() },
                 )
             } else if (showLearningRecords) {
                 LearningRecordsScreen(
@@ -1578,15 +1560,10 @@ fun AppScreen(
                                 onOpenCheckIn = { showCheckIn = true },
                                 onOpenLearningRecords = { showLearningRecords = true },
                                 onOpenWordBookWords = { showWordBookWords = true },
-                                vocabularyCount = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
                                 // 裁决①「我的词」入口：尾部计数只在三段都真读出来时才给（见上面 myWordsSummary），
                                 // 没读出来就是 null，EntryRow 不渲染尾部——空着比给个 0 诚实。
                                 myWordsSummary = myWordsSummary,
                                 onOpenMyWords = { showMyWords = true },
-                                onOpenVocabulary = {
-                                    vocabularyViewModel?.load(state.profile.id)
-                                    showVocabulary = vocabularyViewModel != null
-                                },
                                 onOpenSearch = {
                                     // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
                                     // 「浏览词书」——那属于词书管理语义，不是「查一个词」。

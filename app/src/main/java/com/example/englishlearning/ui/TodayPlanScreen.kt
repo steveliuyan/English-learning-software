@@ -82,10 +82,8 @@ fun TodayPlanScreen(
     onOpenCheckIn: () -> Unit = {},
     onOpenLearningRecords: () -> Unit = {},
     onOpenWordBookWords: () -> Unit = {},
-    onOpenVocabulary: () -> Unit = {},
     onOpenMyWords: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
-    vocabularyCount: Int? = null,
     myWordsSummary: String? = null,
 ) {
     val colors = appColors()
@@ -320,10 +318,8 @@ fun TodayPlanScreen(
                     )
                 }
                 TodayPlanEntryGroup(
-                    vocabularyCount = vocabularyCount,
                     myWordsSummary = myWordsSummary,
                     onOpenWordBookWords = onOpenWordBookWords,
-                    onOpenVocabulary = onOpenVocabulary,
                     onOpenMyWords = onOpenMyWords,
                     onOpenLearningRecords = onOpenLearningRecords,
                     onOpenCheckIn = onOpenCheckIn,
@@ -345,8 +341,10 @@ fun TodayPlanScreen(
  * **常驻**卡里的一行（见 [TodayPlanScreen] 里 `when (state)` 之前那段），域色对位（`Library`）不变。
  *
  * 域色对位（每枚都有来历，不是凑色）：
- *  - 词书单词 → `Learn`、生词本 → `Reading`：逐字对应稿 `mockups.html:911-916` 的
- *    `--d-library` / `--d-learn` / `--d-reading` 三行（`--d-library` 那一行现在由常驻查词条读）；
+ *  - 词书单词 → `Learn`、我的词 → `Reading`：逐字对应稿 `mockups.html:911-916` 的
+ *    `--d-library` / `--d-learn` / `--d-reading` 三行（`--d-library` 那一行现在由常驻查词条读；
+ *    `--d-reading` 原先由「生词本」老行与「我的词」两枚共读，那条老行已由 Task 22-A 摘除，
+ *    现在这一族在本组只剩「我的词」一枚读点）；
  *  - 学习记录 → `Learn`（它记的是学习行为本身，与「词书单词」同一域，本屏不给它第二种颜色）；
  *  - 打卡与成就 → `Review`：稿「连续与记录」那一组用的就是 `--d-review`（`mockups.html:930`），
  *    打卡页自身的强调色也是复习域（`CheckInScreen.kt` 通体 `DomainColors.Review.deep`）。**这一枚同时
@@ -365,10 +363,8 @@ fun TodayPlanScreen(
  */
 @Composable
 private fun TodayPlanEntryGroup(
-    vocabularyCount: Int?,
     myWordsSummary: String?,
     onOpenWordBookWords: () -> Unit,
-    onOpenVocabulary: () -> Unit,
     onOpenMyWords: () -> Unit,
     onOpenLearningRecords: () -> Unit,
     onOpenCheckIn: () -> Unit,
@@ -394,28 +390,12 @@ private fun TodayPlanEntryGroup(
                 modifier = Modifier.testTag("today_plan_open_wordbook_words").semantics { contentDescription = "词书单词" },
                 onClick = onOpenWordBookWords,
             )
-            EntryRow(
-                icon = AppIcon.Bookmark,
-                domain = AppDomain.Reading,
-                title = "生词本",
-                trailing = vocabularyCount?.let { "$it 个" },
-                iconTone = EntryIconTone.Tint,
-                topDivider = true,
-                modifier = Modifier
-                    .testTag("today_plan_open_vocabulary")
-                    .semantics {
-                        contentDescription = if (vocabularyCount == null) {
-                            "生词本"
-                        } else {
-                            "生词本，共 ${vocabularyCount} 个词"
-                        }
-                    },
-                onClick = onOpenVocabulary,
-            )
-            // 裁决① 的第三枚入口（Task 20-A「只建不摘」）：收藏 · 生词本 · 错词 合成的一页三段。
-            // 图标与域色逐字照稿 `mockups.html:914-916`（书签形 + `--d-reading`，尾部是三段计数串）。
-            // 它与本组「生词本」行此刻同形同色是**已知的临时状态**：那条行是本页三段之一，
-            // 摘除动作按铁律归 Task 22（新入口先可用，旧入口才摘），这里不提前给一枚新图形去凑独特。
+            // 裁决① 的第三枚入口（Task 20-A「只建不摘」→ Task 22-A 已摘老路由）：收藏 · 生词本 · 错词
+            // 合成的一页三段。图标与域色逐字照稿 `mockups.html:914-916`（书签形 + `--d-reading`，
+            // 尾部是三段计数串）。
+            // 本组原先与它同形同色的那条「生词本」老行已于 22-A 摘除（新入口可用是摘旧入口的前置，
+            // 铁律见 plan Task 22 Step 1），所以 `--d-reading` 这一族在本组只剩这一枚读点，
+            // 「临时同形」的陈述随之作废；这里不提前给一枚新图形去凑独特。
             EntryRow(
                 icon = AppIcon.Bookmark,
                 domain = AppDomain.Reading,
