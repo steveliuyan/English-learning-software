@@ -2027,6 +2027,15 @@ internal val MintBackground: Color
 - Produces: 状态徽章与 `AiFeature.implemented` 一致的渲染函数 `fun featureStatusBadge(implemented: Boolean): String`（`"现在能用"` / `"未上线"`）。
 
 - [ ] **Step 1: 写失败测试**：默认展开态可见「选能力」区（AC-R-23）；未上线项折叠且标「未上线」；徽章文案与 `implemented` 逐条一致（`assertEquals` 遍历能力表）；**含字徽标禁令**（spec §4.2）源码契约：
+  - **R-23.1（落点更正，控制者 2026-10-21 实核）**：「AI 主页」是 **`AiLearningScreen.kt`**（底导 `AppTab.AI` 一级页，
+    挂载 `AppScreen.kt:1620`；其 `:90` 注释原文即「功能入口默认收起……点开才见全部功能」），
+    本 Files 段只点 `AiFeatureScreen.kt`（二级单功能骨架，`AppScreen.kt:1340`）**漏了承载 AC-R-23 的那一屏**
+    ⇒ 本批范围改为**两屏**。重算命令：`grep -rn "AiFeatureScreen(\|AiLearningScreen(" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt`。
+  - **R-23.2（原稿判据形状作废，天然空转）**：下面这段 Kotlin 锚的是 `"AI"` 字面量，而
+    `grep -rn '"AI"' app/src/main/java/com/example/englishlearning` **现盘零命中** ⇒ 断言不干活就绿。
+    spec §4.2 禁的是「文字当图标」，本仓真实形状是**单字中文徽标** `Text(feature.glyph, …)`
+    （站点 `AiFeatureScreen.kt:87`、`AiLearningScreen.kt:206`；字形来自 `AiFeature.kt` 的 `glyph` 字段 7 枚值 文/填/听/讲/析/拍/画）
+    与一级页行尾 `Text("›")`（`AiLearningScreen.kt:213`）。契约必须锚这组真实形状并**先在现盘判红**。
   ```kotlin
   @Test fun no_letter_badges_left_in_ai_surface() {
       val src = stripComments(File(AI_FEATURE_SCREEN).readText())
@@ -2034,7 +2043,21 @@ internal val MintBackground: Color
   }
   ```
 - [ ] **Step 2: 修 F5-03 遗留的渐变站点**：`AiFeatureScreen.kt:87` 单字徽标白字压 `AiFeatureGradient`（实测 ≈1.29–2.40:1）换为 `AppIcon.Spark` + **`on-brand #04241C`** 前景（Task 1 裁决 #3：渐变上取 `on-brand`）。`AiBadgeContrastFixTest` 用亮度函数断言 `ratio(0xFF04241C, gradientEnd) >= 4.5`。
+  - **R-23.5（现状更正）**：`:87` 现盘前景**已不是白字**，是 `AppPalette.OnMintPrimary`（`AppPalette.kt:19` = `#174C44`）——
+    批 1 已换过，`AccessibilityContrastContractTest.kt:22` 仍把「AiFeatureScreen 头部 glyph 徽标」挂在设备侧取证清单里。
+    所以本步剩下的是**徽标形状本身**（R-23.2/R-23.3 换成 `AppIcon.Spark`），不是「修一个不存在的白字」；
+    若新徽标仍压渐变，前景按裁决 3 取 `AppPalette.OnBrand`（`AppPalette.kt:43`）/`appColors().onBrand`。
+    `AiBadgeContrastFixTest.kt` **现盘不存在**（本批新建），且断言里必须**读 token 常量**算亮度比，
+    不许把 `0xFF04241C` 抄进测试——抄了字面量就变成「token 改了测试还绿」。顶层 `Brush`（`:47`）保持静态（Task 3 口径）。
 - [ ] **Step 3: 实现**：未上线压成一条折叠行；`AppPalette` 静态读点迁 `appColors()`；顶层 `Brush`（`:47`）保持静态（品牌渐变模式不变，Task 3 口径）。
+  - **R-23.6（棘轮同步授权）**：迁静态读点会真实减少 `DarkTokenConsumptionRatchetTest` 的命中数，
+    该类规则是 `\b(?:AppPalette|DomainColors)\.[A-Za-z0-9_]+` **逐成员计数**（`DarkTokenConsumptionRatchetTest.kt:201-205`），
+    现盘 seed `:80 "AiFeatureScreen.kt" to 3`、`:84 "AiLearningScreen.kt" to 2` ⇒ **迁几枚改几枚、减到 0 删该行**，
+    这是本任务唯一被授权的棘轮改动；另两张棘轮（`RawColorLiteralRatchetTest`、`SharedComponentUniquenessRatchetTest`）不动。
+  - **R-23.4（文案两面分开）**：状态徽章产出 `featureStatusBadge(implemented)` → 「现在能用」/「未上线」
+    （现盘 `AiFeatureScreen.kt:189` 是「可用」/「未实现」）；但 `AiFeature.status` 目录原文
+    （`AiFeature.kt:16` 契约：未实现必须以「未实现」开头）**一字不改**，
+    `AiFeatureScreenTest` 里 `status_block_repeats_the_catalogue_wording` 那类断目录原文的用例保持原文。
 - [ ] **Step 4: 门控 + connected（含 TalkBack 读能力名 + 状态）+ 提交**（`feat(ui-ai): AI 主页默认展开可用能力并去掉文字徽标`）。
 
 ---
