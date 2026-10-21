@@ -35,7 +35,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import android.util.Log
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
 import com.example.englishlearning.learning.domain.WordCard
@@ -605,7 +604,6 @@ class WordBookWordsScreenTest {
         val layout = notice.textLayout()
         val widthDp = layout.size.width / density
         val maxLines = layout.layoutInput.maxLines
-        Log.i("T20B_F1", "notice widthDp=$widthDp maxLines=$maxLines density=$density textLayoutWidthPx=${layout.size.width}")
         assertTrue(
             "禁用行原因串必须完整呈现：实测宽度应明显大于右列上限 120dp（阈值 132dp），" +
                 "被上限卡住即省略号吞信息。实测 ${widthDp}dp，maxLines=$maxLines",

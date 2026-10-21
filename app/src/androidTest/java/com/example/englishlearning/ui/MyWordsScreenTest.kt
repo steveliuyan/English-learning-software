@@ -1,9 +1,13 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertTextEquals
@@ -15,7 +19,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.learning.FavoriteWord
 import com.example.englishlearning.learning.VocabularyEntry
 import com.example.englishlearning.learning.domain.WordCard
@@ -24,6 +33,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -530,5 +540,220 @@ class MyWordsScreenTest {
         composeRule.onNodeWithText("已标记为掌握").assertDoesNotExist()
         composeRule.onNodeWithText("保存失败").assertDoesNotExist()
         composeRule.onNodeWithTag("my_words_wordbook_mastered_0").assertExists()
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Task 20-D（计划 Step 4c / R-20D.1③）：合并页三枚 `meta` 站点的**布局级不截断判据**。
+    //
+    // 站点（重算：`grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/{FavoritesScreen,MyWordsScreen}.kt`）：
+    //  `MyWordsScreen.kt:167` 收藏段 `收藏于 yyyy-MM-dd`、`:224` 生词本死行 `加入于 <日期时间>`、
+    //  `:234` 生词本活行 `加入于 <日期时间>`。R-20D.1② 登记的缺口正是「合并页渲染了但只到文本层」：
+    //  `favorite_timestamp_shows_the_same_date_tier_as_the_favorites_page` 一直绿着，而右列当时是
+    //  `maxLines = 1` —— 语义文本给全文，`Ellipsis` 截断时 `onNodeWithText` 读不出差别。
+    //  ⇒ 这里改读 `textLayout()`（形状同 `b76f133` 的 `disabledRowShowsTheUnavailableNoticeInFull`）。
+    //
+    // 三站点共用一次 `setContent`（本仓硬约束：一个方法只许一次组合；三段同宿主正是 R-20A.1 的实证形状），
+    // 所以夹具把两枚生词本条目的时刻错开（00:30 / 08:15），三枚 `meta` 文本互不相同、逐枚可定位。
+    // ---------------------------------------------------------------------------------------------
+
+    /** 20-D 夹具：可指定加入时刻与「词卡已随词书删除」（`card == null` ⇒ 走 `:224` 那枚死行分支）。 */
+    private fun vocabularyItemAt(
+        lemma: String,
+        index: Int,
+        addedAt: Instant,
+        card: WordCard?,
+    ) = VocabularyItem(
+        entry = VocabularyEntry(
+            profileId = "p1",
+            wordBookId = "cet4",
+            cardId = "card-$index",
+            addedAt = addedAt,
+            lastFeedback = "Again",
+        ),
+        card = card,
+    )
+
+    /** 20-D 夹具：三段同宿主的合并页（字号由调用处的 `LocalDensity` 钉死）。 */
+    private fun showMergedPageWithLongAndShortMeta() {
+        composeRule.setContent {
+            val base = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 1f)) {
+                MintGlassTheme {
+                    MyWordsScreen(
+                        favoritesState = FavoritesUiState.Ready(words = listOf(favorite("anchor", 0))),
+                        vocabularyState = VocabularyUiState.Ready(
+                            items = listOf(
+                                vocabularyItemAt(
+                                    lemma = "abandon",
+                                    index = 0,
+                                    addedAt = baseInstant,
+                                    card = null,
+                                ),
+                                vocabularyItemAt(
+                                    lemma = "bravery",
+                                    index = 1,
+                                    addedAt = Instant.parse("2026-10-19T08:15:00Z"),
+                                    card = card("bravery", 1),
+                                ),
+                            ),
+                        ),
+                        wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                        zoneId = ZoneOffset.UTC,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    /**
+     * 站点 `:167` / `:224` / `:234` 的布局级判据（裁定 R-20D.2：`meta` 两行、右列**不加宽**、`status` 维持单行）。
+     *
+     * 每枚 `meta` 四条腿，各钉一种破坏：
+     *  ① `maxLines ≥ 2`（R-20D.2 的行数口径；现盘 `WordRow.kt:189` 的 `maxLines = 1` 在这一条天然红）；
+     *  ② 宽度落在右列区间 `48dp–120.1dp`（上限钉「不靠加宽糊过去」，下限钉右列没被挤塌）；
+     *  ③ 纵向腿 `getLineEnd(末行) == 文本长度`（整句真被画出来）；
+     *  ④ 横向腿逐行 `getLineRight ≤ 盒宽 + 1dp`（`Ellipsis` 与 `Clip` 都不改语义文本，只有这里分得出）。
+     * `:224`/`:234` 的 `加入于 <日期时间>` 另钉 `lineCount ≥ 2`：换行策略真的被用上（120dp 单行装不下这句，
+     * 修复前它占 1 行且被省略号收尾）。字号在组合级钉 `1f`，判据不随设备「字体大小」滑档漂移。
+     */
+    @Test
+    fun metaSlotsOfTheThreeMergedSitesAreLaidOutInTwoAllowedLinesInsideTheColumnCap() {
+        showMergedPageWithLongAndShortMeta()
+        assertMetaSlotSurvives("收藏于 2026-10-19", expectMinLines = 1)
+        assertMetaSlotSurvives("加入于 2026-10-19 00:30", expectMinLines = 2)
+        assertMetaSlotSurvives("加入于 2026-10-19 08:15", expectMinLines = 2)
+    }
+
+    /**
+     * `fontScale = 2.0` 档的同一批站点（组合级钉 `2f`，先例 `WordRowTest`/`EntryRowTest`/`CheckInScreenTest`）。
+     *
+     * 大字号档**只判策略腿**，不判「整句可见」：右列上限是 `120.dp`（不随 sp 放大），而 `meta` 的行数预算
+     * 按 R-20D.2 只有两行，`加入于 2026-10-19 00:30` 在 26sp 下需要三行以上——`WordRow.kt` KDoc 早已写明
+     * 「fontScale 2.0 下靠省略号退化，不靠裁切」，本条不把它改成假绿。这里钉的是：
+     *  ① 两行额度仍在（`maxLines ≥ 2`）；② 宽度仍被 120dp 收住（大字档正是当年 F3 挤瘪 lemma 的那一档）；
+     *  ③ 第二行**确实被占上**（`lineCount ≥ 2`，修复前 `maxLines = 1` 时必为 1 行）；
+     *  ④ 逐行不伸出文本盒 +1dp（裁切信号在任何字号下都不许出现）；
+     *  ⑤ 哨兵：单行行高 ≥58px，证明 `2f` 真的落进了组合（同档实测 scale 1.0 = 40px、2.0 = 77px，
+     *     出处 `AppScreenOverlayContainerTest.assertScaleTookEffect`）——护栏不许在 scale 1.0 下空转。
+     */
+    @Test
+    fun metaSlotsKeepTheTwoLineBudgetAndTheColumnCapAtDoubleFontScale() {
+        composeRule.setContent {
+            val base = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 2f)) {
+                MintGlassTheme {
+                    MyWordsScreen(
+                        favoritesState = FavoritesUiState.Ready(words = listOf(favorite("anchor", 0))),
+                        vocabularyState = VocabularyUiState.Ready(
+                            items = listOf(
+                                vocabularyItemAt(
+                                    lemma = "abandon",
+                                    index = 0,
+                                    addedAt = baseInstant,
+                                    card = null,
+                                ),
+                            ),
+                        ),
+                        wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                        zoneId = ZoneOffset.UTC,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        listOf("加入于 2026-10-19 00:30").forEach { meta ->
+            val layout = metaLayout(meta)
+            val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+            val widthDp = layout.size.width / density
+            val maxLines = layout.layoutInput.maxLines
+            val lineHeightPx = layout.size.height / layout.lineCount
+            assertTrue(
+                "fontScale=2.0 下「$meta」所在槽仍要允许两行；实测 maxLines=$maxLines",
+                maxLines >= 2,
+            )
+            assertTrue(
+                "fontScale=2.0 下「$meta」仍不得越过右列 120dp 上限（当年 F3 无上限时把 weight(1f) 的 " +
+                    "lemma 列挤成 0dp）；实测宽度 ${widthDp}dp、lineCount=${layout.lineCount}",
+                widthDp <= 120.1,
+            )
+            assertTrue(
+                "fontScale=2.0 下「$meta」必须真的用上第二行（`lineCount ≥ 2` 才是换行策略在生效）；" +
+                    "实测 lineCount=${layout.lineCount} maxLines=$maxLines widthDp=${widthDp}",
+                layout.lineCount >= 2,
+            )
+            assertTrue(
+                "「$meta」字号哨兵：单行行高要 ≥58px 才算 fontScale 2.0 落进组合（实测 scale 1.0 = 40px、" +
+                    "2.0 = 77px），护栏不许在 scale 1.0 下空转；实测行高 ${lineHeightPx}px、" +
+                    "size=${layout.size} lineCount=${layout.lineCount}",
+                lineHeightPx >= 58f,
+            )
+            val bounds = composeRule.onNodeWithText(meta, useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot
+            val tolerancePx = with(Density(density, fontScale = 1f)) { 1.dp.toPx() }
+            for (line in 0 until layout.lineCount) {
+                assertTrue(
+                    "fontScale=2.0 下「$meta」第 $line 行不得伸出文本盒 +1dp（裁切在任何字号下都不合法）：" +
+                        "lineRight=${layout.getLineRight(line)} boxWidth=${bounds.width} tolerancePx=$tolerancePx",
+                    layout.getLineRight(line) <= bounds.width + tolerancePx,
+                )
+            }
+        }
+    }
+
+    /**
+     * 读 `meta` 那枚文本节点的 `TextLayoutResult`。
+     *
+     * 走**未合并树**：合并页的收藏行与活行都带 `onClick`（外层 `clickable` 合并语义），
+     * 合并后一次 `GetTextLayoutResult` 回调会把行内多枚文本并成一包、`layouts.single()` 当场炸
+     * （先例 `EntryRowTest.entry_row_truncates_title_and_subtitle_with_ellipsis_not_clipping`）。
+     */
+    private fun metaLayout(meta: String): TextLayoutResult {
+        val node = composeRule.onNodeWithText(meta, useUnmergedTree = true)
+        node.performScrollTo()
+        node.assertIsDisplayed()
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
+    }
+
+    private fun assertMetaSlotSurvives(meta: String, expectMinLines: Int) {
+        val node = composeRule.onNodeWithText(meta, useUnmergedTree = true)
+        val layout = metaLayout(meta)
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val widthDp = layout.size.width / density
+        val maxLines = layout.layoutInput.maxLines
+        val boxWidth = node.fetchSemanticsNode().boundsInRoot.width
+        val tolerancePx = with(Density(density, fontScale = 1f)) { 1.dp.toPx() }
+        assertTrue(
+            "「$meta」所在槽必须允许两行（R-20D.2：meta 是自由文本承载位，截断即用户可见的信息丢失）；" +
+                "实测 maxLines=$maxLines 说明它还在单行右列槽里",
+            maxLines >= 2,
+        )
+        assertTrue(
+            "「$meta」必须待在右列 `widthIn(max = 120.dp)` 上限内（R-20D.2 明确不加宽：加宽挤压左列 " +
+                "lemma/gloss 阅读主体），也不得塌成 0dp：实测宽度 ${widthDp}dp（判定区间 48dp–120.1dp）、" +
+                "lineCount=${layout.lineCount} size=${layout.size}",
+            widthDp in 48.0..120.1,
+        )
+        assertTrue(
+            "「$meta」至少要占 ${expectMinLines} 行（两行换行策略真的被用上，不是靠加宽糊过去）：" +
+                "实测 lineCount=${layout.lineCount} maxLines=$maxLines widthDp=${widthDp}",
+            layout.lineCount >= expectMinLines,
+        )
+        assertEquals(
+            "「$meta」必须整句被布局（末行没到文本末尾 = 有字被省略号吃掉）：" +
+                "lineCount=${layout.lineCount} maxLines=$maxLines widthDp=${widthDp} size=${layout.size} " +
+                "lineEnd=${layout.getLineEnd(layout.lineCount - 1)}",
+            meta.length,
+            layout.getLineEnd(layout.lineCount - 1),
+        )
+        for (line in 0 until layout.lineCount) {
+            assertTrue(
+                "「$meta」第 $line 行不得伸出文本盒 +1dp（逐行真裁切信号）：" +
+                    "lineRight=${layout.getLineRight(line)} boxWidth=$boxWidth tolerancePx=$tolerancePx",
+                layout.getLineRight(line) <= boxWidth + tolerancePx,
+            )
+        }
     }
 }
