@@ -319,6 +319,54 @@ class AppScreenTest {
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
+    /**
+     * Task 22-A §二.4 / plan R2-1 的**第六枚判据**（端到端，经宿主）：`AppScreen` 必须真的把
+     * `vocabularyMasteryState` 与 `clearMasteryMessage` 接进「我的词」合并页。
+     *
+     * 为什么必须新立一枚：既有五枚判据钉的是**屏侧**行为与**静态挂点**——`MyWordsScreenTest` 自己传
+     * 复位 lambda、不经宿主，而静态锚 `MyWordsScreenContractTest.the_merged_page_consumes_and_resets_the_mastery_state`
+     * 只读源码形状。老路由（`showVocabulary` / `VocabularyScreen`）摘掉后，合并页是这条反馈面在全站的
+     * **唯一出口**：宿主少接一环时静默失败的代价不再是「少一个框」，而是**用户以为已保存**。
+     *
+     * 形状（一个测试方法只一次 `setContent`）：走宿主打开「我的词」→ 生词本段逐行「标记为已掌握」→
+     * 共享二次确认框确认 → 断 `Success` 结果对话框可见 → 点「知道了」后断它真的消失且不再残留。
+     * 夹具用 `vocabularyViewModelWithOneEntry()`（`NoopLearningEventRepository` 使 `markMastered`
+     * 落到 `SubmitFeedbackResult.Recorded` ⇒ `VocabularyMasteryState.Success`），所以这枚判据穿过的是
+     * 真 ViewModel、真状态流，不是屏侧注入的假回调。
+     *
+     * 反向红凭据（本席留档 `t22A-RED-03-connected-AppScreenTest-hostmastery-wiring.log`）：把宿主
+     * `MyWordsScreen(...)` 的 `masteryState = vocabularyMasteryState` 换成 `VocabularyMasteryState.Idle`
+     * （不动本用例任何被断言字面量的间接路径），本用例即在「结果对话框可见」那一步当场红。
+     */
+    @Test
+    fun mergedPageMasteryResultDialogIsDrivenByTheHostAndClosesOnAck() {
+        composeRule.setContent {
+            readyAppScreen(vocabularyViewModel = vocabularyViewModelWithOneEntry())
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("my_words_wordbook_row_0").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("my_words_wordbook_mastered_0").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("confirm_destructive_confirm").performClick()
+        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("my_words_mastery_result_dialog").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertIsDisplayed()
+        composeRule.onNodeWithText("已标记为掌握").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("my_words_mastery_result_dismiss").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertDoesNotExist()
+        composeRule.onNodeWithText("已标记为掌握").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+    }
+
     @Test
     fun checkInEntryOpensOverlayAndBackReturnsToTodayPlan() {
         composeRule.setContent { readyAppScreen() }
@@ -328,7 +376,9 @@ class AppScreenTest {
             .performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("check_in_screen").assertExists()
-        composeRule.onNodeWithTag("check_in_back").performClick()
+        // Task 22-A §二.1：打卡页页头改用共享 AppScreenHeader 后，返回位没有 testTag（组件返回位只带
+        // contentDescription "返回"），故这里由 tag 选取换成描述选取——语义仍是「点返回位、回调把叠层关掉」，未放宽。
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
         composeRule.onNodeWithTag("check_in_screen").assertDoesNotExist()
