@@ -1890,11 +1890,22 @@ internal val MintBackground: Color
 - Consumes: `WordRow`、`AppScreenHeader`、`EntryRow`、`ScreenUnavailable`。
 - Produces: `enum class MyWordsSection { Favorites, Wordbook, Wrong }`；`@Composable fun MyWordsScreen(section: MyWordsSection = MyWordsSection.Favorites, …)`；三段各自 `testTag("my_words_section_<name>")`。
 
-- [ ] **Step 1（风险前置，spec §10.1）: 评估宿主拆分**
+- [x] **Step 1（风险前置，spec §10.1）: 评估宿主拆分**
   `MyWordsScreen` 要让三个 ViewModel 同宿主并存。**先跑一次最小可行性探针**：一个测试方法内 `setContent { MyWordsScreen(...) }` 且三个 `hiltViewModel()` 并存，确认不崩、数据各自加载（同一测试内两次 `setContent` 真机必崩，故一个方法一个 `setContent`）。
   若探针失败：本任务降级为「三段用同一 ViewModel 的聚合查询端口」，并在 `docs/decisions/2026-10-19-ui-redesign-mywords-host.md` 记录降级方案与影响——**这属架构级取舍，必须先向用户请示再实施**（四件停止事项之一：接口重构影响面大）。
-- [ ] **Step 2: 写失败测试**：三段各自的行渲染正确（收藏段显示收藏词、错词段显示错词）、段标题可读、空态用 `ScreenUnavailable`/空态文案、每段有一个可点进详情的出口。
-- [ ] **Step 3: 实现**：新入口挂到词汇域（三入口文案「查词 / 词表 / 我的词」，参考扇贝单词的简洁三段）；旧入口**保留**，摘除动作在 Task 22 之后或本批收口时执行，并在报告里逐条列出「哪些旧入口仍在」。
+  **本步结案口径（控制者裁定 R-20A.1，2026-10-19；20-D 关闭时补勾本框）**：探针的前提被生产事实否掉——
+  三段所需的三个 ViewModel 在本仓**不是** `hiltViewModel()` 取用的形状，屏侧收的是宿主传入的参数，
+  因此「三 ViewModel 同宿主并存」这一风险在页面上并不存在 ⇒ **不做宿主拆分、不产出上面那份 `docs/decisions/` 文档、
+  不触发「架构级取舍先请示」那条停止事项**；§10.1 的风险陈述据此结案。重算：
+  `grep -rn "hiltViewModel()" app/src/main/java/com/example/englishlearning/ui/MyWordsScreen.kt`
+  （现盘两枚命中**都在 KDoc 注释里**——该处自述「本屏是 state-in，不取 ViewModel、不调 `hiltViewModel()`」⇒ 代码面零调用）。
+- [x] **Step 2: 写失败测试**：三段各自的行渲染正确（收藏段显示收藏词、错词段显示错词）、段标题可读、空态用 `ScreenUnavailable`/空态文案、每段有一个可点进详情的出口。
+  **落地=席位 20-A**：connected `MyWordsScreenTest`（`three_sections_render_in_one_composition` / `empty_sections_show_their_own_honest_copy` /
+  `unavailable_sections_each_offer_a_working_retry` / `section_param_lands_the_viewport_on_that_section` 等）
+  + JVM `MyWordsScreenContractTest`。重算：`grep -n "    fun " app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt`。
+- [x] **Step 3: 实现**：新入口挂到词汇域（三入口文案「查词 / 词表 / 我的词」，参考扇贝单词的简洁三段）；旧入口**保留**，摘除动作在 Task 22 之后或本批收口时执行，并在报告里逐条列出「哪些旧入口仍在」。
+  **落地=席位 20-A**：`MyWordsScreen.kt:136` `title = "我的词"`，旧入口清单在 `task-20A-report.md` §5（逐条「旧入口 + 文件:行」）。
+  摘除动作按本条授权归 **Task 22**（`today_plan_open_vocabulary` / `showVocabulary` 的前置判据已由 20-A-fix 补齐，见台账「Task 22 前置核验」段）。
   - **留名（依 `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta` 的自述规程）**：本步在「今日计划」入口组新增第 7 行「我的词」（`today_plan_open_my_words`），
     该判据的闭合集合因此由 **9 → 10**（1 主 CTA + 1 阅读文章 + 1 常驻查词 + 7 条组内行），已同步改判据与消息文案。
     改动理由 = 裁决①要求的第三枚词汇域入口；「只建不摘」铁律下本屏没有减任何出口，所以是 +1 而不是替换。
@@ -1982,7 +1993,16 @@ internal val MintBackground: Color
     `disabledRowShowsTheUnavailableNoticeInFull`），并跑 `font_scale 2.0` 轮；不先补取证，改完策略无从验收。
   - 组件签名若变（增槽/改宽度），须同步 `WordRowSpeakerContractTest` 的逐槽取色与对比断言 +
     `SharedComponentGeometryContractTest`，并按 Global Constraint 16 给写死的枚数配重算命令。
-- [ ] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。
+- [x] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。
+  **落地口径（20-D 关闭时补勾）**：本任务按席位拆分执行，提交与门禁随各子席逐批落地
+  （20-A / 20-B / 20-C / 20-D 各自的提交链与 `task-20*-report.md`，收工证据在控制者台账），
+  不存在单独一枚 `feat(ui-words)` 汇总提交——本框钉的是「本域门控 + connected 全绿并已提交」这件事成立。
+  收口现值重算（全量门控 + awk 读 XML）：
+  `GRADLE="$HOME/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle.bat"; "$GRADLE" :app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin --no-daemon --no-build-cache --rerun-tasks`
+  后 `ls app/build/test-results/testDebugUnitTest/*.xml | wc -l` 与
+  `awk -F'"' '/<testsuite /{for(i=1;i<=NF;i++){if($(i-1)~/tests=$/)t+=$i;if($(i-1)~/failures=$/)f+=$i;if($(i-1)~/errors=$/)e+=$i}}END{printf "tests=%d failures=%d errors=%d\n",t,f,e}' app/build/test-results/testDebugUnitTest/*.xml`；
+  connected 侧 `MyWordsScreenTest` / `FavoritesScreenTest` / `WrongWordsScreenTest` / `WordBookWordsScreenTest` / `WordRowTest` / `AppScreenTest`
+  逐类 `am instrument -e class`（20-D 修复轮读数 `t20D-fixround-connected.log`）。
 
 ---
 
@@ -1992,9 +2012,24 @@ internal val MintBackground: Color
 - Modify: 词表/字母索引所在屏（现场以 `grep -rln "字母\|Rail\|alphabet" app/src/main/java/com/example/englishlearning/ui` 定位）
 - Test: 该屏 connected 类内增 48dp 命中区用例
 
-- [ ] **Step 1: 写失败测试**：每个字母节点的可点区（`boundsInRoot().height`）≥ 48dp，**不是**视觉高度 48；断言相邻字母命中区不重叠（否则点击落到错字母）。
-- [ ] **Step 2: 实现**：`Modifier.size(48.dp)` 或 `heightIn(min = 48.dp)` + 字形 17dp 居中；Rail 改横向可滚或折叠为「A-F / G-N / O-Z」三段（信息架构级改动，版面选型以不挤压正文为准，写进报告）。
-- [ ] **Step 3: 门控 + connected + 提交**（`fix(ui-words): 字母索引真 48dp 命中区`）。
+- [x] **Step 1: 写失败测试**：每个字母节点的可点区（`boundsInRoot().height`）≥ 48dp，**不是**视觉高度 48；断言相邻字母命中区不重叠（否则点击落到错字母）。
+  **落地=Task 21（`e2c8a48`→`6f6a459`）**：connected `WordBookWordsScreenTest` 的
+  `everyRailLetterIsAFourEightTouchTarget`（26 枚逐枚见方 ≥48dp，容差只给 dp 换算的 0.05dp）+
+  `adjacentRailLetterHitAreasDoNotOverlap`（逐对扫 25 对、断四向分离）+ `activeRailGlyphStaysWithinItsChip` +
+  `railLettersKeepTheTouchTargetFloorInATinyViewport`（`LocalDensity=1f` 下**无换算余量**的硬 48dp 下限）。
+  天然红与逐轮读数见台账 Task 21 段与 `t21-RED-*.log` / `t21-connected-*.log`。
+  重算：`grep -n "fun everyRailLetterIsAFourEightTouchTarget\|fun adjacentRailLetterHitAreasDoNotOverlap\|Density(1f" app/src/androidTest/java/com/example/englishlearning/ui/WordBookWordsScreenTest.kt`。
+- [x] **Step 2: 实现**：`Modifier.size(48.dp)` 或 `heightIn(min = 48.dp)` + 字形 17dp 居中；Rail 改横向可滚或折叠为「A-F / G-N / O-Z」三段（信息架构级改动，版面选型以不挤压正文为准，写进报告）。
+  **落地口径**：选了「横向可滚」这一支（折叠三段会牺牲一眼可达的字母跨度）。Rail 移到内容 Box 之上，
+  `Row` + `horizontalScroll` + `spacedBy(2.dp)`，每枚字母的 48dp 下限钉在**带 `clickable` 的那枚节点自身**（`sizeIn(minWidth = 48.dp, minHeight = 48.dp)`），
+  字形 active 档 17sp；旧的拖拽索引路径（`pointerInput`/`detectDragGestures`/`slotPixels` 等）随改版删除。
+  版面代价与选型理由写在 `task-21-report.md` §2 与 `docs/verification/f5-03-accessibility-hardening-2026-10.md` §5 站点 4（已清偿）。
+  重算：`grep -n "horizontalScroll\|minWidth = 48.dp" app/src/main/java/com/example/englishlearning/ui/WordBookWordsScreen.kt`。
+- [x] **Step 3: 门控 + connected + 提交**（`fix(ui-words): 字母索引真 48dp 命中区`）。
+  提交实际落在 `e2c8a48 → 6e64d23 → 122057f → 17172f3 → 3615dd5 → bc64a29 → 6f6a459`（scope 随各步拆分，非单枚汇总提交）；
+  门控 `t21-gate-fixround.log`、connected `WordBookWordsScreenTest OK (23)` + `AppScreenTest OK (48)`（emulator-5574，双 APK `adb install -r`）。
+  F5-03 移交账「字母 Rail 真 48dp」三处文档同步勾账（`docs/decisions/2026-10-15-f5-03-accessibility-hardening-semantics.md` §5、
+  `docs/verification/f5-03-accessibility-hardening-2026-10.md`、设计规格 §7）。
 
 ---
 
