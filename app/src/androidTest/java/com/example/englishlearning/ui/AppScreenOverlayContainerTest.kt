@@ -240,6 +240,11 @@ class AppScreenOverlayContainerTest {
                 composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithTag("app_tab_settings").performClick()
+            // Task 19 折叠化：词书 SAF 子行收进「词书内容包」一行里，先到达并展开，再走原链路。
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag("settings_word_books").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("settings_word_books").performScrollTo().performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) {
                 composeRule.onAllNodesWithTag("settings_export_word_book").fetchSemanticsNodes().isNotEmpty()
             }
@@ -295,6 +300,13 @@ class AppScreenOverlayContainerTest {
                 composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithTag("app_tab_settings").performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag("settings_word_books").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("settings_word_books").performScrollTo().performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag("settings_export_word_book").fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.onNodeWithTag("settings_export_word_book").performScrollTo().performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) {
                 composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isNotEmpty()
@@ -345,6 +357,10 @@ class AppScreenOverlayContainerTest {
                 composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithTag("app_tab_settings").performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag("settings_word_books").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("settings_word_books").performScrollTo().performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) {
                 composeRule.onAllNodesWithTag("settings_export_word_book").fetchSemanticsNodes().isNotEmpty()
             }

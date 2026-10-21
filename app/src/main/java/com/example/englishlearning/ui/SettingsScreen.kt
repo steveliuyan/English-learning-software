@@ -3,49 +3,49 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.language.domain.PronunciationEngine
-import com.example.englishlearning.ui.components.glass.pressableScale
+import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.EntryIconTone
+import com.example.englishlearning.ui.components.EntryRow
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.ui.theme.AppThemePreferences
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainAccent
-import com.example.englishlearning.ui.theme.DomainColors
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
-import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.ThemeMode
+import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.rememberAppThemeMode
 
 data class SpeechEngineStatuses(
     val miMo: String = "未配置",
@@ -81,30 +81,112 @@ fun SpeechSettingsUiState.engineStatuses(): SpeechEngineStatuses {
 }
 
 /**
- * 「设置」一级页。
+ * 一条设置行的静态描述（AC-R-21 的 IA 数据）。
  *
- * 收纳了原先挂在「今日计划 → 学习工具」里的入口。已实现的项可点；未实现的项**禁用并把
- * 「后续版本」写在副标题里**，而不是做成能点却没反应的假入口。
+ * [icon] 可为 `null`：「主题」行是分段选择卡而不是入口行（稿 §7④），没有行首徽标位；
+ * 其余八行都必须给 [AppIcon] 白名单内的字形——设置页禁止任何文字徽标（AI / ♪ / ⏰ / ℹ / ⭕ / ⚠ / ›）。
+ */
+data class SettingsEntry(
+    val title: String,
+    val tag: String,
+    val icon: AppIcon?,
+    val domain: AppDomain,
+)
+
+/** 设置一级页的一个分组（标题 + 行清单）。 */
+data class SettingsGroup(
+    val title: String,
+    val tag: String,
+    val entries: List<SettingsEntry>,
+)
+
+/**
+ * 设置页信息架构的唯一台账（AC-R-21 / 裁决②）：**恰 4 组、恰 9 行**。
  *
- * 资料卡刻意**不显示「每日新增 N 词」**：当日计划里的 `newTarget` 在词书新词学完时会小于
- * 用户配置的每日目标（PRD FR-01 第 8 条），拿它当「每日新增」是错的。这里只报今日计划的
- * 真实数量，改目标请走「调整词书与目标」。
+ * 落位：「学习」3 行（词书与每日目标 / 学习提醒 / 生成默写纸）、「AI 与语音」2 行、
+ * 「外观与关于」2 行（主题三态 / 开源许可与隐私说明）、「数据与安全」2 行
+ * （词书内容包、备份与恢复——两行都是折叠入口，展开后才见 SAF 与危险操作子行）。
+ * 「学习提醒」按裁决②归「学习」组，不再错挂 AI 组；「账户」整组与两条占位行已删。
  *
- * @param todayNewTarget 今日计划的新词数，`null` 表示今日计划还不可读。
- * @param todayDueTarget 今日计划的待复习词数，`null` 同上。
+ * JVM 侧 `SettingsNoDeveloperJargonTest` 钉本表形状；connected 侧
+ * `SettingsScreenTest` 逐条核对这些 tag 真的渲染出来——两边对不上都会红。
+ */
+object SettingsGroups {
+    val all: List<SettingsGroup> = listOf(
+        SettingsGroup(
+            title = "学习",
+            tag = "settings_group_learning",
+            entries = listOf(
+                SettingsEntry("词书与每日目标", "settings_open_setup", AppIcon.BookOpen, AppDomain.Learn),
+                SettingsEntry("学习提醒", "settings_open_reminder", AppIcon.Clock, AppDomain.Review),
+                SettingsEntry("生成默写纸", "settings_open_worksheet", AppIcon.Document, AppDomain.Learn),
+            ),
+        ),
+        SettingsGroup(
+            title = "AI 与语音",
+            tag = "settings_group_ai_speech",
+            entries = listOf(
+                SettingsEntry("AI 服务与密钥", "settings_open_ai_profiles", AppIcon.Spark, AppDomain.AiSpeech),
+                SettingsEntry("语音朗读", "settings_open_speech", AppIcon.Speaker, AppDomain.AiSpeech),
+            ),
+        ),
+        SettingsGroup(
+            title = "外观与关于",
+            tag = "settings_group_appearance",
+            entries = listOf(
+                SettingsEntry("主题", "settings_theme_mode", null, AppDomain.Settings),
+                SettingsEntry("开源许可与隐私说明", "settings_open_licenses", AppIcon.Info, AppDomain.Settings),
+            ),
+        ),
+        SettingsGroup(
+            title = "数据与安全",
+            tag = "settings_group_data_security",
+            entries = listOf(
+                SettingsEntry("词书内容包", "settings_word_books", AppIcon.Upload, AppDomain.Library),
+                SettingsEntry("备份与恢复", "settings_backup", AppIcon.Shield, AppDomain.Settings),
+            ),
+        ),
+    )
+}
+
+/** 三态在界面上的用户语言标签（存储键仍走 `ThemeMode.storageKey`，这里只是文案）。 */
+private val ThemeMode.userLabel: String
+    get() = when (this) {
+        ThemeMode.System -> "跟随系统"
+        ThemeMode.Light -> "浅色"
+        ThemeMode.Dark -> "深色"
+    }
+
+/**
+ * 「设置」一级页（AC-R-21）：**4 组 9 行**，静态台账见 [SettingsGroups]。
+ *
+ * - 资料卡刻意**不显示任何今日计划数字**：当日统计的职责归打卡页（裁决③），
+ *   而 `newTarget` 在词书新词学完时会小于用户配置的每日目标（PRD FR-01 第 8 条），
+ *   把它当「每日新增」印在设置页更是错的。资料卡只报昵称与词书名。
+ * - 「词书内容包」「备份与恢复」各收成**一行折叠入口**：展开后才是原来的 SAF 子行
+ *   （导入/导出词书；留档导出、认证导出、从旧设备恢复），结果提示也在展开区里以
+ *   [InlineNotice] 呈现。SAF 拉起、认证与删除确认链路一行未动，本屏只改呈现层级。
+ * - 「删除全部学习数据」退出设置一级页（裁决⑥的方向），下沉到「备份与恢复」展开区末节；
+ *   级联预览 + 二次确认仍由 AppScreen 宿主承载（F4-01 Spec 04 L18），语义不变。
+ * - 「主题」为三态分段选择：选中即 `AppThemePreferences.write`，回读经
+ *   [rememberAppThemeMode] 的监听让整棵树即时换套，无需重启。
+ *
+ * @param importedBookCount 已导入的词书册数，决定导出子标题与可点性。
+ * @param transferBusy 导入/导出进行中：子行回调被按住（副标题显示处理中），避免重复拉起文件选择器。
+ * @param transferMessage 导入/导出的一句结果提示，`null` 时不占位；在词书内容包展开区呈现。
+ * @param deleteAllLearningDataNotice 「删除全部学习数据」的一句结果回执，`null` 时不占位；
+ *   在备份与恢复展开区呈现。
  */
 @Composable
 fun SettingsScreen(
     profileName: String,
     wordBookName: String?,
-    todayNewTarget: Int?,
-    todayDueTarget: Int?,
     onOpenSetup: () -> Unit,
     onOpenWorksheet: () -> Unit,
     onOpenAiProfiles: () -> Unit,
     onOpenSpeechSettings: () -> Unit = {},
     onOpenReminderSettings: () -> Unit = {},
-    /** 备份导出入口：打开无认证 Salvage 包导出确认页（SAF 另存为）。 */
+    /** 备份导出入口：打开无认证留档包导出确认页（SAF 另存为，F4-03）。 */
     onOpenBackupExport: () -> Unit = {},
     onOpenBackupRestore: () -> Unit = {},
     /** 认证导出入口：旧设备系统认证 + 配对二维码 + 可选密码的受保护备份导出（F4-04）。 */
@@ -116,325 +198,345 @@ fun SettingsScreen(
     onImportWordBook: () -> Unit = {},
     /** 词书导出入口：拉起系统「另存为」（SAF）。 */
     onExportWordBook: () -> Unit = {},
-    /** 已导入的词书册数，决定导出副标题与可点性。 */
     importedBookCount: Int = 0,
-    /** 导入/导出进行中：入口置灰，避免重复拉起文件选择器。 */
     transferBusy: Boolean = false,
-    /** 导入/导出的一句结果提示，`null` 时不占位。 */
     transferMessage: String? = null,
     /** 危险操作入口（F4-01 决策 §9）：打开「删除全部学习数据」的级联预览+二次确认框。 */
     onDeleteAllLearningData: () -> Unit = {},
-    /** 「删除全部学习数据」的一句结果回执（删除成功或预览读取失败），`null` 时不占位。 */
     deleteAllLearningDataNotice: String? = null,
     /** F5-04「关于与开源许可」入口（AC5-04）：必须是真实可达页面，不许做假入口。 */
     onOpenLicenses: () -> Unit = {},
 ) {
+    val colors = appColors()
+    val context = LocalContext.current
+    val themeMode = rememberAppThemeMode()
+    var wordBooksExpanded by rememberSaveable { mutableStateOf(false) }
+    var backupExpanded by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MintBackground)
+            .background(colors.background)
+            // 底部导航会吃掉一截高度，小屏或大字号下整页必须可滚动，否则最后一组被裁掉。
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 20.dp)
+            .padding(horizontal = 20.dp, vertical = 24.dp)
             .testTag("settings_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("设置", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+        AppScreenHeader(
+            title = "设置",
+            subtitle = "学习、AI、语音、数据与外观。API Key 只保存在本机加密区。",
+        )
 
         Card(
-            colors = CardDefaults.cardColors(containerColor = MintSurface),
-            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, MintOutline, RoundedCornerShape(24.dp))
+                .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
                 .testTag("settings_profile_card"),
         ) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(profileName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(profileName, style = AppType.Title, color = colors.text1)
                 Text(
                     text = wordBookName ?: "尚未选择词书",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MintTextMuted,
+                    style = AppType.Footnote,
+                    color = colors.text2,
                     modifier = Modifier.testTag("settings_profile_word_book"),
-                )
-                Text(
-                    text = when {
-                        todayNewTarget == null || todayDueTarget == null -> "今日计划还没读出来"
-                        else -> "今日计划：新增 $todayNewTarget · 复习 $todayDueTarget"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                    modifier = Modifier.testTag("settings_profile_summary"),
                 )
             }
         }
 
-        SettingsGroup(title = "学习", tag = "settings_group_learning") {
-            SettingsActionRow(
-                title = "调整词书与目标",
+        // 「学习」组三条入口行按稿 §7④：词书与每日目标走强档渐变底，其余弱档 tint；
+        // 「学习提醒」保持导航行（开关状态在二级页），副标题沿用既有文案。
+        SettingsGroupSection(SettingsGroups.all[0]) {
+            EntryRow(
+                icon = AppIcon.BookOpen,
+                domain = AppDomain.Learn,
+                title = "词书与每日目标",
                 subtitle = "换词书、改每日新增量、改反馈后的详情开关",
-                tag = "settings_open_setup",
+                iconTone = EntryIconTone.Gradient,
+                modifier = Modifier.testTag("settings_open_setup"),
                 onClick = onOpenSetup,
             )
-            SettingsActionRow(
+            EntryRow(
+                icon = AppIcon.Clock,
+                domain = AppDomain.Review,
+                title = "学习提醒",
+                subtitle = "每日提醒，默认关闭（非精确、每天最多一次）",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("settings_open_reminder"),
+                onClick = onOpenReminderSettings,
+            )
+            EntryRow(
+                icon = AppIcon.Document,
+                domain = AppDomain.Learn,
                 title = "生成默写纸",
                 subtitle = "选中译英或英译中，预览后导出可打印 PDF",
-                tag = "settings_open_worksheet",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("settings_open_worksheet"),
                 onClick = onOpenWorksheet,
             )
         }
 
-        SettingsGroup(title = "阅读", tag = "settings_group_reading") {
-            SettingsPendingRow(
-                title = "文章类型与长度偏好",
-                subtitle = "后续版本：目前可在「阅读」页选择默认类型",
-                tag = "settings_pending_reading",
-            )
-        }
-
         // 「AI 与语音」是这一页唯一的云服务入口组：一级页只放两个可点入口，引擎状态与
-        // 「待接入」厂商属于二级页的信息量——此前它们在一级页占了近一半屏（9 行里 6 行
-        // 点不了），用户学习成本过高。
-        SettingsGroup(title = "AI 与语音", tag = "settings_group_ai_speech") {
-            SettingsActionRow(
+        // 「待接入」厂商属于二级页的信息量——它们在一级页占过近一半屏，用户学习成本过高。
+        SettingsGroupSection(SettingsGroups.all[1]) {
+            EntryRow(
+                icon = AppIcon.Spark,
+                domain = AppDomain.AiSpeech,
                 title = "AI 服务与密钥",
                 subtitle = aiProfileSubtitle ?: "添加多套 OpenAI 兼容服务，管理 Endpoint、模型与密钥",
-                tag = "settings_open_ai_profiles",
+                iconTone = EntryIconTone.Gradient,
+                modifier = Modifier.testTag("settings_open_ai_profiles"),
                 onClick = onOpenAiProfiles,
-                badge = "AI",
-                accent = DomainColors.Settings,
             )
-            SettingsActionRow(
+            EntryRow(
+                icon = AppIcon.Speaker,
+                domain = AppDomain.AiSpeech,
                 title = "语音朗读",
                 subtitle = "当前供应商：${speechEngineStatuses.currentProvider}",
-                tag = "settings_open_speech",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("settings_open_speech"),
                 onClick = onOpenSpeechSettings,
-                badge = "♪",
-                accent = DomainColors.AiSpeech,
-            )
-            SettingsActionRow(
-                title = "学习提醒",
-                subtitle = "每日提醒，默认关闭（非精确、每天最多一次）",
-                tag = "settings_open_reminder",
-                onClick = onOpenReminderSettings,
-                badge = "⏰",
-                accent = DomainColors.Settings,
             )
         }
 
-        SettingsGroup(title = "账户", tag = "settings_group_account") {
-            SettingsPendingRow(
-                title = "昵称与头像",
-                subtitle = "后续版本：支持更换昵称与自定义头像",
-                tag = "settings_pending_profile",
-            )
-            SettingsActionRow(
-                title = "关于与开源许可",
+        // 「外观与关于」：主题三态分段卡（稿 §7④「主题」卡）+ 许可入口行，两张卡共用一个组标题。
+        // 分段选中即写偏好；[rememberAppThemeMode] 的监听让装配点即时换套。
+        SettingsGroupSectionHeader(SettingsGroups.all[2])
+        ThemeModeRow(mode = themeMode, onSelect = { AppThemePreferences.write(context, it) })
+        SettingsGroupCard {
+            EntryRow(
+                icon = AppIcon.Info,
+                domain = AppDomain.Settings,
+                title = "开源许可与隐私说明",
                 subtitle = "第三方组件、许可证与隐私说明",
-                tag = "settings_open_licenses",
+                iconTone = EntryIconTone.Tint,
+                modifier = Modifier.testTag("settings_open_licenses"),
                 onClick = onOpenLicenses,
-                badge = "ℹ",
-                accent = DomainColors.Settings,
             )
         }
 
-        // 词书导入/导出走的是**完全离线**的 `.wbpack`：文件由用户自己传递，不依赖任何服务器。
-        // 独立成组是因为它既不属于「学习」也不属于「账户」——它是内容包管理。
-        SettingsGroup(title = "词书内容包", tag = "settings_group_word_books") {
-            SettingsActionRow(
-                title = "导入词书",
-                subtitle = if (transferBusy) {
-                    "正在处理，请稍候…"
-                } else {
-                    "选择 `.wbpack` 文件，校验通过后加入本机词书"
-                },
-                tag = "settings_import_word_book",
-                onClick = onImportWordBook,
-                badge = "↓",
-                accent = DomainColors.Library,
-                enabled = !transferBusy,
+        // 词书内容包与备份与恢复各收成一行折叠入口（R-B）：SAF 子行与结果提示
+        // 只在展开区出现；busy 时子行回调被按住，语义与原「置灰不可点」一致。
+        SettingsGroupSection(SettingsGroups.all[3]) {
+            EntryRow(
+                icon = AppIcon.Upload,
+                domain = AppDomain.Library,
+                title = "词书内容包",
+                subtitle = "导入 / 导出 .wbpack · 全离线",
+                iconTone = EntryIconTone.Tint,
+                modifier = Modifier.testTag("settings_word_books"),
+                onClick = { wordBooksExpanded = !wordBooksExpanded },
             )
-            SettingsActionRow(
-                title = "导出词书",
-                subtitle = when {
-                    transferBusy -> "正在处理，请稍候…"
-                    importedBookCount > 0 -> "已导入 $importedBookCount 册，导出为 `.wbpack` 分享给别的设备"
-                    else -> "先导入一册词书后才能导出"
-                },
-                tag = "settings_export_word_book",
-                onClick = onExportWordBook,
-                badge = "↑",
-                accent = DomainColors.Library,
-                enabled = !transferBusy && importedBookCount > 0,
-            )
-            transferMessage?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintPrimaryDark,
-                    modifier = Modifier
-                        .padding(vertical = 6.dp)
-                        .testTag("settings_word_book_message")
-                        .semantics { contentDescription = message },
+            if (wordBooksExpanded) {
+                EntryRow(
+                    icon = AppIcon.Upload,
+                    domain = AppDomain.Library,
+                    title = "导入词书",
+                    subtitle = if (transferBusy) {
+                        "正在处理，请稍候…"
+                    } else {
+                        "选择 `.wbpack` 文件，校验通过后加入本机词书"
+                    },
+                    iconTone = EntryIconTone.Tint,
+                    topDivider = true,
+                    modifier = Modifier.testTag("settings_import_word_book"),
+                    onClick = { if (!transferBusy) onImportWordBook() },
                 )
-            }
-        }
-
-        // F4-03：数据留档导出走本机 SAF「另存为」，文件由用户自持，无账户、无云同步。
-        // 明确是**不可用于认证恢复**的 Salvage 包，故入口文案不承诺「备份/恢复」，只说「导出留档」。
-        SettingsGroup(title = "数据备份", tag = "settings_group_backup") {
-            SettingsActionRow(
-                title = "导出学习数据留档",
-                subtitle = "生成 `.elpbak` 文件（不含 API Key，暂不可用于认证恢复）",
-                tag = "settings_open_backup_export",
-                onClick = onOpenBackupExport,
-                badge = "⭕",
-                accent = DomainColors.Settings,
-            )
-            SettingsActionRow(
-                title = "认证导出（可用于新设备恢复）",
-                subtitle = "旧设备系统认证后生成配对码与受保护备份（F4-04）",
-                tag = "settings_open_backup_pairing_export",
-                onClick = onOpenBackupPairingExport,
-                badge = "⭕",
-                accent = DomainColors.Settings,
-            )
-            SettingsActionRow(
-                title = "从旧设备恢复（认证恢复）",
-                subtitle = "扫描旧设备配对码并替换本机数据（F4-04）",
-                tag = "settings_open_backup_restore",
-                onClick = onOpenBackupRestore,
-                badge = "⭕",
-                accent = DomainColors.Settings,
-            )
-        }
-
-        // F4-01 决策 §9：删除全部学习数据是全机唯一会清空学习事实的入口。Spec 04 L18
-        // 要求级联影响+二次确认——确认框在 AppScreen 宿主，本行只发 request。
-        // 文案讲清保留面（文章与收藏不删）与不可撤销。
-        SettingsGroup(title = "危险操作", tag = "settings_group_danger") {
-            SettingsActionRow(
-                title = "删除全部学习数据",
-                subtitle = "清空学习记录、复习调度、每日计划与阅读完成；文章与收藏保留",
-                tag = "settings_delete_all_learning_data",
-                onClick = onDeleteAllLearningData,
-                badge = "⚠",
-                accent = DomainColors.Danger,
-            )
-            deleteAllLearningDataNotice?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintPrimaryDark,
-                    modifier = Modifier
-                        .padding(vertical = 6.dp)
-                        .testTag("settings_delete_all_learning_data_notice")
-                        .semantics { contentDescription = message },
+                EntryRow(
+                    icon = AppIcon.Download,
+                    domain = AppDomain.Library,
+                    title = "导出词书",
+                    subtitle = when {
+                        transferBusy -> "正在处理，请稍候…"
+                        importedBookCount > 0 -> "已导入 $importedBookCount 册，导出为 `.wbpack` 分享给别的设备"
+                        else -> "先导入一册词书后才能导出"
+                    },
+                    iconTone = EntryIconTone.Tint,
+                    topDivider = true,
+                    modifier = Modifier.testTag("settings_export_word_book"),
+                    onClick = { if (!transferBusy && importedBookCount > 0) onExportWordBook() },
                 )
+                transferMessage?.let { message ->
+                    InlineNotice(
+                        text = message,
+                        kind = InlineNoticeKind.Info,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun SettingsGroup(title: String, tag: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MintPrimaryDark,
-            modifier = Modifier.testTag(tag),
-        )
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MintSurface),
-            shape = RoundedCornerShape(22.dp),
-            modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(22.dp)),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { content() }
+            EntryRow(
+                icon = AppIcon.Shield,
+                domain = AppDomain.Settings,
+                title = "备份与恢复",
+                subtitle = "导出本机文件、换机恢复与清空学习数据",
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier.testTag("settings_backup"),
+                onClick = { backupExpanded = !backupExpanded },
+            )
+            if (backupExpanded) {
+                EntryRow(
+                    icon = AppIcon.Download,
+                    domain = AppDomain.Settings,
+                    title = "导出学习数据留档",
+                    subtitle = "生成 `.elpbak` 文件（不含密钥，暂不可用于认证恢复）",
+                    iconTone = EntryIconTone.Tint,
+                    topDivider = true,
+                    modifier = Modifier.testTag("settings_open_backup_export"),
+                    onClick = onOpenBackupExport,
+                )
+                EntryRow(
+                    icon = AppIcon.Shield,
+                    domain = AppDomain.Settings,
+                    title = "认证导出（可用于新设备恢复）",
+                    subtitle = "旧设备系统认证后生成配对码与受保护备份",
+                    iconTone = EntryIconTone.Tint,
+                    topDivider = true,
+                    modifier = Modifier.testTag("settings_open_backup_pairing_export"),
+                    onClick = onOpenBackupPairingExport,
+                )
+                EntryRow(
+                    icon = AppIcon.Upload,
+                    domain = AppDomain.Settings,
+                    title = "从旧设备恢复（认证恢复）",
+                    subtitle = "扫描旧设备配对码并替换本机数据",
+                    iconTone = EntryIconTone.Tint,
+                    topDivider = true,
+                    modifier = Modifier.testTag("settings_open_backup_restore"),
+                    onClick = onOpenBackupRestore,
+                )
+                // F4-01 Spec 04 L18：级联影响 + 二次确认在 AppScreen 宿主；本行只发 request。
+                EntryRow(
+                    icon = AppIcon.Trash,
+                    domain = AppDomain.Danger,
+                    title = "删除全部学习数据",
+                    subtitle = "清空学习记录、复习调度、每日计划与阅读完成；文章与收藏保留",
+                    iconTone = EntryIconTone.Tint,
+                    topDivider = true,
+                    modifier = Modifier.testTag("settings_delete_all_learning_data"),
+                    onClick = onDeleteAllLearningData,
+                )
+                deleteAllLearningDataNotice?.let { message ->
+                    InlineNotice(
+                        text = message,
+                        kind = InlineNoticeKind.Info,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
         }
     }
 }
 
 /**
- * 可点入口行。传 `badge` + `accent` 时为域色化形态：行首 32dp 圆角域色方块（白色符号）、
- * 文字层级用 AppType、按压缩放反馈；不传时保持旧版视觉（其他分组，批 2/3 再改）。
+ * 主题三态选择卡（稿 §7④「主题」分段控件）：纯展示组件——[mode] 进、[onSelect] 出，
+ * 写偏好与回读由调用方接线（`AppThemePreferences.write` + `rememberAppThemeMode()`）。
+ *
+ * 三档标签固定为「跟随系统 / 浅色 / 深色」；每档可点面 `heightIn(min = 48.dp)`（F5-03 触控下限）。
  */
 @Composable
-private fun SettingsActionRow(
-    title: String,
-    subtitle: String,
-    tag: String,
-    onClick: () -> Unit,
-    badge: String? = null,
-    accent: DomainAccent? = null,
-    enabled: Boolean = true,
-) {
-    val domainStyled = badge != null && accent != null
-    val interaction = remember { MutableInteractionSource() }
-    Row(
+fun ThemeModeRow(mode: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    val colors = appColors()
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(18.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .testTag(tag)
-            .then(
-                if (enabled && domainStyled) {
-                    Modifier
-                        .pressableScale(interaction)
-                        .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                } else if (enabled) {
-                    Modifier.clickable(onClick = onClick)
-                } else {
-                    Modifier
-                },
-            )
-            .semantics { contentDescription = title },
-        verticalAlignment = Alignment.CenterVertically,
+            .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
+            .testTag("settings_theme_mode"),
     ) {
-        if (domainStyled) {
-            Box(
-                modifier = Modifier.size(32.dp).background(accent.deep, AppShape.Button),
-                contentAlignment = Alignment.Center,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("主题", style = AppType.Body, fontWeight = FontWeight.Bold, color = colors.text1)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.outlineSoft, AppShape.Button)
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Text(badge, style = AppType.Label, color = Color.White, textAlign = TextAlign.Center)
+                ThemeMode.entries.forEach { option ->
+                    val selected = option == mode
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(if (selected) colors.surface else Color.Transparent)
+                            .clickable { onSelect(option) }
+                            .heightIn(min = 48.dp)
+                            .testTag("settings_theme_${option.storageKey}"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = option.userLabel,
+                            style = AppType.Footnote,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) colors.text1 else colors.text2,
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.width(12.dp))
-        }
-        Column(Modifier.weight(1f)) {
             Text(
-                title,
-                style = if (domainStyled) AppType.Title else MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (enabled) MintPrimaryDark else MintTextMuted,
-            )
-            Text(
-                subtitle,
-                style = if (domainStyled) AppType.Footnote else MaterialTheme.typography.bodySmall,
-                color = MintTextMuted,
+                text = "切换后立即生效，仅影响本机显示，不属于学习数据。",
+                style = AppType.Footnote,
+                color = colors.text2,
             )
         }
-        Text("›", style = MaterialTheme.typography.titleLarge, color = MintPrimary)
     }
 }
 
-/**
- * 未实现项：整行不可点，并在右侧挂一个明确的标记，避免被误认为坏掉的按钮。
- */
+/** 分组标题（`.sec-title`）：标题文字与 tag 都取自 [SettingsGroups] 台账，别在调用处另写一份。 */
 @Composable
-private fun SettingsPendingRow(title: String, subtitle: String, tag: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag(tag),
-        verticalAlignment = Alignment.CenterVertically,
+private fun SettingsGroupSectionHeader(group: SettingsGroup) {
+    Text(
+        text = group.title,
+        style = AppType.Body,
+        fontWeight = FontWeight.Bold,
+        color = appColors().text1,
+        modifier = Modifier.testTag(group.tag),
+    )
+}
+
+/** 分组卡壳：标题 + `surface` 容器卡（18dp 圆角 + `outlineSoft` 描边），行内容交给 [content]。 */
+@Composable
+private fun SettingsGroupSection(group: SettingsGroup, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SettingsGroupSectionHeader(group)
+        SettingsGroupCard(content = content)
+    }
+}
+
+/** 只有卡壳、不带标题的分组容器（供「外观与关于」这类「标题下两张卡」的组用）。 */
+@Composable
+private fun SettingsGroupCard(content: @Composable ColumnScope.() -> Unit) {
+    val colors = appColors()
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp)),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MintTextMuted)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
-        }
-        Row(
-            modifier = Modifier.background(MintTint, RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text("后续版本", style = MaterialTheme.typography.labelSmall, color = MintPrimaryDark)
-        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            content = content,
+        )
     }
 }

@@ -68,7 +68,6 @@ import kotlin.test.assertTrue
  */
 internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     "AiProfileSettingsScreen.kt" to 8,
-    "SettingsScreen.kt" to 10,
     "SpeechSettingsScreen.kt" to 5,
     "components/glass/GlassButton.kt" to 1,
     "CheckInScreen.kt" to 7,

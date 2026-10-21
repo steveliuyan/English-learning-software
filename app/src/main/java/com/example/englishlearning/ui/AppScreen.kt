@@ -1629,8 +1629,6 @@ fun AppScreen(
                                 SettingsScreen(
                                     profileName = state.profile.displayName,
                                     wordBookName = todayReady?.wordBookName,
-                                    todayNewTarget = todayReady?.newTarget,
-                                    todayDueTarget = todayReady?.dueTarget,
                                     onOpenSetup = { showSetup = true },
                                     onOpenWorksheet = {
                                         worksheetViewModel?.load(state.profile.id)

@@ -180,7 +180,6 @@ class SharedComponentUniquenessRatchetTest {
             "ReadingAccessScreen.kt",
             "ReadingHistoryScreen.kt",
             "SentenceAnalysisScreen.kt",
-            "SettingsScreen.kt",
             "VocabularyScreen.kt",
             "WordAiQaScreen.kt",
             "WordCardScreen.kt",
