@@ -682,10 +682,13 @@ class SharedComponentUniquenessRatchetTest {
      * 词行族 seed 必须**恰好**是 spec §3 点名的六枚原始名单减去已接线的三屏（防「规则形状改了、
      * seed 数字凑巧还对」，也防「摘了 seed 行但那一屏根本没接线」）。
      *
-     * 20-B 之前的形态（逐字点名六枚）已由本条改成「seed ∪ 已接线三屏 == spec §3 六枚」的**并集精确相等**：
-     * 台账会随接线递减（类 KDoc 与 [componentFamilySeeds] 的口径），把六枚硬钉在 seed 上会让每一次合法递减
-     * 都变成改断言；改成并集后，「名单来源」这一半仍然一次都漂不掉（多一枚、少一枚、换成没在 spec 名单里的
-     * 新屏都当场红），而「摘行」那一半改成要额外举证（下面三条），比旧写法更严不是更宽。
+     * 形状史（修复轮 1 · F3）：20-B 首轮把旧的「逐字点名六枚」改成「seed ∪ `wiredByTask20B` 字面量 == spec §3 六枚」，
+     * 但那份字面量把**台账内容**抄成了第二真值——下一次合法摘行仍要改测试本体。现已改成**推导**：
+     * `wired = spec 六枚 − seed`，seed 是台账唯一真值。「名单来源」那一半仍一次都漂不掉
+     * （`seed ∪ 推导出的 wired == spec 六枚` 恰等价于「seed 不得混入 spec 名单之外的文件」，塞一枚名单外的屏当场红）；
+     * 「摘行」那一半逐枚举证（下面②两条），举证面**自动跟随台账**：合法摘一行，该屏立刻落进举证集合；
+     * 恢复一行，`each_family_offender_set_equals_its_seed_exactly` 的差集当场判红。不弱于首轮写法的自证：
+     * 四个攻击面（塞入名单外屏 / 摘行未接线 / 接线未清窗 / 恢复六枚）逐条跑过，结果记在修复轮报告。
      *
      * 摘行的合法性（与页头族 [removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared]
      * 同口径，R-13.1 给词行族补的那道门）：每枚已摘 seed 行的屏必须同时满足
@@ -715,27 +718,19 @@ class SharedComponentUniquenessRatchetTest {
             "WordBookWordsScreen.kt",
             "WrongWordsScreen.kt",
         )
-        val wiredByTask20B = setOf(
-            "FavoritesScreen.kt",
-            "WordBookWordsScreen.kt",
-            "WrongWordsScreen.kt",
-        )
         val seed = componentFamilySeeds.getValue("词行（应调 WordRow）")
-        // ① 名单来源仍然钉死：台账 ∪ 已摘行的三枚 == spec §3 的六枚，逐枚相等。
+        // F3（修复轮 1）：已摘行集合不再抄成字面量——台账的唯一真值是 seed 本身，摘了哪些由差集推导；
+        // 下一次合法递减只删台账行、不动本测试本体。
+        val wired = specWordRowFiles - seed
+        // ① 名单来源仍然钉死：seed 不得混入 spec §3 名单之外的文件（台账 ∪ 推导出的已摘行 == 六枚，逐枚相等）。
         assertEquals(
             specWordRowFiles,
-            seed + wiredByTask20B,
-            "词行族 seed 与「spec §3 点名的六枚减去本批已接线的三枚」不符（改 seed 前先改规则形状并说明理由；" +
+            seed + wired,
+            "词行族 seed 混入了 spec §3 名单之外的文件（改 seed 前先改规则形状并说明理由；" +
                 "把没在 spec 名单里的屏塞进 seed 也算不符）",
         )
-        assertEquals(
-            setOf("GlobalVocabularySearchScreen.kt", "LearningRecordsScreen.kt", "VocabularyScreen.kt"),
-            seed,
-            "词行族台账现况（重算命令见 [componentFamilySeeds] KDoc）：Task 20-B 摘三屏后剩这三枚，" +
-                "多一枚即有新债未登记，少一枚即有人删行未举证",
-        )
         // ② 摘行的合法性：已摘 seed 行的屏必须真调 WordRow(，且本族私有词行窗口清零。
-        wiredByTask20B.forEach { name ->
+        wired.forEach { name ->
             val source = uiScreenSource(name)
             assertTrue(
                 sharedWordRowCall.containsMatchIn(source),
