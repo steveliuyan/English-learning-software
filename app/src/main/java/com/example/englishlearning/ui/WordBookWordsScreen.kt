@@ -4,11 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.height
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,13 +12,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -37,7 +30,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -45,13 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.floor
 import kotlinx.coroutines.launch
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
@@ -66,8 +54,8 @@ import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
 
 /**
- * 词书单词浏览页（D2）：字母分组 + 右侧 A–Z 快速导航栏。
- * 默认落在 A 组顶部，点右侧字母直接跳到对应组，不用长滑找词。
+ * 词书单词浏览页（D2）：字母分组 + 顶部横向可滚的 A–Z 快速索引（Task 21 起为 48dp 芯片条）。
+ * 默认落在 A 组顶部，点索引字母直接跳到对应组，不用长滑找词。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -128,6 +116,23 @@ fun WordBookWordsScreen(
             )
         }
         WordBookWordsFilterBar(state, onFilter)
+        // Task 21：字母索引从右侧竖排压缩槽搬到正文上方的横向可滚 48dp 芯片条
+        // （Rail 的显示条件与挂载语义逐字保留：载入中/不可用时不出现）。
+        if (!state.loading && state.error == null) {
+            WordBookWordsAlphabetRail(
+                availableLetters = groups.map { it.letter }.toSet(),
+                currentLetter = currentLetter,
+                onLetter = { letter ->
+                    // 点了没有单词的字母时跳到「字母序最近的下一组」，避免点了没反应。
+                    val target = groups.firstOrNull { it.letter >= letter }?.letter
+                        ?: groups.lastOrNull()?.letter
+                        ?: return@WordBookWordsAlphabetRail
+                    headerIndices[target]?.let { index ->
+                        railScope.launch { listState.scrollToItem(index) }
+                    }
+                },
+            )
+        }
         Box(Modifier.fillMaxSize()) {
             when {
                 state.loading -> Column(
@@ -174,24 +179,6 @@ fun WordBookWordsScreen(
                         }
                     }
                 }
-            }
-            if (!state.loading && state.error == null) {
-                WordBookWordsAlphabetRail(
-                    availableLetters = groups.map { it.letter }.toSet(),
-                    currentLetter = currentLetter,
-                    onLetter = { letter ->
-                        // 点了没有单词的字母时跳到「字母序最近的下一组」，避免点了没反应。
-                        val target = groups.firstOrNull { it.letter >= letter }?.letter
-                            ?: groups.lastOrNull()?.letter
-                            ?: return@WordBookWordsAlphabetRail
-                        headerIndices[target]?.let { index ->
-                            railScope.launch { listState.scrollToItem(index) }
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 4.dp),
-                )
             }
         }
     }
@@ -284,7 +271,17 @@ private fun WordBookWordsEmpty() {
     )
 }
 
-/** 右侧 A–Z 导航栏：26 个字母常驻；有单词的字母高亮，没有的变淡但仍可点（跳到最近一组）。 */
+/**
+ * 正文上方的 A–Z 导航条（Task 21 / F5-03 移交账 AC-R-04）：26 枚 **48dp 见方**字母芯片横向可滚。
+ * 有单词的字母高亮、当前组更醒目，没有的变淡但仍可点（挂载点保留「跳字母序最近的下一组」）。
+ *
+ * 版面选型（裁定 R-21.1，理由见 task-21 报告）：AC-R-04 约束的是控件**高度** ≥48dp，
+ * 横向滚动容器让 26 枚方形目标各占 48dp 宽且互不重叠；本屏 `WordBookWordsFilterBar` 已是
+ * `horizontalScroll` + chip 的同款先例。三段折叠会把「任一字母一次直达」变成两次操作，
+ * 且 26×48dp=1248dp 的纵向空间远超屏高。
+ * 旧竖排压缩槽（`slotPixels = min(18dp, maxHeight/26)`，命中区 ≈24×13dp）连同其**代偿输入路径**
+ * ——整轨 `pointerInput` 拖动面——一并退役（豁免注记见 `docs/decisions/2026-10-15-f5-03-accessibility-hardening-semantics.md` §5）。
+ */
 @Composable
 private fun WordBookWordsAlphabetRail(
     availableLetters: Set<String>,
@@ -292,80 +289,54 @@ private fun WordBookWordsAlphabetRail(
     onLetter: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val latestOnLetter by rememberUpdatedState(onLetter)
-    BoxWithConstraints(modifier.width(24.dp).fillMaxHeight()) {
-        val density = LocalDensity.current
-        // 布局和手势共用整数像素槽高，避免小高度下逐槽取整产生累计定位误差。
-        val slotPixels = with(density) { floor(minOf(18.dp, maxHeight / 26).toPx()).coerceAtLeast(1f) }
-        val slotHeight = with(density) { slotPixels.toDp() }
-        val activeFontSize = with(density) {
-            // 压缩高度下按字形安全比例缩小，保留比普通字母更醒目的字号但不让字形越过行框。
-            minOf(16.sp.toPx(), (slotHeight.toPx() * 0.7f).coerceAtLeast(10.sp.toPx())).toSp()
-        }
-        val activeLineHeight = 16.sp
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .testTag("wordbook_words_rail")
-                .pointerInput(slotPixels) {
-                    fun navigate(y: Float) {
-                        val index = (y / slotPixels).toInt().coerceIn(0, 25)
-                        latestOnLetter(('A'.code + index).toChar().toString())
-                    }
-                    detectDragGestures(
-                        onDragStart = { navigate(it.y) },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            navigate(change.position.y)
-                        },
-                    )
-                },
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            ('A'..'Z').forEach { letter ->
-                val letterText = letter.toString()
-                val available = letterText in availableLetters
-                val active = letterText == currentLetter
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .testTag("wordbook_words_rail")
+            // 左右 20dp 与本屏 `WordBookWordsFilterBar` 的同款横向滚动条一致（贴边会把芯片顶到屏幕边缘）；
+            // 竖向只给 6dp：芯片本身已是 48dp，再叠 FilterBar 那 10dp 会让索引条吃掉过多正文高度。
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ('A'..'Z').forEach { letter ->
+            val letterText = letter.toString()
+            val available = letterText in availableLetters
+            val active = letterText == currentLetter
+            // 外层只管「当前字母」这枚标签：**同一枚 modifier 链上挂两次 `testTag` 后者会被静默丢弃**
+            // （设备实测：合并后 `wordbook_words_rail_active_*` 在语义树里彻底消失，23 例里 17 例连带红），
+            // 所以 active 标签必须由独立语义节点承载。旧竖排也是这个形状（槽 Box + 字形 Text 两枚节点）。
+            Box(
+                modifier = if (active) Modifier.testTag("wordbook_words_rail_active_$letterText") else Modifier,
+                contentAlignment = Alignment.Center,
+            ) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(slotHeight).testTag("wordbook_words_rail_$letterText"),
+                    modifier = Modifier
+                        // 48dp 下限钉在**这枚带 clickable 的节点自身**（AC-R-04 要的是可点区，不是视觉高度）；
+                        // 用下限而不是 `size`，动态字体下芯片随字号只增不减。`spacedBy(2.dp)` 保证相邻命中区不相交，
+                        // 旧压缩槽「命中区落在整槽内并覆盖槽心」那套代偿护栏因此退役。
+                        // 颜色只读既有薄荷令牌，本函数不新增裸 hex / `AppPalette.` / `DomainColors.` 静态读点。
+                        .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                        .clickable(onClick = { onLetter(letterText) })
+                        .testTag("wordbook_words_rail_$letterText"),
+                    // 字形由 Box 居中，不靠 `lineHeight` 撑高：后者会让 `TextLayoutResult.hasVisualOverflow`
+                    // 为真（设备实测），把「字形不越界」这条护栏变成假红。
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = letterText,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = { onLetter(letterText) })
-                            // F5-03 / Task 10 取证后决定：字母栏**不加** minimumInteractiveComponentSize()。
-                            // 设备实测（emulator-5574）：加上后字母命中区确实扩到 ≥48dp（尺寸断言转绿），
-                            // 但 26 个槽的间距只有 slotPixels≈18dp，48dp 目标两两重叠，
-                            // 点 F 槽被后画的相邻字母抢走 —— 既有 connected 用例
-                            // `WordBookWordsScreenTest.tappingTheActualRailSlotUsesTheLetterClickAction` 直接红
-                            // （active_F 不再显示）。18dp 间距下任何 >18dp 的方形目标都必然重叠，
-                            // 26×48dp=1248dp 也远超屏高，故本屏 48dp 结构性不可达；
-                            // 命中区必须**落在整槽之内并覆盖槽心**（当前 ≈24×13dp，槽 24×18dp，纵向未铺满；
-                            // 护栏见同文件 railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre），
-                            // 48dp 在本屏结构性不可达，豁免见决策 §5 注记，真正的 48dp 归 UI 重设计轮（见报告 §遗留）。
-                            .then(if (active) Modifier.wrapContentHeight(unbounded = true) else Modifier)
-                            .padding(vertical = if (active) 0.dp else 1.dp, horizontal = 2.dp)
-                            .then(
-                                if (active) {
-                                    Modifier.testTag("wordbook_words_rail_active_$letterText")
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .semantics { contentDescription = "导航字母 $letterText" },
+                        // 朗读定语挂在字形这一枚：合并语义后由上面那枚可点芯片承载（TalkBack 念的是按钮），
+                        // 而 connected 侧要读字形取值时用 `useUnmergedTree = true` 取本节点。
+                        modifier = Modifier.semantics { contentDescription = "导航字母 $letterText" },
                         color = when {
                             active -> MintPrimary
                             available -> MintPrimaryDark
                             else -> MintTextMuted.copy(alpha = 0.45f)
                         },
-                        fontSize = if (active) activeFontSize else 9.sp,
-                        lineHeight = if (active) activeLineHeight else 10.sp,
+                        fontSize = if (active) 17.sp else 13.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                        textAlign = TextAlign.Center,
-                        style = if (active) TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)) else TextStyle.Default,
+                        maxLines = 1,
                     )
                 }
             }
