@@ -211,6 +211,55 @@ class MyWordsScreenContractTest {
     }
 
     /**
+     * I-4（修复轮 1，登记见 fix1 报告 §1「摘除前必须补齐的能力」）：合并页的生词本段必须补上
+     * 旧生词页独有的两枚能力——段头「开始重新学习」与逐行「标记为已掌握」（共享
+     * [com.example.englishlearning.ui.components.ConfirmDestructiveDialog] 二次确认）。
+     * Task 22 摘 `today_plan_open_vocabulary` / `showVocabulary` 老路由的前置条件就是这两枚先在册；
+     * 「点了真的通到重学页 / 真的把该行移出」的行为面由 connected
+     * `MyWordsScreenTest.wordbook_offers_relearn_and_mastered_behind_confirmation` 承重。
+     */
+    @Test
+    fun wordbook_section_supplies_the_capabilities_task_22_depends_on() {
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""onStartRelearn: \(\) -> Unit""")),
+            "MyWordsScreen 形参 onStartRelearn 必须恰一处声明（0 = 整册重学动作没有进合并页，Task 22 便不能摘老路由）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""onMarkMastered: \(VocabularyItem\) -> Unit""")),
+            "MyWordsScreen 形参 onMarkMastered 必须恰一处声明（0 = 逐行标记已掌握缺位，同样摘不得老路由）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex(Regex.escape("\"my_words_wordbook_start_relearn\""))),
+            "重学按钮在生词本段必须恰一枚标签锚（connected 按它定位；2 = 同段长出两枚整册动作）",
+        )
+        assertTrue(
+            countMatches(screen, Regex(Regex.escape("\"my_words_wordbook_mastered_"))) >= 1,
+            "逐行「标记为已掌握」必须带生词本段的行标签锚（缺 = 该能力没长在行上）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""ConfirmDestructiveDialog\(""")),
+            "二次确认必须复用共享 ConfirmDestructiveDialog 且合并页恰一处（0 = 又自搓私有 AlertDialog，" +
+                "对话框份数棘轮判新增债务；2 = 一页两枚确认框）",
+        )
+        val appScreen = uiScreenSource("AppScreen.kt")
+        val myWordsMount = appScreen
+            .substringAfter("else if (showMyWords)")
+            .substringBefore("else if (showAiProfiles)")
+        assertTrue(
+            "onStartRelearn = { showVocabularyRelearn = true }" in myWordsMount,
+            "合并页挂点的 onStartRelearn 必须接宿主现成的 showVocabularyRelearn 通路（不新建通路）",
+        )
+        assertTrue(
+            "vocabularyViewModel?.markMastered(" in myWordsMount,
+            "合并页挂点的 onMarkMastered 必须回调现成的 vocabularyViewModel?.markMastered（与老页挂载处同一回调）",
+        )
+    }
+
+    /**
      * m-2（修复轮 1）：重试必须**带段标**——三段各回交自己的段枚举。
      *
      * 旧形状 `onRetry: () -> Unit` 让任一段的「重试」一次拉三册（另外两段被打回 Loading）。

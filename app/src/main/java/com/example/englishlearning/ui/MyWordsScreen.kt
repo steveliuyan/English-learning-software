@@ -17,8 +17,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.FavoriteWord
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
 import com.example.englishlearning.ui.components.ScreenUnavailable
 import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -93,12 +97,21 @@ fun MyWordsScreen(
     onUnfavorite: (FavoriteWord) -> Unit = {},
     onOpenVocabularyCard: (WordCard) -> Unit = {},
     onOpenWrongWord: (WordCard) -> Unit = {},
+    // I-4（修复轮 1，报告 §1「摘除前必须补齐的能力」）：老生词页独有的两枚动作在合并页补齐——
+    // 段头整册「开始重新学习」与逐行「标记为已掌握」。宿主接线用现成通路
+    // （`showVocabularyRelearn` / `vocabularyViewModel?.markMastered`），本屏不新建任何数据通路。
+    onStartRelearn: () -> Unit = {},
+    onMarkMastered: (VocabularyItem) -> Unit = {},
     // m-2（修复轮 1）：重试带段标，只刷用户点的那一册。原先三段共用一个无参 onRetry，
     // 任一段的「重试」都会把另外两册打回 Loading（还连带触发 I-1 的旧缺陷）。
     onRetry: (MyWordsSection) -> Unit = {},
 ) {
     val colors = appColors()
     val scrollState = rememberScrollState()
+    // I-4：逐行「标记为已掌握」先落进本屏的待确认态，共享确认框确认后才回交宿主——
+    // 「点了就移行、没有反悔闸」是这条 finding 点名要补的动作形状
+    // （connected `MyWordsScreenTest.wordbook_offers_relearn_and_mastered_behind_confirmation`）。
+    var pendingMastery by remember { mutableStateOf<VocabularyItem?>(null) }
     // 段容器顶边的偏移由各自的 onGloballyPositioned 写进来；键是段，值是本 Column 内容坐标系里的 y（px）。
     val sectionTops = remember { mutableStateMapOf<MyWordsSection, Int>() }
     // I-1（修复轮 1）：键**只有 `section`**。三份 UiState 都是会发射的数据源（收藏 reload、生词本后台 load…），
@@ -193,6 +206,14 @@ fun MyWordsScreen(
                             text = "还没有生词，提交“不认识”后会自动加入。",
                         )
                     } else {
+                        // I-4：整册「开始重新学习」——老生词页 Ready 非空时列表上方的同名动作，
+                        // 合并页同规格补回（空册时这一段根本没有词，按钮不出现，由 connected 反向钉）。
+                        PillButton(
+                            text = "开始重新学习",
+                            onClick = onStartRelearn,
+                            testTag = "my_words_wordbook_start_relearn",
+                            contentDescription = "开始重新学习，共 ${vocabularyState.items.size} 个生词",
+                        )
                         vocabularyState.items.forEachIndexed { index, item ->
                             val card = item.card
                             if (card == null) {
@@ -215,6 +236,17 @@ fun MyWordsScreen(
                                         .testTag("my_words_wordbook_row_$index")
                                         .semantics { contentDescription = "生词本 ${card.lemma}" },
                                     onClick = { onOpenVocabularyCard(card) },
+                                    actions = {
+                                        // I-4：逐行「标记为已掌握」。只落待确认态，
+                                        // 真回交在页尾共享确认框的确认回调里（无 card 的行没有可提交的对象，不给这枚出口）。
+                                        PillButton(
+                                            text = "标记为已掌握",
+                                            onClick = { pendingMastery = item },
+                                            style = PillStyle.Secondary,
+                                            testTag = "my_words_wordbook_mastered_$index",
+                                            contentDescription = "将 ${card.lemma} 标记为已掌握并移出生词本",
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -256,6 +288,26 @@ fun MyWordsScreen(
                 }
             }
         }
+    }
+    // I-4（修复轮 1）：「标记为已掌握」的二次确认——复用共享 ConfirmDestructiveDialog，不另起私有
+    // AlertDialog（对话框份数棘轮把私有确认框记新增债务）。措辞要素照老生词页搬齐：移出行 + 保留面；
+    // 该操作可经复习里再提交「不认识」找回，所以 irreversible = false——谎称不可撤销会让人放弃本可挽回的操作。
+    // 已知差异（登记于报告 §1）：老页在成功后另有结果对话框（Success/Failure 两态），合并页以
+    // 「markMastered 内部 reload ⇒ 行消失 + 段计数变化」为成功反馈；失败时行不消失、可原地重试。
+    pendingMastery?.let { item ->
+        ConfirmDestructiveDialog(
+            state = true,
+            title = "确认标记为已掌握？",
+            cascadeLines = listOf("${item.card?.lemma ?: item.entry.cardId} 将从生词本移除"),
+            keepLines = listOf("复习记录会保留"),
+            irreversible = false,
+            confirmLabel = "确认",
+            onConfirm = {
+                pendingMastery = null
+                onMarkMastered(item)
+            },
+            onDismiss = { pendingMastery = null },
+        )
     }
 }
 

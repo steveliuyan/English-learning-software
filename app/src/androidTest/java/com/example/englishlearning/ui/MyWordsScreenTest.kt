@@ -167,6 +167,45 @@ class MyWordsScreenTest {
             composeRule.onNodeWithTag(section).assertExists()
             composeRule.onNodeWithTag(empty).assertExists()
         }
+        // I-4（修复轮 1）：空册不给整册动作——没有词可重学时「开始重新学习」不得出现。
+        composeRule.onNodeWithTag("my_words_wordbook_start_relearn").assertDoesNotExist()
+    }
+
+    /**
+     * I-4（修复轮 1，报告 §1「摘除前必须补齐的能力」的 connected 凭据）：生词本段两枚能力。
+     *
+     * 判据：段头「开始重新学习」点击回交宿主；行上「标记为已掌握」点击后**不直接回调**——
+     * 必须先出共享二次确认（取消/确认两枚出口都在），确认之后回调才收到那一行的 item。
+     * 「标记即移行」没有反悔机会，是这条 finding 点名要在摘除前补齐的动作形状。
+     */
+    @Test
+    fun wordbook_offers_relearn_and_mastered_behind_confirmation() {
+        var relearnRequests = 0
+        val mastered = mutableListOf<VocabularyItem>()
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = emptyList()),
+                    vocabularyState = VocabularyUiState.Ready(
+                        items = listOf(vocabularyItem("abandon", 0), vocabularyItem("bravery", 1)),
+                    ),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                    onStartRelearn = { relearnRequests++ },
+                    onMarkMastered = { mastered += it },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("my_words_wordbook_start_relearn").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, relearnRequests)
+
+        composeRule.onNodeWithTag("my_words_wordbook_mastered_0").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals("确认前不得回调（二次确认是第一道闸）", emptyList<VocabularyItem>(), mastered)
+        composeRule.onNodeWithTag("confirm_destructive_dismiss").assertExists()
+        composeRule.onNodeWithTag("confirm_destructive_confirm").performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf("abandon"), mastered.map { it.card?.lemma })
     }
 
     /**

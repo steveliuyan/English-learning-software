@@ -1160,6 +1160,11 @@ fun AppScreen(
                         detailSource = DetailSource.RECORDS
                         selectedLearningRecordCard = it
                     },
+                    // I-4（修复轮 1）：生词本段两枚能力接宿主**现成**通路，不新建任何线路——
+                    // 重学走 showVocabularyRelearn 分支（其渲染早于本页、自带 BackHandler），
+                    // 行内标记走老页挂载处同一回调 vocabularyViewModel?.markMastered。
+                    onStartRelearn = { showVocabularyRelearn = true },
+                    onMarkMastered = { vocabularyViewModel?.markMastered(state.profile.id, it) },
                     // m-2（修复轮 1）：重试只刷用户点的那一册，不再一次拉三册
                     // （旧写法会把另外两段打回 Loading，连带闪 loading 与历史 I-1 的重复落位）。
                     onRetry = { section ->
