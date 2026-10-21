@@ -1903,7 +1903,25 @@ internal val MintBackground: Color
     白名单留在 9/6 且未认领新标签；修复轮已把两侧对齐，并把两处自述改成**不抄绝对枚数**的口径（权威 = 判据 `rowTags` + 白名单名册）。
     **Task 22 动入口时的规程**：`TodayPlanScreenTest` 闭合集合判据、`TodayPlanNumberAuthorityTest` 白名单名册、`TodayPlanScreen` KDoc
     必须**同批**同步，改一处不改其余即判违规。
-- [ ] **Step 4（= 席位 20-B）: `WordRow` 替换词行台账（`SharedComponentUniquenessRatchetTest.componentFamilySeeds["词行（应调 WordRow）"]`）中的本域侧三屏**——`WordBookWordsScreen.kt`（私有 `WordBookWordsRow`）、`WrongWordsScreen.kt`（私有 `WrongWordRow`）、`FavoritesScreen.kt`（私有 `FavoriteRow`）；同步递减 seed（seed 按文件计，三行一次删净）。
+- [x] **Step 4（= 席位 20-B）: `WordRow` 替换词行台账（`SharedComponentUniquenessRatchetTest.componentFamilySeeds["词行（应调 WordRow）"]`）中的本域侧三屏**——`WordBookWordsScreen.kt`（私有 `WordBookWordsRow`）、`WrongWordsScreen.kt`（私有 `WrongWordRow`）、`FavoritesScreen.kt`（私有 `FavoriteRow`）；同步递减 seed（seed 按文件计，三行一次删净）。
+  **落地记录（2026-10-21）**：实现提交 `4198136`；控制者串行复跑门控 `236 suites / 1747 tests / 0 失败`，
+  connected 只在 `emulator-5574`：`WordBookWordsScreenTest OK (22)`、`GlobalVocabularySearchScreenTest OK (13)`、
+  `MyWordsScreenTest OK (12)`、`AppScreenTest OK (48)`。独立评审席判 **PASS WITH RESIDUALS**（0C / 2I / 2m / 3o），
+  两枚 Important 全在呈现层，处置见下面两条裁定。
+  - **R-20B.2（棘轮纪律的必要偏离，控制者追认）**：原用例把词行族 seed 硬钉成「恰等于 spec §3 六枚」，
+    与本步被要求的 seed 递减构造性互斥 ⇒ 该用例改为「名单来源 + 摘行举证」两层；断言未删、阈值未放宽、用例数不变。
+    完整口径与效力见 `docs/verification/ui-redesign-2026-10.md` 的「词行族台账递减」节；
+    **后续批次合法递减该族 seed 时同步改这条用例，不算违反「棘轮一字不动」**。
+  - **R-20B.3（F1 处置，授权偏离本步的槽位映射表）**：`WordBookWordsScreen` 禁用行的原因串
+    `这个词已不在当前词书中`（11 枚汉字 ≈143dp）按派工单表第三行落进 `meta`，即组件右列
+    `widthIn(max = 120.dp)` + `maxLines = 1` + Ellipsis，**默认字号即省略**，旧版满宽整句可见 ⇒ 呈现层丢信息。
+    授权改走 `gloss` 槽（左列、无 120dp 上限）：可行性前提是 `canOpenDetail == (card != null)`
+    （默认值与唯一生产构造站点 `RoomLearningRecordRepository.kt:44` 皆如此，重算命令
+    `grep -rn "canOpenDetail" app/src/main/java/com/example/englishlearning`），故禁用时 `gloss` 按构造为空、两槽互斥，
+    文本逐字不变、组件签名不动。**修复轮必须同时**：① 补一枚渲染禁用行的 connected 用例钉「整句不被截断」
+    （本屏 22 例此前无一渲染禁用行，是零守护）；② 用一枚 JVM 锚钉住「两槽互斥」的前提，前提一旦放开当场红。
+  - **R-20B.4（F2 处置，不在 20-B 修）**：收藏页 `meta` 的 `收藏于 yyyy-MM-dd` 同一机制（估算 ≈103dp，
+    放大字号触顶），与已关闭的合并页 `MyWordsScreen` 同源，**单屏改会让两页分叉** ⇒ 挂 **Task 20-D** 组件级裁决。
   台账存量与差集的**重算命令**：`"$GRADLE" :app:testDebugUnitTest --offline --no-daemon --no-build-cache --tests com.example.englishlearning.ui.SharedComponentUniquenessRatchetTest`
   （`each_family_offender_set_equals_its_seed_exactly` 逐族打印实际违规文件集与 seed 的双向差异）。
   - **R-20B.1（控制者裁定，20-A 关闭后落）**：本步原稿点名的第四屏 `GlobalVocabularySearchScreen.kt` **移出 20-B**，另立 **Task 20-C**。
@@ -1914,8 +1932,23 @@ internal val MintBackground: Color
     20-C 的两条候选解法：**给 `WordRow` 增一枚可选槽**（须同步 `WordRowSpeakerContractTest` 的槽位取色表与 AA 断言），
     或**给词典条目行另立组件并登记为新族**；若最终判定「词典条目行不该算词行」，走 Task 26 Step 3 的「写明保留理由」那条，
     **不得**为了让 seed 归零而硬改组件签名或偷删信息。
-- [ ] **Step 4b: 词行台账剩余站点归属**——`LearningRecordsScreen.kt` 与 `VocabularyScreen.kt` 两文件归本批收口（Task 26 Step 3），
+- [x] **Step 4b: 词行台账剩余站点归属**——`LearningRecordsScreen.kt` 与 `VocabularyScreen.kt` 两文件归本批收口（Task 26 Step 3），
   `GlobalVocabularySearchScreen.kt` 归 Task 20-C；三处都允许「接线清零」或「留档写理由」两种收法，理由须写进 `docs/verification/ui-redesign-2026-10.md`。
+  **R-20C.1（控制者裁定，2026-10-21）**：Task 20-C 从「迁移任务」降级为「留档动作」并**已执行完毕**——
+  词典结果行五枚信息 + 两枚诊断标签 vs `WordRow` 四槽（右列 120dp 单行省略），强迁必丢 IPA 或截断词书名；
+  收窄族 4 规则形状 / 另立组件登记新族 / 给组件加槽三条出路代价均已核过，全部否决，
+  改走本步已授权的「写明保留理由」出口（理由与代价已落 `docs/verification/ui-redesign-2026-10.md`），
+  该文件在词行族台账里保留为已裁定的长期债务，批 4 重做查词域组件时重新裁决。
+- [ ] **Step 4c（= Task 20-D，新立）：`WordRow` 右列宽度与换行策略**——`meta`/`status` 右列现为
+  `widthIn(max = 120.dp)` + `maxLines = 1` + Ellipsis，承载「时间戳 / 出处 / 原因串」这类长文本是**有损位**
+  （现场：收藏页 `收藏于 yyyy-MM-dd`、合并页同槽同源；F1 那条禁用原因串已由 R-20B.3 改走左列）。
+  本任务一次性定策略（加宽 / 允许两行 / 明确「右列只放短标签并把长文本改走左列」为组件口径），
+  并让 `FavoritesScreen`、`MyWordsScreen`、`WrongWordsScreen` 三屏同改，不得单屏分叉。
+  - **前置（硬项）**：先把这两屏的**渲染级** connected 取证补上——本仓现状是收藏页与错词页没有任何用例渲染它们
+    （重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`），而截断只在渲染层暴露；
+    不先补取证，改完策略无从验收。
+  - 组件签名若变（增槽/改宽度），须同步 `WordRowSpeakerContractTest` 的逐槽取色与对比断言 +
+    `SharedComponentGeometryContractTest`，并按 Global Constraint 16 给写死的枚数配重算命令。
 - [ ] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。
 
 ---

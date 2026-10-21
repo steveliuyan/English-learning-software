@@ -188,7 +188,44 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   （接线时两枚变体在同一行里一并消失）。**不得**为了凑数把窗口放宽成「任何 `Row {`」——
   那会立刻误伤 `CardDetailScreen.kt` 的 `SenseRow` 与 `AppScreen.kt` 的 `DetailToggleRow`（两枚都不是词行），
   使词行族 seed 凭空变大。
-- 兑现时机：批 3 接线该屏时，两处一起改调 `WordRow`；届时同步删 seed 行并复核这条边界是否仍在。
+- ~~兑现时机：批 3 接线该屏时，两处一起改调 `WordRow`；届时同步删 seed 行并复核这条边界是否仍在。~~
+  **已被裁定 R-20C.1 作废（2026-10-21）**：词典页两处形态**不改调 `WordRow`**，该文件在词行族台账里保留为
+  已裁定的长期债务；理由与代价见下一节。本条登记的「无名内联 `Row` 落窗规则之外」仍是现行边界，未变。
+
+## 词行族台账递减、词典行保留理由与右列宽度策略（Task 20-B / 20-C，2026-10-21 登记）
+
+台账现况的重算命令（逐枚打印实际违规文件集与 seed 的双向差集，不抄文档里的数）：
+`"$GRADLE" :app:testDebugUnitTest --offline --no-daemon --no-build-cache --tests com.example.englishlearning.ui.SharedComponentUniquenessRatchetTest`
+
+- **R-20B.1（范围裁定）**：计划 Task 20 Step 4 收窄为三屏（`FavoritesScreen` / `WrongWordsScreen` /
+  `WordBookWordsScreen`），已在提交 `4198136` 落地；词典页移出本批。
+- **R-20B.2（棘轮纪律的必要偏离，追认）**：`SharedComponentUniquenessRatchetTest` 里原
+  `word_row_family_names_the_six_spec_files_…` 把 seed 硬钉成「恰等于 spec §3 六枚名单」，
+  与「接线一屏删一行」的台账口径**构造性互斥**（不删 → `each_family_offender_set_equals_its_seed_exactly` 红；
+  删 → 它红）。该用例改为「名单来源 + 摘行举证」两层：seed 必须等于「spec §3 六枚 − 已摘行屏」，
+  且每枚已摘屏必须 ① 出现共享 `WordRow(` 调用、② 本族落窗形状读点为 0。
+  断言未删、阈值未放宽、该类用例数不变。**这条裁决的效力**：后续批次合法递减词行族 seed 时同步改该用例，
+  不算违反「棘轮一字不动」纪律；反之，只删 seed 行而不给①②举证，该用例当场红。
+- **R-20C.1（词典行保留理由）**：`GlobalVocabularySearchScreen.kt` 的结果行有**五枚用户信息**
+  （词头 / IPA / 释义 / `来源：词书名` / `搜索 N 次`）加两枚测试诊断标签，`WordRow` 只有四枚文本槽且右列
+  `widthIn(max = 120.dp)` + `maxLines = 1` + Ellipsis。强迁的确定后果：IPA 无处放、词书名被省略号截断
+  （用户靠它区分跨词书同名结果）、两枚标签失去挂点。三条出路均已核过代价：收窄族 4 规则形状 = 给棘轮开第二只
+  失明眼（该族已有一只「本文件调共享即整体豁免」）；另立组件登记新族 = 只有一个站点，「同一形态不得有第二份」的
+  立论不成立；给 `WordRow` 加槽 = 签名口袋化并牵动取色表与逐槽对比契约。**决定**：三者都不做，
+  走计划 Task 26 Step 3 授权的第二出口「seed 归零**或写明保留理由**」，本文件即那份「保留理由」。
+  **代价**：词典搜索结果行保留一份私有版式，本轮 UI 不收敛；批 4 重做查词域组件时必须重新裁决。
+- **F2 / 右列宽度策略（挂 Task 20-D）**：`WordRow` 右列的 120dp 上限 + 单行省略，对「时间戳/原因串」
+  是有损承载位（收藏页 `收藏于 yyyy-MM-dd` 在放大字号下即触顶；与本批已关闭的合并页同源）。
+  **不得单屏改**（会让合并页与收藏页分叉）。Task 20-D 是组件级裁决：右列宽度/换行策略一次性定，
+  前置是先把三屏的**渲染级** connected 取证补上（本仓现状：收藏页与错词页没有任何用例渲染它们，
+  截断只在渲染层暴露）。重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`。
+- **F4（改名逃逸残形，登记不修）**：族 4 的 forbidden 形状就是「顶层私有 `*Row*` 函数体窗口」，
+  把私有行函数改成不含 `Row` 的名字即可离开窗口规则；R-20B.2 撤销绝对 pin 后，这条残形不再被任何断言挡
+  （它本来也只被「seed 恰等于六枚」顺带挡住，而那条与本族递减互斥）。口径：这是 R-13.1 计划本身定义的残形，
+  收法是「每屏 forbidden 读点计数」的收紧（计划里已列为批 3 之后的修订事项），本轮不做。
+- **F5（更正一条被反复引用的旧口径）**：「设备侧读不到颜色」在本仓**不绝对**——语义树读不到颜色，
+  但文本节点可以经 `textLayout().layoutInput.style` 读到（现场：`WordBookWordsScreenTest` 的
+  `activeLetterUsesADifferentColor`）。既往按「读不到颜色」豁免的断言，今后要按「可测而不测」重新表述。
 
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
 
