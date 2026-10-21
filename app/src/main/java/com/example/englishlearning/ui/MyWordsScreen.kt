@@ -1,0 +1,342 @@
+package com.example.englishlearning.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import com.example.englishlearning.learning.FavoriteWord
+import com.example.englishlearning.learning.domain.WordCard
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.ScreenUnavailable
+import com.example.englishlearning.ui.components.WordRow
+import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.theme.appColors
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+
+/**
+ * 词汇域三入口的第三枚（裁决① `docs/decisions/2026-10-17-ui-redesign-information-architecture.md` ①）：
+ * **收藏 · 生词本 · 错词** 合成一页三段，不再让用户为「我攒下来的词」跑三个页面。
+ *
+ * 三段是**同屏并列的三个容器**，不是 tab 页：`section` 形参只决定初始落位（滚到哪一段），
+ * **永远不决定渲染哪一段**（R-20A.2）。这条由两处双向钉住：
+ *  - `MyWordsScreenContractTest.section_param_lands_instead_of_filtering` 钉源码形状（本文件不得出现 `when (section)`）；
+ *  - connected `MyWordsScreenTest.three_sections_render_in_one_composition` 钉行为（一次 `setContent`、三段各自的数据都在）。
+ *
+ * 三份状态来自三枚 ViewModel（`FavoritesViewModel` / `VocabularyViewModel` / `WrongWordsViewModel`），
+ * 但**本屏是 state-in**：不取 ViewModel、不调 `hiltViewModel()`。同宿主并存这件事在生产侧早已成立
+ * （26 枚 `hiltViewModel()` 在 `MainActivity.kt` 同一装配点注入 `AppScreen`，`AppScreen` 同一组合里
+ * 已同时收集 `VocabularyUiState` 与 `FavoritesUiState`），所以本屏不需要新的宿主形态，也不需要宿主拆分（R-20A.1）。
+ *
+ * 只建不摘：本屏是**新增**入口，收藏页 / 错词页 / 生词本页三条老路由仍在册（摘除归 Task 22）。
+ *
+ * 词行一律调共享 [WordRow]（词行族：本屏是新屏，不在 `SharedComponentUniquenessRatchetTest` 的词行 seed 台账里，
+ * 写私有词行即判新增债务）；页头调共享 [AppScreenHeader]；段内降级调共享 [ScreenUnavailable]；
+ * 出口动作调共享 [PillButton]（份数棘轮不允许再造「行内专用按钮」）。
+ * 墨色只走 `appColors()`，不写裸 hex、不读 `AppPalette.` / `DomainColors.` 静态值（三张棘轮的新屏口径）。
+ */
+enum class MyWordsSection { Favorites, Wordbook, Wrong }
+
+private val myWordsDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+private fun myWordsAddedLabel(instant: java.time.Instant, zoneId: ZoneId): String =
+    instant.atZone(zoneId).format(myWordsDateFormatter)
+
+private fun myWordsSourceLabel(feedback: String): String = when (feedback) {
+    "Again" -> "来源：不认识"
+    "Manual" -> "来源：手动加入"
+    else -> "来源：$feedback"
+}
+
+private fun myWordsMeaning(card: WordCard): String? =
+    card.meaningZh.ifBlank { card.senses.firstOrNull()?.meaningZh.orEmpty() }
+        .ifBlank { null }
+
+@Composable
+fun MyWordsScreen(
+    favoritesState: FavoritesUiState,
+    vocabularyState: VocabularyUiState,
+    wrongWordsState: WrongWordsUiState,
+    modifier: Modifier = Modifier,
+    section: MyWordsSection = MyWordsSection.Favorites,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+    onBack: () -> Unit = {},
+    onOpenFavoriteWord: (FavoriteWord) -> Unit = {},
+    onUnfavorite: (FavoriteWord) -> Unit = {},
+    onOpenVocabularyCard: (WordCard) -> Unit = {},
+    onOpenWrongWord: (WordCard) -> Unit = {},
+    onRetry: () -> Unit = {},
+) {
+    val colors = appColors()
+    val scrollState = rememberScrollState()
+    // 段容器顶边的偏移由各自的 onGloballyPositioned 写进来；键是段，值是本 Column 内容坐标系里的 y（px）。
+    val sectionTops = remember { mutableStateMapOf<MyWordsSection, Int>() }
+    LaunchedEffect(section, favoritesState, vocabularyState, wrongWordsState) {
+        // 等第一个非空偏移再滚：段容器的顶边只有在这次 layout 之后才量得到，而 LaunchedEffect 可能跑在
+        // 测量之前，那时 scrollTo 一个不存在的偏移就是空滚（connected 的落位用例正是抓这条）。
+        snapshotFlow { sectionTops[section] }.filterNotNull().first().let { top ->
+            scrollState.scrollTo(top)
+        }
+    }
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .verticalScroll(scrollState)
+            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .testTag("my_words_screen"),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        AppScreenHeader(
+            title = "我的词",
+            subtitle = "收藏 · 生词本 · 错词，三处攒下来的词都在这一页",
+            onBack = onBack,
+        )
+        MyWordsSectionCard(
+            title = "收藏",
+            sectionTag = "my_words_section_favorites",
+            count = (favoritesState as? FavoritesUiState.Ready)?.words?.size,
+            onTopChanged = { sectionTops[MyWordsSection.Favorites] = it },
+        ) {
+            when (favoritesState) {
+                FavoritesUiState.Loading -> SectionLoading("my_words_favorites_loading", "正在读取收藏…")
+                FavoritesUiState.Unavailable -> SectionUnavailable(
+                    tag = "my_words_favorites_unavailable",
+                    reason = "收藏暂时无法读取，请稍后重试",
+                    onRetry = onRetry,
+                )
+                is FavoritesUiState.Ready -> {
+                    favoritesState.notice?.let {
+                        Text(it, style = AppType.Footnote, color = colors.text2)
+                    }
+                    if (favoritesState.words.isEmpty()) {
+                        SectionEmpty(
+                            tag = "my_words_favorites_empty",
+                            text = "还没有收藏。在词卡详情页点星标即可收藏。",
+                        )
+                    } else {
+                        favoritesState.words.forEachIndexed { index, favorite ->
+                            WordRow(
+                                lemma = favorite.lemma,
+                                gloss = null,
+                                meta = "收藏于 ${myWordsAddedLabel(favorite.addedAt, zoneId)}",
+                                modifier = Modifier
+                                    .testTag("my_words_favorite_row_$index")
+                                    .semantics { contentDescription = "收藏 ${favorite.lemma}" },
+                                onClick = { onOpenFavoriteWord(favorite) },
+                                actions = {
+                                    PillButton(
+                                        text = "取消收藏",
+                                        onClick = { onUnfavorite(favorite) },
+                                        style = PillStyle.Secondary,
+                                        testTag = "my_words_favorite_unfavorite_$index",
+                                        contentDescription = "取消收藏 ${favorite.lemma}",
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        MyWordsSectionCard(
+            title = "生词本",
+            sectionTag = "my_words_section_wordbook",
+            count = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
+            onTopChanged = { sectionTops[MyWordsSection.Wordbook] = it },
+        ) {
+            when (vocabularyState) {
+                VocabularyUiState.Loading -> SectionLoading("my_words_wordbook_loading", "正在读取生词本…")
+                VocabularyUiState.Unavailable -> SectionUnavailable(
+                    tag = "my_words_wordbook_unavailable",
+                    reason = "生词本暂时无法读取，请稍后重试",
+                    onRetry = onRetry,
+                )
+                is VocabularyUiState.Ready -> {
+                    if (vocabularyState.items.isEmpty()) {
+                        SectionEmpty(
+                            tag = "my_words_wordbook_empty",
+                            text = "还没有生词，提交“不认识”后会自动加入。",
+                        )
+                    } else {
+                        vocabularyState.items.forEachIndexed { index, item ->
+                            val card = item.card
+                            if (card == null) {
+                                WordRow(
+                                    lemma = item.entry.cardId,
+                                    gloss = "词卡内容暂不可用",
+                                    status = myWordsSourceLabel(item.entry.lastFeedback),
+                                    meta = "加入于 ${myWordsAddedLabel(item.entry.addedAt, zoneId)}",
+                                    modifier = Modifier
+                                        .testTag("my_words_wordbook_row_$index")
+                                        .semantics { contentDescription = "生词本条目 ${item.entry.cardId}" },
+                                )
+                            } else {
+                                WordRow(
+                                    lemma = card.lemma,
+                                    gloss = myWordsMeaning(card),
+                                    status = myWordsSourceLabel(item.entry.lastFeedback),
+                                    meta = "加入于 ${myWordsAddedLabel(item.entry.addedAt, zoneId)}",
+                                    modifier = Modifier
+                                        .testTag("my_words_wordbook_row_$index")
+                                        .semantics { contentDescription = "生词本 ${card.lemma}" },
+                                    onClick = { onOpenVocabularyCard(card) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        MyWordsSectionCard(
+            title = "错词",
+            sectionTag = "my_words_section_wrong",
+            count = (wrongWordsState as? WrongWordsUiState.Ready)?.cards?.size,
+            onTopChanged = { sectionTops[MyWordsSection.Wrong] = it },
+        ) {
+            when (wrongWordsState) {
+                WrongWordsUiState.Loading -> SectionLoading("my_words_wrong_loading", "正在统计错词…")
+                WrongWordsUiState.Unavailable -> SectionUnavailable(
+                    tag = "my_words_wrong_unavailable",
+                    reason = "错词暂时无法读取，请稍后重试",
+                    onRetry = onRetry,
+                )
+                is WrongWordsUiState.Ready -> {
+                    if (wrongWordsState.cards.isEmpty()) {
+                        SectionEmpty(
+                            tag = "my_words_wrong_empty",
+                            text = "当前没有待纠正的错词。复习中标记「不认识」的词会出现在这里，重新答对后自动消失。",
+                        )
+                    } else {
+                        wrongWordsState.cards.forEachIndexed { index, card ->
+                            WordRow(
+                                lemma = card.lemma,
+                                gloss = myWordsMeaning(card),
+                                modifier = Modifier
+                                    .testTag("my_words_wrong_row_$index")
+                                    .semantics { contentDescription = "错词 ${card.lemma}" },
+                                onClick = { onOpenWrongWord(card) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 一段的容器：与「今日计划」入口组同一规格的卡（`surface` 底 + 1dp `outlineSoft` 描边 + 18dp 圆角），
+ * 组标题一行是「段名 + 条数」，段名是这条落位与朗读的唯一锚点。
+ *
+ * [onTopChanged] 把本段顶边在本 Column 内容坐标系里的 y 交回调用方，[MyWordsScreen] 用它做 `section` 落位；
+ * 偏移必须来自实测而不是「按段序号估高」——三段的行数是运行时数据，估出来的位置一定错。
+ */
+@Composable
+private fun MyWordsSectionCard(
+    title: String,
+    sectionTag: String,
+    count: Int?,
+    onTopChanged: (Int) -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = appColors()
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
+            .testTag(sectionTag)
+            .onGloballyPositioned { onTopChanged(it.positionInParent().y.toInt()) },
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = AppType.Title, color = colors.text1, modifier = Modifier.weight(1f))
+                if (count != null) {
+                    Text(
+                        text = "$count 个",
+                        style = AppType.Footnote,
+                        color = colors.text2,
+                        modifier = Modifier.semantics { contentDescription = "$title 共 $count 个" },
+                    )
+                }
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SectionLoading(tag: String, text: String) {
+    val colors = appColors()
+    Text(
+        text = text,
+        style = AppType.Footnote,
+        color = colors.text2,
+        modifier = Modifier.testTag(tag),
+    )
+}
+
+/**
+ * 空态沿用三页现有的措辞（逐字照抄 `FavoritesScreen` / `VocabularyScreen` / `WrongWordsScreen`），
+ * 合并的是入口、不是说法：用户在任何一处读到的解释必须还是同一句。
+ */
+@Composable
+private fun SectionEmpty(tag: String, text: String) {
+    val colors = appColors()
+    Text(
+        text = text,
+        style = AppType.Footnote,
+        color = colors.text2,
+        modifier = Modifier
+            .padding(bottom = 8.dp)
+            .testTag(tag),
+    )
+}
+
+@Composable
+private fun SectionUnavailable(tag: String, reason: String, onRetry: () -> Unit) {
+    ScreenUnavailable(
+        title = "读不出来",
+        reason = reason,
+        actionLabel = "重试",
+        onAction = onRetry,
+        modifier = Modifier.testTag(tag),
+    )
+}

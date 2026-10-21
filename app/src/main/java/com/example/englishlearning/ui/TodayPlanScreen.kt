@@ -81,8 +81,10 @@ fun TodayPlanScreen(
     onOpenLearningRecords: () -> Unit = {},
     onOpenWordBookWords: () -> Unit = {},
     onOpenVocabulary: () -> Unit = {},
+    onOpenMyWords: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     vocabularyCount: Int? = null,
+    myWordsSummary: String? = null,
 ) {
     val colors = appColors()
     Column(
@@ -317,8 +319,10 @@ fun TodayPlanScreen(
                 }
                 TodayPlanEntryGroup(
                     vocabularyCount = vocabularyCount,
+                    myWordsSummary = myWordsSummary,
                     onOpenWordBookWords = onOpenWordBookWords,
                     onOpenVocabulary = onOpenVocabulary,
+                    onOpenMyWords = onOpenMyWords,
                     onOpenLearningRecords = onOpenLearningRecords,
                     onOpenCheckIn = onOpenCheckIn,
                     onOpenLearningTools = onOpenLearningTools,
@@ -357,8 +361,10 @@ fun TodayPlanScreen(
 @Composable
 private fun TodayPlanEntryGroup(
     vocabularyCount: Int?,
+    myWordsSummary: String?,
     onOpenWordBookWords: () -> Unit,
     onOpenVocabulary: () -> Unit,
+    onOpenMyWords: () -> Unit,
     onOpenLearningRecords: () -> Unit,
     onOpenCheckIn: () -> Unit,
     onOpenLearningTools: () -> Unit,
@@ -400,6 +406,29 @@ private fun TodayPlanEntryGroup(
                         }
                     },
                 onClick = onOpenVocabulary,
+            )
+            // 裁决① 的第三枚入口（Task 20-A「只建不摘」）：收藏 · 生词本 · 错词 合成的一页三段。
+            // 图标与域色逐字照稿 `mockups.html:914-916`（书签形 + `--d-reading`，尾部是三段计数串）。
+            // 它与本组「生词本」行此刻同形同色是**已知的临时状态**：那条行是本页三段之一，
+            // 摘除动作按铁律归 Task 22（新入口先可用，旧入口才摘），这里不提前给一枚新图形去凑独特。
+            EntryRow(
+                icon = AppIcon.Bookmark,
+                domain = AppDomain.Reading,
+                title = "我的词",
+                subtitle = "收藏 · 生词本 · 错词，一页三段",
+                trailing = myWordsSummary,
+                iconTone = EntryIconTone.Tint,
+                topDivider = true,
+                modifier = Modifier
+                    .testTag("today_plan_open_my_words")
+                    .semantics {
+                        contentDescription = if (myWordsSummary == null) {
+                            "我的词"
+                        } else {
+                            "我的词，收藏 · 生词本 · 错词 $myWordsSummary"
+                        }
+                    },
+                onClick = onOpenMyWords,
             )
             EntryRow(
                 icon = AppIcon.Clock,

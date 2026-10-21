@@ -199,6 +199,9 @@ fun AppScreen(
             var favoritesPronunciationRequest by remember { mutableIntStateOf(0) }
             // F4-01 决策⑤错词本：同级叠层；点词复用学习记录详情宿主（selectedLearningRecordCard）。
             var showWrongWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词本 · 错词 一页三段，与上面三页同级叠层。
+            // 本批**只建不摘**：showFavorites / showWrongWords / showVocabulary 三条老路由一行不动，摘除归 Task 22。
+            var showMyWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             val wordBookWordsListState = key(state.profile.id, showWordBookWords) {
@@ -277,14 +280,33 @@ fun AppScreen(
             LaunchedEffect(state.profile.id, favoritesViewModel) {
                 favoritesViewModel?.load(state.profile.id)
             }
-            LaunchedEffect(showWrongWords, state.profile.id) {
-                if (showWrongWords) wrongWordsViewModel?.load(state.profile.id)
+            LaunchedEffect(showWrongWords || showMyWords, state.profile.id) {
+                if (showWrongWords || showMyWords) wrongWordsViewModel?.load(state.profile.id)
+            }
+            // 错词状态在「错词本」与「我的词」两处叠层里是同一份，所以在这里收一次（原先只在错词页本地收）。
+            val wrongWordsState = wrongWordsViewModel?.uiState?.collectAsState()?.value
+                ?: WrongWordsUiState.Loading
+            // 「我的词」入口行的尾部计数串（稿 `mockups.html:916` 的 `34 · 12 · 8`）：
+            // 三段任一还没读出来时**不给半截数字**，宁缺（半个数会让人把「还在读」当成「0 个」）。
+            val favoritesReadyForMyWords = favoritesState as? FavoritesUiState.Ready
+            val vocabularyReadyForMyWords = vocabularyState as? VocabularyUiState.Ready
+            val wrongWordsReadyForMyWords = wrongWordsState as? WrongWordsUiState.Ready
+            val myWordsSummary = if (
+                favoritesReadyForMyWords != null &&
+                vocabularyReadyForMyWords != null &&
+                wrongWordsReadyForMyWords != null
+            ) {
+                "${favoritesReadyForMyWords.words.size} · ${vocabularyReadyForMyWords.items.size} · " +
+                    "${wrongWordsReadyForMyWords.cards.size}"
+            } else {
+                null
             }
             val openedFavoriteCard = favoritesViewModel?.openedCard?.collectAsState()?.value
-            LaunchedEffect(openedFavoriteCard, showFavorites) {
+            LaunchedEffect(openedFavoriteCard, showFavorites || showMyWords) {
                 val opened = openedFavoriteCard ?: return@LaunchedEffect
                 favoritesViewModel?.consumeOpenedCard()
-                if (!showFavorites) return@LaunchedEffect
+                // 收藏详情有两个宿主页（收藏页与「我的词」的收藏段）：只要还开着其中之一就交给详情层。
+                if (!showFavorites && !showMyWords) return@LaunchedEffect
                 favoritesPronunciationRequest++
                 favoritesPronunciationMessage = PronunciationStatus.Idle
                 selectedFavoriteCard = opened
@@ -442,7 +464,7 @@ fun AppScreen(
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
-                showWordQaCard != null || showFavorites || selectedFavoriteCard != null || showWrongWords
+                showWordQaCard != null || showFavorites || selectedFavoriteCard != null || showWrongWords || showMyWords
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -469,6 +491,13 @@ fun AppScreen(
             }
             // 错词本复用学习记录详情宿主：详情打开时该处理器保持禁用，返回键先关详情。
             BackHandler(enabled = showWrongWords && selectedLearningRecordCard == null) { showWrongWords = false }
+            // 裁决①「我的词」：三段各自复用现成的详情宿主（收藏→selectedFavoriteCard、
+            // 生词本→selectedSearchCard、错词→selectedLearningRecordCard），
+            // 任一详情开着时本处理器让位，返回键先关详情再退这一页。
+            BackHandler(
+                enabled = showMyWords && selectedFavoriteCard == null &&
+                    selectedSearchCard == null && selectedLearningRecordCard == null,
+            ) { showMyWords = false }
             BackHandler(enabled = showGlobalVocabularySearch && selectedSearchCard == null) {
                 showGlobalVocabularySearch = false
             }
@@ -1111,8 +1140,6 @@ fun AppScreen(
                     onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
                 )
             } else if (showWrongWords) {
-                val wrongWordsState = wrongWordsViewModel?.uiState?.collectAsState()?.value
-                    ?: WrongWordsUiState.Loading
                 WrongWordsScreen(
                     state = wrongWordsState,
                     onBack = { showWrongWords = false },
@@ -1122,6 +1149,32 @@ fun AppScreen(
                         learningRecordPronunciationRequest++
                         detailSource = DetailSource.RECORDS
                         selectedLearningRecordCard = it
+                    },
+                )
+            } else if (showMyWords) {
+                // 裁决①：收藏 · 生词本 · 错词 合成一页三段。三段各自复用现成的详情宿主与动作口径，
+                // 本屏不新造任何数据通路（state-in：三份 UiState 从上面已经收好的状态直接喂进来）。
+                MyWordsScreen(
+                    favoritesState = favoritesState ?: FavoritesUiState.Loading,
+                    vocabularyState = vocabularyState,
+                    wrongWordsState = wrongWordsState,
+                    onBack = { showMyWords = false },
+                    onOpenFavoriteWord = { favoritesViewModel?.open(it) },
+                    onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
+                    onOpenVocabularyCard = {
+                        detailSource = DetailSource.VOCABULARY
+                        selectedSearchCard = it
+                    },
+                    onOpenWrongWord = {
+                        detailPronunciationMessage = PronunciationStatus.Idle
+                        learningRecordPronunciationRequest++
+                        detailSource = DetailSource.RECORDS
+                        selectedLearningRecordCard = it
+                    },
+                    onRetry = {
+                        favoritesViewModel?.load(state.profile.id)
+                        vocabularyViewModel?.load(state.profile.id)
+                        wrongWordsViewModel?.load(state.profile.id)
                     },
                 )
             } else if (showAiProfiles) {
@@ -1522,6 +1575,10 @@ fun AppScreen(
                                 onOpenLearningRecords = { showLearningRecords = true },
                                 onOpenWordBookWords = { showWordBookWords = true },
                                 vocabularyCount = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
+                                // 裁决①「我的词」入口：尾部计数只在三段都真读出来时才给（见上面 myWordsSummary），
+                                // 没读出来就是 null，EntryRow 不渲染尾部——空着比给个 0 诚实。
+                                myWordsSummary = myWordsSummary,
+                                onOpenMyWords = { showMyWords = true },
                                 onOpenVocabulary = {
                                     vocabularyViewModel?.load(state.profile.id)
                                     showVocabulary = vocabularyViewModel != null

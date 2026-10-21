@@ -1895,6 +1895,10 @@ internal val MintBackground: Color
   若探针失败：本任务降级为「三段用同一 ViewModel 的聚合查询端口」，并在 `docs/decisions/2026-10-19-ui-redesign-mywords-host.md` 记录降级方案与影响——**这属架构级取舍，必须先向用户请示再实施**（四件停止事项之一：接口重构影响面大）。
 - [ ] **Step 2: 写失败测试**：三段各自的行渲染正确（收藏段显示收藏词、错词段显示错词）、段标题可读、空态用 `ScreenUnavailable`/空态文案、每段有一个可点进详情的出口。
 - [ ] **Step 3: 实现**：新入口挂到词汇域（三入口文案「查词 / 词表 / 我的词」，参考扇贝单词的简洁三段）；旧入口**保留**，摘除动作在 Task 22 之后或本批收口时执行，并在报告里逐条列出「哪些旧入口仍在」。
+  - **留名（依 `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta` 的自述规程）**：本步在「今日计划」入口组新增第 7 行「我的词」（`today_plan_open_my_words`），
+    该判据的闭合集合因此由 **9 → 10**（1 主 CTA + 1 阅读文章 + 1 常驻查词 + 7 条组内行），已同步改判据与消息文案。
+    改动理由 = 裁决①要求的第三枚词汇域入口；「只建不摘」铁律下本屏没有减任何出口，所以是 +1 而不是替换。
+    同一判据在 Task 22 摘除旧入口时还要再改一次（届时是 −1，并把这条引用过去）。
 - [ ] **Step 4: `WordRow` 替换词行台账（`componentFamilySeeds["词行（应调 WordRow）"]`，批 1 出厂 6 个文件 / 7 枚裸行组合）中的本域侧**——`WordBookWordsScreen.kt:239-258`、`GlobalVocabularySearchScreen.kt:274-299/:319-358`（**一个文件两枚**）、`WrongWordsScreen.kt:110-129`、`FavoritesScreen.kt:116-156` 四个文件；同步递减 seed（seed 按文件计，四文件一次删净，剩下 `LearningRecordsScreen.kt`/`VocabularyScreen.kt` 两文件归批 3）。
 - [ ] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。
 
