@@ -267,6 +267,101 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   但文本节点可以经 `textLayout().layoutInput.style` 读到（现场：`WordBookWordsScreenTest` 的
   `activeLetterUsesADifferentColor`）。既往按「读不到颜色」豁免的断言，今后要按「可测而不测」重新表述。
 
+## 打卡页版面收敛与生词页老路由摘除（Task 22-A，2026-10-22 登记）
+
+**分工口径（R-22.1，控制者按用户 2026-10-22 拍板拆分）**：设计规格 §6 表格 ③「打卡页回归统计职责，
+头部两条裸文字链移出」这一裁决**拆 22-A / 22-B 两席执行**——
+22-A = 打卡页版面收敛（统一页头 + 裸 hex token 化）+ 摘生词页老路由 + 补第六枚端到端判据；
+22-B = 摘打卡页那两条裸文字链 + 收藏页/错词页两屏下线。
+**本节不宣称「Task 22 已全部完成」**；22-B 未跑，另两条老路由与两屏仍在册。
+（规格 §6③ 本体需要同一句拆分注记，但 `docs/superpowers/specs/2026-10-17-ui-redesign-design.md`
+在本次收口时正被另一席（图标识别度与入口配色，2026-10-22）改写、工作树不干净，本席不代提交，
+移交收口席补那一行。）
+
+### 已落地面
+
+- **统一页头**：`CheckInScreen.kt` 的私有页头 `Row`（`fillMaxWidth().horizontalScroll(…)` + 文字「返回」）
+  换成共享 `AppScreenHeader(title = "学习打卡", onBack = onBack, action = { 收藏链 + 错词链 })`；
+  两条裸文字链的 testTag / contentDescription / `defaultMinSize(48.dp)` / `padding(10.dp)` 逐字未改，
+  只从私有 Row 搬进组件的 `action` 槽。重算：
+  `grep -c "AppScreenHeader(" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt`（应为 1）、
+  `grep -c "check_in_open_favorites\|check_in_open_wrong_words" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt`
+  （**必须 > 0**，证两条链未被 22-A 提前摘，归 22-B）。
+- **L-T11-1 结清**：屏侧那段自认「真实的大字号症状…归 UI 重设计轮」的注释随私有页头一起改述，
+  `horizontalScroll` 反例形态的教训迁进 `AppScreenHeader` 自己的 KDoc（组件 `Row` 显式 `fillMaxWidth()`）；
+  屏侧不留「本轮未收口」的陈旧自述。
+- **返回位交接**：屏侧 `check_in_back` 那枚文字返回节点删除，返回位由组件的 48dp 图标位承载
+  （组件返回位**无 testTag**，只有 `contentDescription = "返回"`）。判据侧因此把
+  `CheckInScreenTest.back_invokes_callback` 与 `AppScreenTest.checkInEntryOpensOverlayAndBackReturnsToTodayPlan`
+  的选取器从 `onNodeWithTag("check_in_back")` 换成 `onNodeWithContentDescription("返回")`——语义不变
+  （点返回位、回调恰一次），未放宽。48dp 与可读描述改由
+  `AppScreenHeaderTest.header_back_is_a_48dp_target_with_a_readable_description` 承重，护栏 KDoc 里点名了这次交接。
+  新立 `CheckInScreenTest.headerIsCarriedByTheSharedAppScreenHeader` 钉「组件节点在册 + 旧 tag 必须消失」。
+- **headline 读点清零**（R-22.3）：整文件 `MaterialTheme.typography.headline` 读点归零——页头那一枚随私有
+  `Row` 消失，环内完成度数字（原 `headlineMedium` 28sp）改 `style = AppType.Headline`（24sp）。重算：
+  `grep -cE "MaterialTheme\.typography\.headline" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt`
+  收工为 `0`。这是删页头族 seed 行的前置判据。
+- **裸 hex token 化**：`drawArc` 的轨道底色 `Color(0xFFFFF1DB)` 改为复用现成语义槽 `appColors().tint`，
+  **未新增** `AppColorSet` 槽。重算：`grep -c "0xFFFFF1DB" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt` = `0`。
+- **生词页老路由摘除**：`today_plan_open_vocabulary` 入口行、`onOpenVocabulary` / `vocabularyCount` 形参链、
+  `AppScreen.kt` 的 `showVocabulary` 态 / `BackHandler` / `LaunchedEffect` / `else if (showVocabulary) { VocabularyScreen(...) }`
+  挂载分支一整条摘掉。`showVocabularyRelearn`（合并页整册重学）与 `vocabularyViewModel` 本体**未动**——
+  合并页生词本段靠它；该段的装载另有两枚站点（LEARNING tab 与切到 Wordbook 段）。重算：
+  生产侧凭据（两条读数都应为 `0`；`grep -c` 无命中时退出码是 1，取数值不取退出码）：
+  `grep -cE "(^|[^A-Za-z0-9_])VocabularyScreen\(|else if \(showVocabulary\)|showVocabulary = " app/src/main/java/com/example/englishlearning/ui/AppScreen.kt` = 0
+  （挂载分支、状态位与 `BackHandler` 一起消失；`showVocabularyRelearn` 不在该式命中范围内，它仍在册）；
+  `grep -c "today_plan_open_vocabulary" app/src/main/java/com/example/englishlearning/ui/TodayPlanScreen.kt` = 0
+  （入口行与形参链一起消失）。判据字面量侧
+  `grep -rn "\"today_plan_open_vocabulary\"" app/src/test app/src/androidTest` = 零命中
+  （余下只余注释/KDoc 里「该行已于 22-A 摘除」的过去时陈述，不是判据字面量）。
+  同步的六处：`TodayPlanScreenTest` 闭合集合减一行、`TodayPlanNumberAuthorityTest` 入口标签白名单删行、
+  `TodayPlanScreen` 入口组注释改述（该文件 KDoc 明写「本注释不抄枚数」，故 plan Step 1 的「KDoc 枚数自述」对本屏不适用）、
+  `AppScreen.kt` 的「只建不摘」注释改述为「三条里 `showVocabulary` 已于 22-A 摘除，另两条归 22-B」、
+  `MyWordsScreenContractTest` 两份反向控清单各删一枚（另两枚留给 22-B，断言本体保留）。
+  另按同一口径把 `MyWordsScreen.kt` KDoc 里「三条老路由仍在册」那句改述为拆分现状（本屏不在禁改清单内，
+  且留着它就是陈旧陈述）。
+- **第六枚判据（plan R2-1 硬项，与摘路由同批）**：新立 connected
+  `AppScreenTest.mergedPageMasteryResultDialogIsDrivenByTheHostAndClosesOnAck`——经**宿主**打开「我的词」
+  生词本段 → 逐行「标记为已掌握」→ 二次确认 → 断 `Success` 结果框可见 → 点「知道了」后断其消失且不残留。
+  它补的正是「宿主真的把 `vocabularyMasteryState` / `clearMasteryMessage` 接进合并页」这半边设备侧零判据的缺口
+  （原盘重算 `grep -icE "mastery" app/src/androidTest/java/com/example/englishlearning/ui/AppScreenTest.kt`
+  在本席之前为 `0`，现算 `grep -icE "mastery" app/src/androidTest/java/com/example/englishlearning/ui/AppScreenTest.kt` 应 > 0）。
+
+### 两枚独立的台账动作（不是一句「seed 递减」）
+
+1. `SharedComponentUniquenessRatchetTest` 页头族 seed **只删 `"CheckInScreen.kt"` 这一行**，该族其余行与
+   其他三族一字不动。删行的合法性由该测试当场复核：
+   `removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared` 在「已接线但 `:153`
+   仍读 `headlineMedium`」的中间态**实跑判红**（天然红样 `t22A-RED-02-jvm-header-seedgate-headline-uncleared.log`，
+   失败点即该用例的 `notCleared` 断言），清零后才绿。
+   重算：`grep -n "CheckInScreen.kt" app/src/test/java/com/example/englishlearning/ui/SharedComponentUniquenessRatchetTest.kt` = 零命中。
+2. `RawColorLiteralRatchetTest` 只删与 `CheckInScreen.kt` 直接相关的**两枚站点**（计数表 `"CheckInScreen.kt" to 1`
+   与逐字样本行），两表同进同退；该文件没有把 `CheckInScreen.kt` 计入的全局合计断言，故无第三处可动。
+   天然红样：token 化之后、减 seed 之前跑，`per-file hit count equals the seed count in both directions` 判红
+   （`t22A-RED-03-jvm-rawcolor-seed-stale.log`），即「债减了而台账不跟着减」这一方向被当场挡住。
+   重算：`grep -n "CheckInScreen" app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` = 零命中。
+3. `DarkTokenConsumptionRatchetTest` **一字不动**。控制者实核口径复核：
+   `grep -cE "\b(AppPalette|DomainColors)\.[A-Za-z0-9_]+" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt`
+   开工为 7、收工仍为 7（页头区零命中，`AppType.Headline` 不落入该正则），该文件里 `CheckInScreen.kt` 的登记值仍为 7。
+
+### 代价（观感变化，登记为 Task 26 目视项，不宣称「未变」）
+
+- **R-22.2 环色**：完成度环的轨道从奶油 `#FFF1DB` 换成 `tint`——明档 `#DDF7E8`、暗档 `#1C2C26`
+  （`theme/AppColors.kt`）。观感从「奶油环」变「薄荷环」，且**暗档下轨道由奶油变深**
+  （此前一枚裸 hex 在明暗两档是同一枚奶油）。本席未为此新增 token、未改任何棘轮。
+- **完成度数位收小**：环内百分比 28sp → 24sp（`AppType.Headline`）。不取 `AppType.Display`（34sp）的理由：
+  环内净空仅约 108dp，`fontScale 2.0` 下 34sp 会把「100%」顶出环、反造 AC-R-07 破口。
+- **打卡页华丽动效**：本轮**未做**（spec §1 不做的事 #5，不引入动画代码）——华丽动效属另批范围。
+
+### `fontScale 2.0` 设备档护栏与本席的边界
+
+本席按纪律跑了设备级 `font_scale = 2.0` 轮（跑前回显 `1.0`、置档后回显 `2.0`、收工回 `1.0`）：
+`CheckInScreenTest` `OK (8 tests)` 与 `AppScreenHeaderTest` `OK (4 tests)` 在 2.0 下**全绿**——这正是本席
+改动面的 AC-R-07 判据。同档下 `TodayPlanScreenTest` 有 3 枚、`MyWordsScreenTest` 有 1 枚失败；本席把
+`app/src` 整体 stash 回 BASE 后在同一设备、同一 2.0 档复跑，得到**逐枚同名同因**的 3+1 失败
+（留档 `t22A-baseline-fontscale2.0-probe.log`），据此判定那是**既存**的设备级大字号脆弱面，不由 22-A 引入，
+本席不扩面修，登记给 Task 26（症状：设备档下未滚动节点被判不可显示、注脚档比值随换行漂移）。
+
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
 
 `app/src/test/java/com/example/englishlearning/ui/SourceRatchet.kt` 的 `stripComments` 现为**字符串感知**扫描实现：
@@ -305,12 +400,17 @@ adb -s emulator-5574 shell dumpsys user | grep 'State:'      # 期望 RUNNING_UN
 数据盘按设计每次开机即弃，无可丢的用户数据；真机 `bf353dda` 全程未碰（只按里程碑装过 debug 包，
 未跑 `am instrument`、未装测试包）。恢复后按类实跑见上表 AC-R-04/05b 与门禁节，合计 27 用例 0 失败。
 
-## 仍待用户目视（只有人眼能判的四项，本棒不替用户判定）
+## 仍待用户目视（只有人眼能判的项，本棒不替用户判定；枚数以本清单在册行现算，不写死）
 
 ① 六档 `AppType` 未写 `lineHeight` 后正文是否偏紧（判「太紧」则触发批 2 在装配点补，并先把取值写进规格 §2.2）；
 ② 排印换档的整体观感（逐屏看有没有被撑破或挤扁的头部）；
 ③ M3 控件默认色由库紫转薄荷 + Card 圆角 20→18dp、`colorScheme.outline` 换成 `text2` 是否可接受；
-④ 跟随系统的深色档与 `fontScale 2.0` 下底导与设置页不裁。
+④ 跟随系统的深色档与 `fontScale 2.0` 下底导与设置页不裁；
+⑤ 打卡页完成度环的轨道色（Task 22-A / R-22.2：奶油 `#FFF1DB` → 语义槽 `tint`，明档变薄荷、暗档变深）是否可接受，
+   还是要为「奶油轨道」单开一枚令牌（那属计划修订，不属实现席自决）；
+⑥ 打卡页环内完成度数位 28sp → 24sp（Task 22-A / R-22.3 的 headline 清零代价）是否偏小。
+
+重算本清单在册枚数：`sed -n '/^## 仍待用户目视/,/^## /p' docs/verification/ui-redesign-2026-10.md | grep -cE '^[①-⑩]'`。
 
 ## 真机深色实勘（2026-10-19 批 1 里程碑装机，`bf353dda`）
 
