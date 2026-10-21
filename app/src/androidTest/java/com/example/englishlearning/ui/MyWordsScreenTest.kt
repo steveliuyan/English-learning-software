@@ -1,5 +1,8 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -8,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.FavoriteWord
 import com.example.englishlearning.learning.VocabularyEntry
@@ -221,6 +225,48 @@ class MyWordsScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("my_words_section_wrong").assertIsDisplayed()
         composeRule.onNodeWithText("wrong-word").assertIsDisplayed()
+        composeRule.onNodeWithText("favorite-word-0").assertIsNotDisplayed()
+    }
+
+    /**
+     * I-1（修复轮 1）：`section` 的语义是**初始落位**，落位只许发生一次。
+     *
+     * 缺陷形状：`LaunchedEffect` 的键集里放了会变的 UiState——任何一册的后台重载
+     * （如 `FavoritesViewModel.toggle` 成功后的 reload：Loading→Ready 两次发射）都会重启落位 effect，
+     * 把视口从用户当前阅读位置**拽回段首**。生产里这就是「读到一半，页面自己跳回顶部」。
+     *
+     * 判据为什么咬得住：一次 `setContent` 里喂 `mutableStateOf` 的收藏状态（真实数据流形状——
+     * 状态会发射，不是静态对象）；用户已下滚到错词段底部时，点「取消收藏」让收藏状态发射一次
+     * （`onUnfavorite` 里换成少一条的 `Ready`，与 VM 的 reload 同形）。修复后落位 effect 只认 `section`
+     * 这一枚键、不会重跑 ⇒ 视口必须留在用户所在处；修复前它必然被拉回收藏段首 ⇒ 当场红。
+     */
+    @Test
+    fun state_emit_after_landing_does_not_yank_the_viewport_back() {
+        val many = (0 until 20).map { favorite("favorite-word-$it", it) }
+        var favorites: FavoritesUiState by mutableStateOf(FavoritesUiState.Ready(words = many))
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = favorites,
+                    vocabularyState = VocabularyUiState.Ready(items = emptyList()),
+                    wrongWordsState = WrongWordsUiState.Ready(
+                        cards = listOf(card("wrong-word-0", 0), card("wrong-word-1", 1), card("wrong-word-2", 2)),
+                    ),
+                    onUnfavorite = { favorites = FavoritesUiState.Ready(words = many.take(many.lastIndex)) },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        // 用户下滚到页面底部读错词段（此时视口已不在 `section` 落位的段首）。
+        composeRule.onNodeWithTag("my_words_wrong_row_2").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("my_words_wrong_row_2").assertIsDisplayed()
+        // 夹具自证：最后一条收藏行的「取消收藏」此刻仍在视口内，下面的点击是用户真点得到的。
+        composeRule.onNodeWithTag("my_words_favorite_unfavorite_19").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        // 收藏状态发射（Ready(20)→Ready(19)）不得触发第二次落位：
+        // 用户所在处必须原地不动，段首那枚收藏词不得被拽回视口。
+        composeRule.onNodeWithTag("my_words_wrong_row_2").assertIsDisplayed()
         composeRule.onNodeWithText("favorite-word-0").assertIsNotDisplayed()
     }
 }

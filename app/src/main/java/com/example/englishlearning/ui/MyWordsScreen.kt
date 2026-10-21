@@ -99,7 +99,11 @@ fun MyWordsScreen(
     val scrollState = rememberScrollState()
     // 段容器顶边的偏移由各自的 onGloballyPositioned 写进来；键是段，值是本 Column 内容坐标系里的 y（px）。
     val sectionTops = remember { mutableStateMapOf<MyWordsSection, Int>() }
-    LaunchedEffect(section, favoritesState, vocabularyState, wrongWordsState) {
+    // I-1（修复轮 1）：键**只有 `section`**。三份 UiState 都是会发射的数据源（收藏 reload、生词本后台 load…），
+    // 把它们放进键集等于「每次数据发射都重做一次落位」——用户读到一半会被拽回段首。
+    // `section` 的语义是初始落位/聚焦（R-20A.2），落位每段组合只发生一次；判红形状见
+    // connected `MyWordsScreenTest.state_emit_after_landing_does_not_yank_the_viewport_back`。
+    LaunchedEffect(section) {
         // 等第一个非空偏移再滚：段容器的顶边只有在这次 layout 之后才量得到，而 LaunchedEffect 可能跑在
         // 测量之前，那时 scrollTo 一个不存在的偏移就是空滚（connected 的落位用例正是抓这条）。
         snapshotFlow { sectionTops[section] }.filterNotNull().first().let { top ->
