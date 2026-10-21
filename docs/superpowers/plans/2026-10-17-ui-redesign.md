@@ -1927,14 +1927,23 @@ internal val MintBackground: Color
 - Test: 既有 `CheckInScreenTest`（护栏口径沿用，不重写）
 
 - [ ] **Step 1: 前置检查（必做，铁律）**：确认「我的词」三入口已可达且 connected 通过（Task 20 收口）。未完成则**本任务不得开始摘除**，只允许做版面收敛。
-  - **能力前置（R-20A-fix.4，评审席 I-4 的登记面）**：摘 `today_plan_open_vocabulary` / `showVocabulary` 老路由之前，
-    「我的词」生词本段必须具备旧生词页已有、且摘除后会变全站不可达的两枚能力——段头整册「开始重新学习」、
+  - **能力前置一（R-20A-fix.4，评审席 I-4 的登记面）**：摘 `today_plan_open_vocabulary` / `showVocabulary` 老路由之前，
+    「我的词」生词本段必须具备旧生词页已有、且摘除后会变全站不可达的前两枚能力——段头整册「开始重新学习」、
     逐行「标记为已掌握」（带二次确认）。凭据：`MyWordsScreenTest.wordbook_offers_relearn_and_mastered_behind_confirmation`
     与 `MyWordsScreenContractTest.wordbook_section_supplies_the_capabilities_task_22_depends_on`（均已绿）。
     **若这两枚判据任一不在册或为红，本任务不得摘上述老路由**，只允许收敛版面。
     摘除时同步改**三处**，缺一即留陈旧陈述（I-2 的双向同步规程）：今日计划可点闭合集合判据（−1）、
     `TodayPlanNumberAuthorityTest` 入口标签白名单（删行）、`TodayPlanScreen.kt` KDoc 里的枚数自述（改数）；
     写死枚数一律配可重算命令，别把新数字裸抄进文档。
+  - **能力前置二（R-20A-fix.3，复评席 N-1 的登记面）＝失败可见反馈**：同一批摘除前，「我的词」还必须具备旧生词页
+    `markMastered` 的**结果态消费**——`Success`/`Failure` 各弹与老页逐字同文的结果对话框，且点「知道了」即复位宿主态。
+    缺它不是「少一层反馈」，而是两个用户可见错态：失败静默 + 未复位的 `Success` 会在别的老页一进页面就弹出无上下文的框；
+    摘除老路由后这条反馈面全站不可达。凭据（提交 `0d673ea`，均已绿）：connected
+    `MyWordsScreenTest.mastery_failure_shows_the_same_result_dialog_as_the_old_page_and_resets_on_ack` /
+    `mastery_success_shows_the_same_result_dialog_as_the_old_page` / `submitting_renders_no_result_dialog` /
+    `idle_renders_no_result_dialog` ＋ JVM
+    `MyWordsScreenContractTest.the_merged_page_consumes_and_resets_the_mastery_state`。
+    **这五枚判据任一不在册或为红，同样不得摘 `today_plan_open_vocabulary` / `showVocabulary`**（或明写「本批不摘」）。
 - [ ] **Step 2: 写失败测试**：打卡页不再出现裸文字链（`grep` 级契约 + UI 断言「无两条通往收藏/错词的裸文字链节点」）；三统计卡数值口径不变（F4-01 已建的统计口径零改动）。
 - [ ] **Step 3: 实现**：头部两条裸文字链移出；`CheckInScreen.kt:148` 的裸 hex `#FFF1DB` token 化并从 seed 删除；`:66-73` 注释自认「大字号挤压归本轮」的头部换 `AppScreenHeader`，跑 `fontScale 2.0` 护栏（AC-R-07）。
 - [ ] **Step 4: 动效不做**（spec §1 不做的事 #5）：不引入动画代码；在 `docs/verification/ui-redesign-2026-10.md` 记一行「打卡页华丽动效 = 另批，未在本轮范围」。
