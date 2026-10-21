@@ -29,6 +29,14 @@ import kotlin.test.assertTrue
  * 那枚 `lerp` → 表只对**理想配方**成立。`icon_badge_weak_tone_backdrop_recipe_is_pinned_to_source`
  * 补的就是这条生产绑定腿（变异自证 ⑪：生产 `0.16f`→`0.30f` → 本用例红）。几何值与配色配方从此同属
  * 一份契约：**connected 钉下限、本类钉取值与取色来源**。
+ *
+ * **Task 19 修复轮 2 的 I-1（几何锚补牙）**：`entryRowOrderIndices` 的链头原先用「clickable 之前最近的
+ * `modifier`/`Modifier` 接收者」定位，被 Task 19 引入的 `.then(if (enabled) Modifier.clickable(…) else Modifier)`
+ * 包装打回原形（链头落进包装内侧，窗口缩到近零），于是「`.padding(` 插在 `fillMaxWidth()` 与 clickable 之间」
+ * 与「clickable 挪到链尾 padding 之后」两枚变异在 JVM 侧全部静默放行；同族那枚靠字面邻接承重的
+ * `clickableAfterPadding` 禁形正则也已被实测证明数为 0（摆设）。现链头改锚「clickable 之前最近的一枚
+ * `.fillMaxWidth()`」，窗口 = `fillIndex until clickableIndex`，两枚变异各配一条合成负片段自证承重，
+ * 那枚摆设正则已删（判据不许两条都留着当摆设）。
  */
 class SharedComponentGeometryContractTest {
 
@@ -78,30 +86,38 @@ class SharedComponentGeometryContractTest {
         Regex("""drawBehind\s*\{[^{}]*1\.dp\.toPx\(\)[^{}]*\}\s*\.padding\(top = 1\.dp\)""")
 
     /**
-     * 可点面的第②条交付（批 1 终审 F1 重写）：`clickable` 排在任何 `padding` **之前**。
+     * 可点面的第②条交付（批 1 终审 F1 重写；修复轮 2 的 I-1 把链头改锚到 `fillMaxWidth()`）：
+     * `clickable` 排在任何 `padding` **之前**。
      *
-     * 判据形状照 `WordRowSpeakerContractTest.pillOrderIndices` 的**下标比较**，不再用字面文本正则定位：
-     * 旧锚 `fillMaxWidth\(\)\s*\.clickable\(` 把「`heightIn` 插在 `fillMaxWidth` 与 `clickable` 之间」这一
-     * **合法**写法判成不合法（数到 0 处），批 2 任何按 `.fillMaxWidth().heightIn(...).clickable(...)` 写的
+     * 判据形状照 `WordRowSpeakerContractTest.pillOrderIndices` 的**下标比较**，不用字面文本正则定位：
+     * 更早那枚锚 `fillMaxWidth\(\)\s*\.clickable\(` 把「`heightIn` 插在 `fillMaxWidth` 与 `clickable` 之间」
+     * 这一**合法**写法判成不合法（数到 0 处），批 2 任何按 `.fillMaxWidth().heightIn(...).clickable(...)` 写的
      * 入口行都会假红。`clickable` 不参与测量，所以 `heightIn` 在不在它前面与可点面尺寸无关（第①条交付
      * 由 [rowMinHeight56] 单独钉）；本函数只看两件事：`clickable` 在 `fillMaxWidth()` 之后、在本条链里
      * 早于 `clickable` 的 `padding(` 不存在。
      *
-     * **padding 的取样窗口必须只有本条 modifier 链**（批 1 终审窄复评 N-3）：原先取的是**全文件首个**
-     * `.padding(`，于是同一文件里行链之前任何别处的 padding（上方另一枚 `Box`、子组件形参默认值）都会
-     * 把合法链判成假红，而批 2 正是往 `EntryRow.kt` 里加东西的那一棒。链头用「`clickable` 之前最近的一枚
-     * `modifier`/`Modifier` 接收者」定位（本仓行链一律写 `modifier.fillMaxWidth()…`），
-     * 第三个下标语义随之改成「链内早于 clickable 的第一枚 padding 的下标；-1 = 没有（合规）」。
+     * **链头为什么改锚到「`clickable` 之前最近的一枚 `.fillMaxWidth()`」**（修复轮 2 的 I-1；这条判据一度
+     * 因此空转、成了摆设）：上一版的链头取「`clickable` 之前最近的一枚 `modifier`/`Modifier` 接收者」，
+     * 而 Task 19 之后行链把 clickable 裹进了 `.then(if (enabled) Modifier.clickable(…) else Modifier)`
+     * （`EntryRow.kt:161-168`）——`lastIndexOf("Modifier", clickableIndex)` 命中的是**包装内侧**那枚
+     * 紧贴 `.clickable(` 的 `Modifier`，链头被拽到离 clickable 只剩一个 `Modifier` 标记长度的地方，
+     * 取样窗口随之缩到近零：任何插在 `fillMaxWidth()` 与 clickable 之间的 `.padding(` 都落在窗口**左侧**、
+     * 再也数不到 ⇒ 「padding 插进 fillMaxWidth 与 clickable 之间」这一变异 JVM 侧不再判红（旧写法下会红）。
+     * 现在窗口 = `fillIndex until clickableIndex`，即以本条链自己的 `fillMaxWidth()` 为起点，
+     * 窗口内出现任何 `.padding(` 即违规；`.then(...)` 包装、`heightIn` 插位都不影响判定。
+     *
+     * 两条既有约束原样保留：
+     *  - **取样窗口只有本条 modifier 链**（批 1 终审窄复评 N-3）：链之前别处先出现的 `.padding(`
+     *    （上方另一枚 `Box`、子组件形参默认值）不得把合法链判成假红。链头取「clickable 之前**最近的**」
+     *    那一枚 `fillMaxWidth()` 而不是「全文件第一枚」，同一文件里更早出现的别的链（别的盒子的
+     *    `.fillMaxWidth().padding(…)`）同样污染不了窗口，比旧写法更严。
+     *  - 第三个下标语义不变：链内早于 clickable 的第一枚 `padding(` 的下标；-1 = 没有（合规）。
      */
     private fun entryRowOrderIndices(source: String): Triple<Int, Int, Int> {
-        val fillIndex = source.indexOf(".fillMaxWidth()")
         val clickableIndex = source.indexOf(".clickable(")
-        val chainStart = maxOf(
-            source.lastIndexOf("modifier", clickableIndex),
-            source.lastIndexOf("Modifier", clickableIndex),
-        )
-        val paddingBeforeClickable = if (chainStart in 0 until clickableIndex) {
-            val index = source.indexOf(".padding(", chainStart)
+        val fillIndex = if (clickableIndex >= 0) source.lastIndexOf(".fillMaxWidth()", clickableIndex) else -1
+        val paddingBeforeClickable = if (fillIndex in 0 until clickableIndex) {
+            val index = source.indexOf(".padding(", fillIndex + ".fillMaxWidth()".length)
             if (index in 0 until clickableIndex) index else -1
         } else {
             -1
@@ -124,10 +140,15 @@ class SharedComponentGeometryContractTest {
     /** 链上只此一枚可点源（「整行一个可点目标」的源码面镜像；少了这一条时 indexOf 只认第一枚会放过重复）。 */
     private val singleClickable = Regex("""\.clickable\(""")
 
-    /** 旧形状（禁止）：clickable 排在 heightIn/padding 之后——真机只给出 40dp 可点面，撞 F5-03。 */
-    private val clickableAfterPadding = Regex(
-        """heightIn\(min = 56\.dp\)\s*\.padding\(vertical = 8\.dp\)\s*\.clickable\(""",
-    )
+    // 修复轮 2 的 I-1：**删掉了**这里原先那枚 `clickableAfterPadding` 禁形正则
+    // （`heightIn\(min = 56\.dp\)\s*\.padding\(vertical = 8\.dp\)\s*\.clickable\(`）。
+    // 理由（摆设判据，取证见 `t19fix2-i1-probe-decorative-regex.log`）：它靠**字面邻接**承重，而现盘行链把
+    // clickable 裹在 `.then(if (enabled) Modifier.clickable(…) else Modifier)` 里，`padding` 与 `clickable`
+    // 之间横着 `.then(if (enabled) Modifier`，`\s*` 吞不掉 ⇒ 对真实变异数为 0（`expected:<1> but was:<0>` 实测）。
+    // 它守的「clickable 排在 heightIn/padding 之后」这一违规方向已由 [entryRowOrderIndices] 的窗口判据承重
+    // （clickable 一旦挪到链尾，链尾那枚 padding 就落进 `fillIndex until clickableIndex` 窗口 ⇒ 判红），
+    // 并配了两枚合成负片段自证：紧贴的旧邻接形状与 `.then(` 包装下的链尾形状各一枚。
+    // 保留一条数不出任何东西的正则当护栏，比没有护栏更糟——它会让后人以为这一维有人守过。
 
     @Test
     fun entry_row_geometry_literals_are_pinned_in_source() {
@@ -150,9 +171,8 @@ class SharedComponentGeometryContractTest {
                 "heightIn 在 clickable 之前**不算**违规，两条共同交付见 EntryRow.kt KDoc）",
         )
         assertEquals(1, countMatches(source, singleClickable), "入口行链上 clickable 只此一处（两处 = 第二个可点源，撞「整行一个可点目标」用例）")
-        assertEquals(0, countMatches(source, clickableAfterPadding), "禁旧形状 clickable 排在 heightIn/padding 之后（真机只有 40dp 可点面，撞 F5-03）")
 
-        // 合成正片段：新顺序形状必须被下标判据认出、且不被「旧形状」探针误认。
+        // 合成正片段：新顺序形状必须被下标判据认出来。
         val newShape = "Row(modifier = modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)" +
             ".heightIn(min = 56.dp).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp))"
         assertTrue(clickableCoversWholeBox(newShape), "合成正片段漏判：新顺序没被下标判据认出来（${entryRowOrderDebug(newShape)}）")
@@ -164,14 +184,28 @@ class SharedComponentGeometryContractTest {
             clickableCoversWholeBox(otherPaddingEarlier),
             "反假红钉失控：同一文件里行链之前的无关 padding 把合法链判成了违规（${entryRowOrderDebug(otherPaddingEarlier)}）",
         )
-        assertEquals(0, countMatches(newShape, clickableAfterPadding), "合成正片段越界：新顺序被判成了旧形状")
+        // 反假红钉（同族第二枚，修复轮 2 的 I-1 新增）：同一文件里**更早的另一条链**写了
+        // `.fillMaxWidth().padding(…)` 也不许污染本条链的窗口——链头取 clickable 之前最近的那枚 fillMaxWidth。
+        val earlierOtherFillChain = "Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp))\n" + newShape
+        assertTrue(
+            clickableCoversWholeBox(earlierOtherFillChain),
+            "反假红钉失控：同一文件里更早的另一条 fillMaxWidth→padding 链把合法行链判成了违规（${entryRowOrderDebug(earlierOtherFillChain)}）",
+        )
         assertEquals(1, countMatches(newShape, rowGap12), "合成正片段漏判：12dp 间隙锚认不出自家形状")
 
-        // 合成负片段：旧顺序串必须被「旧形状」探针命中，且不满足下标判据。
+        // 合成负片段一：链首丢了 `fillMaxWidth()`（可点面不再覆盖整盒宽度）——由 fillIndex 那半边判据承重。
         val legacyShape = "Row(modifier = modifier.heightIn(min = 56.dp).padding(vertical = 8.dp)" +
             ".clickable(role = Role.Button, onClick = onClick))"
-        assertEquals(1, countMatches(legacyShape, clickableAfterPadding), "合成负片段失控：旧顺序没被禁形探针认出")
-        assertFalse(clickableCoversWholeBox(legacyShape), "合成负片段被放行：padding 在 clickable 之前的旧顺序竟过了下标判据（${entryRowOrderDebug(legacyShape)}）")
+        assertFalse(clickableCoversWholeBox(legacyShape), "合成负片段被放行：链首没有 fillMaxWidth() 的旧顺序竟过了下标判据（${entryRowOrderDebug(legacyShape)}）")
+
+        // 合成负片段二：`fillMaxWidth()` 在，但 clickable 排在 `heightIn`/`padding` **之后**（字面紧贴的旧形状，
+        // 即被删掉那枚禁形正则原本要抓的那一枚）——由窗口的 padding 那半边承重。
+        val legacyTailOrderShape = "Row(modifier = modifier.fillMaxWidth().heightIn(min = 56.dp)" +
+            ".padding(vertical = 8.dp).clickable(role = Role.Button, onClick = onClick))"
+        assertFalse(
+            clickableCoversWholeBox(legacyTailOrderShape),
+            "合成负片段被放行：clickable 排在 heightIn/padding 之后的旧邻接形状竟过了窗口判据——被删禁形正则的这一维必须有人守（${entryRowOrderDebug(legacyTailOrderShape)}）",
+        )
 
         // 反假红钉（批 1 终审 F1，本项验收物）：heightIn 插在 fillMaxWidth 与 clickable 之间**同样合法**
         // ——clickable 不参与测量，可点面尺寸只由「链上有 48dp 下限」+「clickable 在任何 padding 之前」
@@ -184,7 +218,46 @@ class SharedComponentGeometryContractTest {
             clickableCoversWholeBox(heightInFirstShape),
             "反假红钉失控：heightIn 插在 clickable 之前的合法链被下标判据误判成不合法（${entryRowOrderDebug(heightInFirstShape)}）",
         )
-        assertEquals(0, countMatches(heightInFirstShape, clickableAfterPadding), "反假红钉越界：heightIn 在前的合法链被旧顺序禁形探针误命中")
+        // 被删掉那枚禁形正则在这一条上的反假红腿不需要替代品：链尾那枚 `.padding(` 的下标**大于**
+        // clickableIndex，天然落在 `fillIndex until clickableIndex` 窗口之外，上面的 assertTrue 已经是这一维。
+
+        // ===== 修复轮 2（窄复评 I-1）：`.then(...)` 包装下的两种「padding 在 clickable 之前」变异 =====
+        // 现盘行链把 clickable 包在 `.then(if (enabled) Modifier.clickable(…) else Modifier)` 里
+        // （`EntryRow.kt:161-168`），于是「链头 = clickable 之前最近的 `modifier`/`Modifier` 接收者」这条旧锚
+        // 落到 `.then(if (enabled) Modifier` 内侧那枚 `Modifier` 上，取样窗口缩到 `Modifier` 到 `.clickable(`
+        // 这十几个字符 ≈ 零 ⇒ 下面两枚变异在 JVM 侧全部静默放行（本席已实测：改锚前这两条都红在「被放行」上）。
+        // 窗口必须以本条链自己的 `.fillMaxWidth()` 为起点，这两枚才判得出。
+
+        // 变异一（brief 指定的形状）：有人把 `.padding(` 插到 `fillMaxWidth()` 与 clickable 之间
+        // ——可点面缩回内容盒，撞计划 :1049 的实测教训。
+        val paddingInsertedAfterFill = "Row(modifier = modifier.fillMaxWidth().padding(top = 8.dp)" +
+            ".then(if (enabled) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)" +
+            ".heightIn(min = 56.dp))"
+        assertFalse(
+            clickableCoversWholeBox(paddingInsertedAfterFill),
+            "合成变异被放行：`.padding(` 插在 fillMaxWidth() 与 clickable 之间（`.then(` 包装内）竟仍算「可点面覆盖整盒」（${entryRowOrderDebug(paddingInsertedAfterFill)}）",
+        )
+
+        // 变异二：clickable 被挪到链尾（`heightIn`/`padding` 之后），但仍裹在 `.then(if (enabled) Modifier…)` 里
+        // ——旧的那枚靠**字面邻接**承重的禁形正则对这一形状数为 0（本席实测留档 `t19fix2-i1-probe-decorative-regex.log`：
+        // `expected:<1> but was:<0>`），因为 `.then(if (enabled) Modifier` 横在 `padding` 与 `clickable` 之间、
+        // `\s*` 吞不掉；旧下标锚同样放行。真机只给 40dp 可点面（F5-03）。改锚后由窗口判据自己承重。
+        val clickableAtTailInsideWrapper = "Row(modifier = modifier.fillMaxWidth().then(stateModifier).then(dividerModifier)" +
+            ".heightIn(min = 56.dp).padding(vertical = 8.dp)" +
+            ".then(if (enabled) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier))"
+        assertFalse(
+            clickableCoversWholeBox(clickableAtTailInsideWrapper),
+            "合成变异被放行：clickable 排在链尾 padding 之后（`.then(` 包装内）竟仍算合规——禁形旧正则因中间多了 .then( 永不命中，本判据必须自己承重（${entryRowOrderDebug(clickableAtTailInsideWrapper)}）",
+        )
+
+        // 合法链的正样本（现盘真实形状）：`.then(...)` 包装本身不是违规，padding 只在链尾时才合规。
+        val currentChainShape = "Row(modifier = modifier.fillMaxWidth().then(stateModifier)" +
+            ".then(if (enabled) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)" +
+            ".then(dividerModifier).heightIn(min = 56.dp).padding(vertical = 8.dp))"
+        assertTrue(
+            clickableCoversWholeBox(currentChainShape),
+            "反假红钉失控：现盘这条 `.then(...)` 包装 + 链尾 padding 的合法链被判成了违规（${entryRowOrderDebug(currentChainShape)}）",
+        )
 
         // 合成负片段：邻近取值不得互相冒名——48dp 串不得被 56dp 锚命中，10dp 串不得被 12dp 锚命中。
         assertEquals(0, countMatches("Box(Modifier.heightIn(min = 48.dp))", rowMinHeight56), "合成负片段被放行：48dp 下限串被 56dp 取值锚冒名命中")

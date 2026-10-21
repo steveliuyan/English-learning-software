@@ -267,7 +267,7 @@ class SettingsScreenTest {
         listOf("settings_speech_mimo", "settings_speech_openai", "settings_speech_zipvoice").forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
-        listOf("Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax", "本地 ZipVoice-Distill").forEach { vendor ->
+        SPEECH_VENDOR_PLACEHOLDERS.forEach { vendor ->
             composeRule.onNodeWithText(vendor).assertDoesNotExist()
         }
         composeRule.onNodeWithText("当前供应商 · 已配置").assertDoesNotExist()
@@ -281,7 +281,7 @@ class SettingsScreenTest {
     fun default_speech_row_names_system_tts_and_no_vendor_placeholder_returns() {
         setScreen()
         composeRule.onNodeWithText("当前供应商：系统 TTS").assertExists()
-        listOf("Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax", "本地 ZipVoice-Distill").forEach { vendor ->
+        SPEECH_VENDOR_PLACEHOLDERS.forEach { vendor ->
             composeRule.onNodeWithText(vendor).assertDoesNotExist()
         }
         composeRule.onNodeWithText("当前供应商 · 已配置").assertDoesNotExist()
@@ -568,3 +568,17 @@ private const val CLICKABLE_WHEN_COLLAPSED = 11
  * 所以那两个禁用态各另有自己的用例，不混进这一条。
  */
 private const val CLICKABLE_WHEN_BOTH_FOLDS_OPEN = 17
+
+/**
+ * 「待接入」厂商名占位清单：这一族护栏钉的是「六枚厂商名一律不得回到设置一级页」，
+ * 由 [speech_row_reports_current_provider_and_status_rows_stay_out] 与
+ * [default_speech_row_names_system_tts_and_no_vendor_placeholder_returns] 两条各遍历一次
+ * （一条走注入 MiMo 状态的路径、一条走默认态，两条的正断腿不同，缺席腿同文）。
+ *
+ * 修复轮 2 的 M-2 把它从「两条各抄一遍逐字相同的 `listOf(...)`」提成本文件一枚 private 常量，
+ * 与本文件既有的 [CLICKABLE_WHEN_COLLAPSED] / [CLICKABLE_WHEN_BOTH_FOLDS_OPEN] 同一惯例
+ * （同一份现盘读数只留一个真值）。理由：这两串是**同一条规则**的两份拷贝，
+ * 生产侧新增第七枚占位名时只补一处就会让另一处静默失去覆盖——漂移风险比「共享夹具被顺手改」更大，
+ * 且本常量只被这两条缺席断言读、不参与任何正断。**断言语义零改动**：缺席侧仍逐枚 `assertDoesNotExist()`。
+ */
+private val SPEECH_VENDOR_PLACEHOLDERS = listOf("Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax", "本地 ZipVoice-Distill")

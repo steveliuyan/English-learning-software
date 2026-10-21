@@ -294,4 +294,47 @@ class EntryRowTest {
         // 线的上限也钉住：多出来的高度只能是一条发丝线（超过 4dp 说明线被做成分隔块、把内容顶跑了）。
         assertTrue("顶线只能是一条 1dp 发丝线，实际多出了 $extra", extra <= 4.dp)
     }
+
+    /**
+     * 钉的破坏（修复轮 2 的 M-1）：`EntryRow.kt:149-150` 那条 `enabled && expanded == null` 快路径失守
+     * ——**普通入口行不该多挂任何 semantics**，也不该在 `enabled == true` 时被写成不可用。
+     *
+     * 为什么要有这一枚：`enabled` / `expanded` 两枚新参都带默认值，全仓 4 个生产消费者里只有设置页的
+     * 折叠子行显式传参，`SettingsScreenTest` 只正面断过「折叠行必须挂 Expand/Collapse」，
+     * 「普通行（两枚都不传）语义里**没有** Expand/Collapse/Disabled」这一腿此前无人守：
+     * 有人把快路径的 `if` 写成恒走 `Modifier.semantics { … }` 那支、或把 `null -> Unit` 改成
+     * `null -> collapse(…)`，今日计划那 7 枚行会一起挂上折叠动作，而所有既有断言仍全绿。
+     * `SemanticsProperties.Disabled` 缺席同时是 `enabled == true` 那条腿的判据
+     * （`assertIsNotEnabled()` 走的是同一条键，`SettingsScreenTest` 已在禁用子行上反用）。
+     *
+     * 判据取**合并树**的 tagged 节点：`testTag` 由调用方传在链首（最外层），而 Expand/Collapse/Disabled
+     * 都挂在同一条链上，`SettingsScreenTest.fold_rows_expose_expand_and_collapse_semantics` 已实测
+     * 这一形状下 `onNodeWithTag(...)` 数得到那两枚动作键 ⇒ 反向「数不到」才是有效判据。
+     * 「折叠行必须挂」这一维已由 `SettingsScreenTest` 断过，本席不重复造。
+     * 本用例自己的反向自证（TDD 红证，日志 `t19fix2-i2-connected-decoy-red.log`）：同一节点、同一 targeting
+     * 先断 `keyIsDefined(SemanticsActions.Expand)` 必须红，红讯原文给出该节点 `Actions = […OnClick… ]`
+     * 里既无 Expand 也无 Collapse、且没有 `Disabled` 键——证明判据读的是真实语义配置而不是空转。
+     *
+     * 已知残余（登记而非放宽，见报告顾虑）：若有人只摘掉快路径的 `if` 条件而 `null` 分支仍是 `Unit`，
+     * 挂上去的是一枚**空** semantics 节点，三枚键都不会出现，本用例与既有那两条按可点性计数的用例
+     * 都读不到——空 semantics 只在未合并树里多一枚无属性节点，connected 侧没有不脆弱的写法守它。
+     */
+    @Test
+    fun plain_entry_row_carries_no_disclosure_or_disabled_semantics() {
+        composeRule.setContent {
+            MintGlassTheme {
+                EntryRow(
+                    icon = AppIcon.Book,
+                    domain = AppDomain.Library,
+                    title = "词书库",
+                    subtitle = "10 本内置词书",
+                    modifier = Modifier.testTag("entry_row"),
+                ) {}
+            }
+        }
+        val row = composeRule.onNodeWithTag("entry_row")
+        row.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Expand))
+        row.assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Collapse))
+        row.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Disabled))
+    }
 }
