@@ -1904,7 +1904,8 @@ internal val MintBackground: Color
   `unavailable_sections_each_offer_a_working_retry` / `section_param_lands_the_viewport_on_that_section` 等）
   + JVM `MyWordsScreenContractTest`。重算：`grep -n "    fun " app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt`。
 - [x] **Step 3: 实现**：新入口挂到词汇域（三入口文案「查词 / 词表 / 我的词」，参考扇贝单词的简洁三段）；旧入口**保留**，摘除动作在 Task 22 之后或本批收口时执行，并在报告里逐条列出「哪些旧入口仍在」。
-  **落地=席位 20-A**：`MyWordsScreen.kt:136` `title = "我的词"`，旧入口清单在 `task-20A-report.md` §5（逐条「旧入口 + 文件:行」）。
+  **落地=席位 20-A**：`MyWordsScreen` 的页头标题即 `"我的词"`（重算 `grep -n 'title = "我的词"' app/src/main/java/com/example/englishlearning/ui/MyWordsScreen.kt`），
+  旧入口清单在 `task-20A-report.md` §5（逐条「旧入口 + 文件:行」）。
   摘除动作按本条授权归 **Task 22**（`today_plan_open_vocabulary` / `showVocabulary` 的前置判据已由 20-A-fix 补齐，见台账「Task 22 前置核验」段）。
   - **留名（依 `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta` 的自述规程）**：本步在「今日计划」入口组新增第 7 行「我的词」（`today_plan_open_my_words`），
     该判据的闭合集合因此由 **9 → 10**（1 主 CTA + 1 阅读文章 + 1 常驻查词 + 7 条组内行），已同步改判据与消息文案。
