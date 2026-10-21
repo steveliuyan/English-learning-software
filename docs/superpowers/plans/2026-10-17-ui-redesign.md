@@ -1899,6 +1899,10 @@ internal val MintBackground: Color
     该判据的闭合集合因此由 **9 → 10**（1 主 CTA + 1 阅读文章 + 1 常驻查词 + 7 条组内行），已同步改判据与消息文案。
     改动理由 = 裁决①要求的第三枚词汇域入口；「只建不摘」铁律下本屏没有减任何出口，所以是 +1 而不是替换。
     同一判据在 Task 22 摘除旧入口时还要再改一次（届时是 −1，并把这条引用过去）。
+  - **留名（20-A 修复轮 1 / 评审 I-2）**：9→10 那次只同步了 connected 判据一侧，生产屏 KDoc 与 `TodayPlanNumberAuthorityTest`
+    白名单留在 9/6 且未认领新标签；修复轮已把两侧对齐，并把两处自述改成**不抄绝对枚数**的口径（权威 = 判据 `rowTags` + 白名单名册）。
+    **Task 22 动入口时的规程**：`TodayPlanScreenTest` 闭合集合判据、`TodayPlanNumberAuthorityTest` 白名单名册、`TodayPlanScreen` KDoc
+    必须**同批**同步，改一处不改其余即判违规。
 - [ ] **Step 4: `WordRow` 替换词行台账（`componentFamilySeeds["词行（应调 WordRow）"]`，批 1 出厂 6 个文件 / 7 枚裸行组合）中的本域侧**——`WordBookWordsScreen.kt:239-258`、`GlobalVocabularySearchScreen.kt:274-299/:319-358`（**一个文件两枚**）、`WrongWordsScreen.kt:110-129`、`FavoritesScreen.kt:116-156` 四个文件；同步递减 seed（seed 按文件计，四文件一次删净，剩下 `LearningRecordsScreen.kt`/`VocabularyScreen.kt` 两文件归批 3）。
 - [ ] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。
 

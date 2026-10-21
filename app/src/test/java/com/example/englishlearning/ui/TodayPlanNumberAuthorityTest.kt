@@ -416,7 +416,8 @@ class TodayPlanNumberAuthorityTest {
         val entryRows = countMatches(source, Regex("""(?<![A-Za-z0-9_])EntryRow\("""))
         assertTrue(
             entryRows >= 3,
-            "AC-R-20 要求入口行组：本屏至少 3 条共享 EntryRow（查词/词书单词/生词本/学习记录/打卡/工具），实际 $entryRows",
+            "AC-R-20 要求入口行组：本屏至少 3 条共享 EntryRow（名单权威在下方白名单与 " +
+                "TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta，此处只封下界）",
         )
         assertEquals(
             1,
@@ -426,6 +427,7 @@ class TodayPlanNumberAuthorityTest {
         listOf(
             "today_plan_open_wordbook_words",
             "today_plan_open_vocabulary",
+            "today_plan_open_my_words",
             "today_plan_open_learning_records",
             "today_plan_open_check_in",
             "today_plan_learning_tools",
@@ -435,7 +437,10 @@ class TodayPlanNumberAuthorityTest {
             assertTrue(
                 tag in source,
                 "入口行标签 $tag 不得改名或删除（既有 connected 用例与 AppScreenTest 依赖它；" +
-                    "名单是 6 条组内行 + 1 条常驻查词 = 本屏入口的全部，两者都不许改名）",
+                    "**本名单就是这批入口标签的名册，名单本身是唯一真值**——增删或改名入口标签必须同批改这份名单，" +
+                    "并同步 TodayPlanScreenTest 的闭合集合判据与 TodayPlanScreen KDoc；" +
+                    "I-2 修复轮 1 的教训：旧消息写着「6 条组内行 + 1 常驻 = 本屏入口的全部」，" +
+                    "新增 today_plan_open_my_words 后这句当场为假且无人认领新标签）",
             )
         }
     }

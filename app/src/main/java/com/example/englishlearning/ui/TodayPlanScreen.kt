@@ -57,12 +57,14 @@ import com.example.englishlearning.ui.theme.appDomain
  *     （`text1`/`text2`）不带强调色——「今天到底做了多少」只有一个视觉重量，其余数字是同一条信息的注脚。
  *  2. **八枚整宽按钮收成 1 CTA + 入口行组**：只有「继续学习/复习」回答「今天做什么」，它留在主操作位；
  *     阅读文章是**受解锁态约束**的支撑动作（enabled 态与解锁文案都要留在行为面上，批 3 才并成状态点），
- *     故保持本屏唯一一枚 M3 `Button`；其余 6 个目录型动作收进 [TodayPlanEntryGroup]。
+ *     故保持本屏唯一一枚 M3 `Button`；其余目录型动作全部收进 [TodayPlanEntryGroup]。
  *     **查词条例外**（修复轮 1 的 F3）：它是四态常驻的出口，留在 `when (state)` **之前**的独立卡里，
  *     跟着入口组走会让缺配置 / 不可用 / 加载态失去查词出口，与 `AGENTS.md` 的离线可用口径相抵。
- *     于是本屏可点节点的**闭合集合 = 9**：1 主 CTA + 1 阅读文章 + 1 常驻查词 + 6 条组内行
- *     （判据在 `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta`，
- *     增删入口要同时改那条判据并在批 3 计划里留名）。
+ *     于是本屏可点节点的**闭合集合 = 1 主 CTA + 1 阅读文章 + 1 常驻查词 + 组内入口行各一枚**；
+ *     枚数与组内行名单的**唯一权威**是 `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta`
+ *     里的 `rowTags` 与等式，标签在册核验由 `TodayPlanNumberAuthorityTest` 的白名单负责（名单本身即真值，
+ *     本注释不抄枚数——抄了就会随入口增删漂移，I-2 修复轮 1 正是被这处漂移点名的）。
+ *     增删入口必须**同批**改这两处判据与本注释，并在批 3 计划里留名。
  *  3. **取色只读动态 token**：中性色 `appColors()`、域色 `appDomain(...)`，本屏不再有裸 hex、静态令牌读点、
  *     `Mint*` 快捷名与库内排印档。三形裸 hex 的域色对位与各自行由写在 [WorkloadKind.color] 与
  *     [TodayPlanEntryGroup] 上。
@@ -334,7 +336,8 @@ fun TodayPlanScreen(
 }
 
 /**
- * 入口行组（AC-R-20 的「一组入口行」）：原先 6 枚整宽按钮收成一张卡里的 **6 条**共享 [EntryRow]，
+ * 入口行组（AC-R-20 的「一组入口行」）：原先的整宽按钮收成一张卡里的若干条共享 [EntryRow]
+ * （当前条数的唯一权威是上面 [TodayPlanScreen] KDoc 点名的两处判据，本注释不抄枚数），
  * 除首行外每条一条顶线（R-10.5）。
  *
  * **查词不在本组里**（修复轮 1 的 F3 / 评审 I-1）：它原先是本组首行，而本组只在 `is TodayPlanUiState.Ready`
@@ -350,10 +353,12 @@ fun TodayPlanScreen(
  *    了结了那处无对应令牌的棕色裸 hex `#795B36`**：它的语义是「打卡/成就」，最近且成体系的对应值就是
  *    复习域 `deep`（浅套 #AB5700，压白 5.13:1），不是随便挑一枚像棕色的色（登记优于蒙混）；
  *  - 学习工具与设置 / 调整词书与目标 → `Settings`：`onOpenLearningTools` 落的是设置 tab
- *    （`AppScreen.kt:1536`），`调整词书与目标` 打开的是学习设置，稿也把它并进设置页同名条目。
+ *    （`AppScreen.kt` 里 `TodayPlanScreen(...)` 调用点的 `onOpenLearningTools = { selectedTab = AppTab.SETTINGS }`
+ *    这一行是唯一锚点；锚绝不用绝对行号——行号会随别处接线漂移，I-2 修复轮 1 就是被一个漂移的行指针点名的），
+ *    `调整词书与目标` 打开的是学习设置，稿也把它并进设置页同名条目。
  *
  * 图标容器一律 [EntryIconTone.Tint]（R-10.2）：本屏的饱和底归主 CTA 一处，入口行用弱档底色，
- * 免得七条行（6 组内 + 1 常驻）都上渐变底，把「今天做什么」压下去。
+ * 免得组内各行连同一枚常驻查词行都上渐变底，把「今天做什么」压下去。
  *
  * `contentDescription` 留在调用方传进的 `modifier` 上（与行本身同一枚可点节点），既保住既有用例
  * （`AppScreenTest` 按「学习记录」「调整词书与目标」这些描述点导航）也不为了迁就组件签名丢无障碍语义。
