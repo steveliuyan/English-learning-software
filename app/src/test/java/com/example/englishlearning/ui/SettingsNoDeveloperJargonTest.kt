@@ -68,4 +68,40 @@ class SettingsNoDeveloperJargonTest {
             "只许「主题」一行没有行首图标；其余行必须给 AppIcon 字形而不是文字徽标",
         )
     }
+
+    /**
+     * 修复轮 1（评审 I3）：**台账不得是第二套真值**——9 枚行标题与 4 枚组标题在
+     * `SettingsScreen.kt` 里各只许出现一次，且那次就在 [SettingsGroups] 的定义处。
+     *
+     * 这条为什么必须在 JVM 侧：connected 侧 `SettingsScreenTest` 拿 `entry.title` 去树上找，
+     * 抓得住「台账改了、渲染没改」这种**漂移**，却抓不住渲染处另抄了一份**恰好相同**的字面量
+     * （两份都改齐时它全绿，而第二套真值已经种下）。`125ced3` 的现场就是后一种：
+     * 台账 9 枚 + 渲染 9 枚，逐行两枚。现在渲染侧只按 tag 经 `settingsEntry` 取，
+     * 本用例把这枚「只许一处」钉死；把标题再抄回调用处，这条先红。
+     *
+     * 读法同族口径：先 [stripComments]（注释里用「」引述的标题不计），只数**带引号的字面量**，
+     * 并配一枚合成负片段自证计数器不是空转。
+     */
+    @Test fun ledger_titles_are_defined_exactly_once_in_settings_screen() {
+        val src = stripComments(File(SETTINGS_FILE).readText())
+        val titles = SettingsGroups.all.flatMap { group ->
+            listOf(group.title) + group.entries.map { it.title }
+        }
+        assertEquals(13, titles.size, "4 组 + 9 行共 13 枚标题（台账形状变了先改这条）")
+        titles.forEach { title ->
+            val quoted = Regex(""""\Q$title\E"""")
+            assertEquals(
+                1,
+                countMatches(src, quoted),
+                "标题「$title」在 SettingsScreen.kt 里必须只写在 SettingsGroups 一处" +
+                    "（渲染侧另抄一份 = 第二套真值；改成按 tag 读台账）",
+            )
+        }
+        // 反空转：计数器必须判得出「同一枚标题抄了两份」这个形状。
+        assertEquals(
+            2,
+            countMatches("""Text("词书与每日目标"); SettingsEntry("词书与每日目标", …)""", Regex(""""词书与每日目标""")),
+            "计数器失控：抄了两份也只数出 1 处，本用例就成了空判",
+        )
+    }
 }

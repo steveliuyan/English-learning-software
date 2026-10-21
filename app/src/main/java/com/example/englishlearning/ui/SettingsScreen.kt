@@ -149,6 +149,52 @@ object SettingsGroups {
     )
 }
 
+/**
+ * 按 tag 取台账里的一行（Task 19 修复轮 1 / I3：**渲染侧不得再抄一份行标题、图标或域色**）。
+ *
+ * tag 是这一页的身份证：`SettingsEntry` 的 title/icon/domain 都只写在 [SettingsGroups] 一处，
+ * 调用处只报 tag + 动态部分（副标题、可点性、展开态、回调）。找不到就是编程错误，当场点名下标，
+ * 不做静默兜底（兜底会把它变成第二套真值）。
+ */
+private fun settingsEntry(tag: String): SettingsEntry =
+    SettingsGroups.all.flatMap { it.entries }.firstOrNull { it.tag == tag }
+        ?: error("设置页台账里没有 tag「$tag」的一级行（AC-R-21 的 9 行形状与渲染侧对不上）")
+
+/** 按 tag 取台账里的一个分组（同上：不用 `all[0..3]` 下标，版面重排不漂）。 */
+private fun settingsGroup(tag: String): SettingsGroup =
+    SettingsGroups.all.firstOrNull { it.tag == tag }
+        ?: error("设置页台账里没有 tag「$tag」的分组")
+
+/**
+ * 台账行 → [EntryRow] 的唯一装配点：标题、图标、域色、testTag 全部取自 [SettingsEntry]，
+ * 调用处只提供动态部分。折叠入口另给 [expanded]（chevron 与展开态语义由它驱动），
+ * SAF 在途或未导入时给 [enabled] = false（禁用态真禁用，见 `EntryRow` KDoc）。
+ */
+@Composable
+private fun LedgerEntryRow(
+    tag: String,
+    subtitle: String?,
+    onClick: () -> Unit,
+    iconTone: EntryIconTone = EntryIconTone.Tint,
+    topDivider: Boolean = false,
+    enabled: Boolean = true,
+    expanded: Boolean? = null,
+) {
+    val entry = settingsEntry(tag)
+    EntryRow(
+        icon = requireNotNull(entry.icon) { "台账行「${entry.title}」没有图标：分段卡不走本装配点" },
+        domain = entry.domain,
+        title = entry.title,
+        subtitle = subtitle,
+        iconTone = iconTone,
+        topDivider = topDivider,
+        enabled = enabled,
+        expanded = expanded,
+        modifier = Modifier.testTag(entry.tag),
+        onClick = onClick,
+    )
+}
+
 /** 三态在界面上的用户语言标签（存储键仍走 `ThemeMode.storageKey`，这里只是文案）。 */
 private val ThemeMode.userLabel: String
     get() = when (this) {
@@ -164,18 +210,25 @@ private val ThemeMode.userLabel: String
  *   而 `newTarget` 在词书新词学完时会小于用户配置的每日目标（PRD FR-01 第 8 条），
  *   把它当「每日新增」印在设置页更是错的。资料卡只报昵称与词书名。
  * - 「词书内容包」「备份与恢复」各收成**一行折叠入口**：展开后才是原来的 SAF 子行
- *   （导入/导出词书；留档导出、认证导出、从旧设备恢复），结果提示也在展开区里以
- *   [InlineNotice] 呈现。SAF 拉起、认证与删除确认链路一行未动，本屏只改呈现层级。
+ *   （导入/导出词书；留档导出、认证导出、从旧设备恢复），两枚折叠件的 chevron 随展开态取
+ *   `ChevronDown`/`ChevronRight`，展开态另经 `EntryRow(expanded = …)` 注册成
+ *   `SemanticsActions.Expand`/`Collapse`（AC-R-12）。**结果提示住在折叠行外侧**（修复轮 1 / I4）：
+ *   回执是「上一次操作的结果」，收起态也必须读得到，不该被折叠藏起来。
+ *   SAF 拉起、认证与删除确认链路一行未动，本屏只改呈现层级。
  * - 「删除全部学习数据」退出设置一级页（裁决⑥的方向），下沉到「备份与恢复」展开区末节；
  *   级联预览 + 二次确认仍由 AppScreen 宿主承载（F4-01 Spec 04 L18），语义不变。
  * - 「主题」为三态分段选择：选中即 `AppThemePreferences.write`，回读经
  *   [rememberAppThemeMode] 的监听让整棵树即时换套，无需重启。
+ * - 九行标题、图标、域色与 testTag 只在 [SettingsGroups] 定义一处，渲染侧按 tag 经
+ *   [settingsEntry] 取（修复轮 1 / I3：台账不得是第二套真值）。
  *
- * @param importedBookCount 已导入的词书册数，决定导出子标题与可点性。
- * @param transferBusy 导入/导出进行中：子行回调被按住（副标题显示处理中），避免重复拉起文件选择器。
- * @param transferMessage 导入/导出的一句结果提示，`null` 时不占位；在词书内容包展开区呈现。
+ * @param importedBookCount 已导入的词书册数：0 时导出子行**真禁用**（`enabled = false`）并说明前提。
+ * @param transferBusy 导入/导出进行中：两枚 SAF 子行一律**真禁用**（不挂 click、语义「不可用」、
+ *   副标题显示处理中），避免重复拉起文件选择器；一级 9 行不受牵连，始终可点。
+ * @param transferMessage 导入/导出的一句结果提示，`null` 时不占位；在「词书内容包」折叠行**外侧**呈现
+ *   （收起态也读得到）。档位仍取 `InlineNoticeKind.Info`：宿主传来的是裸 `String`，不做文本嗅探。
  * @param deleteAllLearningDataNotice 「删除全部学习数据」的一句结果回执，`null` 时不占位；
- *   在备份与恢复展开区呈现。
+ *   在「备份与恢复」折叠行**外侧**呈现。
  */
 @Composable
 fun SettingsScreen(
@@ -254,88 +307,65 @@ fun SettingsScreen(
 
         // 「学习」组三条入口行按稿 §7④：词书与每日目标走强档渐变底，其余弱档 tint；
         // 「学习提醒」保持导航行（开关状态在二级页），副标题沿用既有文案。
-        SettingsGroupSection(SettingsGroups.all[0]) {
-            EntryRow(
-                icon = AppIcon.BookOpen,
-                domain = AppDomain.Learn,
-                title = "词书与每日目标",
+        // 标题/图标/域色一律从台账取（修复轮 1 / I3），这里只写动态的副标题与回调。
+        SettingsGroupSection(settingsGroup("settings_group_learning")) {
+            LedgerEntryRow(
+                tag = "settings_open_setup",
                 subtitle = "换词书、改每日新增量、改反馈后的详情开关",
                 iconTone = EntryIconTone.Gradient,
-                modifier = Modifier.testTag("settings_open_setup"),
                 onClick = onOpenSetup,
             )
-            EntryRow(
-                icon = AppIcon.Clock,
-                domain = AppDomain.Review,
-                title = "学习提醒",
+            LedgerEntryRow(
+                tag = "settings_open_reminder",
                 subtitle = "每日提醒，默认关闭（非精确、每天最多一次）",
-                iconTone = EntryIconTone.Tint,
                 topDivider = true,
-                modifier = Modifier.testTag("settings_open_reminder"),
                 onClick = onOpenReminderSettings,
             )
-            EntryRow(
-                icon = AppIcon.Document,
-                domain = AppDomain.Learn,
-                title = "生成默写纸",
+            LedgerEntryRow(
+                tag = "settings_open_worksheet",
                 subtitle = "选中译英或英译中，预览后导出可打印 PDF",
-                iconTone = EntryIconTone.Tint,
                 topDivider = true,
-                modifier = Modifier.testTag("settings_open_worksheet"),
                 onClick = onOpenWorksheet,
             )
         }
 
         // 「AI 与语音」是这一页唯一的云服务入口组：一级页只放两个可点入口，引擎状态与
         // 「待接入」厂商属于二级页的信息量——它们在一级页占过近一半屏，用户学习成本过高。
-        SettingsGroupSection(SettingsGroups.all[1]) {
-            EntryRow(
-                icon = AppIcon.Spark,
-                domain = AppDomain.AiSpeech,
-                title = "AI 服务与密钥",
+        SettingsGroupSection(settingsGroup("settings_group_ai_speech")) {
+            LedgerEntryRow(
+                tag = "settings_open_ai_profiles",
                 subtitle = aiProfileSubtitle ?: "添加多套 OpenAI 兼容服务，管理 Endpoint、模型与密钥",
                 iconTone = EntryIconTone.Gradient,
-                modifier = Modifier.testTag("settings_open_ai_profiles"),
                 onClick = onOpenAiProfiles,
             )
-            EntryRow(
-                icon = AppIcon.Speaker,
-                domain = AppDomain.AiSpeech,
-                title = "语音朗读",
+            LedgerEntryRow(
+                tag = "settings_open_speech",
                 subtitle = "当前供应商：${speechEngineStatuses.currentProvider}",
-                iconTone = EntryIconTone.Tint,
                 topDivider = true,
-                modifier = Modifier.testTag("settings_open_speech"),
                 onClick = onOpenSpeechSettings,
             )
         }
 
         // 「外观与关于」：主题三态分段卡（稿 §7④「主题」卡）+ 许可入口行，两张卡共用一个组标题。
         // 分段选中即写偏好；[rememberAppThemeMode] 的监听让装配点即时换套。
-        SettingsGroupSectionHeader(SettingsGroups.all[2])
+        SettingsGroupSectionHeader(settingsGroup("settings_group_appearance"))
         ThemeModeRow(mode = themeMode, onSelect = { AppThemePreferences.write(context, it) })
         SettingsGroupCard {
-            EntryRow(
-                icon = AppIcon.Info,
-                domain = AppDomain.Settings,
-                title = "开源许可与隐私说明",
+            LedgerEntryRow(
+                tag = "settings_open_licenses",
                 subtitle = "第三方组件、许可证与隐私说明",
-                iconTone = EntryIconTone.Tint,
-                modifier = Modifier.testTag("settings_open_licenses"),
                 onClick = onOpenLicenses,
             )
         }
 
-        // 词书内容包与备份与恢复各收成一行折叠入口（R-B）：SAF 子行与结果提示
-        // 只在展开区出现；busy 时子行回调被按住，语义与原「置灰不可点」一致。
-        SettingsGroupSection(SettingsGroups.all[3]) {
-            EntryRow(
-                icon = AppIcon.Upload,
-                domain = AppDomain.Library,
-                title = "词书内容包",
+        // 词书内容包与备份与恢复各收成一行折叠入口（R-B）：SAF 子行只在展开区出现，
+        // busy / 未导入的子行是真禁用（`enabled`，不是「点了没反应」），一级 9 行始终可点。
+        // 结果提示住在折叠行**外侧**（修复轮 1 / I4）：收起态也读得到回执，不必先展开。
+        SettingsGroupSection(settingsGroup("settings_group_data_security")) {
+            LedgerEntryRow(
+                tag = "settings_word_books",
                 subtitle = "导入 / 导出 .wbpack · 全离线",
-                iconTone = EntryIconTone.Tint,
-                modifier = Modifier.testTag("settings_word_books"),
+                expanded = wordBooksExpanded,
                 onClick = { wordBooksExpanded = !wordBooksExpanded },
             )
             if (wordBooksExpanded) {
@@ -350,8 +380,9 @@ fun SettingsScreen(
                     },
                     iconTone = EntryIconTone.Tint,
                     topDivider = true,
+                    enabled = !transferBusy,
                     modifier = Modifier.testTag("settings_import_word_book"),
-                    onClick = { if (!transferBusy) onImportWordBook() },
+                    onClick = onImportWordBook,
                 )
                 EntryRow(
                     icon = AppIcon.Download,
@@ -364,25 +395,23 @@ fun SettingsScreen(
                     },
                     iconTone = EntryIconTone.Tint,
                     topDivider = true,
+                    enabled = !transferBusy && importedBookCount > 0,
                     modifier = Modifier.testTag("settings_export_word_book"),
-                    onClick = { if (!transferBusy && importedBookCount > 0) onExportWordBook() },
+                    onClick = onExportWordBook,
                 )
-                transferMessage?.let { message ->
-                    InlineNotice(
-                        text = message,
-                        kind = InlineNoticeKind.Info,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
             }
-            EntryRow(
-                icon = AppIcon.Shield,
-                domain = AppDomain.Settings,
-                title = "备份与恢复",
+            transferMessage?.let { message ->
+                InlineNotice(
+                    text = message,
+                    kind = InlineNoticeKind.Info,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            LedgerEntryRow(
+                tag = "settings_backup",
                 subtitle = "导出本机文件、换机恢复与清空学习数据",
-                iconTone = EntryIconTone.Tint,
                 topDivider = true,
-                modifier = Modifier.testTag("settings_backup"),
+                expanded = backupExpanded,
                 onClick = { backupExpanded = !backupExpanded },
             )
             if (backupExpanded) {
@@ -427,13 +456,13 @@ fun SettingsScreen(
                     modifier = Modifier.testTag("settings_delete_all_learning_data"),
                     onClick = onDeleteAllLearningData,
                 )
-                deleteAllLearningDataNotice?.let { message ->
-                    InlineNotice(
-                        text = message,
-                        kind = InlineNoticeKind.Info,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
+            }
+            deleteAllLearningDataNotice?.let { message ->
+                InlineNotice(
+                    text = message,
+                    kind = InlineNoticeKind.Info,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
         }
     }
@@ -444,17 +473,21 @@ fun SettingsScreen(
  * 写偏好与回读由调用方接线（`AppThemePreferences.write` + `rememberAppThemeMode()`）。
  *
  * 三档标签固定为「跟随系统 / 浅色 / 深色」；每档可点面 `heightIn(min = 48.dp)`（F5-03 触控下限）。
+ *
+ * 卡标题与卡片 testTag 都取自台账里「主题」那一行（修复轮 1 / I3：这一页的行标题只许定义一处）；
+ * 本件不消费 [EntryRow]，所以不走 [LedgerEntryRow]，但同样只报 tag、不抄标题。
  */
 @Composable
 fun ThemeModeRow(mode: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     val colors = appColors()
+    val themeEntry = settingsEntry("settings_theme_mode")
     Card(
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier
             .fillMaxWidth()
             .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
-            .testTag("settings_theme_mode"),
+            .testTag(themeEntry.tag),
     ) {
         Column(
             modifier = Modifier
@@ -462,7 +495,12 @@ fun ThemeModeRow(mode: ThemeMode, onSelect: (ThemeMode) -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("主题", style = AppType.Body, fontWeight = FontWeight.Bold, color = colors.text1)
+            Text(
+                text = themeEntry.title,
+                style = AppType.Body,
+                fontWeight = FontWeight.Bold,
+                color = colors.text1,
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -18,6 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.collapse
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.expand
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppColorSet
@@ -104,8 +108,24 @@ fun entryRowInks(set: AppColorSet): EntryRowInk = EntryRowInk(
  * 把内容整块推下去，`heightIn(min = 56.dp)` 落在这条 padding 的**内侧**——所以 56dp 的最小内容高
  * 一动不动（R-10.5 禁的正是「把 56 吃成 55/57」），行的整体外框才是 56+1。
  *
- * [onClick] 是最后一个必填形参：调用方用尾随 lambda 写法 `EntryRow(icon, domain, "今日计划") { … }`
+ * [onClick] 是最后一个**必填**形参：调用方用尾随 lambda 写法 `EntryRow(icon, domain, "今日计划") { … }`
  * 即可，其余可选项一律具名传。
+ *
+ * [enabled]（Task 19 修复轮 1 / 评审 I1+I2）：**禁用态必须真的是禁用态**，不是「可点却不作为」。
+ * `enabled = false` 时链上**不挂 `clickable`**（AGENTS 与本屏旧 KDoc 都禁「能点却没反应的假入口」；
+ * `onClick = { if (!busy) … }` 那种守卫把职责交给了调用方，删掉守卫全仓仍绿，所以守卫不算实现），
+ * 同时补 `disabled()` 语义（`SemanticsProperties.Disabled`），connected 侧的判据是
+ * `assertHasNoClickAction()` 与 `assertIsNotEnabled()`。墨色只走弱一档：标题从 `text1` 降到 [EntryRowInk.subtitle]
+ * （= `text2`，本表里唯一仍达正文 AA 的弱墨），副标题与尾部值本就在 `text2`，chevron 与徽标按现盘既有墨档
+ * 取值不动（`text2` 与域色；被裁决禁回的 `text3` 与不达 3:1 的 `outline` 都不许拿来当「置灰」）。
+ * 行名与「为什么不可点」仍由标题文本与副标题文本承载，`testTag` 在最外层，节点照样找得到。
+ *
+ * [expanded]（同轮 I4）：把这枚行声明成**折叠入口**（disclosure）。三态里 `null` = 普通入口行，
+ * 链上不多挂任何语义，与加这两个形参之前的行为逐字相同（今日计划那 7 枚行不受影响）；
+ * 非空时 chevron 随状态取 [AppIcon.ChevronDown]（展开）/ [AppIcon.ChevronRight]（收起），
+ * 并注册 `SemanticsActions.Collapse` / `SemanticsActions.Expand`，动作体就是 [onClick]——
+ * TalkBack 用户不必先摸到「可点按」也能展开。现盘 Compose（ui 1.10.0）没有布尔 `expanded` 属性，
+ * 只有这两枚动作键，所以展开态语义按这一条路落地。
  */
 @Composable
 fun EntryRow(
@@ -118,14 +138,31 @@ fun EntryRow(
     showChevron: Boolean = true,
     topDivider: Boolean = false,
     iconTone: EntryIconTone = EntryIconTone.Gradient,
+    enabled: Boolean = true,
+    expanded: Boolean? = null,
     onClick: () -> Unit,
 ) {
     val inks = entryRowInks(appColors())
     val dividerModifier = hairlineTop(if (topDivider) inks.divider else null)
+    // 普通可点入口行（enabled=true 且不是折叠件）不进这条链：一个空 semantics 也会多开一枚语义节点，
+    // 那会把 TodayPlanScreen 那 7 枚行拽离「链上只此一枚可点源」的现盘形状。
+    val stateModifier = if (enabled && expanded == null) {
+        Modifier
+    } else {
+        Modifier.semantics {
+            if (!enabled) disabled()
+            when (expanded) {
+                true -> collapse(label = "收起 $title") { onClick(); true }
+                false -> expand(label = "展开 $title") { onClick(); true }
+                null -> Unit
+            }
+        }
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
+            .then(stateModifier)
+            .then(if (enabled) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .then(dividerModifier)
             .heightIn(min = 56.dp)
             .padding(vertical = 8.dp),
@@ -142,7 +179,7 @@ fun EntryRow(
             Text(
                 text = title,
                 style = AppType.Body,
-                color = inks.title,
+                color = if (enabled) inks.title else inks.subtitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -167,7 +204,8 @@ fun EntryRow(
             )
         }
         if (showChevron) {
-            AppGlyph(icon = AppIcon.ChevronRight, tint = inks.chevron, size = 16.dp, layer = AppGlyphLayer.StrokeOnly)
+            val chevronIcon = if (expanded == true) AppIcon.ChevronDown else AppIcon.ChevronRight
+            AppGlyph(icon = chevronIcon, tint = inks.chevron, size = 16.dp, layer = AppGlyphLayer.StrokeOnly)
         }
     }
 }
