@@ -1927,6 +1927,14 @@ internal val MintBackground: Color
 - Test: 既有 `CheckInScreenTest`（护栏口径沿用，不重写）
 
 - [ ] **Step 1: 前置检查（必做，铁律）**：确认「我的词」三入口已可达且 connected 通过（Task 20 收口）。未完成则**本任务不得开始摘除**，只允许做版面收敛。
+  - **能力前置（R-20A-fix.4，评审席 I-4 的登记面）**：摘 `today_plan_open_vocabulary` / `showVocabulary` 老路由之前，
+    「我的词」生词本段必须具备旧生词页已有、且摘除后会变全站不可达的两枚能力——段头整册「开始重新学习」、
+    逐行「标记为已掌握」（带二次确认）。凭据：`MyWordsScreenTest.wordbook_offers_relearn_and_mastered_behind_confirmation`
+    与 `MyWordsScreenContractTest.wordbook_section_supplies_the_capabilities_task_22_depends_on`（均已绿）。
+    **若这两枚判据任一不在册或为红，本任务不得摘上述老路由**，只允许收敛版面。
+    摘除时同步改**三处**，缺一即留陈旧陈述（I-2 的双向同步规程）：今日计划可点闭合集合判据（−1）、
+    `TodayPlanNumberAuthorityTest` 入口标签白名单（删行）、`TodayPlanScreen.kt` KDoc 里的枚数自述（改数）；
+    写死枚数一律配可重算命令，别把新数字裸抄进文档。
 - [ ] **Step 2: 写失败测试**：打卡页不再出现裸文字链（`grep` 级契约 + UI 断言「无两条通往收藏/错词的裸文字链节点」）；三统计卡数值口径不变（F4-01 已建的统计口径零改动）。
 - [ ] **Step 3: 实现**：头部两条裸文字链移出；`CheckInScreen.kt:148` 的裸 hex `#FFF1DB` token 化并从 seed 删除；`:66-73` 注释自认「大字号挤压归本轮」的头部换 `AppScreenHeader`，跑 `fontScale 2.0` 护栏（AC-R-07）。
 - [ ] **Step 4: 动效不做**（spec §1 不做的事 #5）：不引入动画代码；在 `docs/verification/ui-redesign-2026-10.md` 记一行「打卡页华丽动效 = 另批，未在本轮范围」。
@@ -1990,6 +1998,9 @@ internal val MintBackground: Color
 - [ ] **Step 2: 契约测试正则局限 M-B1/M-B2 补测**（不改门禁语义）：为两处已记录漏判面补合成用例与新规则；补完后 `AccessibilityColorTokenContractTest` 既有用例必须原样通过。
 - [ ] **Step 3: 棘轮清零**（AC-R-02 兑现）：`RawColorLiteralRatchetTest` seed 应为空；若非空，逐站点要么 token 化、要么在验证文档写明「该站点与主题无关，理由是 X」。`SharedComponentUniquenessRatchetTest` 四条 seed 归零或写明保留理由。`DarkTokenConsumptionRatchetTest` 按**本批开头的「批 3 深色清零专项」**收口：排印墨色族与玻璃容器族迁净、蒙版族留档写理由，四处 `AppPalette.GlassFill` 的迁移动作即 AC-R-11 的兑现面（该行的站点清单已在验证文档登记，别另起口径）。
 - [ ] **Step 4: 真机取证（不得凭代码宣称一致）**：六屏在 360dp 宽真机浅/深两套截图，逐屏与 `docs/design/2026-10-17-ui-redesign-mockups.html` 比对（AC-R-10）；玻璃层与域色容器深色下可读性实测（AC-R-11）；TalkBack 走查一遍（AC-R-12：图标替换后描述、逐词、未配置卡出口）。截图与脚本只放 `.git/qa-scratch/`，**不入库**；报告不写含用户数据的绝对路径。
+- [ ] **Step 4b: 「我的词」进入帧时实测（性能债收口，评审席 `task-20A-review.md` m-1，控制者裁定 ②）**：合并页三段同屏是 eager `Column + verticalScroll` 全量组合，峰值 = 生词本 + 收藏 + 错词三册之和一次排布（生词本段从旧页 `LazyColumn` 退化而来）。本轮**有意不改** `LazyColumn`——同批把落位逻辑从 `scrollTo(px)` 换成 `scrollToItem(段落位下标)` 会与 I-1 的落位修正叠成结构重构。收口动作：用一台小屏（360dp 级）+ 合成大词表（数百条级，三册各 ≥200）量一次冷启动进入「我的词」的首帧帧时并**给出数字**，写进 `docs/verification/ui-redesign-2026-10.md` 的 AC-R 证据表；数字超 AGENTS.md「核心路径不得阻塞 UI」的口径则立改造任务（改 `LazyColumn` + 宿主 hoist `rememberLazyListState`，先例 `AppScreen.kt:207-209` 与 `WordBookWordsScreen.kt:83/:158`），不得只登记不处置。
+  同批顺带观察（不是本席引入、已定性为既有脆弱）：`AppScreenTest.startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan` 在装机后**整类首跑**连红三枚 HEAD、单跑与复跑绿；
+  另 `wrongWordsState` 上提宿主后每次组合多收集一枚 flow，属该类 flake 的可疑面之一——取证时一并记录，**禁止**为它改实现或放宽判据。
 - [ ] **Step 5: 门禁 + 基线重算 + lockfile 零变化确认**：Global Constraints #11 命令 + #10 重算 + `git diff --name-only main..HEAD | grep -c lockfile` == 0；`verifyThirdPartyNotices` 与 `verifyAcTraceabilityMatrix` 全绿（AC-R 不进矩阵，见 `build.gradle.kts:45-72` 的 `AC[0-4]-\d{2}` 过滤）。
 - [ ] **Step 6: 更新 `docs/verification/ui-redesign-2026-10.md`**：AC-R-01…23 全表证据（含真机项的取证方式与结论），逐条要么给证据要么写「未覆盖 + 原因」。
 - [ ] **Step 7: 按 `docs/handoff/REPORT-TEMPLATE.md` 写批 3 报告**（七节必填），提交，推送并用 `ls-remote` 核验远端 tip；合 `main` 需用户拍板（外部副作用，停止事项）。
