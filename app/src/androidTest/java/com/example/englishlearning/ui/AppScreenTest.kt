@@ -201,6 +201,7 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_screen").assertExists()
         composeRule.onNodeWithTag("wordbook_words_row_aword").assertExists()
+        scrollToRailLetter("W")
         composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
@@ -230,6 +231,7 @@ class AppScreenTest {
         }
         createProfile()
         composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        scrollToRailLetter("W")
         composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
@@ -251,6 +253,7 @@ class AppScreenTest {
         }
         createProfile()
         composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        scrollToRailLetter("W")
         composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
         composeRule.waitForIdle()
         val row = composeRule.onNodeWithTag("wordbook_words_row_wonder")
@@ -1578,6 +1581,19 @@ class AppScreenTest {
             }),
             keys,
         ).also { it.keys += "mimo" }
+    }
+
+    /**
+     * Task 21：字母索引从右侧竖排压缩槽搬到**正文上方的横向可滚 48dp 芯片条**，
+     * 靠后的字母（这里用到的是 W）落在视口外，`performClick` 的坐标打不到芯片。
+     * 与 `WordBookWordsScreenTest.scrollToRailLetter` 同法走 `performScrollTo()`：
+     * 设备实测手推 `SemanticsActions.ScrollBy (dx, 0f)` 在本 Compose 版本上对
+     * `Modifier.horizontalScroll` 容器不产生位移（只有竖向 LazyColumn 吃这个动作），
+     * 而 `performScrollTo()` 会沿父链找真正能滚的祖先，可靠。
+     */
+    private fun scrollToRailLetter(letter: String) {
+        composeRule.onNodeWithTag("wordbook_words_rail_$letter").performScrollTo()
+        composeRule.waitForIdle()
     }
 
     private fun wordBookWordsViewModelWithAlphabetThroughW(wRows: Int = 1): WordBookWordsViewModel {

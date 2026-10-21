@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertHasClickAction
@@ -20,6 +19,7 @@ import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
@@ -85,7 +85,99 @@ class WordBookWordsScreenTest {
         }
     }
 
-    /** 当前滚动分组应在右侧导航栏中以 active 标记突出显示，并随跳转更新。 */
+    /**
+     * Task 21 / F5-03 移交账（AC-R-04）：字母索引**每一枚**的可点区必须 ≥48dp 见方，
+     * 并且**带 tag 的那枚节点自己**承担 click action（不靠父槽、更不靠整轨拖动代偿）。
+     *
+     * 天然红锚：旧竖排压缩槽里 tag 在 `24×18dp`（屏矮时更小）的 `Box` 槽上、`clickable` 在子 `Text` 上，
+     * 本用例的两条（尺寸 + click action 落在 tag 节点）在旧实现上同时判红。
+     */
+    @Test
+    fun everyRailLetterIsAFourEightTouchTarget() {
+        showAlphabet()
+        val failures = mutableListOf<Throwable>()
+        ('A'..'Z').forEach { letter ->
+            val chip = composeRule.onNodeWithTag("wordbook_words_rail_$letter")
+            recordAssertion(failures, "$letter 存在") { chip.assertExists() }
+            recordAssertion(failures, "$letter 自带 click action") { chip.assertHasClickAction() }
+            recordAssertion(failures, "$letter 命中区 ≥48dp 见方") {
+                val hit = chip.getUnclippedBoundsInRoot()
+                assertTrue(
+                    "字母 $letter 的命中区必须 ≥48dp 见方（AC-R-04 钉的是可点区，不是视觉高度），实测 $hit",
+                    hit.bottom - hit.top >= 48.dp && hit.right - hit.left >= 48.dp,
+                )
+            }
+        }
+        MultipleFailureException.assertEmpty(failures)
+    }
+
+    /** Task 21 / F5-03：相邻字母的命中区不得相交（相交即「点 F 落到后画的字母」，正是压缩槽时代红过的形状）。 */
+    @Test
+    fun adjacentRailLetterHitAreasDoNotOverlap() {
+        showAlphabet()
+        val tolerance = 0.5.dp
+        val failures = mutableListOf<Throwable>()
+        ('A'..'Y').forEach { letter ->
+            val next = ('B'..'Z').first { it > letter }.toString()
+            val left = composeRule.onNodeWithTag("wordbook_words_rail_$letter").getUnclippedBoundsInRoot()
+            val right = composeRule.onNodeWithTag("wordbook_words_rail_$next").getUnclippedBoundsInRoot()
+            recordAssertion(failures, "$letter/$next 命中区不相交") {
+                val separated = left.right <= right.left + tolerance || left.left >= right.right - tolerance ||
+                    left.bottom <= right.top + tolerance || left.top >= right.bottom - tolerance
+                assertTrue("相邻字母 $letter 与 $next 的命中区不得重叠：$left vs $right", separated)
+            }
+        }
+        MultipleFailureException.assertEmpty(failures)
+    }
+
+    /**
+     * Task 21（顶掉退役的 `compressedRailMapsTheActualXSlotToX` 的「视口被压小」前提）：
+     * 400dp 高、density 1 的小视口里字母芯片仍必须各占 48dp 见方且**互不相交**，并能把 X 走通。
+     * 旧实现槽高 `min(18dp, 400/26≈15dp)` → 尺寸断言当场红。
+     */
+    @Test
+    fun railLettersKeepTheTouchTargetFloorInATinyViewport() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                Box(Modifier.height(400.dp)) {
+                    WordBookWordsScreen(
+                        state = WordBookWordsUiState(words = ('A'..'Z').flatMap { letter ->
+                            (1..10).map { word("book:$letter$it", "${letter.lowercaseChar()}word$it") }
+                        }),
+                        onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
+                    )
+                }
+            }
+        }
+        val tolerance = 0.5.dp
+        val failures = mutableListOf<Throwable>()
+        ('A'..'Z').forEach { letter ->
+            recordAssertion(failures, "$letter 命中区 ≥48dp 见方") {
+                val hit = composeRule.onNodeWithTag("wordbook_words_rail_$letter").getUnclippedBoundsInRoot()
+                assertTrue(
+                    "小视口不得把字母芯片压回 48dp 以下（48dp 是下限，不是视口分配值），实测 $hit",
+                    hit.bottom - hit.top >= 48.dp && hit.right - hit.left >= 48.dp,
+                )
+            }
+        }
+        ('A'..'Y').forEach { letter ->
+            val next = ('B'..'Z').first { it > letter }.toString()
+            val left = composeRule.onNodeWithTag("wordbook_words_rail_$letter").getUnclippedBoundsInRoot()
+            val right = composeRule.onNodeWithTag("wordbook_words_rail_$next").getUnclippedBoundsInRoot()
+            recordAssertion(failures, "$letter/$next 命中区不相交") {
+                val separated = left.right <= right.left + tolerance || left.left >= right.right - tolerance ||
+                    left.bottom <= right.top + tolerance || left.top >= right.bottom - tolerance
+                assertTrue("小视口里相邻字母 $letter 与 $next 的命中区不得重叠：$left vs $right", separated)
+            }
+        }
+        MultipleFailureException.assertEmpty(failures)
+        scrollToRailLetter("X")
+        composeRule.onNodeWithTag("wordbook_words_rail_X").performClick()
+        composeRule.waitForIdle()
+        assertNavigationState("X")
+    }
+
+    /** 当前滚动分组应在字母索引中以 active 标记突出显示，并随跳转更新。 */
     @Test
     fun activeRailLetterTracksCurrentScrollGroup() {
         val words = ('A'..'Z').flatMap { letter ->
@@ -96,6 +188,7 @@ class WordBookWordsScreenTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_rail_active_A").assertIsDisplayed()
+        scrollToRailLetter("Z")
         composeRule.onNodeWithTag("wordbook_words_rail_Z").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_rail_active_A").assertDoesNotExist()
@@ -105,90 +198,90 @@ class WordBookWordsScreenTest {
     @Test
     fun lastGroupIsHighlightedWhenItsHeaderCannotReachTheTop() {
         showAlphabet()
+        scrollToRailLetter("Z")
         composeRule.onNodeWithTag("wordbook_words_rail_Z").performClick()
         composeRule.onNodeWithTag("wordbook_words_rail_active_Z").assertIsDisplayed()
     }
 
+    /**
+     * Task 21 顶掉退役的 `draggingDownTheAlphabetRailJumpsToZ`：48dp 芯片条里「一次点到底」由滚动 + tap 承担，
+     * 拖动面已删除。这里钉住同一末端契约——把索引滚到头、点最后一枚字母，必须落到 Z 组。
+     */
     @Test
-    fun draggingDownTheAlphabetRailJumpsToZ() {
+    fun tappingTheLastRailLetterJumpsToZ() {
         showAlphabet()
-        composeRule.onNodeWithTag("wordbook_words_rail").performTouchInput {
-            down(Offset(center.x, 1f))
-            moveTo(Offset(center.x, height - 1f), 500)
-            up()
-        }
+        scrollToRailLetter("Z")
+        composeRule.onNodeWithTag("wordbook_words_rail_Z").assertIsDisplayed()
+        composeRule.onNodeWithTag("wordbook_words_rail_Z").performClick()
+        composeRule.waitForIdle()
         assertNavigationState("Z")
     }
 
+    /**
+     * Task 21 顶掉退役的 `draggingUpTheAlphabetRailJumpsBackToA`：从 Z 回 A 仍是一次 tap（滚回 A 后点它）。
+     */
     @Test
-    fun draggingToTheVisibleMiddleLetterJumpsToF() {
+    fun tappingTheFirstRailLetterAfterZJumpsBackToA() {
         showAlphabet()
-        val rail = composeRule.onNodeWithTag("wordbook_words_rail").fetchSemanticsNode().boundsInRoot
-        val target = composeRule.onNodeWithTag("wordbook_words_rail_F").fetchSemanticsNode().boundsInRoot.center
-        composeRule.onNodeWithTag("wordbook_words_rail").performTouchInput {
-            down(Offset(center.x, 1f))
-            moveTo(Offset(target.x - rail.left, target.y - rail.top), 500)
-            up()
-        }
-        assertNavigationState("F")
-    }
-
-    @Test
-    fun draggingUpTheAlphabetRailJumpsBackToA() {
-        showAlphabet()
+        scrollToRailLetter("Z")
         composeRule.onNodeWithTag("wordbook_words_rail_Z").performClick()
-        composeRule.onNodeWithTag("wordbook_words_rail").performTouchInput {
-            down(Offset(center.x, height - 1f))
-            moveTo(Offset(center.x, 1f), 500)
-            up()
-        }
+        composeRule.waitForIdle()
+        assertNavigationState("Z")
+        scrollToRailLetter("A")
+        composeRule.onNodeWithTag("wordbook_words_rail_A").performClick()
+        composeRule.waitForIdle()
         assertNavigationState("A")
     }
 
+    /**
+     * Task 21 顶掉退役的 `compressedRailKeepsActiveGlyphWithinItsLayout`：当前字母的字形整颗必须落在
+     * 它那枚 48dp 芯片里（旧判据是「字形不越出压缩槽位」，语义等价，只是夹具换成真 48dp）。
+     *
+     * 为什么不沿用 `TextLayoutResult.hasVisualOverflow`：设备实测单枚字母在固有宽度上
+     * `didOverflowWidth` 为真（`size=30 x 52`，行的可见右缘比取整后的布局宽度大 0.x px），
+     * 是取整造成的假红而不是真越界；「字形包围盒 ⊆ 芯片包围盒」才是这条契约的直接表达，
+     * 且照样可伪——芯片缩到小于字形、或字号涨到撑破 48dp，包含关系都会失败。
+     */
     @Test
-    fun compressedRailMapsTheActualXSlotToX() {
-        composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
-                Box(Modifier.height(400.dp)) {
-                    WordBookWordsScreen(
-                        state = WordBookWordsUiState(words = ('A'..'Z').flatMap { letter ->
-                            (1..10).map { word("book:$letter$it", "${letter.lowercaseChar()}word$it") }
-                        }),
-                        onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
-                    )
-                }
-            }
-        }
-        dragToLetter("X")
-        assertNavigationState("X")
-    }
-
-    @Test
-    fun compressedRailKeepsActiveGlyphWithinItsLayout() {
-        composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
-                Box(Modifier.height(400.dp)) {
-                    WordBookWordsScreen(
-                        state = WordBookWordsUiState(words = ('A'..'Z').flatMap { letter ->
-                            (1..10).map { word("book:$letter$it", "${letter.lowercaseChar()}word$it") }
-                        }),
-                        onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
-                    )
-                }
-            }
-        }
-        val layouts = mutableListOf<TextLayoutResult>()
-        composeRule.onNodeWithContentDescription("导航字母 A")
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        val layout = layouts.single()
+    fun activeRailGlyphStaysWithinItsChip() {
+        showAlphabet()
+        scrollToRailLetter("A")
+        val glyph = composeRule.onNodeWithContentDescription("导航字母 A", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val chip = composeRule.onNodeWithTag("wordbook_words_rail_A").getUnclippedBoundsInRoot()
+        val tolerance = 0.5.dp
+        // DpRect 只有 left/top/right/bottom，宽高自己减（Rect 才有 width/height）
+        val glyphWidth = glyph.right - glyph.left
+        val glyphHeight = glyph.bottom - glyph.top
+        val chipWidth = chip.right - chip.left
+        val chipHeight = chip.bottom - chip.top
         assertTrue(
-            "压缩轨道的当前字母不应发生字形溢出: size=${layout.size}, overflow=${layout.hasVisualOverflow}, width=${layout.didOverflowWidth}, height=${layout.didOverflowHeight}",
-            !layout.hasVisualOverflow,
+            "当前字母的字形必须整颗落在它的 48dp 芯片内: glyph=$glyph chip=$chip",
+            glyph.left >= chip.left - tolerance &&
+                glyph.right <= chip.right + tolerance &&
+                glyph.top >= chip.top - tolerance &&
+                glyph.bottom <= chip.bottom + tolerance,
+        )
+        assertTrue(
+            "字形包围盒不得为零尺寸（为零说明该字母没渲染出内容）: glyph=$glyph",
+            glyphWidth > 0.dp && glyphHeight > 0.dp,
+        )
+        assertTrue(
+            "芯片自身不得跌破 48dp 触摸下限: chip=$chip",
+            chipWidth >= 48.dp && chipHeight >= 48.dp,
         )
     }
 
+    /**
+     * Task 21（点屏内可点的芯片本身，不是屏外的槽位）：tap 芯片中心必须触发该字母的 click action。
+     * 顶掉退役的 `railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre` 里「点槽心选对该字母」那一半，
+     * 另外两半（命中区不越槽、不与相邻重叠）由 `everyRailLetterIsAFourEightTouchTarget` +
+     * `adjacentRailLetterHitAreasDoNotOverlap` 以更强的「48dp 见方 + 相邻不相交」形式承重。
+     * 同时收下退役的 `draggingToTheVisibleMiddleLetterJumpsToF` 的契约：中间那枚字母（这里是 F）
+     * 滚进视口后一次点中即落到 F 组——原用例靠拖到该字母的槽位坐标，本用例靠「滚进视口 + 点芯片中心」。
+     */
     @Test
-    fun tappingTheActualRailSlotUsesTheLetterClickAction() {
+    fun tappingTheRailLetterUsesTheLetterClickAction() {
         composeRule.setContent {
             WordBookWordsScreen(
                 state = WordBookWordsUiState(words = ('A'..'Z').flatMap { letter ->
@@ -197,6 +290,7 @@ class WordBookWordsScreenTest {
                 onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
             )
         }
+        scrollToRailLetter("F")
         composeRule.onNodeWithTag("wordbook_words_rail_F").performTouchInput {
             down(center)
             up()
@@ -205,8 +299,12 @@ class WordBookWordsScreenTest {
         assertNavigationState("F")
     }
 
+    /**
+     * Task 21（原 `draggingAfterFilteringUsesTheNewGroupIndices` 的 tap 时代等价）：筛选改变分组后，
+     * 字母 → 下标表必须跟着重算，点 F 仍落到筛选结果里的 F 组。
+     */
     @Test
-    fun draggingAfterFilteringUsesTheNewGroupIndices() {
+    fun tappingAfterFilteringUsesTheNewGroupIndices() {
         var filter by mutableStateOf<WordBookRecordStatus?>(null)
         val words = ('A'..'Z').flatMap { letter ->
             (1..10).map { word("book:$letter$it", "${letter.lowercaseChar()}word$it",
@@ -219,39 +317,42 @@ class WordBookWordsScreenTest {
             )
         }
         composeRule.onNodeWithTag("wordbook_words_filter_due").performClick()
-        dragToLetter("F")
+        scrollToRailLetter("F")
+        composeRule.onNodeWithTag("wordbook_words_rail_F").performClick()
+        composeRule.waitForIdle()
         assertNavigationState("F")
     }
 
+    /** Task 21（顶掉退役的 `draggingToAMissingLetterUsesTheNextAvailableGroup`）：点没有单词的字母仍跳字母序最近的下一组。 */
     @Test
-    fun draggingToAMissingLetterUsesTheNextAvailableGroup() {
+    fun tappingAMissingLetterUsesTheNextAvailableGroup() {
         showWords(listOf('A', 'F', 'Z').flatMap { letter ->
             (1..10).map { word("book:$letter$it", "${letter.lowercaseChar()}word$it") }
         })
-        dragToLetter("E")
+        scrollToRailLetter("E")
+        composeRule.onNodeWithTag("wordbook_words_rail_E").performClick()
+        composeRule.waitForIdle()
         assertNavigationState("F")
     }
 
+    /**
+     * Task 21（原 `draggingUpdatesGroupsBeforeTheFingerIsReleased` 的 tap 时代等价）：拖动面退役后，
+     * 「一次连点里每一步都要立刻反映到列表」改成逐枚 tap 连点，仍用累加失败的写法——
+     * 前一步红不遮蔽后一步（`checkNavigationState` 的既有价值原样保留）。
+     */
     @Test
-    fun draggingUpdatesGroupsBeforeTheFingerIsReleased() {
+    fun successiveRailTapsUpdateTheNavigationStateEachStep() {
         showAlphabet()
+        scrollToRailLetter("Z")
         composeRule.onNodeWithTag("wordbook_words_rail_Z").performClick()
+        composeRule.waitForIdle()
         assertNavigationState("Z")
-        val rail = composeRule.onNodeWithTag("wordbook_words_rail").fetchSemanticsNode().boundsInRoot
-        val targets = listOf("F", "M", "A").map { letter ->
-            letter to (composeRule.onNodeWithTag("wordbook_words_rail_$letter").fetchSemanticsNode().boundsInRoot.center - rail.topLeft)
-        }
-        val node = composeRule.onNodeWithTag("wordbook_words_rail")
         val failures = mutableListOf<Throwable>()
-        node.performTouchInput { down(Offset(center.x, height - 1f)) }
-        try {
-            targets.forEach { (letter, position) ->
-                node.performTouchInput { moveTo(position, 500) }
-                // 同一次按下中逐步验证；前一步失败不遮蔽后面的 M/A，也不提前抬手。
-                checkNavigationState(letter, failures)
-            }
-        } finally {
-            node.performTouchInput { up() }
+        listOf("F", "M", "A").forEach { letter ->
+            scrollToRailLetter(letter)
+            composeRule.onNodeWithTag("wordbook_words_rail_$letter").performClick()
+            composeRule.waitForIdle()
+            checkNavigationState(letter, failures)
         }
         MultipleFailureException.assertEmpty(failures)
     }
@@ -279,14 +380,17 @@ class WordBookWordsScreenTest {
         }
     }
 
-    private fun dragToLetter(letter: String) {
-        val rail = composeRule.onNodeWithTag("wordbook_words_rail").fetchSemanticsNode().boundsInRoot
-        val target = composeRule.onNodeWithTag("wordbook_words_rail_$letter").fetchSemanticsNode().boundsInRoot.center
-        composeRule.onNodeWithTag("wordbook_words_rail").performTouchInput {
-            down(Offset(center.x, 1f))
-            moveTo(target - rail.topLeft, 500)
-            up()
-        }
+    /**
+     * 把某枚字母芯片滚进视口。26×48dp（实测 Rail 内容宽 1295dp）远超屏宽，点靠后的字母前必须让容器先滚，
+     * 否则 `performClick` 的坐标落在视口外、打不到芯片（设备实测：`Z after scroll` 的裁剪后矩形为 0×0）。
+     *
+     * 用 `performScrollTo()` 而不是手推 `SemanticsActions.ScrollBy`：后者在本 Compose 版本上对
+     * `Modifier.horizontalScroll` 传 (dx, 0f) **不发生横向位移**（当场实测无反应），
+     * 而 `performScrollTo()` 会自己找可滚祖先并按容器语义补齐位移。
+     */
+    private fun scrollToRailLetter(letter: String) {
+        composeRule.onNodeWithTag("wordbook_words_rail_$letter").performScrollTo()
+        composeRule.waitForIdle()
     }
 
     @Test
@@ -349,6 +453,10 @@ class WordBookWordsScreenTest {
         val normal = composeRule.onNodeWithContentDescription("导航字母 B").textLayout().layoutInput.style
         assertTrue("当前字母颜色应区别于普通字母", active.color != normal.color)
         saveScreenshot("current-A")
+        // 去留理由（裁定 R-21.1）：本条有证伪力——文本节点确实能经 `textLayout().layoutInput.style` 读到
+        // 字形取值（20-B 评审席已更正「设备侧读不到颜色」的旧口径），把 active 换成与 normal 同值即当场红。
+        // 因此保留，只把点靠后字母补上「先滚进视口」这一步（横向 48dp 芯片条的必然改动）。
+        scrollToRailLetter("F")
         composeRule.onNodeWithTag("wordbook_words_rail_F").performClick()
         saveScreenshot("current-F")
     }
@@ -393,6 +501,7 @@ class WordBookWordsScreenTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_row_a1").assertIsDisplayed()
+        scrollToRailLetter("Z")
         composeRule.onNodeWithTag("wordbook_words_rail_Z").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_letter_Z").assertIsDisplayed()
@@ -453,49 +562,15 @@ class WordBookWordsScreenTest {
     }
 
     /**
-     * F5-03 / Task 10（B3 字母栏）：这里钉住的是**本屏能真正成立**的触控契约，不是 48dp 见方。
-     *
-     * 取证过程（详见 task-10 报告）：
-     *  - RED：按 brief 口径先写「字母 F 的命中区 ≥48dp 见方」，设备实测 12.95dp 高 → 红（真实缺口）；
-     *  - 按 brief 加上 `minimumInteractiveComponentSize()` 后尺寸断言转绿，但既有行为用例
-     *    `tappingTheActualRailSlotUsesTheLetterClickAction` 立刻转红：26 个字母的槽间距只有
-     *    slotPixels≈18dp，48dp 目标两两重叠，点 F 被后画的相邻字母抢走命中。
-     *  - 结论：18dp 间距下任何 >18dp 的方形目标必然重叠，26×48dp=1248dp 也远超屏高，
-     *    本屏 48dp **结构性不可达**，真要达标得重做轨道（归 UI 重设计轮）。
-     *
-     * 因此本用例钉三条可证伪的契约：命中区**落在整槽之内并覆盖槽心**（现 ≈24×13dp，槽 24×18dp，
-     * 纵向未铺满；点槽心能选中该字母）、且与下一个字母的命中区不重叠——
-     * 把上面那条 48dp 修饰符加回来，第 2、3 条立刻红（伪修证伪器）。
+     * Task 21 修复轮·退役说明（原 F5-03 / Task 10 的 B3 字母栏代偿护栏
+     * `railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre` 已随竖排压缩槽一并删除）：
+     * 它钉的三条（命中区覆盖槽心 / 不越出整槽 / 不与下一字母重叠）都是**压缩槽时代**的契约，
+     * 版面搬到横向 48dp 芯片后「槽」这个概念不存在。同等契约由这四枚承重且更强：
+     *  - `everyRailLetterIsAFourEightTouchTarget`：26 枚逐枚 ≥48dp 见方 + click action 落在带 tag 的节点自身；
+     *  - `adjacentRailLetterHitAreasDoNotOverlap`：逐对相邻命中区不相交（旧护栏只看 F/G 一对）；
+     *  - `railLettersKeepTheTouchTargetFloorInATinyViewport`：小视口（density 1、400dp 高）不达标即红；
+     *  - `tappingTheRailLetterUsesTheLetterClickAction`：点芯片中心选对字母（旧护栏「点槽心」那一半）。
      */
-    @Test
-    fun railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre() {
-        showAlphabet()
-
-        val slot = composeRule.onNodeWithTag("wordbook_words_rail_F").getUnclippedBoundsInRoot()
-        val letter = composeRule.onNodeWithContentDescription("导航字母 F")
-        letter.assertHasClickAction()
-        letter.assertIsDisplayed()
-        val hit = letter.getUnclippedBoundsInRoot()
-        val next = composeRule.onNodeWithContentDescription("导航字母 G").getUnclippedBoundsInRoot()
-        val tolerance = 0.5.dp
-
-        val slotCenterX = (slot.left + slot.right) / 2f
-        val slotCenterY = (slot.top + slot.bottom) / 2f
-        assertTrue(
-            "F 的命中区应覆盖整槽槽心（点槽心能选中 F），slot=$slot hit=$hit",
-            hit.left <= slotCenterX && slotCenterX <= hit.right &&
-                hit.top <= slotCenterY && slotCenterY <= hit.bottom,
-        )
-        assertTrue(
-            "F 的命中区不得越出整槽去抢相邻字母，slot=$slot hit=$hit",
-            hit.left >= slot.left - tolerance && hit.right <= slot.right + tolerance &&
-                hit.top >= slot.top - tolerance && hit.bottom <= slot.bottom + tolerance,
-        )
-        assertTrue(
-            "相邻字母的命中区不得重叠（重叠会让点 F 落到后画的字母），F=$hit G=$next",
-            hit.bottom <= next.top + tolerance,
-        )
-    }
 
     /**
      * Task 20-B 修复轮 1 · F1 判据（行为级、可量）：渲染禁用行时，原因串「这个词已不在当前词书中」
