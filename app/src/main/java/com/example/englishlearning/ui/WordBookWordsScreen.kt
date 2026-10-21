@@ -251,14 +251,20 @@ private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) ->
         // Task 20-B（计划 Step 4）：卡内那枚私有 `Column` + 四枚 `Text` 换成共享 [WordRow]。
         // 卡面归调用方（本屏的 enabled/disabled 底色与描边、testTag、可点面都原样保留），行本体只管版式；
         // **不传 onClick**：可点面只有卡那一枚，禁用态由「不挂 clickable」表达。
-        // 禁用行的行墨因此与可用行统一（旧的 `textColor` 双档随私有行一起删掉），
-        // 「这个词已不在当前词书中」改走 [WordRow] 的 meta 槽；设备侧读不到颜色，
+        // 禁用行的行墨因此与可用行统一（旧的 `textColor` 双档随私有行一起删掉），设备侧读不到颜色，
         // 本屏没有任何用例断过禁用墨（判据见 connected `WordBookWordsScreenTest`）。
+        // 修复轮 1 · F1（控制者裁定 R-20B.3，授权偏离 20-B 派工单槽位映射表第三行）：禁用行原因串 11 枚汉字
+        // ≈143dp，走 `meta` 会被右列 `widthIn(max = 120.dp)` + `maxLines = 1` 卡成省略号（设备实测 120.0dp），
+        // 呈现层丢信息；改走 `gloss` 槽（左列 weight(1f)、maxLines = 2、无 120dp 上限），`meta` 置空。
+        // 成立前提是「两槽互斥」：禁用 ⇒ `card == null` ⇒ 释义侧按构造恒为 `null`，`?:` 才落到原因串；
+        // 前提由 JVM 锚 `WordBookWordsViewModelTest`「can open detail stays derived from card presence…」钉死，
+        // 哪天放开（如 `card != null` 却 `canOpenDetail == false`）锚当场红，提示改本屏写法——
+        // 那种形态下原因串会被释义吃掉（新的信息丢失）。connected 判据：`disabledRowShowsTheUnavailableNoticeInFull`。
+        val unavailableNotice = if (enabled) null else "这个词已不在当前词书中"
         WordRow(
             lemma = row.displayLemma,
-            gloss = row.card?.meaningZh?.takeIf { it.isNotBlank() }?.let { "释义：$it" },
+            gloss = row.card?.meaningZh?.takeIf { it.isNotBlank() }?.let { "释义：$it" } ?: unavailableNotice,
             status = row.status.statusLabel(),
-            meta = if (enabled) null else "这个词已不在当前词书中",
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
     }

@@ -35,6 +35,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.util.Log
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
 import com.example.englishlearning.learning.domain.WordCard
@@ -495,6 +496,52 @@ class WordBookWordsScreenTest {
             hit.bottom <= next.top + tolerance,
         )
     }
+
+    /**
+     * Task 20-B 修复轮 1 · F1 判据（行为级、可量）：渲染禁用行时，原因串「这个词已不在当前词书中」
+     * 必须**完整呈现**——不被组件右列的 `widthIn(max = 120.dp)` + `maxLines = 1` + Ellipsis 吃掉。
+     *
+     * 判据取派工单点名口径：承载该串的文本布局实测宽度**明显大于** 120dp 右列上限
+     * （阈值 120×1.10 = 132dp：现盘 `meta` 写法被上限卡死在 ≈120dp 当场红；改走 `gloss` 左列后
+     * 整句 ≈143dp，对 120dp 上限余量 ≈19%、对 132dp 阈值余量 ≈8%，数走 logcat tag `T20B_F1`），
+     * 且该槽必须允许多行（`layoutInput.maxLines ≥ 2`，钉住「不再落回单行右列」这一形状）。
+     * 迁移前这枚 `Text` 在满宽 `Column` 里整句可见；本条把「呈现层不丢信息」钉成设备实测。
+     */
+    @Test
+    fun disabledRowShowsTheUnavailableNoticeInFull() {
+        composeRule.setContent {
+            WordBookWordsScreen(
+                state = WordBookWordsUiState(words = listOf(disabledWord("book:ghost", "ghost"))),
+                onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
+            )
+        }
+        val notice = composeRule.onNodeWithText("这个词已不在当前词书中")
+        notice.assertIsDisplayed()
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val layout = notice.textLayout()
+        val widthDp = layout.size.width / density
+        val maxLines = layout.layoutInput.maxLines
+        Log.i("T20B_F1", "notice widthDp=$widthDp maxLines=$maxLines density=$density textLayoutWidthPx=${layout.size.width}")
+        assertTrue(
+            "禁用行原因串必须完整呈现：实测宽度应明显大于右列上限 120dp（阈值 132dp），" +
+                "被上限卡住即省略号吞信息。实测 ${widthDp}dp，maxLines=$maxLines",
+            widthDp > 132.0,
+        )
+        assertTrue(
+            "承载原因串的槽必须允许多行（maxLines ≥ 2）；实测 maxLines=$maxLines 说明它还在单行右列槽里",
+            maxLines >= 2,
+        )
+    }
+
+    /** F1 夹具：禁用行——`card == null` 且 `canOpenDetail == false`（与释义槽按构造互斥的前提见 JVM 锚）。 */
+    private fun disabledWord(cardId: String, lemma: String): WordBookRecord =
+        WordBookRecord(
+            card = null,
+            cardId = cardId,
+            displayLemma = lemma,
+            status = WordBookRecordStatus.Unlearned,
+            canOpenDetail = false,
+        )
 
     private fun word(
         cardId: String,
