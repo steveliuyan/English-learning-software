@@ -42,7 +42,7 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
 
 **25 类 / 278 用例 / 0 失败**——口径订正：这是「批 2 改动触达的 25 类子集」，**不是 connected 全集**（现场 `app/src/androidTest` 含 `@Test` 的类共 97 个，可重算 `grep -rl "@Test" app/src/androidTest/java --include=*.kt | wc -l`）；点名在册但**本席未实跑**的是 `WordbookPickerHeaderTest`（现场 3 枚 `@Test`，行首锚可重算 `grep -cE "^[[:space:]]*@Test" app/src/androidTest/java/com/example/englishlearning/ui/WordbookPickerHeaderTest.kt`；控制者一度数成 4，是把该类 KDoc 里「三条各一个 `@Test`」一起数了），页头族，批 2 的 17B 改过页头接入点，须补跑——**控制者已于 2026-10-20 补跑 `OK (3 tests)`**（`fix18c-controller2-connected-WordbookPickerHeaderTest.log`）。（日志 `t18-connected-*.log`，逐类末行已贴进验证文档）。规程执行：每轮前后 `settings get system font_scale` 回显入日志，收工值 `1.0`；跑前 `dumpsys user` 为 `RUNNING_UNLOCKED`；真机 `bf353dda` 全程未碰、未装测试包、零 instrument、截图零入库；`connectedDebugAndroidTest` 未使用。
 
-- `AppScreenOverlayContainerTest` 两枚大字号用例的运行前置是**设备级** `font_scale=2.0`：未设前置自然 scale 整类 `Tests run: 4, Failures: 2` 为登记在案的响亮红样（护栏不空转，两份日志均留档），置 2.0 后整类 `OK (4 tests)`。
+- `AppScreenOverlayContainerTest` 名带 `AtDoubleFontScale` 的大字号用例的运行前置是**设备级** `font_scale=2.0`：未设前置自然 scale 整类 `Tests run: 4, Failures: 2` 为登记在案的响亮红样（护栏不空转，两份日志均留档），置 2.0 后整类 `OK (4 tests)`。**（批 3 Task 19 收口订正：本行的 4 是 17B 当时实跑的末行，不是现盘数——现盘该类 5 枚 `@Test`、大字号 3 枚；`c33a3d8` 上双侧现测：自然 scale 1.0 整类 `Tests run: 5, Failures: 3` 且三枚全红在 `assertScaleTookEffect` 哨兵，置 `font_scale=2.0` 后整类 `OK (5 tests)`；重算命令与日志出处见 `docs/verification/ui-redesign-2026-10.md`「陈旧枚数订正」。）**
 - `AppScreenTest` 整类一次 `OK (46 tests)`；已登记 known-flaky 的 `AppScreenTest:1686`（`mandatorySetupOffersNoCancelEntry` 注入抖动）本轮**未复现**。
 - brief 点名但现场无 connected 侧此类：`AppTabTest`（仅存 JVM 侧，未拿别的类顶数）。
 - 用例数无下降类：14A-ii 的 14 类 176 例全部原样复跑通过；本席 25 类 278 例的增量 102 例来自后续受体面（`AppScreenTest` 46、WordCard 族 24、`AppBottomBarTest` 8、`CheckInScreenTest` 7、浮层类 4、三档对话框族 8、`ArticlePronunciationControlsTest` 5）。
@@ -89,7 +89,7 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
 ## 6. 下一任接手须知
 
 - 第一步：读本报告 + `docs/verification/ui-redesign-2026-10.md`（门禁节为最新口径）+ 批 3 对应 spec/plan Task 19 起；推送请示在控制者手里，实施席不 push。
-- 坑：`AppScreenOverlayContainerTest` 大字号两枚**必须**先 `adb shell settings put system font_scale 2.0` 再跑、收工回 `1.0`（否则整类 2 红是预期哨兵不是缺陷）；`AppScreenTest:1686` known-flaky 复现时复跑一次留两版日志；绝禁 `connectedDebugAndroidTest`（清设备数据）；模拟器全类同报「Unable to resolve activity」先查 `dumpsys user` 是否 `USER_RUNNING_LOCKED`（见验证文档「connected 环境债」）；真机 `bf353dda` 只手工试用（MIUI 会自动卸载 adb 装的包，装完即测）。
+- 坑：`AppScreenOverlayContainerTest` 名带 `AtDoubleFontScale` 的大字号例**必须**先 `adb shell settings put system font_scale 2.0` 再跑、收工回 `1.0`（否则大字号例逐枚红在 `assertScaleTookEffect` 哨兵上，是预期红样不是缺陷——红枚数 = 大字号枚数，17B 时 2 枚 2 红、现盘 3 枚 3 红，别写死）；`AppScreenTest:1686` known-flaky 复现时复跑一次留两版日志；绝禁 `connectedDebugAndroidTest`（清设备数据）；模拟器全类同报「Unable to resolve activity」先查 `dumpsys user` 是否 `USER_RUNNING_LOCKED`（见验证文档「connected 环境债」）；真机 `bf353dda` 只手工试用（MIUI 会自动卸载 adb 装的包，装完即测）。
 - 基线交接：JVM **231/1708/0/0/0**（只准增不准减，增量跑不作背书；**终审修复轮后现盘已推进到 232/1725/0/0/0**，见 §8）；connected **25 类/278 用例/0 失败**（emulator-5574，批 2 子集而非全集，口径见 §3.2）。
 
 ## 7. 用户确认过的决策

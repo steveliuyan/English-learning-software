@@ -72,12 +72,12 @@ import org.junit.runner.RunWith
  *    列表项 tag（`settings_export_book_*`）仍逐项可达——**只断存在与可点，绝不点击**
  *    （点击会拉起 SAF 系统界面，设备用例不该把系统文件选择器卷进来）。
  *
- * `fontScale = 2.0` 那两例钉的是大字档下面板正文与按钮仍**整体在视口内**
+ * 方法名带 `AtDoubleFontScale` 的那几例钉的是大字档下面板正文与按钮仍**整体在视口内**
  * （`assertIsDisplayed()` 要求节点 ≥90% 可见，正文被挤出屏幕或按钮被裁掉都会当场红），
  * 写法沿用本包先例：`LocalDensity provides Density(density, fontScale = 2f)`。
  * **但 `Dialog` 窗口的 density 取自窗口自身上下文**（17B 收口席实测：provider 覆盖只作用于宿主组成，
  * 窗口内短行在设备 scale 1.0 下以 `lineCount=1 + overflow=true` 亚像素假阳性判红），
- * 所以这两例的运行前置是设备级 `adb shell settings put system font_scale 2.0`（跑完必须回 `1.0`），
+ * 所以这几例的运行前置是设备级 `adb shell settings put system font_scale 2.0`（跑完必须回 `1.0`），
  * 并各带一枚 [assertScaleTookEffect] 哨兵防「scale 1.0 复读」式假绿。
  *
  * 每个方法**只调一次 `setContent`**（同方法内第二次 `setContent` 真机必崩，Task 9 实测），
