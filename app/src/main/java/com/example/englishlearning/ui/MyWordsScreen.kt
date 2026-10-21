@@ -93,7 +93,9 @@ fun MyWordsScreen(
     onUnfavorite: (FavoriteWord) -> Unit = {},
     onOpenVocabularyCard: (WordCard) -> Unit = {},
     onOpenWrongWord: (WordCard) -> Unit = {},
-    onRetry: () -> Unit = {},
+    // m-2（修复轮 1）：重试带段标，只刷用户点的那一册。原先三段共用一个无参 onRetry，
+    // 任一段的「重试」都会把另外两册打回 Loading（还连带触发 I-1 的旧缺陷）。
+    onRetry: (MyWordsSection) -> Unit = {},
 ) {
     val colors = appColors()
     val scrollState = rememberScrollState()
@@ -135,7 +137,7 @@ fun MyWordsScreen(
                 FavoritesUiState.Unavailable -> SectionUnavailable(
                     tag = "my_words_favorites_unavailable",
                     reason = "收藏暂时无法读取，请稍后重试",
-                    onRetry = onRetry,
+                    onRetry = { onRetry(MyWordsSection.Favorites) },
                 )
                 is FavoritesUiState.Ready -> {
                     favoritesState.notice?.let {
@@ -182,7 +184,7 @@ fun MyWordsScreen(
                 VocabularyUiState.Unavailable -> SectionUnavailable(
                     tag = "my_words_wordbook_unavailable",
                     reason = "生词本暂时无法读取，请稍后重试",
-                    onRetry = onRetry,
+                    onRetry = { onRetry(MyWordsSection.Wordbook) },
                 )
                 is VocabularyUiState.Ready -> {
                     if (vocabularyState.items.isEmpty()) {
@@ -231,7 +233,7 @@ fun MyWordsScreen(
                 WrongWordsUiState.Unavailable -> SectionUnavailable(
                     tag = "my_words_wrong_unavailable",
                     reason = "错词暂时无法读取，请稍后重试",
-                    onRetry = onRetry,
+                    onRetry = { onRetry(MyWordsSection.Wrong) },
                 )
                 is WrongWordsUiState.Ready -> {
                     if (wrongWordsState.cards.isEmpty()) {

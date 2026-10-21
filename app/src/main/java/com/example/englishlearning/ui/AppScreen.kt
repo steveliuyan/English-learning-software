@@ -286,21 +286,10 @@ fun AppScreen(
             // 错词状态在「错词本」与「我的词」两处叠层里是同一份，所以在这里收一次（原先只在错词页本地收）。
             val wrongWordsState = wrongWordsViewModel?.uiState?.collectAsState()?.value
                 ?: WrongWordsUiState.Loading
-            // 「我的词」入口行的尾部计数串（稿 `mockups.html:916` 的 `34 · 12 · 8`）：
-            // 三段任一还没读出来时**不给半截数字**，宁缺（半个数会让人把「还在读」当成「0 个」）。
-            val favoritesReadyForMyWords = favoritesState as? FavoritesUiState.Ready
-            val vocabularyReadyForMyWords = vocabularyState as? VocabularyUiState.Ready
-            val wrongWordsReadyForMyWords = wrongWordsState as? WrongWordsUiState.Ready
-            val myWordsSummary = if (
-                favoritesReadyForMyWords != null &&
-                vocabularyReadyForMyWords != null &&
-                wrongWordsReadyForMyWords != null
-            ) {
-                "${favoritesReadyForMyWords.words.size} · ${vocabularyReadyForMyWords.items.size} · " +
-                    "${wrongWordsReadyForMyWords.cards.size}"
-            } else {
-                null
-            }
+            // 「我的词」入口行的尾部计数串：规则本体在 `MyWordsSummary.kt` 的 myWordsSummaryOf
+            // （三段全 Ready 才给数，宁缺；I-3 修复轮 1 抽成可测纯函数，JVM 判据在 MyWordsSummaryTest）。
+            // 宿主这里只留唯一一处聚合调用，静态形状由 MyWordsScreenContractTest 点名。
+            val myWordsSummary = myWordsSummaryOf(favoritesState, vocabularyState, wrongWordsState)
             val openedFavoriteCard = favoritesViewModel?.openedCard?.collectAsState()?.value
             LaunchedEffect(openedFavoriteCard, showFavorites || showMyWords) {
                 val opened = openedFavoriteCard ?: return@LaunchedEffect
@@ -1171,10 +1160,14 @@ fun AppScreen(
                         detailSource = DetailSource.RECORDS
                         selectedLearningRecordCard = it
                     },
-                    onRetry = {
-                        favoritesViewModel?.load(state.profile.id)
-                        vocabularyViewModel?.load(state.profile.id)
-                        wrongWordsViewModel?.load(state.profile.id)
+                    // m-2（修复轮 1）：重试只刷用户点的那一册，不再一次拉三册
+                    // （旧写法会把另外两段打回 Loading，连带闪 loading 与历史 I-1 的重复落位）。
+                    onRetry = { section ->
+                        when (section) {
+                            MyWordsSection.Favorites -> favoritesViewModel?.load(state.profile.id)
+                            MyWordsSection.Wordbook -> vocabularyViewModel?.load(state.profile.id)
+                            MyWordsSection.Wrong -> wrongWordsViewModel?.load(state.profile.id)
+                        }
                     },
                 )
             } else if (showAiProfiles) {

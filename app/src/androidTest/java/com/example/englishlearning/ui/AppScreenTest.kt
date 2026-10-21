@@ -71,10 +71,14 @@ import com.example.englishlearning.language.domain.PronunciationEngine
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
 import com.example.englishlearning.language.domain.SpeechPreference
+import com.example.englishlearning.learning.EventIdFactory
 import com.example.englishlearning.learning.LearningProfile
 import com.example.englishlearning.learning.LearningProfileRepository
 import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SeedWordBooksUseCase
+import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
+import com.example.englishlearning.learning.VocabularyEntry
+import com.example.englishlearning.learning.VocabularyRepository
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
@@ -268,6 +272,48 @@ class AppScreenTest {
             1f,
         )
         composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
+    }
+
+    @Test
+    fun myWordsEntryOpensTheMergedPageAndSystemBackReturnsToTheTodayPlan() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+        pressSystemBack()
+        composeRule.onNodeWithTag("my_words_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+    }
+
+    /**
+     * I-3（修复轮 1，评审选项 ①）：钉「我的词」的三条件前置 BackHandler——三段共用宿主详情
+     * （生词本 → `selectedSearchCard`），详情开着时返回键必须**先关详情、再退合并页**，
+     * 一按就把整页推掉是这条 finding 点名的未证行为。VM 全 null 时三段停在 Loading，
+     * 所以这一枚必须喂一枚真有词条的 `VocabularyViewModel`（宿主在 LEARNING 页会自动 load）。
+     */
+    @Test
+    fun myWordsSystemBackClosesAnOpenWordDetailBeforeLeavingTheMergedPage() {
+        composeRule.setContent {
+            readyAppScreen(vocabularyViewModel = vocabularyViewModelWithOneEntry())
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("my_words_wordbook_row_0").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("my_words_wordbook_row_0").performScrollTo().performClick()
+        composeRule.onNodeWithTag("card_detail_screen").assertExists()
+
+        pressSystemBack()
+        composeRule.onNodeWithTag("card_detail_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+
+        pressSystemBack()
+        composeRule.onNodeWithTag("my_words_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
     @Test
@@ -1592,6 +1638,35 @@ class AppScreenTest {
         return LearningRecordsViewModel(repository, stats, FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC))
     }
 
+    /**
+     * 生词本单条夹具（I-3 修复轮 1）：`list()` 返回一条命中占位内容库的词条，
+     * 卡片由 `PlaceholderWordCardSource` 真解出——宿主在 LEARNING 页会自动 `load`，
+     * 于是「我的词」生词本段真的有一行可点进详情（上一枚用例钉的就是这行的返回次序）。
+     */
+    private fun vocabularyViewModelWithOneEntry(): VocabularyViewModel {
+        val cardId = PlaceholderWordCardSource.cardId("cet4", "ability")
+        val card = kotlinx.coroutines.runBlocking { PlaceholderWordCardSource().cards(listOf(cardId)) }.first()
+        val entry = VocabularyEntry(
+            profileId = "profile-1",
+            wordBookId = card.wordBookId,
+            cardId = cardId,
+            addedAt = java.time.Instant.EPOCH,
+            lastFeedback = "Manual",
+        )
+        val events = NoopLearningEventRepository()
+        return VocabularyViewModel(
+            repository = object : VocabularyRepository {
+                override suspend fun add(profileId: String, wordBookId: String, cardId: String, feedback: String, addedAt: java.time.Instant) = Unit
+                override suspend fun remove(profileId: String, wordBookId: String, cardId: String) = Unit
+                override suspend fun contains(profileId: String, wordBookId: String, cardId: String) = true
+                override suspend fun list(profileId: String, wordBookId: String?) = RepositoryResult.Success(listOf(entry))
+            },
+            cards = PlaceholderWordCardSource(),
+            submitFeedback = SubmitCardFeedbackUseCase(events, FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)),
+            eventIds = EventIdFactory { "vocabulary-event-1" },
+        )
+    }
+
     @Composable
     private fun readyAppScreen(
         speechSettingsViewModel: SpeechSettingsViewModel? = null,
@@ -1605,6 +1680,7 @@ class AppScreenTest {
         imageStudioViewModel: ImageStudioViewModel? = null,
         learningRecordsViewModel: LearningRecordsViewModel? = null,
         wordBookWordsViewModel: WordBookWordsViewModel? = null,
+        vocabularyViewModel: VocabularyViewModel? = null,
     ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
@@ -1624,6 +1700,7 @@ class AppScreenTest {
             imageStudioViewModel = imageStudioViewModel,
             learningRecordsViewModel = learningRecordsViewModel,
             wordBookWordsViewModel = wordBookWordsViewModel,
+            vocabularyViewModel = vocabularyViewModel,
         )
     }
 

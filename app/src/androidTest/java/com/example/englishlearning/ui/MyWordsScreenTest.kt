@@ -171,18 +171,19 @@ class MyWordsScreenTest {
 
     /**
      * 三份状态同时 `Unavailable` 时的降级：三段各出一枚共享 `ScreenUnavailable`，
-     * 出口真的可达（可点 + 回调落到宿主），不是三行死字。
+     * 出口真的可达（可点 + 回调落到宿主），且**只回交被点那一段的段标**（m-2 修复轮 1：
+     * 旧形状一次重试刷三册，另外两段被打回 Loading）。
      */
     @Test
     fun unavailable_sections_each_offer_a_working_retry() {
-        var retried = 0
+        val retried = mutableListOf<MyWordsSection>()
         composeRule.setContent {
             MintGlassTheme {
                 MyWordsScreen(
                     favoritesState = FavoritesUiState.Unavailable,
                     vocabularyState = VocabularyUiState.Unavailable,
                     wrongWordsState = WrongWordsUiState.Unavailable,
-                    onRetry = { retried++ },
+                    onRetry = { retried += it },
                 )
             }
         }
@@ -195,11 +196,13 @@ class MyWordsScreenTest {
         )
         // 本仓 Compose 版本（1.10.0）的 SemanticsNodeInteractionCollection 只有 `get(index)`，没有 `onFirst()`
         // （javap 实测：成员是 fetchSemanticsNodes + get），所以下标取第一枚。
+        // 树序里第一段是收藏段：点它的重试，回调必须恰收到 Favorites 一枚段标——
+        // 收到别的段、或收到三枚（旧共刷形状），都在这条红。
         composeRule.onAllNodesWithTag("screen_unavailable_action")[0]
             .assertHasClickAction()
             .performClick()
         composeRule.waitForIdle()
-        assertEquals(1, retried)
+        assertEquals(listOf(MyWordsSection.Favorites), retried)
     }
 
     /**
