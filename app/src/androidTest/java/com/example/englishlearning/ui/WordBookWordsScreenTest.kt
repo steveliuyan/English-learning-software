@@ -50,8 +50,9 @@ class WordBookWordsScreenTest {
 
     /**
      * `getUnclippedBoundsInRoot()` 把每条边**各自** px→dp 换算后再相减，48dp 见方的芯片会算成
-     * `47.999962dp`（emulator-5574 density 2.625 实测：`DpRect(left=219.80952, right=267.8095)`，
-     * 而像素侧 126px 是精确的 48dp）。尺寸下限比较因此允许 0.05dp 的**换算**容差；
+     * 47.99996–47.99998dp（emulator-5574 density 2.625 实测两枚：E `left=219.80952, right=267.8095` → 47.99998，
+     * J `left=469.33334, right=517.3333` → 47.99996；取证 `t21-connected-WordBookWordsScreenTest-FINAL-2.log`），
+     * 而像素侧 126px 是精确的 48dp。尺寸下限比较因此允许 0.05dp 的**换算**容差；
      * 要挡的红是旧竖排压缩槽的 24×18dp（差 24dp 量级），容差不构成放行空间。
      */
     private val dpConversionTolerance = 0.05.dp
