@@ -1943,10 +1943,22 @@ internal val MintBackground: Color
   `widthIn(max = 120.dp)` + `maxLines = 1` + Ellipsis，承载「时间戳 / 出处 / 原因串」这类长文本是**有损位**
   （现场：收藏页 `收藏于 yyyy-MM-dd`、合并页同槽同源；F1 那条禁用原因串已由 R-20B.3 改走左列）。
   本任务一次性定策略（加宽 / 允许两行 / 明确「右列只放短标签并把长文本改走左列」为组件口径），
-  并让 `FavoritesScreen`、`MyWordsScreen`、`WrongWordsScreen` 三屏同改，不得单屏分叉。
-  - **前置（硬项）**：先把这两屏的**渲染级** connected 取证补上——本仓现状是收藏页与错词页没有任何用例渲染它们
-    （重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`），而截断只在渲染层暴露；
-    不先补取证，改完策略无从验收。
+  并让承载长文本的站点**同批改净**，不得单屏分叉。
+  - **R-20D.1（口径更正，2026-10-21 实核）**：受影响面是**两文件四站点**，不是「三屏」。
+    实核 `grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/{FavoritesScreen,MyWordsScreen,WrongWordsScreen,WordBookWordsScreen}.kt`
+    得 `FavoritesScreen.kt:144`（`收藏于 yyyy-MM-dd`）、`MyWordsScreen.kt:167`（同文）、
+    `MyWordsScreen.kt:224` / `:234`（`加入于 <日期时间>`）；`WrongWordsScreen.kt:127-131` 只传 `lemma`+`gloss`、
+    **不传 `meta`/`status`** ⇒ 不受右列 120dp 影响，本任务**不需要**改它。`WordBookWordsScreen.kt:267` 传的是
+    短状态标签（`status`），属「右列只放短标签」的正例，留作策略选定后的对照。
+  - **前置（硬项，取证形状已由 R-20D.1 定形）**：四站点全仓**没有布局级不截断判据**——
+    收藏页与错词页的**独立屏**零渲染级用例（重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`
+    只命中 `MyWordsScreenTest.kt`，而那两处 `:160`/`:214` **都在注释里**），
+    但**合并页 `MyWordsScreen` 是挂着的**（`:226-231` 一次 `setContent` 喂三段真实 `UiState`，`:234` 断
+    `收藏于 2026-10-19` 存在、`:237` 反向控 `加入于 2026-10-19 00:30`）⇒ 它的缺口不是「没渲染」而是
+    **「渲染了但只到文本层」**：`onNodeWithText` 匹配语义全文，节点被 Ellipsis 截断时照样绿。
+    重算命令：`grep -n "textLayout\|maxLines\|fontScale" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt` 现盘零命中。
+    **补法**：给四站点各补一枚布局级判据（`textLayout()` 读宽度与 `maxLines`，形同 `b76f133` 的
+    `disabledRowShowsTheUnavailableNoticeInFull`），并跑 `font_scale 2.0` 轮；不先补取证，改完策略无从验收。
   - 组件签名若变（增槽/改宽度），须同步 `WordRowSpeakerContractTest` 的逐槽取色与对比断言 +
     `SharedComponentGeometryContractTest`，并按 Global Constraint 16 给写死的枚数配重算命令。
 - [ ] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。

@@ -217,8 +217,28 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 - **F2 / 右列宽度策略（挂 Task 20-D）**：`WordRow` 右列的 120dp 上限 + 单行省略，对「时间戳/原因串」
   是有损承载位（收藏页 `收藏于 yyyy-MM-dd` 在放大字号下即触顶；与本批已关闭的合并页同源）。
   **不得单屏改**（会让合并页与收藏页分叉）。Task 20-D 是组件级裁决：右列宽度/换行策略一次性定，
-  前置是先把三屏的**渲染级** connected 取证补上（本仓现状：收藏页与错词页没有任何用例渲染它们，
-  截断只在渲染层暴露）。重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`。
+  前置是先把承载长文本那两屏的**渲染级** connected 取证补上（本仓现状见下一条 R-20D.1 的拆分：
+  收藏页独立屏与错词页独立屏连渲染级用例都没有，合并页有渲染级但只到文本层、读不到截断，
+  截断只在布局层暴露）。重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`。
+- **R-20D.1（影响面取证口径实核，2026-10-21 更正本文件与计划 Step 4c 的原稿）**：
+  ① 真正受右列 120dp 影响的是**两文件四站点**，不是「三屏同改」：`FavoritesScreen.kt:144`、
+  `MyWordsScreen.kt:167`、`MyWordsScreen.kt:224`、`MyWordsScreen.kt:234`
+  （前两枚 `收藏于 yyyy-MM-dd`，后两枚 `加入于 <日期时间>`）。
+  `WrongWordsScreen.kt:127-131` 只传 `lemma`+`gloss`、**不传 `meta`/`status`** ⇒ 不受右列影响，本任务不需要改它；
+  `WordBookWordsScreen.kt:267` 传的是短状态标签，属「右列只放短标签」的正例，留作策略选定后的对照。
+  重算命令：`grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/{FavoritesScreen,MyWordsScreen,WrongWordsScreen,WordBookWordsScreen}.kt`
+  ② **取证缺口的准确形状**（原稿「收藏页与错词页没有任何用例渲染它们」只对了一半，且漏了合并页的另一半缺口）：
+  收藏页与错词页的**独立屏**确实零渲染级用例——上面那条重算命令只命中 `MyWordsScreenTest.kt`，
+  而它的 `:160`/`:214` 两处命中**都在注释里**（描述缺陷形状，不是挂屏）；
+  但**合并页 `MyWordsScreen` 是挂着的**（`:226-231` 一次 `setContent` 喂三段真实 `UiState`，
+  `:234` 断 `收藏于 2026-10-19` 存在、`:235` 断带时分的旧档不存在、`:237` 反向控 `加入于 2026-10-19 00:30`）。
+  ⇒ 合并页的缺口不是「没渲染」而是**「渲染了但只到文本层」**：`onNodeWithText` 匹配的是语义全文，
+  节点被 Ellipsis 截断时它照样绿，所以四站点全仓**没有任何布局级不截断判据**
+  （重算命令：`grep -n "textLayout\|maxLines\|fontScale" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt` 现盘零命中，
+  该类也没有 `font_scale 2.0` 轮）。
+  ③ **因此 Task 20-D 的前置取证定形为**：给四站点各补一枚**布局级**判据（`textLayout()` 读宽度与 `maxLines`，
+  形同 `b76f133` 给禁用行补的 `disabledRowShowsTheUnavailableNoticeInFull`），并在 `font_scale 2.0` 轮跑一遍；
+  收藏页/错词页独立屏若要保留则各补一枚渲染级冒烟用例，若已归并进合并页则由合并页取证覆盖并在报告写明。
 - **F4（改名逃逸残形，登记不修）**：族 4 的 forbidden 形状就是「顶层私有 `*Row*` 函数体窗口」，
   把私有行函数改成不含 `Row` 的名字即可离开窗口规则；R-20B.2 撤销绝对 pin 后，这条残形不再被任何断言挡
   （它本来也只被「seed 恰等于六枚」顺带挡住，而那条与本族递减互斥）。口径：这是 R-13.1 计划本身定义的残形，
