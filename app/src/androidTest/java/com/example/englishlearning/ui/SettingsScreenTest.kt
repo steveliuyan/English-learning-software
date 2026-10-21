@@ -4,16 +4,22 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ui.theme.AppColorDark
@@ -47,6 +53,13 @@ import org.junit.runner.RunWith
  * 排除了「本机恰好在夜间模式、prefs 没生效也撞色」的空用例路径（同一手法见 `ThemeModeSwitchTest`）。
  * 设置页直测会真写 `ui_display_prefs`（显示偏好，可丢项、不进备份），`@Before`/`@After` 双道复位
  * `System`，不把人为档留给下一枚用例。
+ *
+ * **修复轮 1（评审席 C1/I1/I2/I3/I4）加进来的三类判据**：
+ *  - 台账唯一真值 + 可点节点数精确相等（[CLICKABLE_WHEN_COLLAPSED] / [CLICKABLE_WHEN_BOTH_FOLDS_OPEN]）；
+ *  - 折叠子行的**禁用态是真禁用**（`assertHasNoClickAction` + `assertIsNotEnabled`），
+ *    一级 9 行在任何在途状态下都保持可点；
+ *  - 折叠件的展开态进语义（`SemanticsActions.Expand`/`Collapse`），结果回执在收起态也读得到，
+ *    以及「待接入」厂商名与「当前供应商 · 已配置」的一级页缺席护栏（`d73a3cb` 时代被删，本轮补回）。
  */
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
@@ -120,16 +133,26 @@ class SettingsScreenTest {
         composeRule.waitForIdle()
     }
 
+    /** 全页可点节点计数（合并树；一级行各 1 枚、主题分段各 1 枚）。 */
+    private fun clickableNodeCount(): Int =
+        composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size
+
     /**
-     * AC-R-21 主判据：**恰 4 组、恰 9 行、行行可点**。
+     * AC-R-21 主判据：**恰 4 组、恰 9 行、行行可点**，并且**逐行按台账核对**（修复轮 1 / I3）。
      *
-     * 「行行可点」在这里的可执行形状：[SettingsGroups] 台账里除「主题」分段卡外的 8 个 tag
-     * 全部带 click action；「主题」行由三枚分段按钮承载（每枚都必须可点）；
-     * 全页可点节点数 ≥ 9；占位行整族（`settings_pending_*`）与占位文案在树里绝迹。
+     * 三条收紧各对评审席的一条判据：
+     *  - **台账是唯一真值**：行标题一律取 `SettingsGroups` 里的 `entry.title` 去节点树里找。渲染侧
+     *    另抄一份字面量时，台账改了、界面没改（或反之）都会在这里红——不再只钉 tag。
+     *  - **分组按 `group.tag` 配对**，不用 `SettingsGroups.all[0..3]` 下标：版面重排不漂。
+     *  - **可点节点数精确相等**（上下界都钉）：收起态恰 [CLICKABLE_WHEN_COLLAPSED]
+     *    （8 枚一级行 + 3 枚主题分段；「主题」卡片本体不可点），两组折叠都展开、且已导入 2 册时
+     *    恰 [CLICKABLE_WHEN_BOTH_FOLDS_OPEN]（再 +导入/导出 +备份四行 = 17）。
+     *    下界抓「看起来是行却不可点」，上界抓「行外长出可点节点」；两个数字都是现盘读数，
+     *    版面一动就必须一起动——那正是 AC-R-21 的 9 行形状被动了的信号。
      */
     @Test
     fun settings_screen_has_four_groups_nine_rows_and_every_row_is_clickable() {
-        setScreen()
+        setScreen(importedBookCount = 2)
         composeRule.onNodeWithTag("settings_screen").assertExists()
 
         assertEquals(4, SettingsGroups.all.size)
@@ -140,6 +163,8 @@ class SettingsScreenTest {
             composeRule.onNodeWithText(group.title).assertExists()
         }
         SettingsGroups.all.flatMap { it.entries }.forEach { entry ->
+            // 台账里的行标题必须真的渲染在树上（渲染侧另抄一份时，这一条先红）。
+            composeRule.onNodeWithText(entry.title).performScrollTo().assertExists()
             if (entry.icon != null) {
                 composeRule.onNodeWithTag(entry.tag).performScrollTo().assertHasClickAction()
             } else {
@@ -153,10 +178,20 @@ class SettingsScreenTest {
             }
         }
 
-        val clickable = composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size
-        assertTrue(
-            "九行加三枚分段应至少 9 个可点节点，实测 $clickable（出现「看起来是行却不可点」的节点时先查这里）",
-            clickable >= 9,
+        assertEquals(
+            "收起态可点节点必须恰 $CLICKABLE_WHEN_COLLAPSED（8 枚一级行 + 3 枚主题分段；" +
+                "多一枚 = 行外长出可点节点，少一枚 = 有行不可点）",
+            CLICKABLE_WHEN_COLLAPSED,
+            clickableNodeCount(),
+        )
+
+        expand("settings_word_books")
+        expand("settings_backup")
+        assertEquals(
+            "两组都展开、已导入 2 册且空闲时可点节点必须恰 $CLICKABLE_WHEN_BOTH_FOLDS_OPEN" +
+                "（收起态 $CLICKABLE_WHEN_COLLAPSED + 词书 2 行 + 备份 4 行）",
+            CLICKABLE_WHEN_BOTH_FOLDS_OPEN,
+            clickableNodeCount(),
         )
         listOf("settings_pending_reading", "settings_pending_profile").forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
@@ -168,6 +203,7 @@ class SettingsScreenTest {
             )
         }
     }
+
 
     /** 资料卡只报昵称与词书名；今日计划数字按裁决③移出设置页（统计职责归打卡页）。 */
     @Test
@@ -215,7 +251,15 @@ class SettingsScreenTest {
         }
     }
 
-    /** 语音行副标题报真实当前供应商；引擎状态明细行不得回到一级页（旧回归口径保持）。 */
+    /**
+     * 语音行副标题报真实当前供应商；引擎状态明细行与「待接入」厂商名不得回到一级页（旧回归口径保持）。
+     *
+     * 修复轮 1 / C1 补回 `d73a3cb` 时代被删掉的那批反退化护栏：六枚厂商名与「当前供应商 · 已配置」
+     * 曾在一级页占了近半屏（9 行里 6 行点不了），护栏蒸发一次就已经让它们离回归只差一次改动。
+     * 本枚走**注入了 MiMo 状态**的那条路径，所以正断的是「当前供应商：小米 MiMo」；
+     * 「系统 TTS」的默认态正断在 [default_speech_row_names_system_tts_and_no_vendor_placeholder_returns]
+     * 里断（那边不注入任何 MiMo 状态），两枚合起来覆盖两套入参，谁也不跟自己矛盾。
+     */
     @Test
     fun speech_row_reports_current_provider_and_status_rows_stay_out() {
         setScreen(speechEngineStatuses = SpeechEngineStatuses(miMo = "已配置", currentProvider = "小米 MiMo"))
@@ -223,7 +267,26 @@ class SettingsScreenTest {
         listOf("settings_speech_mimo", "settings_speech_openai", "settings_speech_zipvoice").forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
+        listOf("Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax", "本地 ZipVoice-Distill").forEach { vendor ->
+            composeRule.onNodeWithText(vendor).assertDoesNotExist()
+        }
+        composeRule.onNodeWithText("当前供应商 · 已配置").assertDoesNotExist()
     }
+
+    /**
+     * 默认态（宿主没读出任何引擎状态）语音行必须说「当前供应商：系统 TTS」，
+     * 同时把六枚厂商名与「当前供应商 · 已配置」钉在缺席侧（修复轮 1 / C1 的正断腿）。
+     */
+    @Test
+    fun default_speech_row_names_system_tts_and_no_vendor_placeholder_returns() {
+        setScreen()
+        composeRule.onNodeWithText("当前供应商：系统 TTS").assertExists()
+        listOf("Azure", "火山引擎", "腾讯云", "阿里云百炼", "MiniMax", "本地 ZipVoice-Distill").forEach { vendor ->
+            composeRule.onNodeWithText(vendor).assertDoesNotExist()
+        }
+        composeRule.onNodeWithText("当前供应商 · 已配置").assertDoesNotExist()
+    }
+
 
     /** AI 行副标题优先用宿主摘要；读不到时退回固定引导文案。 */
     @Test
@@ -255,12 +318,40 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("已导入 2 册，导出为 `.wbpack` 分享给别的设备").assertExists()
     }
 
-    /** 没导过时导出子行要如实说前提；一句「先导入」而不是做成点了没反应的假入口。 */
+    /**
+     * 没导过时导出子行要如实说前提，**并且真的不可点**（修复轮 1 / I2）：
+     * 「可点却不作为」就是 AGENTS 与本屏旧 KDoc 都明令禁止的假入口；禁用态由 `EntryRow(enabled = false)`
+     * 承载，所以判据是 `assertHasNoClickAction`（+ 语义上的「不可用」），不是「点了没反应」。
+     * 同屏的导入子行不受牵连，仍必须可点。
+     */
     @Test
-    fun export_row_admits_when_nothing_was_imported_yet() {
+    fun export_row_is_disabled_until_a_book_was_imported_while_import_stays_reachable() {
         setScreen(importedBookCount = 0)
         expand("settings_word_books")
         composeRule.onNodeWithText("先导入一册词书后才能导出").assertExists()
+        composeRule.onNodeWithTag("settings_export_word_book").performScrollTo()
+            .assertHasNoClickAction()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithTag("settings_import_word_book").performScrollTo().assertHasClickAction()
+    }
+
+    /**
+     * busy 时两条 SAF 子行一律真禁用（修复轮 1 / I1 + I2）：守卫从 `onClick` 里的
+     * `if (!transferBusy)` 移到了 `enabled`，所以这里断的是「没有点击语义」而不是「点了不回调」。
+     * 一级 9 行**不得**被在途状态连带禁用（AC-R-21「零不可点行」钉的是一级行的永久占位，
+     * SAF 在途的瞬时禁用只发生在折叠子行）。
+     */
+    @Test
+    fun transfer_busy_disables_both_word_book_sub_rows_only() {
+        setScreen(importedBookCount = 2, transferBusy = true)
+        expand("settings_word_books")
+        listOf("settings_import_word_book", "settings_export_word_book").forEach { tag ->
+            composeRule.onNodeWithTag(tag).performScrollTo().assertHasNoClickAction().assertIsNotEnabled()
+        }
+        listOf("settings_word_books", "settings_backup", "settings_open_setup", "settings_open_speech")
+            .forEach { tag ->
+                composeRule.onNodeWithTag(tag).performScrollTo().assertHasClickAction()
+            }
     }
 
     /** busy 时两条 SAF 子行的副标题都换成「正在处理」，与迁移前的置灰语义同口径。 */
@@ -275,13 +366,20 @@ class SettingsScreenTest {
         )
     }
 
-    /** 导入/导出结果提示在展开区以共享提示条呈现（InlineNotice 自带行标签，按文案断言）。 */
+    /**
+     * 导入/导出结果提示是**结果回执**，不是展开区的内容（修复轮 1 / I4）：
+     * 折叠行收起时也必须读得到，展开后仍读得到。提示档位仍取 `InlineNoticeKind.Info`
+     * （控制者裁决：宿主传来的是裸 `String`，不做文本嗅探）。
+     */
     @Test
-    fun transfer_message_is_shown_in_the_expanded_area() {
-        setScreen(transferMessage = "已导入《ngsl-core-100》，可在「词书与每日目标」中选用。")
+    fun transfer_message_stays_readable_when_the_word_book_fold_is_closed() {
+        val receipt = "已导入《ngsl-core-100》，可在「词书与每日目标」中选用。"
+        setScreen(transferMessage = receipt)
+        composeRule.onNodeWithText(receipt).assertExists()
         expand("settings_word_books")
-        composeRule.onNodeWithText("已导入《ngsl-core-100》，可在「词书与每日目标」中选用。").assertExists()
+        composeRule.onNodeWithText(receipt).assertExists()
     }
+
 
     /**
      * 「备份与恢复」收成一行折叠入口（R-B / 裁决⑥方向）：展开后四行子入口可达——
@@ -315,13 +413,47 @@ class SettingsScreenTest {
         }
     }
 
-    /** 删除回执（成功或预览读取失败的一句话）在展开区呈现，不为它保留第二版私有提示条。 */
+    /**
+     * 删除回执（成功或预览读取失败的一句话）同样住在折叠行**外侧**（修复轮 1 / I4）：
+     * 收起态也要读得到结果，不为它保留第二版私有提示条。
+     */
     @Test
-    fun delete_notice_is_shown_in_the_expanded_area() {
-        setScreen(deleteAllLearningDataNotice = "学习数据已删除；文章与收藏保留。")
+    fun delete_notice_stays_readable_when_the_backup_fold_is_closed() {
+        val receipt = "学习数据已删除；文章与收藏保留。"
+        setScreen(deleteAllLearningDataNotice = receipt)
+        composeRule.onNodeWithText(receipt).assertExists()
         expand("settings_backup")
-        composeRule.onNodeWithText("学习数据已删除；文章与收藏保留。").assertExists()
+        composeRule.onNodeWithText(receipt).assertExists()
     }
+
+    /**
+     * 折叠件必须把展开态写进语义（修复轮 1 / I4，AC-R-12 面）：
+     * 收起时挂 `SemanticsActions.Expand` 且没有 `Collapse`，展开后反过来；
+     * 并且**执行 Expand 这条语义动作本身**就能展开（TalkBack 用户不走 performClick 也到得了子行）。
+     * 现盘 Compose（BOM 2025.12.00 / ui 1.10.0）没有布尔 `expanded` 属性，只有 Expand/Collapse
+     * 两枚动作键，所以判据取这一条路。
+     */
+    @Test
+    fun fold_rows_expose_expand_and_collapse_semantics() {
+        setScreen(importedBookCount = 2)
+        listOf("settings_word_books", "settings_backup").forEach { tag ->
+            composeRule.onNodeWithTag(tag).performScrollTo()
+                .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
+                .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Collapse))
+        }
+        expand("settings_word_books")
+        composeRule.onNodeWithTag("settings_word_books")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Expand))
+
+        composeRule.onNodeWithTag("settings_backup").performScrollTo()
+            .performSemanticsAction(SemanticsActions.Expand)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_delete_all_learning_data").assertExists()
+        composeRule.onNodeWithTag("settings_backup").performScrollTo()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse))
+    }
+
 
     /** ThemeModeRow 纯展示件：三档标签固定，点击把选中档原样送出（写偏好由调用方接线）。 */
     @Test
@@ -422,3 +554,17 @@ private val ThemeMode.segmentLabelForTest: String
  * `SURFACE_CHANNEL_TOLERANCE`，那份是另一文件的 private，此处按同一数值口径各自钉住）。
  */
 private const val BACKGROUND_CHANNEL_TOLERANCE = 2
+
+/**
+ * 收起态的可点节点数现盘读数：8 枚一级行（学习 3 + AI 与语音 2 + 许可 1 + 折叠 2）+ 3 枚主题分段
+ * = 11。「主题」那张卡本体不可点，可点面只有分段。
+ */
+private const val CLICKABLE_WHEN_COLLAPSED = 11
+
+/**
+ * 两组折叠都展开、且已导入 2 册（`transferBusy = false`）时的现盘读数：
+ * 收起态 11 + 词书子行 2 + 备份子行 4 = 17。
+ * 空闲且有册时 6 枚子行全部可点；任一子行被禁用（busy / 未导入）时它就不在该态的计数里，
+ * 所以那两个禁用态各另有自己的用例，不混进这一条。
+ */
+private const val CLICKABLE_WHEN_BOTH_FOLDS_OPEN = 17
