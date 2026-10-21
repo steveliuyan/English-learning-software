@@ -146,7 +146,7 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
   - **本豁免已于 2026-10-21 清偿（UI 重设计轮批 3 Task 21，Spec §7 移交账同批勾账）**：
     字母索引不再走「竖排常驻 26 槽」的信息架构，改为**正文上方横向可滚的 26 枚 48dp 见方字母芯片**
     （`WordBookWordsAlphabetRail`；48dp 下限钉在带 `clickable` 的节点自身 `sizeIn(minWidth/minHeight = 48.dp)`，
-    相邻芯片 `spacedBy(2.dp)` 使命中区两两不相交，横向滚动容器解决「26×48dp 超屏高」）。
+    相邻芯片 `spacedBy(2.dp)` 使**命中区**两两不相交，横向滚动容器解决「26×48dp 超屏高」）。
     上面两条「不可达」前提因此在新版面下不再成立：屏高约束由横向滚动承担，重叠约束由 2dp 间距 + 不叠加
     `minimumInteractiveComponentSize()` 的自绘芯片承担（芯片自己就是 48dp 可点区，无需外扩）。
     **整轨 `pointerInput` 拖动面=压缩槽时代的代偿输入路径，随压缩槽一并退役**，

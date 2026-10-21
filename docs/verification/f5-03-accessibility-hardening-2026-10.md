@@ -89,7 +89,7 @@
 
 **站点 4 = 词书字母 Rail：本阶段显式豁免 → 2026-10-21 由 UI 重设计轮批 3 Task 21 清偿（真 48dp，非放宽判据；站点 1–8 编号取 `task-10-report.md` 的站点账，站点 8 为 Favorites/WrongWords 返回链）**：
 - 本阶段口径（保留原文，勿改读）：Rail 常驻 26 槽、`slotPixels = min(18dp, maxHeight/26)`，26×48dp=1248dp 超屏高，且相邻 48dp 方形目标必然重叠、会抢走相邻字母 tap（实测：加 `minimumInteractiveComponentSize()` 后既有用例 `tappingTheActualRailSlotUsesTheLetterClickAction` 转红）。当时命中区 ≈24×13dp（槽 24×18dp），整轨拖动（`pointerInput`）为等效输入路径。
-- **清偿后的版面**：字母索引搬到正文上方，横向可滚的 26 枚 **48dp 见方**字母芯片；48dp 下限钉在带 `clickable` 的节点自身（`sizeIn(minWidth = 48.dp, minHeight = 48.dp)`），相邻芯片 `spacedBy(2.dp)` 使命中区不相交；整轨拖动面与压缩槽一并退役。设备级断言形状：A–Z 逐枚 ≥48dp 见方 + 逐对相邻不相交 + `Density(1f)`/400dp 高小视口下不跌破下限 + tap 落到正确字母 + 点缺失字母跳字母序最近下一组。
+- **清偿后的版面**：字母索引搬到正文上方，横向可滚的 26 枚 **48dp 见方**字母芯片；48dp 下限钉在带 `clickable` 的节点自身（`sizeIn(minWidth = 48.dp, minHeight = 48.dp)`），相邻芯片 `spacedBy(2.dp)` 使**命中区**不相交；整轨拖动面与压缩槽一并退役。设备级断言形状：A–Z 逐枚 ≥48dp 见方 + 逐对相邻不相交 + `Density(1f)`/400dp 高小视口下不跌破下限（该条为**硬下限、无换算容差**）+ tap 落到正确字母 + 点缺失字母跳字母序最近下一组。红样（在旧竖排压缩槽上当场红）由 `everyRailLetterIsAFourEightTouchTarget` 与 `railLettersKeepTheTouchTargetFloorInATinyViewport` 承重；`adjacentRailLetterHitAreasDoNotOverlap` 是前瞻护栏（旧竖排逐格相接、纵向本就不相交，它在旧实现上同样通过）。
 - 重算命令（不写绝对数，用例名即判据）：`adb -s emulator-5574 shell am instrument -w -e class com.example.englishlearning.ui.WordBookWordsScreenTest com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`；点名用例 `everyRailLetterIsAFourEightTouchTarget`、`adjacentRailLetterHitAreasDoNotOverlap`、`railLettersKeepTheTouchTargetFloorInATinyViewport`、`tappingTheRailLetterUsesTheLetterClickAction`、`tappingAMissingLetterUsesTheNextAvailableGroup`。豁免依据与退役说明见决策 §5 字母栏注记的清偿段（`a422039` 回写 → Task 21 清偿）。
 
 ## 6. 动态字体批与固定高保留清单（决策 §5，Task 11）

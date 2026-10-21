@@ -121,7 +121,11 @@ class WordBookWordsScreenTest {
     }
 
     /** Task 21 / F5-03：相邻字母的命中区不得相交（相交即「点 F 落到后画的字母」，正是压缩槽时代红过的形状）。
-     *  覆盖面比退役的 `railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre`（只看 F/G 一对）强：本条逐对扫 A/B … Y/Z 全部相邻对。 */
+     *  覆盖面比退役的 `railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre`（只看 F/G 一对、且只断纵向分离）强：
+     *  本条逐对扫 A/B … Y/Z 全部相邻对并断四向分离。
+     *  **性质说明**：本条是**前瞻护栏**，不是本席的天然红样——旧竖排 24dp 宽槽逐格相接、纵向本就分离，
+     *  它在旧实现上同样通过。改版面前的红由 `everyRailLetterIsAFourEightTouchTarget`（尺寸 + click action 落在带 tag 的节点自身）
+     *  承重，取证见 `t21-RED-rail-48dp.log`（A 槽实测 24.0×17.9dp）。 */
     @Test
     fun adjacentRailLetterHitAreasDoNotOverlap() {
         showAlphabet()
@@ -251,6 +255,11 @@ class WordBookWordsScreenTest {
      * `didOverflowWidth` 为真（`size=30 x 52`，行的可见右缘比取整后的布局宽度大 0.x px），
      * 是取整造成的假红而不是真越界；「字形包围盒 ⊆ 芯片包围盒」才是这条契约的直接表达，
      * 且照样可伪——芯片缩到小于字形、或字号涨到撑破 48dp，包含关系都会失败。
+     *
+     * 芯片下限这一枚同样让 `dpConversionTolerance`：本用例走设备真实 density（2.625），
+     * `getUnclippedBoundsInRoot()` 逐边换算会把精确 126px 算成 47.99996dp（`t21-connected-…FINAL-2.log`
+     * 里 E/J 两枚实测 47.99998 / 47.99996），A 恰好落在干净像素上才没红——把容差只留给一枚用例是维护陷阱。
+     * **不留容差的硬下限**由 `railLettersKeepTheTouchTargetFloorInATinyViewport` 承重（它把 `LocalDensity` 钉为 1f，px 即 dp，无换算误差可让）。
      */
     @Test
     fun activeRailGlyphStaysWithinItsChip() {
@@ -278,7 +287,7 @@ class WordBookWordsScreenTest {
         )
         assertTrue(
             "芯片自身不得跌破 48dp 触摸下限: chip=$chip",
-            chipWidth >= 48.dp && chipHeight >= 48.dp,
+            chipWidth >= 48.dp - dpConversionTolerance && chipHeight >= 48.dp - dpConversionTolerance,
         )
     }
 

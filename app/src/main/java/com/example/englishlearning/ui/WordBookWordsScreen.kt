@@ -304,8 +304,8 @@ private fun WordBookWordsAlphabetRail(
             val letterText = letter.toString()
             val available = letterText in availableLetters
             val active = letterText == currentLetter
-            // 外层只管「当前字母」这枚标签：**同一枚 modifier 链上挂两次 `testTag` 后者会被静默丢弃**
-            // （设备实测：合并后 `wordbook_words_rail_active_*` 在语义树里彻底消失，23 例里 17 例连带红），
+            // 外层只管「当前字母」这枚标签：**同一个节点只能留一枚 `testTag`**
+            // （设备实测：两枚并挂时 `wordbook_words_rail_active_*` 在语义树里彻底消失，23 例里 17 例连带红），
             // 所以 active 标签必须由独立语义节点承载。旧竖排也是这个形状（槽 Box + 字形 Text 两枚节点）。
             Box(
                 modifier = if (active) Modifier.testTag("wordbook_words_rail_active_$letterText") else Modifier,
