@@ -6,7 +6,7 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
 
 ## 2. 完成了什么
 
-### 2.1 批 2 任务序列与提交（全部仅在本分支，未推送）
+### 2.1 批 2 任务序列与提交（全在本分支；2026-10-21 经用户批准已推 `origin`，见 §4）
 
 | 任务 | 交付 | 提交 | 验收锚 |
 |---|---|---|---|
@@ -51,7 +51,9 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
 
 - 分支 `stage-5-ui-r2-learning-path`；本席接手 HEAD `0d60658`，工作树接手时干净。
 - 本席提交：本报告的 docs 提交（逐文件 `git add`：验证文档、本报告、task-16-report 订正、计划 :691 订正），带 git 身份参数。
-- **不 push、不合 main**（用户明令「推送前先问我」，覆盖计划 Task 18 Step 3 的推送动作）；批 2 段提交（含裁决文档与修复轮）**仅本地、未推送**，推送由控制者批 2 关账后向用户请示（`44d81f8` 里「19 枚仅本地」是当时口径，收口时以 `git log` 现场为准）。
+- **不 push、不合 main**（用户明令「推送前先问我」，覆盖计划 Task 18 Step 3 的推送动作）；批 2 段提交（含裁决文档与修复轮）在关账前**仅本地、未推送**（`44d81f8` 里「19 枚仅本地」是当时口径，收口时以 `git log` 现场为准）。
+- **批 2 关账后已按请示推送（2026-10-21）**：用户批准「可以」后方推，目标 `origin` = `https://github.com/steveliuyan/English-learning-software.git`，分支 `stage-5-ui-r2-learning-path`，命令 `git push -u origin stage-5-ui-r2-learning-path`（**新建远端分支**，非 force、未碰 `main`）。
+  推送后核验：`git ls-remote origin refs/heads/stage-5-ui-r2-learning-path` 回 `62a23b43e286ba032e7d00d1fa01012f4a789671`，与 `git rev-parse HEAD` 逐字相等；`git rev-list --left-right --count origin/stage-5-ui-r2-learning-path...HEAD` 回 `0 0`。相对 `origin/main` 的 120 枚提交全部落到远端分支作异地备份。合并 `main` 仍待用户另行拍板。
 - 日志与证据文件均在 `.superpowers/sdd/2026-10-17-ui-redesign/`（非入库面），`.git/qa-scratch/` 零密钥/挑战明文，本报告与日志零 API Key。
 
 ## 5. 结转批 3 全表与未完成项
@@ -101,7 +103,7 @@ UI 重设计批 2「学习路径与壳」六席（14A-i / 14A-ii / 15 / 16 / 17A
 - **终审**：六席只读评审（A 拆 A1/A2，`b3f54b8..04b6398`，40 提交/47 文件）→ 控制者逐条物证复核，
   5 条承重发现坐实、1 条算术驳回（驳回的是**控制者自己的数**，见验证文档 AC-R-11 行与本节末条）。
   Critical 一条 = 玻璃容器深色下仍写死白；用户拍板「同批迁容器」，落为计划裁决 **R-18-R1**。
-- **修复轮三笔 + 契约一笔**（全在 `stage-5-ui-r2-learning-path`，未推送）：
+- **修复轮三笔 + 契约一笔**（全在 `stage-5-ui-r2-learning-path`，2026-10-21 随批 2 关账一并推送）：
   `2c08792`（`GlassDialog` 容器 + 8 枚消费者面板内 16 处前景 + `PillButton` 可点 `role`）、
   `ce1e188`（`GlassOverlay` / `SectionCard` / `PreviewCard` 三块面板容器与前景同批迁）、
   `3a2f0a2`→`0da5dc1`→`6b05e95`（浅套两枚正文档域色墨按 `AppBottomBar.kt:95` 的形状按套归位到 `onMint`，
