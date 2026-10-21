@@ -1903,7 +1903,19 @@ internal val MintBackground: Color
     白名单留在 9/6 且未认领新标签；修复轮已把两侧对齐，并把两处自述改成**不抄绝对枚数**的口径（权威 = 判据 `rowTags` + 白名单名册）。
     **Task 22 动入口时的规程**：`TodayPlanScreenTest` 闭合集合判据、`TodayPlanNumberAuthorityTest` 白名单名册、`TodayPlanScreen` KDoc
     必须**同批**同步，改一处不改其余即判违规。
-- [ ] **Step 4: `WordRow` 替换词行台账（`componentFamilySeeds["词行（应调 WordRow）"]`，批 1 出厂 6 个文件 / 7 枚裸行组合）中的本域侧**——`WordBookWordsScreen.kt:239-258`、`GlobalVocabularySearchScreen.kt:274-299/:319-358`（**一个文件两枚**）、`WrongWordsScreen.kt:110-129`、`FavoritesScreen.kt:116-156` 四个文件；同步递减 seed（seed 按文件计，四文件一次删净，剩下 `LearningRecordsScreen.kt`/`VocabularyScreen.kt` 两文件归批 3）。
+- [ ] **Step 4（= 席位 20-B）: `WordRow` 替换词行台账（`SharedComponentUniquenessRatchetTest.componentFamilySeeds["词行（应调 WordRow）"]`）中的本域侧三屏**——`WordBookWordsScreen.kt`（私有 `WordBookWordsRow`）、`WrongWordsScreen.kt`（私有 `WrongWordRow`）、`FavoritesScreen.kt`（私有 `FavoriteRow`）；同步递减 seed（seed 按文件计，三行一次删净）。
+  台账存量与差集的**重算命令**：`"$GRADLE" :app:testDebugUnitTest --offline --no-daemon --no-build-cache --tests com.example.englishlearning.ui.SharedComponentUniquenessRatchetTest`
+  （`each_family_offender_set_equals_its_seed_exactly` 逐族打印实际违规文件集与 seed 的双向差异）。
+  - **R-20B.1（控制者裁定，20-A 关闭后落）**：本步原稿点名的第四屏 `GlobalVocabularySearchScreen.kt` **移出 20-B**，另立 **Task 20-C**。
+    依据是硬事实而非偏好：其结果行 `GlobalSearchResultRow` 渲染**五枚信息**（lemma / IPA / 释义 / `来源：词书名` / `搜索次数`）+ 尾部箭头，
+    而 `WordRow` 只有 `lemma`/`gloss`/`status`/`meta` 四枚文本槽；且 `GlobalVocabularySearchScreenTest` 正在断言
+    `global_search_result_book_*`、`global_search_result_count_*`、`global_search_history_count_*` 三枚诊断标签存在。
+    硬塞只有两种后果——丢 IPA（词典页发音信息，产品回退）或删标签（削弱判据），两条都不接受。
+    20-C 的两条候选解法：**给 `WordRow` 增一枚可选槽**（须同步 `WordRowSpeakerContractTest` 的槽位取色表与 AA 断言），
+    或**给词典条目行另立组件并登记为新族**；若最终判定「词典条目行不该算词行」，走 Task 26 Step 3 的「写明保留理由」那条，
+    **不得**为了让 seed 归零而硬改组件签名或偷删信息。
+- [ ] **Step 4b: 词行台账剩余站点归属**——`LearningRecordsScreen.kt` 与 `VocabularyScreen.kt` 两文件归本批收口（Task 26 Step 3），
+  `GlobalVocabularySearchScreen.kt` 归 Task 20-C；三处都允许「接线清零」或「留档写理由」两种收法，理由须写进 `docs/verification/ui-redesign-2026-10.md`。
 - [ ] **Step 5: 门控 + connected + 提交**（`feat(ui-words): 词汇域收成查词/词表/我的词三入口`）。
 
 ---
@@ -1944,6 +1956,13 @@ internal val MintBackground: Color
     `idle_renders_no_result_dialog` ＋ JVM
     `MyWordsScreenContractTest.the_merged_page_consumes_and_resets_the_mastery_state`。
     **这五枚判据任一不在册或为红，同样不得摘 `today_plan_open_vocabulary` / `showVocabulary`**（或明写「本批不摘」）。
+    **R2-1 残留（摘路由那一批必须一起补的第六枚判据）**：上述五枚钉的是**屏侧**行为与**静态挂点**，
+    而「宿主真的把 `vocabularyMasteryState` / `clearMasteryMessage` 接进合并页」这半边**设备侧判据为零**——
+    `MyWordsScreenTest` 自己传复位 lambda，不经宿主（轮 3 报告 §6.1 那句「改宿主实参会让 connected 红」的归因已被复评席证伪）。
+    静态锚 `the_merged_page_consumes_and_resets_the_mastery_state` 按构造有牙（`Regex.escape` 逐字 + 限定
+    `else if (showMyWords)` 切片），所以这不是无门可守；但老页摘掉后合并页是全站唯一出口，
+    静默失败的代价从「少一个框」变成「用户以为已保存」，故摘除批必须补一枚 `AppScreenTest` 端到端用例。
+    现状与漂移检查（重算命令）：`grep -icE "mastery" app/src/androidTest/java/com/example/englishlearning/ui/AppScreenTest.kt` 现盘为 `0`。
 - [ ] **Step 2: 写失败测试**：打卡页不再出现裸文字链（`grep` 级契约 + UI 断言「无两条通往收藏/错词的裸文字链节点」）；三统计卡数值口径不变（F4-01 已建的统计口径零改动）。
 - [ ] **Step 3: 实现**：头部两条裸文字链移出；`CheckInScreen.kt:148` 的裸 hex `#FFF1DB` token 化并从 seed 删除；`:66-73` 注释自认「大字号挤压归本轮」的头部换 `AppScreenHeader`，跑 `fontScale 2.0` 护栏（AC-R-07）。
 - [ ] **Step 4: 动效不做**（spec §1 不做的事 #5）：不引入动画代码；在 `docs/verification/ui-redesign-2026-10.md` 记一行「打卡页华丽动效 = 另批，未在本轮范围」。
