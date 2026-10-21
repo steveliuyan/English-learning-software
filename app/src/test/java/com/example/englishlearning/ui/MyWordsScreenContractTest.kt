@@ -260,6 +260,35 @@ class MyWordsScreenContractTest {
     }
 
     /**
+     * m-7（修复轮 2）：三段空态的**逐字文案**与生词本那条的**专属朗读描述**都在源码里在册。
+     *
+     * 为什么要这一枚静态锚：文案本体的行为判据在 connected（`empty_sections_show_their_own_honest_copy`
+     * 现在逐段 `assertTextEquals`），但描述层只在跑设备时才看得见；本锚让「把某句空态改成一句话」
+     * 「把生词本那条的 contentDescription 删掉」在不接设备的门控里也当场红。
+     * 三句文案逐字对齐三页旧文（`FavoritesScreen.kt:101` / `VocabularyScreen.kt:63` /
+     * `WrongWordsScreen.kt:90`），描述串逐字对齐 `VocabularyScreen.kt:64`。
+     */
+    @Test
+    fun empty_states_keep_the_copy_and_the_reading_layer() {
+        listOf(
+            "还没有收藏。在词卡详情页点星标即可收藏。",
+            "还没有生词，提交“不认识”后会自动加入。",
+            "当前没有待纠正的错词。复习中标记「不认识」的词会出现在这里，重新答对后自动消失。",
+        ).forEach { copy ->
+            assertEquals(
+                1,
+                countMatches(screen, Regex(Regex.escape("\"$copy\""))),
+                "空态文案「$copy」必须在本屏恰一处（0 = 措辞被改写，与旧页不再是同一句；2 = 同一段两枚说法）",
+            )
+        }
+        assertEquals(
+            1,
+            countMatches(screen, Regex(Regex.escape("\"生词本为空，提交不认识后会自动加入\""))),
+            "生词本空态必须带旧页那条专属朗读描述（0 = TalkBack 档比旧页少一层，m-7 点名的缺陷形状）",
+        )
+    }
+
+    /**
      * m-2（修复轮 1）：重试必须**带段标**——三段各回交自己的段枚举。
      *
      * 旧形状 `onRetry: () -> Unit` 让任一段的「重试」一次拉三册（另外两段被打回 Loading）。

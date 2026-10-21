@@ -24,7 +24,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import com.example.englishlearning.ui.theme.MintBackground
 
 @Composable
@@ -121,13 +120,8 @@ fun VocabularyScreen(
     }
 }
 
-private val vocabularyDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-
-private fun vocabularySourceLabel(feedback: String): String = when (feedback) {
-    "Again" -> "来源：不认识"
-    "Manual" -> "来源：手动加入"
-    else -> "来源：${feedback}"
-}
+// m-5（修复轮 2）：本屏原有的 `vocabularyDateFormatter` / `vocabularySourceLabel` 两枚私有副本
+// （与 `MyWordsScreen` 逐字同文）已收敛到 `ui/WordListFormat.kt`，两屏同调同一份。
 
 @Composable
 private fun VocabularyRow(
@@ -138,11 +132,11 @@ private fun VocabularyRow(
     Column(Modifier.fillMaxWidth().padding(12.dp)) {
         Text(item.card?.lemma ?: item.entry.cardId, style = MaterialTheme.typography.titleMedium)
         Text(
-            text = vocabularySourceLabel(item.entry.lastFeedback),
+            text = wordListSourceLabel(item.entry.lastFeedback),
             style = MaterialTheme.typography.labelSmall,
         )
         Text(
-            text = "加入时间：${item.entry.addedAt.atZone(ZoneId.systemDefault()).format(vocabularyDateFormatter)}",
+            text = "加入时间：${wordListDateTimeLabel(item.entry.addedAt, ZoneId.systemDefault())}",
             style = MaterialTheme.typography.labelSmall,
         )
         item.card?.let { card ->

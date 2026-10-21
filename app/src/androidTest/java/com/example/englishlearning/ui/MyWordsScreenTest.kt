@@ -3,7 +3,10 @@ package com.example.englishlearning.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -18,7 +21,9 @@ import com.example.englishlearning.learning.VocabularyEntry
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.ui.theme.MintGlassTheme
 import java.time.Instant
+import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -147,7 +152,19 @@ class MyWordsScreenTest {
         assertEquals(listOf("beacon"), unfavorited)
     }
 
-    /** 三段全空时的诚实空态：每段各留一条自己的说明，不是一片白屏。 */
+    /**
+     * 三段全空时的诚实空态：每段各留一条自己的说明，不是一片白屏。
+     *
+     * m-7（修复轮 2）：这一枚原先只 `assertExists()` 段容器与空态标签，**三句文案本体没有任何判据**——
+     * 文案被改成一句话照样绿。评审席要求的正是「逐字文案」承重，所以这里逐段 `assertTextEquals`
+     * 钉回三页旧文（`FavoritesScreen.kt:101` / `VocabularyScreen.kt:63` / `WrongWordsScreen.kt:90`）。
+     *
+     * 朗读层（m-7 第二半）：旧生词页的空态除了文案还带一条专属 `contentDescription`
+     * （`VocabularyScreen.kt:64`「生词本为空，提交不认识后会自动加入」），合并页缺它 ⇒ TalkBack 档比旧页少一层，
+     * 所以生词本这条必须补上（本方法的真红面）。收藏段与错词段的旧页从来没有专属描述，
+     * 而 `contentDescription` 一旦存在就**取代**文案本体被朗读——给它们新造一句反而比旧页读得少，
+     * 所以这两段断言「没有专属描述」，让 TalkBack 继续读逐字文案本体。
+     */
     @Test
     fun empty_sections_show_their_own_honest_copy() {
         composeRule.setContent {
@@ -159,16 +176,65 @@ class MyWordsScreenTest {
                 )
             }
         }
-        listOf(
-            "my_words_section_favorites" to "my_words_favorites_empty",
-            "my_words_section_wordbook" to "my_words_wordbook_empty",
-            "my_words_section_wrong" to "my_words_wrong_empty",
-        ).forEach { (section, empty) ->
-            composeRule.onNodeWithTag(section).assertExists()
-            composeRule.onNodeWithTag(empty).assertExists()
-        }
+        composeRule.onNodeWithTag("my_words_section_favorites").assertExists()
+        composeRule.onNodeWithTag("my_words_section_wordbook").assertExists()
+        composeRule.onNodeWithTag("my_words_section_wrong").assertExists()
+
+        composeRule.onNodeWithTag("my_words_favorites_empty")
+            .assertTextEquals("还没有收藏。在词卡详情页点星标即可收藏。")
+        assertNoOwnContentDescription("my_words_favorites_empty")
+        composeRule.onNodeWithTag("my_words_wordbook_empty")
+            .assertTextEquals("还没有生词，提交“不认识”后会自动加入。")
+            .assertContentDescriptionEquals("生词本为空，提交不认识后会自动加入")
+        composeRule.onNodeWithTag("my_words_wrong_empty")
+            .assertTextEquals("当前没有待纠正的错词。复习中标记「不认识」的词会出现在这里，重新答对后自动消失。")
+        assertNoOwnContentDescription("my_words_wrong_empty")
         // I-4（修复轮 1）：空册不给整册动作——没有词可重学时「开始重新学习」不得出现。
         composeRule.onNodeWithTag("my_words_wordbook_start_relearn").assertDoesNotExist()
+    }
+
+    /**
+     * 本节点自己没有 `ContentDescription`（读的是 Text 的逐字文案）。
+     * 用 `fetchSemanticsNode().config.contains(...)` 直读（本仓口径先例见 `AppBottomBarTest`）而不选
+     * `assertContentDescriptionEquals()` 传空串数组：后者对「键缺失」与「空表」两种状态在本仓
+     * Compose 1.10.0 上语义不确定，直读没有歧义。
+     */
+    private fun assertNoOwnContentDescription(tag: String) {
+        val config = composeRule.onNodeWithTag(tag).fetchSemanticsNode().config
+        assertFalse(
+            "$tag 不该自带专属朗读描述：旧收藏页与旧错词页都没有这一层，而 contentDescription 一旦存在" +
+                "就取代文案本体被朗读，给它们新造一句反而比旧页读得少",
+            config.contains(SemanticsProperties.ContentDescription),
+        )
+    }
+
+    /**
+     * m-6（修复轮 2）：「收藏于」时间戳与旧收藏页同文——统一取**日期档**（`yyyy-MM-dd`）。
+     *
+     * 缺陷形状：`FavoritesScreen.kt:140` 渲染 `收藏于 <yyyy-MM-dd>`（`toLocalDate()`），
+     * 合并页 `MyWordsScreen.kt:169` 渲染 `收藏于 <yyyy-MM-dd HH:mm>`；同一条收藏在两处读到两种时间。
+     * 摘除前两页并存，必须同文（评审席 m-6 逐字），而合并页自己的注释也写着「说法必须还是同一句」。
+     *
+     * 判据为什么咬得住：夹具把时刻钉死为 `2026-10-19T00:30:00Z` + `zoneId = UTC`
+     * （不靠设备时区，数字可复算），时分档在这一刻必然写成 `… 00:30` ⇒ 修复前判红；
+     * 收藏段的时间戳文案整枚匹配 ⇒ 只把「收藏于」改档、把「加入于」带下水也照样红。
+     */
+    @Test
+    fun favorite_timestamp_shows_the_same_date_tier_as_the_favorites_page() {
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = listOf(favorite("anchor", 0))),
+                    vocabularyState = VocabularyUiState.Ready(items = listOf(vocabularyItem("abandon", 1))),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                    zoneId = ZoneOffset.UTC,
+                )
+            }
+        }
+        composeRule.onNodeWithText("收藏于 2026-10-19").assertExists()
+        composeRule.onNodeWithText("收藏于 2026-10-19 00:30").assertDoesNotExist()
+        // 反向控：生词本条目的「加入于」仍是时分档（m-6 只统一收藏时间戳，顺手改它属扩面）。
+        composeRule.onNodeWithText("加入于 2026-10-19 00:30").assertExists()
     }
 
     /**

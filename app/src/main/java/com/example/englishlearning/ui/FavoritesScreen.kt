@@ -137,7 +137,10 @@ private fun FavoriteRow(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(favorite.lemma, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
                 Text(
-                    "收藏于 ${favorite.addedAt.atZone(zoneId).toLocalDate()}",
+                    // m-6（修复轮 2）：时间戳档由本页原来自拼的 `toLocalDate()` 改为共享
+                    // `wordListDateLabel`——渲染结果同一档、同一句（`yyyy-MM-dd`），但「收藏于」的格式
+                    // 从此只有一处定义，与「我的词」收藏段并存期间不可能再分叉。
+                    "收藏于 ${wordListDateLabel(favorite.addedAt, zoneId)}",
                     color = MintTextMuted,
                     style = MaterialTheme.typography.labelMedium,
                 )

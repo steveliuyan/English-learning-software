@@ -42,7 +42,6 @@ import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 
@@ -69,20 +68,9 @@ import kotlinx.coroutines.flow.first
  */
 enum class MyWordsSection { Favorites, Wordbook, Wrong }
 
-private val myWordsDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-
-private fun myWordsAddedLabel(instant: java.time.Instant, zoneId: ZoneId): String =
-    instant.atZone(zoneId).format(myWordsDateFormatter)
-
-private fun myWordsSourceLabel(feedback: String): String = when (feedback) {
-    "Again" -> "来源：不认识"
-    "Manual" -> "来源：手动加入"
-    else -> "来源：$feedback"
-}
-
-private fun myWordsMeaning(card: WordCard): String? =
-    card.meaningZh.ifBlank { card.senses.firstOrNull()?.meaningZh.orEmpty() }
-        .ifBlank { null }
+// m-5 / m-6（修复轮 2）：日期档、时分档、来源档、释义档四枚 helper 已从本屏的私有副本
+// 收敛到 `ui/WordListFormat.kt`（与 `VocabularyScreen` 共用同一份，逐字同文），
+// 本屏不再自拼时间戳或来源文案。
 
 @Composable
 fun MyWordsScreen(
@@ -166,7 +154,7 @@ fun MyWordsScreen(
                             WordRow(
                                 lemma = favorite.lemma,
                                 gloss = null,
-                                meta = "收藏于 ${myWordsAddedLabel(favorite.addedAt, zoneId)}",
+                                meta = "收藏于 ${wordListDateLabel(favorite.addedAt, zoneId)}",
                                 modifier = Modifier
                                     .testTag("my_words_favorite_row_$index")
                                     .semantics { contentDescription = "收藏 ${favorite.lemma}" },
@@ -204,6 +192,8 @@ fun MyWordsScreen(
                         SectionEmpty(
                             tag = "my_words_wordbook_empty",
                             text = "还没有生词，提交“不认识”后会自动加入。",
+                            // m-7：逐字搬旧生词页那条专属朗读描述（缺它即比旧页少一层）。
+                            readingDescription = "生词本为空，提交不认识后会自动加入",
                         )
                     } else {
                         // I-4：整册「开始重新学习」——老生词页 Ready 非空时列表上方的同名动作，
@@ -220,8 +210,8 @@ fun MyWordsScreen(
                                 WordRow(
                                     lemma = item.entry.cardId,
                                     gloss = "词卡内容暂不可用",
-                                    status = myWordsSourceLabel(item.entry.lastFeedback),
-                                    meta = "加入于 ${myWordsAddedLabel(item.entry.addedAt, zoneId)}",
+                                    status = wordListSourceLabel(item.entry.lastFeedback),
+                                    meta = "加入于 ${wordListDateTimeLabel(item.entry.addedAt, zoneId)}",
                                     modifier = Modifier
                                         .testTag("my_words_wordbook_row_$index")
                                         .semantics { contentDescription = "生词本条目 ${item.entry.cardId}" },
@@ -229,9 +219,9 @@ fun MyWordsScreen(
                             } else {
                                 WordRow(
                                     lemma = card.lemma,
-                                    gloss = myWordsMeaning(card),
-                                    status = myWordsSourceLabel(item.entry.lastFeedback),
-                                    meta = "加入于 ${myWordsAddedLabel(item.entry.addedAt, zoneId)}",
+                                    gloss = wordListMeaning(card),
+                                    status = wordListSourceLabel(item.entry.lastFeedback),
+                                    meta = "加入于 ${wordListDateTimeLabel(item.entry.addedAt, zoneId)}",
                                     modifier = Modifier
                                         .testTag("my_words_wordbook_row_$index")
                                         .semantics { contentDescription = "生词本 ${card.lemma}" },
@@ -277,7 +267,7 @@ fun MyWordsScreen(
                         wrongWordsState.cards.forEachIndexed { index, card ->
                             WordRow(
                                 lemma = card.lemma,
-                                gloss = myWordsMeaning(card),
+                                gloss = wordListMeaning(card),
                                 modifier = Modifier
                                     .testTag("my_words_wrong_row_$index")
                                     .semantics { contentDescription = "错词 ${card.lemma}" },
@@ -374,9 +364,16 @@ private fun SectionLoading(tag: String, text: String) {
 /**
  * 空态沿用三页现有的措辞（逐字照抄 `FavoritesScreen` / `VocabularyScreen` / `WrongWordsScreen`），
  * 合并的是入口、不是说法：用户在任何一处读到的解释必须还是同一句。
+ *
+ * m-7（修复轮 2）：旧生词页的空态除文案外还带一条专属朗读描述（`VocabularyScreen.kt:64`），
+ * 合并页缺这一层 ⇒ TalkBack 档比旧页少一层，所以本组件收 [readingDescription]，生词本段把旧页那句
+ * 逐字搬过来。另两段的旧页从来没有专属描述（读的是文案本体），本屏也不给它们新造一句——
+ * `contentDescription` 一旦存在就**取代**文案被朗读，新造短句反而读得比旧页少。
+ * 文案本体与描述层的判据：connected `MyWordsScreenTest.empty_sections_show_their_own_honest_copy`、
+ * JVM `MyWordsScreenContractTest.empty_states_keep_the_copy_and_the_reading_layer`。
  */
 @Composable
-private fun SectionEmpty(tag: String, text: String) {
+private fun SectionEmpty(tag: String, text: String, readingDescription: String? = null) {
     val colors = appColors()
     Text(
         text = text,
@@ -384,7 +381,14 @@ private fun SectionEmpty(tag: String, text: String) {
         color = colors.text2,
         modifier = Modifier
             .padding(bottom = 8.dp)
-            .testTag(tag),
+            .testTag(tag)
+            .then(
+                if (readingDescription == null) {
+                    Modifier
+                } else {
+                    Modifier.semantics { contentDescription = readingDescription }
+                },
+            ),
     )
 }
 
