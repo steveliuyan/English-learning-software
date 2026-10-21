@@ -55,6 +55,7 @@ import kotlin.math.floor
 import kotlinx.coroutines.launch
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
+import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -239,7 +240,6 @@ private fun WordBookWordsLetterHeader(letter: String) {
 private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) -> Unit) {
     val safeId = row.cardId.substringAfterLast(':').replace(Regex("[^A-Za-z0-9一-龥_-]"), "_")
     val enabled = row.canOpenDetail
-    val textColor = if (enabled) MintPrimaryDark else MintTextMuted
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -248,12 +248,19 @@ private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) ->
         colors = CardDefaults.cardColors(containerColor = if (enabled) MintSurface else MintTint.copy(alpha = 0.55f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) MintOutline else MintOutline.copy(alpha = 0.65f)),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(row.displayLemma, color = textColor, fontWeight = FontWeight.Bold)
-            row.card?.meaningZh?.takeIf { it.isNotBlank() }?.let { Text("释义：$it", color = textColor) }
-            Text(row.status.statusLabel(), color = textColor)
-            if (!enabled) Text("这个词已不在当前词书中", color = MintTextMuted)
-        }
+        // Task 20-B（计划 Step 4）：卡内那枚私有 `Column` + 四枚 `Text` 换成共享 [WordRow]。
+        // 卡面归调用方（本屏的 enabled/disabled 底色与描边、testTag、可点面都原样保留），行本体只管版式；
+        // **不传 onClick**：可点面只有卡那一枚，禁用态由「不挂 clickable」表达。
+        // 禁用行的行墨因此与可用行统一（旧的 `textColor` 双档随私有行一起删掉），
+        // 「这个词已不在当前词书中」改走 [WordRow] 的 meta 槽；设备侧读不到颜色，
+        // 本屏没有任何用例断过禁用墨（判据见 connected `WordBookWordsScreenTest`）。
+        WordRow(
+            lemma = row.displayLemma,
+            gloss = row.card?.meaningZh?.takeIf { it.isNotBlank() }?.let { "释义：$it" },
+            status = row.status.statusLabel(),
+            meta = if (enabled) null else "这个词已不在当前词书中",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
     }
 }
 

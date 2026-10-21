@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.FavoriteWord
+import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -130,30 +131,29 @@ private fun FavoriteRow(
             .semantics { contentDescription = "收藏 ${favorite.lemma}" }
             .clickable(onClick = onOpen),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // Task 20-B（计划 Step 4）：卡内那枚私有 `Row` + 两枚 `Text` 换成共享 [WordRow]。
+        // 分工按 `WordRow.kt` KDoc：卡面（圆角/描边/底色/testTag/朗读定语/clickable）留在调用方，
+        // 行本体只管版式；**不传 onClick** —— 卡已经 clickable，行再挂一枚就是嵌套触控目标（TalkBack 双读）。
+        // 行墨由组件从 `wordRowInks(appColors())` 取，本屏不再手写 `MintPrimaryDark` / `MintTextMuted` /
+        // `MaterialTheme.typography.*`（这正是本次接线要还的深色套债）。
+        // m-6（修复轮 2）继承：时间戳只走共享 `wordListDateLabel`（`yyyy-MM-dd` 一档），
+        // 「收藏于」的格式全仓只有一处定义，与「我的词」收藏段并存期间不可能再分叉。
+        WordRow(
+            lemma = favorite.lemma,
+            gloss = null,
+            meta = "收藏于 ${wordListDateLabel(favorite.addedAt, zoneId)}",
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(favorite.lemma, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-                Text(
-                    // m-6（修复轮 2）：时间戳档由本页原来自拼的 `toLocalDate()` 改为共享
-                    // `wordListDateLabel`——渲染结果同一档、同一句（`yyyy-MM-dd`），但「收藏于」的格式
-                    // 从此只有一处定义，与「我的词」收藏段并存期间不可能再分叉。
-                    "收藏于 ${wordListDateLabel(favorite.addedAt, zoneId)}",
-                    color = MintTextMuted,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-            TextButton(
-                onClick = onUnfavorite,
-                colors = ButtonDefaults.textButtonColors(contentColor = MintTextMuted),
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .widthIn(min = 48.dp)
-                    .testTag("favorites_unfavorite_$index")
-                    .semantics { contentDescription = "取消收藏 ${favorite.lemma}" },
-            ) { Text("取消收藏") }
-        }
+            actions = {
+                TextButton(
+                    onClick = onUnfavorite,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MintTextMuted),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .widthIn(min = 48.dp)
+                        .testTag("favorites_unfavorite_$index")
+                        .semantics { contentDescription = "取消收藏 ${favorite.lemma}" },
+                ) { Text("取消收藏") }
+            },
+        )
     }
 }

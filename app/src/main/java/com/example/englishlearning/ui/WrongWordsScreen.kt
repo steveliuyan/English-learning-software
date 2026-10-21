@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.WordCard
+import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -118,12 +119,15 @@ private fun WrongWordRow(index: Int, card: WordCard, onOpen: () -> Unit) {
             .semantics { contentDescription = "错词 ${card.lemma}" }
             .clickable(onClick = onOpen),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(card.lemma, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            val meaning = card.meaningZh.ifBlank { card.senses.firstOrNull()?.meaningZh.orEmpty() }
-            if (meaning.isNotBlank()) {
-                Text(meaning, color = MintTextMuted, style = MaterialTheme.typography.labelMedium)
-            }
-        }
+        // Task 20-B（计划 Step 4）：卡内那枚私有 `Column` + 两枚 `Text` 换成共享 [WordRow]。
+        // 卡面（圆角/描边/底色/testTag/朗读定语/clickable）原样留在调用方；**不传 onClick**，
+        // 免得与已 `clickable` 的卡形成嵌套触控目标。释义档改走共享 `wordListMeaning`
+        // （原来行内手写的 `meaningZh.ifBlank { senses… }` 与它逐字同义，且空释义时它给 null，
+        // 组件据此不渲染释义槽——与旧的 `if (meaning.isNotBlank())` 同一行为）。
+        WordRow(
+            lemma = card.lemma,
+            gloss = wordListMeaning(card),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
     }
 }

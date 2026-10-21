@@ -158,8 +158,13 @@ class SharedComponentUniquenessRatchetTest {
      *    `SettingsScreen.kt` **不在**其中），以实测为准，清零归批 3；
      *  - 未配置卡族：R-12.3 ① 已核实（`ImageStudioScreen`/`PhotoTranslationScreen`/
      *    `SentenceAnalysisScreen`/`WordAiQaScreen` 各一份私有定义），批 2/批 3 接线时逐枚删；
-     *  - 词行族：spec §3 点名的六个文件。spec 说「7 份」是「6 文件 + `GlobalVocabularySearchScreen`
-     *    里的第二变体」，本台账按**文件**计（同文件两变体接线时一并消失，按变体计会让 seed 半路删不掉）。
+     *  - 词行族：spec §3 点名的六个文件为**原始名单**；Task 20-B（计划 Step 4）把其中三屏
+     *    （`FavoritesScreen`/`WrongWordsScreen`/`WordBookWordsScreen`）的行本体换成共享 `WordRow`，
+     *    按上面「接线完毕就删一行」的口径把这三行从台账删除。剩余行的归属与收法见计划 Step 4b
+     *    （`GlobalVocabularySearchScreen.kt` 归 Task 20-C，`LearningRecordsScreen.kt`/`VocabularyScreen.kt`
+     *    归本批收口 Task 26 Step 3）。删行的合法性由
+     *    [word_row family seed is the spec list minus the wired screens and pins the window rule boundary]
+     *    当场复核（已摘行的屏必须真调 `WordRow(` 且私有词行窗口清零），不是「补一行调用即准删」。
      *
      * 台账**不含**任何组件文件：`components/` 下的组件是各族的唯一真值，它们出现在 seed 里就等于
      * 把「唯一份」登记成「债务」；[canonical component files exist with exactly one top level definition each]
@@ -208,12 +213,9 @@ class SharedComponentUniquenessRatchetTest {
             "WordAiQaScreen.kt",
         ),
         "词行（应调 WordRow）" to setOf(
-            "FavoritesScreen.kt",
             "GlobalVocabularySearchScreen.kt",
             "LearningRecordsScreen.kt",
             "VocabularyScreen.kt",
-            "WordBookWordsScreen.kt",
-            "WrongWordsScreen.kt",
         ),
     )
 
@@ -677,7 +679,21 @@ class SharedComponentUniquenessRatchetTest {
     }
 
     /**
-     * 词行族的 seed 必须是 spec §3 点名的那 6 个文件，逐枚点名（防「规则形状改了、seed 数字凑巧还对」）。
+     * 词行族 seed 必须**恰好**是 spec §3 点名的六枚原始名单减去已接线的三屏（防「规则形状改了、
+     * seed 数字凑巧还对」，也防「摘了 seed 行但那一屏根本没接线」）。
+     *
+     * 20-B 之前的形态（逐字点名六枚）已由本条改成「seed ∪ 已接线三屏 == spec §3 六枚」的**并集精确相等**：
+     * 台账会随接线递减（类 KDoc 与 [componentFamilySeeds] 的口径），把六枚硬钉在 seed 上会让每一次合法递减
+     * 都变成改断言；改成并集后，「名单来源」这一半仍然一次都漂不掉（多一枚、少一枚、换成没在 spec 名单里的
+     * 新屏都当场红），而「摘行」那一半改成要额外举证（下面三条），比旧写法更严不是更宽。
+     *
+     * 摘行的合法性（与页头族 [removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared]
+     * 同口径，R-13.1 给词行族补的那道门）：每枚已摘 seed 行的屏必须同时满足
+     *  ① 文件里出现共享 `WordRow(`（真接了组件，不是删了行就完事）；
+     *  ② 本族的取样窗口里**没有**「lemma 词头 Text + 第二枚 Text」形状的私有词行（forbidden 读点清零）。
+     * 族 4 的判定面带「本文件调了 `WordRow(` 即整体合规」出口（见
+     * [family compliance exits are a declared known blindness surface]），只看①会放行「接线了但私有行还留着」的
+     * 中间态，所以②是必须的一半。
      *
      * **本族规则形状的已知边界（修复轮 1 的 Fix 3 裁决，已在 `docs/verification/ui-redesign-2026-10.md` 登记）**：
      * spec 说 7 份 = 6 文件 + `GlobalVocabularySearchScreen.kt` 里的第二变体，但第二变体
@@ -686,24 +702,56 @@ class SharedComponentUniquenessRatchetTest {
      * 所以这里钉的是「该文件按窗口规则恰 **1** 处落窗」（`:319` 的 `private fun GlobalSearchResultRow(`，
      * 体内 `result.lemma` + `result.meaningZh` 两枚 Text），而不是硬凑 2。
      * **不得**为了凑数把窗口放宽成「任何 `Row {`」——那会立刻误伤 `CardDetailScreen.kt` 的 `SenseRow`
-     * 与 `AppScreen.kt` 的 `DetailToggleRow`（两枚都不是词行），seed 会从 6 变 8。
-     * 台账按**文件**计，故第二变体接线时（批 3）与第一变体在同一行里一并消失，无需为它单开 seed 条目。
+     * 与 `AppScreen.kt` 的 `DetailToggleRow`（两枚都不是词行）。
+     * 台账按**文件**计，故第二变体接线时（20-C）与第一变体在同一行里一并消失，无需为它单开 seed 条目。
      */
     @Test
-    fun word_row_family_names_the_six_spec_files_and_pins_the_window_rule_boundary() {
-        val seed = componentFamilySeeds.getValue("词行（应调 WordRow）")
-        assertEquals(
-            setOf(
-                "FavoritesScreen.kt",
-                "GlobalVocabularySearchScreen.kt",
-                "LearningRecordsScreen.kt",
-                "VocabularyScreen.kt",
-                "WordBookWordsScreen.kt",
-                "WrongWordsScreen.kt",
-            ),
-            seed,
-            "词行族 seed 与 spec §3 点名的 6 个文件不符（改 seed 前先改规则形状并说明理由）"
+    fun `word_row family seed is the spec list minus the wired screens and pins the window rule boundary`() {
+        val specWordRowFiles = setOf(
+            "FavoritesScreen.kt",
+            "GlobalVocabularySearchScreen.kt",
+            "LearningRecordsScreen.kt",
+            "VocabularyScreen.kt",
+            "WordBookWordsScreen.kt",
+            "WrongWordsScreen.kt",
         )
+        val wiredByTask20B = setOf(
+            "FavoritesScreen.kt",
+            "WordBookWordsScreen.kt",
+            "WrongWordsScreen.kt",
+        )
+        val seed = componentFamilySeeds.getValue("词行（应调 WordRow）")
+        // ① 名单来源仍然钉死：台账 ∪ 已摘行的三枚 == spec §3 的六枚，逐枚相等。
+        assertEquals(
+            specWordRowFiles,
+            seed + wiredByTask20B,
+            "词行族 seed 与「spec §3 点名的六枚减去本批已接线的三枚」不符（改 seed 前先改规则形状并说明理由；" +
+                "把没在 spec 名单里的屏塞进 seed 也算不符）",
+        )
+        assertEquals(
+            setOf("GlobalVocabularySearchScreen.kt", "LearningRecordsScreen.kt", "VocabularyScreen.kt"),
+            seed,
+            "词行族台账现况（重算命令见 [componentFamilySeeds] KDoc）：Task 20-B 摘三屏后剩这三枚，" +
+                "多一枚即有新债未登记，少一枚即有人删行未举证",
+        )
+        // ② 摘行的合法性：已摘 seed 行的屏必须真调 WordRow(，且本族私有词行窗口清零。
+        wiredByTask20B.forEach { name ->
+            val source = uiScreenSource(name)
+            assertTrue(
+                sharedWordRowCall.containsMatchIn(source),
+                "$name 已摘词行族 seed 行，却没有共享 WordRow( 调用：摘行必须对应真接线（R-13.1 给词行族的口径）",
+            )
+            val windows = rowFunctionBodies(source).count { body ->
+                lemmaText.containsMatchIn(body) && anyText.findAll(body).count() >= 2
+            }
+            assertEquals(
+                0,
+                windows,
+                "$name 摘了 seed 行但私有词行窗口还剩 $windows 处（族 4 的「本文件调 WordRow( 即合规」出口会把它遮蔽至隐形）：" +
+                    "批 2 接线判据是「该屏 forbidden 读点清零」，不是「补一行调用就准删 seed 行」",
+            )
+        }
+        // ③ 窗口规则的边界：词典页仍恰 1 处落窗（第二变体是无名内联 Row，规则抓不到，已登记为限制）。
         val search = uiScreenSource("GlobalVocabularySearchScreen.kt")
         val hits = rowFunctionBodies(search).count { body ->
             lemmaText.containsMatchIn(body) && anyText.findAll(body).count() >= 2
@@ -713,7 +761,7 @@ class SharedComponentUniquenessRatchetTest {
             hits,
             "GlobalVocabularySearchScreen.kt 按窗口规则恰 1 处落窗（`:319` GlobalSearchResultRow）；" +
                 "第二变体是无名内联 Row，本族规则抓不到，已作为限制登记进 docs/verification/ui-redesign-2026-10.md，" +
-                "接线时（批 3）与第一变体一并消失。实际 $hits ——数值变了说明规则形状或该文件写法动了，先改文档再改本断言。"
+                "接线时（20-C）与第一变体一并消失。实际 $hits ——数值变了说明规则形状或该文件写法动了，先改文档再改本断言。"
         )
     }
 
