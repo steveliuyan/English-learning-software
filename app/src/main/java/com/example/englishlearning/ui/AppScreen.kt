@@ -1165,6 +1165,12 @@ fun AppScreen(
                     // 行内标记走老页挂载处同一回调 vocabularyViewModel?.markMastered。
                     onStartRelearn = { showVocabularyRelearn = true },
                     onMarkMastered = { vocabularyViewModel?.markMastered(state.profile.id, it) },
+                    // N-1（修复轮 3）：结果态必须由本页消费并复位——与老页挂载处 :852/:853 **同一来源**
+                    // （vocabularyMasteryState 在宿主层恒收集，复位回调就是 clearMasteryMessage），
+                    // 不新建通路。少了这两行时：失败静默（StorageUnavailable 不 reload、合并页零反馈），
+                    // 而残留的 Success 会让随后打开的老生词页弹出一枚属于另一页动作的结果框。
+                    masteryState = vocabularyMasteryState,
+                    onDismissMasteryMessage = { vocabularyViewModel?.clearMasteryMessage() },
                     // m-2（修复轮 1）：重试只刷用户点的那一册，不再一次拉三册
                     // （旧写法会把另外两段打回 Loading，连带闪 loading 与历史 I-1 的重复落位）。
                     onRetry = { section ->

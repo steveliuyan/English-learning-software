@@ -377,4 +377,139 @@ class MyWordsScreenTest {
         composeRule.onNodeWithTag("my_words_wrong_row_2").assertIsDisplayed()
         composeRule.onNodeWithText("favorite-word-0").assertIsNotDisplayed()
     }
+
+    /**
+     * N-1（修复轮 3）：`markMastered` **失败**后合并页必须自己把结果说出来。
+     *
+     * 缺陷形状：`VocabularyViewModel.markMastered` 遇 `StorageUnavailable` 只置 `_mastery = Failure` 并
+     * `return@launch`（**不 reload**），而合并页原先不读这枚状态 ⇒ 用户点了确认、行还在、零反馈，
+     * 只能猜「是没点着还是没保存」。老生词页有那枚结果框，摘除前两页必须同一句说法。
+     *
+     * 判据四条：① 结果框与老页 `VocabularyScreen.kt:90-96` 的标题/正文**逐字**在册；② 点「知道了」
+     * 只回调复位、**不得**再回调 `onMarkMastered`（复位不是重做动作）；③ 复位后（`mastery` 由夹具翻回
+     * `Idle`）框必须消失——证明复位出口真的接在渲染上，不是只叫到回调；
+     * ④ 反向控：成功态那两句不得出现在失败框里（两态共用一套说法就是「保存失败」被读成「已掌握」）。
+     *
+     * 夹具用 `mutableStateOf` 的 `mastery`（真实 `StateFlow` 形状），所以一个方法仍只一次 `setContent`。
+     */
+    @Test
+    fun mastery_failure_shows_the_same_result_dialog_as_the_old_page_and_resets_on_ack() {
+        var mastery: VocabularyMasteryState by mutableStateOf(VocabularyMasteryState.Failure)
+        var dismissRequests = 0
+        val mastered = mutableListOf<VocabularyItem>()
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = emptyList()),
+                    vocabularyState = VocabularyUiState.Ready(items = listOf(vocabularyItem("abandon", 0))),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                    masteryState = mastery,
+                    onDismissMasteryMessage = {
+                        dismissRequests++
+                        mastery = VocabularyMasteryState.Idle
+                    },
+                    onMarkMastered = { mastered += it },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertIsDisplayed()
+        composeRule.onNodeWithText("保存失败").assertIsDisplayed()
+        composeRule.onNodeWithText("复习状态未更新，生词仍保留在生词本中。请重试。").assertIsDisplayed()
+        composeRule.onNodeWithText("已标记为掌握").assertDoesNotExist()
+        composeRule.onNodeWithText("该词已从生词本移除，复习记录已保留。").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("my_words_mastery_result_dismiss").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, dismissRequests)
+        assertEquals(
+            "「知道了」是复位出口，不是重做动作（回调 onMarkMastered 会把同一条词二次提交成 Known）",
+            emptyList<VocabularyItem>(),
+            mastered,
+        )
+        composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertDoesNotExist()
+    }
+
+    /**
+     * N-1（修复轮 3）：`markMastered` **成功**后的结果框与老生词页逐字同文。
+     *
+     * 与失败那枚拆成两枚方法，是本仓「一个测试方法只允许一次 `setContent`」的硬约束（见本类 KDoc），
+     * 不是可以把两种形态塞进一次组合的情况。
+     */
+    @Test
+    fun mastery_success_shows_the_same_result_dialog_as_the_old_page() {
+        var dismissRequests = 0
+        val mastered = mutableListOf<VocabularyItem>()
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = emptyList()),
+                    vocabularyState = VocabularyUiState.Ready(items = listOf(vocabularyItem("abandon", 0))),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                    masteryState = VocabularyMasteryState.Success,
+                    onDismissMasteryMessage = { dismissRequests++ },
+                    onMarkMastered = { mastered += it },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertIsDisplayed()
+        composeRule.onNodeWithText("已标记为掌握").assertIsDisplayed()
+        composeRule.onNodeWithText("该词已从生词本移除，复习记录已保留。").assertIsDisplayed()
+        composeRule.onNodeWithText("保存失败").assertDoesNotExist()
+        composeRule.onNodeWithText("复习状态未更新，生词仍保留在生词本中。请重试。").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("my_words_mastery_result_dismiss").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, dismissRequests)
+        assertEquals(
+            "「知道了」是复位出口，不是重做动作",
+            emptyList<VocabularyItem>(),
+            mastered,
+        )
+    }
+
+    /**
+     * N-1（修复轮 3）：`Submitting` **不渲染**任何结果框。
+     *
+     * 为什么单独钉这一枚：提交中弹「已标记为掌握」是比缺反馈更坏的错态（用户会以为已经保存完），
+     * 而老页 `VocabularyScreen.kt:98-100` 那两条分支就是靠 `-> Unit` 什么都不画。
+     * 这里同时反向钉住：段内动作（标记已掌握）仍在，说明「没有框」不是因为整段没渲染。
+     * `Idle` 那一半另拆一枚方法（本仓硬约束：一个测试方法只许一次 `setContent`），
+     * 两枚合起来才是老页那两条 `-> Unit` 分支的等价覆盖。
+     */
+    @Test
+    fun submitting_renders_no_result_dialog() {
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = emptyList()),
+                    vocabularyState = VocabularyUiState.Ready(items = listOf(vocabularyItem("abandon", 0))),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                    masteryState = VocabularyMasteryState.Submitting,
+                )
+            }
+        }
+        composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertDoesNotExist()
+        composeRule.onNodeWithText("已标记为掌握").assertDoesNotExist()
+        composeRule.onNodeWithText("保存失败").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_wordbook_mastered_0").assertExists()
+    }
+
+    /** N-1（修复轮 3）：`Idle`（初始与复位后的取值）同样不渲染结果框——与 `Submitting` 那枚成对。 */
+    @Test
+    fun idle_renders_no_result_dialog() {
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = emptyList()),
+                    vocabularyState = VocabularyUiState.Ready(items = listOf(vocabularyItem("abandon", 0))),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = emptyList()),
+                    masteryState = VocabularyMasteryState.Idle,
+                )
+            }
+        }
+        composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertDoesNotExist()
+        composeRule.onNodeWithText("已标记为掌握").assertDoesNotExist()
+        composeRule.onNodeWithText("保存失败").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_wordbook_mastered_0").assertExists()
+    }
 }

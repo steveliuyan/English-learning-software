@@ -260,6 +260,92 @@ class MyWordsScreenContractTest {
     }
 
     /**
+     * N-1（修复轮 3，复评 `task-20A-re-review-1.md` §C Important）：合并页必须**消费并复位**
+     * `VocabularyMasteryState`，不能只调 `markMastered` 就把结果态丢在 ViewModel 里。
+     *
+     * 缺陷形状两条（复评逐字）：`_mastery` 只有 `clearMasteryMessage()` 会复位，合并页挂点既不读也不清 ⇒
+     *  ① 两页并存期间，用户随后打开老生词页会弹出一枚**没有上下文**的结果框（那是另一页做过的动作）；
+     *  ② `StorageUnavailable` 时 `_mastery = Failure` 且**不 reload**，合并页零反馈——点了确认、行还在、没有任何解释。
+     *
+     * 静态侧钉的是「接线与措辞同源」这四件事（行为侧由 connected 的三枚结果框用例承重）：
+     *  - 屏侧两枚形参各恰一处声明（默认值保住既有 state-in 夹具不碎）；
+     *  - 结果框走共享 [com.example.englishlearning.ui.components.glass.GlassDialog]，**不得**自搓裸 `AlertDialog`
+     *    （对话框份数棘轮的同一口径）；
+     *  - 成功/失败两态的四句措辞各恰一处且与老生词页 `VocabularyScreen.kt:81-97` 逐字同文——本页 KDoc 自述
+     *    「用户在任何一处读到的解释必须还是同一句」；
+     *  - 宿主 `MyWordsScreen(` 挂载段内**恰一处**把与老页 `:852/:853` 同源的状态与复位回调传进来（不新建通路）。
+     *    口径用「挂载段 + countMatches」而不是全文件计数：老页那两行仍在册（Task 22 才摘），全文件计数必然 ≥2，
+     *    写绝对枚数就是写死一份会自漂移的存量数。
+     */
+    @Test
+    fun the_merged_page_consumes_and_resets_the_mastery_state() {
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""masteryState: VocabularyMasteryState = VocabularyMasteryState\.Idle""")),
+            "MyWordsScreen 形参 masteryState 必须恰一处声明且默认 Idle（0 = 合并页读不到结果态，" +
+                "失败静默、成功也无反馈，正是 N-1 点名的缺陷形状）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""onDismissMasteryMessage: \(\) -> Unit""")),
+            "MyWordsScreen 形参 onDismissMasteryMessage 必须恰一处声明（0 = 结果框没有复位出口，" +
+                "读完还留在 Success/Failure，下一次进老生词页就弹出无上下文的框）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""(^|[^A-Za-z0-9_])GlassDialog\(""")),
+            "结果对话框必须复用共享 GlassDialog 且本屏恰一处（0 = 没有结果框或又自搓一份，" +
+                "2 = 成功与失败各长出一套外壳，措辞从此两处可漂）",
+        )
+        assertEquals(
+            0,
+            countMatches(screen, Regex("""(^|[^A-Za-z0-9_])AlertDialog\(""")),
+            "本屏不得出现裸 Material3 AlertDialog（对话框份数棘轮口径：本席不新建组件、不迁旧页那份）",
+        )
+        listOf(
+            "已标记为掌握",
+            "该词已从生词本移除，复习记录已保留。",
+            "保存失败",
+            "复习状态未更新，生词仍保留在生词本中。请重试。",
+            "知道了",
+        ).forEach { copy ->
+            assertEquals(
+                1,
+                countMatches(screen, Regex(Regex.escape("\"$copy\""))),
+                "结果框措辞「$copy」必须在本屏恰一处（0 = 说法与老生词页不再是同一句，2 = 同页两枚说法）",
+            )
+        }
+        listOf("my_words_mastery_result_dialog", "my_words_mastery_result_dismiss").forEach { tag ->
+            assertEquals(
+                1,
+                countMatches(screen, Regex(Regex.escape("\"$tag\""))),
+                "$tag 标签锚必须恰一处（connected 按它定位结果框与「知道了」出口；缺 = 行为面没有可定位的锚）",
+            )
+        }
+
+        val appScreen = uiScreenSource("AppScreen.kt")
+        val myWordsMount = appScreen
+            .substringAfter("else if (showMyWords)")
+            .substringBefore("else if (showAiProfiles)")
+        assertTrue(
+            myWordsMount.contains("MyWordsScreen("),
+            "挂载段定界符失效（`else if (showMyWords)` 之后必须紧跟 MyWordsScreen 挂载），" +
+                "否则下面的恰一处判定会在错位切片上假绿",
+        )
+        assertEquals(
+            1,
+            countMatches(myWordsMount, Regex("""masteryState = vocabularyMasteryState""")),
+            "合并页挂点必须恰一处把宿主同源状态喂进 masteryState（0 = 状态无人消费，" +
+                "2 = 长出第二个真源）；与老生词页挂载处的 vocabularyMasteryState 同一来源，不新建通路",
+        )
+        assertEquals(
+            1,
+            countMatches(myWordsMount, Regex(Regex.escape("onDismissMasteryMessage = { vocabularyViewModel?.clearMasteryMessage() }"))),
+            "合并页挂点必须恰一处接现成的复位回调（与老页 :853 逐字同形）；0 = 读完的结果态留在 ViewModel 里污染另一页",
+        )
+    }
+
+    /**
      * m-7（修复轮 2）：三段空态的**逐字文案**与生词本那条的**专属朗读描述**都在源码里在册。
      *
      * 为什么要这一枚静态锚：文案本体的行为判据在 connected（`empty_sections_show_their_own_honest_copy`

@@ -37,6 +37,7 @@ import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
 import com.example.englishlearning.ui.components.ScreenUnavailable
 import com.example.englishlearning.ui.components.WordRow
+import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppType
@@ -63,7 +64,9 @@ import kotlinx.coroutines.flow.first
  *
  * 词行一律调共享 [WordRow]（词行族：本屏是新屏，不在 `SharedComponentUniquenessRatchetTest` 的词行 seed 台账里，
  * 写私有词行即判新增债务）；页头调共享 [AppScreenHeader]；段内降级调共享 [ScreenUnavailable]；
- * 出口动作调共享 [PillButton]（份数棘轮不允许再造「行内专用按钮」）。
+ * 出口动作调共享 [PillButton]（份数棘轮不允许再造「行内专用按钮」）；
+ * 「标记为已掌握」的结果反馈调共享 [GlassDialog]（N-1 修复轮 3：本屏消费 `masteryState` 并用宿主
+ * `onDismissMasteryMessage` 复位，老页那句「已标记为掌握 / 保存失败」在这里仍是同一句）。
  * 墨色只走 `appColors()`，不写裸 hex、不读 `AppPalette.` / `DomainColors.` 静态值（三张棘轮的新屏口径）。
  */
 enum class MyWordsSection { Favorites, Wordbook, Wrong }
@@ -90,6 +93,13 @@ fun MyWordsScreen(
     // （`showVocabularyRelearn` / `vocabularyViewModel?.markMastered`），本屏不新建任何数据通路。
     onStartRelearn: () -> Unit = {},
     onMarkMastered: (VocabularyItem) -> Unit = {},
+    // N-1（修复轮 3）：`markMastered` 的结果态必须由合并页**消费并给出复位出口**。
+    // `VocabularyViewModel._mastery` 只有 `clearMasteryMessage()` 会复位，成功留 `Success`、
+    // `StorageUnavailable` 留 `Failure` 且**不 reload**；原先合并页挂点两枚都没传 ⇒ 失败静默（用户点了确认、
+    // 行还在、没有任何解释），而残留的 `Success` 会让随后打开的老生词页弹出一枚**没有上下文**的结果框。
+    // 两枚都带默认值：本屏仍是 state-in，既有夹具与用例不因签名变化而碎。
+    masteryState: VocabularyMasteryState = VocabularyMasteryState.Idle,
+    onDismissMasteryMessage: () -> Unit = {},
     // m-2（修复轮 1）：重试带段标，只刷用户点的那一册。原先三段共用一个无参 onRetry，
     // 任一段的「重试」都会把另外两册打回 Loading（还连带触发 I-1 的旧缺陷）。
     onRetry: (MyWordsSection) -> Unit = {},
@@ -282,8 +292,6 @@ fun MyWordsScreen(
     // I-4（修复轮 1）：「标记为已掌握」的二次确认——复用共享 ConfirmDestructiveDialog，不另起私有
     // AlertDialog（对话框份数棘轮把私有确认框记新增债务）。措辞要素照老生词页搬齐：移出行 + 保留面；
     // 该操作可经复习里再提交「不认识」找回，所以 irreversible = false——谎称不可撤销会让人放弃本可挽回的操作。
-    // 已知差异（登记于报告 §1）：老页在成功后另有结果对话框（Success/Failure 两态），合并页以
-    // 「markMastered 内部 reload ⇒ 行消失 + 段计数变化」为成功反馈；失败时行不消失、可原地重试。
     pendingMastery?.let { item ->
         ConfirmDestructiveDialog(
             state = true,
@@ -298,6 +306,47 @@ fun MyWordsScreen(
             },
             onDismiss = { pendingMastery = null },
         )
+    }
+    // N-1（修复轮 3）：结果对话框——`Idle` / `Submitting` 什么都不画（与老页 `VocabularyScreen.kt:98-100`
+    // 那两条 `-> Unit` 分支同口径：提交中弹「已标记为掌握」是比缺反馈更坏的错态），`Success` / `Failure`
+    // 各出与老页 `VocabularyScreen.kt:81-97` **逐字同文**的结果框（本屏 KDoc 自述「用户在任何一处读到的
+    // 解释必须还是同一句」）。外壳只用现成的共享 [GlassDialog]，确认按钮只用 [PillButton]，不新建组件。
+    // 点击「知道了」与点 scrim 走同一枚复位出口 onDismissMasteryMessage（宿主接现成 clearMasteryMessage，
+    // 与老页 `:853` 同源）；它**不是**重做动作，所以这里绝不回调 onMarkMastered。
+    // 两枚对话框互不吞：确认闸由 `pendingMastery` 管显隐、结果框由 `masteryState` 管显隐，各读各的状态，
+    // 「确认前不得回调」那条既有断言不受本框影响（connected `wordbook_offers_relearn_and_mastered_behind_confirmation`）。
+    val masteryResultCopy: Pair<String, String>? = when (masteryState) {
+        VocabularyMasteryState.Success -> "已标记为掌握" to "该词已从生词本移除，复习记录已保留。"
+        VocabularyMasteryState.Failure -> "保存失败" to "复习状态未更新，生词仍保留在生词本中。请重试。"
+        VocabularyMasteryState.Idle,
+        VocabularyMasteryState.Submitting,
+        -> null
+    }
+    masteryResultCopy?.let { (masteryTitle, masteryBody) ->
+        GlassDialog(
+            onDismiss = onDismissMasteryMessage,
+            modifier = Modifier.testTag("my_words_mastery_result_dialog"),
+        ) {
+            Text(
+                text = masteryTitle,
+                style = AppType.Headline,
+                color = colors.text1,
+            )
+            Text(
+                text = masteryBody,
+                modifier = Modifier.padding(top = 8.dp),
+                style = AppType.Body,
+                color = colors.text1,
+            )
+            PillButton(
+                text = "知道了",
+                onClick = onDismissMasteryMessage,
+                style = PillStyle.Secondary,
+                testTag = "my_words_mastery_result_dismiss",
+                contentDescription = "$masteryTitle，知道了",
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
     }
 }
 
