@@ -148,6 +148,10 @@ class FavoritesScreenTest {
      * 未合并树取节点：收藏行外层 `Card` 带 `clickable`，合并后一次 `GetTextLayoutResult` 回调会把
      * 行内多枚文本并成一包（`layouts.single()` 当场炸），逐槽判定必须走未合并树
      * （先例见 `EntryRowTest.entry_row_truncates_title_and_subtitle_with_ellipsis_not_clipping`）。
+     *
+     * **RED 覆盖账**（与 `MyWordsScreenTest` 同一条款）：现盘天然红只证到第一腿 `maxLines >= 2`
+     * （`t20D-RED-FavoritesScreenTest.log` 的栈即停在这里，`assertTrue` 快速失败），后四条腿未能在
+     * `maxLines = 1` 现盘上各自见红；它们非恒真，背书来自 GREEN 轮的正向读数。
      */
     private fun assertMetaSlotSurvives(meta: String, expectMinLines: Int) {
         val node: SemanticsNodeInteraction = composeRule.onNodeWithText(meta, useUnmergedTree = true)

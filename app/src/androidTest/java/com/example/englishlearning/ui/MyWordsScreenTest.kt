@@ -717,6 +717,16 @@ class MyWordsScreenTest {
         return layouts.single()
     }
 
+    /**
+     * 四站点共用的布局级不截断判据（R-20D.2 口径，`FavoritesScreenTest` 同形状）。
+     *
+     * **RED 覆盖账**：现盘天然红只证到第一腿（`maxLines >= 2`，`t20D-RED-*.log` 的栈即停在这里——
+     * `assertTrue` 快速失败，后四条腿没能在 `maxLines = 1` 的现盘上各自见红）。它们并非恒真：
+     * 上限腿挡「加宽糊过去」、下限腿挡右列挤塌成 0dp、`lineCount` 腿要求第二行真被占上、
+     * `getLineEnd` 腿要求末行抵达文本末尾（有字被省略号吃掉即红）、逐行 `getLineRight` 腿分得出
+     * `Ellipsis`/`Clip` 都不改语义文本的那种横向真裁切；这五条的背书来自 GREEN 轮的正向读数
+     * （`t20D-GREEN-FavoritesScreenTest.log` / `t20D-GREEN-MyWordsScreenTest.log`）。
+     */
     private fun assertMetaSlotSurvives(meta: String, expectMinLines: Int) {
         val node = composeRule.onNodeWithText(meta, useUnmergedTree = true)
         val layout = metaLayout(meta)

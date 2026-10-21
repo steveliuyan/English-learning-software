@@ -223,7 +223,9 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   重算命令 `grep -n "maxLines" app/src/test/java/com/example/englishlearning/ui/WordRowSpeakerContractTest.kt app/src/test/java/com/example/englishlearning/ui/SharedComponentGeometryContractTest.kt`
   ——命中的是 `lemma`/`gloss` 两枚正则与 `EntryRow.kt` 的枚数，均不在本组件）。
   **代价（照实记）**：① `meta` 换行时该词行行高增高、右列不再与左列首行等高（`verticalAlignment = CenterVertically`
-  下整行一起长）；② `fontScale 2.0` 档下两行预算仍装不下 `加入于 <日期时间>` 全串，按组件既有口径以省略号退化
+  下整行一起长）；② `fontScale 2.0` 档下两行预算**推断**装不下 `加入于 <日期时间>` 全串（推断依据：右列
+  `widthIn(max = 120.dp)` 是 dp 上限、不随 sp 放大，而该串在 2.0 档需 >2 行；**未实测**——2.0 档判据故意不判整句可见，
+  故没有留下一枚「在 2f 断整句可见并见其红」的探针），按组件既有口径以省略号退化
   （`WordRow.kt` KDoc「fontScale 2.0 下靠省略号退化，不靠裁切」），所以大字号轮判**策略腿**（额度 ≥2、上限 ≤120dp、
   第二行真被占上、逐行不伸出文本盒 + 字号哨兵）而不判「整句可见」，整句可见腿只在组合级钉 `fontScale = 1f` 的判据里判；
   ③ 验收一律以布局级判据为准，不以观感为准。取证与改动分两枚提交（取证先行）：

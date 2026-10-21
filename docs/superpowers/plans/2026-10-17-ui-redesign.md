@@ -1948,8 +1948,9 @@ internal val MintBackground: Color
     `meta` 的 `maxLines` 由 1 改为 **2**（保留 `TextOverflow.Ellipsis` 作第三行兜底，它是自由文本承载位，
     截断即用户可见的信息丢失）；`status` **维持单行 + Ellipsis**（短状态标签）；右列 `widthIn(max = 120.dp)`
     **不加宽**（加宽挤压左列 `lemma`/`gloss` 阅读主体，比截断更坏）。
-    **代价（照实记）**：`meta` 换行时行高增高、右列不再与左列首行等高；`fontScale 2.0` 档下两行预算仍装不下
-    `加入于 <日期时间>` 全串，按组件既有口径以省略号退化（不靠裁切），故大字号轮判**策略腿**（额度/上限/占行/裁切）
+    **代价（照实记）**：`meta` 换行时行高增高、右列不再与左列首行等高；`fontScale 2.0` 档下两行预算**推断**装不下
+    `加入于 <日期时间>` 全串（依据是右列 `widthIn(max = 120.dp)` 为 dp 上限、不随 sp 放大；**未实测**，
+    2.0 档判据故意不判整句可见），按组件既有口径以省略号退化（不靠裁切），故大字号轮判**策略腿**（额度/上限/占行/裁切）
     而不判「整句可见」。验收一律以布局级判据为准，不以观感为准。
     代码面只动 `WordRow.kt` 一枚 `maxLines` 字面量（`status`/`lemma`/`gloss` 三枚与 `widthIn(max = 120.dp)` 原样）。
   - **落地取证（提交序：取证先行、组件改动随后，两枚不合并）**：四站点各补布局级不截断判据
@@ -1967,14 +1968,17 @@ internal val MintBackground: Color
     `MyWordsScreen.kt:224` / `:234`（`加入于 <日期时间>`）；`WrongWordsScreen.kt:127-131` 只传 `lemma`+`gloss`、
     **不传 `meta`/`status`** ⇒ 不受右列 120dp 影响，本任务**不需要**改它。`WordBookWordsScreen.kt:267` 传的是
     短状态标签（`status`），属「右列只放短标签」的正例，留作策略选定后的对照。
-  - **前置（硬项，取证形状已由 R-20D.1 定形）**：四站点全仓**没有布局级不截断判据**——
-    收藏页与错词页的**独立屏**零渲染级用例（重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`
-    只命中 `MyWordsScreenTest.kt`，而那两处 `:160`/`:214` **都在注释里**），
+  - **前置（硬项，取证形状已由 R-20D.1 定形；本小节描述的是「补取证之前的现盘」，现状见每条的重算命令）**：
+    当时四站点全仓**没有布局级不截断判据**——
+    收藏页与错词页的**独立屏**当时确实零渲染级用例（当时的取证命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`
+    只命中 `MyWordsScreenTest.kt`，而那两处 `:160`/`:214` **都在注释里**；
+    现状重算同一条命令已命中 `FavoritesScreenTest.kt` 与 `WrongWordsScreenTest.kt` 两枚新类），
     但**合并页 `MyWordsScreen` 是挂着的**（`:226-231` 一次 `setContent` 喂三段真实 `UiState`，`:234` 断
     `收藏于 2026-10-19` 存在、`:237` 反向控 `加入于 2026-10-19 00:30`）⇒ 它的缺口不是「没渲染」而是
     **「渲染了但只到文本层」**：`onNodeWithText` 匹配语义全文，节点被 Ellipsis 截断时照样绿。
-    重算命令：`grep -n "textLayout\|maxLines\|fontScale" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt` 现盘零命中。
-    **补法**：给四站点各补一枚布局级判据（`textLayout()` 读宽度与 `maxLines`，形同 `b76f133` 的
+    当时的取证命令 `grep -n "textLayout\|maxLines\|fontScale" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt` 零命中；
+    **现状重算同一条命令已多枚命中**（四站点布局级判据 + `fontScale` 分档轮在册）。
+    **补法（已按此落地，见上面「落地取证」小节）**：给四站点各补一枚布局级判据（`textLayout()` 读宽度与 `maxLines`，形同 `b76f133` 的
     `disabledRowShowsTheUnavailableNoticeInFull`），并跑 `font_scale 2.0` 轮；不先补取证，改完策略无从验收。
   - 组件签名若变（增槽/改宽度），须同步 `WordRowSpeakerContractTest` 的逐槽取色与对比断言 +
     `SharedComponentGeometryContractTest`，并按 Global Constraint 16 给写死的枚数配重算命令。
