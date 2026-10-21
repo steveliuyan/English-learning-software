@@ -347,10 +347,17 @@ class MyWordsScreenTest {
      * 状态会发射，不是静态对象）；用户已下滚到错词段底部时，点「取消收藏」让收藏状态发射一次
      * （`onUnfavorite` 里换成少一条的 `Ready`，与 VM 的 reload 同形）。修复后落位 effect 只认 `section`
      * 这一枚键、不会重跑 ⇒ 视口必须留在用户所在处；修复前它必然被拉回收藏段首 ⇒ 当场红。
+     *
+     * N-4（修复轮 3）：**先自证发射真的发生，再断言视口没动**。原先的写法对「发射没发生」是瞎的——
+     * 若 `onUnfavorite` 断线（或夹具喂错形参），两条视口断言会双双静默绿，整枚用例退化成空转。
+     * 现在点击后先钉三件数据面的事：回调恰收到那一枚收藏（`unfavorited` 捕获列表，沿用本文件既有写法）、
+     * 少一条后的**那一行**已从组合里消失（`my_words_favorite_row_19`）、段头条数从 `20 个` 变成 `19 个`；
+     * 三条都过了，才轮到「视口未被拉回」那两条。断言顺序即因果顺序：状态变了 → 视口没动。
      */
     @Test
     fun state_emit_after_landing_does_not_yank_the_viewport_back() {
         val many = (0 until 20).map { favorite("favorite-word-$it", it) }
+        val unfavorited = mutableListOf<String>()
         var favorites: FavoritesUiState by mutableStateOf(FavoritesUiState.Ready(words = many))
         composeRule.setContent {
             MintGlassTheme {
@@ -360,7 +367,10 @@ class MyWordsScreenTest {
                     wrongWordsState = WrongWordsUiState.Ready(
                         cards = listOf(card("wrong-word-0", 0), card("wrong-word-1", 1), card("wrong-word-2", 2)),
                     ),
-                    onUnfavorite = { favorites = FavoritesUiState.Ready(words = many.take(many.lastIndex)) },
+                    onUnfavorite = {
+                        unfavorited += it.lemma
+                        favorites = FavoritesUiState.Ready(words = many.take(many.lastIndex))
+                    },
                 )
             }
         }
@@ -372,6 +382,15 @@ class MyWordsScreenTest {
         // 夹具自证：最后一条收藏行的「取消收藏」此刻仍在视口内，下面的点击是用户真点得到的。
         composeRule.onNodeWithTag("my_words_favorite_unfavorite_19").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
+        // ---- 先证「发射真的发生」（N-4）----
+        // ① 回调收到的是被点那一枚，且恰一次（断线 / 接错行都在这一条红）。
+        assertEquals(listOf("favorite-word-19"), unfavorited)
+        // ② 数据面真的变了：Ready(20)→Ready(19) 后第 20 行必须已从组合里消失。
+        composeRule.onNodeWithTag("my_words_favorite_row_19").assertDoesNotExist()
+        // ③ 段头条数同批跟着变（旧值 20 不得还在册）。
+        composeRule.onNodeWithText("19 个").assertExists()
+        composeRule.onNodeWithText("20 个").assertDoesNotExist()
+        // ---- 再证「视口没被拉回」----
         // 收藏状态发射（Ready(20)→Ready(19)）不得触发第二次落位：
         // 用户所在处必须原地不动，段首那枚收藏词不得被拽回视口。
         composeRule.onNodeWithTag("my_words_wrong_row_2").assertIsDisplayed()

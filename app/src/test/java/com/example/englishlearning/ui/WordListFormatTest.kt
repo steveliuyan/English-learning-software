@@ -118,7 +118,32 @@ class WordListFormatTest {
                 countMatches(screen, Regex("""private (?:val|fun) \w*(?:DateFormatter|DateLabel|AddedLabel|SourceLabel|Meaning)\w*""")),
                 "$screenName 不得再留私有格式化 helper（m-5：两份逐字同文的副本就是这次要收敛的那份债）",
             )
+            // N-3（修复轮 3，复评 §C Minor）：上面那条只认「`private` 前缀 + 五个名字片段」，
+            // 于是这两半它都挡不住——① 把 helper 改个名（`myWordsFormatter` 之类不在名单里的名字）；
+            // ② 根本不新建声明，把 `DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")` **内联进屏**，
+            // 此时私有副本正则为 0、共享名的声明扫描也 0、用量锚 `>= 1` 还被另一条分支喂饱 ⇒ 全绿。
+            // 补一道**按形态**的闸：三屏源码里不得出现 `DateTimeFormatter` 与 `ofPattern(` 任何一个，
+            // 格式化只许走 WordListFormat.kt 那一处；改名与内联两条路一起堵死。
+            listOf("DateTimeFormatter" to "自建 formatter 类型", """ofPattern\(""" to "就地拼格式")
+                .forEach { (forbidden, why) ->
+                    assertEquals(
+                        0,
+                        countMatches(screen, Regex(forbidden)),
+                        "$screenName 不得出现「$forbidden」（$why）：N-3 的缺陷形状就是「不新建 private 声明、" +
+                            "直接把格式内联回屏里」，上面那道只认私有声明的门对它是瞎的，" +
+                            "格式化只能走 WordListFormat.kt 那一处（改名副本也同样被这条挡住）",
+                    )
+                }
         }
+        // 反向钉（派工单 N-3「确认这条新断言不会误伤 WordListFormat.kt 本体」）：禁令只作用于**屏**，
+        // helper 本体必须还在原地造 formatter——否则「三屏 0 命中」会因为唯一真值被搬空而假绿。
+        val formatSource = File("${UI_MAIN_SOURCE_PATH}/WordListFormat.kt").readText()
+        assertEquals(
+            2,
+            countMatches(formatSource, Regex("""private val \w+ = DateTimeFormatter\.ofPattern\(""")),
+            "WordListFormat.kt 必须仍恰有两枚顶层 formatter（日期档 + 时分档）：0/1 枚 = 唯一真值被搬空或减档，" +
+                "上面那组「三屏 0 命中」会随之假绿",
+        )
 
         // 两页并存期间「收藏于」必须同文：同一枚日期档入口、每页该串恰一处。
         val myWords = uiScreenSource("MyWordsScreen.kt")
