@@ -55,7 +55,6 @@ import kotlin.test.assertTrue
 internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
     "AppScreen.kt" to 2,
     "ArticleReadingScreen.kt" to 1,
-    "CheckInScreen.kt" to 1,
     "components/glass/GlassButton.kt" to 1,
     "mascot/AiMascot.kt" to 1,
 )
@@ -76,7 +75,6 @@ internal val RawColorSeedSiteLines: List<String> = listOf(
     "AppScreen.kt: colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = Color(0xFFCDEFE1)),",
     "AppScreen.kt: inactiveTrackColor = Color(0xFFCDEFE1),",
     "ArticleReadingScreen.kt: style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF17342A)),",
-    "CheckInScreen.kt: drawArc(color = Color(0xFFFFF1DB), startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))",
     "GlassButton.kt: Color(0xFF65D3B9),",
     "AiMascot.kt: private val EyeColor: Color = Color(0xFF188F76)",
 )

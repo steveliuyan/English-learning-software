@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +38,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.DailyLearningStats
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -63,26 +64,33 @@ fun CheckInScreen(
         modifier = Modifier.fillMaxSize().background(MintBackground).verticalScroll(rememberScrollState()).padding(20.dp).testTag("check_in_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // F5-03 / Task 11（§E.2，Task 10 评审 I-4；Task 11 评审 I-1 订正本注释口径）：
-        // 本 Row 保留 `fillMaxWidth()` 在前的 `horizontalScroll`，但**取证表明该顺序不产生滚动范围**——
-        // 加/不加滚动时头部边界逐位相同（标题 DpRect(20.190475..98.666664)，emulator-5574 fontScale=2.0），
-        // 摘掉滚动后三条链仍可达（P4 实测仍绿），即「可滚可达」的效果本轮**没有取得**，不得据此认为溢出已收口。
-        // 留着它只为钉住**修饰符顺序**：反写成 horizontalScroll().fillMaxWidth() 会让标题的 weight(1f)
-        // 在无界约束下塌成 0 宽（实测 DpRect(left=right=20.190475)，P3 必红），属回归。
-        // 真实的大字号症状是标题被 weight(1f) 压到 78.48dp 换行，`horizontalScroll` 修不了它 → 归 UI 重设计轮（L-T11-1）。
-        // 护栏见 `CheckInScreenTest` 的 fontScale=2.0 用例（该护栏不钉本修饰符的存在性）。
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-            // F5-03 / Task 10：三条文字链原来只有 padding(10.dp)（实测 36.19dp 高，不足 48dp 触控下限），
-            // 一律在 clickable 之前补 defaultMinSize(48.dp)；padding 与 testTag/semantics 链保持原样。
-            Text("学习打卡", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.weight(1f))
-            onOpenFavorites?.let { open ->
-                Text("我的收藏", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_favorites").semantics { contentDescription = "打开我的收藏" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
-            }
-            onOpenWrongWords?.let { open ->
-                Text("错词本", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_wrong_words").semantics { contentDescription = "打开错词本" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
-            }
-            Text("返回", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_back").semantics { contentDescription = "返回" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onBack).padding(10.dp))
-        }
+        // Task 22-A §二.1（R-22.3）：页头交给共享 AppScreenHeader，屏侧不留私有页头 Row。
+        // 这里原本是一枚 `Row(fillMaxWidth().horizontalScroll(…))`：那条 `horizontalScroll` 只钉得住
+        // **修饰符顺序**——反写成 `horizontalScroll().fillMaxWidth()` 会让标题的 `weight(1f)` 在无界约束下
+        // 塌成 0 宽（emulator-5574 实测 `DpRect(left = right = 20.190475)`），但 F5-03 / Task 11 已取证：
+        // 它买不到「可滚可达」，真实的大字号症状是标题被 `weight(1f)` 压到 78.48dp 后换行，
+        // `horizontalScroll` 修不了它，当时登记为 L-T11-1「归 UI 重设计轮」。
+        // 这个反例形态的教训现在迁进组件自己：`AppScreenHeader` 的 `Row` 显式 `fillMaxWidth()`，
+        // KDoc 点名「无界宽宿主下标题列会塌宽（CheckInScreenTest 钉过这个反例形态）」。
+        // L-T11-1 的账由「换用统一页头组件」这一动作结，屏侧不留「本轮未收口」的陈旧自述；
+        // 护栏改述见 `CheckInScreenTest.headerKeepsLinksReachableAndTitleReadableAtMaximumLargeFontScale`。
+        AppScreenHeader(
+            title = "学习打卡",
+            onBack = onBack,
+            // F5-03 / Task 10：两条裸文字链（我的收藏 / 错词本）留在组件为行尾内容开的 action 槽里，
+            // testTag / contentDescription / defaultMinSize(48.dp) / padding(10.dp) 逐字不改——
+            // 摘它们按 R-22.1 归 Task 22-B，本席只搬位置。
+            // 原第 84 行那枚私有文字「返回」已删，返回位由组件的 48dp 图标位承载（它的 48dp 与
+            // contentDescription 由 AppScreenHeaderTest.header_back_is_a_48dp_target_with_a_readable_description 钉）。
+            action = {
+                onOpenFavorites?.let { open ->
+                    Text("我的收藏", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_favorites").semantics { contentDescription = "打开我的收藏" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
+                }
+                onOpenWrongWords?.let { open ->
+                    Text("错词本", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_wrong_words").semantics { contentDescription = "打开错词本" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
+                }
+            },
+        )
         when (state) {
             CheckInUiState.Loading -> Text("正在读取打卡记录…", color = MintTextMuted)
             CheckInUiState.Unavailable -> {
@@ -142,15 +150,21 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
     Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_completion_ratio")) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("今日完成度", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+            // Task 22-A §二.2 / R-22.2：那枚裸 hex `#FFF1DB`（奶油环轨道）token 化为现成语义槽 `tint`，
+            // 不新增 AppColorSet 槽（新增会牵动明暗两套装配与三张棘轮，属越面）。
+            // 代价照写：tint 明档 = 0xFFDDF7E8、暗档 = 0xFF1C2C26（theme/AppColors.kt），
+            // 观感从「奶油环」变「薄荷环」，且**暗档下轨道由奶油变深**（此前一枚裸 hex 在明暗两档是同一枚奶油）。
+            // 已登记为 Task 26 目视项。Canvas 的 onDraw 不是 composable 作用域，取色必须在它外面。
+            val ringTrack = appColors().tint
             Box(Modifier.size(132.dp).align(Alignment.CenterHorizontally), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize().testTag("check_in_completion_arc")) {
                     val strokeWidth = 12.dp.toPx()
-                    drawArc(color = Color(0xFFFFF1DB), startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
+                    drawArc(color = ringTrack, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
                     if (ratio > 0f) {
                         drawArc(color = DomainColors.Review.deep, startAngle = -90f, sweepAngle = ratio * 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
                     }
                 }
-                Text("${(ratio * 100).toInt()}%", modifier = Modifier.testTag("check_in_completion_percent"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = DomainColors.Review.deep)
+                Text("${(ratio * 100).toInt()}%", modifier = Modifier.testTag("check_in_completion_percent"), style = AppType.Headline, fontWeight = FontWeight.Bold, color = DomainColors.Review.deep)
             }
             Text("目标 ${today.targetTaskCount} 项，已完成 ${today.completedTaskCount} 项", color = MintTextMuted)
         }

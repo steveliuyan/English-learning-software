@@ -176,7 +176,6 @@ class SharedComponentUniquenessRatchetTest {
             "AiLearningScreen.kt",
             "ArticleImportScreen.kt",
             "ArticleReadingScreen.kt",
-            "CheckInScreen.kt",
             "FavoritesScreen.kt",
             "GlobalVocabularySearchScreen.kt",
             "ImageStudioScreen.kt",
