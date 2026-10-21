@@ -120,7 +120,8 @@ class WordBookWordsScreenTest {
         MultipleFailureException.assertEmpty(failures)
     }
 
-    /** Task 21 / F5-03：相邻字母的命中区不得相交（相交即「点 F 落到后画的字母」，正是压缩槽时代红过的形状）。 */
+    /** Task 21 / F5-03：相邻字母的命中区不得相交（相交即「点 F 落到后画的字母」，正是压缩槽时代红过的形状）。
+     *  覆盖面比退役的 `railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre`（只看 F/G 一对）强：本条逐对扫 A/B … Y/Z 全部相邻对。 */
     @Test
     fun adjacentRailLetterHitAreasDoNotOverlap() {
         showAlphabet()
@@ -569,17 +570,6 @@ class WordBookWordsScreenTest {
         assertTrue("wordbook_words_back 的触控目标应至少 48dp 高，实际=$bounds", bounds.bottom - bounds.top >= 48.dp)
         assertTrue("wordbook_words_back 的触控目标应至少 48dp 宽，实际=$bounds", bounds.right - bounds.left >= 48.dp)
     }
-
-    /**
-     * Task 21 修复轮·退役说明（原 F5-03 / Task 10 的 B3 字母栏代偿护栏
-     * `railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre` 已随竖排压缩槽一并删除）：
-     * 它钉的三条（命中区覆盖槽心 / 不越出整槽 / 不与下一字母重叠）都是**压缩槽时代**的契约，
-     * 版面搬到横向 48dp 芯片后「槽」这个概念不存在。同等契约由这四枚承重且更强：
-     *  - `everyRailLetterIsAFourEightTouchTarget`：26 枚逐枚 ≥48dp 见方 + click action 落在带 tag 的节点自身；
-     *  - `adjacentRailLetterHitAreasDoNotOverlap`：逐对相邻命中区不相交（旧护栏只看 F/G 一对）；
-     *  - `railLettersKeepTheTouchTargetFloorInATinyViewport`：小视口（density 1、400dp 高）不达标即红；
-     *  - `tappingTheRailLetterUsesTheLetterClickAction`：点芯片中心选对字母（旧护栏「点槽心」那一半）。
-     */
 
     /**
      * Task 20-B 修复轮 1 · F1 判据（行为级、可量）：渲染禁用行时，原因串「这个词已不在当前词书中」
