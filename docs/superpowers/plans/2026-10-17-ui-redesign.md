@@ -1939,11 +1939,28 @@ internal val MintBackground: Color
   收窄族 4 规则形状 / 另立组件登记新族 / 给组件加槽三条出路代价均已核过，全部否决，
   改走本步已授权的「写明保留理由」出口（理由与代价已落 `docs/verification/ui-redesign-2026-10.md`），
   该文件在词行族台账里保留为已裁定的长期债务，批 4 重做查词域组件时重新裁决。
-- [ ] **Step 4c（= Task 20-D，新立）：`WordRow` 右列宽度与换行策略**——`meta`/`status` 右列现为
+- [x] **Step 4c（= Task 20-D，新立）：`WordRow` 右列宽度与换行策略**——`meta`/`status` 右列现为
   `widthIn(max = 120.dp)` + `maxLines = 1` + Ellipsis，承载「时间戳 / 出处 / 原因串」这类长文本是**有损位**
   （现场：收藏页 `收藏于 yyyy-MM-dd`、合并页同槽同源；F1 那条禁用原因串已由 R-20B.3 改走左列）。
   本任务一次性定策略（加宽 / 允许两行 / 明确「右列只放短标签并把长文本改走左列」为组件口径），
   并让承载长文本的站点**同批改净**，不得单屏分叉。
+  - **R-20D.2（控制者裁定，2026-10-21，本步已按此落地）**：右列按**槽位语义分治**，不整体加宽、不改签名增槽——
+    `meta` 的 `maxLines` 由 1 改为 **2**（保留 `TextOverflow.Ellipsis` 作第三行兜底，它是自由文本承载位，
+    截断即用户可见的信息丢失）；`status` **维持单行 + Ellipsis**（短状态标签）；右列 `widthIn(max = 120.dp)`
+    **不加宽**（加宽挤压左列 `lemma`/`gloss` 阅读主体，比截断更坏）。
+    **代价（照实记）**：`meta` 换行时行高增高、右列不再与左列首行等高；`fontScale 2.0` 档下两行预算仍装不下
+    `加入于 <日期时间>` 全串，按组件既有口径以省略号退化（不靠裁切），故大字号轮判**策略腿**（额度/上限/占行/裁切）
+    而不判「整句可见」。验收一律以布局级判据为准，不以观感为准。
+    代码面只动 `WordRow.kt` 一枚 `maxLines` 字面量（`status`/`lemma`/`gloss` 三枚与 `widthIn(max = 120.dp)` 原样）。
+  - **落地取证（提交序：取证先行、组件改动随后，两枚不合并）**：四站点各补布局级不截断判据
+    （`FavoritesScreenTest`、`MyWordsScreenTest` 两枚新方法与既有 12 枚并存），天然红样 `maxLines=1`
+    留档 `t20D-RED-*.log`；收藏页/错词页独立屏仍在导航树上（`AppScreen.kt` 打卡页两枚入口可达），
+    故按「补冒烟」这一支各立一类。重算命令：
+    `grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/{FavoritesScreen,MyWordsScreen}.kt`（四枚站点）、
+    `grep -n "textLayout\|maxLines\|fontScale" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt`（判据在册）。
+    两枚契约**无需同步**（未增槽、未改宽度、取色表一字未动）：`WordRowSpeakerContractTest` 只钉 `lemma` 单行与
+    `gloss` 两行两枚正则，`SharedComponentGeometryContractTest` 的 `maxLines = 1` 枚数钉在 `EntryRow.kt` 而非本组件，
+    重算命令 `grep -n "maxLines" app/src/test/java/com/example/englishlearning/ui/WordRowSpeakerContractTest.kt app/src/test/java/com/example/englishlearning/ui/SharedComponentGeometryContractTest.kt`。
   - **R-20D.1（口径更正，2026-10-21 实核）**：受影响面是**两文件四站点**，不是「三屏」。
     实核 `grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/{FavoritesScreen,MyWordsScreen,WrongWordsScreen,WordBookWordsScreen}.kt`
     得 `FavoritesScreen.kt:144`（`收藏于 yyyy-MM-dd`）、`MyWordsScreen.kt:167`（同文）、

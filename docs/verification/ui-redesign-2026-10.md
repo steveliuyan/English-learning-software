@@ -214,31 +214,49 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   立论不成立；给 `WordRow` 加槽 = 签名口袋化并牵动取色表与逐槽对比契约。**决定**：三者都不做，
   走计划 Task 26 Step 3 授权的第二出口「seed 归零**或写明保留理由**」，本文件即那份「保留理由」。
   **代价**：词典搜索结果行保留一份私有版式，本轮 UI 不收敛；批 4 重做查词域组件时必须重新裁决。
-- **F2 / 右列宽度策略（挂 Task 20-D）**：`WordRow` 右列的 120dp 上限 + 单行省略，对「时间戳/原因串」
-  是有损承载位（收藏页 `收藏于 yyyy-MM-dd` 在放大字号下即触顶；与本批已关闭的合并页同源）。
-  **不得单屏改**（会让合并页与收藏页分叉）。Task 20-D 是组件级裁决：右列宽度/换行策略一次性定，
-  前置是先把承载长文本那两屏的**渲染级** connected 取证补上（本仓现状见下一条 R-20D.1 的拆分：
-  收藏页独立屏与错词页独立屏连渲染级用例都没有，合并页有渲染级但只到文本层、读不到截断，
-  截断只在布局层暴露）。重算命令：`grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`。
+- **F2 / 右列宽度策略（Task 20-D 已落地，裁定 R-20D.2；原稿「挂 Task 20-D」的陈述作废）**：
+  `WordRow` 右列的 120dp 上限 + 单行省略，对「时间戳/原因串」是有损承载位（收藏页 `收藏于 yyyy-MM-dd`
+  在放大字号下即触顶；与合并页同槽同源）。**不得单屏改**（会让合并页与收藏页分叉），故本项按组件级裁决一次性定：
+  **`meta` 的 `maxLines` 由 1 改为 2**（保留 `TextOverflow.Ellipsis` 作第三行兜底）、**`status` 维持单行 + Ellipsis**
+  （短状态标签）、**右列 `widthIn(max = 120.dp)` 不加宽**（加宽挤压左列 `lemma`/`gloss` 阅读主体，比截断更坏）、
+  **不改签名不增槽**（`WordRowSpeakerContractTest` 取色表与 `SharedComponentGeometryContractTest` 枚数因此无需同步，
+  重算命令 `grep -n "maxLines" app/src/test/java/com/example/englishlearning/ui/WordRowSpeakerContractTest.kt app/src/test/java/com/example/englishlearning/ui/SharedComponentGeometryContractTest.kt`
+  ——命中的是 `lemma`/`gloss` 两枚正则与 `EntryRow.kt` 的枚数，均不在本组件）。
+  **代价（照实记）**：① `meta` 换行时该词行行高增高、右列不再与左列首行等高（`verticalAlignment = CenterVertically`
+  下整行一起长）；② `fontScale 2.0` 档下两行预算仍装不下 `加入于 <日期时间>` 全串，按组件既有口径以省略号退化
+  （`WordRow.kt` KDoc「fontScale 2.0 下靠省略号退化，不靠裁切」），所以大字号轮判**策略腿**（额度 ≥2、上限 ≤120dp、
+  第二行真被占上、逐行不伸出文本盒 + 字号哨兵）而不判「整句可见」，整句可见腿只在组合级钉 `fontScale = 1f` 的判据里判；
+  ③ 验收一律以布局级判据为准，不以观感为准。取证与改动分两枚提交（取证先行）：
+  `91a57ec`（四站点布局级判据 + 收藏/错词独立屏冒烟，天然红 `t20D-RED-*.log`）→ `efd08e1`（`WordRow.kt` 一枚 `maxLines`）。
 - **R-20D.1（影响面取证口径实核，2026-10-21 更正本文件与计划 Step 4c 的原稿）**：
   ① 真正受右列 120dp 影响的是**两文件四站点**，不是「三屏同改」：`FavoritesScreen.kt:144`、
   `MyWordsScreen.kt:167`、`MyWordsScreen.kt:224`、`MyWordsScreen.kt:234`
   （前两枚 `收藏于 yyyy-MM-dd`，后两枚 `加入于 <日期时间>`）。
   `WrongWordsScreen.kt:127-131` 只传 `lemma`+`gloss`、**不传 `meta`/`status`** ⇒ 不受右列影响，本任务不需要改它；
-  `WordBookWordsScreen.kt:267` 传的是短状态标签，属「右列只放短标签」的正例，留作策略选定后的对照。
+  `WordBookWordsScreen.kt` 传的是短状态标签（`status = row.status.statusLabel()`，属「右列只放短标签」的正例，
+  留作策略选定后的对照；该行号随 Task 21 与本批注释已漂，按锚点重算
+  `grep -n "status = row.status.statusLabel()" app/src/main/java/com/example/englishlearning/ui/WordBookWordsScreen.kt`）。
   重算命令：`grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/{FavoritesScreen,MyWordsScreen,WrongWordsScreen,WordBookWordsScreen}.kt`
-  ② **取证缺口的准确形状**（原稿「收藏页与错词页没有任何用例渲染它们」只对了一半，且漏了合并页的另一半缺口）：
-  收藏页与错词页的**独立屏**确实零渲染级用例——上面那条重算命令只命中 `MyWordsScreenTest.kt`，
+  ② **取证缺口的准确形状**（原稿「收藏页与错词页没有任何用例渲染它们」只对了一半，且漏了合并页的另一半缺口；
+  本条描述的是**补取证之前的现盘**，现状重算 `grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/androidTest`
+  已命中新立的 `FavoritesScreenTest.kt`/`WrongWordsScreenTest.kt`）：
+  收藏页与错词页的**独立屏**当时确实零渲染级用例——上面那条重算命令只命中 `MyWordsScreenTest.kt`，
   而它的 `:160`/`:214` 两处命中**都在注释里**（描述缺陷形状，不是挂屏）；
   但**合并页 `MyWordsScreen` 是挂着的**（`:226-231` 一次 `setContent` 喂三段真实 `UiState`，
   `:234` 断 `收藏于 2026-10-19` 存在、`:235` 断带时分的旧档不存在、`:237` 反向控 `加入于 2026-10-19 00:30`）。
   ⇒ 合并页的缺口不是「没渲染」而是**「渲染了但只到文本层」**：`onNodeWithText` 匹配的是语义全文，
   节点被 Ellipsis 截断时它照样绿，所以四站点全仓**没有任何布局级不截断判据**
-  （重算命令：`grep -n "textLayout\|maxLines\|fontScale" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt` 现盘零命中，
-  该类也没有 `font_scale 2.0` 轮）。
-  ③ **因此 Task 20-D 的前置取证定形为**：给四站点各补一枚**布局级**判据（`textLayout()` 读宽度与 `maxLines`，
-  形同 `b76f133` 给禁用行补的 `disabledRowShowsTheUnavailableNoticeInFull`），并在 `font_scale 2.0` 轮跑一遍；
-  收藏页/错词页独立屏若要保留则各补一枚渲染级冒烟用例，若已归并进合并页则由合并页取证覆盖并在报告写明。
+  （**下述取证落地前的现盘形状**；现盘重算命令 `grep -n "textLayout\|maxLines\|fontScale" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt`
+  已有多枚命中，登记值 `现盘零命中` 只作历史口径保留，该类也没有 `font_scale 2.0` 轮）。
+  ③ **前置取证已按这枚定形落地（Task 20-D，取证提交先于组件提交）**：四站点各补一枚**布局级**判据
+  （`textLayout()` 读宽度与 `maxLines`，形状取自 `b76f133` 的 `disabledRowShowsTheUnavailableNoticeInFull`；
+  合并页三站点在 `MyWordsScreenTest` 内同一次 `setContent` 逐枚判，收藏站点在 `FavoritesScreenTest`）；
+  收藏页/错词页独立屏**仍在导航树上**（`AppScreen.kt:1125`/`:1132`，打卡页两枚入口可达，重算
+  `grep -n "FavoritesScreen(\|WrongWordsScreen(" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt`）
+  ⇒ 走「各补一枚渲染级冒烟用例」这一支，新立 `FavoritesScreenTest`（`OK (2 tests)`）与 `WrongWordsScreenTest`（`OK (2 tests)`）；
+  合并页类由 12 枚增至 14 枚（`OK (14 tests)`，枚数重算 `grep -c "    @Test" app/src/androidTest/java/com/example/englishlearning/ui/MyWordsScreenTest.kt`）；
+  `font_scale 2.0` 轮已跑（设备级 `settings put system font_scale 2.0` 前后各回显、收工回 `1.0`，
+  新判据另在组合级各钉 `1f`/`2f`，见上一条 F2 的代价②）。天然红样留档 `t20D-RED-*.log`（实测 `maxLines=1`）。
 - **F4（改名逃逸残形，登记不修）**：族 4 的 forbidden 形状就是「顶层私有 `*Row*` 函数体窗口」，
   把私有行函数改成不含 `Row` 的名字即可离开窗口规则；R-20B.2 撤销绝对 pin 后，这条残形不再被任何断言挡
   （它本来也只被「seed 恰等于六枚」顺带挡住，而那条与本族递减互斥）。口径：这是 R-13.1 计划本身定义的残形，
