@@ -143,6 +143,18 @@ AiSpeech.deep≈4.1:1 为临界值，徽标信息与同行标题重复属装饰�
     护栏钉的是既有性质、只防退化不推改善，不得读成「已按整槽收口」。
     真正 48dp 需让轨道可滚动/分页/减少常驻数，属信息架构级改动 → **归 UI 重设计轮**（先改 Spec 再实施）。
     矩阵登记口径见 `docs/verification/f5-03-accessibility-hardening-2026-10.md` 的触控节。
+  - **本豁免已于 2026-10-21 清偿（UI 重设计轮批 3 Task 21，Spec §7 移交账同批勾账）**：
+    字母索引不再走「竖排常驻 26 槽」的信息架构，改为**正文上方横向可滚的 26 枚 48dp 见方字母芯片**
+    （`WordBookWordsAlphabetRail`；48dp 下限钉在带 `clickable` 的节点自身 `sizeIn(minWidth/minHeight = 48.dp)`，
+    相邻芯片 `spacedBy(2.dp)` 使命中区两两不相交，横向滚动容器解决「26×48dp 超屏高」）。
+    上面两条「不可达」前提因此在新版面下不再成立：屏高约束由横向滚动承担，重叠约束由 2dp 间距 + 不叠加
+    `minimumInteractiveComponentSize()` 的自绘芯片承担（芯片自己就是 48dp 可点区，无需外扩）。
+    **整轨 `pointerInput` 拖动面=压缩槽时代的代偿输入路径，随压缩槽一并退役**，
+    其等价契约改由 tap 时代用例承重（`everyRailLetterIsAFourEightTouchTarget` 48dp 见方、
+    `adjacentRailLetterHitAreasDoNotOverlap` 相邻不相交、`railLettersKeepTheTouchTargetFloorInATinyViewport`
+    小视口不退化、`tappingTheRailLetterUsesTheLetterClickAction` 点中即落到该字母、
+    `tappingAMissingLetterUsesTheNextAvailableGroup` 保留「点缺失字母跳字母序最近下一组」）。
+    重算命令：`adb -s emulator-5574 shell am instrument -w -e class com.example.englishlearning.ui.WordBookWordsScreenTest com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`。
 - 动态字体：按钮/卡片容器固定 `height(N.dp)` → `heightIn(min = N.dp)`（逐点清单见计划 Task 11）；
   Canvas 图表保留固定高（绘制几何），但日历单元 `height(34.dp)` → `heightIn(min = 34.dp)`；
   chip 行加 `horizontalScroll`；`maxLines` 处补 `overflow = TextOverflow.Ellipsis`。

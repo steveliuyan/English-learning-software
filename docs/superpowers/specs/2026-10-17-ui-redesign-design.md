@@ -202,7 +202,7 @@
 
 | 事项 | 现状 | 本轮处置 |
 |---|---|---|
-| 字母 Rail 真 48dp | 视觉 48 但可点区不足，需信息架构级改动 | 批 3 随「词表」屏重排一起做 |
+| 字母 Rail 真 48dp | 视觉 48 但可点区不足，需信息架构级改动 | **已完成（批 3 Task 21，2026-10-21）**：索引改顶部横向可滚 26 枚 48dp 见方字母芯片、整轨拖动代偿随压缩槽退役；口径见 `docs/decisions/2026-10-15-f5-03-accessibility-hardening-semantics.md` §5 清偿段与 `docs/verification/f5-03-accessibility-hardening-2026-10.md` §5 站点 4 清偿段 |
 | `fontScale` 大字号头部挤压 | `CheckInScreen.kt:66-73` 注释自认归本轮 | 批 1 定 Header 版面 + 批 3 逐屏验收 |
 | 喇叭药片放大 | 触控不足 | 批 1 组件样张已画，批 2 落地 |
 | `ClickableText` 逐词 | 无障碍朗读不逐词 | 批 3（与 `AppIcons`/组件收口同批） |

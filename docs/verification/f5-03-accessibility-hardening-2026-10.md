@@ -7,7 +7,7 @@
 ## 0. 结论口径（红线，不得越界）
 
 - **AC5-03 = 代码侧完成 + connected 语义断言；设备 TalkBack 走查归 `docs/handoff/2026-10-15-qa-round3-task.md` 第三轮任务书。设备轮未完成前，本文档与矩阵一律不得宣称「AC5-03 全绿 / 已验证」。**
-- 触控：8 个站点中**代码侧 7 站达成 48dp**、真正**有 connected 尺寸断言且全绿的只有 6 站**（站点 1/2/3/5/6/7，类名逐站配对见 §5）；第 4 站词书字母 Rail 显式豁免（命中区 ≈24×13dp，纵向未铺满整槽；代偿=整槽内命中 + 整轨拖动）；第 8 站 Favorites/WrongWords 返回链**只作代码级 `.defaultMinSize`，两屏无 connected 测试类、零设备取证**（`L-T11-4 / D-8`）。**禁止**读作「触控全部达标」「7 站均有设备级断言」或「命中区铺满整槽」。
+- 触控：8 个站点中**代码侧 7 站达成 48dp**、真正**有 connected 尺寸断言且全绿的只有 6 站**（站点 1/2/3/5/6/7，类名逐站配对见 §5）；第 4 站词书字母 Rail 本阶段显式豁免（当时命中区 ≈24×13dp，纵向未铺满整槽；代偿=整槽内命中 + 整轨拖动）——**该豁免已于 2026-10-21 UI 重设计轮批 3 Task 21 清偿为真 48dp 并有设备级断言，见 §5 站点 4 清偿段**；第 8 站 Favorites/WrongWords 返回链**只作代码级 `.defaultMinSize`，两屏无 connected 测试类、零设备取证**（`L-T11-4 / D-8`）。**禁止**读作「触控全部达标」「7 站均有设备级断言」或（清偿前）「命中区铺满整槽」。
 - 动态字体：护栏钉「不为 0 宽 + 链接可达 + 高度有下限」，**不宣称「大字号不破版」**；三处 `fillMaxWidth().horizontalScroll()` 取证为版面 no-op，**禁止**读作「头部溢出已由 T11 修复」。
 - liveRegion 容器反证（Task 10 M-6「删容器必红」RED 留痕）**未跑**，收口口径=**静态闭合**（评审 §③ 已封掉四种伪修形状），本文档如实写「未跑反证、静态闭合」，不写「已 RED 取证」。
 
@@ -79,7 +79,7 @@
 
 ## 5. 触控 48dp 批（决策 §5，Task 10）
 
-**代码侧 7/8 站点达成 48dp；connected 尺寸断言只覆盖其中 6 站**：`42a43ae`（48dp 8 站点）→ `1ad0cdd`（N-4 详情页容器）→ `d62c36b`（N-1/N-2/N-3）。connected 尺寸断言 6 类全绿；**类名与站点号逐站配对（按 `task-10-report.md` §1–§8 的站点账，勿按本句罗列顺序逐位对读）**：站点 1 WordCard 喇叭 → `WordCardScreenTest`、站点 2 CardDetail 喇叭 → `CardDetailScreenTest`、站点 3 WordBookWords 返回链 → `WordBookWordsScreenTest`、站点 5 LearningRecords 返回链 → `LearningRecordsScreenTest`、站点 6 Licenses `‹` → `LicensesScreenTest`、站点 7 CheckIn 三链接 → `CheckInScreenTest`。站点 4（字母 Rail，显式豁免）与站点 8（Favorites/WrongWords，零取证）不在此集合。六站点走过「main 文件整批退回 `0c014cb` 观察 RED 32.0–36.19dp → checkout 还原转绿」。
+**代码侧 7/8 站点达成 48dp；connected 尺寸断言只覆盖其中 6 站**：`42a43ae`（48dp 8 站点）→ `1ad0cdd`（N-4 详情页容器）→ `d62c36b`（N-1/N-2/N-3）。connected 尺寸断言 6 类全绿；**类名与站点号逐站配对（按 `task-10-report.md` §1–§8 的站点账，勿按本句罗列顺序逐位对读）**：站点 1 WordCard 喇叭 → `WordCardScreenTest`、站点 2 CardDetail 喇叭 → `CardDetailScreenTest`、站点 3 WordBookWords 返回链 → `WordBookWordsScreenTest`、站点 5 LearningRecords 返回链 → `LearningRecordsScreenTest`、站点 6 Licenses `‹` → `LicensesScreenTest`、站点 7 CheckIn 三链接 → `CheckInScreenTest`。站点 4（字母 Rail，本阶段显式豁免 → 批 3 Task 21 已清偿，见下）与站点 8（Favorites/WrongWords，零取证）不在此集合。六站点走过「main 文件整批退回 `0c014cb` 观察 RED 32.0–36.19dp → checkout 还原转绿」。
 
 **站点 8 的缺口必须单独记账（终审 C 的 IM-2）**：站点 8 = Favorites / WrongWords 返回链
 （`FavoritesScreen.kt:78` / `WrongWordsScreen.kt:70`）本轮**只加代码级 `.defaultMinSize(48.dp)`**，
@@ -87,10 +87,10 @@
 缺口记 L2 → 升级措辞后为 **L-T11-4 / D-8**）。所以「7/8 达成」是**代码侧**计数，
 不得与「connected 6 类全绿」并读成「7 站都有设备级断言」。
 
-**站点 4 = 词书字母 Rail，显式豁免（有据偏离，非漏改；站点 1–8 编号取 `task-10-report.md` 的站点账，站点 8 为 Favorites/WrongWords 返回链）**：
-- 算术不可达：Rail 常驻 26 槽、`slotPixels = min(18dp, maxHeight/26)`，26×48dp=1248dp 超屏高，且相邻 48dp 方形目标必然重叠、会抢走相邻字母 tap（实测：加 `minimumInteractiveComponentSize()` 后既有用例 `tappingTheActualRailSlotUsesTheLetterClickAction` 转红）。
-- 代偿护栏 `railLetterHitAreaStaysInsideItsSlotAndCoversItsCentre`：命中区覆盖槽心、不越出整槽、不与相邻字母重叠。**现状命中区 ≈24×13dp（槽 24×18dp），纵向并未铺满整槽**——该站本轮**零行为改动**，护栏钉的是既有性质、只防退化不推改善，**不得读成「已按整槽收口」**。整轨拖动（`pointerInput`）为等效输入路径。
-- 真 48dp 需让轨道可滚动/分页/减少常驻数 = 信息架构级改动 → 归 UI 重设计轮（先改 Spec 再实施）。豁免依据见决策 §5 字母栏豁免注记（`a422039` 回写）。
+**站点 4 = 词书字母 Rail：本阶段显式豁免 → 2026-10-21 由 UI 重设计轮批 3 Task 21 清偿（真 48dp，非放宽判据；站点 1–8 编号取 `task-10-report.md` 的站点账，站点 8 为 Favorites/WrongWords 返回链）**：
+- 本阶段口径（保留原文，勿改读）：Rail 常驻 26 槽、`slotPixels = min(18dp, maxHeight/26)`，26×48dp=1248dp 超屏高，且相邻 48dp 方形目标必然重叠、会抢走相邻字母 tap（实测：加 `minimumInteractiveComponentSize()` 后既有用例 `tappingTheActualRailSlotUsesTheLetterClickAction` 转红）。当时命中区 ≈24×13dp（槽 24×18dp），整轨拖动（`pointerInput`）为等效输入路径。
+- **清偿后的版面**：字母索引搬到正文上方，横向可滚的 26 枚 **48dp 见方**字母芯片；48dp 下限钉在带 `clickable` 的节点自身（`sizeIn(minWidth = 48.dp, minHeight = 48.dp)`），相邻芯片 `spacedBy(2.dp)` 使命中区不相交；整轨拖动面与压缩槽一并退役。设备级断言形状：A–Z 逐枚 ≥48dp 见方 + 逐对相邻不相交 + `Density(1f)`/400dp 高小视口下不跌破下限 + tap 落到正确字母 + 点缺失字母跳字母序最近下一组。
+- 重算命令（不写绝对数，用例名即判据）：`adb -s emulator-5574 shell am instrument -w -e class com.example.englishlearning.ui.WordBookWordsScreenTest com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`；点名用例 `everyRailLetterIsAFourEightTouchTarget`、`adjacentRailLetterHitAreasDoNotOverlap`、`railLettersKeepTheTouchTargetFloorInATinyViewport`、`tappingTheRailLetterUsesTheLetterClickAction`、`tappingAMissingLetterUsesTheNextAvailableGroup`。豁免依据与退役说明见决策 §5 字母栏注记的清偿段（`a422039` 回写 → Task 21 清偿）。
 
 ## 6. 动态字体批与固定高保留清单（决策 §5，Task 11）
 
@@ -120,7 +120,7 @@
 
 | 站点 | 形态 | 处置 |
 |---|---|---|
-| `WordBookWordsScreen.kt:318` | `.height(slotHeight)`（变量高度） | 字母 Rail 槽高，豁免依据=决策 §5 字母栏注记；归重设计轮 |
+| `WordBookWordsScreen.kt:318` | `.height(slotHeight)`（变量高度） | **已随批 3 Task 21 退役**：压缩槽版面整体删除（该 `.height(slotHeight)` 现盘零命中，重算 `grep -c "slotHeight" app/src/main/java/com/example/englishlearning/ui/WordBookWordsScreen.kt` 得 `0`），字母索引改 48dp 见方芯片；豁免依据与清偿说明见决策 §5 字母栏注记 |
 | `AiFeatureScreen.kt:84` | `size(44.dp)` 含字徽标 | fontScale≥1.5 字形顶出底块 → 归重设计轮 + 设备走查 |
 | `SettingsScreen.kt:395` | `size(32.dp)` 含字徽标 | 同上，fontScale 顶档破版 → 归重设计轮 + 设备走查 |
 
@@ -222,12 +222,12 @@ bash scripts/secret-scan.sh
 - **揭晓焦点播报**、liveRegion 容器空态 `spacedBy` 幽灵间距版面确认。
 - **动态字体顶档不破版**：`fontScale` 逐档走查，**必须含 `fontScale = 3.0` 与真机 MIUI 档**（connected 护栏只覆盖 2.0 档；按几何推演 3.0 档三条 48dp 链会吃满 370.6dp 内容宽、标题很可能已 <48dp，HEAD 代码在该档会让护栏变红）。同时取证：`AiFeatureScreen.kt:84 size(44.dp)`、`SettingsScreen.kt:395 size(32.dp)` 两处含字徽标顶档破版；放大后喇叭药片（≈60dp）与音标行/相邻按钮的打架情况。
 - **深色走查**（Compose 侧深色完全未落地，token 化归 UI 重设计轮）。
-- 字母栏触控实际可达性（≈24×13dp 命中区在真手指下的可命中率）。
+- ~~字母栏触控实际可达性（≈24×13dp 命中区在真手指下的可命中率）~~ → 版面已于批 3 Task 21 改为 48dp 见方芯片条，旧现象不存在；**改取证新版面**：真手指下横向索引条的命中正确率，以及 26 枚芯片需横向滚动时「尾部字母是否够显眼」（设备级断言已在 `emulator-5574` 绿，真机侧只补手指手感）。
 
 ## 10. 交下来的账（不 silently drop）
 
 - **深色 / 硬编码色 token 化**、**`ClickableText` 逐词读屏**、**对比度 `AiSpeech.deep≈4.1:1` 临界** → UI 重设计轮（决策 §1/§3/§5 显式移交）。
-- **字母栏真 48dp** → UI 重设计轮（轨道可滚动/分页/减常驻数，信息架构级）。
+- **字母栏真 48dp** → **已完成（2026-10-21，UI 重设计轮批 3 Task 21）**：轨道改为顶部横向可滚的 48dp 见方字母芯片（=本条「轨道可滚动」那一支），整轨拖动代偿随压缩槽退役；详见 §5 站点 4 清偿段与决策 §5 字母栏注记的清偿段。
 - **`spacedBy` 幽灵间距**（liveRegion 常驻容器代价）→ UI 重设计轮版面重排。
 - **契约 helper 未抽公共 fixture**：为不碰 T6 既有类，每个源码扫描契约各带一份 `stripComments` + 扫描守卫，终审批 2 的 `PronunciationIdleFallbackContractTest` 是同款副本（份数现算：`grep -rln 'fun .*stripComments' app/src/test`）。终审裁定「登记、不改实现」（M-2）→ 归下一轮测试面清理批；风险=守卫形状在各副本间漂移。
 - **已知债 M-B1 / M-B2（契约匹配面）**：禁令 1a/2 的正则只锁「恰一个空格 + 同行」形状，压缩空格/换行赋值/`+=` 可逃逸；`stripComments` 的 `//.*` 会吞掉同行 URL 字符串后半段，且禁令 1/2/3 三个类的同款缺陷此前未登记 → 全部写进 §1.1「契约测试匹配面局限」，相关测试 KDoc 的「待整支终审统一处理」承诺改为指向该小节；统一修 `stripComments` 或补登 KDoc 归下次契约面改动，本轮不改判定逻辑。
