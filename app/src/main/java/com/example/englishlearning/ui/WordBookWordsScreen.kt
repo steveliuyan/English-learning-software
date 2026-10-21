@@ -238,8 +238,12 @@ private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) ->
         // Task 20-B（计划 Step 4）：卡内那枚私有 `Column` + 四枚 `Text` 换成共享 [WordRow]。
         // 卡面归调用方（本屏的 enabled/disabled 底色与描边、testTag、可点面都原样保留），行本体只管版式；
         // **不传 onClick**：可点面只有卡那一枚，禁用态由「不挂 clickable」表达。
-        // 禁用行的行墨因此与可用行统一（旧的 `textColor` 双档随私有行一起删掉），设备侧读不到颜色，
-        // 本屏没有任何用例断过禁用墨（判据见 connected `WordBookWordsScreenTest`）。
+        // 禁用行的行墨因此与可用行统一（旧的 `textColor` 双档随私有行一起删掉）。口径更正（Task 20-D 结转 §五.1）：
+        // 「设备侧读不到颜色」不准确——**语义树**读不到取色，但文本节点可以经 `textLayout().layoutInput.style`
+        // 读到 `style.color`（现场证据即同测试类 `activeLetterUsesADifferentColor`，它就在读这一枚）。
+        // 所以「本屏没有任何用例断过禁用墨」是**可测而不测**，不是测不了（重算命令：
+        // `grep -n "layoutInput.style" app/src/androidTest/java/com/example/englishlearning/ui/WordBookWordsScreenTest.kt`）；
+        // 禁用墨若要补取证走这条读法即可，判据仍在 connected `WordBookWordsScreenTest`。
         // 修复轮 1 · F1（控制者裁定 R-20B.3，授权偏离 20-B 派工单槽位映射表第三行）：禁用行原因串 11 枚汉字
         // ≈143dp，走 `meta` 会被右列 `widthIn(max = 120.dp)` + `maxLines = 1` 卡成省略号（设备实测 120.0dp），
         // 呈现层丢信息；改走 `gloss` 槽（左列 weight(1f)、maxLines = 2、无 120dp 上限），`meta` 置空。
