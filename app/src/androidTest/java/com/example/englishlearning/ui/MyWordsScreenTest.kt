@@ -226,10 +226,14 @@ class MyWordsScreenTest {
      * 在 `Ready` 且列表非空时渲染的那行「最近一次标记为「不认识」的词，按到期先后排列。」随屏一起丢了，
      * 全仓 `git grep "按到期先后排列"` 零命中 ⇒ 合并页的错词段比旧页少一层解释，用户读不出这一列按什么排。
      *
-     * 三条腿各挡一种破坏：
+     * 四条腿各挡一种破坏：
      *  ① 逐字 `assertTextEquals` —— 把这句「润色」成别的说法当场红（搬回来的原话不许改）；
      *  ② `my_words_wrong_row_0` 同屏在册 —— 挡「用说明行替换掉列表」这种假修（补一层 ≠ 挤掉词行）；
-     *  ③ 说明行的矩形必须落在 `my_words_section_wrong` 容器内 —— 挡「挂到别的段/段外」。
+     *  ③ 说明行的矩形必须落在 `my_words_section_wrong` 容器内 —— 挡「挂到别的段/段外」；
+     *  ④ **顺序**（22-B 修复轮 2 / R-22B.12）：说明行的 `boundsInRoot().top` 必须 ≤ 第一枚词行的 top
+     *     （容差沿用本方法既有的 `±1f` 形状）—— 挡「把说明行挪到 `forEachIndexed` 之后」。
+     *     复评席已证明 ①②③ 对这种「挪动而不删除」全绿，而旧错词页那行说明在列表**上方**，
+     *     「先解释再列词」正是这层文案的意义：没有 ④，本方法测不出顺序。
      * 空态侧不得出现这行由既有 `empty_sections_show_their_own_honest_copy` 的整段形状间接承重，
      * 本条不复述（一次 `setContent` 是本仓硬约束，两种形态不能塞进同一枚方法）。
      */
@@ -257,6 +261,19 @@ class MyWordsScreenTest {
             true,
             hintBox.top >= containerBox.top - 1f && hintBox.bottom <= containerBox.bottom + 1f &&
                 hintBox.left >= containerBox.left - 1f && hintBox.right <= containerBox.right + 1f,
+        )
+
+        // 第四腿（R-22B.12）：钉**顺序**，不只是在册。前三腿读的是「存在 / 逐字 / 在容器内」，
+        // 把说明行从 cards.forEachIndexed 之前挪到之后（不删文案、不换段、不丢行）三腿照样全绿，
+        // 而旧错词页的这行说明在列表**上方**——「先解释再列词」才是这层文案的意义。
+        // 容差沿用本方法既有的 ±1f 形状（同一把尺子，不新造阈值）。
+        val rowBox = composeRule.onNodeWithTag("my_words_wrong_row_0").fetchSemanticsNode().boundsInRoot
+        assertEquals(
+            "排序说明行必须排在第一枚词行**之上**（先解释再列词）：说明行 $hintBox，第一枚词行 $rowBox。" +
+                "把 `my_words_wrong_order_hint` 挪到 `wrongWordsState.cards.forEachIndexed` 之后，" +
+                "前三腿（逐字 / 同屏在册 / 落在段容器内）全部测不出来，本腿红。",
+            true,
+            hintBox.top <= rowBox.top + 1f,
         )
     }
 
