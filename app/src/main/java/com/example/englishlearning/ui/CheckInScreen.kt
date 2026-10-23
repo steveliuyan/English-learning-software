@@ -3,11 +3,9 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -55,10 +53,8 @@ fun CheckInScreen(
     state: CheckInUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit = {},
-    // F4-01 决策⑦：打卡页是收藏页的唯一入口；ViewModel 未接线时入口整体不渲染。
-    onOpenFavorites: (() -> Unit)? = null,
-    // F4-01 决策⑤：错词本入口与收藏并列，同样按接线与否显隐。
-    onOpenWrongWords: (() -> Unit)? = null,
+    // Task 22-B（R-22.1）：原 `onOpenFavorites` / `onOpenWrongWords` 两枚形参已随头部裸文字链一并摘除；
+    // 收藏与错词能力由合并页 MyWordsScreen 承载，打卡页不再持有这两条入口。
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(MintBackground).verticalScroll(rememberScrollState()).padding(20.dp).testTag("check_in_screen"),
@@ -73,23 +69,12 @@ fun CheckInScreen(
         // 这个反例形态的教训现在迁进组件自己：`AppScreenHeader` 的 `Row` 显式 `fillMaxWidth()`，
         // KDoc 点名「无界宽宿主下标题列会塌宽（CheckInScreenTest 钉过这个反例形态）」。
         // L-T11-1 的账由「换用统一页头组件」这一动作结，屏侧不留「本轮未收口」的陈旧自述；
-        // 护栏改述见 `CheckInScreenTest.headerKeepsLinksReachableAndTitleReadableAtMaximumLargeFontScale`。
+        // 护栏改述见 `CheckInScreenTest.headerTitleStaysReadableAtMaximumLargeFontScale`。
+        // Task 22-B（R-22.1）：F5-03 / Task 10 遗留在 action 槽里的两枚裸文字链（我的收藏 / 错词本）已摘除，
+        // 收藏与错词能力由合并页 MyWordsScreen 承载；组件的 action 无默认值（默认 null），故不再传入。
         AppScreenHeader(
             title = "学习打卡",
             onBack = onBack,
-            // F5-03 / Task 10：两条裸文字链（我的收藏 / 错词本）留在组件为行尾内容开的 action 槽里，
-            // testTag / contentDescription / defaultMinSize(48.dp) / padding(10.dp) 逐字不改——
-            // 摘它们按 R-22.1 归 Task 22-B，本席只搬位置。
-            // 原第 84 行那枚私有文字「返回」已删，返回位由组件的 48dp 图标位承载（它的 48dp 与
-            // contentDescription 由 AppScreenHeaderTest.header_back_is_a_48dp_target_with_a_readable_description 钉）。
-            action = {
-                onOpenFavorites?.let { open ->
-                    Text("我的收藏", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_favorites").semantics { contentDescription = "打开我的收藏" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
-                }
-                onOpenWrongWords?.let { open ->
-                    Text("错词本", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("check_in_open_wrong_words").semantics { contentDescription = "打开错词本" }.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = open).padding(10.dp))
-                }
-            },
         )
         when (state) {
             CheckInUiState.Loading -> Text("正在读取打卡记录…", color = MintTextMuted)

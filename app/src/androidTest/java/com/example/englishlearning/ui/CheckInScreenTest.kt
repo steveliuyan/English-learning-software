@@ -10,8 +10,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertHeightIsAtLeast
-import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.DomainColors
@@ -117,8 +115,6 @@ class CheckInScreenTest {
             CheckInScreen(
                 state = CheckInUiState.Loading,
                 onBack = { backs++ },
-                onOpenFavorites = {},
-                onOpenWrongWords = {},
             )
         }
         composeRule.onNodeWithTag("app_screen_header").assertIsDisplayed()
@@ -129,42 +125,22 @@ class CheckInScreenTest {
     }
 
     /**
-     * F5-03 / Task 10（B2 文字链）：打卡页头部的裸文字链触控目标必须 ≥48dp 见方——它们只有
-     * `padding(10.dp)`（emulator-5574 RED 原文实测 36.190475dp 高，原先记录的「约 40dp」为目测值、已废弃），
-     * 不达标准。
+     * Task 22-B（RED-1 闭集判据）：打卡页页头不再承载「我的收藏 / 错词本」两条裸文字链。
      *
-     * Task 22-A §二.1 的**交接**：本用例原先遍历「收藏 / 错词 / 返回」三枚 tag，返回那一腿现在交回组件——
-     * 屏侧只钉本屏自留的两条链（摘这两条链归 22-B，故它们必须**仍在册**）；返回位的 48dp 与可读描述由
-     * `AppScreenHeaderTest.header_back_is_a_48dp_target_with_a_readable_description` 承重
-     * （该类现盘重算：`grep -c "@Test" app/src/androidTest/java/com/example/englishlearning/ui/AppScreenHeaderTest.kt`）。
-     *
-     * 双口径（dispatch-notes §B）：brief 的 `assertHeightIsAtLeast/assertWidthIsAtLeast`（读裁剪后矩形，
-     * 故先 `performScrollTo()` + `assertIsDisplayed()` 确认在视口内）与既有先例的
-     * `getUnclippedBoundsInRoot`（断真实尺寸）各跑一遍。
+     * RED 阶段（BASE）页头 action 槽里仍钉着这两枚 tag，本条 `assertDoesNotExist` 先红；
+     * GREEN 阶段 22-B 把两枚形参与两条链一并摘除（编译面已咬死：`CheckInScreen` 不再接受
+     * `onOpenFavorites` / `onOpenWrongWords`），这里只以 `onBack` 组页头，两条 tag 必须不存在，
+     * 作为「链不被悄悄补回 action 槽」的闭集护栏保留。收藏 / 错词的全站唯一出口是合并页 `MyWordsScreen`。
      */
-    @Test fun headerTextLinksMeetTheMinimumTouchTarget() {
+    @Test fun openFavoritesAndWrongWordsLinksAreNotRenderedOnCheckInHeader() {
         composeRule.setContent {
             CheckInScreen(
                 state = CheckInUiState.Loading,
                 onBack = {},
-                onOpenFavorites = {},
-                onOpenWrongWords = {},
             )
         }
-        listOf("check_in_open_favorites", "check_in_open_wrong_words").forEach { tag ->
-            assertMinTouchTarget(tag)
-        }
-    }
-
-    private fun assertMinTouchTarget(tag: String) {
-        composeRule.onNodeWithTag(tag).performScrollTo()
-        composeRule.onNodeWithTag(tag).assertIsDisplayed()
-        composeRule.onNodeWithTag(tag).assertHeightIsAtLeast(48.dp)
-        composeRule.onNodeWithTag(tag).assertWidthIsAtLeast(48.dp)
-
-        val bounds = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
-        assertTrue("$tag 的触控目标应至少 48dp 高，实际=$bounds", bounds.bottom - bounds.top >= 48.dp)
-        assertTrue("$tag 的触控目标应至少 48dp 宽，实际=$bounds", bounds.right - bounds.left >= 48.dp)
+        composeRule.onNodeWithTag("check_in_open_favorites").assertDoesNotExist()
+        composeRule.onNodeWithTag("check_in_open_wrong_words").assertDoesNotExist()
     }
 
     @Test fun zero_target_shows_zero_percent() {
@@ -176,41 +152,35 @@ class CheckInScreenTest {
     }
 
     /**
-     * F5-03 / Task 11（§E.2，Task 10 评审 I-4 的护栏）+ Task 22-A §二.1 的改版口径。
+     * F5-03 / Task 11（§E.2，Task 10 评审 I-4 的护栏）+ Task 22-A §二.1 的改版口径 + Task 22-B 摘链后的口径。
      *
      * **本用例钉的形状已随统一页头改版换掉了宿主**：原先它钉的是屏侧私有页头 `Row` 的修饰符顺序
      * （`fillMaxWidth()` 在前、`horizontalScroll` 在后）与它带来的标题塌宽反例；Task 22-A 把页头交给共享
      * [com.example.englishlearning.ui.components.AppScreenHeader] 后，那条私有 `Row` 与 `horizontalScroll`
      * 都不存在了，`horizontalScroll` 反例形态的教训迁进了组件自己的宿主（`AppScreenHeader` KDoc 已写明
      * 「`Row` 显式 `fillMaxWidth()`：无界宽宿主下标题列会塌宽（`CheckInScreenTest` 钉过这个反例形态）」），
-     * L-T11-1 的账由「换用统一页头组件」这一动作结。本用例因此改述为钉**改版后仍然成立**的两条可观测性质：
-     *  1. `fontScale = 2.0`（Android「字体大小」上限档，AC-R-07 钉的口径）下本屏自留的两条文字链仍能
-     *     `performScrollTo()` 后进入视口——口径照本文件既有 `assertMinTouchTarget`，钉「链不因头部改版而变得不可达」；
-     *  2. 页头标题列不得塌成 0 宽：阈值 ≥48dp。反例形态是 `horizontalScroll().fillMaxWidth()`
-     *     （emulator-5574 实测塌成 `DpRect(left = right = 20.190475.dp)` 即 0dp），组件的显式
-     *     `fillMaxWidth()` 就是为它写的。**这条仍是本护栏的证伪力来源**，摘掉组件那枚 `fillMaxWidth()`
-     *     会立刻被钉住。
+     * L-T11-1 的账由「换用统一页头组件」这一动作结。
      *
-     * 返回位的 48dp 与描述在 2.0 档下不在本用例里钉（那一腿归组件，见上方
-     * `headerTextLinksMeetTheMinimumTouchTarget` 的 KDoc）；若组件用例在 `fontScale 2.0` 下没钉过返回位，
-     * 本席不扩面补，已登记给 Task 26。
+     * Task 22-B（R-22.1）摘除打卡页两条裸文字链后，本用例不再钉「链可达」那一腿（链已不存在，钉它的
+     * `headerTextLinksMeetTheMinimumTouchTarget` 已随摘链一并删除），只保留改版后仍然成立、且仍是本护栏
+     * 证伪力来源的一条可观测性质：
+     *  1. 页头标题列不得塌成 0 宽：阈值 ≥48dp。反例形态是 `horizontalScroll().fillMaxWidth()`
+     *     （emulator-5574 实测塌成 `DpRect(left = right = 20.190475.dp)` 即 0dp），组件的显式
+     *     `fillMaxWidth()` 就是为它写的。摘掉组件那枚 `fillMaxWidth()` 会立刻被钉住。
+     *
+     * 返回位（48dp 图标位）的可达性归组件用例 `AppScreenHeaderTest`，本用例不扩面；
+     * 收藏 / 错词入口在 22-B 后已整体下线，其能力护栏见 `MyWordsScreenTest`。
      */
     @Test
-    fun headerKeepsLinksReachableAndTitleReadableAtMaximumLargeFontScale() {
+    fun headerTitleStaysReadableAtMaximumLargeFontScale() {
         composeRule.setContent {
             val baseDensity = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 2f)) {
                 CheckInScreen(
                     state = CheckInUiState.Loading,
                     onBack = {},
-                    onOpenFavorites = {},
-                    onOpenWrongWords = {},
                 )
             }
-        }
-        listOf("check_in_open_favorites", "check_in_open_wrong_words").forEach { tag ->
-            composeRule.onNodeWithTag(tag).performScrollTo()
-            composeRule.onNodeWithTag(tag).assertIsDisplayed()
         }
         val title = composeRule.onNodeWithText("学习打卡").getUnclippedBoundsInRoot()
         assertTrue(
