@@ -37,6 +37,7 @@ import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
+import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -64,7 +65,10 @@ fun AiFeatureScreen(
     onOpenSettings: () -> Unit,
     onOpenLearning: () -> Unit,
 ) {
-    // 批 3 Task 23（R-23.6）：本屏两枚墨色改走组合期 `appColors()`，深色档不再停在浅套静态值。
+    // 批 3 Task 23（R-23.6）：本屏墨色走组合期 `appColors()`；修复轮 R-23.13 起，落在 **MintPrimary 亮底**上的
+    // 两枚前景再按容器主题归属分档（`if (!LocalIsDark.current) colors.onMint else colors.onBrand`，先例
+    // `AppBottomBar.kt:95`、`GlassButton.kt:78`、`AiProfileSettingsScreen.kt:402/:524`）——AiSpeech 深色档
+    // 仍是亮底（DomainDark base/deep 合一），单迁 `onMint` 在深套就是亮墨压亮底（≈1.49:1，本轮修的 B1）。
     // 顶层 `AiFeatureGradient` 保持静态（Task 3 口径：品牌渐变模式不动），它读的是 `AppleMint*`，
     // 不是本屏的静态读点。
     val colors = appColors()
@@ -168,7 +172,9 @@ fun AiFeatureScreen(
                         .testTag("ai_feature_open_settings")
                         .semantics { contentDescription = "去配置 AI 服务" },
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = colors.onMint),
+                    // R-23.13：容器 MintPrimary 两套皆亮，前景按主题分档（浅 onMint ≈4.62:1 / 深 onBrand ≈7.79:1，
+                    // 比值由 AiBadgeContrastFixTest 按活 token 当场复算）；容器随主题改造归 Task 26/27。
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = if (!LocalIsDark.current) colors.onMint else colors.onBrand),
                 ) { Text("去配置 AI 服务", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenLearning,
@@ -213,9 +219,11 @@ private fun StatusPill(implemented: Boolean) {
             text = label,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            // 「现在能用」档底是 MintPrimary（浅套那枚薄荷主色，旧白字 ≈2.1:1 违规，批 1 已换深字），
+            // 「现在能用」档底是 MintPrimary——深色档同族仍是**亮底**，所以前景按 R-23.13 再分一层档：
+            // 浅档 onMint、深档 onBrand（单迁裸 onMint = 亮墨压亮底 ≈1.49:1，正是本轮 B1 的形状；
+            // 写法取 `AiProfileSettingsScreen.kt:524` 的门控链式同形）。
             // 「未上线」档底是浅 MintTint + MintPrimaryDark 深字；两档底色按裁决保持不变。
-            color = if (implemented) colors.onMint else MintPrimaryDark,
+            color = if (implemented && !LocalIsDark.current) colors.onMint else if (implemented) colors.onBrand else MintPrimaryDark,
         )
     }
 }

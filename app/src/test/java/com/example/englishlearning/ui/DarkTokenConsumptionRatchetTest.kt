@@ -77,8 +77,12 @@ internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     "theme/AppType.kt" to 6,
     "WordAiQaScreen.kt" to 3,
     "ImageStudioScreen.kt" to 2,
-    // Task 23（R-23.6）：`AiFeatureScreen.kt`（原 3 枚）与 `AiLearningScreen.kt`（原 2 枚）两行 seed 已随迁移删除——
-    // 五枚静态读点全部改走 appColors() / appDomain()，逐成员计数归零即摘整行（不是把数字改成 0）。
+    // Task 23（R-23.6）：`AiFeatureScreen.kt`（原 3 枚）整行随迁移摘除——三枚前景全部改走组合期取值，
+    // 修复轮 R-23.13 只在其上补「按容器主题归属分档」的守卫，不新增静态读点，本行保持摘除。
+    // 修复轮 1（R-23.14）：`AiLearningScreen.kt` 一行按 seed 恢复为 2——白胶囊容器主题不变
+    // （`Color.White.copy`，RawColorLiteralRatchet 地盘），批 3 把前景单迁主题访问器属 B1 回归，
+    // 已回退为批前两枚登记静态墨（deep/TextSecondary，理由见站点注记与 `AiBadgeContrastFixTest`）。
+    "AiLearningScreen.kt" to 2,
     "AppScreen.kt" to 3,
     "SentenceAnalysisScreen.kt" to 1,
     "components/glass/GlassOverlay.kt" to 2,

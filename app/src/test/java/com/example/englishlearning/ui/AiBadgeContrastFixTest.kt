@@ -205,7 +205,8 @@ class AiBadgeContrastFixTest {
         val learningSource = uiScreenSource("AiLearningScreen.kt")
         val learningHits: List<String> = staticRead.findAll(learningSource).map { it.value }.toList().sorted()
         assertEquals(
-            listOf("AppPalette.TextSecondary", "DomainColors.AiSpeech.deep"),
+            // 读点记号止于第一段成员名（正则类不含点号）：`DomainColors.AiSpeech.deep` 命中记作 `DomainColors.AiSpeech`。
+            listOf("AppPalette.TextSecondary", "DomainColors.AiSpeech"),
             learningHits,
             "AiLearningScreen.kt 的静态读点必须恰是白胶囊前景那一行登记的两枚（R-23.14 回退形状）：实际 $learningHits。" +
                 "多出来=又长出静态墨；少了=seed 与注记漂移；换成 themed 墨=容器未随主题而前景单迁（B1 形状）",
@@ -261,7 +262,7 @@ class AiBadgeContrastFixTest {
 
     /** 容器是 `MintPrimary` 的按钮调用里 `contentColor` 的实参表达式（`AiFeatureScreen.kt:171` 形状）。 */
     private val mintPrimaryButtonCall = Regex(
-        """buttonColors\(\s*containerColor = MintPrimary(?![A-Za-z]),\s*contentColor = ([^(),\n]+)\)"""
+        """buttonColors\(\s*containerColor = MintPrimary(?![A-Za-z]),\s*contentColor = ((?:[^(),\n]|\([^(),\n]*\))*)\)""",
     )
 
     /**
