@@ -2064,7 +2064,15 @@ internal val MintBackground: Color
     静态锚 `the_merged_page_consumes_and_resets_the_mastery_state` 按构造有牙（`Regex.escape` 逐字 + 限定
     `else if (showMyWords)` 切片），所以这不是无门可守；但老页摘掉后合并页是全站唯一出口，
     静默失败的代价从「少一个框」变成「用户以为已保存」，故摘除批必须补一枚 `AppScreenTest` 端到端用例。
-    现状与漂移检查（重算命令）：`grep -icE "mastery" app/src/androidTest/java/com/example/englishlearning/ui/AppScreenTest.kt` 现盘为 `0`。
+    现状与漂移检查（重算命令）：`grep -icE "mastery" app/src/androidTest/java/com/example/englishlearning/ui/AppScreenTest.kt`
+    （写本段时为 `0`；22-A 落第六枚端到端判据后已 >0，重算即可，本行不抄绝对数）。
+  - **留名（22-A 席位 `118ee98`，依 `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta` 的自述规程）**：
+    本席摘除「今日计划」入口组的生词本行（`today_plan_open_vocabulary`），该判据的闭合集合因此由 **10 → 9**
+    （权威表达式是判据里的 `1 + 1 + 1 + rowTags.size`，散文不抄枚数；重算
+    `sed -n '/val rowTags = listOf(/,/^        )/p' app/src/androidTest/java/com/example/englishlearning/ui/TodayPlanScreenTest.kt`）。
+    改动理由 = 裁决①把生词本并入「我的词」合并页，本屏那行入口成了重复出口，属 Step 1 预告的那次 −1；
+    同批已按三处同步规程对齐（闭合集合判据、`TodayPlanNumberAuthorityTest` 白名单删行、`TodayPlanScreen.kt` KDoc 改述为不抄枚数口径）。
+    本屏在批 3 里到此为止：**22-B 与 Task 26 都不再动今日计划的闭合集合**（22-B 动的是打卡页两条链与两屏下线）。
 - [ ] **Step 2: 写失败测试**：打卡页不再出现裸文字链（`grep` 级契约 + UI 断言「无两条通往收藏/错词的裸文字链节点」）；三统计卡数值口径不变（F4-01 已建的统计口径零改动）。
 - [ ] **Step 3: 实现**：头部两条裸文字链移出；`CheckInScreen.kt:148` 的裸 hex `#FFF1DB` token 化并从 seed 删除；`:66-73` 注释自认「大字号挤压归本轮」的头部换 `AppScreenHeader`，跑 `fontScale 2.0` 护栏（AC-R-07）。
 - [ ] **Step 4: 动效不做**（spec §1 不做的事 #5）：不引入动画代码；在 `docs/verification/ui-redesign-2026-10.md` 记一行「打卡页华丽动效 = 另批，未在本轮范围」。
