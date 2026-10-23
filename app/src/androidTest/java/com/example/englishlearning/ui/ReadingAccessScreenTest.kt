@@ -1,7 +1,9 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -11,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.reading.FeedItem
 import com.example.englishlearning.reading.NotConfiguredReason
@@ -19,6 +22,7 @@ import com.example.englishlearning.reading.domain.ArticleSource
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,6 +76,10 @@ class ReadingAccessScreenTest {
             )
         }
 
+        // 裁决⑤ 第三件后，四枚类型行与偏好区随「生成前参数」出现；这里仍逐枚点数四枚，
+        // 少一枚（搬家时裁掉类型）当场红——判据强度没降，只是多了一步展开。
+        composeRule.onNodeWithTag("reading_generation_params_toggle").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("reading_type_news").assertExists()
         composeRule.onNodeWithTag("reading_type_story").assertExists()
         composeRule.onNodeWithTag("reading_type_science").assertExists().performClick()
@@ -149,13 +157,16 @@ class ReadingAccessScreenTest {
             )
         }
 
+        // `outbound_confirmation_text` 在接共享件后指「本屏的出站确认对话框槽位」而非正文文本节点：
+        // 正文节点的权威锚是共享件自带的 `outbound_confirm_body`，本条同时点名它，锚语义收窄但不脱凭。
         composeRule.onNodeWithTag("outbound_confirmation_text").assertExists()
+        composeRule.onNodeWithTag("outbound_confirm_body").assertExists()
         composeRule.onNodeWithText("api.test", substring = true).assertExists()
         composeRule.onNodeWithText("密钥将发送给", substring = true).assertExists()
-        composeRule.onNodeWithTag("outbound_cancel").assertExists().performClick()
+        composeRule.onNodeWithTag("outbound_confirm_dismiss").assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(false, answered)
-        composeRule.onNodeWithTag("outbound_confirm").assertExists().performClick()
+        composeRule.onNodeWithTag("outbound_confirm_confirm").assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(true, answered)
     }
@@ -181,14 +192,23 @@ class ReadingAccessScreenTest {
 
     @Test
     fun feedEmptyStateIsExplicit() {
+        // 裁决⑤ 第二件：Feed 离开主页内联区。状态照常带进 Ready，但主页一枚都不许画——
+        // 画了就把主任务挤出首屏。状态的正面证据在 ReadingFeedScreenTest。
         composeRule.setContent { readyScreen(feed = FeedUiState.Empty) }
-        composeRule.onNodeWithTag("feed_empty").assertExists()
+        composeRule.onNodeWithTag("feed_empty").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_source_feed").assertExists().assertHasClickAction()
     }
 
     @Test
     fun feedUnreachableStateIsExplicit() {
-        composeRule.setContent { readyScreen(feed = FeedUiState.Unreachable) }
-        composeRule.onNodeWithTag("feed_error").assertExists()
+        var feedOpened = 0
+        composeRule.setContent {
+            readyScreen(feed = FeedUiState.Unreachable, onOpenFeed = { feedOpened++ })
+        }
+        composeRule.onNodeWithTag("feed_error").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_source_feed").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, feedOpened)
     }
 
     @Test
@@ -201,9 +221,70 @@ class ReadingAccessScreenTest {
                 ),
             )
         }
-        composeRule.onNodeWithTag("feed_source").assertExists()
-        composeRule.onNodeWithText("VOA Learning English", substring = true).assertExists()
-        composeRule.onNodeWithTag("feed_item_0").assertExists().assertHasClickAction()
+        // Feed  Ready 曾是最能把主页撑成一页流水账的一档：主页必须对它零渲染。
+        composeRule.onNodeWithTag("feed_source").assertDoesNotExist()
+        composeRule.onNodeWithTag("feed_item_0").assertDoesNotExist()
+    }
+
+    // ---------- Task 24（裁决⑤）：主任务上提第一屏 + 主 CTA 唯一 ----------
+
+    @Test
+    fun mainTaskCtaSitsAboveTheFoldWithoutScrolling() {
+        // 裁决⑤ 第一件：不滚动即可见「今日文章」那枚主 CTA，且它落在首屏上半。
+        // 阈值取根容器高度的一半（设备无关），不写死 dp。
+        // 阈值取根容器高度的一半（`getBoundsInRoot()` 给 DpRect，比较按 Dp 走，不写死像素也不写死 dp 常量）。
+        composeRule.setContent { readyScreen(todayArticle = todayArticle()) }
+        val rootBottom = composeRule.onNodeWithTag("reading_access_screen")
+            .getBoundsInRoot().bottom
+        assertTrue("根容器高度读数异常：$rootBottom", rootBottom > 0.dp)
+        val ctaTop = composeRule.onNodeWithTag("reading_open_today").getBoundsInRoot().top
+        composeRule.onNodeWithTag("reading_open_today").assertIsDisplayed()
+        assertTrue(
+            "今日文章主 CTA 的 top=$ctaTop 必须落在首屏上半（根高=$rootBottom 的一半以下）：主任务被埋进长列就是本件要修的形状",
+            ctaTop < rootBottom / 2f,
+        )
+    }
+
+    @Test
+    fun primaryGenerationCtaAndRegenerateNeverShareTheScreen() {
+        // 主 CTA 数 == 1：无当日文章时是「生成今天的文章」（reading_source_ai），
+        // 已有当日文章时同一位置换成阅读 + 换一篇，两枚生成档锚永不并列。
+        composeRule.setContent { readyScreen(todayArticle = todayArticle()) }
+        composeRule.onNodeWithTag("reading_source_ai").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_regenerate").assertExists().assertHasClickAction()
+    }
+
+    @Test
+    fun regenerateCtaIsAbsentUntilTodayArticleExists() {
+        composeRule.setContent { readyScreen() }
+        composeRule.onNodeWithTag("reading_source_ai").assertExists().assertHasClickAction()
+        composeRule.onNodeWithTag("reading_regenerate").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_open_today").assertDoesNotExist()
+    }
+
+    @Test
+    fun typeChoicesAndPreferenceOnlyAppearAfterTheGenerationParamsToggle() {
+        // 裁决⑤ 第三件：类型与长度偏好不再常驻主页，随「生成前参数」这一次动作出现。
+        var selected: ArticleType? = null
+        composeRule.setContent {
+            ReadingAccessScreen(
+                state = ReadingAccessUiState.Ready(
+                    preference = ReadingPreference("p1", ArticleType.SCIENCE, ArticleLengthTier.LONG),
+                    history = emptyList(),
+                ),
+                onSelectType = { selected = it },
+                onOpenHistory = {},
+            )
+        }
+        composeRule.onNodeWithTag("reading_preference").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_type_science").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("reading_generation_params_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reading_preference").assertExists()
+        composeRule.onNodeWithTag("reading_type_science").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(ArticleType.SCIENCE, selected)
     }
 
     @Test
@@ -228,7 +309,6 @@ class ReadingAccessScreenTest {
         onConfirmOutbound: (Boolean) -> Unit = {},
         onOpenAiSettings: () -> Unit = {},
         onOpenFeed: () -> Unit = {},
-        onFetchFeedItem: (FeedItem) -> Unit = {},
     ) = ReadingAccessScreen(
         state = ReadingAccessUiState.Ready(
             preference = ReadingPreference("p1", ArticleType.STORY, null),
@@ -245,7 +325,6 @@ class ReadingAccessScreenTest {
         onConfirmOutbound = onConfirmOutbound,
         onOpenAiSettings = onOpenAiSettings,
         onOpenFeed = onOpenFeed,
-        onFetchFeedItem = onFetchFeedItem,
     )
 
     private fun historyArticle() = com.example.englishlearning.reading.domain.Article(
