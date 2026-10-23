@@ -338,7 +338,7 @@ class AppScreenTest {
      * 落到 `SubmitFeedbackResult.Recorded` ⇒ `VocabularyMasteryState.Success`），所以这枚判据穿过的是
      * 真 ViewModel、真状态流，不是屏侧注入的假回调。
      *
-     * 反向红凭据（本席留档 `t22A-RED-03-connected-AppScreenTest-hostmastery-wiring.log`）：把宿主
+     * 反向红凭据（本席留档 `t22A-RED-06-connected-AppScreenTest-hostmastery-wiring.log`）：把宿主
      * `MyWordsScreen(...)` 的 `masteryState = vocabularyMasteryState` 换成 `VocabularyMasteryState.Idle`
      * （不动本用例任何被断言字面量的间接路径），本用例即在「结果对话框可见」那一步当场红。
      */
