@@ -167,7 +167,8 @@ class MyWordsScreenTest {
      *
      * m-7（修复轮 2）：这一枚原先只 `assertExists()` 段容器与空态标签，**三句文案本体没有任何判据**——
      * 文案被改成一句话照样绿。评审席要求的正是「逐字文案」承重，所以这里逐段 `assertTextEquals`
-     * 钉回三页旧文（`FavoritesScreen.kt:101` / `VocabularyScreen.kt:63` / `WrongWordsScreen.kt:90`）。
+     * 钉回三页旧文（旧收藏页 :101 / `VocabularyScreen.kt:63` / 旧错词页 :90；收藏页与错词页两枚屏
+     * 已于 Task 22-B 下线，故此处只留中文页名与旧文行号，避免指向已不存在的文件）。
      *
      * 朗读层（m-7 第二半）：旧生词页的空态除了文案还带一条专属 `contentDescription`
      * （`VocabularyScreen.kt:64`「生词本为空，提交不认识后会自动加入」），合并页缺它 ⇒ TalkBack 档比旧页少一层，
@@ -221,9 +222,10 @@ class MyWordsScreenTest {
     /**
      * m-6（修复轮 2）：「收藏于」时间戳与旧收藏页同文——统一取**日期档**（`yyyy-MM-dd`）。
      *
-     * 缺陷形状：`FavoritesScreen.kt:140` 渲染 `收藏于 <yyyy-MM-dd>`（`toLocalDate()`），
+     * 缺陷形状：旧收藏页 `:140`（该屏已于 Task 22-B 下线）渲染 `收藏于 <yyyy-MM-dd>`（`toLocalDate()`），
      * 合并页 `MyWordsScreen.kt:169` 渲染 `收藏于 <yyyy-MM-dd HH:mm>`；同一条收藏在两处读到两种时间。
-     * 摘除前两页并存，必须同文（评审席 m-6 逐字），而合并页自己的注释也写着「说法必须还是同一句」。
+     * 摘除前两页并存，必须同文（评审席 m-6 逐字），而合并页自己的注释也写着「说法必须还是同一句」；
+     * 摘除后这条判据仍是合并页单侧的口径闸——「收藏于」只许读成日期档。
      *
      * 判据为什么咬得住：夹具把时刻钉死为 `2026-10-19T00:30:00Z` + `zoneId = UTC`
      * （不靠设备时区，数字可复算），时分档在这一刻必然写成 `… 00:30` ⇒ 修复前判红；
@@ -545,7 +547,8 @@ class MyWordsScreenTest {
     // ---------------------------------------------------------------------------------------------
     // Task 20-D（计划 Step 4c / R-20D.1③）：合并页三枚 `meta` 站点的**布局级不截断判据**。
     //
-    // 站点（重算：`grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/{FavoritesScreen,MyWordsScreen}.kt`）：
+    // 站点（重算：`grep -rn "meta = " app/src/main/java/com/example/englishlearning/ui/MyWordsScreen.kt`；
+    //  原并列的旧收藏页站点已随该屏于 Task 22-B 下线）：
     //  `MyWordsScreen.kt:167` 收藏段 `收藏于 yyyy-MM-dd`、`:224` 生词本死行 `加入于 <日期时间>`、
     //  `:234` 生词本活行 `加入于 <日期时间>`。R-20D.1② 登记的缺口正是「合并页渲染了但只到文本层」：
     //  `favorite_timestamp_shows_the_same_date_tier_as_the_favorites_page` 一直绿着，而右列当时是
@@ -718,7 +721,8 @@ class MyWordsScreenTest {
     }
 
     /**
-     * 四站点共用的布局级不截断判据（R-20D.2 口径，`FavoritesScreenTest` 同形状）。
+     * 四站点共用的布局级不截断判据（R-20D.2 口径，与旧收藏页那枚同形状冒烟类逐腿同构；
+     * 该类随旧收藏页于 Task 22-B 一并下线，四站点的布局级承重此后只在合并页这一侧在册）。
      *
      * **RED 覆盖账**：现盘天然红只证到第一腿（`maxLines >= 2`，`t20D-RED-*.log` 的栈即停在这里——
      * `assertTrue` 快速失败，后四条腿没能在 `maxLines = 1` 的现盘上各自见红）。它们并非恒真：

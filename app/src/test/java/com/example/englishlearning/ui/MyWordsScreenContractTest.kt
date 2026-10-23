@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -208,16 +209,62 @@ class MyWordsScreenContractTest {
             countMatches(appScreen, Regex("""myWordsSummaryOf\(""")),
             "AppScreen 必须恰一处调用纯函数 myWordsSummaryOf（0 = 规则没接线或在别处内联了第二份，2 = 两处真源）",
         )
-        // 老屏挂载点的反向控，按 R-22.1 的两席拆分收敛：`VocabularyScreen(` 那条老路由已由 22-A 摘除
-        // （合并页生词本段自此是这条通路的全站唯一出口，结果反馈面见上面
-        // the_merged_page_consumes_and_resets_the_mastery_state 与 connected 的宿主端到端用例）；
-        // 收藏页与错词页两枚挂载仍在册，摘除归 22-B。
-        listOf("FavoritesScreen(", "WrongWordsScreen(").forEach { call ->
-            assertTrue(
-                call in appScreen,
-                "旧屏挂载点 $call 不得被摘（摘除归 22-B）",
+    }
+
+    /**
+     * Task 22-B（RED-2 路由闭集）：宿主不再持有 `showFavorites` / `showWrongWords` 两条老通路。
+     *
+     * 判据形状写成「**不存在这两个标识符**」，而不是「存在某句否定注释」——
+     * 22-B 把收藏页 / 错词页两条独立路由整条摘除后，合并页 `showMyWords` 一段是这三族词表能力的唯一出口，
+     * 因此 `AppScreen.kt` 源码里 `showFavorites` / `showWrongWords` 这两个标识符必须为 0 处。
+     * 摘除前它们仍逐枚在册（状态位、setValue、BackHandler、装载 effect、挂载分支）⇒ 本条先红；
+     * 摘除后仍**有牙**：谁把任一标识符补回宿主，本条当场红，不靠注释自证。
+     */
+    @Test
+    fun the_host_holds_no_favorites_or_wrong_words_routes() {
+        val appScreen = uiScreenSource("AppScreen.kt")
+        listOf("showFavorites", "showWrongWords").forEach { identifier ->
+            assertEquals(
+                0,
+                countMatches(appScreen, Regex("""\b$identifier\b""")),
+                "Task 22-B 后 AppScreen.kt 不得再持有 `$identifier`（0 处 = 老路由已整条摘除；" +
+                    "非 0 = 收藏页/错词页那条独立通路又长回来了，合并页 showMyWords 一段才是这三族词表的唯一出口）",
             )
         }
+    }
+
+    /**
+     * Task 22-B §二.4 / §四.3① 的**闭集判据**（下线型任务的 RED 形状：两枚屏文件还在树上 ⇒ 本条红；
+     * 红样留档 `.superpowers/sdd/2026-10-17-ui-redesign/t22B-cont-RED1-jvm-closure.log`）。
+     *
+     * 两枚旧屏既要从磁盘消失，也要从 `ui/` 源码的**任何文本**里消失（含注释——KDoc 留着旧屏文件名
+     * 就是「引用已不存在的文件」那种假线索，评审复核时会照着去读一个不存在的文件）。
+     *
+     * 为什么不能只靠 `SharedComponentUniquenessRatchetTest`：那条走 `uiScreenSource`，其内置的
+     * `assertTrue(files.size == 1, …)` 会在「屏文件已删但名单还在册」时红；本条钉的是**反向**那一半——
+     * 名单摘干净之后，谁再把两枚屏名写回生产码（新建屏、复活挂载、或把旧文件名留在注释里），本条点名文件。
+     * 磁盘存在性用 `File(...).exists()` 直判，不借 `uiFiles()`：后者是扫描夹具，
+     * 拿它判「不存在」会撞上「空扫即失败」的内置守卫而把判据变成永远红。
+     */
+    @Test
+    fun the_two_legacy_screens_are_off_the_production_tree() {
+        listOf("FavoritesScreen.kt", "WrongWordsScreen.kt").forEach { name ->
+            assertTrue(
+                !File(UI_MAIN_SOURCE_PATH, name).exists(),
+                "Task 22-B 下线判据：$name 必须已从生产树摘除（JVM 工作目录 ${File(".").absolutePath}）——" +
+                    "收藏与错词两族能力的唯一宿主是合并页 MyWordsScreen，屏文件留着就是第二个目的地",
+            )
+        }
+        val offenders = uiFiles()
+            .filter { file ->
+                listOf("FavoritesScreen", "WrongWordsScreen").any { identifier -> identifier in file.readText() }
+            }
+            .map { it.name }
+        assertTrue(
+            offenders.isEmpty(),
+            "ui/ 源码（含注释）里不得再出现 FavoritesScreen / WrongWordsScreen 字样——§四.3① 的闭集面，" +
+                "旧屏名留在注释里等于给后来人留一条指向不存在文件的假线索。实际命中：$offenders",
+        )
     }
 
     /**
@@ -362,8 +409,9 @@ class MyWordsScreenContractTest {
      * 为什么要这一枚静态锚：文案本体的行为判据在 connected（`empty_sections_show_their_own_honest_copy`
      * 现在逐段 `assertTextEquals`），但描述层只在跑设备时才看得见；本锚让「把某句空态改成一句话」
      * 「把生词本那条的 contentDescription 删掉」在不接设备的门控里也当场红。
-     * 三句文案逐字对齐三页旧文（`FavoritesScreen.kt:101` / `VocabularyScreen.kt:63` /
-     * `WrongWordsScreen.kt:90`），描述串逐字对齐 `VocabularyScreen.kt:64`。
+     * 三句文案逐字对齐三页旧文（旧收藏页 :101 / `VocabularyScreen.kt:63` / 旧错词页 :90——
+     * 收藏页与错词页两枚屏已于 Task 22-B 下线，故这里只留中文页名与旧文行号，不再写会被当成现存文件的路径），
+     * 描述串逐字对齐 `VocabularyScreen.kt:64`。
      */
     @Test
     fun empty_states_keep_the_copy_and_the_reading_layer() {

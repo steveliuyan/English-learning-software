@@ -159,7 +159,7 @@ class SharedComponentUniquenessRatchetTest {
      *  - 未配置卡族：R-12.3 ① 已核实（`ImageStudioScreen`/`PhotoTranslationScreen`/
      *    `SentenceAnalysisScreen`/`WordAiQaScreen` 各一份私有定义），批 2/批 3 接线时逐枚删；
      *  - 词行族：spec §3 点名的六个文件为**原始名单**；Task 20-B（计划 Step 4）把其中三屏
-     *    （`FavoritesScreen`/`WrongWordsScreen`/`WordBookWordsScreen`）的行本体换成共享 `WordRow`，
+     *    （收藏页、错词页、`WordBookWordsScreen`）的行本体换成共享 `WordRow`，
      *    按上面「接线完毕就删一行」的口径把这三行从台账删除。剩余行的归属与收法见计划 Step 4b
      *    （`GlobalVocabularySearchScreen.kt` 归 Task 20-C，`LearningRecordsScreen.kt`/`VocabularyScreen.kt`
      *    归本批收口 Task 26 Step 3）。删行的合法性由
@@ -176,7 +176,9 @@ class SharedComponentUniquenessRatchetTest {
             "AiLearningScreen.kt",
             "ArticleImportScreen.kt",
             "ArticleReadingScreen.kt",
-            "FavoritesScreen.kt",
+            // Task 22-B：原在册的 `"FavoritesScreen.kt"` 与 `"WrongWordsScreen.kt"` 两行已摘——两屏随 22-B 下线，
+            // 私有页头随屏消失（摘行门 removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared
+            // 的覆盖面只判「仍在树上且调用 AppScreenHeader(」的根屏，屏不在树上时本门对其无账可核）。
             "GlobalVocabularySearchScreen.kt",
             "ImageStudioScreen.kt",
             "LicensesScreen.kt",
@@ -189,7 +191,6 @@ class SharedComponentUniquenessRatchetTest {
             "WordCardScreen.kt",
             "WorksheetPreviewScreen.kt",
             "WorksheetSettingsScreen.kt",
-            "WrongWordsScreen.kt",
         ),
         "错误提示条（应调 InlineNotice）" to setOf(
             "AppScreen.kt",
@@ -710,18 +711,18 @@ class SharedComponentUniquenessRatchetTest {
     @Test
     fun `word_row family seed is the spec list minus the wired screens and pins the window rule boundary`() {
         val specWordRowFiles = setOf(
-            "FavoritesScreen.kt",
+            // Task 22-B：名单原另含 `"FavoritesScreen.kt"` 与 `"WrongWordsScreen.kt"` 两枚——两屏已随 22-B 下线，
+            // 私有词行随屏消失，spec §3 的「证据」列已同步改述（先改 spec、再改本字面抄录、与删屏文件同枚提交）。
             "GlobalVocabularySearchScreen.kt",
             "LearningRecordsScreen.kt",
             "VocabularyScreen.kt",
             "WordBookWordsScreen.kt",
-            "WrongWordsScreen.kt",
         )
         val seed = componentFamilySeeds.getValue("词行（应调 WordRow）")
         // F3（修复轮 1）：已摘行集合不再抄成字面量——台账的唯一真值是 seed 本身，摘了哪些由差集推导；
         // 下一次合法递减只删台账行、不动本测试本体。
         val wired = specWordRowFiles - seed
-        // ① 名单来源仍然钉死：seed 不得混入 spec §3 名单之外的文件（台账 ∪ 推导出的已摘行 == 六枚，逐枚相等）。
+        // ① 名单来源仍然钉死：seed 不得混入 spec §3 名单之外的文件（台账 ∪ 推导出的已摘行 == spec 名单，逐枚相等）。
         assertEquals(
             specWordRowFiles,
             seed + wired,

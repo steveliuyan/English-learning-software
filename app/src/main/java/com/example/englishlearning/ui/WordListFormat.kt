@@ -20,7 +20,7 @@ import java.time.format.DateTimeFormatter
  * 也不新增用户可见文案（文案逐字继承旧页，见下方各函数注释）。
  */
 
-/** 日期档（`yyyy-MM-dd`）：收藏时间戳用它——旧收藏页 `FavoritesScreen.kt:140` 给的就是这一档。 */
+/** 日期档（`yyyy-MM-dd`）：收藏时间戳用它——旧收藏页给的就是这一档，合并页收藏段逐字继承（旧收藏页屏已于 Task 22-B 下线）。 */
 private val wordListDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 /** 时分档（`yyyy-MM-dd HH:mm`）：生词本条目的加入时间用它——旧生词页 `VocabularyScreen.kt:124` 原样。 */

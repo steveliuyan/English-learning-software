@@ -35,6 +35,8 @@ import com.example.englishlearning.ai.net.AudioHttpTransport
 import com.example.englishlearning.imagegen.DrawingPromptUseCase
 import com.example.englishlearning.imagegen.GeneratedImageStore
 import com.example.englishlearning.imagegen.ImageGenerationUseCase
+import com.example.englishlearning.learning.FavoriteWord
+import com.example.englishlearning.learning.FavoriteWordRepository
 import com.example.englishlearning.learning.LearningEventRepository
 import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
@@ -79,6 +81,8 @@ import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
 import com.example.englishlearning.learning.VocabularyEntry
 import com.example.englishlearning.learning.VocabularyRepository
+import com.example.englishlearning.learning.WrongWord
+import com.example.englishlearning.learning.WrongWordsRepository
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
@@ -364,6 +368,79 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("my_words_mastery_result_dialog").assertDoesNotExist()
         composeRule.onNodeWithText("已标记为掌握").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+    }
+
+    /**
+     * Task 22-B §四.1 RED-3「能力不截断」的**宿主端到端**判据：摘打卡页两条链、摘
+     * `showFavorites` / `showWrongWords` 两条老路由、把收藏页与错词页下线之前，必须先证明合并页
+     * `MyWordsScreen` 的三段真能经宿主走到旧两屏独有的三枚能力——
+     *  ① 收藏详情：点收藏段词行 → `onOpenFavoriteWord` → `favoritesViewModel.open()` 回源 →
+     *     宿主 `selectedFavoriteCard` → `card_detail_screen`；
+     *  ② 取消收藏：点收藏段行内 PillButton → `onUnfavorite` → `favoritesViewModel.toggle()` 落仓储 →
+     *     列表回刷后该行真的消失（并落回收藏段空态）；
+     *  ③ 错词重学入口：点错词段词行 → `onOpenWrongWord` → 宿主 `selectedLearningRecordCard` →
+     *     `card_detail_screen` 的「重新学习」（旧错词页点词进的就是这枚只读详情）。
+     *
+     * 为什么必须新立一枚（§一「先证能力承接，再动任何一行」的铁律）：
+     *  - `MyWordsScreenTest.rows_and_unfavorite_invoke_the_host_callbacks` 与
+     *    `wordbook_offers_relearn_and_mastered_behind_confirmation` 证的是**屏侧**——它们自己传回调，
+     *    宿主那一环（`favoritesViewModel?.open(it)` 等直达 lambda）不在观察面里；
+     *  - 既有宿主用例只覆盖生词本段与掌握结果框，收藏段与错词段的宿主通路一直**未证**。
+     * 老路由摘掉后合并页是这三族词表能力的唯一出口，少接一环时用户看到的是「点了没反应」，
+     * 所以这里喂**真** ViewModel（`favoritesViewModelWithOneWord()` / `wrongWordsViewModelWithOneWord()`），
+     * 不走屏侧注入的假回调。
+     *
+     * 形状约束：一个测试方法只一次 `setContent`（skill §1.2）；详情层与合并页在同一条 `else if` 链上互斥，
+     * 所以每次退详情后都要重新 `performScrollTo()`。
+     */
+    @Test
+    fun mergedPageSectionsReachFavoriteDetailUnfavoriteAndWrongWordRelearnThroughTheHost() {
+        composeRule.setContent {
+            readyAppScreen(
+                favoritesViewModel = favoritesViewModelWithOneWord(),
+                wrongWordsViewModel = wrongWordsViewModelWithOneWord(),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("my_words_favorite_row_0").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("my_words_wrong_row_0").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // ① 收藏详情经宿主：详情层的星标 PillButton 描述由 `favoriteIds`（宿主从同一份收藏状态派生）决定，
+        // 断它读到「取消收藏 ability」同时钉住了「回源词卡对了」与「宿主收藏集合接上了」。
+        composeRule.onNodeWithTag("my_words_favorite_row_0").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("取消收藏 ability").assertIsDisplayed()
+        pressSystemBack()
+        composeRule.onNodeWithTag("card_detail_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_screen").assertExists()
+
+        // ② 取消收藏经宿主：真仓储落库 + 真 reload，所以断的是「那一行消失、段退回空态」而不是「回调被调过一次」。
+        composeRule.onNodeWithTag("my_words_favorite_unfavorite_0").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("my_words_favorites_empty").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("my_words_favorite_row_0").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_wrong_row_0").assertExists()
+
+        // ③ 错词重学入口经宿主：错词行的 onClick 走 `selectedLearningRecordCard` 那条只读详情，
+        // 「重新学习」PillButton 由 `onRelearn` 是否为 null 决定，正是旧错词页独有的那枚出口。
+        composeRule.onNodeWithTag("my_words_wrong_row_0").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("重新学习 achieve").assertIsDisplayed()
+        pressSystemBack()
+        composeRule.onNodeWithTag("card_detail_screen").assertDoesNotExist()
         composeRule.onNodeWithTag("my_words_screen").assertExists()
     }
 
@@ -1733,6 +1810,69 @@ class AppScreenTest {
         )
     }
 
+    /**
+     * 收藏段单条夹具（Task 22-B RED-3）：走**真** `FavoritesViewModel`，仓储是一枚内存假件——
+     * `toggle` 会真的把那行删掉，于是「取消收藏后该行消失」这条能力能被端到端观察到（屏侧用例只观察到回调）。
+     * 词卡由 `PlaceholderWordCardSource` 真回源，`open()` 的一次性事件才会带着词卡回到宿主。
+     */
+    private fun favoritesViewModelWithOneWord(): FavoritesViewModel {
+        val cardId = PlaceholderWordCardSource.cardId("cet4", "ability")
+        return FavoritesViewModel(
+            repository = InMemoryFavoriteWordRepository(
+                mutableListOf(
+                    FavoriteWord(
+                        profileId = "profile-1",
+                        cardId = cardId,
+                        wordBookId = "cet4",
+                        lemma = "ability",
+                        addedAt = java.time.Instant.EPOCH,
+                    ),
+                ),
+            ),
+            cards = PlaceholderWordCardSource(),
+            io = kotlinx.coroutines.Dispatchers.IO,
+        )
+    }
+
+    /** 错词段单条夹具（Task 22-B RED-3）：一条「最近反馈 Again」的派生条目，回源到占位词卡 achieve。 */
+    private fun wrongWordsViewModelWithOneWord(): WrongWordsViewModel {
+        val cardId = PlaceholderWordCardSource.cardId("cet4", "achieve")
+        return WrongWordsViewModel(
+            repository = object : WrongWordsRepository {
+                override suspend fun wrongWords(profileId: String) = Result.success(
+                    listOf(
+                        WrongWord(
+                            cardId = cardId,
+                            wordBookId = "cet4",
+                            lastFeedbackAtEpochMillis = 0L,
+                            nextReviewAtEpochMillis = null,
+                        ),
+                    ),
+                )
+            },
+            cards = PlaceholderWordCardSource(),
+            io = kotlinx.coroutines.Dispatchers.IO,
+        )
+    }
+
+    /** 可变的内存收藏仓储：只服务上面的夹具，顺序按 `listFavorites` 声明的「收藏时间降序」。 */
+    private class InMemoryFavoriteWordRepository(
+        private val words: MutableList<FavoriteWord>,
+    ) : FavoriteWordRepository {
+        override suspend fun toggle(profileId: String, cardId: String, wordBookId: String, lemma: String): Result<Unit> {
+            if (!words.removeAll { it.cardId == cardId }) {
+                words += FavoriteWord(profileId, cardId, wordBookId, lemma, java.time.Instant.EPOCH)
+            }
+            return Result.success(Unit)
+        }
+
+        override suspend fun isFavorite(profileId: String, cardId: String): Result<Boolean> =
+            Result.success(words.any { it.cardId == cardId })
+
+        override suspend fun listFavorites(profileId: String): Result<List<FavoriteWord>> =
+            Result.success(words.sortedByDescending { it.addedAt }.toList())
+    }
+
     @Composable
     private fun readyAppScreen(
         speechSettingsViewModel: SpeechSettingsViewModel? = null,
@@ -1747,6 +1887,10 @@ class AppScreenTest {
         learningRecordsViewModel: LearningRecordsViewModel? = null,
         wordBookWordsViewModel: WordBookWordsViewModel? = null,
         vocabularyViewModel: VocabularyViewModel? = null,
+        // Task 22-B（RED-3 能力承接）：合并页的收藏段与错词段各需一枚真 ViewModel，
+        // 否则这两段永远停在 Loading，端到端只能证到屏侧注入的假回调。
+        favoritesViewModel: FavoritesViewModel? = null,
+        wrongWordsViewModel: WrongWordsViewModel? = null,
     ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
@@ -1767,6 +1911,8 @@ class AppScreenTest {
             learningRecordsViewModel = learningRecordsViewModel,
             wordBookWordsViewModel = wordBookWordsViewModel,
             vocabularyViewModel = vocabularyViewModel,
+            favoritesViewModel = favoritesViewModel,
+            wrongWordsViewModel = wrongWordsViewModel,
         )
     }
 

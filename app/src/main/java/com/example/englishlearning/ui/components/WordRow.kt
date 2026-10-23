@@ -31,10 +31,12 @@ import com.example.englishlearning.ui.theme.appColors
  * （`each_family_offender_set_equals_its_seed_exactly` 会逐族打印实际违规文件集与 seed 的双向差异）。
  *
  * 收的是 spec §3 点名的那批裸组合（`WordBookWordsScreen`/`LearningRecordsScreen`/
- * `GlobalVocabularySearchScreen` 两变体/`VocabularyScreen`/`WrongWordsScreen`/`FavoritesScreen`）：
+ * `GlobalVocabularySearchScreen` 两变体/`VocabularyScreen`/旧收藏页/旧错词页）：
  * 它们没有共同的函数名，形状是「同枚私有 Row 组合里并排两枚 Text（lemma + 释义）」，
  * 故 `SharedComponentUniquenessRatchetTest` 按**私有 Row 函数体窗口**取样，不按函数名搜。
  * 批 2/批 3 逐屏接线时删私有份并递减该棘轮 seed。
+ * 名单里那两枚旧屏（收藏页、错词页）已于 **Task 22-B 下线**，其私有词行随屏消失，
+ * 收藏与错词两族词表现由合并页 `MyWordsScreen` 的收藏段与错词段以本组件渲染。
  *
  * 墨色全部来自纯表 [wordRowInks]（无 `@Composable`），所以每槽取哪枚 token 能在 JVM 侧被钉死：
  * connected 读不到颜色（Task 9 实测口径），本组件只读这张表、不在组件里凑色。

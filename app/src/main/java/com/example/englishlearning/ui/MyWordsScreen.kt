@@ -62,7 +62,8 @@ import kotlinx.coroutines.flow.first
  *
  * 摘除进度（按 R-22.1 的两席拆分）：本屏是**新增**入口；三条老路由里生词本页那条
  * （`today_plan_open_vocabulary` / `showVocabulary` / `VocabularyScreen` 挂载）已由 **Task 22-A** 摘除，
- * 本屏的生词本段自此是这条通路的全站唯一出口；收藏页与错词页另两条仍在册，摘除归 **Task 22-B**。
+ * 本屏的生词本段自此是这条通路的全站唯一出口；收藏页与错词页另两条（打卡页页头那两条裸文字链及其宿主路由）
+ * 已由 **Task 22-B** 摘除，两枚独立屏随之从生产树下线，本屏的收藏段与错词段是这两族词表的唯一出口。
  *
  * 词行一律调共享 [WordRow]（词行族：本屏是新屏，不在 `SharedComponentUniquenessRatchetTest` 的词行 seed 台账里，
  * 写私有词行即判新增债务）；页头调共享 [AppScreenHeader]；段内降级调共享 [ScreenUnavailable]；
@@ -413,7 +414,8 @@ private fun SectionLoading(tag: String, text: String) {
 }
 
 /**
- * 空态沿用三页现有的措辞（逐字照抄 `FavoritesScreen` / `VocabularyScreen` / `WrongWordsScreen`），
+ * 空态沿用三页现有的措辞（逐字照抄旧收藏页 / 旧生词页 / 旧错词页三页的原文，其中收藏页与错词页两枚屏
+ * 已于 Task 22-B 下线，措辞仍按当页在册的原文逐字保留），
  * 合并的是入口、不是说法：用户在任何一处读到的解释必须还是同一句。
  *
  * m-7（修复轮 2）：旧生词页的空态除文案外还带一条专属朗读描述（`VocabularyScreen.kt:64`），

@@ -192,16 +192,16 @@ fun AppScreen(
             var showBackupPairingExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLicenses by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            // F4-01 决策⑦收藏：列表是 CheckIn 同级的叠层；详情是一次性回源结果的本地覆盖层。
-            var showFavorites by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // Task 22-B（R-22.1）：原 `showFavorites` 独立叠层路由已摘除，收藏改由合并页 MyWordsScreen 承载；
+            // 下面三枚收藏详情宿主变量（selectedFavoriteCard / favoritesPronunciation*）保留——合并页的
+            // 收藏段点开单词时复用的正是这套详情覆盖层。
             var selectedFavoriteCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             var favoritesPronunciationMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
             var favoritesPronunciationRequest by remember { mutableIntStateOf(0) }
-            // F4-01 决策⑤错词本：同级叠层；点词复用学习记录详情宿主（selectedLearningRecordCard）。
-            var showWrongWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词本 · 错词 一页三段，与上面三页同级叠层。
+            // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词本 · 错词 一页三段，是这一族唯一在册的路由叠层。
             // 三条老路由的摘除按 R-22.1 拆成两席：`showVocabulary`（生词本页）已由 **Task 22-A** 摘除，
-            // `showFavorites` / `showWrongWords` 另两条仍在册，归 **Task 22-B**（连同打卡页那两条裸文字链）。
+            // `showFavorites` / `showWrongWords` 另两条连同打卡页那两条裸文字链由 **Task 22-B** 摘除；
+            // 三者合并后「我的词汇」全站只剩 MyWordsScreen 这一处入口。
             var showMyWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -280,8 +280,10 @@ fun AppScreen(
             LaunchedEffect(state.profile.id, favoritesViewModel) {
                 favoritesViewModel?.load(state.profile.id)
             }
-            LaunchedEffect(showWrongWords || showMyWords, state.profile.id) {
-                if (showWrongWords || showMyWords) wrongWordsViewModel?.load(state.profile.id)
+            // Task 22-B：错词数据源原按 `showWrongWords || showMyWords` 共享；错词本页已下线，
+            // 这一半并入合并页 `showMyWords`（wrongWordsViewModel 仍是合并页错词段的数据源，数据通路不动）。
+            LaunchedEffect(showMyWords, state.profile.id) {
+                if (showMyWords) wrongWordsViewModel?.load(state.profile.id)
             }
             // 错词状态在「错词本」与「我的词」两处叠层里是同一份，所以在这里收一次（原先只在错词页本地收）。
             val wrongWordsState = wrongWordsViewModel?.uiState?.collectAsState()?.value
@@ -291,11 +293,12 @@ fun AppScreen(
             // 宿主这里只留唯一一处聚合调用，静态形状由 MyWordsScreenContractTest 点名。
             val myWordsSummary = myWordsSummaryOf(favoritesState, vocabularyState, wrongWordsState)
             val openedFavoriteCard = favoritesViewModel?.openedCard?.collectAsState()?.value
-            LaunchedEffect(openedFavoriteCard, showFavorites || showMyWords) {
+            LaunchedEffect(openedFavoriteCard, showMyWords) {
                 val opened = openedFavoriteCard ?: return@LaunchedEffect
                 favoritesViewModel?.consumeOpenedCard()
-                // 收藏详情有两个宿主页（收藏页与「我的词」的收藏段）：只要还开着其中之一就交给详情层。
-                if (!showFavorites && !showMyWords) return@LaunchedEffect
+                // Task 22-B：收藏详情原有两个宿主页（收藏页与「我的词」的收藏段），收藏页下线后
+                // 只剩合并页这一宿主页；仍开着本页时才把回源结果交给详情层。
+                if (!showMyWords) return@LaunchedEffect
                 favoritesPronunciationRequest++
                 favoritesPronunciationMessage = PronunciationStatus.Idle
                 selectedFavoriteCard = opened
@@ -410,7 +413,9 @@ fun AppScreen(
                     if (showLearningRecords) {
                         learningRecordsViewModel?.load(state.profile.id, todayReady?.planId, todayReady?.activeWordBookId)
                     }
-                    if (showWrongWords) wrongWordsViewModel?.load(state.profile.id)
+                    // Task 22-B：删除数据后回刷可见屏——原按 `showWrongWords` 刷错词页，错词页下线后
+                    // 把这一刷原样改挂到承载错词段的合并页 `showMyWords`，保持「删除后当前可见的错词数据刷新」这一口径。
+                    if (showMyWords) wrongWordsViewModel?.load(state.profile.id)
                 }
             }
             // 任一来源产出文章都会设置 readingTarget：此时导入页让位给文章页，
@@ -453,7 +458,7 @@ fun AppScreen(
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
-                showWordQaCard != null || showFavorites || selectedFavoriteCard != null || showWrongWords || showMyWords
+                showWordQaCard != null || selectedFavoriteCard != null || showMyWords
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -471,15 +476,14 @@ fun AppScreen(
                 learningRecordsViewModel?.clearDetail()
             }
             BackHandler(enabled = selectedSearchCard != null) { closeSearchDetail() }
-            // F4-01 收藏：详情声明在列表之后（后声明者优先），返回键先关详情再退列表。
-            BackHandler(enabled = showFavorites && selectedFavoriteCard == null) { showFavorites = false }
+            // Task 22-B：原「收藏列表」的退页 BackHandler（`showFavorites && …`）随收藏页路由一并摘除；
+            // 收藏详情覆盖层的关闭（下面这枚 `selectedFavoriteCard != null`）保留——合并页收藏段点开单词时
+            // 用的就是这套详情层，返回键先关详情、再退合并页（合并页退页处理器在下方，后声明者优先）。
             BackHandler(enabled = selectedFavoriteCard != null) {
                 selectedFavoriteCard = null
                 favoritesPronunciationRequest++
                 favoritesPronunciationMessage = PronunciationStatus.Idle
             }
-            // 错词本复用学习记录详情宿主：详情打开时该处理器保持禁用，返回键先关详情。
-            BackHandler(enabled = showWrongWords && selectedLearningRecordCard == null) { showWrongWords = false }
             // 裁决①「我的词」：三段各自复用现成的详情宿主（收藏→selectedFavoriteCard、
             // 生词本→selectedSearchCard、错词→selectedLearningRecordCard），
             // 任一详情开着时本处理器让位，返回键先关详情再退这一页。
@@ -1092,35 +1096,6 @@ fun AppScreen(
                     state = checkInState,
                     onBack = { showCheckIn = false },
                     onRetry = { checkInViewModel?.load(state.profile.id) },
-                    onOpenFavorites = if (favoritesViewModel != null) {
-                        { showFavorites = true }
-                    } else {
-                        null
-                    },
-                    onOpenWrongWords = if (wrongWordsViewModel != null) {
-                        { showWrongWords = true }
-                    } else {
-                        null
-                    },
-                )
-            } else if (showFavorites) {
-                FavoritesScreen(
-                    state = favoritesState ?: FavoritesUiState.Loading,
-                    onBack = { showFavorites = false },
-                    onOpenWord = { favoritesViewModel?.open(it) },
-                    onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
-                )
-            } else if (showWrongWords) {
-                WrongWordsScreen(
-                    state = wrongWordsState,
-                    onBack = { showWrongWords = false },
-                    onOpenCard = {
-                        // 复用学习记录详情宿主：详情里笔记/收藏/重新学习全部现成。
-                        detailPronunciationMessage = PronunciationStatus.Idle
-                        learningRecordPronunciationRequest++
-                        detailSource = DetailSource.RECORDS
-                        selectedLearningRecordCard = it
-                    },
                 )
             } else if (showMyWords) {
                 // 裁决①：收藏 · 生词本 · 错词 合成一页三段。三段各自复用现成的详情宿主与动作口径，

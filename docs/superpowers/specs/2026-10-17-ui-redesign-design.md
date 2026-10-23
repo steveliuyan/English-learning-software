@@ -124,7 +124,7 @@
 |---|---|---|---|
 | `AppScreenHeader` | 返回 + 标题 + 副标题 + 右侧动作，唯一返回写法 | 14 个页头 / 6 种返回 | `CheckInScreen.kt:74-85`、`LearningRecordsScreen.kt:64-82`、`LicensesScreen.kt:61-82`、`ReadingHistoryScreen.kt:56-60`、`WorksheetSettingsScreen.kt:72-77`、`BackupRestoreScreen.kt:62`/`:184-188` |
 | `ConfirmDestructiveDialog` | 级联条数 + 保留面 + 不可撤销 + 双按钮，措辞统一 | 4 份 AlertDialog + 1 份行内 | `AppScreen.kt:644-672`/`:1322-1345`/`:1699-1730`/`:1869-1905`、`BackupRestoreScreen.kt:141-154` |
-| `WordRow` | 一行 lemma + 释义 + 状态/时间 + 右侧动作 | 7 份私有实现、0 复用 | `WordBookWordsScreen.kt:239-258`、`LearningRecordsScreen.kt:225-250`、`GlobalVocabularySearchScreen.kt:274-299`/`:319-358`、`VocabularyScreen.kt:133-195`、`WrongWordsScreen.kt:110-129`、`FavoritesScreen.kt:116-156` |
+| `WordRow` | 一行 lemma + 释义 + 状态/时间 + 右侧动作 | 7 份私有实现、0 复用 | `WordBookWordsScreen.kt:239-258`、`LearningRecordsScreen.kt:225-250`、`GlobalVocabularySearchScreen.kt:274-299`/`:319-358`、`VocabularyScreen.kt:133-195`；名单原另含收藏页与错词页两枚私有词行（`WrongWordsScreen.kt:110-129`、`FavoritesScreen.kt:116-156`）——**该两屏已于 Task 22-B 下线，私有词行随屏消失**，其能力由合并页 `MyWordsScreen` 的收藏段与错词段承接 |
 | `NotConfiguredCard` | AI 未配置：一句现状 + 一个「去配置 ›」出口，绝不再做只给文字的死屏 | 4 屏 12 行（3 份逐字 + 1 变体），4 处无出口 | `SentenceAnalysisScreen.kt:212/214/216`、`WordAiQaScreen.kt:267/269/271`、`PhotoTranslationScreen.kt:709/711/713`、`ImageStudioScreen.kt:253/255/257` |
 | `InlineNotice` | 错误/回执行统一样式与措辞 | 11 份实现 | `LearningRecordsScreen.kt:153-168`、`ReminderSettingsScreen.kt:42-49`、`BackupExportScreen.kt:40-47`、`SettingsScreen.kt:269-279`/`:323-333` |
 | `ScreenUnavailable` | 整屏不可用态：原因 + 一个动作 | 3+1 份退化页头 | 同上 + `RecoveryScreen.kt` |

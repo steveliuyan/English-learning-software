@@ -111,7 +111,9 @@ class WordListFormatTest {
                 "（别处再长一份 = m-5 的逐字复制回来了，而这族重复不在份数棘轮的取样窗口里，没有门会响）",
         )
 
-        listOf("MyWordsScreen.kt", "VocabularyScreen.kt", "FavoritesScreen.kt").forEach { screenName ->
+        // Task 22-B：名单里的收藏页屏已下线（`FavoritesScreen.kt` 随屏摘除）——本行是**消费方减少**，
+        // 循环体内三条禁令逐字未动；`VocabularyScreen.kt` 按 R-22.4 留册，归 Task 26 收口。
+        listOf("MyWordsScreen.kt", "VocabularyScreen.kt").forEach { screenName ->
             val screen = uiScreenSource(screenName)
             assertEquals(
                 0,
@@ -122,7 +124,7 @@ class WordListFormatTest {
             // 于是这两半它都挡不住——① 把 helper 改个名（`myWordsFormatter` 之类不在名单里的名字）；
             // ② 根本不新建声明，把 `DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")` **内联进屏**，
             // 此时私有副本正则为 0、共享名的声明扫描也 0、用量锚 `>= 1` 还被另一条分支喂饱 ⇒ 全绿。
-            // 补一道**按形态**的闸：三屏源码里不得出现 `DateTimeFormatter` 与 `ofPattern(` 任何一个，
+            // 补一道**按形态**的闸：名单里每一屏的源码都不得出现 `DateTimeFormatter` 与 `ofPattern(` 任何一个，
             // 格式化只许走 WordListFormat.kt 那一处；改名与内联两条路一起堵死。
             listOf("DateTimeFormatter" to "自建 formatter 类型", """ofPattern\(""" to "就地拼格式")
                 .forEach { (forbidden, why) ->
@@ -136,7 +138,7 @@ class WordListFormatTest {
                 }
         }
         // 反向钉（派工单 N-3「确认这条新断言不会误伤 WordListFormat.kt 本体」）：禁令只作用于**屏**，
-        // helper 本体必须还在原地造 formatter——否则「三屏 0 命中」会因为唯一真值被搬空而假绿。
+        // helper 本体必须还在原地造 formatter——否则「名单里每一屏都 0 命中」会因为唯一真值被搬空而假绿。
         val formatSource = File("${UI_MAIN_SOURCE_PATH}/WordListFormat.kt").readText()
         assertEquals(
             2,
@@ -145,10 +147,11 @@ class WordListFormatTest {
                 "上面那组「三屏 0 命中」会随之假绿",
         )
 
-        // 两页并存期间「收藏于」必须同文：同一枚日期档入口、每页该串恰一处。
+        // 「收藏于」时间戳的口径闸（Task 22-B 后只剩合并页一枚消费方——收藏页屏已随 22-B 下线）：
+        // 断言本体一字未松，仍要求「恰一处走 wordListDateLabel」+「不得自拼 toLocalDate()」；
+        // 少的是**取样面**（原两页同文对照里的第二页），不是判据强度。
         val myWords = uiScreenSource("MyWordsScreen.kt")
-        val favorites = uiScreenSource("FavoritesScreen.kt")
-        listOf("MyWordsScreen.kt" to myWords, "FavoritesScreen.kt" to favorites).forEach { (name, source) ->
+        listOf("MyWordsScreen.kt" to myWords).forEach { (name, source) ->
             assertEquals(
                 1,
                 countMatches(source, Regex("""收藏于 \$\{wordListDateLabel\(""")),
