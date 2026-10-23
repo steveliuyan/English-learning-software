@@ -436,11 +436,31 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   其 48dp 由 `AppScreenHeaderTest:53-63` 在**默认 `fontScale`** 下实测两轴承住；`CheckInScreenTest` 保留的那条大字号腿
   量的是**标题 Text 的宽度**（不是可点区）。**`fontScale 2.0` 档下页头可点区的 48dp 全仓无测**——这是被删用例
   KDoc 早已点名给 Task 26 的既存债，不由 22-B 引入，但也不由 22-B 补齐。
-- **一度丢失的说明文案（评审席 A-1 抓到；控制者裁定逐字补回，裁定号 R-22B.3，落地随本节点的修复轮提交，补回前本行即为已知缺口）**：旧错词页在列表非空时有一行排序说明
-  「最近一次标记为「不认识」的词，按到期先后排列。」（`WrongWordsScreen.kt:97`），22-B 摘屏时随屏消失且未进本段台账
-  ——合并页错词段只搬了**空态**文案，没搬这一行。控制者裁定：这属裁决①「三段承接两屏职责」漏搬的一层，
-  按同文件既有先例（生词本段空态 `readingDescription` 「逐字搬旧页那条，缺它即比旧页少一层」）**逐字补回**合并页错词段，
-  而非登记成永久代价。补回面与判据见本节点修复轮提交。
+- **一度丢失的说明文案（评审席 A-1 抓到；控制者裁定逐字补回，裁定号 R-22B.3）**：旧错词页在列表非空时有一行排序说明
+  「最近一次标记为「不认识」的词，按到期先后排列。」（摘除前在册的 `:97`），22-B 摘屏时随屏消失且未进本段台账
+  ——合并页错词段只搬了**空态**文案，没搬这一行。裁定依据是同文件既有先例（生词本段空态 `readingDescription`
+  的注：「逐字搬旧页那条，缺它即比旧页少一层」），**不登记成永久代价**。
+  **修复轮 1 已落地**（`c2f4a81`）：合并页错词段非空腿补该行，形状为 `AppType.Footnote` + `colors.text2`
+  （与收藏段 notice 那行同规格；旧页的 `labelMedium` + `Mint` 系快捷色名是批 3 令牌迁移前的形状，**没有搬回来**），
+  新锚 `my_words_wrong_order_hint`。判据 connected `MyWordsScreenTest.wrongWordsSectionKeepsTheOrderingHintFromTheLegacyPage`
+  三条腿：逐字 `assertTextEquals`（润色即红）+ 词行 `my_words_wrong_row_0` 同屏在册（挡「用说明替换掉列表」的假修）
+  + 说明行矩形必须落在 `my_words_section_wrong` 容器内（挡挂到别的段）。
+  重算：`git grep -n "按到期先后排列" HEAD -- app/src` 现在**生产侧与判据侧各有命中**（22-B 收工时此处为零）。
+- **修复轮 1 的另三件（`353ff25` / `abba685` / `7afa858` / `492c42d`）**：
+  ① 新立 JVM 源码形状契约 `CheckInScreenHeaderShapeContractTest`（4 枚）——钉 `CheckInScreen.kt` 恰一处
+  `AppScreenHeader(` 且**那次调用的实参区间**不含 `action`；两枚反事实腿把 `action = { … }` 与「只在注释里的 `action`」
+  分别喂给同一提取器判红/判绿，实参括号配不平时**响亮失败而不是返回空串**（空串会让「不含 action」假绿，是该夹具最坏的失效形状）。
+  补这条的理由：摘链的 `openFavoritesAndWrongWordsLinksAreNotRenderedOnCheckInHeader` 在 `androidTest`，
+  而门控第三项 `compileDebugAndroidTestKotlin` **只编译不跑** ⇒ 链复活在门控里本来是不可见的。
+  ② 两枚 22-B 闭集判据各补覆盖面边界 KDoc（R-22B.5）：**本条钉「本批下线动作不被回滚」，不钉「此后不许有第二个收藏/错词目的地」**；
+  以新名重建第二目的地时两枚全绿，那条结构级缺口按 R-22B.8 路由 Task 26。
+  ③ connected 判据 `favorite_timestamp_shows_the_same_date_tier_as_the_favorites_page` 更名为
+  `favoriteTimestampUsesTheSharedDateTier`（R-22B.6，断言本体一字不动）——旧名把已不存在的屏写成对照物，属假线索。
+- **一条被判据当场教会的口径（R-22B.9，登记给后续所有席位）**：`the_two_legacy_screens_are_off_the_production_tree`
+  的扫描面是 `ui/` 源码**全文含注释**（`readText()` 不剥注释）⇒ **生产注释里点名已下线屏的文件名会进 offenders、判据当场红**。
+  修复席两次踩中后选择**改写自己的注释**（用中文页名指代）而不是放宽判据，本控制者追认这个处置：
+  它与 A-6「方法名点名已下线屏 = 假线索」是同一个方向的闸。与页头族那条**先剥注释**的口径不一致属**有意**：
+  债务棘轮数的是「还欠着的读点」（注释不算欠），本条数的是「死引用」（注释也算）。
 
 ### 凭据（控制者亲跑，HEAD `3f989db`）
 
