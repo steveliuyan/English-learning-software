@@ -219,6 +219,11 @@ class MyWordsScreenContractTest {
      * 因此 `AppScreen.kt` 源码里 `showFavorites` / `showWrongWords` 这两个标识符必须为 0 处。
      * 摘除前它们仍逐枚在册（状态位、setValue、BackHandler、装载 effect、挂载分支）⇒ 本条先红；
      * 摘除后仍**有牙**：谁把任一标识符补回宿主，本条当场红，不靠注释自证。
+     *
+     * **覆盖面边界（22-B 修复轮 1 的 F3 / A-2）**：本条钉的是 22-B 那次下线动作不被回滚，
+     * **不**钉「此后不许有第二个收藏/错词目的地」——判据读的是 `showFavorites` / `showWrongWords`
+     * 这两枚**硬编码标识符**，以新名（如 `showFavoriteWords`）重建第二条宿主路由时本条照绿，改名重建不在其覆盖面；
+     * 想钉「第二个目的地」本身得换判据形状（按能力面计数），那是另一件事，本条不冒充它。
      */
     @Test
     fun the_host_holds_no_favorites_or_wrong_words_routes() {
@@ -245,6 +250,16 @@ class MyWordsScreenContractTest {
      * 名单摘干净之后，谁再把两枚屏名写回生产码（新建屏、复活挂载、或把旧文件名留在注释里），本条点名文件。
      * 磁盘存在性用 `File(...).exists()` 直判，不借 `uiFiles()`：后者是扫描夹具，
      * 拿它判「不存在」会撞上「空扫即失败」的内置守卫而把判据变成永远红。
+     *
+     * **扫描口径（22-B 修复轮 1 的 F3 / A-2，现场读码确认）**：offenders 那一腿读的是 `file.readText()`，
+     * **不过** [com.example.englishlearning.ui.stripComments] ⇒ 覆盖面确实**含注释**：
+     * 「旧屏已于 22-B 下线」这类**正确的历史叙述**只要点名 `FavoritesScreen` / `WrongWordsScreen` 两个标识符本身，
+     * 也一样进 offenders 判红。这是刻意的闭集面（假线索护栏：注释里的旧屏名会让复核席去读一个不存在的文件），
+     * 代价是生产注释从此只能用中文页名 + 行号指代旧页，不许写这两个文件名。
+     *
+     * **覆盖面边界**：本条钉的是 22-B 那次下线动作不被回滚，**不**钉「此后不许有第二个收藏/错词目的地」——
+     * 判据读的是**硬编码文件名集合**，以新名重建第二目的地（`FavoritesHubScreen.kt` 之类）时两枚磁盘判定与
+     * 文本扫描全都绿；改名重建不在其覆盖面。真要钉「唯一目的地」得换成按能力/路由面计数的判据形状，本条不冒充它。
      */
     @Test
     fun the_two_legacy_screens_are_off_the_production_tree() {

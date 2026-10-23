@@ -271,9 +271,13 @@ class MyWordsScreenTest {
      * 判据为什么咬得住：夹具把时刻钉死为 `2026-10-19T00:30:00Z` + `zoneId = UTC`
      * （不靠设备时区，数字可复算），时分档在这一刻必然写成 `… 00:30` ⇒ 修复前判红；
      * 收藏段的时间戳文案整枚匹配 ⇒ 只把「收藏于」改档、把「加入于」带下水也照样红。
+     *
+     * F4（22-B 修复轮 1 / A-6）：方法名从 `…_as_the_favorites_page` 更名为 `favoriteTimestampUsesTheSharedDateTier`
+     * ——对照物（旧收藏页）已随 Task 22-B 下线，旧名会指挥后来人拿现存屏去和一个不存在的页对表；
+     * **断言本体一字未动**，本条从此只钉合并页自己这一侧的日期档口径。
      */
     @Test
-    fun favorite_timestamp_shows_the_same_date_tier_as_the_favorites_page() {
+    fun favoriteTimestampUsesTheSharedDateTier() {
         composeRule.setContent {
             MintGlassTheme {
                 MyWordsScreen(
@@ -592,7 +596,7 @@ class MyWordsScreenTest {
     //  原并列的旧收藏页站点已随该屏于 Task 22-B 下线）：
     //  `MyWordsScreen.kt:167` 收藏段 `收藏于 yyyy-MM-dd`、`:224` 生词本死行 `加入于 <日期时间>`、
     //  `:234` 生词本活行 `加入于 <日期时间>`。R-20D.1② 登记的缺口正是「合并页渲染了但只到文本层」：
-    //  `favorite_timestamp_shows_the_same_date_tier_as_the_favorites_page` 一直绿着，而右列当时是
+    //  `favoriteTimestampUsesTheSharedDateTier`（原名点名已下线的旧收藏页，22-B 修复轮 1 的 F4 已更名）一直绿着，而右列当时是
     //  `maxLines = 1` —— 语义文本给全文，`Ellipsis` 截断时 `onNodeWithText` 读不出差别。
     //  ⇒ 这里改读 `textLayout()`（形状同 `b76f133` 的 `disabledRowShowsTheUnavailableNoticeInFull`）。
     //
