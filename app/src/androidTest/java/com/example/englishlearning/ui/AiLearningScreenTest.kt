@@ -99,7 +99,7 @@ class AiLearningScreenTest {
     /**
      * 深色档取证（Task 23 修复轮 R-23.14）：状态胶囊的容器是 `Color.White.copy(alpha = 0.85f)`，
      * **主题无关**的亮容器——两档底色几乎相同，前景单迁主题访问器就是本轮的 AA 回归：
-     * 深色档 `colors.text2` 取到 #9FB3AA 亮灰压白胶囊（1.69:1）。回退后未配置档必须仍逐像素
+     * 深色档 `colors.text2` 取到 #9FB3AA 亮灰压白胶囊（2.21:1）。回退后未配置档必须仍逐像素
      * 打出登记的静态中性墨 `AppPalette.TextSecondary`（浅档 4.02:1 是 deep-on-white 同形既有债，另行登记）。
      *
      * 深色档走显式 `MintGlassTheme(themeMode = ThemeMode.Dark)` 包装（先例 `ThemeModeSwitchTest`、
@@ -157,7 +157,7 @@ class AiLearningScreenTest {
             (0 until badge.width).any { x -> (0 until badge.height).any { y -> badge.getPixel(x, y) == registeredDeep } })
         val darkDomainDeep = DomainDark.getValue(AppDomain.AiSpeech).deep.toArgb()
         assertTrue(
-            "the bright dark-tier domain deep (2.21:1 on the white pill) must not be painted here",
+            "the bright dark-tier domain deep (1.69:1 on the white pill) must not be painted here",
             (0 until badge.width).none { x -> (0 until badge.height).any { y -> badge.getPixel(x, y) == darkDomainDeep } },
         )
     }

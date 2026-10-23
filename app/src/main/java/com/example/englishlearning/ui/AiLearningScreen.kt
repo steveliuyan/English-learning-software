@@ -154,7 +154,7 @@ fun AiLearningScreen(
 private fun AiHeaderCard(aiConfigured: Boolean) {
     // 修复轮 R-23.14 回退（批 3 R-23.6 的第三站单迁）：状态胶囊容器是 `Color.White.copy(alpha = 0.85f)`，
     // 主题不变面（且属 RawColorLiteralRatchet 地盘，本批无权动容器）——前景改走主题访问器等于把
-    // 深套亮墨钉死在白底上（深档 text2 压白 ≈1.69:1、深套域 deep 压白 ≈2.21:1，即评审席 B1）。
+    // 深套亮墨钉死在白底上（深档 text2 压白 ≈2.21:1、深套域 deep 压白 ≈1.69:1，即评审席 B1）。
     // 前景因此回到批前两枚登记静态墨；浅档 AiSpeech 的 deep 墨压白 4.02:1 是批前既有债
     // （与 GlassButton.kt:70 同口径，登记在验证文档 Task 23 节），容器随主题改造归 Task 26/27，
     // 届时容器与前景同批重算，不再做第二次「前景单迁」。形状由 AiBadgeContrastFixTest 逐行钉死

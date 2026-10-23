@@ -574,21 +574,42 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 
 ### 台账动作（三张棘轮逐张交代）
 
-- `DarkTokenConsumptionRatchetTest`：`"AiFeatureScreen.kt" to 3` 与 `"AiLearningScreen.kt" to 2`
-  **两行整行删除**（五枚逐成员计数全部迁完，减到 0 即摘行，不把数字改成 0）。顺序 = **先迁生产码断掉引用、
-  同一工作树内再摘 seed 行**，两枚改动同批提交（`ae082e6` 生产 / `27002e1` 台账），
-  因此不存在「seed 先减、生产未迁」的中间绿，也不存在「生产已迁、seed 未减」的中间红被提交。
+- `DarkTokenConsumptionRatchetTest`：批 3 把 `"AiFeatureScreen.kt" to 3` 与 `"AiLearningScreen.kt" to 2`
+  两行整行删除（逐成员计数减到 0 即摘行，不把数字改成 0）。
+  **修复轮 1 的更正（M1，原登记失实）**：原文声称生产与 seed「两枚改动同批提交
+  （`ae082e6` 生产 / `27002e1` 台账），因此不存在被提交的中间红」——这句不实：拆了两枚 commit 的
+  中间态里，`ae082e6` 单独 checkout 时生产静态读点已归零而 seed 仍要求 3/2，
+  `DarkTokenConsumptionRatchetTest.kt:359` 的 stale-seed 用例当场判红，**该红样是被提交的**；
+  全量门只在合并态 `986e162` 与修复轮修复态各自跑过。教训已吃进本轮：修复轮的 seed 恢复与
+  生产改动**同枚**落地（`fix(ui-ai): AI 面前景按容器主题归属分档…`）。
+  **修复轮 1 的动作（R-23.14）**：`"AiLearningScreen.kt" to 2` 整行恢复——白胶囊容器
+  `Color.White.copy(alpha = 0.85f)` 不随主题（且属 `RawColorLiteralRatchet` 地盘，容器不许单迁前景），
+  批 3 单迁的两枚前景回退为批前登记静态墨，逐成员计数回到 2；
+  `"AiFeatureScreen.kt"` 行保持摘除（R-23.13 分档只加 `LocalIsDark` 守卫，不产出静态读点）。
 - `RawColorLiteralRatchetTest`：一字未动（本批未新增裸 hex；亮度断言全部读活 token）。
 - `SharedComponentUniquenessRatchetTest`：一字未动（页头族两行仍在册）。
 
-### 代价（深色档三处变色 + 一处浅档变色，登记为目视项）
+### 代价（性质 = 无障碍（AA 亮度比）：深色档三站变色 + 浅档一站变色；行数为下表现算，回退两站另列）
 
-| 站点 | 旧（静态浅值） | 新（按档取值） | 浅档 | 深档 |
+| # | 站点 | 批前静态 → 现状（修复轮 1 后） | 浅档比值 | 深档比值 |
 |---|---|---|---|---|
-| `AiFeatureScreen` 头部 44dp 品牌渐变徽标前景 | `AppPalette.OnMintPrimary` #174C44 | `appColors().onBrand` #04241C | **变深**（裁决 #3 要求） | 同值 #04241C（两套同三段） |
-| `AiFeatureScreen`「去配置 AI 服务」按钮 `contentColor` | `AppPalette.OnMintPrimary` #174C44 | `appColors().onMint` | 逐值不变 | **变浅** #DFF6EC 压深底 |
-| `AiLearningScreen` 头卡状态徽章（已配置档） | `DomainColors.AiSpeech.deep` #188F76 | `appDomain(AiSpeech).deep` | 逐值不变 | **变亮** #35E0AC |
-| `AiLearningScreen` 头卡状态徽章（未配置档） | `AppPalette.TextSecondary` #4E756A | `appColors().text2` | 逐值不变 | **变亮** #9FB3AA |
+| 1 | `AiFeatureScreen.kt:100` 头部 44dp 品牌渐变徽标前景 | `AppPalette.OnMintPrimary` #174C44 → `appColors().onBrand` #04241C（两套同值） | 渐变最浅端 #35B9B5 上 6.87（批前同位 4.07，裁决 #3 要求） | 同左（`AiFeatureGradient` 静态，不随主题） |
+| 2 | `AiFeatureScreen.kt`「去配置 AI 服务」按钮 `contentColor` | #174C44 → 分档 `if (!LocalIsDark.current) colors.onMint else colors.onBrand` | #174C44 压 #2EC99C = 4.62 | #04241C 压 #35E0AC = 9.74（批前静态同墨压深底 5.76；批 3 中间态裸 onMint 单迁 = 1.49 的 B1 已修） |
+| 3 | `AiFeatureScreen.kt` StatusPill「现在能用」档前景 | #174C44 → 门控分档（浅 onMint / 深 onBrand；`AiProfileSettingsScreen.kt:524` 同族形） | 同第 2 行 4.62 | 同第 2 行 9.74 |
+| 4 | `AiLearningScreen.kt:199` 头卡状态徽章（已配置档） | `DomainColors.AiSpeech.deep` #188F76 →（批 3 单迁主题墨，深档压白 1.69）→ **修复轮回退同值** | 压白胶囊 4.02（批前既有债：`GlassButton.kt:70` 同口径；判据钉 ≥3.0 且 <4.5 双向） | 同左（容器主题不变，两档同墨——前景单迁正是 B1 第三站） |
+| 5 | `AiLearningScreen.kt:199` 头卡状态徽章（未配置档） | `AppPalette.TextSecondary` #4E756A →（批 3 单迁 `colors.text2`，深档压白 2.21）→ **修复轮回退同值** | 压白胶囊 5.15 | 同左 |
+
+- 深色档实际变色 = 第 1–3 站（第 1 站浅档同步变深）；第 4、5 站为回退位，两档维持批前静态值。
+  「三处 + 一处」是修复轮对本表逐站现算的结果，不是抄旧口径。
+- 现算尺（WCAG 2.1 相对亮度，与 `SourceRatchet.ratio` 同式）：
+  `awk 'function lin(v){v=v/255; return v<=0.03928 ? v/12.92 : ((v+0.055)/1.055)^2.4} function lum(h,r,g,b){r=strtonum("0x" substr(h,1,2));g=strtonum("0x" substr(h,3,2));b=strtonum("0x" substr(h,5,2));return 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b)} function ratio(a,b,La,Lb,t){La=lum(a);Lb=lum(b);if(La<Lb){t=La;La=Lb;Lb=t}return (La+0.05)/(Lb+0.05)} BEGIN{printf "%.2f\n", ratio("04241C","35E0AC")}'`
+  ——把 `BEGIN` 里的 hex 对换成上表任意一对即得该行比值（活 token 的权威复算以判据为准，下表同名用例当场现算，表内数字不许反抄进断言）。
+- 逐行判据（`app/src/test/java/com/example/englishlearning/ui/AiBadgeContrastFixTest.kt`，
+  复算命令 = `GRADLE="$HOME/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle.bat"; "$GRADLE" :app:testDebugUnitTest --tests "com.example.englishlearning.ui.AiBadgeContrastFixTest" --no-daemon`）：
+  行 1 → `the brand gradient badge keeps its on brand tint` + `on_brand_foreground_clears_the_AA_floor_on_both_gradient_ends`；
+  行 2/3 → `the mint primary ink pair clears the AA floor on both theme sets` + `the mint primary sites split their foreground ink by theme set`；
+  行 4/5 → `the theme invariant white pill keeps its registered static foregrounds`；
+  设备侧镜像 = `t23-fix1-connected-dark.log`（深浅两档像素腿）。
 
 另两处不是「迁令牌」而是本批版面本身：一级页新增的 `EntryRow` 折叠行带来 40dp 域渐变徽标 +
 `text1/text2/outlineSoft` 三枚主题墨色；一级页行尾新增徽章文字取 `MintPrimaryDark`（批 1 前的裸常量，
@@ -615,6 +636,21 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
   `t23-connected-fs2.0-ai-screens.log`（25 OK）、`t23-connected-fs2.0-appscreen-and-restore.log`（50 OK）。
 - 渲染取证：`t23-render-evidence-icon-gallery.log` + 三张 `icon-gallery-*.png`
   （写到设备外部文件目录，**不入库**，pull 到仓库外临时目录目视后删除）。
+
+### 修复轮 1 的凭据（B1/M1/M2/M3，2026-10-24 登记）
+
+- 判据红样（改生产之前，现盘）：`t23-fix1-RED-jvm.log`（12 枚中 3 红，全部为站点腿：
+  分档形状腿 / 静态读点回退腿 / 白胶囊回退腿；合成反事实与亮度前置腿当场绿）。
+- 深色档 connected 红样（未修生产 + 新判据）：`t23-fix1-connected-dark-RED.log`
+  （`Tests run: 4, Failures: 4`，全红在墨腿、前置腿绿；同文件附 uimode night 前后读数）。
+- 门控收工：`t23-fix1-gate.log` → `suites=238 tests=1770 failures=0 errors=0`
+  （基线 1764，净 +6 枚，`@Test` 只增不减）。
+- 深色档取证（修复后）：`t23-fix1-connected-dark.log`——深色 4 枚 OK、浅档两全类 29 枚 OK、
+  `AppScreenTest` 动过的 3 枚 OK；设备 `emulator-5574`，`adb install -r` + `am instrument`，
+  真机 `bf353dda` 全程未连接未触碰。`cmd uimode night yes` 只翻得动 `ui_night_mode` 读数
+  （null→2→复位 1），翻不动无主题提供者的 `createComposeRule` 测试面——深色取证实际走
+  `MintGlassTheme(themeMode = ThemeMode.Dark)` 包装（设置页主题档同一条装配路径，先例
+  `ThemeModeSwitchTest`、`glass/GlassPanelThemeInkTest.kt:290`），读数与判定都在该文件里。
 
 ### 登记给后续批次的两笔
 
