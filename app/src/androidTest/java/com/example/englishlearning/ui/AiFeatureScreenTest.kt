@@ -86,11 +86,22 @@ class AiFeatureScreenTest {
         }
     }
 
+    /**
+     * 徽章面（裁决④）：骨架页属于「未上线」那批，徽章必须说「未上线」；
+     * 同一屏的状态正文仍照目录原文说「未实现：…」（R-23.4 两面分开，徽章改词不动目录）。
+     * 词一律从 `featureStatusBadge` 取，测试不抄徽章字面量——徽章词改了这里跟着走。
+     */
     @Test fun status_pill_admits_the_feature_is_not_implemented() {
-        setScreen()
+        val current = setScreen()
         composeRule.onNodeWithTag("ai_feature_status_pill").assertExists()
-        composeRule.onNodeWithText("未实现").assertExists()
-        composeRule.onNodeWithText("可用").assertDoesNotExist()
+        composeRule.onNodeWithText(featureStatusBadge(false)).assertExists()
+        composeRule.onNodeWithText(featureStatusBadge(true)).assertDoesNotExist()
+        composeRule.onNodeWithText(current.value.status).assertExists()
+
+        current.value = AiFeature.SENTENCE_ANALYSIS
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(featureStatusBadge(true)).assertExists()
+        composeRule.onNodeWithText(featureStatusBadge(false)).assertDoesNotExist()
     }
 
     @Test fun data_block_reports_the_real_counts() {

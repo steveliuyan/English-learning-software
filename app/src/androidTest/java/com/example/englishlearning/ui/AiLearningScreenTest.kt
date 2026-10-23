@@ -8,6 +8,8 @@ import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintStart
 import org.junit.Assert.assertTrue
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -95,44 +97,120 @@ class AiLearningScreenTest {
         return Math.sqrt(dr * dr + dg * dg + db * db)
     }
 
-    /** 展开键：功能入口默认收起，一键展开、再点收起——页面不能是一张扁平长列表。 */
-    @Test fun feature_rows_start_collapsed_and_expand_on_tap() {
+    /**
+     * 折叠键只管**未上线**那批：点开逐枚列出、再点收回。
+     *
+     * 原名 `feature_rows_start_collapsed_and_expand_on_tap`（批 2 口径「功能入口默认收起」）。
+     * 裁决④ 把默认态改成「已上线的三枚直接可见」，那条「默认全收起」的断言随之作废——
+     * 它不是护栏而是被撤销的旧裁决本身（默认展开正是本批要交付的行为），所以这里改名并改成
+     * 判「折叠只管未上线」；@Test 枚数只增不减（本类净 +4）。
+     */
+    @Test fun feature_rows_expand_and_collapse_on_the_unreleased_line() {
         setScreen()
-        AiFeature.entries.forEach { feature ->
+        val unreleased = AiFeature.entries.filter { !it.implemented }
+        unreleased.forEach { feature ->
             composeRule.onNodeWithTag("ai_feature_${feature.key}").assertDoesNotExist()
         }
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().assertExists()
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().assertExists()
 
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performClick()
-        composeRule.waitForIdle()
-        AiFeature.entries.forEach { feature ->
+        expandUnreleased()
+        unreleased.forEach { feature ->
             composeRule.onNodeWithTag("ai_feature_${feature.key}").assertExists().assertHasClickAction()
-            composeRule.onNodeWithText(feature.summary).assertExists()
+            composeRule.onNodeWithText(feature.summary).performScrollTo().assertExists()
         }
-        composeRule.onNodeWithText("AI 功能 收起 ˄").assertExists()
 
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performClick()
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
-        AiFeature.entries.forEach { feature ->
+        unreleased.forEach { feature ->
             composeRule.onNodeWithTag("ai_feature_${feature.key}").assertDoesNotExist()
         }
     }
 
-    /** 展开键默认收起，需要先展开再断言功能行。 */
-    private fun expandFeatures() {
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+    /**
+     * RED-3（裁决④ / AC-R-23）：默认态就是「现在能用」的那三枚，未上线的四枚压成一条折叠行。
+     *
+     * 不点任何东西就能断言到已上线的能力；未上线的项**不在**默认树上，但那条折叠行自己标着
+     * 「未上线」——用户不必展开也知道下面压着的是没做完的东西。
+     * 徽章词在这里按字面量写：`featureStatusBadge` 是本批要新建的符号，测试若直接引用它，
+     * 红样只会是一枚编译错误而不是判据红（派工块 §五.3 的「间接路径」要求）；
+     * 词与 `implemented` 的绑定由 JVM 侧 `AiFeatureTest` 与下面的
+     * `badges_read_the_shared_renderer_word_for_word` 两侧夹住。
+     */
+    @Test fun implemented_features_are_visible_by_default_and_unreleased_ones_collapse_into_one_line() {
+        setScreen()
+        AiFeature.entries.filter { it.implemented }.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").performScrollTo().assertExists()
+            composeRule.onNodeWithTag("ai_feature_status_badge_${feature.key}", useUnmergedTree = true)
+                .performScrollTo()
+                .assertTextEquals(AVAILABLE_BADGE)
+        }
+        AiFeature.entries.filter { !it.implemented }.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").assertDoesNotExist()
+        }
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().assertExists().assertHasClickAction()
+        composeRule.onNodeWithText(UNRELEASED_BADGE, useUnmergedTree = true).performScrollTo().assertExists()
+        // 折叠标题不再拿「7 个」这种混算总数当默认可见面的口径（R-23.8 ③）。
+        composeRule.onNodeWithText("AI 功能（${AiFeature.entries.size} 个）展开 ˅").assertDoesNotExist()
+    }
+
+    /** 折叠行点开后才逐枚列出未上线项，再点收回。 */
+    @Test fun the_unreleased_line_expands_into_the_unreleased_rows_and_collapses_again() {
+        setScreen()
+        val unreleased = AiFeature.entries.filter { !it.implemented }
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        unreleased.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").performScrollTo().assertExists().assertHasClickAction()
+            composeRule.onNodeWithTag("ai_feature_status_badge_${feature.key}", useUnmergedTree = true)
+                .performScrollTo()
+                .assertTextEquals(UNRELEASED_BADGE)
+        }
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        unreleased.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}").assertDoesNotExist()
+        }
+    }
+
+    /**
+     * 徽章词必须来自那一个共享产出（R-23.9）：屏上出现的词与 `featureStatusBadge(implemented)`
+     * 逐枚相等，防止屏侧再长出第二套「可用 / 未实现」措辞。
+     */
+    @Test fun badges_read_the_shared_renderer_word_for_word() {
+        setScreen()
+        expandUnreleased()
+        AiFeature.entries.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_status_badge_${feature.key}", useUnmergedTree = true)
+                .performScrollTo()
+                .assertTextEquals(featureStatusBadge(feature.implemented))
+        }
+    }
+
+    /** TalkBack 读一行必须同时读到能力名与状态，不能只念名字。 */
+    @Test fun each_feature_row_is_announced_with_its_own_status() {
+        setScreen()
+        AiFeature.entries.filter { it.implemented }.forEach { feature ->
+            composeRule.onNodeWithTag("ai_feature_${feature.key}")
+                .performScrollTo()
+                .assertContentDescriptionEquals("${feature.title}，状态：${featureStatusBadge(feature.implemented)}")
+        }
+    }
+
+    /** 折叠入口默认收起未上线那批，需要先点开再断言那四枚行。 */
+    private fun expandUnreleased() {
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
     }
 
     @Test fun renders_all_feature_rows_after_expanding() {
         setScreen()
-        expandFeatures()
+        expandUnreleased()
         AiFeature.entries.forEach { feature ->
             composeRule
                 .onNodeWithTag("ai_feature_${feature.key}")
                 .assertExists()
                 .assertHasClickAction()
-            composeRule.onNodeWithText(feature.summary).assertExists()
+            composeRule.onNodeWithText(feature.summary).performScrollTo().assertExists()
         }
     }
 
@@ -142,7 +220,7 @@ class AiLearningScreenTest {
     @Test fun every_feature_row_reports_its_own_feature() {
         val received = mutableListOf<AiFeature>()
         setScreen(onOpenFeature = { received += it })
-        expandFeatures()
+        expandUnreleased()
         AiFeature.entries.forEach { feature ->
             composeRule.onNodeWithTag("ai_feature_${feature.key}").performScrollTo().performClick()
         }
@@ -181,5 +259,10 @@ class AiLearningScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("会用到的数据").assertExists()
         composeRule.onNodeWithText("数据发往哪里").assertExists()
+    }
+
+    private companion object {
+        const val AVAILABLE_BADGE = "现在能用"
+        const val UNRELEASED_BADGE = "未上线"
     }
 }
