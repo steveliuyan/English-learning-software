@@ -362,6 +362,91 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 （留档 `t22A-baseline-fontscale2.0-probe.log`），据此判定那是**既存**的设备级大字号脆弱面，不由 22-A 引入，
 本席不扩面修，登记给 Task 26（症状：设备档下未滚动节点被判不可显示、注脚档比值随换行漂移）。
 
+## 收藏页与错词页下线及打卡页两条裸文字链摘除（Task 22-B，2026-10-24 登记）
+
+**执行归属（如实登记，关系到下面每条凭据的可信度）**：本节点不是实现席一次跑完的。
+第一席派发后静默终止（约 11.5 小时零提交、零报告），接续席撞 `Agent` 工具 150 回合硬上限、
+零提交并留下十七枚脏文件；最终由**控制者本人**完成遗作审计、缺陷修复、门控复跑与提交。
+故本节凭据均为控制者亲跑日志（文件名见末段），不是席位转述。
+
+### 已落地面
+
+- **两屏下线**：删除 `ui/FavoritesScreen.kt`、`ui/WrongWordsScreen.kt` 与两屏的 androidTest 冒烟类
+  `FavoritesScreenTest.kt`、`WrongWordsScreenTest.kt`。收藏与错词的展示/操作职责由 Task 20 已上线的
+  合并页 `MyWordsScreen`（分段：收藏 / 错词 / 生词本 / 词书）承接。重算（三条都为预期值）：
+  `grep -rln "FavoritesScreen\|WrongWordsScreen" app/src/main/java | wc -l` = `0`（屏名在生产侧彻底消失）；
+  `ls app/src/main/java/com/example/englishlearning/ui | grep -cE "^(Favorites|WrongWords)ViewModel\.kt$"` = `2`
+  （两枚 ViewModel **保留**——它们是合并页两段的宿主数据源，不是孤儿类，也不许顺手删）；
+  `ls app/src/androidTest/java/com/example/englishlearning/ui | grep -cE "^(Favorites|WrongWords)ScreenTest\.kt$"` = `0`。
+- **两条宿主路由下线**：`AppScreen.kt` 的 `showFavorites` / `showWrongWords` 状态位、对应 `setValue` 点、
+  两枚 `BackHandler` 与两个挂载分支整体摘除；`LaunchedEffect(showMyWords, …)` 由双条件回到单条件。
+  数据侧只改装载条件、不改数据源：错词数据原按 `showWrongWords || showMyWords` 共享，现只跟 `showMyWords`；
+  删词后回刷可见屏的那处同理去掉 `showWrongWords`。收藏详情三枚宿主变量保留（合并页收藏段复用）。重算：
+  `grep -cE "^[[:space:]]*(val )?show(Favorites|WrongWords)\b" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt` = `0`
+  （只判**声明**；该文件仍有若干**注释**提到旧状态位名，是过去时陈述，不是代码）。
+- **合并页端到端承接（plan R2-1 同一口径的第七枚判据）**：新立 connected
+  `AppScreenTest.mergedPageSectionsReachFavoriteDetailUnfavoriteAndWrongWordRelearnThroughTheHost`——经**宿主**
+  打开「我的词」，走「收藏段 → 收藏详情 → 取消收藏」与「错词段 → 重学」两条链，钉两屏下线后职责确实被合并页接住
+  （不是只删不接）。它带着两枚宿主侧 ViewModel 构造助手（各seed 一枚词），零放宽既有断言。
+- **打卡页两条裸文字链摘除**：`CheckInScreen.kt` 的两枚形参 `onOpenFavorites` / `onOpenWrongWords`、
+  `AppScreenHeader(action = { 两条裸文字链 })` 的整个 `action` 槽、以及随之失去引用的
+  `clickable` / `defaultMinSize` import 一并摘除；页头只剩 `title` + `onBack`。重算：
+  `grep -c "check_in_open_favorites\|check_in_open_wrong_words" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt` = `0`；
+  `grep -c "AppScreenHeader(" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt` = `1`（统一页头仍在册，22-A 的成果未回退）。
+- **判据侧同步（删判据必须换成正判据，不许留空）**：
+  `CheckInScreenTest` 里钉 48dp 触控的 `headerTextLinksMeetTheMinimumTouchTarget` 与其私有
+  `assertMinTouchTarget` **随链一起删除**（被断言的节点已不存在，留着就是测空气），
+  新立反向判据 `openFavoritesAndWrongWordsLinksAreNotRenderedOnCheckInHeader`（两枚 tag 各 `assertDoesNotExist`）；
+  原 `fontScale 2.0` 那枚更名 `headerTitleStaysReadableAtMaximumLargeFontScale`，
+  并**保留**「标题列 ≥48dp」那条证伪腿（触控护栏没有因为链的消失而丢）。
+  `MyWordsScreenContractTest` 的两份反向控清单（22-A 留的两枚）去掉，改立两枚正判据：
+  `the_host_holds_no_favorites_or_wrong_words_routes`（按标识符逐枚数 `Regex("""\b$identifier\b""")` 命中为 0）与
+  `the_two_legacy_screens_are_off_the_production_tree`（`File(...).exists()` 为假 + 扫 `uiFiles()` 点名任何仍含旧屏字样的生产文件）。
+- **取样面减少、断言本体逐字未松**：`WordListFormatTest` 的三元素名单去掉 `FavoritesScreen.kt`、
+  「两页同文对照」去掉第二页——该判据此后成为合并页单侧口径闸（「收藏于」只许读成日期档），
+  文本规则一字未改。`VocabularyScreen.kt` 按 R-22.4 留册未动。
+- **KDoc-only 改述（判定为合规，不含行为改动）**：`MyWordsScreen.kt`、`WordListFormat.kt`、
+  `components/WordRow.kt`、`MyWordsScreenTest.kt`、以及规格 `docs/superpowers/specs/2026-10-17-ui-redesign-design.md`
+  §3 `WordRow` 行「证据」列——把「三页并存」的旧陈述改成下线现状，避免留下指向已删文件的陈旧行号。
+
+### 台账动作（三张棘轮逐张交代）
+
+1. `SharedComponentUniquenessRatchetTest` **页头族** seed 删 `"FavoritesScreen.kt"`、`"WrongWordsScreen.kt"` 两行，
+   **词行族** `specWordRowFiles` 同批摘同名两枚——两处都留了注释点名「随 22-B 下线」，族内其余行与其他两族一字未动。
+2. 本节点有一枚**控制者修复**必须留名：接续席在临终末笔把 `"MyWordsScreen.kt"` **误登记为页头债务**（该屏早已接线
+   `AppScreenHeader(`，属「把唯一份登记成债务」的反向错形）。控制者现跑
+   `each_family_offender_set_equals_its_seed_exactly` 得 `cleared=[MyWordsScreen.kt]` **判红**
+   （留档 `t22B-cont-controller-ratchet-probe.log`），删掉该行后 focused 复跑转绿
+   （`t22B-cont-controller-ratchet-fixed.log`，`BUILD SUCCESSFUL in 30s`）。
+   教训已进台账：席位的 GATE 绿灯**不覆盖其绿灯之后的末笔编辑**，收口前必须重跑。
+3. `RawColorLiteralRatchetTest` 与 `DarkTokenConsumptionRatchetTest` **一字不动**。
+   后者对 `CheckInScreen.kt` 的登记值仍成立：
+   `grep -cE "\b(AppPalette|DomainColors)\.[A-Za-z0-9_]+" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt` = `7`
+   （摘掉的两条链是纯文字 `Text`，本来就不读令牌）。
+
+### 代价（可达性与观感变化，登记为目视项，不宣称「未变」）
+
+- **入口少了一处**：打卡页页头不再有「收藏」「错词」两条直达文字链。用户此后须经底部「我的词」进入合并页分段。
+  这是 spec §6 表格 ③「打卡页回归统计职责」的**正面执行**，但确实改变了两条老路径的可达性——见「仍待用户目视」⑦。
+- **返回栈少两层**：`showFavorites` / `showWrongWords` 叠层消失后，从「我的词」返回只退一层。
+- **删判据的账面**：`CheckInScreenTest` 用例数净变化为 0（删一枚 48dp 触控、加一枚反向不渲染），
+  48dp 护栏改由 `AppScreenHeaderTest` 与更名后的标题列腿承重。
+
+### 凭据（控制者亲跑，HEAD `3f989db`）
+
+- 门控 `:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin --no-daemon --no-build-cache --rerun-tasks`：
+  `BUILD SUCCESSFUL in 3m 36s`，XML 现算 `suites=236 tests=1750 skipped=0 failures=0 errors=0`
+  （批 3 上一记录 1748 → +2 枚 JVM 闭集判据；本行是运行日志不是规范值）——`t22B-cont-controller-gate.log`。
+- connected（仅 `emulator-5574`，`adb install -r` + `am instrument`，未用 `connectedDebugAndroidTest`）：
+  `CheckInScreenTest OK (8)`、`MyWordsScreenTest OK (14)`、`AppScreenTest OK (50)`、`TodayPlanScreenTest OK (21)`
+  ——`t22B-cont-controller-connected.log`。首跑 `AppScreenTest` 有 1 枚 flake
+  （`startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan`），单方法复跑 OK、全类复跑 OK(50)，控制者本人再复跑亦 OK(50)。
+- `font_scale = 2.0` 设备档轮：跑前回显 `1.0`、置档回显 `2.0`、收工回显 `1.0`
+  （`t22B-cont-fontscale2.0-echo.log` / `t22B-cont-fontscale-restore-echo.log`）；2.0 档下
+  `CheckInScreenTest` `OK (8)`、`MyWordsScreenTest` `OK (14)`、`AppScreenHeaderTest` `OK (4)` 全绿
+  （`t22B-cont-connected-5/6/7-*.log`）。22-B 改动面无大字号破口。
+- 真机 `bf353dda` 本节点未触碰。
+
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
 
 `app/src/test/java/com/example/englishlearning/ui/SourceRatchet.kt` 的 `stripComments` 现为**字符串感知**扫描实现：
@@ -408,7 +493,9 @@ adb -s emulator-5574 shell dumpsys user | grep 'State:'      # 期望 RUNNING_UN
 ④ 跟随系统的深色档与 `fontScale 2.0` 下底导与设置页不裁；
 ⑤ 打卡页完成度环的轨道色（Task 22-A / R-22.2：奶油 `#FFF1DB` → 语义槽 `tint`，明档变薄荷、暗档变深）是否可接受，
    还是要为「奶油轨道」单开一枚令牌（那属计划修订，不属实现席自决）；
-⑥ 打卡页环内完成度数位 28sp → 24sp（Task 22-A / R-22.3 的 headline 清零代价）是否偏小。
+⑥ 打卡页环内完成度数位 28sp → 24sp（Task 22-A / R-22.3 的 headline 清零代价）是否偏小；
+⑦ 打卡页页头两条裸文字链摘除后（Task 22-B），从打卡页**找不到**收藏与错词的直达入口——须确认
+   「经底部『我的词』进合并页分段」这条替代路径在人手里可达且可接受（自动化只证明合并页能走通，证明不了「用户知道要去这儿」）。
 
 重算本清单在册枚数：`sed -n '/^## 仍待用户目视/,/^## /p' docs/verification/ui-redesign-2026-10.md | grep -cE '^[①-⑩]'`。
 
