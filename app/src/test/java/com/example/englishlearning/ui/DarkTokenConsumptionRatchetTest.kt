@@ -77,11 +77,11 @@ internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     "theme/AppType.kt" to 6,
     "WordAiQaScreen.kt" to 3,
     "ImageStudioScreen.kt" to 2,
-    "AiFeatureScreen.kt" to 3,
+    // Task 23（R-23.6）：`AiFeatureScreen.kt`（原 3 枚）与 `AiLearningScreen.kt`（原 2 枚）两行 seed 已随迁移删除——
+    // 五枚静态读点全部改走 appColors() / appDomain()，逐成员计数归零即摘整行（不是把数字改成 0）。
     "AppScreen.kt" to 3,
     "SentenceAnalysisScreen.kt" to 1,
     "components/glass/GlassOverlay.kt" to 2,
-    "AiLearningScreen.kt" to 2,
     "BackupExportScreen.kt" to 2,
     "components/glass/GlassDialog.kt" to 1,
     "ArticleImportScreen.kt" to 1,
