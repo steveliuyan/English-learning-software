@@ -415,8 +415,10 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
    **词行族** `specWordRowFiles` 同批摘同名两枚——两处都留了注释点名「随 22-B 下线」，族内其余行与其他两族一字未动。
 2. 本节点有一枚**控制者修复**必须留名：接续席在临终末笔把 `"MyWordsScreen.kt"` **误登记为页头债务**（该屏早已接线
    `AppScreenHeader(`，属「把唯一份登记成债务」的反向错形）。控制者现跑
-   `each_family_offender_set_equals_its_seed_exactly` 得 `cleared=[MyWordsScreen.kt]` **判红**
-   （留档 `t22B-cont-controller-ratchet-probe.log`），删掉该行后 focused 复跑转绿
+   `each_family_offender_set_equals_its_seed_exactly` **判红**（`t22B-cont-controller-ratchet-probe.log:48` 点名该用例 FAILED），
+   差集内容（cleared 侧的 `MyWordsScreen.kt`）由控制者当场读该次的 JUnit 报告得出——
+   **gradle 的控制台日志只点名到用例一级，不含差集字面量，别把这句当日志字面量凭据**；
+   删掉该行后 focused 复跑转绿
    （`t22B-cont-controller-ratchet-fixed.log`，`BUILD SUCCESSFUL in 30s`）。
    教训已进台账：席位的 GATE 绿灯**不覆盖其绿灯之后的末笔编辑**，收口前必须重跑。
 3. `RawColorLiteralRatchetTest` 与 `DarkTokenConsumptionRatchetTest` **一字不动**。
@@ -429,22 +431,36 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 - **入口少了一处**：打卡页页头不再有「收藏」「错词」两条直达文字链。用户此后须经底部「我的词」进入合并页分段。
   这是 spec §6 表格 ③「打卡页回归统计职责」的**正面执行**，但确实改变了两条老路径的可达性——见「仍待用户目视」⑦。
 - **返回栈少两层**：`showFavorites` / `showWrongWords` 叠层消失后，从「我的词」返回只退一层。
-- **删判据的账面**：`CheckInScreenTest` 用例数净变化为 0（删一枚 48dp 触控、加一枚反向不渲染），
-  48dp 护栏改由 `AppScreenHeaderTest` 与更名后的标题列腿承重。
+- **删判据的账面**：`CheckInScreenTest` 用例数净变化为 0（删一枚 48dp 触控、加一枚反向不渲染）。
+  触控承重的**准确表述**（评审席 A-4 纠正本席原话「护栏未丢」过强）：链摘除后打卡页页头唯一可点节点是共享组件的返回位，
+  其 48dp 由 `AppScreenHeaderTest:53-63` 在**默认 `fontScale`** 下实测两轴承住；`CheckInScreenTest` 保留的那条大字号腿
+  量的是**标题 Text 的宽度**（不是可点区）。**`fontScale 2.0` 档下页头可点区的 48dp 全仓无测**——这是被删用例
+  KDoc 早已点名给 Task 26 的既存债，不由 22-B 引入，但也不由 22-B 补齐。
+- **一度丢失的说明文案（评审席 A-1 抓到；控制者裁定逐字补回，裁定号 R-22B.3，落地随本节点的修复轮提交，补回前本行即为已知缺口）**：旧错词页在列表非空时有一行排序说明
+  「最近一次标记为「不认识」的词，按到期先后排列。」（`WrongWordsScreen.kt:97`），22-B 摘屏时随屏消失且未进本段台账
+  ——合并页错词段只搬了**空态**文案，没搬这一行。控制者裁定：这属裁决①「三段承接两屏职责」漏搬的一层，
+  按同文件既有先例（生词本段空态 `readingDescription` 「逐字搬旧页那条，缺它即比旧页少一层」）**逐字补回**合并页错词段，
+  而非登记成永久代价。补回面与判据见本节点修复轮提交。
 
 ### 凭据（控制者亲跑，HEAD `3f989db`）
 
 - 门控 `:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin --no-daemon --no-build-cache --rerun-tasks`：
   `BUILD SUCCESSFUL in 3m 36s`，XML 现算 `suites=236 tests=1750 skipped=0 failures=0 errors=0`
-  （批 3 上一记录 1748 → +2 枚 JVM 闭集判据；本行是运行日志不是规范值）——`t22B-cont-controller-gate.log`。
+  （分母出自 `task-22B-brief.md` §四.2 写给席位的开工基线 1748，**本档不另立该记录**；+2 枚 JVM 闭集判据；
+  本行是运行日志不是规范值，重算命令见本文开头「门禁与基线」）——`t22B-cont-controller-gate.log`。
 - connected（仅 `emulator-5574`，`adb install -r` + `am instrument`，未用 `connectedDebugAndroidTest`）：
   `CheckInScreenTest OK (8)`、`MyWordsScreenTest OK (14)`、`AppScreenTest OK (50)`、`TodayPlanScreenTest OK (21)`
   ——`t22B-cont-controller-connected.log`。首跑 `AppScreenTest` 有 1 枚 flake
   （`startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan`），单方法复跑 OK、全类复跑 OK(50)，控制者本人再复跑亦 OK(50)。
-- `font_scale = 2.0` 设备档轮：跑前回显 `1.0`、置档回显 `2.0`、收工回显 `1.0`
-  （`t22B-cont-fontscale2.0-echo.log` / `t22B-cont-fontscale-restore-echo.log`）；2.0 档下
-  `CheckInScreenTest` `OK (8)`、`MyWordsScreenTest` `OK (14)`、`AppScreenHeaderTest` `OK (4)` 全绿
-  （`t22B-cont-connected-5/6/7-*.log`）。22-B 改动面无大字号破口。
+- `font_scale = 2.0` 设备档轮：跑前回显 **`null`**（该 setting 键未设置，等价于系统默认档，**不等于回显 `1.0`**——
+  评审席 B-1 纠正本席原话）、置档回显 `2.0`（`t22B-cont-fontscale2.0-echo.log`）、收工复位回显 `1.0`
+  （`t22B-cont-fontscale-restore-echo.log`）；2.0 档下实跑的是三类：
+  `CheckInScreenTest OK (8)`（`t22B-cont-connected-5-*.log`）、`MyWordsScreenTest OK (14)`（`-6-*.log`）、
+  `AppScreenTest` 合并页承接链**子集** `OK (4)`（`-7-*.log`；该类整类是 50 枚，本档只跑了其中 4 枚，
+  日志按当时命令只记到「类 + 例数」一级，方法列表未落进该文件）。
+  共享页头组件在大字号档的证据 `AppScreenHeaderTest OK (4)` 出自 **Task 22-A** 那轮
+  （`t22A-connected-fontscale2.0.log`），22-B **未重跑该组件类**——评审席 B-2 纠正本席原话。
+  22-B 改动面在本席这几轮里无大字号破口。
 - 真机 `bf353dda` 本节点未触碰。
 
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
