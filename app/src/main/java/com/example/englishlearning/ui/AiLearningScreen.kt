@@ -39,19 +39,24 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.components.AppGlyph
+import com.example.englishlearning.ui.components.AppGlyphLayer
+import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.mascot.AiMascot
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
-import com.example.englishlearning.ui.theme.AppPalette
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 
 private val AiHeaderGradient = Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))
 
@@ -87,8 +92,12 @@ fun AiLearningScreen(
     onOpenWordList: () -> Unit,
 ) {
     var explainerOpen by rememberSaveable { mutableStateOf(false) }
-    // 功能入口默认收起：用户反感扁平长列表，展开键把目录折叠成一行，点开才见全部功能。
-    var featuresOpen by rememberSaveable { mutableStateOf(false) }
+    // 裁决④（AC-R-23）：默认展开的是**现在能用**的能力，折叠键只管「未上线」那批。
+    // 旧形状把 3 枚可用与 4 枚未上线混成一句「AI 功能（7 个）展开 ˅」，
+    // 用户要么整页收起看不到能用的东西，要么展开后被四枚坏入口刷屏。
+    var unreleasedOpen by rememberSaveable { mutableStateOf(false) }
+    val implementedFeatures = AiFeature.entries.filter { it.implemented }
+    val unreleasedFeatures = AiFeature.entries.filter { !it.implemented }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -99,25 +108,35 @@ fun AiLearningScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         AiHeaderCard(aiConfigured = aiConfigured)
-        TextButton(
-            onClick = { featuresOpen = !featuresOpen },
+        Text(
+            text = "现在能用（${implementedFeatures.size} 个）",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MintPrimaryDark,
+            modifier = Modifier.testTag("ai_learning_available_section"),
+        )
+        implementedFeatures.forEach { feature ->
+            AiFeatureRow(feature = feature, onOpen = { onOpenFeature(feature) })
+        }
+        // 未上线那批压成一条折叠行：这一行自己就标着「未上线」，不必点开也知道下面压的是什么。
+        // 折叠入口走共享 EntryRow（48dp 以上可点面 + 展开态语义），不再手搓第二份折叠件。
+        EntryRow(
+            icon = AppIcon.Spark,
+            domain = AppDomain.AiSpeech,
+            title = "未上线功能（${unreleasedFeatures.size} 个）",
+            subtitle = "点开逐条看进度与还差什么",
+            trailing = featureStatusBadge(false),
+            expanded = unreleasedOpen,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("ai_learning_features_toggle")
-                .semantics { contentDescription = "AI 功能列表展开收起" },
-            colors = ButtonDefaults.textButtonColors(contentColor = MintPrimaryDark),
-        ) {
-            Text(
-                text = if (featuresOpen) "AI 功能 收起 ˄" else "AI 功能（${AiFeature.entries.size} 个）展开 ˅",
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        if (featuresOpen) {
+                .testTag("ai_learning_unreleased_toggle"),
+        ) { unreleasedOpen = !unreleasedOpen }
+        if (unreleasedOpen) {
             Column(
                 modifier = Modifier.fillMaxWidth().animateContentSize(),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                AiFeature.entries.forEach { feature ->
+                unreleasedFeatures.forEach { feature ->
                     AiFeatureRow(feature = feature, onOpen = { onOpenFeature(feature) })
                 }
             }
@@ -133,6 +152,9 @@ fun AiLearningScreen(
 
 @Composable
 private fun AiHeaderCard(aiConfigured: Boolean) {
+    // 批 3 Task 23（R-23.6）：状态徽章的两枚墨色改走组合期取值。浅套逐值与旧静态源相同，
+    // 深色档从「停在浅值」变成按档取值——这是迁令牌的目的，观感代价登记在验证文档与报告。
+    val colors = appColors()
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         shape = RoundedCornerShape(24.dp),
@@ -174,7 +196,7 @@ private fun AiHeaderCard(aiConfigured: Boolean) {
                     text = if (aiConfigured) "AI 已配置" else "AI 尚未接通",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (aiConfigured) DomainColors.AiSpeech.deep else AppPalette.TextSecondary,
+                    color = if (aiConfigured) appDomain(AppDomain.AiSpeech).deep else colors.text2,
                 )
             }
         }
@@ -183,6 +205,7 @@ private fun AiHeaderCard(aiConfigured: Boolean) {
 
 @Composable
 private fun AiFeatureRow(feature: AiFeature, onOpen: () -> Unit) {
+    val status = featureStatusBadge(feature.implemented)
     Card(
         colors = CardDefaults.cardColors(containerColor = MintSurface),
         shape = RoundedCornerShape(20.dp),
@@ -191,7 +214,10 @@ private fun AiFeatureRow(feature: AiFeature, onOpen: () -> Unit) {
             .border(1.dp, MintOutline, RoundedCornerShape(20.dp))
             .testTag("ai_feature_${feature.key}")
             .clickable(onClick = onOpen)
-            .semantics { contentDescription = feature.title },
+            // TalkBack 读一行要同时读到「哪个能力」与「现在能不能用」，只念能力名等于把
+            // 裁决④ 的判断又推回给用户自己猜。「状态：」这枚中文引导词是
+            // `AccessibilityLabelContractTest` 禁令 1a 要求的（字面量里必须留中文，插值不算）。
+            .semantics { contentDescription = "${feature.title}，状态：$status" },
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
@@ -203,14 +229,33 @@ private fun AiFeatureRow(feature: AiFeature, onOpen: () -> Unit) {
                     .background(MintTint, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(feature.glyph, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
+                // 裁决④ / spec §4.2：单字中文（文/填/听/讲/析/拍/画）不再当图标，
+                // 换 AI 域锚点字形 AppIcon.Spark；层取默认 Duotone（取证与理由见报告 §4）。
+                AppGlyph(icon = AppIcon.Spark, tint = MintPrimaryDark, size = 20.dp)
             }
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text(feature.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
                 Spacer(Modifier.height(3.dp))
                 Text(feature.summary, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
             }
-            Text("›", style = MaterialTheme.typography.titleLarge, color = MintTextMuted)
+            Text(
+                text = status,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MintPrimaryDark,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .testTag("ai_feature_status_badge_${feature.key}"),
+            )
+            // 「›」这个字符也不再当图标：与 EntryRow / NotConfiguredCard 的尾部箭头同一形状
+            // （16dp + 显式 StrokeOnly，ChevronRight 本就在两层豁免表里，没有填充层可画）。
+            AppGlyph(
+                icon = AppIcon.ChevronRight,
+                tint = MintTextMuted,
+                size = 16.dp,
+                modifier = Modifier.padding(start = 6.dp),
+                layer = AppGlyphLayer.StrokeOnly,
+            )
         }
     }
 }

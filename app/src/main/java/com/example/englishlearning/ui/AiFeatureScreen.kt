@@ -32,7 +32,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.components.AppGlyph
+import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
@@ -43,6 +44,7 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appColors
 
 private val AiFeatureGradient = Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))
 
@@ -62,6 +64,10 @@ fun AiFeatureScreen(
     onOpenSettings: () -> Unit,
     onOpenLearning: () -> Unit,
 ) {
+    // 批 3 Task 23（R-23.6）：本屏两枚墨色改走组合期 `appColors()`，深色档不再停在浅套静态值。
+    // 顶层 `AiFeatureGradient` 保持静态（Task 3 口径：品牌渐变模式不动），它读的是 `AppleMint*`，
+    // 不是本屏的静态读点。
+    val colors = appColors()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -81,10 +87,17 @@ fun AiFeatureScreen(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(44.dp).background(AiFeatureGradient, RoundedCornerShape(14.dp)),
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(AiFeatureGradient, RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(feature.glyph, fontWeight = FontWeight.Bold, color = AppPalette.OnMintPrimary, style = MaterialTheme.typography.titleLarge)
+                // 裁决④ / spec §4.2：单字中文不当图标。换共享字形 AppIcon.Spark（AI 域锚点，
+                // 与底导「AI」槽同一枚），层走默认 Duotone——现盘取证见 `t23-render-evidence-icon-gallery.log`
+                // 与报告：40dp 容器档的两层 Spark 在真机上描边与填充都出得来，
+                // 而 StrokeOnly 正是真机 QA「图标一半一半」那批站点的共同形状（属 Task 27，本席不跟）。
+                // 压品牌渐变的前景按 2026-10-18 裁决 #3 取 on-brand（`AiBadgeContrastFixTest` 当场复算亮度）。
+                AppGlyph(icon = AppIcon.Spark, tint = colors.onBrand, size = 22.dp)
             }
             Column(Modifier.padding(start = 14.dp)) {
                 Text(
@@ -155,7 +168,7 @@ fun AiFeatureScreen(
                         .testTag("ai_feature_open_settings")
                         .semantics { contentDescription = "去配置 AI 服务" },
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = colors.onMint),
                 ) { Text("去配置 AI 服务", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = onOpenLearning,
@@ -186,7 +199,10 @@ private fun SectionCard(tag: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun StatusPill(implemented: Boolean) {
-    val label = if (implemented) "可用" else "未实现"
+    val colors = appColors()
+    // 徽章面文案只有一个出处（R-23.9）：featureStatusBadge(implemented)。
+    // 目录原文（AiFeature.status 的「已可用：…」/「未实现：…」）是另一面，本屏照旧原样渲染。
+    val label = featureStatusBadge(implemented)
     Box(
         modifier = Modifier
             .background(if (implemented) MintPrimary else MintTint, RoundedCornerShape(50))
@@ -197,9 +213,9 @@ private fun StatusPill(implemented: Boolean) {
             text = label,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            // 「可用」档底是 MintPrimary（≈2.1:1 白字违规），「未实现」档底是浅 MintTint；
-            // 两档文字统一深字，底色按裁决保持不变。
-            color = if (implemented) AppPalette.OnMintPrimary else MintPrimaryDark,
+            // 「现在能用」档底是 MintPrimary（浅套那枚薄荷主色，旧白字 ≈2.1:1 违规，批 1 已换深字），
+            // 「未上线」档底是浅 MintTint + MintPrimaryDark 深字；两档底色按裁决保持不变。
+            color = if (implemented) colors.onMint else MintPrimaryDark,
         )
     }
 }
