@@ -2123,6 +2123,26 @@ internal val MintBackground: Color
     （现盘 `AiFeatureScreen.kt:189` 是「可用」/「未实现」）；但 `AiFeature.status` 目录原文
     （`AiFeature.kt:16` 契约：未实现必须以「未实现」开头）**一字不改**，
     `AiFeatureScreenTest` 里 `status_block_repeats_the_catalogue_wording` 那类断目录原文的用例保持原文。
+  - **R-23.7（不迁页头，控制者 2026-10-24 裁定）**：`SharedComponentUniquenessRatchetTest` 页头族里 `"AiFeatureScreen.kt"`、
+    `"AiLearningScreen.kt"` 两行 seed 本席**一字不动**（两屏 `AppScreenHeader(` 现盘计数 = 0，硬迁会和 Task 22-B / Task 26 的账打架）。
+    页头收编归 **Task 26 收口账**。
+  - **R-23.8（「默认展开」的真实形状）**：不是把 `featuresOpen` 默认值翻成 `true` 了事。要的是
+    ① `implemented = true` 的三枚默认可见；② `implemented = false` 的四枚压成**一条**折叠行并标「未上线」；
+    ③ 折叠标题现盘那句 `"AI 功能（${AiFeature.entries.size} 个）展开 ˅"` 把可用与未上线混成一枚总数，正是裁决④ 要消掉的误导。
+    默认态必须能在 connected 侧「不点任何东西」直接断言（三枚可用 `assertIsDisplayed` + 四枚未上线不在树上）。
+  - **R-23.9（产出落点）**：`fun featureStatusBadge(implemented: Boolean): String` 放 **`ui/AiFeature.kt`**（与目录同文件），
+    **不新开组件文件、不进 `components/`**——否则组件族名单要跟着动，那是未授权面。
+  - **R-23.10（徽标渲染档）**：换 `AppIcon.Spark` 用 `AppGlyph(...)`，`layer` 取默认 `Duotone` 还是显式 `StrokeOnly` 由实现席
+    现盘取证后自定并写明理由；**禁止新开 `IconBadge` 的 `EntryIconTone.Tint` 用法**（`IconBadge.kt` 该档硬传 `StrokeOnly`，
+    正是真机 QA「图标一半一半」B-1 的根因，属 **Task 27**）。品牌渐变面前景按裁决 3 取 `onBrand`。
+  - **R-23.11（不扩面）**：`MintPrimary` / `MintTint` / `MintTextMuted` / `MintPrimaryDark` 这类批 1 前的裸常量
+    不属本批（`DarkTokenConsumptionRatchetTest` 不计它们，plan 未授权），只在报告登记剩余枚数与重算命令，留给 Task 26。
+  - **R-23.12（并发面）**：Task 22-B 在飞时 `AppScreen.kt`、`CheckInScreen.kt`、`MyWordsScreenContractTest.kt` 一字不许动；
+    两屏挂载点行号会随 22-B 漂移 ⇒ 本批判据**一律符号锚定，禁止锚行号**。
+  - **R-23.13（令牌对位，控制者实核）**：五枚静态读点全部有对位令牌，**不需要新增 `AppColorSet` 槽**：
+    `AppPalette.OnMintPrimary` ↔ `appColors().onMint`、`AppPalette.TextSecondary` ↔ `appColors().text2`、
+    `DomainColors.AiSpeech.deep` ↔ `appDomain(AppDomain.AiSpeech).deep`。浅套逐值等价、**深套由静态浅值改为按档取值**
+    = 本批唯一真实观感代价，须写进验证文档与报告。五枚迁完后两行 seed 归 0 ⇒ 按 R-23.6 **删行**（不是把数字写成 0）。
 - [ ] **Step 4: 门控 + connected（含 TalkBack 读能力名 + 状态）+ 提交**（`feat(ui-ai): AI 主页默认展开可用能力并去掉文字徽标`）。
 
 ---
