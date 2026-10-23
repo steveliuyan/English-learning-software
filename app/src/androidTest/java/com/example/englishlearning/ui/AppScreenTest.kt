@@ -633,7 +633,8 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_ai").performClick()
         composeRule.waitForIdle()
-        // 功能列表默认收起，先展开才能点具体功能。
+        // 裁决④ 后已上线三行默认可见、折叠键只管「未上线」那批；cloze 属未上线批，
+        // 这一枚点开折叠行是**必要动作**，不是旧「整页默认收起」形状的残留。
         composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_feature_cloze").performScrollTo().performClick()
@@ -1391,8 +1392,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_ai").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
-        composeRule.waitForIdle()
+        // 长难句分析是已上线行（裁决④ 后默认可见），折叠键只管未上线批，这里不需要点它。
         composeRule.onNodeWithTag("ai_feature_sentence-analysis").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("sentence_analysis_screen").assertExists()
@@ -1435,8 +1435,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_ai").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
-        composeRule.waitForIdle()
+        // AI 生图同样是已上线行，默认可见；点开未上线折叠行是白增耦合，删之。
         composeRule.onNodeWithTag("ai_feature_image-studio").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("image_studio_screen").assertExists()

@@ -4,9 +4,15 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertHasClickAction
+import com.example.englishlearning.ui.theme.AppColorDark
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintStart
+import com.example.englishlearning.ui.theme.DomainColors
+import com.example.englishlearning.ui.theme.DomainDark
+import com.example.englishlearning.ui.theme.MintGlassTheme
+import com.example.englishlearning.ui.theme.ThemeMode
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
@@ -88,6 +94,72 @@ class AiLearningScreenTest {
         assertTrue("AI detail action should render mint gradient start", pixels.minOf { colorDistance(it, AppleMintStart.toArgb()) } <= 18.0)
         assertTrue("AI detail action should render softened mint end", pixels.minOf { colorDistance(it, 0xFF65D3B9.toInt()) } <= 18.0)
         assertTrue("AI detail action should use readable teal text", pixels.minOf { colorDistance(it, 0xFF174C44.toInt()) } <= 18.0)
+    }
+
+    /**
+     * 深色档取证（Task 23 修复轮 R-23.14）：状态胶囊的容器是 `Color.White.copy(alpha = 0.85f)`，
+     * **主题无关**的亮容器——两档底色几乎相同，前景单迁主题访问器就是本轮的 AA 回归：
+     * 深色档 `colors.text2` 取到 #9FB3AA 亮灰压白胶囊（1.69:1）。回退后未配置档必须仍逐像素
+     * 打出登记的静态中性墨 `AppPalette.TextSecondary`（浅档 4.02:1 是 deep-on-white 同形既有债，另行登记）。
+     *
+     * 深色档走显式 `MintGlassTheme(themeMode = ThemeMode.Dark)` 包装（先例 `ThemeModeSwitchTest`、
+     * `glass/GlassPanelThemeInkTest.kt:290`）：本类 `setContent` 不带主题提供者，
+     * `cmd uimode night` 翻不动它（`LocalAppColors` 的 `compositionLocalOf` 默认值停在浅套），
+     * 应用侧真实路径是设置页主题档——两条路径的差别与读数记录在修复轮报告。
+     */
+    @Test fun dark_tier_keeps_the_registered_static_neutral_ink_on_the_theme_invariant_pill() {
+        composeRule.setContent {
+            MintGlassTheme(themeMode = ThemeMode.Dark) {
+                AiLearningScreen(
+                    todayWordCount = 12,
+                    dueWordCount = 5,
+                    aiConfigured = false,
+                    onOpenFeature = {},
+                    onOpenWordList = {},
+                )
+            }
+        }
+        // 前置腿：页底角落 = AppColorDark.background，证明深色档确实到位（不是浅套冒充）。
+        val screen = composeRule.onNodeWithTag("ai_learning_screen").captureToImage().asAndroidBitmap()
+        assertEquals("dark tier must be actually rendered before the pill leg counts",
+            AppColorDark.background.toArgb(), screen.getPixel(0, 0))
+        val badge = composeRule.onNodeWithTag("ai_learning_status_badge").captureToImage().asAndroidBitmap()
+        val registered = AppPalette.TextSecondary.toArgb()
+        assertTrue("the theme-invariant white pill keeps its registered static neutral ink",
+            (0 until badge.width).any { x -> (0 until badge.height).any { y -> badge.getPixel(x, y) == registered } })
+        // 迁移后的深色值就是回归形状本身：亮灰字身哪怕出现一次都判红。
+        val migratedDarkInk = AppColorDark.text2.toArgb()
+        assertTrue(
+            "the migrated-on-MintTheme text2 must not be painted into a theme-invariant container",
+            (0 until badge.width).none { x -> (0 until badge.height).any { y -> badge.getPixel(x, y) == migratedDarkInk } },
+        )
+    }
+
+    /** 同胶囊的配置档：登记的静态 `DomainColors.AiSpeech.deep`（#188F76）在场，深色域亮值（#35E0AC）禁入。 */
+    @Test fun dark_tier_keeps_the_registered_deep_ink_on_the_configured_pill() {
+        composeRule.setContent {
+            MintGlassTheme(themeMode = ThemeMode.Dark) {
+                AiLearningScreen(
+                    todayWordCount = 12,
+                    dueWordCount = 5,
+                    aiConfigured = true,
+                    onOpenFeature = {},
+                    onOpenWordList = {},
+                )
+            }
+        }
+        val screen = composeRule.onNodeWithTag("ai_learning_screen").captureToImage().asAndroidBitmap()
+        assertEquals("dark tier must be actually rendered before the pill leg counts",
+            AppColorDark.background.toArgb(), screen.getPixel(0, 0))
+        val badge = composeRule.onNodeWithTag("ai_learning_status_badge").captureToImage().asAndroidBitmap()
+        val registeredDeep = DomainColors.AiSpeech.deep.toArgb()
+        assertTrue("configured pill keeps the registered static deep ink",
+            (0 until badge.width).any { x -> (0 until badge.height).any { y -> badge.getPixel(x, y) == registeredDeep } })
+        val darkDomainDeep = DomainDark.getValue(AppDomain.AiSpeech).deep.toArgb()
+        assertTrue(
+            "the bright dark-tier domain deep (2.21:1 on the white pill) must not be painted here",
+            (0 until badge.width).none { x -> (0 until badge.height).any { y -> badge.getPixel(x, y) == darkDomainDeep } },
+        )
     }
 
     private fun colorDistance(actual: Int, expected: Int): Double {
