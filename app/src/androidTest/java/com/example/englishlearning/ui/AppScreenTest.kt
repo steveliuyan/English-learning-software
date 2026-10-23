@@ -472,8 +472,9 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_learning_screen").assertExists()
         composeRule.onNodeWithTag("ai_learning_header").assertExists()
-        // 功能列表默认收起在展开键后面，先展开再断言入口存在。
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        // 裁决④（Task 23）之后：已上线的三枚默认可见，折叠键只管「未上线」那批，
+        // 所以这里点开折叠行才凑得齐全部七枚入口（旧标签 ai_learning_features_toggle 已随形状改名）。
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
         AiFeature.entries.forEach { feature ->
             composeRule.onNodeWithTag("ai_feature_${feature.key}").assertExists()
@@ -633,7 +634,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_ai").performClick()
         composeRule.waitForIdle()
         // 功能列表默认收起，先展开才能点具体功能。
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_feature_cloze").performScrollTo().performClick()
         composeRule.waitForIdle()
@@ -1390,7 +1391,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_ai").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_feature_sentence-analysis").performScrollTo().performClick()
         composeRule.waitForIdle()
@@ -1434,7 +1435,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_ai").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("ai_learning_features_toggle").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_learning_unreleased_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_feature_image-studio").performScrollTo().performClick()
         composeRule.waitForIdle()
