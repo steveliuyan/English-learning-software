@@ -172,7 +172,7 @@ fun AiFeatureScreen(
                         .testTag("ai_feature_open_settings")
                         .semantics { contentDescription = "去配置 AI 服务" },
                     shape = RoundedCornerShape(14.dp),
-                    // R-23.13：容器 MintPrimary 两套皆亮，前景按主题分档（浅 onMint ≈4.62:1 / 深 onBrand ≈7.79:1，
+                    // R-23.13：容器 MintPrimary 两套皆亮，前景按主题分档（浅 onMint ×#2EC99C ≈4.62:1 / 深 onBrand ×#35E0AC ≈9.74:1，
                     // 比值由 AiBadgeContrastFixTest 按活 token 当场复算）；容器随主题改造归 Task 26/27。
                     colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = if (!LocalIsDark.current) colors.onMint else colors.onBrand),
                 ) { Text("去配置 AI 服务", fontWeight = FontWeight.Bold) }
