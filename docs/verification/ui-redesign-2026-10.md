@@ -474,7 +474,8 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   + 说明行矩形必须落在 `my_words_section_wrong` 容器内（挡挂到别的段）。
   重算：`git grep -n "按到期先后排列" HEAD -- app/src` 现在**生产侧与判据侧各有命中**（22-B 收工时此处为零）。
 - **修复轮 1 的另三件（`353ff25` / `abba685` / `7afa858` / `492c42d`）**：
-  ① 新立 JVM 源码形状契约 `CheckInScreenHeaderShapeContractTest`（4 枚）——钉 `CheckInScreen.kt` 恰一处
+  ① 新立 JVM 源码形状契约 `CheckInScreenHeaderShapeContractTest`（立时 4 枚，修复轮 2 后 6 枚；
+  重算 `grep -c "@Test" app/src/test/java/com/example/englishlearning/ui/CheckInScreenHeaderShapeContractTest.kt`）——钉 `CheckInScreen.kt` 恰一处
   `AppScreenHeader(` 且**那次调用的实参区间**不含 `action`；两枚反事实腿把 `action = { … }` 与「只在注释里的 `action`」
   分别喂给同一提取器判红/判绿，实参括号配不平时**响亮失败而不是返回空串**（空串会让「不含 action」假绿，是该夹具最坏的失效形状）。
   补这条的理由：摘链的 `openFavoritesAndWrongWordsLinksAreNotRenderedOnCheckInHeader` 在 `androidTest`，
@@ -494,6 +495,30 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   **R-22B.11：扫描面不扩到测试树**——`src/test` 现盘 4 处合法历史引用（闭集判据自己的名单 + 三处历史叙述；
   重算 `grep -rn "WrongWordsScreen.kt\|FavoritesScreen.kt" app/src/test app/src/androidTest | wc -l`），
   扩面只会让判据永远红、逼人放宽它；测试树侧的死引用由 A-6 那类人工闸管。
+- **修复轮 2（窄复评席的 1 枚 major + 2 枚 minor ⇒ 裁定 R-22B.10 / R-22B.12；提交 `66dfc29` + `df80ac1`）**：
+  复评席抓到的漏检形状是真的——`components/AppScreenHeader.kt:72` 的 `action: @Composable (() -> Unit)? = null` 是**末位形参**，
+  于是 `AppScreenHeader(title = …, onBack = onBack) { Text("我的收藏") }` 这种**尾随 lambda** 写法合法编译、
+  实参区间一个 `action` 词元都没有，修复轮 1 那两枚 JVM 腿会全绿。
+  落地形状：判定入口收成 `headerCallHangsActionSlot` = 实参词元 **∪** 尾随 lambda；
+  姊妹夹具从**配平的右括号下标**起只跳分隔空白、只看首个非空白字符是否 `{`——
+  写成「在剩下的文本里找第一个 `{`」会当场假红，因为真实调用后面紧跟的是 `when (state) {`，
+  故另立一枚 `aFollowingWhenBlockIsNotMistakenForATrailingLambda` 做**假阳对照腿**。
+  覆盖面措辞同时改述到位：本类钉的是「共享页头那一次调用的两种挂槽形状」，
+  **不钉**「干脆不用共享页头、把私有 `Row` 页头长回来」（那归页头族 + `checkInScreenMountsTheSharedHeaderExactlyOnce`），
+  类 KDoc 与失败消息里的「任何……都在本条红」全称句已删。
+  F2 那枚 connected 判据补第四腿（说明行 `boundsInRoot().top` ≤ 第一枚词行 top，容差沿用本方法既有的 `±1f`，未新造阈值、未改前三腿）。
+- **控制者代跑的变异取证（席位只读禁跑，本控制者执行）**：
+  ① **真源码挂尾随 lambda**（把两条链以 `) { Text("我的收藏") … }` 形式补回 `CheckInScreen.kt:75`）
+  → `checkInHeaderCallCarriesNoActionSlot` **FAILED**，`6 tests completed, 1 failed`（`t22B-fix2-cont-mutation1-trailing-lambda.log`）
+  ⇒ R-22B.10 的 major 就此闭合，不是靠措辞而是靠实测。
+  ③ **整枚页头调用连锚点一起注释掉** → **两枚**红（恰一枚 + 实参腿的「找不到锚点」响亮失败），
+  证明锚点缺失不会被当成「不含 action」的假绿（`t22B-fix2-cont-mutation3-header-call-removed.log`）。
+  ⑧ **把排序说明行挪到 `forEachIndexed` 之后**（生产码临时改、跑完复原）→ 唯一红的是新第四腿，
+  其失败消息逐字点名「前三腿全部测不出来，本腿红」；复原后 `MyWordsScreenTest` `OK (15 tests)`
+  （`t22B-fix2-cont-mutation8-connected.log` / `t22B-fix2-cont-restore-connected.log`，全程只 `emulator-5574`，真机未触碰）。
+  其余五条（复评席待取证的 ②④⑤⑥⑦）不外跑：②④⑤ 的形状已由该类**自身的合成反事实腿**在同一提取器上自证，
+  ⑥⑦ 分别被逐字 `assertTextEquals` 与「落在 `my_words_section_wrong` 容器内」那腿直接覆盖——
+  登记为「类内自证 + 逻辑覆盖」，不等价于外部变异，Task 26 若要补齐全谱按此口径补。
 
 ### 凭据（控制者亲跑，HEAD `3f989db`）
 
@@ -514,6 +539,14 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   共享页头组件在大字号档的证据 `AppScreenHeaderTest OK (4)` 出自 **Task 22-A** 那轮
   （`t22A-connected-fontscale2.0.log`），22-B **未重跑该组件类**——评审席 B-2 纠正本席原话。
   22-B 改动面在本席这几轮里无大字号破口。
+- **修复轮 1 + 2 合并态的控制者全量门**（HEAD `df80ac1`，同一条三段门控带 `--offline`）：
+  `BUILD SUCCESSFUL in 3m 40s`、`59 actionable tasks: 59 executed`，XML 现算
+  `suites=237 tests=1756 skipped=0 failures=0 errors=0`（`t22B-fix2-controller-gate.log`）。
+  为什么还要本控制者再跑一次：修复席自己的门控原文（`t22B-fix1-gate.log`）早于其后三枚末笔提交、
+  修复轮 2 的收工读数只覆盖它那一枚提交——**席位绿灯不覆盖其后落库的编辑**，这条口径已登记在 R-22B.2 与其后的复跑里。
+  22-A 修复轮那一轮是 JVM 门（`:app:testDebugUnitTest` + `:app:compileDebugAndroidTestKotlin`，零 adb，
+  `BUILD SUCCESSFUL in 3m 4s`、`40 actionable tasks: 40 executed`，日志 `t22A-fix1-gate.log` 里 `FAILED` 零命中；
+  该席自报收工计数与开工同形 `237/1754` ⇒ 它确实一枚 `@Test` 未增删，而合并态由上面那条全量门背书）。
 - 真机 `bf353dda` 本节点未触碰。
 
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
