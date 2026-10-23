@@ -298,7 +298,15 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   `AppScreenHeaderTest.header_back_is_a_48dp_target_with_a_readable_description` 承重，护栏 KDoc 里点名了这次交接。
   新立 `CheckInScreenTest.headerIsCarriedByTheSharedAppScreenHeader` 钉「组件节点在册 + 旧 tag 必须消失」。
 - **headline 读点清零**（R-22.3）：整文件 `MaterialTheme.typography.headline` 读点归零——页头那一枚随私有
-  `Row` 消失，环内完成度数字（原 `headlineMedium` 28sp）改 `style = AppType.Headline`（24sp）。重算：
+  `Row` 消失，环内完成度数字那一枚从 `style = MaterialTheme.typography.headlineMedium` 改写为
+  `style = AppType.Headline`。**这是等价改写、零视觉变化**（修复轮 1 更正）：`headlineMedium` 在批 1 装配点
+  早已映射为 `AppType.Headline`（24sp），改前后读的是同一枚样式对象，**席位自述的那次数位收小从未发生**。
+  映射链三段重算（逐条命中即为成立）：
+  `grep -n "Headline = TextStyle\|headlineMedium = AppType.Headline" app/src/main/java/com/example/englishlearning/ui/theme/AppType.kt`
+  （同一文件里 `Headline` 定义为 `24.sp`、`appTypography()` 里 `headlineMedium = AppType.Headline.neutralForTheme()`）、
+  `grep -n "typography = appTypography()" app/src/main/java/com/example/englishlearning/ui/theme/MintGlassTheme.kt`
+  （M3 装配点）、`grep -n "\"headlineMedium\" to \"Headline\"" app/src/test/java/com/example/englishlearning/ui/MaterialThemeAssemblyContractTest.kt`
+  （该映射由在册 JVM 判据钉住，不可能漂移）。清零读数重算：
   `grep -cE "MaterialTheme\.typography\.headline" app/src/main/java/com/example/englishlearning/ui/CheckInScreen.kt`
   收工为 `0`。这是删页头族 seed 行的前置判据。
 - **裸 hex token 化**：`drawArc` 的轨道底色 `Color(0xFFFFF1DB)` 改为复用现成语义槽 `appColors().tint`，
@@ -349,8 +357,11 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 - **R-22.2 环色**：完成度环的轨道从奶油 `#FFF1DB` 换成 `tint`——明档 `#DDF7E8`、暗档 `#1C2C26`
   （`theme/AppColors.kt`）。观感从「奶油环」变「薄荷环」，且**暗档下轨道由奶油变深**
   （此前一枚裸 hex 在明暗两档是同一枚奶油）。本席未为此新增 token、未改任何棘轮。
-- **完成度数位收小**：环内百分比 28sp → 24sp（`AppType.Headline`）。不取 `AppType.Display`（34sp）的理由：
-  环内净空仅约 108dp，`fontScale 2.0` 下 34sp 会把「100%」顶出环、反造 AC-R-07 破口。
+- **本屏字号未变**（装配点早已把 `headlineMedium` 映射为 `AppType.Headline`），R-22.3 收的是 `MaterialTheme.typography`
+  读点归零，不是观感。原登记的「**完成度数位收小**：环内百分比 28sp → 24sp」与「不取 `AppType.Display`（34sp）
+  因净空不足」两条**一并撤销**——它们描述的动作从未发生（等价改写，见上节三条重算命令）。
+  本屏真实成立的观感代价只有 R-22.2 完成环轨道色那一条（目视清单⑤）。
+  留名：`3eb703b` 提交消息里那句字号代价**不可改**（提交已入库），以本节更正为准。
 - **打卡页华丽动效**：本轮**未做**（spec §1 不做的事 #5，不引入动画代码）——华丽动效属另批范围。
 
 ### `fontScale 2.0` 设备档护栏与本席的边界
@@ -361,6 +372,22 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 `app/src` 整体 stash 回 BASE 后在同一设备、同一 2.0 档复跑，得到**逐枚同名同因**的 3+1 失败
 （留档 `t22A-baseline-fontscale2.0-probe.log`），据此判定那是**既存**的设备级大字号脆弱面，不由 22-A 引入，
 本席不扩面修，登记给 Task 26（症状：设备档下未滚动节点被判不可显示、注脚档比值随换行漂移）。
+
+### 登记给 Task 26 的两笔设备面缺口（修复轮 1 补落点，此前只活在测试 KDoc 与评审报告里）
+
+1. **共享页头组件返回位在 `fontScale 2.0` 档尚未被钉**：`AppScreenHeader` 的返回位是
+   `.semantics { contentDescription = "返回" }`（**无 testTag**），其 48dp 只由
+   `AppScreenHeaderTest.header_back_is_a_48dp_target_with_a_readable_description` 在**默认 `fontScale`** 下实测；
+   同类的 `header_survives_font_scale_2_without_clipping_the_title` 量的是**标题 Text 的宽度**，不是可点区
+   ⇒ 大字号档下返回可点区全仓无测（Task 22-B 摘掉屏侧文字返回节点后，打卡页页头唯一可点节点就是它）。
+   Task 26 应补「组件返回位在 `fontScale 2.0` 下两轴 ≥48dp」的判据。重算：
+   `grep -n "contentDescription = \"返回\"" app/src/main/java/com/example/englishlearning/ui/components/AppScreenHeader.kt`（命中即无 testTag 那一枚）、
+   `grep -n "fun header_" app/src/androidTest/java/com/example/englishlearning/ui/AppScreenHeaderTest.kt`（两枚分工同上）。
+2. **`font_scale` 大档轮的凭据必须落日志**：Task 22-A 那轮跑前/置档/收工三次 `settings get system font_scale` 的
+   **回显原文没有进任何日志文件**，只余本节那句转述 ⇒ 该轮的置档证据不可复算。Task 26 的口径：
+   设备级大字号轮必须把三次回显原文写进当轮日志（跑前、置档后、复位后各一枚），
+   并注意「未设置该键时回显 `null`，`null` 不等于 `1.0`」（Task 22-B 已就这点纠正过一次口径）。重算（现盘零命中，即本条登记的依据）：
+   `grep -l "settings get system font_scale" .superpowers/sdd/2026-10-17-ui-redesign/t22A-*.log`
 
 ## 收藏页与错词页下线及打卡页两条裸文字链摘除（Task 22-B，2026-10-24 登记）
 
@@ -529,9 +556,12 @@ adb -s emulator-5574 shell dumpsys user | grep 'State:'      # 期望 RUNNING_UN
 ④ 跟随系统的深色档与 `fontScale 2.0` 下底导与设置页不裁；
 ⑤ 打卡页完成度环的轨道色（Task 22-A / R-22.2：奶油 `#FFF1DB` → 语义槽 `tint`，明档变薄荷、暗档变深）是否可接受，
    还是要为「奶油轨道」单开一枚令牌（那属计划修订，不属实现席自决）；
-⑥ 打卡页环内完成度数位 28sp → 24sp（Task 22-A / R-22.3 的 headline 清零代价）是否偏小；
 ⑦ 打卡页页头两条裸文字链摘除后（Task 22-B），从打卡页**找不到**收藏与错词的直达入口——须确认
    「经底部『我的词』进合并页分段」这条替代路径在人手里可达且可接受（自动化只证明合并页能走通，证明不了「用户知道要去这儿」）。
+
+序号口径：原⑥「打卡页环内完成度数位是否偏小」随本清单的虚假代价登记一并撤销（该改写是等价改写，
+本屏字号未变，见「打卡页版面收敛」节 R-22.3 条与「代价」节）；圈号按稳定 ID 使用，**空出的⑥不复用、⑦及以后不重编号**，
+在册枚数以下面那条命令现算。
 
 重算本清单在册枚数：`sed -n '/^## 仍待用户目视/,/^## /p' docs/verification/ui-redesign-2026-10.md | grep -cE '^[①-⑩]'`。
 
