@@ -549,6 +549,84 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   该席自报收工计数与开工同形 `237/1754` ⇒ 它确实一枚 `@Test` 未增删，而合并态由上面那条全量门背书）。
 - 真机 `bf353dda` 本节点未触碰。
 
+## AI 主页默认展开「现在能用」（Task 23，2026-10-24 登记）
+
+范围 = 裁决④ / AC-R-23 的两屏（`ui/AiLearningScreen.kt` 一级页 + `ui/AiFeatureScreen.kt` 二级骨架页）。
+派工块：`.superpowers/sdd/2026-10-17-ui-redesign/task-23-brief.md`；报告：同目录 `task-23-report.md`。
+
+### 已落地面
+
+- **默认展开的是能用的**：`implemented = true` 的三枚（长难句分析 / 拍照翻译 / AI 生图）进默认树，
+  区段标题「现在能用（3 个）」；`implemented = false` 的四枚压成一条 `EntryRow` 折叠行，
+  标题「未上线功能（4 个）」、尾部值就是徽章词「未上线」，点开才逐枚列出。
+  旧那句「AI 功能（7 个）展开 ˅」把可用与未上线混成一枚总数，随本批作废（R-23.8 ③）。
+- **文字不再当图标**：两屏的 `Text(feature.glyph)`（文/填/听/讲/析/拍/画）换 `AppGlyph(AppIcon.Spark)`，
+  一级页行尾 `Text("›")` 换 `AppGlyph(AppIcon.ChevronRight, 16.dp, StrokeOnly)`；
+  契约 `AiBadgeContrastFixTest` 把禁令取样切片**限定在这两枚 AI 文件内**（`Text("›")` 在
+  `GlobalVocabularySearchScreen.kt` 另有站外站点，不属本批）。
+- **徽章两面分开**：徽章面唯一产出 `featureStatusBadge(implemented)` → 「现在能用」/「未上线」，
+  落在 `ui/AiFeature.kt` 末尾（R-23.9）；目录原文 `AiFeature.status`（「已可用：…」/「未实现：…」）
+  一字未改，由 `AiFeatureTest` 与 `AiFeatureScreenTest` 各自钉一面。
+- **一级页行内补状态**：行尾显示徽章词，`contentDescription = "<能力名>，状态：<徽章词>"`，
+  TalkBack 读一行即读到「能不能用」（connected `each_feature_row_is_announced_with_its_own_status`）。
+- 页头**未迁**（R-23.7）：两屏 `AppScreenHeader(` 计数仍为 0，`SharedComponentUniquenessRatchetTest`
+  页头族两行 seed 一字未动，归 Task 26 收口账。
+
+### 台账动作（三张棘轮逐张交代）
+
+- `DarkTokenConsumptionRatchetTest`：`"AiFeatureScreen.kt" to 3` 与 `"AiLearningScreen.kt" to 2`
+  **两行整行删除**（五枚逐成员计数全部迁完，减到 0 即摘行，不把数字改成 0）。顺序 = **先迁生产码断掉引用、
+  同一工作树内再摘 seed 行**，两枚改动同批提交（`ae082e6` 生产 / `27002e1` 台账），
+  因此不存在「seed 先减、生产未迁」的中间绿，也不存在「生产已迁、seed 未减」的中间红被提交。
+- `RawColorLiteralRatchetTest`：一字未动（本批未新增裸 hex；亮度断言全部读活 token）。
+- `SharedComponentUniquenessRatchetTest`：一字未动（页头族两行仍在册）。
+
+### 代价（深色档三处变色 + 一处浅档变色，登记为目视项）
+
+| 站点 | 旧（静态浅值） | 新（按档取值） | 浅档 | 深档 |
+|---|---|---|---|---|
+| `AiFeatureScreen` 头部 44dp 品牌渐变徽标前景 | `AppPalette.OnMintPrimary` #174C44 | `appColors().onBrand` #04241C | **变深**（裁决 #3 要求） | 同值 #04241C（两套同三段） |
+| `AiFeatureScreen`「去配置 AI 服务」按钮 `contentColor` | `AppPalette.OnMintPrimary` #174C44 | `appColors().onMint` | 逐值不变 | **变浅** #DFF6EC 压深底 |
+| `AiLearningScreen` 头卡状态徽章（已配置档） | `DomainColors.AiSpeech.deep` #188F76 | `appDomain(AiSpeech).deep` | 逐值不变 | **变亮** #35E0AC |
+| `AiLearningScreen` 头卡状态徽章（未配置档） | `AppPalette.TextSecondary` #4E756A | `appColors().text2` | 逐值不变 | **变亮** #9FB3AA |
+
+另两处不是「迁令牌」而是本批版面本身：一级页新增的 `EntryRow` 折叠行带来 40dp 域渐变徽标 +
+`text1/text2/outlineSoft` 三枚主题墨色；一级页行尾新增徽章文字取 `MintPrimaryDark`（批 1 前的裸常量，
+R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户判定。
+
+### `fontScale 2.0` 大字号轮（本批改版面，必跑）
+
+三次回显原文全部落档（`.superpowers/sdd/2026-10-17-ui-redesign/`）：
+开工 `t23-fontscale-00-before.log`（`null` = 系统默认 1.0）、
+置档与跑批 `t23-connected-fs2.0-ai-screens.log`（置档回显 `2.0`）、
+收工 `t23-connected-fs2.0-appscreen-and-restore.log`（回档后回显 `1.0`）。
+2.0 档下 AI 两屏 25 枚、`AppScreenTest` 50 枚全绿，未见折叠行与行尾徽章被挤出或裁切。
+
+### 凭据
+
+- 三枚 RED：`t23-RED-1-jvm.log`（3 红：禁字徽标 / Spark 字形缺席 / 静态读点未清）、
+  `t23-RED-2-jvm.log`（1 红：徽章产出缺失与屏侧字面量）、
+  `t23-RED-3-connected.log`（`Tests run: 14, Failures: 5`，全部为 `AssertionError` 级判据红，非编译错）。
+- 门控收工：`t23-gate-final.log` → `suites=238 tests=1764 skipped=0 failures=0 errors=0`
+  （基线 237/1756，净 +1 类 +8 枚，`@Test` 只增不减）。
+- connected 收工：`t23-connected-fs1.0-ai-screens.log`（25 OK）、
+  `t23-connected-fs1.0-appscreen.log`（首跑 50 中 1 枚 `startLearning…` `waitUntil` 5s 超时，
+  单跑 OK、整类复跑 50 OK ⇒ 判为顺序相关偶发，且该用例走背词链路不触 AI 面）、
+  `t23-connected-fs2.0-ai-screens.log`（25 OK）、`t23-connected-fs2.0-appscreen-and-restore.log`（50 OK）。
+- 渲染取证：`t23-render-evidence-icon-gallery.log` + 三张 `icon-gallery-*.png`
+  （写到设备外部文件目录，**不入库**，pull 到仓库外临时目录目视后删除）。
+
+### 登记给后续批次的两笔
+
+- **R-23.11 未做面**：两屏 `Mint*` 裸常量各 23 处（非 import/注释行；记号总出现数 33 / 29），
+  `DarkTokenConsumptionRatchetTest` 不计它们、plan 未授权本席扩面，留给 Task 26。
+  重算命令：`grep -oE "\bMint[A-Za-z0-9_]+" app/src/main/java/com/example/englishlearning/ui/AiFeatureScreen.kt | wc -l`
+  （另一枚同形，把文件名换成 `AiLearningScreen.kt`）。
+- **AppIcons 台账里等 Task 23 的另一件事没做**：`components/AppIcons.kt` 文件头第 19/21/22/23 行写着
+  「七功能映射由 Task 23 钉定」（Mic/Camera/Image/Document 各有所指），但本席派工块 R-23.10 只裁决了
+  「徽标换 `AppIcon.Spark`」这一枚形状，**未授权**七枚逐功能分形。该映射需要一份决策文档再落码，
+  现登记为缺口，不当作已完成。
+
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
 
 `app/src/test/java/com/example/englishlearning/ui/SourceRatchet.kt` 的 `stripComments` 现为**字符串感知**扫描实现：
