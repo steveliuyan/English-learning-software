@@ -579,7 +579,7 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
   **修复轮 1 的更正（M1，原登记失实）**：原文声称生产与 seed「两枚改动同批提交
   （`ae082e6` 生产 / `27002e1` 台账），因此不存在被提交的中间红」——这句不实：拆了两枚 commit 的
   中间态里，`ae082e6` 单独 checkout 时生产静态读点已归零而 seed 仍要求 3/2，
-  `DarkTokenConsumptionRatchetTest.kt:359` 的 stale-seed 用例当场判红，**该红样是被提交的**；
+  `DarkTokenConsumptionRatchetTest` 的 stale-seed 用例（符号锚：`a file whose reads dropped below the seed must decrement the seed too`，重算 `grep -n "a file whose reads dropped below the seed" app/src/test/java/com/example/englishlearning/ui/DarkTokenConsumptionRatchetTest.kt`）当场判红，**该红样是被提交的**；
   全量门只在合并态 `986e162` 与修复轮修复态各自跑过。教训已吃进本轮：修复轮的 seed 恢复与
   生产改动**同枚**落地（`fix(ui-ai): AI 面前景按容器主题归属分档…`）。
   **修复轮 1 的动作（R-23.14）**：`"AiLearningScreen.kt" to 2` 整行恢复——白胶囊容器
@@ -593,11 +593,11 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 
 | # | 站点 | 批前静态 → 现状（修复轮 1 后） | 浅档比值 | 深档比值 |
 |---|---|---|---|---|
-| 1 | `AiFeatureScreen.kt:100` 头部 44dp 品牌渐变徽标前景 | `AppPalette.OnMintPrimary` #174C44 → `appColors().onBrand` #04241C（两套同值） | 渐变最浅端 #35B9B5 上 6.87（批前同位 4.07，裁决 #3 要求） | 同左（`AiFeatureGradient` 静态，不随主题） |
+| 1 | `AiFeatureScreen` 头部 44dp 品牌渐变徽标前景（符号锚：`AiFeatureGradient` 那次 `AppGlyph(icon = AppIcon.Spark…)` 调用） | `AppPalette.OnMintPrimary` #174C44 → `appColors().onBrand` #04241C（两套同值） | 渐变**最深**端 #35B9B5（三端里 on-brand 对比最低的一枚，即 `AppleMintEnd`）上 6.87（批前同位 4.07，裁决 #3 要求） | 同左（`AiFeatureGradient` 静态，不随主题） |
 | 2 | `AiFeatureScreen.kt`「去配置 AI 服务」按钮 `contentColor` | #174C44 → 分档 `if (!LocalIsDark.current) colors.onMint else colors.onBrand` | #174C44 压 #2EC99C = 4.62 | #04241C 压 #35E0AC = 9.74（批前静态同墨压深底 5.76；批 3 中间态裸 onMint 单迁 = 1.49 的 B1 已修） |
 | 3 | `AiFeatureScreen.kt` StatusPill「现在能用」档前景 | #174C44 → 门控分档（浅 onMint / 深 onBrand；`AiProfileSettingsScreen.kt:524` 同族形） | 同第 2 行 4.62 | 同第 2 行 9.74 |
-| 4 | `AiLearningScreen.kt:199` 头卡状态徽章（已配置档） | `DomainColors.AiSpeech.deep` #188F76 →（批 3 单迁主题墨，深档压白 1.69）→ **修复轮回退同值** | 压白胶囊 4.02（批前既有债：`GlassButton.kt:70` 同口径；判据钉 ≥3.0 且 <4.5 双向） | 同左（容器主题不变，两档同墨——前景单迁正是 B1 第三站） |
-| 5 | `AiLearningScreen.kt:199` 头卡状态徽章（未配置档） | `AppPalette.TextSecondary` #4E756A →（批 3 单迁 `colors.text2`，深档压白 2.21）→ **修复轮回退同值** | 压白胶囊 5.15 | 同左 |
+| 4 | `AiLearningScreen` 头卡状态徽章（已配置档；符号锚：`testTag("ai_learning_status_badge")` 那枚白胶囊里的 `Text`） | `DomainColors.AiSpeech.deep` #188F76 →（批 3 单迁主题墨，深档压白 1.69）→ **修复轮回退同值** | 压白胶囊 4.02（批前既有债：`GlassButton.kt:70` 同口径；判据钉 ≥3.0 且 <4.5 双向） | 同左（容器主题不变，两档同墨——前景单迁正是 B1 第三站） |
+| 5 | 同第 4 站那枚白胶囊的未配置档 | `AppPalette.TextSecondary` #4E756A →（批 3 单迁 `colors.text2`，深档压白 2.21）→ **修复轮回退同值** | 压白胶囊 5.15 | 同左 |
 
 - 深色档实际变色 = 第 1–3 站（第 1 站浅档同步变深）；第 4、5 站为回退位，两档维持批前静态值。
   「三处 + 一处」是修复轮对本表逐站现算的结果，不是抄旧口径。

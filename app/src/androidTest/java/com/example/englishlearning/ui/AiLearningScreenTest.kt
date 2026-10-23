@@ -100,7 +100,8 @@ class AiLearningScreenTest {
      * 深色档取证（Task 23 修复轮 R-23.14）：状态胶囊的容器是 `Color.White.copy(alpha = 0.85f)`，
      * **主题无关**的亮容器——两档底色几乎相同，前景单迁主题访问器就是本轮的 AA 回归：
      * 深色档 `colors.text2` 取到 #9FB3AA 亮灰压白胶囊（2.21:1）。回退后未配置档必须仍逐像素
-     * 打出登记的静态中性墨 `AppPalette.TextSecondary`（浅档 4.02:1 是 deep-on-white 同形既有债，另行登记）。
+     * 打出登记的静态中性墨 `AppPalette.TextSecondary`（压白胶囊 5.15:1）。**4.02:1 那笔既有债属另一档**：
+     * 已配置档的 `DomainColors.AiSpeech.deep` 压同一枚白胶囊（`GlassButton.kt:70` 同口径登记，判据钉 ≥3.0 且 <4.5 双向）。
      *
      * 深色档走显式 `MintGlassTheme(themeMode = ThemeMode.Dark)` 包装（先例 `ThemeModeSwitchTest`、
      * `glass/GlassPanelThemeInkTest.kt:290`）：本类 `setContent` 不带主题提供者，

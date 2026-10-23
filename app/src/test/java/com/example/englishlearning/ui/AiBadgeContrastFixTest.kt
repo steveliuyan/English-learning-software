@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
  * ## 修复轮 1 补的牙（评审席 M3 + m1/m2，控制者裁定见 `task-23-fix1-brief.md` §四）
  *
  * 批 3 原判据只守 token 侧（token×渐变端点）与文件级子串（`contains("AppGlyph(")` 等两枚），
- * 站点侧「前景到底取了哪枚墨」零防线——这正是 B1（三处前景单迁、深色档 1.49–2.12:1）能穿过
+ * 站点侧「前景到底取了哪枚墨」零防线——这正是 B1（三处前景单迁、深色档 1.49–2.21:1）能穿过
  *  全部门与 connected 的洞。修复轮补三族腿：
  *  ① **亮度腿（两套都要有）**：`the mint primary ink pair clears the AA floor on both theme sets`
  *    钉 R-23.13 分档成立的前提（浅 `onMint`×浅 AiSpeech 底、`onBrand`×浅底、深 `onBrand`×深底均 ≥4.5），
@@ -260,7 +260,7 @@ class AiBadgeContrastFixTest {
         "MintPrimaryDark" to (AppColorLight.text1 to AppColorDark.text1),
     )
 
-    /** 容器是 `MintPrimary` 的按钮调用里 `contentColor` 的实参表达式（`AiFeatureScreen.kt:171` 形状）。 */
+    /** 容器是 `MintPrimary` 的按钮调用里 `contentColor` 的实参表达式（`AiFeatureScreen`「去配置 AI 服务」那枚按钮的形状）。 */
     private val mintPrimaryButtonCall = Regex(
         """buttonColors\(\s*containerColor = MintPrimary(?![A-Za-z]),\s*contentColor = ((?:[^(),\n]|\([^(),\n]*\))*)\)""",
     )
