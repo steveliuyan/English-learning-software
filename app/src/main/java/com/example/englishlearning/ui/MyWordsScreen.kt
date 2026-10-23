@@ -277,6 +277,17 @@ fun MyWordsScreen(
                             text = "当前没有待纠正的错词。复习中标记「不认识」的词会出现在这里，重新答对后自动消失。",
                         )
                     } else {
+                        // R-22B.3（22-B 修复轮 1 的 F1）：这行排序说明逐字搬自旧错词页在 `Ready` 且列表非空时
+                        // 渲染的那一行（`WrongWordsScreen.kt:97`）。22-B 摘屏时只搬了空态文案，这一层随屏丢了，
+                        // 合并页的错词段因此比旧页少一句「这一列按什么排」的解释。
+                        // 排印与前景用本文件已在册的一对（`AppType.Footnote` + `colors.text2`，与收藏段 notice
+                        // 那行同规格）；旧页的 `labelMedium` + `MintTextMuted` 是批 3 令牌迁移前的形状，不搬回来。
+                        Text(
+                            "最近一次标记为「不认识」的词，按到期先后排列。",
+                            style = AppType.Footnote,
+                            color = colors.text2,
+                            modifier = Modifier.testTag("my_words_wrong_order_hint"),
+                        )
                         wrongWordsState.cards.forEachIndexed { index, card ->
                             WordRow(
                                 lemma = card.lemma,

@@ -220,6 +220,47 @@ class MyWordsScreenTest {
     }
 
     /**
+     * R-22B.3（22-B 修复轮 1 的 F1，唯一 major）：错词段非空时必须在册旧错词页那行**排序说明**。
+     *
+     * 缺陷形状：Task 22-B 摘屏时只把旧错词页的**空态**文案搬进合并页，`WrongWordsScreen.kt:97`
+     * 在 `Ready` 且列表非空时渲染的那行「最近一次标记为「不认识」的词，按到期先后排列。」随屏一起丢了，
+     * 全仓 `git grep "按到期先后排列"` 零命中 ⇒ 合并页的错词段比旧页少一层解释，用户读不出这一列按什么排。
+     *
+     * 三条腿各挡一种破坏：
+     *  ① 逐字 `assertTextEquals` —— 把这句「润色」成别的说法当场红（搬回来的原话不许改）；
+     *  ② `my_words_wrong_row_0` 同屏在册 —— 挡「用说明行替换掉列表」这种假修（补一层 ≠ 挤掉词行）；
+     *  ③ 说明行的矩形必须落在 `my_words_section_wrong` 容器内 —— 挡「挂到别的段/段外」。
+     * 空态侧不得出现这行由既有 `empty_sections_show_their_own_honest_copy` 的整段形状间接承重，
+     * 本条不复述（一次 `setContent` 是本仓硬约束，两种形态不能塞进同一枚方法）。
+     */
+    @Test
+    fun wrongWordsSectionKeepsTheOrderingHintFromTheLegacyPage() {
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = emptyList()),
+                    vocabularyState = VocabularyUiState.Ready(items = emptyList()),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = listOf(card("gossamer", 0))),
+                )
+            }
+        }
+        val hint = composeRule.onNodeWithTag("my_words_wrong_order_hint")
+        hint.assertExists()
+        hint.assertTextEquals("最近一次标记为「不认识」的词，按到期先后排列。")
+        composeRule.onNodeWithTag("my_words_wrong_row_0").assertExists()
+        hint.performScrollTo()
+        val containerBox = composeRule.onNodeWithTag("my_words_section_wrong").fetchSemanticsNode().boundsInRoot
+        val hintBox = hint.fetchSemanticsNode().boundsInRoot
+        assertEquals(
+            "排序说明行没有落在错词段容器内（挂到别的段就等于该段的解释仍然缺失）：" +
+                "容器 $containerBox，说明行 $hintBox",
+            true,
+            hintBox.top >= containerBox.top - 1f && hintBox.bottom <= containerBox.bottom + 1f &&
+                hintBox.left >= containerBox.left - 1f && hintBox.right <= containerBox.right + 1f,
+        )
+    }
+
+    /**
      * m-6（修复轮 2）：「收藏于」时间戳与旧收藏页同文——统一取**日期档**（`yyyy-MM-dd`）。
      *
      * 缺陷形状：旧收藏页 `:140`（该屏已于 Task 22-B 下线）渲染 `收藏于 <yyyy-MM-dd>`（`toLocalDate()`），
