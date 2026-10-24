@@ -180,6 +180,9 @@ fun AppScreen(
             var showSetup by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLearning by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showReadingHistory by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 裁决⑤ 第二件：外刊 Feed 从阅读主页的内联区改独立二级层，宿主路由照抄上面 showReadingHistory 那一套
+            // （状态位 + overlayOpen 追加一项 + BackHandler + 挂载分支）；主页只留一枚通往它的入口。
+            var showReadingFeed by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWorksheetSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWorksheetPreview by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 选中的 AI 功能存 key 而不是枚举实例：String 进 Bundle 最省心，将来加功能也不用改存法。
@@ -457,7 +460,7 @@ fun AppScreen(
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
-                showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null ||
+                showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null || showMyWords
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
@@ -468,6 +471,8 @@ fun AppScreen(
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
+            // Feed 二级层与阅读历史同优先级档：文章层（下方后声明）永远先拿走返回键。
+            BackHandler(enabled = showReadingFeed) { showReadingFeed = false }
             BackHandler(enabled = showCheckIn) { showCheckIn = false }
             BackHandler(enabled = selectedLearningRecordCard != null) {
                 selectedLearningRecordCard = null
@@ -1345,6 +1350,16 @@ fun AppScreen(
                         onDismiss = { articleVersionViewModel?.cancelDelete() },
                     )
                 }
+            } else if (showReadingFeed && readingTarget == null && historyArticle == null) {
+                // 裁决⑤ 第二件：外刊列表与抓取归本层，阅读主页只留 `reading_source_feed` 一枚入口。
+                // 挂载守卫照抄 `showReadingHistory && historyArticle == null` 那一形：文章层一旦在顶上，
+                // 列表就让位，返回键先把文章关掉、再退本层（对应上面的 BackHandler 声明顺序）。
+                val feedState = (readingState as? ReadingAccessUiState.Ready)?.feed ?: FeedUiState.Idle
+                ReadingFeedScreen(
+                    feed = feedState,
+                    onBack = { showReadingFeed = false },
+                    onFetchFeedItem = { readingAccessViewModel?.fetchFeedItem(it) },
+                )
             } else if (showArticleImport) {
                 val importState = (readingState as? ReadingAccessUiState.Ready)?.import ?: ImportUiState()
                 ArticleImportScreen(
@@ -1566,8 +1581,11 @@ fun AppScreen(
                                     }
                                 },
                                 onOpenImport = { showArticleImport = true },
-                                onOpenFeed = { readingAccessViewModel?.openFeed() },
-                                onFetchFeedItem = { readingAccessViewModel?.fetchFeedItem(it) },
+                                // 主页这一枚只负责导航：进二级层的同时触发一次取列表（取源本体仍归 ViewModel）。
+                                onOpenFeed = {
+                                    showReadingFeed = true
+                                    readingAccessViewModel?.openFeed()
+                                },
                             )
                             AppTab.AI -> AiLearningScreen(
                                 todayWordCount = todayReady?.newTarget,

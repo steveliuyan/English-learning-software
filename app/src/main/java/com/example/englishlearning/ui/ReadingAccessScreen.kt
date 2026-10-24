@@ -3,8 +3,8 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,36 +19,33 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.ai.UserAction
 import com.example.englishlearning.ai.toUserAction
-import com.example.englishlearning.reading.FetchFailure
-import com.example.englishlearning.reading.FeedItem
 import com.example.englishlearning.reading.NotConfiguredReason
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
-import com.example.englishlearning.ui.components.glass.GlassDialog
-import com.example.englishlearning.ui.components.glass.PillButton
-import com.example.englishlearning.ui.components.glass.PillStyle
-import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.components.OutboundConfirmDialog
+import com.example.englishlearning.ui.components.PayloadKind
 import com.example.englishlearning.ui.theme.AppPalette
-import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
-import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.MintTextMuted
 
 sealed interface ReadingAccessUiState {
     data object Loading : ReadingAccessUiState
@@ -89,6 +86,12 @@ val ReadingAccessUiState.historyOrEmpty: List<Article>
 /**
  * 「阅读」栏的根页面。一级 tab，出口交给底部导航与页内二级层，所以**没有**自带的返回按钮。
  *
+ * 版面按裁决⑤ 重排（spec §6 表格 ⑤ 行）：
+ *  ① 主任务（今日文章）上提第一屏——不滚动即可见那枚主 CTA；
+ *  ② 「AI 生成」与「换一篇」**合并为一枚主 CTA**，两档按「今天有没有文章」各归其位，永不并列；
+ *  ③ 外刊 Feed 改独立二级层（`ReadingFeedScreen`），本页只留通往它的入口；
+ *  ④ 类型与长度偏好下沉「生成前参数」，随这一次动作出现，不再常驻长列。
+ *
  * Ready 态的三个来源入口（AI 生成 / 外刊选取 / 粘贴文章）与生成状态都由
  * [ReadingAccessViewModel] 编排；本文件只做呈现，不持有任何业务判断。
  */
@@ -104,9 +107,11 @@ fun ReadingAccessScreen(
     onOpenAiSettings: () -> Unit = {},
     onOpenImport: () -> Unit = {},
     onOpenFeed: () -> Unit = {},
-    onFetchFeedItem: (FeedItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    // 生成前参数的展开态是本屏的呈现状态，不进 ViewModel：它不改变任何持久化取值，
+    // 只决定偏好区这一支此刻画不画（brief §二.3「偏好写入路径不改」）。
+    var generationParamsExpanded by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -130,6 +135,8 @@ fun ReadingAccessScreen(
             }
             is ReadingAccessUiState.Ready -> ReadyContent(
                 state = state,
+                generationParamsExpanded = generationParamsExpanded,
+                onToggleGenerationParams = { generationParamsExpanded = !generationParamsExpanded },
                 onSelectType = onSelectType,
                 onOpenHistory = onOpenHistory,
                 onGenerate = onGenerate,
@@ -139,7 +146,6 @@ fun ReadingAccessScreen(
                 onOpenAiSettings = onOpenAiSettings,
                 onOpenImport = onOpenImport,
                 onOpenFeed = onOpenFeed,
-                onFetchFeedItem = onFetchFeedItem,
             )
         }
     }
@@ -148,6 +154,8 @@ fun ReadingAccessScreen(
 @Composable
 private fun ReadyContent(
     state: ReadingAccessUiState.Ready,
+    generationParamsExpanded: Boolean,
+    onToggleGenerationParams: () -> Unit,
     onSelectType: (ArticleType) -> Unit,
     onOpenHistory: () -> Unit,
     onGenerate: () -> Unit,
@@ -157,15 +165,16 @@ private fun ReadyContent(
     onOpenAiSettings: () -> Unit,
     onOpenImport: () -> Unit,
     onOpenFeed: () -> Unit,
-    onFetchFeedItem: (FeedItem) -> Unit,
 ) {
-    AccessCard(
-        "文章已解锁",
-        "三种来源任选：AI 生成、外刊选取，或粘贴你自己的文章。",
-        "reading_access_unlocked",
-    )
-
-    SourceEntryButton("AI 生成文章", "reading_source_ai", "用 AI 生成今天的文章", onGenerate)
+    // —— 主任务区（裁决⑤ 第一件 + 第四件）：紧跟页头，第一屏不滚动即可点。
+    // 主 CTA 恰一枚：无当日文章时这一格是「生成今天的文章」，已有当日文章时同一位置换成「阅读今天的文章」，
+    // 换一篇退为次级行。`reading_source_ai` 与 `reading_regenerate` 因此永不并列。
+    if (state.todayArticle != null) {
+        PrimaryCtaButton("阅读今天的文章", "reading_open_today", "阅读今天的文章", onOpenTodayArticle)
+        SecondaryCtaButton("换一篇", "reading_regenerate", "换一篇", onRegenerate)
+    } else {
+        PrimaryCtaButton("生成今天的文章", "reading_source_ai", "用 AI 生成今天的文章", onGenerate)
+    }
     Text(
         "每次生成都会真实调用你配置的 AI 服务并可能产生费用",
         style = MaterialTheme.typography.bodySmall,
@@ -175,8 +184,12 @@ private fun ReadyContent(
             .testTag("generation_cost_hint")
             .semantics { contentDescription = "生成费用提示" },
     )
-    SourceEntryButton("从外刊选取", "reading_source_feed", "从已核验的外刊来源选取", onOpenFeed)
-    SourceEntryButton("粘贴文章", "reading_source_import", "粘贴你自己的文章", onOpenImport)
+
+    AccessCard(
+        "文章已解锁",
+        "三种来源任选：AI 生成、外刊选取，或粘贴你自己的文章。",
+        "reading_access_unlocked",
+    )
 
     when (val generation = state.generation) {
         GenerationUiState.Generating -> Text(
@@ -191,52 +204,92 @@ private fun ReadyContent(
         )
         is GenerationUiState.Failed -> GenerationFailureBanner(generation.failure, onOpenAiSettings)
         is GenerationUiState.NotConfigured -> NotConfiguredBanner(generation.reason, onOpenAiSettings)
-        is GenerationUiState.NeedsConfirmation -> OutboundConfirmationDialog(generation.host, onConfirmOutbound)
+        // 出站确认走共享件（本席是它第一枚生产接线）：载荷档位显式给 `PayloadKind.Text`。
+        // 屏侧锚 `outbound_confirmation_text` 随接线收窄为「本屏出站确认槽位」，
+        // 正文节点的权威锚是共享件自带的 `outbound_confirm_body`；两枚锚由同一枚 connected 用例点名。
+        is GenerationUiState.NeedsConfirmation -> Box(Modifier.testTag("outbound_confirmation_text")) {
+            OutboundConfirmDialog(
+                endpointHost = generation.host,
+                payloadKind = PayloadKind.Text,
+                onConfirm = { onConfirmOutbound(true) },
+                onDismiss = { onConfirmOutbound(false) },
+            )
+        }
         GenerationUiState.Idle -> Unit
     }
 
-    if (state.todayArticle != null) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = onOpenTodayArticle,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 54.dp)
-                    .testTag("reading_open_today")
-                    .semantics { contentDescription = "阅读今天的文章" },
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
-            ) { Text("阅读今天的文章", fontWeight = FontWeight.Bold) }
-            Button(
-                onClick = onRegenerate,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 54.dp)
-                    .testTag("reading_regenerate")
-                    .semantics { contentDescription = "换一篇" },
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-            ) { Text("换一篇", fontWeight = FontWeight.Bold) }
+    GenerationParamsToggle(expanded = generationParamsExpanded, onClick = onToggleGenerationParams)
+    if (generationParamsExpanded) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MintTint),
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.fillMaxWidth().testTag("reading_preference"),
+        ) {
+            Text(
+                "默认类型：${state.preference.defaultArticleType.label} · 长度：${state.preference.explicitLengthTier?.label ?: "按词书默认"}",
+                color = MintPrimaryDark,
+                modifier = Modifier.padding(18.dp),
+            )
+        }
+        ArticleType.entries.forEach { type ->
+            TypeButton(type, true, onSelectType)
         }
     }
 
-    FeedSection(state.feed, onFetchFeedItem)
+    // —— 另外两枚来源：次级行。Feed 只在主页留入口，列表与抓取归二级层。
+    SecondaryCtaButton("从外刊选取", "reading_source_feed", "从已核验的外刊来源选取", onOpenFeed)
+    SecondaryCtaButton("粘贴文章", "reading_source_import", "粘贴你自己的文章", onOpenImport)
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintTint),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth().testTag("reading_preference"),
-    ) {
-        Text(
-            "默认类型：${state.preference.defaultArticleType.label} · 长度：${state.preference.explicitLengthTier?.label ?: "按词书默认"}",
-            color = MintPrimaryDark,
-            modifier = Modifier.padding(18.dp),
-        )
-    }
-    ArticleType.entries.forEach { type ->
-        TypeButton(type, true, onSelectType)
-    }
     HistoryButton(onOpenHistory, state.historyCount)
+}
+
+/**
+ * 主 CTA 一档：`MintPrimary` 容器 + `AppPalette.OnMintPrimary` 前景。
+ *
+ * 这对配值**刻意不改成 `appColors().onMint`**（深色令牌消费棘轮会把它算作「待迁静态读点」，
+ * 迁了反而是回归）：容器 `MintPrimary` 是 `LocalDomainColors` 的组合期读点，两套都落在**亮**薄荷上
+ * （浅 #2EC99C / 深 #35E0AC），所以前景两套都得取**深墨**；`appColors().onMint` 的深套取值是
+ * 浅墨 #DFF6EC，压 #35E0AC 只有 1.49:1，而现在的静态深墨 #174C44 压同一枚深套容器实测 5.76:1。
+ * 亮度复算与这条判据见 `ReadingHomeLayoutContractTest` 的姊妹用例
+ * `[the mint primary pair stays dark ink on both theme sets]`；本文件四枚站点同一形状。
+ */
+@Composable
+private fun PrimaryCtaButton(title: String, tag: String, description: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag(tag).semantics { contentDescription = description },
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+    ) { Text(title, fontWeight = FontWeight.Bold) }
+}
+
+/** 次级档：与主 CTA 同几何、不同容器，保证一屏只有一枚薄荷主色按钮抢到主任务叙事。 */
+@Composable
+private fun SecondaryCtaButton(title: String, tag: String, description: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag(tag).semantics { contentDescription = description },
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
+    ) { Text(title, fontWeight = FontWeight.Bold) }
+}
+
+/** 「生成前参数」开关：偏好区不再常驻长列，随这一次动作出现（裁决⑤ 第三件）。 */
+@Composable
+private fun GenerationParamsToggle(expanded: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 54.dp)
+            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
+            .testTag("reading_generation_params_toggle")
+            .semantics { contentDescription = if (expanded) "收起生成前参数" else "展开生成前参数" },
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
+    ) {
+        Text(if (expanded) "收起生成前参数" else "生成前参数：类型与长度", fontWeight = FontWeight.Bold)
+    }
 }
 
 /** 生成失败横幅：文案与按钮标签全部来自常量（AiFailure 的泄露防线），不发自由文本。 */
@@ -285,101 +338,6 @@ private fun GenerationFailureBanner(failure: AiFailure, onOpenAiSettings: () -> 
             }
         }
     }
-}
-
-@Composable
-private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean) -> Unit) {
-    GlassDialog(onDismiss = { onConfirmOutbound(false) }) {
-        Text("确认发送请求", style = AppType.Headline, color = appColors().text1)
-        Text(
-            "你的文本与该服务的密钥将发送给 $host，并可能产生费用。",
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .testTag("outbound_confirmation_text"),
-            style = AppType.Body,
-            color = appColors().text1,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            PillButton(
-                text = "取消",
-                onClick = { onConfirmOutbound(false) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Secondary,
-                domain = AppDomain.Reading,
-                testTag = "outbound_cancel",
-            )
-            PillButton(
-                text = "确认发送",
-                onClick = { onConfirmOutbound(true) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Primary,
-                domain = AppDomain.Reading,
-                testTag = "outbound_confirm",
-            )
-        }
-    }
-}
-
-/** 外刊列表区。Idle 不渲染任何东西；空态与失败态都显式给出文字。 */
-@Composable
-private fun FeedSection(feed: FeedUiState, onFetchFeedItem: (FeedItem) -> Unit) {
-    when (feed) {
-        FeedUiState.Idle -> Unit
-        FeedUiState.Loading -> Text("正在获取外刊列表…", color = MintTextMuted, modifier = Modifier.testTag("feed_loading"))
-        FeedUiState.Empty -> Text(
-            "这个来源暂时没有可读的文章，稍后再来看看。",
-            color = MintTextMuted,
-            modifier = Modifier.testTag("feed_empty"),
-        )
-        FeedUiState.Unreachable -> Text(
-            "外刊来源暂时不可用，请检查网络后重试。",
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.testTag("feed_error"),
-        )
-        is FeedUiState.FetchFailed -> Text(
-            "抓取失败：${feed.failure.label}",
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.testTag("feed_fetch_failed"),
-        )
-        is FeedUiState.Ready -> {
-            Text("来源：${feed.sourceDisplayName}", color = MintPrimaryDark, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("feed_source"))
-            feed.items.forEachIndexed { index, item ->
-                Button(
-                    onClick = { onFetchFeedItem(item) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("feed_item_$index")
-                        .semantics { contentDescription = "阅读外刊文章 ${item.title}" },
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                ) { Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-            }
-        }
-    }
-}
-
-private val FetchFailure.label: String
-    get() = when (this) {
-        FetchFailure.NetworkUnavailable -> "网络不可用"
-        FetchFailure.SourceUnreachable -> "来源暂时不可用"
-        FetchFailure.BodyNotFound -> "页面里找不到正文，链接可能已失效"
-        FetchFailure.BodyTooShort -> "正文太短"
-        FetchFailure.QualityRejected -> "内容未通过质量检查"
-    }
-
-@Composable
-private fun SourceEntryButton(title: String, tag: String, description: String, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag(tag).semantics { contentDescription = description },
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-    ) { Text(title, fontWeight = FontWeight.Bold) }
 }
 
 @Composable

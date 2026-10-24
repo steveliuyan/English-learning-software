@@ -97,7 +97,10 @@ class GlassPanelInkPairingContractTest {
         Panel("ArticleReadingScreen.kt", "本文覆盖你已背的"),
         Panel("ImageStudioScreen.kt", "确认发送请求"),
         Panel("PhotoTranslationScreen.kt", "确认发送请求"),
-        Panel("ReadingAccessScreen.kt", "确认发送请求"),
+        // Task 24（裁决⑤ 第二件）：`ReadingAccessScreen.kt` 的私有玻璃对话框退役、改调共享
+        // `OutboundConfirmDialog`，本屏随玻璃面板族摘一行——共享件的面板由 `DialogPanel` 承重，
+        // 不属本契约的 `GlassDialog(` 取样族。重算：
+        // `grep -rn 'GlassDialog(' app/src/main/java/com/example/englishlearning/ui/ReadingAccessScreen.kt`（应为零命中）。
         Panel("SentenceAnalysisScreen.kt", "确认发送请求"),
         Panel("WordAiQaScreen.kt", "确认发送请求"),
     )

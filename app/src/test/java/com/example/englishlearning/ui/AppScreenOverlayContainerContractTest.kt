@@ -527,7 +527,7 @@ class AppScreenOverlayContainerContractTest {
             "「暂不标记」语义的动作必须恰两处（容器 onDismiss + 第二枚按钮）：少一处 = 按返回即静默标记，多一处 = 幽灵动作",
         )
         assertEquals(2, count(migration, "PillButton("), "迁移弹窗是一对二选一按钮，两枚都必须走共享 PillButton")
-        assertEquals(1, count(migration, "AppType.Body"), "路 B 正文必须走 AppType.Body（房内约定形状，见 ReadingAccessScreen.kt:291-322）")
+        assertEquals(1, count(migration, "AppType.Body"), "路 B 正文必须走 AppType.Body（房内约定形状：玻璃面板内前景逐枚显式配 `color = appColors().text1`，取样看共享件 `components/glass/GlassDialog.kt` 的面板内容与 `OutboundConfirmDialog` 的正文行）")
 
         // 路 B 自渲染 tag 不许跟着路 A 一起退役：窗外零处复核。
         listOf("settings_export_book_\$bookId", "wordbook_migration_confirm", "wordbook_migration_skip").forEach { tag ->
