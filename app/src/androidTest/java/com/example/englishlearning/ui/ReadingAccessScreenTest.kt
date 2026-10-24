@@ -13,7 +13,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.reading.FeedItem
 import com.example.englishlearning.reading.NotConfiguredReason
@@ -194,16 +193,18 @@ class ReadingAccessScreenTest {
     }
 
     @Test
-    fun feedEmptyStateIsExplicit() {
+    fun feedEmptyStateIsNotPaintedOnReadingHome() {
         // 裁决⑤ 第二件：Feed 离开主页内联区。状态照常带进 Ready，但主页一枚都不许画——
         // 画了就把主任务挤出首屏。状态的正面证据在 ReadingFeedScreenTest。
+        // 用例名（修复轮 1 F-3）：原判据反转成 assertDoesNotExist 后仍叫「…IsExplicit」，
+        // 名字与断言相反会让后来人把这三枚当成冗余判据删掉——它们是「不许把 Feed 搬回主页」的唯一行为面护栏。
         composeRule.setContent { readyScreen(feed = FeedUiState.Empty) }
         composeRule.onNodeWithTag("feed_empty").assertDoesNotExist()
         composeRule.onNodeWithTag("reading_source_feed").assertExists().assertHasClickAction()
     }
 
     @Test
-    fun feedUnreachableStateIsExplicit() {
+    fun feedUnreachableStateIsNotPaintedOnReadingHome() {
         var feedOpened = 0
         composeRule.setContent {
             readyScreen(feed = FeedUiState.Unreachable, onOpenFeed = { feedOpened++ })
@@ -215,7 +216,7 @@ class ReadingAccessScreenTest {
     }
 
     @Test
-    fun feedReadyListsItemsWithSourceName() {
+    fun feedReadyItemsAndSourceCreditAreNotPaintedOnReadingHome() {
         composeRule.setContent {
             readyScreen(
                 feed = FeedUiState.Ready(
@@ -234,16 +235,35 @@ class ReadingAccessScreenTest {
     @Test
     fun mainTaskCtaSitsAboveTheFoldWithoutScrolling() {
         // 裁决⑤ 第一件：不滚动即可见「今日文章」那枚主 CTA，且它落在首屏上半。
-        // 阈值取根容器高度的一半（设备无关），不写死 dp。
-        // 阈值取根容器高度的一半（`getBoundsInRoot()` 给 DpRect，比较按 Dp 走，不写死像素也不写死 dp 常量）。
+        // 阈值取根容器高度的一半（设备无关，不写死 dp）；`getBoundsInRoot()` 给 DpRect，比较按 Dp 走。
+        // 修复轮 1 F-2：原来那句 `assertTrue(rootBottom > 0.dp)` 是自我确认型断言（根高只会为正），
+        // 已删——真正有牙的是下面那条 `ctaTop < rootBottom / 2f`：根容器一旦塌成零高，它当场红。
         composeRule.setContent { readyScreen(todayArticle = todayArticle()) }
         val rootBottom = composeRule.onNodeWithTag("reading_access_screen")
             .getBoundsInRoot().bottom
-        assertTrue("根容器高度读数异常：$rootBottom", rootBottom > 0.dp)
         val ctaTop = composeRule.onNodeWithTag("reading_open_today").getBoundsInRoot().top
         composeRule.onNodeWithTag("reading_open_today").assertIsDisplayed()
         assertTrue(
             "今日文章主 CTA 的 top=$ctaTop 必须落在首屏上半（根高=$rootBottom 的一半以下）：主任务被埋进长列就是本件要修的形状",
+            ctaTop < rootBottom / 2f,
+        )
+    }
+
+    @Test
+    fun mainGenerationTaskCtaSitsAboveTheFoldWithoutScrolling() {
+        // 裁决⑤ 第一件的**另一支**（修复轮 1 F-2 补的腿）：没有当日文章时，主任务是
+        // 「生成今天的文章」`reading_source_ai`，而不是阅读档。原批只量了有文章那一支，
+        // 于是「把三枚来源入口重新提到主 CTA 上方」这一形状不会判红。
+        // 阈值口径与上一枚逐字同形：根容器高度的一半（Dp 域，不写死 dp）。
+        // 一支一次 `setContent`（本仓 connected 真机怪癖：同一枚用例两次 setContent 必崩），故另立用例。
+        composeRule.setContent { readyScreen() }
+        val rootBottom = composeRule.onNodeWithTag("reading_access_screen")
+            .getBoundsInRoot().bottom
+        val ctaTop = composeRule.onNodeWithTag("reading_source_ai").getBoundsInRoot().top
+        composeRule.onNodeWithTag("reading_source_ai").assertIsDisplayed().assertHasClickAction()
+        assertTrue(
+            "无当日文章时生成档主 CTA 的 top=$ctaTop 必须落在首屏上半（根高=$rootBottom 的一半以下）：" +
+                "把外刊/粘贴入口提到它上方，就是把这一支的主任务重新埋进长列",
             ctaTop < rootBottom / 2f,
         )
     }
