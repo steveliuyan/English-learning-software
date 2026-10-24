@@ -109,6 +109,11 @@ class ReadingHomeLayoutContractTest {
             "阅读主页必须恰一处调用共享 `OutboundConfirmDialog(`（0 = 没接线，2 = 长出自家第二份出站确认）",
         )
         // 屏侧锚：`outbound_confirmation_text` 是 connected 判据点名的锚，接线时不许静默丢。
+        // 形状如实登记（修复轮 1 F-1 附注，本批不改形状）：它在生产侧是
+        // `Box(Modifier.testTag("outbound_confirmation_text"))` 这层**零尺寸 tag 垫片**——
+        // 共享件内部是 `DialogPanel`，对话框进独立窗口，这枚 Box 既没有内容也没有尺寸。
+        // 因此本条只保证「这层垫片不被顺手删」，**不是**「槽位里有内容」的证据；
+        // 行为面由 connected 的 `outbound_confirm_body` + `outbound_confirm_dismiss` / `outbound_confirm_confirm` 兜住。
         assertTrue(
             "outbound_confirmation_text" in home,
             "锚 `outbound_confirmation_text` 必须在接线后继续存在（connected 侧点名它）",
@@ -120,16 +125,12 @@ class ReadingHomeLayoutContractTest {
             "出站确认必须显式声明 `PayloadKind.Text`：图片档每次都问，两档措辞可区分是共享件的立论",
         )
 
-        // 共享件不是摆设：整棵 `ui/` 生产树（排除组件本体）里至少有一枚真实调用方。
-        val productionCallsites = uiFiles().sumOf { file ->
-            if (file.name == "OutboundConfirmDialog.kt") 0
-            else countMatches(file.readText(), Regex("""\bOutboundConfirmDialog\("""))
-        }
-        assertTrue(
-            productionCallsites >= 1,
-            "`OutboundConfirmDialog(` 在 ui/ 生产树上计数为 $productionCallsites：共享件零调用方就是「摆设组件」，" +
-                "本席的接线必须把它钉成在用件",
-        )
+        // 「共享件不是摆设」这条由**上一行**兜住（修复轮 1 F-1：删掉原判据）：原判据扫整棵 `ui/` 树却
+        // 不排除本屏，主页那枚在场时求和必 ≥1，主页那枚被删时先红的还是上一行 ⇒ 零增量判别力。
+        // 而「除本屏外还 ≥1 枚」这一版也**不能写**：本屏就是共享件当前唯一的生产接线（现算
+        // `grep -rn "OutboundConfirmDialog(" app/src/main --include=*.kt` ⇒ 组件声明 1 处 +
+        // `ReadingAccessScreen.kt` 调用 1 处），把它写成 ≥1 会当场红在别的席的账上。
+        // 后续屏接上共享件时，要钉的是「调用点总数 = 在册份数」这种可数口径，不是一句 ≥1 的安慰句。
     }
 
     // ---------- 3. 类型与长度偏好下沉生成前参数 ----------
@@ -140,10 +141,24 @@ class ReadingHomeLayoutContractTest {
             "reading_generation_params_toggle" in home,
             "主页必须有一枚具名的「生成前参数」开关：偏好区靠它出现，而不是常驻长列",
         )
-        val toggleWindow = home.substringAfter("reading_generation_params_toggle").substringBefore("reading_history_entry")
+        // 偏好族的落点按**花括号配对**取展开分支本体来判：不锚行号，也不靠「下一个具名锚」猜边界——
+        // 原判据的右腿 `"generationParamsExpanded" in home` 读的就是这份源码，永不红（修复轮 1 F-1）；
+        // 而「偏好只要排在开关之后就算对」的窗口式写法也抓不住「平铺回主页、顺序仍在开关之后」这一形状。
+        val expandedBranch = balancedBranchBody(home, "if (generationParamsExpanded)")
         assertTrue(
-            "reading_preference" in toggleWindow || "generationParamsExpanded" in home,
-            "偏好区必须落在开关之后的展开分支里（开关锚与偏好区之间要能看见展开判据）",
+            expandedBranch.isNotEmpty(),
+            "主页必须保留 `if (generationParamsExpanded) { … }` 这一层展开分支本体" +
+                "（取不到 = 开关不再承重，本条与下面两枚一起红才是可读的红样）",
+        )
+        assertTrue(
+            "reading_preference" in expandedBranch,
+            "偏好区 `reading_preference` 必须落在 `if (generationParamsExpanded)` 的分支本体里，" +
+                "而不是平铺在主页长列上：把生产改回「偏好常驻主页」时本条必须红（修复轮 1 F-1 的变异自证）",
+        )
+        assertTrue(
+            "ArticleType.entries" in expandedBranch,
+            "四枚类型行（`ArticleType.entries`）与偏好区同族，也必须由同一层展开分支承重：" +
+                "只把卡收进分支、类型回到常驻，等于给平铺换个名字",
         )
         assertTrue(
             Regex("""if \(!generationParamsExpanded\)""").containsMatchIn(home) ||
@@ -213,6 +228,31 @@ class ReadingHomeLayoutContractTest {
     }
 
     private fun rgbOf(color: Color): Int = color.toArgb() and 0xFFFFFF
+
+    /**
+     * 按花括号配对取 `if (condition) { … }` 的分支本体（源已剥注释，字符串模板里的成对 `{}` 一并计入）。
+     *
+     * 取不到就返回**空串**而不是抛异常：让调用处那几枚断言各自响亮判红（红样要能指认「哪一件没做」），
+     * 而不是把「版面坏了」压成一条 `error()` 堆栈。边界靠配对而不是靠「下一个具名锚」——
+     * 锚一旦改名，窗口就会一路吞到文件末尾，把「平铺」看成「合规」。
+     */
+    private fun balancedBranchBody(source: String, condition: String): String {
+        val start = source.indexOf(condition)
+        if (start < 0) return ""
+        val open = source.indexOf('{', start)
+        if (open < 0) return ""
+        var depth = 0
+        for (index in open until source.length) {
+            when (source[index]) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return source.substring(open + 1, index)
+                }
+            }
+        }
+        return ""
+    }
 
     /**
      * 「前景单迁、容器未迁」这一族的反向护栏（Task 23 的 Blocker 在本屏的对偶形态）。

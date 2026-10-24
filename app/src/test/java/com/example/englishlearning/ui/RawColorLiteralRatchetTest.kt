@@ -55,8 +55,11 @@ import kotlin.test.assertTrue
 internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
     "AppScreen.kt" to 2,
     // Task 24（裁决⑤ 附带债）：英文正文屏（Article 阅读那一屏）的裸 hex 已 token 化，本行随站点行同批摘除。
-    // 摘的是同一枚债务的两张表——只摘一张当场红（本测试核验两表互相吻合）。重算本文件对那枚屏文件名
-    // 的 grep 应零命中：`grep -c "ReadingScreen.kt" <本文件>` 只应剩 AppScreen 之外零条登记。
+    // 摘的是同一枚债务的两张表——只摘一张当场红（本测试核验两表互相吻合）。
+    // 重算口径（修复轮 1 F-6②订正；原文给的 `grep -c "ReadingScreen.kt" <本文件>` 口径是错的：台账 key 写的是
+    // `"ArticleReadingScreen.kt"`，而另一格 `"AppScreen.kt"` 并不含 `ReadingScreen.kt` 子串，
+    // 摘干净后那条命令只会命中注释自己，与「只应剩 AppScreen 之外零条登记」的说法自相矛盾）：
+    // `grep -n "ArticleReadingScreen" app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` ⇒ 零命中。
     "components/glass/GlassButton.kt" to 1,
     "mascot/AiMascot.kt" to 1,
 )

@@ -34,13 +34,14 @@ import kotlin.test.fail
  *  ② 容器可滚：内容 Column 的 modifier 链必须是 `heightIn(max = N.dp) → verticalScroll(rememberScrollState())
  *     → padding(24.dp)` 这一形状（N 取 200..700 之间的实际高度上限，太小=版面坏掉、太大=等于没有上限，
  *     设备字号 2.0 下导出选择器的「取消」因此始终可滚到）。
- *  ③ 八处消费面板（`AppScreen.kt` 两枚 + 六屏各一枚）：窗口内每一枚带 `style = AppType.X` 的 `Text(`
+ *  ③ 花名册 [expectedPanels] 登记的消费面板（枚数以该表现数为准，修复轮 1 F-6① 不留绝对数）：
+ *     窗口内每一枚带 `style = AppType.X` 的 `Text(`
  *     必须显式带 `color = appColors().<X 档当前墨>`；期望墨**由现场解析 `AppType.kt` 的六档墨表得出**
  *     （`TextPrimary → text1`、`TextSecondary → text2`），不是本文件拍脑袋写的常量——判据跟着真值走，
  *     六档一旦漂移本契约当场要求复核而不是悄悄错位。
  *  ④ 取样窗口绑死真实调用点：按 `GlassDialog(` 出现位置配平取「实参括号 + 尾随 lambda」整段，
  *     **未闭合即响亮报错**（批 2 seatC1 评审 I-1 的教训：窗口切歪时「窗外零处」这类断言会自己骗自己）；
- *     份数恰 8、每枚按标题字面认出，多一枚/少一枚/换身份都判红。
+ *     份数恰等于 [expectedPanels] 现数、每枚按标题字面认出，多一枚/少一枚/换身份都判红。
  *
  * 防空转（与 `AppScreenOverlayContainerContractTest`、`ContainerInkPairingContractTest` 同族写法）：
  * 每条主判据都有合成对拍走**同一条**解析链——合规样片放行、违规样片恰被点名、
@@ -88,7 +89,7 @@ class GlassPanelInkPairingContractTest {
         "content: @Composable () -> Unit",
     )
 
-    /** 八处消费面板：`file` + 该枚面板的身份字面（标题文案，逐枚唯一）。 */
+    /** 消费面板花名册：`file` + 该枚面板的身份字面（标题文案，逐枚唯一）；枚数以 [expectedPanels] 现数为准。 */
     private data class Panel(val file: String, val identity: String)
 
     private val expectedPanels = listOf(
@@ -309,7 +310,7 @@ class GlassPanelInkPairingContractTest {
         )
     }
 
-    // ---------- 判据 ③④：八处面板前景同源 ----------
+    // ---------- 判据 ③④：花名册内逐枚面板前景同源（枚数见 [expectedPanels]） ----------
 
     /** 按调用点取全部玻璃面板窗口（未闭合即 fail，见 [balancedRegion]）。 */
     private fun windowsOf(file: String, source: String): List<Window> =
