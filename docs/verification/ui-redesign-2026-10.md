@@ -774,7 +774,8 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
   处置：`Idle` 改为一行文案级兜底 `Text("外刊列表正在准备，请稍候。", tag = feed_idle)`，
   措辞与 `feed_loading` 逐字不同、两枚 tag 可分别点名；**未**新增重试按钮、**未**碰取源与 ViewModel。
   判据：connected `idleFeedStateShowsTheWaitingFallbackNotABlankBody`（先留红样）+
-  JVM 锚台账记上 `feed_idle`。重算：`grep -n "feed_idle" app/src/main/java/com/example/englishlearning/ui/ReadingFeedScreen.kt` ⇒ 1 处。
+  JVM 锚台账记上 `feed_idle`。重算：`grep -n 'testTag("feed_idle")' app/src/main/java/com/example/englishlearning/ui/ReadingFeedScreen.kt` ⇒ 1 处
+  （别用 `grep -n "feed_idle"`——它同时命中本文件类 KDoc 里的说明，现跑 = 2；这正是复评席点出的口径坑，控制者已订正）。
 
 ### `fontScale 2.0` 大字号轮（本批改版面，必跑）
 
@@ -782,7 +783,8 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
 跑前 `1.0`、置档回读 `2.0`、收工回读 `1.0`（设备只有 `emulator-5574`）。
 2.0 档判红一枚、处置一枚：`unlockedStateShowsFourTypesPreferenceAndOfflineHistoryEntry`
 在 2.0 档 `selected == null`——`performClick()` 打在未进视口的节点上是把事件注入窗口之外且**静默不触发**，
-不抛「点击失败」，所以这条腿必须显式 `performScrollTo()`（判据一字未减）。修后 2.0 与 1.0 两档各 17/17 皆绿。
+不抛「点击失败」，所以这条腿必须显式 `performScrollTo()`（判据一字未减）。修后 2.0 与 1.0 两档各 17/17 皆绿
+（修复轮 1 F-2 补第二支首屏腿后该类为 **18/18**，两档皆然，见下面「修复轮 1」段）。
 `mainTaskCtaSitsAboveTheFoldWithoutScrolling`（首屏判据）在 2.0 档**未判红**，即大字号下主任务仍在首屏以内。
 
 ### 对比现算口径（本席所有比值的唯一来源）
@@ -817,10 +819,14 @@ for(i in r){split(r[i],p," ");printf "%s/%s %.4f\n",p[1],p[2],ratio(p[1],p[2])}}
   只会得到 `suites=1 tests=5`，拿不到 239/1775）。
   **订正后的口径**：控制者已在合并态补跑并把 `BUILD` 行与计数行落进**同一份**原始件
   `.superpowers/sdd/2026-10-17-ui-redesign/t24-fix1-controller-gate.log`
-  （现算 `grep -nE "BUILD|suites=" <该文件>` ⇒ `BUILD SUCCESSFUL in 3m 55s` + `suites=239 tests=1775 skipped=0 failures=0 errors=0`），
-  Task 26 收口按同一口径重跑即可。
-  **本批新立凭据口径**：此后任何门控/自证日志必须**同一份**里同时落 `BUILD` 行与本席 awk 算出的
-  `suites=/tests=/skipped=/failures=/errors=` 计数行，否则文档与报告不得把计数绑给某个日志名。
+  （现算 `grep -nE "BUILD|suites=" <该文件>` ⇒ `BUILD SUCCESSFUL in 3m 55s` + `suites=239 tests=1775 skipped=0 failures=0 errors=0`）。
+  **收口件**（修复轮 + 复评后的最终态）是 `.superpowers/sdd/2026-10-17-ui-redesign/t24-close-controller-gate.log`：
+  首两行自带 `== gate HEAD 7921681 at <时间戳> ==` 与 `== working tree: 0 modified files at start ==`，
+  末四行 `BUILD SUCCESSFUL in 3m 16s` / `EXIT=0` / `suites=239 tests=1775 skipped=0 failures=0 errors=0`
+  ——**HEAD 与工作树状态进同一份日志**，这是复评席指出的「合并态不可自证」的正解，Task 26 收口按此形重跑。
+  **本批新立凭据口径**：此后任何门控/自证日志必须**同一份**里同时落 `BUILD` 行、本席 awk 算出的
+  `suites=/tests=/skipped=/failures=/errors=` 计数行、以及 `git rev-parse HEAD` 与开工时 `git status --porcelain` 行数；
+  否则文档与报告不得把计数绑给某个日志名。
   RED 阶段的四枚自证红样在 `t24-red-jvm-contract.log`，主 CTA 的 connected 红样在
   `t24-red-connected-maincta.log`；修复轮 1 的红样与门控读数在 `t24-fix1-red-jvm-f1-mutation.log`、
   `t24-fix1-gate-jvm-c1c2.log`、`t24-fix1-gate-jvm-final.log`、`t24-fix1-device.log`。
@@ -871,7 +877,8 @@ F-4/F-7 只做文档与卫生、C-1 维持既有债裁决。本席提交：`2eaa
   （`t24-fix1-red-jvm-f1-mutation.log`）。
 - **F-3（命名与断言对齐）**：`feedEmptyStateIsExplicit` / `feedUnreachableStateIsExplicit` /
   `feedReadyListsItemsWithSourceName` → `…IsNotPaintedOnReadingHome` 一族，**断言一字未动**。
-  历史文档 `docs/handoff/2026-10-12-stage-2-acceptance-record.md` 里那两个旧用例名是当时的快照，不属本席授权面，未改。
+  历史文档 `docs/handoff/2026-10-12-stage-2-acceptance-record.md` 里的旧用例名是当时的快照（修复席当时未改，不属其授权面）；
+  控制者随后在 `7921681` 给 AC2-05 那一行补了「已改名 …IsNotPaintedOnReadingHome 一族、断言未动」的指针，当轮验收结论一字未改。
 - **F-6（注释里的自漂移绝对数与错命令）**：`GlassPanelInkPairingContractTest` 里所有「八处 / 份数恰 8」的说法
   改为「按 `expectedPanels` 现数」（判据算式本来就用 `expectedPanels.size`，没写死数字；
   现算口径注意：`grep -c 'Panel("' <本文件>` 的命中数含判据夹具里的 `FakeScreen.kt`，台账实数按现表读，别拿这个计数当枚数）。
