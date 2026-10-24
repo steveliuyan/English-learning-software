@@ -691,7 +691,7 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
      同批删掉 `assertTrue(rootBottom > 0.dp)` 那类自我确认断言（根高恒正、永不红）。
      变异自证：把两枚主 CTA 整体挪到长列末尾 ⇒ 两条腿同时红（`top=421.33334.dp` vs 根高 `659.4286.dp` 的一半），
      见 `t24-fix1-device.log`。另记一条实跑教训：第一版更弱的变异（只把来源入口提到 CTA 上方）**没有判红**
-     （两枚 54dp 次级行 + 一张卡不足以把顶部位推过半屏线），所以这条腿的量的是「埋进长列」而不是「顺序微调」。
+     （两枚 54dp 次级行 + 一张卡不足以把顶部位推过半屏线），所以这条腿量的是「埋进长列」而不是「顺序微调」。
 2. **外刊 Feed 拆成带返回的二级层**：新增 `ui/ReadingFeedScreen.kt`（共享页头 `AppScreenHeader` +
    `BackHandler` 由宿主承担），主页只留 `reading_source_feed` 一枚入口。四枚 Feed 状态文案、
    `feed_item_<index>` 与「来源：+ sourceDisplayName」署名逐字照搬；connected 侧新增
@@ -718,7 +718,8 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
   （二级层那份是 `ReadingFeedScreen.kt`，只作为消费者出现）。
 - **裸 hex 族（`RawColorLiteralRatchetTest`）**：`RawColorSeedAllowlist` 与 `RawColorSeedSiteLines`
   两张表**同批**摘掉 `ArticleReadingScreen.kt` 那两枚条目（只动这两处，阈值与别的条目一字未动）。
-  摘后重算 `grep -n "ArticleReadingScreen" app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` ⇒ 零命中；
+  摘后重算 `grep -nE '"Article[A-Za-z]+Screen\.kt" to' app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` ⇒ 零命中
+  （口径锚成「台账 key + ` to`」，且正则写成命中不了注释自己的形式——只 grep 文件名会命中该文件里的说明注释，控制者现跑即如此）；
   `grep -nE "Color\(0x|0xFF[0-9A-Fa-f]{6,8}" app/src/main/java/com/example/englishlearning/ui/ArticleReadingScreen.kt` ⇒ 零命中。
   派工块 §二.4 给的现算命令 `grep -nE "#[0-9A-Fa-f]{6,8}"` 在本仓取不到东西（生产写法是 `0xFF…` 不是 `#…`），
   本席以盘面为准换成上面那条，并把它登记为 §二.4 的正式重算口径。
@@ -760,7 +761,7 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
   （`rememberSaveable` 状态位 / `overlayOpen` 的 `||` 链追加一项 / `BackHandler` / 挂载分支），
   其余半边一字未动；`AppScreenOverlayContainerContractTest` 的浮层计数判据随之必须仍绿（现绿）。
 - **（修复轮 1 F-5① 补登记）Feed 列表行多了一枚 54dp 行高下限**：`ReadingFeedScreen.kt` 的
-  `feed_item_$index` 带 `.heightIn(min = 54.dp)`，而旧的內联 `FeedSection` 同一枚 Button **没有**这条约束
+  `feed_item_$index` 带 `.heightIn(min = 54.dp)`，而旧的内联 `FeedSection` 同一枚 Button **没有**这条约束
   ⇒ 几十枚标题行的那一层必然要滚，比原形状更长。这是搬家时顺手统一触控目标带来的形状代价，
   原批「逐字照搬」的交代漏了它（不是文案/取源变化，列表语义与来源署名口径一字未动）。
   重算：`grep -n "heightIn" app/src/main/java/com/example/englishlearning/ui/ReadingFeedScreen.kt`
@@ -814,7 +815,10 @@ for(i in r){split(r[i],p," ");printf "%s/%s %.4f\n",p[1],p[2],ratio(p[1],p[2])}}
   `grep -nE "suites|tests=|Tests run" t24-controller-gate.log t24-gate-jvm-2.log` ⇒ 零命中；
   磁盘结果目录现只反映最后一次 `--tests` 过滤运行（单类比值复算会**覆写**全量结果，此后按下面那条 awk
   只会得到 `suites=1 tests=5`，拿不到 239/1775）。
-  **订正后的口径**：计数以控制者复跑记录为准，带计数行的原始件由控制者在收口复跑时补 tee（Task 26 收口全门时执行）。
+  **订正后的口径**：控制者已在合并态补跑并把 `BUILD` 行与计数行落进**同一份**原始件
+  `.superpowers/sdd/2026-10-17-ui-redesign/t24-fix1-controller-gate.log`
+  （现算 `grep -nE "BUILD|suites=" <该文件>` ⇒ `BUILD SUCCESSFUL in 3m 55s` + `suites=239 tests=1775 skipped=0 failures=0 errors=0`），
+  Task 26 收口按同一口径重跑即可。
   **本批新立凭据口径**：此后任何门控/自证日志必须**同一份**里同时落 `BUILD` 行与本席 awk 算出的
   `suites=/tests=/skipped=/failures=/errors=` 计数行，否则文档与报告不得把计数绑给某个日志名。
   RED 阶段的四枚自证红样在 `t24-red-jvm-contract.log`，主 CTA 的 connected 红样在
@@ -868,12 +872,14 @@ F-4/F-7 只做文档与卫生、C-1 维持既有债裁决。本席提交：`2eaa
 - **F-3（命名与断言对齐）**：`feedEmptyStateIsExplicit` / `feedUnreachableStateIsExplicit` /
   `feedReadyListsItemsWithSourceName` → `…IsNotPaintedOnReadingHome` 一族，**断言一字未动**。
   历史文档 `docs/handoff/2026-10-12-stage-2-acceptance-record.md` 里那两个旧用例名是当时的快照，不属本席授权面，未改。
-- **F-6（注释里的自漂移绝对数与错命令）**：`GlassPanelInkPairingContractTest` 的「八处 / 份数恰 8」四处
+- **F-6（注释里的自漂移绝对数与错命令）**：`GlassPanelInkPairingContractTest` 里所有「八处 / 份数恰 8」的说法
   改为「按 `expectedPanels` 现数」（判据算式本来就用 `expectedPanels.size`，没写死数字；
-  `grep -c 'Panel("' <本文件>` 现跑 = 9，其中 2 枚是判据夹具里的 `FakeScreen.kt`，台账实数按现表读）。
+  现算口径注意：`grep -c 'Panel("' <本文件>` 的命中数含判据夹具里的 `FakeScreen.kt`，台账实数按现表读，别拿这个计数当枚数）。
   `RawColorLiteralRatchetTest` 摘除处的重算命令改为
-  `grep -n "ArticleReadingScreen" <本文件>` ⇒ 零命中（原 `grep -c "ReadingScreen.kt" <本文件>` 现跑 = 1，
-  只命中注释自己，`"AppScreen.kt"` 并不含该子串——口径自相矛盾，本批改掉以免 Task 26 照抄）。
+  `grep -nE '"Article[A-Za-z]+Screen\.kt" to' <本文件>` ⇒ 零命中（锚成「台账 key + ` to`」的形状）。
+  两条原命令都不可用：`grep -c "ReadingScreen.kt"` 的口径与「只应剩 AppScreen 之外零条登记」自相矛盾，
+  而 `grep -n "ArticleReadingScreen"` 会命中该文件里解释这件事的注释自己——**控制者复跑时踩到，故本批把命令写成命中不了自己的形式**；
+  注释命中数会随注释增删漂移，所以这里不写它等于几。
 - **F-7（大字号证据补齐 + 卫生）**：`font_scale` 2.0 轮补跑本批唯一改到排版的屏与其连带件，三次回显
   落同一份日志 `t24-fix1-device.log`（跑前 `1.0` / 置档 `2.0` / 收工 `1.0`，全程 `-s emulator-5574`，
   未用 `connectedDebugAndroidTest`）：`ArticleReadingScreenTest` **OK (23 tests)**、

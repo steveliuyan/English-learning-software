@@ -59,7 +59,9 @@ internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
     // 重算口径（修复轮 1 F-6②订正；原文给的 `grep -c "ReadingScreen.kt" <本文件>` 口径是错的：台账 key 写的是
     // `"ArticleReadingScreen.kt"`，而另一格 `"AppScreen.kt"` 并不含 `ReadingScreen.kt` 子串，
     // 摘干净后那条命令只会命中注释自己，与「只应剩 AppScreen 之外零条登记」的说法自相矛盾）：
-    // `grep -n "ArticleReadingScreen" app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` ⇒ 零命中。
+    // `grep -nE '"Article[A-Za-z]+Screen\.kt" to' app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` ⇒ 零命中
+    // （口径必须锚成「台账 key + ` to`」的形状；且正则要写成自己命中不了自己的形式——
+    // 直接写文件名的话本段注释自己会被 grep 到：控制者现跑 `grep -c "ArticleReadingScreen" <本文件>` = 2，全在注释里）。
     "components/glass/GlassButton.kt" to 1,
     "mascot/AiMascot.kt" to 1,
 )
