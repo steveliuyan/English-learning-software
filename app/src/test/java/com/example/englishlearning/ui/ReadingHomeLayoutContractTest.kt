@@ -51,8 +51,11 @@ class ReadingHomeLayoutContractTest {
             "onFetchFeedItem" in home,
             "阅读主页不应再持有 Feed 条目回调：抓取动作随 Feed 一起归二级层（主页只留通往该层的导航）",
         )
-        // 二级层本体：四枚 Feed 状态与条目锚逐枚点名，缺任一枚 = 状态族被顺手裁掉。
+        // 二级层本体：状态锚与条目锚逐枚点名，缺任一枚 = 状态族被顺手裁掉。
+        // `feed_idle` 是修复轮 1 F-5② 的文案级兜底锚（宿主非 Ready 时把本层停在 Idle，
+        // 旧的 `Idle -> Unit` = 一整页空白）；把它记进台账，防后续席把这行改回 `Unit`。
         listOf(
+            "feed_idle",
             "feed_loading",
             "feed_empty",
             "feed_error",

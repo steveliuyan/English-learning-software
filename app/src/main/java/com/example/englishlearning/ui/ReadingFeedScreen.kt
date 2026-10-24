@@ -34,8 +34,9 @@ import com.example.englishlearning.ui.theme.appColors
  * 一页流水账，主任务（今日文章）被挤出首屏。现在主页只留 `reading_source_feed` 这一枚入口，
  * 列表与抓取归本层，返回交给宿主（`AppScreen.kt` 的状态位 + `BackHandler`）。
  *
- * **四枚 Feed 状态与 feed_item 下标的语义逐字照搬**（Idle 依旧不渲染任何东西，宿主在进入本层时
- * 已经触发一次 `openFeed()`，所以第一帧起就是 Loading），包括「来源：+ feed.sourceDisplayName」
+ * **四枚 Feed 状态与 feed_item 下标的语义逐字照搬**（`Idle` 一档在修复轮 1 F-5② 由「不渲染任何东西」
+ * 改为一行文案级兜底 `feed_idle`，因为宿主会在状态非 Ready 时把本层停在 Idle，旧形状等于一整页空白；
+ * 宿主在进入本层时已触发一次 `openFeed()`，正常路径第一帧起就是 Loading），包括「来源：+ feed.sourceDisplayName」
  * 这枚来源署名的权威口径——本层只换版面层次，不改取源文案，也不新增重试动作
  * （取源与 `FeedItem` 数据形状归 `ReadingAccessViewModel`，多源是 UI 轮之后的独立小批）。
  *
@@ -63,7 +64,17 @@ fun ReadingFeedScreen(
     ) {
         AppScreenHeader(title = "外刊选读", onBack = onBack)
         when (feed) {
-            FeedUiState.Idle -> Unit
+            // 修复轮 1 F-5②：宿主把非 Ready 的 readingState 映射成 `FeedUiState.Idle`
+            // （`AppScreen.kt:1357` `(readingState as? ReadingAccessUiState.Ready)?.feed ?: FeedUiState.Idle`），
+            // 而旧的 `Idle -> Unit` 会让本层只剩页头、正文一整页空白。这里只补一行文案级兜底：
+            // 不新增重试动作、不碰取源（`onFetchFeedItem` 与 ViewModel 一字不动）、其余五枚状态文案一字不动。
+            // 措辞沿用「正在获取外刊列表…」这一族但与 `feed_loading` 逐字不同，两枚 tag 必须能分别点名。
+            FeedUiState.Idle -> Text(
+                "外刊列表正在准备，请稍候。",
+                style = AppType.Body,
+                color = colors.text2,
+                modifier = Modifier.testTag("feed_idle"),
+            )
             FeedUiState.Loading -> Text(
                 "正在获取外刊列表…",
                 style = AppType.Body,

@@ -12,7 +12,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.reading.FetchFailure
 import com.example.englishlearning.reading.FeedItem
@@ -122,12 +121,17 @@ class ReadingFeedScreenTest {
     }
 
     @Test
-    fun idleFeedStateRendersNothingButTheHeader() {
+    fun idleFeedStateShowsTheWaitingFallbackNotABlankBody() {
         setFeed(ThemeMode.Light, FeedUiState.Idle)
 
-        // Idle 依旧不渲染任何内容：宿主在进入本层时已触发一次 openFeed()，第一帧起就应是 Loading；
-        // 这条钉住「Idle 不是空白列表」，防止有人把它改成 `Empty` 的同形文案。
+        // 修复轮 1 F-5②：宿主 `(readingState as? Ready)?.feed ?: FeedUiState.Idle`（`AppScreen.kt:1357`）
+        // 会在状态非 Ready（Ready→非 Ready 翻转、或测试装配里 ViewModel 缺席）时把本层停在 `Idle`，
+        // 而旧的 `Idle -> Unit` 只画页头 ⇒ 点进二级层看到一整页空白。本层因此必须有一行状态文案。
         composeRule.onNodeWithTag("app_screen_header").assertIsDisplayed()
+        composeRule.onNodeWithTag("feed_idle").assertIsDisplayed()
+        // 兜底只许是「正在准备」这一族，不许借 `Empty` 的文案把空档冒充成待机等：
+        composeRule.onNodeWithText("这个来源暂时没有可读的文章，稍后再来看看。").assertDoesNotExist()
+        // `feed_loading` 仍是 Loading 档专属锚：两枚 tag 必须能被分别点名，否则兜底就是把 Loading 复制了一份。
         composeRule.onNodeWithTag("feed_loading").assertDoesNotExist()
         composeRule.onNodeWithTag("feed_item_0").assertDoesNotExist()
     }
