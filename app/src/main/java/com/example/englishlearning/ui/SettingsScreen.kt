@@ -2,7 +2,8 @@ package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.domain.AiProviderKind
@@ -418,6 +420,11 @@ fun SettingsScreen(
  *
  * 三档标签固定为「跟随系统 / 浅色 / 深色」；每档可点面 `heightIn(min = 48.dp)`（F5-03 触控下限）。
  *
+ * TalkBack 口径（Task 26 Step 4 / AC-R-12 走查发现）：原实现是三个各自 `.clickable` 的 Box，
+ * 读屏只念三段文字、不报「当前选中哪一档」。本件按单选组语义改写：容器 `.selectableGroup()`、
+ * 每档 `.selectable(selected, role = Role.RadioButton)`——读屏念 Role 并附加「已选中」，
+ * 判据见 `SettingsScreenTest#the_theme_segments_expose_their_selected_state_to_talkback`。
+ *
  * 卡标题与卡片 testTag 都取自台账里「主题」那一行（修复轮 1 / I3：这一页的行标题只许定义一处）；
  * 本件不消费 [EntryRow]，所以不走 [LedgerEntryRow]，但同样只报 tag、不抄标题。
  */
@@ -448,6 +455,7 @@ fun ThemeModeRow(mode: ThemeMode, onSelect: (ThemeMode) -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .selectableGroup()
                     .background(colors.outlineSoft, AppShape.Button)
                     .padding(3.dp),
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -459,7 +467,7 @@ fun ThemeModeRow(mode: ThemeMode, onSelect: (ThemeMode) -> Unit) {
                             .weight(1f)
                             .clip(RoundedCornerShape(11.dp))
                             .background(if (selected) colors.surface else Color.Transparent)
-                            .clickable { onSelect(option) }
+                            .selectable(selected = selected, role = Role.RadioButton) { onSelect(option) }
                             .heightIn(min = 48.dp)
                             .testTag("settings_theme_${option.storageKey}"),
                         contentAlignment = Alignment.Center,

@@ -36,38 +36,34 @@ class MaterialThemeAssemblyContractTest {
     // ---------- 钉值表（拆成两段：spec §2.2 钉值段 + 批 1 墨色债务段；见 m12） ----------
 
     /**
-     * 六个语义档在 `AppType.kt` 里的声明，**按判据来源拆成两处**（批 1 终审 m12，Seat A「口径 6 反向锁」）：
+     * 六个语义档的**spec 钉值表**（`fontSize` / `fontWeight` / `letterSpacing`）。
+     * spec §2.2（`docs/superpowers/specs/2026-10-17-ui-redesign-design.md` §2.2）只钉这三项与 M3 角色对位，
+     * **从未钉过 `color`**——批 3 Task 26 把六档的墨改成组合期读 `appColors()`，字号/字重/字距一个字节没动，
+     * 所以钉值段仍是这批字面量（它们是 `AppType` 六档的私有度量表 `<Tier>Spec`）。
      *
-     *  - [appTypeSpecSegments]：**spec 钉值段**（`fontSize` / `fontWeight` / `letterSpacing`）。
-     *    spec §2.2 的钉值表（`docs/superpowers/specs/2026-10-17-ui-redesign-design.md` §2.2）
-     *    只钉这三项与 M3 角色对位，**从未钉过 `color`**；
-     *  - [appTypeInkSegments]：**批 1 债务段**（`color = AppPalette.Text…`）。它钉的是「六档今日仍硬编码浅套墨」
-     *    这一笔**债务**，台账在 `DarkTokenConsumptionRatchetTest` 的 `seed("theme/AppType.kt" = 6)`；
-     *    批 3 给六档摘色时删掉的是本段与那 6 处 seed，**不构成 spec 冲突**。
-     *
-     * 两段拼起来与旧的整条字面比对**逐字节等价**（用例仍断言 `contains(spec + ink)`），所以本轮没有放松任何判据，
-     * 只是让批 3 摘色时红的是「债务段」而不是「规格段」。六档取值一个字节都没动。
+     * 墨的对位不再按字面 `color = AppPalette.Text…` 钉（那笔批 1 债务已在 Task 26 清掉），
+     * 改由 `AppType six tiers take their ink from the current theme set` 逐档钉「取哪一枚主题墨」。
      */
     private val appTypeSpecSegments: Map<String, String> = linkedMapOf(
-        "Display" to "val Display = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, " +
-            "letterSpacing = 0.4.sp",
-        "Headline" to "val Headline = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, " +
-            "letterSpacing = 0.2.sp",
-        "Title" to "val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold",
-        "Body" to "val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal",
-        "Footnote" to "val Footnote = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal",
-        "Label" to "val Label = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, " +
-            "letterSpacing = 0.3.sp",
+        "Display" to "private val DisplaySpec = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, " +
+            "letterSpacing = 0.4.sp)",
+        "Headline" to "private val HeadlineSpec = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, " +
+            "letterSpacing = 0.2.sp)",
+        "Title" to "private val TitleSpec = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)",
+        "Body" to "private val BodySpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)",
+        "Footnote" to "private val FootnoteSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal)",
+        "Label" to "private val LabelSpec = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, " +
+            "letterSpacing = 0.3.sp)",
     )
 
-    /** 六档的批 1 墨色债务段（紧跟 spec 段之后、以右括号收尾）；台账见 `seed("theme/AppType.kt" = 6)`。 */
-    private val appTypeInkSegments: Map<String, String> = linkedMapOf(
-        "Display" to ", color = AppPalette.TextPrimary)",
-        "Headline" to ", color = AppPalette.TextPrimary)",
-        "Title" to ", color = AppPalette.TextPrimary)",
-        "Body" to ", color = AppPalette.TextPrimary)",
-        "Footnote" to ", color = AppPalette.TextSecondary)",
-        "Label" to ", color = AppPalette.TextSecondary)",
+    /** `<Tier>Spec` → 该档应取的主题墨字段名（浅套取值的对位沿用批 1：正文族 text1、辅助族 text2）。 */
+    private val appTypeInkTiers: Map<String, String> = linkedMapOf(
+        "Display" to "text1",
+        "Headline" to "text1",
+        "Title" to "text1",
+        "Body" to "text1",
+        "Footnote" to "text2",
+        "Label" to "text2",
     )
 
     /**
@@ -496,14 +492,14 @@ class MaterialThemeAssemblyContractTest {
     // ---------- 用例：六档钉值（brief Step 1 断言 3；spec 钉值段 + 批 1 债务段分开判，m12） ----------
 
     /**
-     * 六档声明逐字钉住，但**按判据来源分两层报红**：
-     *  - spec 段（字号/字重/字距）红 = 真的偏离 spec §2.2；
-     *  - 墨色段红 = 批 1 债务形态变了（`color = AppPalette.Text…`），由 `DarkTokenConsumptionRatchetTest`
-     *    的 `seed("theme/AppType.kt" = 6)` 台账记账，批 3 摘色时连同本判据一起删，**不是**规格冲突。
-     * 两段仍做整串 `contains`，判据强度与拆分前逐字节等价。
+     * 六档声明逐字钉住 spec §2.2 的钉值（字号/字重/字距 + 恰六档），并把「墨取自当前主题」拆成下一条用例。
+     *
+     * 批 1 时这里还钉着 `color = AppPalette.Text…` 的债务段；批 3 Task 26 已把六档改成组合期读
+     * `appColors().text1/text2`，债务段与 `DarkTokenConsumptionRatchetTest` 的 `AppType.kt` seed 同步消失。
+     * 规格段本身（六个 `<Tier>Spec`）逐字节未动，所以「摘色」不构成 spec 冲突。
      */
     @Test
-    fun `AppType six tiers match spec 2_2 metrics and the batch 1 ink segment`() {
+    fun `AppType six tiers match spec 2_2 metrics`() {
         val text = appTypeText()
         appTypeSpecSegments.forEach { (tier, specSegment) ->
             assertTrue(
@@ -511,19 +507,67 @@ class MaterialThemeAssemblyContractTest {
                 "AppType.$tier 偏离 **spec §2.2 钉值段**（只钉 fontSize/fontWeight/letterSpacing 与 M3 角色对位，" +
                     "spec 从未钉 color）：期望 $specSegment"
             )
-            val inkSegment = appTypeInkSegments.getValue(tier)
-            assertTrue(
-                text.contains(specSegment + inkSegment),
-                "AppType.$tier 的**批 1 墨色债务段** $inkSegment 没有紧跟在 spec 钉值段之后（被改写或位置移动）。" +
-                    "注意：这一段不是 spec 要求，它是 `DarkTokenConsumptionRatchetTest` 的 " +
-                    "seed(theme/AppType.kt = 6) 台账登记的浅套硬编码墨色，批 3 摘色时连同本判据一并删除；" +
-                    "若 spec 钉值段本身也漂了，上面那条判据会先红。"
-            )
         }
         assertEquals(
             6,
-            Regex("""val (Display|Headline|Title|Body|Footnote|Label) = TextStyle\(""").findAll(text).count(),
-            "AppType 必须恰好六个语义档：多出任何一档就是引入新字号（R3 禁止）",
+            Regex("""private val (Display|Headline|Title|Body|Footnote|Label)Spec = TextStyle\(""").findAll(text).count(),
+            "AppType 必须恰好六个语义档的度量表：多出任何一档就是引入新字号（R3 禁止）",
+        )
+        assertEquals(
+            6,
+            Regex("""val (Display|Headline|Title|Body|Footnote|Label): TextStyle\r?\n""").findAll(text).count(),
+            "六个语义档必须各自有一枚 `val <Tier>: TextStyle` 组合期 getter：少一枚就是某档的直读点失去主题墨",
+        )
+    }
+
+    /**
+     * 批 3 Task 26 排印墨色族收口：六档的墨必须是**组合期**读取的 `appColors().text1/text2`。
+     *
+     * 立论（`DarkTokenConsumptionRatchetTest` 文件头同源）：`AppType.*` 有上百处直读，任何一处静态
+     * `AppPalette.TextPrimary` 都会在深色档把浅套近黑墨压到近黑底上。逐档钉「取哪一枚」而不只钉
+     * 「取了某一枚」——正文族四档 `text1`、辅助族两档 `text2`，与批 1 的浅套对位逐字一致（浅套下
+     * `text1 == TextPrimary`、`text2 == TextSecondary`），所以这是纯迁移、不是重新配色。
+     */
+    @Test
+    fun `AppType six tiers take their ink from the current theme set`() {
+        val text = appTypeText()
+        assertEquals(
+            appTypeInkTiers.keys,
+            Regex("""val (Display|Headline|Title|Body|Footnote|Label): TextStyle""")
+                .findAll(text).map { it.groupValues[1] }.toSet(),
+            "六档 getter 的集合与墨对位表不一致（少一档 = 那张档的直读点没有主题墨）",
+        )
+        appTypeInkTiers.forEach { (tier, ink) ->
+            val getter = Regex(
+                """val $tier: TextStyle\s*\n\s*@Composable\s*\n\s*@ReadOnlyComposable\s*\n\s*get\(\) = ${tier}Spec\.copy\(color = appColors\(\)\.$ink\)"""
+            )
+            assertTrue(
+                getter.containsMatchIn(text),
+                "AppType.$tier 的墨必须**组合期**取 `appColors().$ink`（批 3 排印墨色族收口）：" +
+                    "静态浅套墨会让深色档的 $tier 直读点当场不可读；字号/字重/字距仍归 spec 钉值段，不在本条范围。"
+            )
+        }
+        assertEquals(
+            0,
+            countMatches(text, Regex("""AppPalette\.""")),
+            "AppType.kt 不得再读 AppPalette 静态浅套墨（六档是深色档「当场不可读」的主因）",
+        )
+        // 反空转：同一形状换错档位必须判红 —— 否则「逐档对位」只是「六档都取了某个主题墨」的恒真断言。
+        val wrongTier = "val Display: TextStyle\n    @Composable\n    @ReadOnlyComposable\n" +
+            "    get() = DisplaySpec.copy(color = appColors().text2)"
+        val displayText1 = Regex(
+            """val Display: TextStyle\s*\n\s*@Composable\s*\n\s*@ReadOnlyComposable\s*\n\s*get\(\) = DisplaySpec\.copy\(color = appColors\(\)\.text1\)"""
+        )
+        assertTrue(
+            !displayText1.containsMatchIn(wrongTier),
+            "合成负片段被放行：Display 取 text2 也算对位，逐档判据会空转",
+        )
+        assertTrue(
+            displayText1.containsMatchIn(
+                "val Display: TextStyle\n    @Composable\n    @ReadOnlyComposable\n" +
+                    "    get() = DisplaySpec.copy(color = appColors().text1)"
+            ),
+            "合成正片段被判红：形状正则与目标写法脱节（判据会对着真文件一枪不发）",
         )
     }
 

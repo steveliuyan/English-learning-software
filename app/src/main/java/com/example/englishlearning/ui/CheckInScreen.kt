@@ -37,14 +37,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.DailyLearningStats
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 import java.time.DayOfWeek
 import java.time.YearMonth
 
@@ -80,7 +81,7 @@ fun CheckInScreen(
             CheckInUiState.Loading -> Text("正在读取打卡记录…", color = MintTextMuted)
             CheckInUiState.Unavailable -> {
                 Text("打卡记录暂时无法读取，请稍后重试", color = MintTextMuted, modifier = Modifier.testTag("check_in_unavailable"))
-                Button(onClick = onRetry, modifier = Modifier.semantics { contentDescription = "重试" }, colors = ButtonDefaults.buttonColors(containerColor = DomainColors.Review.deep, contentColor = Color.White)) { Text("重试") }
+                Button(onClick = onRetry, modifier = Modifier.semantics { contentDescription = "重试" }, colors = ButtonDefaults.buttonColors(containerColor = appDomain(AppDomain.Review).deep, contentColor = Color.White)) { Text("重试") }
             }
             is CheckInUiState.Ready -> ReadyContent(state)
         }
@@ -90,12 +91,15 @@ fun CheckInScreen(
 @Composable
 private fun ReadyContent(state: CheckInUiState.Ready) {
     val today = state.today
+    // 复习域的深墨在本屏复用 6 处（含 Canvas 的 onDraw）：组合期取一次，
+    // 因为 `Canvas { }` 的绘制 lambda 不是 composable 作用域，不能在里面读 `appDomain()`。
+    val reviewInk = appDomain(AppDomain.Review).deep
     Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(22.dp)).testTag("check_in_today")) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("今日", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
             Text("完成任务 ${today.completedTaskCount}/${today.targetTaskCount}", color = MintPrimaryDark)
             Text("复习 ${today.reviewedWordCount} 词 · 阅读 ${today.completedReadingCount} 篇", color = MintTextMuted)
-            Text(if (state.completed) "今日已完成" else "继续保持学习", color = if (state.completed) DomainColors.Review.deep else MintTextMuted, fontWeight = FontWeight.Bold)
+            Text(if (state.completed) "今日已完成" else "继续保持学习", color = if (state.completed) reviewInk else MintTextMuted, fontWeight = FontWeight.Bold)
         }
     }
     // F4-01 基础统计卡：累计学习/复习、连续天数（按快照解锁口径，不要求阅读）、近 7 日完成率条。
@@ -109,7 +113,7 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
                     state.recentDays.forEachIndexed { index, day ->
                         val ratio = day.completionRatio
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(Modifier.fillMaxWidth().height((56 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) DomainColors.Review.deep else appColors().outlineSoft).testTag("check_in_recent_bar_$index").semantics { contentDescription = "${day.localDate} 完成率 ${(ratio * 100).toInt()}%" })
+                            Box(Modifier.fillMaxWidth().height((56 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) reviewInk else appColors().outlineSoft).testTag("check_in_recent_bar_$index").semantics { contentDescription = "${day.localDate} 完成率 ${(ratio * 100).toInt()}%" })
                             Text(day.localDate.dayOfMonth.toString(), color = MintTextMuted, style = MaterialTheme.typography.labelSmall)
                         }
                     }
@@ -124,7 +128,7 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
                 state.week.take(7).forEachIndexed { index, day ->
                     val ratio = if (day.targetTaskCount > 0) (day.completedTaskCount.toFloat() / day.targetTaskCount).coerceIn(0f, 1f) else 0f
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) DomainColors.Review.deep else appColors().outlineSoft).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
+                        Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) reviewInk else appColors().outlineSoft).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
                         Text(day.localDate.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA), color = MintTextMuted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -146,10 +150,10 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
                     val strokeWidth = 12.dp.toPx()
                     drawArc(color = ringTrack, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
                     if (ratio > 0f) {
-                        drawArc(color = DomainColors.Review.deep, startAngle = -90f, sweepAngle = ratio * 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
+                        drawArc(color = reviewInk, startAngle = -90f, sweepAngle = ratio * 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
                     }
                 }
-                Text("${(ratio * 100).toInt()}%", modifier = Modifier.testTag("check_in_completion_percent"), style = AppType.Headline, fontWeight = FontWeight.Bold, color = DomainColors.Review.deep)
+                Text("${(ratio * 100).toInt()}%", modifier = Modifier.testTag("check_in_completion_percent"), style = AppType.Headline, fontWeight = FontWeight.Bold, color = reviewInk)
             }
             Text("目标 ${today.targetTaskCount} 项，已完成 ${today.completedTaskCount} 项", color = MintTextMuted)
         }
@@ -172,7 +176,7 @@ private fun MonthCalendar(days: List<DailyLearningStats>) {
                     Box(Modifier.weight(1f).heightIn(min = 34.dp), contentAlignment = Alignment.Center) {
                         if (date != null) {
                             val done = (byDate[date]?.completedTaskCount ?: 0) > 0
-                            Text(date.dayOfMonth.toString(), color = if (done) DomainColors.Review.deep else MintTextMuted, fontWeight = if (done) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.semantics { contentDescription = if (done) "$date 已完成" else date.toString() })
+                            Text(date.dayOfMonth.toString(), color = if (done) appDomain(AppDomain.Review).deep else MintTextMuted, fontWeight = if (done) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.semantics { contentDescription = if (done) "$date 已完成" else date.toString() })
                         }
                     }
                 }; repeat(7 - week.size) { Box(Modifier.weight(1f).heightIn(min = 34.dp)) } }

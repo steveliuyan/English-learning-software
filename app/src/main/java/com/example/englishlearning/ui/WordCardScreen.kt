@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,10 +41,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.CardFeedback
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SpeakerButton
 import com.example.englishlearning.ui.components.SpeakerState
-import com.example.englishlearning.ui.theme.AppPalette
-import com.example.englishlearning.ui.theme.DomainColors
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -51,6 +53,8 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 
 /**
  * Word card screen (spec F1-03, recall-reveal-grade flow per decision 2026-10-14).
@@ -125,7 +129,7 @@ fun WordCardScreen(
                 Button(
                     onClick = onRetry,
                     modifier = Modifier.testTag("word_card_retry").semantics { contentDescription = "重试" },
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
                 ) { Text("重试") }
             }
 
@@ -137,7 +141,7 @@ fun WordCardScreen(
             is WordCardUiState.ReviewCompleted -> {
                 Text(
                     text = "到期复习已完成",
-                    color = DomainColors.Review.deep,
+                    color = appDomain(AppDomain.Review).deep,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.testTag("word_card_review_completed"),
                 )
@@ -154,7 +158,7 @@ fun WordCardScreen(
                         .testTag("word_card_start_new_phase")
                         .semantics { contentDescription = "开始学习新增词" },
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
                 ) { Text("开始学习新增词", fontWeight = FontWeight.Bold) }
                 BackToPlanButton(onBackToPlan)
             }
@@ -204,7 +208,7 @@ fun WordCardScreen(
                         "今日新增 ${state.taskCompletedCount}/${state.taskTotal}"
                     },
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (state.isReview) DomainColors.Review.deep else DomainColors.Learn.deep,
+                    color = if (state.isReview) appDomain(AppDomain.Review).deep else appDomain(AppDomain.Learn).deep,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .testTag("word_card_task_type")
@@ -336,11 +340,16 @@ fun WordCardScreen(
                     }
                 }
                 state.message?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag("word_card_message").semantics { contentDescription = it },
-                    )
+                    // Task 26 Step 3：错误行收口到共享 `InlineNotice`。旧锚 `word_card_message` 留在外层 Box
+                    // （组件的 `inline_notice_error` 是后设的，同一 modifier 会被覆盖）；朗读语义仍由
+                    // `contentDescription` 供出，`mergeDescendants` 让整条提示成为一个可朗读节点（与原单枚 Text 同形）。
+                    Box(Modifier.testTag("word_card_message")) {
+                        InlineNotice(
+                            text = it,
+                            kind = InlineNoticeKind.Error,
+                            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = it },
+                        )
+                    }
                 }
                 // F5-03：live region 必须是常驻容器——瞬时消息作为子节点进出组合，容器本身留在树里，
                 // 否则 TalkBack 没有可监听的区域（决策 §4 要求「不打断当前朗读的瞬时播报」）。
@@ -386,7 +395,7 @@ private fun FeedbackButton(
 ) {
     val container = if (feedback == CardFeedback.Known) MintPrimary else MintSurface
     // 「认识」档是浅薄荷底，白字只有 ≈2.1:1（决策 §3 禁令2），统一改深字 token。
-    val content = if (feedback == CardFeedback.Known) AppPalette.OnMintPrimary else MintPrimaryDark
+    val content = if (feedback == CardFeedback.Known) appColors().onBrand else MintPrimaryDark
     Button(
         onClick = { onSubmit(feedback) },
         enabled = !state.submitting,
@@ -416,7 +425,7 @@ private fun BackToPlanButton(onBackToPlan: () -> Unit) {
             .testTag("word_card_back_to_plan")
             .semantics { contentDescription = "返回今日计划" },
         shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
     ) { Text("返回今日计划", fontWeight = FontWeight.Bold) }
 }
 

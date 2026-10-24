@@ -35,11 +35,11 @@ import com.example.englishlearning.ai.AiFailureUiText
 import com.example.englishlearning.sentence.SentenceAnalysisNotConfiguredReason
 import com.example.englishlearning.sentence.SentenceAnalysisPromptPolicy
 import com.example.englishlearning.sentence.SentenceSegment
+import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -63,6 +63,7 @@ fun SentenceAnalysisScreen(
     onAnalyze: (String) -> Unit,
     onConfirmOutbound: (Boolean) -> Unit,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var sentence by rememberSaveable { mutableStateOf("") }
@@ -109,7 +110,7 @@ fun SentenceAnalysisScreen(
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MintPrimary,
-                contentColor = AppPalette.OnMintPrimary,
+                contentColor = appColors().onBrand,
                 disabledContainerColor = MintTint,
                 disabledContentColor = MintPrimaryDark,
             ),
@@ -130,7 +131,12 @@ fun SentenceAnalysisScreen(
             )
             is SentenceAnalysisUiState.Analyzed -> SegmentList(state.segments)
             is SentenceAnalysisUiState.NeedsOutboundConfirmation -> OutboundConfirmationDialog(state.host, onConfirmOutbound)
-            is SentenceAnalysisUiState.NotConfigured -> NotConfiguredCard(state.reason)
+            is SentenceAnalysisUiState.NotConfigured -> NotConfiguredCard(
+                featureLabel = "长难句分析",
+                onConfigure = onOpenAiSettings,
+                modifier = Modifier.testTag("sentence_analysis_not_configured"),
+                detail = state.reason.guidance(),
+            )
             is SentenceAnalysisUiState.Failed -> FailureCard(state.failure.uiText)
         }
     }
@@ -207,32 +213,19 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
     }
 }
 
-@Composable
-private fun NotConfiguredCard(reason: SentenceAnalysisNotConfiguredReason) {
-    val message = when (reason) {
-        SentenceAnalysisNotConfiguredReason.NoDefaultProfile ->
-            "还没有默认的 AI 服务，先去「设置 · AI」添加一套并设为默认。"
-        SentenceAnalysisNotConfiguredReason.DefaultProfileUnavailable ->
-            "默认 AI 服务不可用或缺少密钥，去「设置 · AI」检查。"
-        SentenceAnalysisNotConfiguredReason.InvalidEndpoint ->
-            "AI 服务的地址无效，去「设置 · AI」修正后再试。"
-    }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("sentence_analysis_not_configured"),
-    ) {
-        Text(
-            message,
-            color = MintPrimaryDark,
-            modifier = Modifier
-                .padding(18.dp)
-                .semantics { contentDescription = "AI 未配置提示" },
-        )
-    }
+/**
+ * 各拒绝原因对应的**补路指引**（卡的第二行）；第一行「一句现状」由共享 `NotConfiguredCard` 统一措辞。
+ *
+ * Task 26 Step 3 删掉了本文件同名的私有 `NotConfiguredCard`：旧卡只有一段文字、**没有出口**
+ * （spec §3 点名的死屏）；出口现在由共享件提供并接到 `onOpenAiSettings`。
+ */
+private fun SentenceAnalysisNotConfiguredReason.guidance(): String = when (this) {
+    SentenceAnalysisNotConfiguredReason.NoDefaultProfile ->
+        "去「设置 · AI」添加一套并设为默认。"
+    SentenceAnalysisNotConfiguredReason.DefaultProfileUnavailable ->
+        "去「设置 · AI」检查默认服务或补上密钥。"
+    SentenceAnalysisNotConfiguredReason.InvalidEndpoint ->
+        "去「设置 · AI」修正服务地址后再试。"
 }
 
 @Composable

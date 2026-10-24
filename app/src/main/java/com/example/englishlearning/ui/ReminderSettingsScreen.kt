@@ -24,7 +24,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalTime
 import androidx.compose.runtime.LaunchedEffect
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 
 /**
  * F4-02 提醒设置页：开关 + 时间选择。默认关闭；开启时由宿主请求
@@ -62,7 +63,9 @@ fun ReminderSettingsScreen(
             Text("加载中…", modifier = Modifier.testTag("reminder_settings_loading"))
             return@Column
         }
-        state.error?.let { Text(it, color = AppPalette.ErrorText, modifier = Modifier.testTag("reminder_settings_error")) }
+        // 错误行收编共享 `InlineNotice`（Task 26 Step 3：错误提示条族最后一份私有渲染，
+        // 原 `Text(color = ErrorText)` 迁净静态读点后由共享件承载三态墨与字形）。
+        state.error?.let { InlineNotice(text = it, kind = InlineNoticeKind.Error) }
 
         Row(
             modifier = Modifier

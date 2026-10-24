@@ -20,7 +20,8 @@ import kotlin.test.fail
  *  - `GlassDialog` 的容器底读静态浅套 `AppPalette.GlassFill`（`0xEFFFFFFF`），而 `AppColorLight.surfaceGlass`
  *    与它**逐字相同**（`ui/theme/AppColors.kt`）——目标 token 早已备好，浅色侧迁移像素零变化；
  *  - 面板内文字全是 `style = AppType.Headline/Body` 且**不带 `color=`**，墨色由 `ui/theme/AppType.kt`
- *    六档自带的 `AppPalette.TextPrimary`（= `AppColorLight.text1`，同样逐字相同）钉死在浅套深墨上；
+ *    六档自带（批 1–批 2 时期是浅套静态 `AppPalette.TextPrimary`；批 3 Task 26 起改成组合期读
+ *    `appColors().text1/text2`）钉在主题墨上；
  *  - 于是「只迁容器」会把深色面板从「白玻璃 + 深墨（意外可读）」翻成「深玻璃 + 深墨（当场不可读）」
  *    ——容器与前景**必须同批迁**，这正是 `GlassFillBackdropDebtLedger` 里那条理由的落地。
  *
@@ -189,23 +190,28 @@ class GlassPanelInkPairingContractTest {
     // ---------- 排印档 → 主题墨档（真值来自 AppType.kt 现场解析，不是本文件写死的常量） ----------
 
     /**
-     * 解析 `ui/theme/AppType.kt` 六档自带的静态墨，折算成它们应迁往的 `AppColors` 成员名：
-     * `TextPrimary → text1`、`TextSecondary → text2`（`ui/theme/AppColors.kt` 两套的对应成员）。
+     * 解析 `ui/theme/AppType.kt` 六档的**主题墨对位**，折算成面板内应显式补的 `AppColors` 成员名：
+     * `text1 → "text1"`、`text2 → "text2"`。批 3 Task 26 起六档不再是浅套静态墨，
+     * 而是逐档组合期读 `appColors().<字段>`；本表因此按**同一形状**（`<Tier>Spec.copy(color = appColors().X)`）
+     * 现场解析，仍是「判据跟着真值走」而不是本文件拍脑袋写的常量。
+     *
      * 六档缺任何一档即判红：解析链坏掉（改名/换写法）时必须响亮报错，而不是让下面那条配对判据
-     * 对着空表「无一枚需要补色」地假绿。
+     * 对着空表「无一枚需要补色」地假绿。玻璃面板内仍要求逐枚显式 `color =`——那是房内写法（R-22.3），
+     * 与本契约要挡的「深色面板 + 未显式配墨」是两件事：`AppType` 的主题墨不会跟着玻璃容器走，
+     * 面板前景必须自己钉住。
      */
     private fun appTypeInkTable(): Map<String, String> {
         val source = uiComponentSource("AppType.kt", "/ui/theme/")
-        // 六档各占一行、行内无嵌套括号，故 `[^)]*` 即可取到整段实参；行尾按 CRLF 存盘（本仓源码统一 CRLF），
-        // 所以句尾不能再按 `\n` 收尾判，否则解析链对真文件一枪不发、下面的墨表就是空表假绿。
-        val styleDefinition = Regex("""\bval (Display|Headline|Title|Body|Footnote|Label) = TextStyle\(([^)]*)\)""")
-        val found = styleDefinition.findAll(source).associate { match ->
-            val ink = when {
-                "AppPalette.TextPrimary" in match.groupValues[2] -> "text1"
-                "AppPalette.TextSecondary" in match.groupValues[2] -> "text2"
-                else -> error("AppType.${match.groupValues[1]} 的墨不再是那两枚浅套硬编码：本契约的取样前提已失效，需复核")
-            }
-            match.groupValues[1] to ink
+        val tierWindow = { tier: String ->
+            Regex(
+                """val $tier: TextStyle\s*\n\s*@Composable\s*\n\s*@ReadOnlyComposable\s*\n""" +
+                    """\s*get\(\) = ${tier}Spec\.copy\(color = appColors\(\)\.(text1|text2)\)"""
+            )
+        }
+        val found = listOf("Display", "Headline", "Title", "Body", "Footnote", "Label").associateWith { tier ->
+            val hit = tierWindow(tier).find(source)
+                ?: error("AppType.$tier 的墨不再是组合期 appColors().text1/text2：本契约的取样前提已失效，需复核")
+            hit.groupValues[1]
         }
         assertEquals(
             setOf("Display", "Headline", "Title", "Body", "Footnote", "Label"),

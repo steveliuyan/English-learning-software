@@ -7,12 +7,18 @@ import kotlin.test.assertTrue
 /**
  * Task 12.5 修复轮的容器—墨配对判据（评审 I-5 的自然延伸，不扩范围：它只判本任务自己造出的那一类缺陷）。
  *
- * 立论（与批 1 终审 F4 / AC-R-11 同一条口径）：`AppType` 六档自带**静态浅套墨**
+ * 立论（与批 1 终审 F4 / AC-R-11 同一条口径）：Task 12.5 当时 `AppType` 六档自带**静态浅套墨**
  * （`ui/theme/AppType.kt`：Display/Headline/Title/Body = `AppPalette.TextPrimary`，Footnote/Label =
  * `AppPalette.TextSecondary`），`appTypography()` 只在装配 M3 `Typography` 的路径上摘色，
  * `style = AppType.*` 的**直读**仍然带着那两枚硬编码深墨。于是「容器迁深、墨留浅套」会当场造出
  * 深色档 1.02:1 的不可读前景——本任务要消灭的缺陷的反向形态。批 1 新组件的既定写法正是补显式前景
  * （`ui/components/ScreenUnavailable.kt`、`ui/components/EntryRow.kt`：`style = AppType.Body, color = …`）。
+ *
+ * **批 3 Task 26 起**：六档已改成 `@Composable @ReadOnlyComposable` getter，墨由 `appColors().text1/text2`
+ * 当场读取，所以「直读 `AppType` = 浅套静态墨」这个前提**不再成立**（显式 `color =` 现在只是更精确的
+ * 语义选择，不再是防回归的必要条件）。本判据**保留为纵深防御**：若日后有人把某一档改回静态墨，
+ * 「已迁容器 + 未补色直读」这一形会重新变成真实缺陷，本条随即恢复抓取能力（合成片段两条腿仍然钉着
+ * 「命中形状必报 / 补色后必不报」）。
  *
  * 判据形状（有意按**顶层函数段**取样，不做 AST/缩进窗口）：
  *  ① 段落 = 一条 `fun` 声明起、到下一条 `fun` 声明前（本仓 Composable 一律是 `@Composable` 标注的顶层函数，

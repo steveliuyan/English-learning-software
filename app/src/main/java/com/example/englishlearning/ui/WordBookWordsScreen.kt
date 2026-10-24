@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
 import com.example.englishlearning.ui.components.WordRow
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -158,7 +158,7 @@ fun WordBookWordsScreen(
                         modifier = Modifier
                             .testTag("wordbook_words_retry")
                             .semantics { contentDescription = "重试读取词书单词" },
-                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
                     ) { Text("重试") }
                 }
                 else -> LazyColumn(

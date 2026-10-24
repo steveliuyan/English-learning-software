@@ -38,7 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.worksheet.WorksheetDirection
 import com.example.englishlearning.learning.worksheet.WorksheetSettings
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -172,7 +174,8 @@ fun WorksheetSettingsScreen(
             onCheckedChange = onToggleAnswers,
         )
         if (settings.requiresDirection() && settings.directions.isEmpty()) {
-            Text("至少选择一种默写方向后才能预览。", color = MaterialTheme.colorScheme.error)
+            // Task 26 Step 3：错误行收口到共享 `InlineNotice`（本行无既有测试锚，无需外层 Box）。
+            InlineNotice("至少选择一种默写方向后才能预览。", InlineNoticeKind.Error)
         } else if (selectedCount == 0) {
             Text("当前没有可导出的已完成词条。", color = MintTextMuted)
         }
@@ -184,7 +187,7 @@ fun WorksheetSettingsScreen(
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MintPrimary,
-                contentColor = AppPalette.OnMintPrimary,
+                contentColor = appColors().onBrand,
                 disabledContainerColor = MintTint,
                 disabledContentColor = MintTextMuted,
             ),

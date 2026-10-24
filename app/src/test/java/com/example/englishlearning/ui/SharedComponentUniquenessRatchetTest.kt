@@ -7,6 +7,41 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
+ * 页头族在批 3 Task 26 Step 3 的**保留理由**（计划 Step 3 明许「归零或写明保留理由」的后者）。
+ *
+ * 本族判定面只锚「文件里出现 `MaterialTheme.typography.headline`」这一半（见 `isHeaderOffender` 的 KDoc），
+ * 所以 16 枚命中里有一部分根本不是页头：
+ *  - `AiFeatureScreen.kt`：`feature.title` 是能力**卡片标题**，不在页头行；
+ *  - `ArticleReadingScreen.kt`：`article_title` 是文章正文标题（connected 用例按这个 tag 取），不是屏头；
+ *  - `GlobalVocabularySearchScreen.kt` 第二处、`LicensesScreen.kt` 第一处：`›` / `‹` 是**方向字形**，
+ *    用 headline 档借字号，换 `AppScreenHeader` 会改变字形语义。
+ *
+ * 剩余真正的屏头也没有在批 3 授权迁移，且有一条硬阻塞：共享 `AppScreenHeader` 的返回位把
+ * `contentDescription` 固定写成「返回」、测试标识固定为 `app_screen_header`；而这批屏的返回位承载
+ * **目的地语义**（「返回 AI 学」「返回上一层」「返回设置」「返回每日阅读」，均由各屏 connected 用例按
+ * 专属 testTag 读取）。直接换组件会同时降级无障碍播报与打断既有测试标识——正确做法是给组件增开
+ * 「返回位文案 / 测试标识」参数（组件 API 变更）再逐屏迁移并各自复跑 connected 基线。
+ * 那是独立的一轮工作，计划未排给 Task 26；本轮按 Step 3 的许可**留档**，不硬迁、也不给残余读点补锚。
+ */
+internal val headerSeedRetentionReason: String =
+    "含非页头读点（卡片标题 / 正文标题 / 方向字形）与「返回位带目的地语义」的屏头；" +
+        "共享 AppScreenHeader 的返回位固定为「返回」+ app_screen_header，迁移需先扩组件 API 并逐屏复跑 connected。"
+
+/**
+ * 词行族 `VocabularyScreen.kt` 的**保留理由**（计划 Step 4b 明许「接线清零」或「留档写理由」的后者）。
+ *
+ * 该屏自 Task 22-A 把生词本并入「我的词」合并页之后，`VocabularyScreen(` 在全仓 `src/main` **0 处调用**
+ * （重算：`grep -rn "VocabularyScreen(" app/src/main --include=*.kt`，只应命中它自己的定义行；
+ * 状态类型 `VocabularyUiState` / `VocabularyMasteryState` / `VocabularyItem` 仍被 `VocabularyViewModel`、
+ * `MyWordsScreen` 等消费，故文件不能连同类型一起删）。它的 `VocabularyRow` 是
+ * 「lemma + 来源 + 加入时间 + IPA + 逐条词性释义 + 例句/译文 + 派生词 + 短语 + 近义词 + 两枚按钮」的
+ * **详情卡**，不是 spec §3 的「一行 lemma + 释义 + 状态 + 动作」词行；把它压进 `WordRow` 四槽会丢信息，
+ * 与 R-20C.1 对词典结果行的裁定同构。屏若日后复活，正确做法是重做版面而不是继承这张旧卡。
+ */
+internal val vocabularyRowRetentionReason: String =
+    "孤儿屏（22-A 后 0 处调用）+ 行是十余字段详情卡而非词行形态；状态类型仍被 MyWords 链路消费，文件暂不能删。"
+
+/**
  * 共享组件唯一性棘轮（批 1 Task 12 Step 3，承接 Task 8 Step 4「顺延到 Task 12」那一棒）。
  *
  * 管什么：**同一形态不得有第二份组件**。批 1 把 12 枚共享组件建齐之后，屏侧那些「各自手写一遍」的私有份
@@ -39,8 +74,11 @@ import kotlin.test.assertTrue
  * **例外（R-13.1 / C-1 已落地）**：Task 13 首版正是从这条判据失守——页头族 seed 摘了 `AppScreen.kt`
  * 一行，而该文件的 headline 读数还在。所以页头族先单独把「摘行的合法性」补成可执行的门：
  * [removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared] 只盯
- * 「`ui/` 根屏 + 已摘本族 seed 行 + 已调用 `AppScreenHeader(`」这一形态，要求 headline 读点为 0；
- * 提示条族与词行族的同款收紧仍属计划修订事项，归批 3。
+ * 「`ui/` 根屏 + 已摘本族 seed 行 + 已调用 `AppScreenHeader(`」这一形态，要求 headline 读点为 0。
+ * 词行族的同款门由
+ * [word_row family seed is the spec list minus the wired screens and pins the window rule boundary]
+ * 的②承重（已摘行的屏必须真调 `WordRow(` 且私有窗口清零）。提示条族与未配置卡族在批 3 Task 26 Step 3
+ * 已全域清零（seed 为空），本族没有「摘行」动作可门，非空转由合成负控承重。
  *
  * 三条实现口径（前几棒踩过的坑）：
  *  - **先剥注释再匹配**：`components/InlineNotice.kt` 的 KDoc 里逐字复述了本棘轮那条 grep 命令
@@ -154,16 +192,24 @@ class SharedComponentUniquenessRatchetTest {
      * 「本文件调了共享组件即整体合规」的出口钉在 [family compliance exits are a declared known blindness surface] 里，粗算时容易把它漏掉而多计）。
      *
      * 取值为控制者本席 grep 实测 + 本文件同口径复算（`task-12-precheck.md` §2/§3/§4/§6、计划 R-12.3）：
-     *  - 页头族：R-12.3 ② 明写「批 1 断不出 14 → 0」，本族只钉实测存量、只减不增，清零归批 3；
+     *  - 页头族：R-12.3 ② 明写「批 1 断不出 14 → 0」，本族只钉实测存量、只减不增。
+     *    **批 3 Task 26 Step 3 的收法 = 留档写理由**（计划 Step 3 明许的另一条），理由见 [headerSeedRetentionReason]；
+     *    逐文件条目不再抄数，清零时机归「页头统一」后续任务；
      *  - 提示条族：R-12.3 ③ 订正了 Task 8 Step 4 点名的清单（`LearningRecordsScreen.kt` 与
-     *    `SettingsScreen.kt` **不在**其中），以实测为准，清零归批 3；
+     *    `SettingsScreen.kt` **不在**其中），以实测为准。**Task 26 Step 3 已全域清零**：
+     *    全仓 `ui/` 已无 `AppPalette.ErrorText|colorScheme.error` 读点（只剩注释），seed 为空是
+     *    「本族全域 0 份私有形态」的事实，不是 no-op（见 [seed_table_covers_every_family_and_never_lists_a_canonical_component]）；
      *  - 未配置卡族：R-12.3 ① 已核实（`ImageStudioScreen`/`PhotoTranslationScreen`/
-     *    `SentenceAnalysisScreen`/`WordAiQaScreen` 各一份私有定义），批 2/批 3 接线时逐枚删；
+     *    `SentenceAnalysisScreen`/`WordAiQaScreen` 各一份私有定义）。**Task 26 Step 3 已全域清零**：
+     *    四屏的私有卡换成共享 `NotConfiguredCard`，出口经 `onOpenAiSettings` 接到真实配置页，
+     *    站点形状由 `NotConfiguredCardContractTest.every_ai_screen_wires_the_shared_unconfigured_card_to_a_real_exit` 兼钉；
      *  - 词行族：spec §3 点名的六个文件为**原始名单**；Task 20-B（计划 Step 4）把其中三屏
      *    （收藏页、错词页、`WordBookWordsScreen`）的行本体换成共享 `WordRow`，
-     *    按上面「接线完毕就删一行」的口径把这三行从台账删除。剩余行的归属与收法见计划 Step 4b
-     *    （`GlobalVocabularySearchScreen.kt` 归 Task 20-C，`LearningRecordsScreen.kt`/`VocabularyScreen.kt`
-     *    归本批收口 Task 26 Step 3）。删行的合法性由
+     *    按上面「接线完毕就删一行」的口径把这三行从台账删除。Task 20-C 按 **R-20C.1** 把词典结果行
+     *    降级为「留档」——五枚信息 vs 四槽必丢 IPA 或截断词书名，强迁的三种出路全被否决，理由见验证文档；
+     *    Task 26 Step 3 把 `LearningRecordsScreen.kt` 的 `RecordRow` 换成共享 `WordRow` 并摘行；
+     *    `VocabularyScreen.kt` 按**留档**收（屏已无宿主、行是详情卡而非词行形态），理由见 [vocabularyRowRetentionReason]。
+     *    删行的合法性由
      *    [word_row family seed is the spec list minus the wired screens and pins the window rule boundary]
      *    当场复核（已摘行的屏必须真调 `WordRow(` 且私有词行窗口清零），不是「补一行调用即准删」。
      *
@@ -173,13 +219,14 @@ class SharedComponentUniquenessRatchetTest {
      */
     private val componentFamilySeeds: Map<String, Set<String>> = mapOf(
         "页头（应调 AppScreenHeader）" to setOf(
+            // Task 22-B：原在册的 `"FavoritesScreen.kt"` 与 `"WrongWordsScreen.kt"` 两行已摘——两屏随 22-B 下线，
+            // 私有页头随屏消失（摘行门 removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared
+            // 的覆盖面只判「仍在树上且调用 AppScreenHeader(」的根屏，屏不在树上时本门对其无账可核）。
+            // Task 26 Step 3 的收法是「留档写理由」，逐条理由见 [headerSeedRetentionReason]（计划 Step 3 明许）。
             "AiFeatureScreen.kt",
             "AiLearningScreen.kt",
             "ArticleImportScreen.kt",
             "ArticleReadingScreen.kt",
-            // Task 22-B：原在册的 `"FavoritesScreen.kt"` 与 `"WrongWordsScreen.kt"` 两行已摘——两屏随 22-B 下线，
-            // 私有页头随屏消失（摘行门 removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared
-            // 的覆盖面只判「仍在树上且调用 AppScreenHeader(」的根屏，屏不在树上时本门对其无账可核）。
             "GlobalVocabularySearchScreen.kt",
             "ImageStudioScreen.kt",
             "LicensesScreen.kt",
@@ -193,26 +240,14 @@ class SharedComponentUniquenessRatchetTest {
             "WorksheetPreviewScreen.kt",
             "WorksheetSettingsScreen.kt",
         ),
-        "错误提示条（应调 InlineNotice）" to setOf(
-            "AppScreen.kt",
-            "ArticleImportScreen.kt",
-            "CardDetailScreen.kt",
-            "ReadingAccessScreen.kt",
-            "ReminderSettingsScreen.kt",
-            "SpeechSettingsScreen.kt",
-            "WordAiQaScreen.kt",
-            "WordCardScreen.kt",
-            "WorksheetSettingsScreen.kt",
-        ),
-        "未配置卡（应调 NotConfiguredCard）" to setOf(
-            "ImageStudioScreen.kt",
-            "PhotoTranslationScreen.kt",
-            "SentenceAnalysisScreen.kt",
-            "WordAiQaScreen.kt",
-        ),
+        "错误提示条（应调 InlineNotice）" to emptySet(),
+        "未配置卡（应调 NotConfiguredCard）" to emptySet(),
         "词行（应调 WordRow）" to setOf(
+            // R-20C.1：词典结果行五枚信息 + 两枚诊断标签 vs WordRow 四槽，强迁必丢 IPA 或截断词书名，
+            // 收窄规则 / 另立组件 / 给组件加槽三条出路全被否决，留档理由见验证文档。
             "GlobalVocabularySearchScreen.kt",
-            "LearningRecordsScreen.kt",
+            // 留档：屏已无宿主（Task 22-A 后 `VocabularyScreen(` 在全仓 0 处调用），其 VocabularyRow 是
+            // 十余字段 + 两枚按钮的详情卡而非词行形态；理由见 [vocabularyRowRetentionReason]。
             "VocabularyScreen.kt",
         ),
     )
@@ -331,7 +366,11 @@ class SharedComponentUniquenessRatchetTest {
             "components/glass/GlassDialog.kt" +
             "components/glass/GlassOverlay.kt"
         componentFamilySeeds.forEach { (family, seed) ->
-            assertTrue(seed.isNotEmpty(), "$family 的 seed 为空：空台账让本族棘轮退化成 no-op（批 1 时点四族都有存量）")
+            // 批 3 收口后允许**空台账**（本族已全域清零），空 seed 不是 no-op：
+            // `each_family_offender_set_equals_its_seed_exactly` 断言的是「实际违规集 == seed」，
+            // 空 seed 等价于「本族全域 0 份私有形态」，比有存量时更严；规则本身的非空转由
+            // `the_ratchet_blocks_a_second_component_but_never_an_in_place_value_edit` 的四族合成负控承重。
+            // 清零族之外仍按「有存量」口径要求非空（批 1 时点四族都有存量）。
             val leaked = seed.filter { it in componentPaths }
             assertTrue(
                 leaked.isEmpty(),

@@ -6,6 +6,7 @@ import com.example.englishlearning.ui.theme.AppColorLight
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppleMintEnd
+import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
 import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.DomainDark
@@ -182,6 +183,56 @@ class AiBadgeContrastFixTest {
                 "$label 上 on-brand 前景只有 ${"%.2f".format(value)}:1（AA 正文下限 4.5:1）",
             )
         }
+    }
+
+    /**
+     * 批 3 结转缺陷收口（`docs/superpowers/plans/2026-10-17-ui-redesign.md` 批 2 修复轮 I-3 末句：
+     * 「同屏另有存量缺陷 `AiLearningScreen.kt:156/161`（品牌渐变上白字）结转批 3」）：
+     * `AiLearningScreen` 品牌渐变头卡的两行文案必须改走 on-brand 墨，不许再是 `Color.White`。
+     *
+     * 现算（活 token，断言不抄 hex）：`onBrand` 压三段渐变 12.81 / 9.95 / 6.87:1 全过正文 4.5；
+     * 白字压最亮端 `AppleMintStart` 只有 1.29:1 —— Task 26 Step 4 的 360dp 真机截图里，
+     * 这两行（「AI 学」与副标题）是全站对比度最低的文字。白胶囊 `.background(Color.White…)`
+     * 是容器不是墨，本规则不得误伤它（容器主题化仍归 Task 27 的登记账）。
+     */
+    @Test
+    fun `the AI learning hero prints on brand ink instead of white on the mint gradient`() {
+        val source = stripComments(uiScreenSource("AiLearningScreen.kt"))
+        val headerScope = Regex("""private fun AiHeaderCard\([\s\S]*?\n\}""").find(source)?.value
+        assertTrue(headerScope != null, "抓不到 AiHeaderCard 的作用域（函数搬家/改名：本腿失去对象）")
+        val whiteInk = Regex("""color\s*=\s*Color\.White\b""")
+        assertEquals(
+            0,
+            whiteInk.findAll(headerScope!!).count(),
+            "品牌渐变头卡仍有 `color = Color.White` 的文案墨（批 2 I-3 结转债）：应改 `appColors().onBrand`",
+        )
+        assertEquals(
+            2,
+            Regex("""color\s*=\s*appColors\(\)\.onBrand\b""").findAll(headerScope).count(),
+            "头卡两行文案（「AI 学」与副标题）必须都走 on-brand 墨；少一枚=还有白字，多一枚=墨挪到了别处",
+        )
+        // 反空转：规则要抓得到禁令本体，且不把白胶囊容器当墨。
+        assertTrue(
+            whiteInk.containsMatchIn("""Text("AI 学", color = Color.White)"""),
+            "白字规则抓不到禁令本体（空转）",
+        )
+        assertFalse(
+            whiteInk.containsMatchIn(""".background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(50))"""),
+            "白胶囊容器被误判成墨：容器不是本条的判据对象",
+        )
+        val ink = AppColorLight.onBrand.toArgb()
+        listOf("起点" to AppleMintStart, "中点" to AppleMintMiddle, "终点" to AppleMintEnd).forEach { (label, stop) ->
+            val value = ratio(ink, stop.toArgb())
+            assertTrue(
+                value >= 4.5,
+                "on-brand 压渐变${label}只有 ${"%.2f".format(value)}:1（AA 正文下限 4.5:1）——结转修复的前提破了",
+            )
+        }
+        val whiteOnStart = ratio(0xFFFFFFFF.toInt(), AppleMintStart.toArgb())
+        assertTrue(
+            whiteOnStart < 4.5,
+            "白字压渐变起点已达 ${"%.2f".format(whiteOnStart)}:1——「结转批 3」的依据失实，先复核台账再撤本条",
+        )
     }
 
     /**

@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,11 +32,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailureUiText
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -67,6 +70,7 @@ fun WordAiQaScreen(
     onSavePersonalNote: (String) -> Unit = {},
     savedNotes: List<WordAiNote> = emptyList(),
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -108,7 +112,7 @@ fun WordAiQaScreen(
             },
             enabled = personalNote.isNotBlank(),
             modifier = Modifier.fillMaxWidth().testTag("word_qa_save_personal_note"),
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
         ) { Text("保存我的笔记") }
 
         if (savedNotes.isNotEmpty()) {
@@ -144,7 +148,12 @@ fun WordAiQaScreen(
             )
             is WordAiQaUiState.Answered -> AnsweredContent(state.kind, state.answer, state.saved, state.saveFailed, onSaveNote)
             is WordAiQaUiState.NeedsOutboundConfirmation -> OutboundConfirmationDialog(state.host, onConfirmOutbound)
-            is WordAiQaUiState.NotConfigured -> NotConfiguredCard(state.reason)
+            is WordAiQaUiState.NotConfigured -> NotConfiguredCard(
+                featureLabel = "AI 问词",
+                onConfigure = onOpenAiSettings,
+                modifier = Modifier.testTag("word_qa_not_configured"),
+                detail = state.reason.guidance(),
+            )
             is WordAiQaUiState.Failed -> FailureCard(state.failure.uiText)
         }
     }
@@ -163,7 +172,7 @@ private fun QuestionChip(kind: WordQaKind, enabled: Boolean, onAsk: (WordQaKind)
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = AppPalette.OnMintPrimary,
+            contentColor = appColors().onBrand,
             disabledContainerColor = MintTint,
             disabledContentColor = MintPrimaryDark,
         ),
@@ -210,17 +219,16 @@ private fun AnsweredContent(
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = AppPalette.OnMintPrimary,
+            contentColor = appColors().onBrand,
             disabledContainerColor = MintTint,
             disabledContentColor = MintPrimaryDark,
         ),
     ) { Text(if (saved) "已保存到笔记" else "保存为笔记", fontWeight = FontWeight.Bold) }
     if (saveFailed) {
-        Text(
-            "笔记没有保存成功，可以再试一次。",
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.testTag("word_qa_save_failed"),
-        )
+        // Task 26 Step 3：错误行收口到共享 `InlineNotice`；旧锚留在外层（组件的标签后设，会覆盖同一 modifier）。
+        Box(Modifier.testTag("word_qa_save_failed")) {
+            InlineNotice("笔记没有保存成功，可以再试一次。", InlineNoticeKind.Error)
+        }
     }
 }
 
@@ -262,32 +270,19 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
     }
 }
 
-@Composable
-private fun NotConfiguredCard(reason: WordQaNotConfiguredReason) {
-    val message = when (reason) {
-        WordQaNotConfiguredReason.NoDefaultProfile ->
-            "还没有默认的 AI 服务，先去「设置 · AI」添加一套并设为默认。"
-        WordQaNotConfiguredReason.DefaultProfileUnavailable ->
-            "默认 AI 服务不可用或缺少密钥，去「设置 · AI」检查。"
-        WordQaNotConfiguredReason.InvalidEndpoint ->
-            "AI 服务的地址无效，去「设置 · AI」修正后再试。"
-    }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("word_qa_not_configured"),
-    ) {
-        Text(
-            message,
-            color = MintPrimaryDark,
-            modifier = Modifier
-                .padding(18.dp)
-                .semantics { contentDescription = "AI 未配置提示" },
-        )
-    }
+/**
+ * 各拒绝原因对应的**补路指引**（卡的第二行）；第一行「一句现状」由共享 `NotConfiguredCard` 统一措辞。
+ *
+ * Task 26 Step 3 删掉了本文件同名的私有 `NotConfiguredCard`：旧卡只有一段文字、**没有出口**
+ * （spec §3 点名的死屏）；出口现在由共享件提供并接到 `onOpenAiSettings`。
+ */
+private fun WordQaNotConfiguredReason.guidance(): String = when (this) {
+    WordQaNotConfiguredReason.NoDefaultProfile ->
+        "去「设置 · AI」添加一套并设为默认。"
+    WordQaNotConfiguredReason.DefaultProfileUnavailable ->
+        "去「设置 · AI」检查默认服务或补上密钥。"
+    WordQaNotConfiguredReason.InvalidEndpoint ->
+        "去「设置 · AI」修正服务地址后再试。"
 }
 
 @Composable

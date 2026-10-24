@@ -2,6 +2,7 @@ package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,7 +26,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.reading.ImportRejection
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -89,18 +92,16 @@ fun ArticleImportScreen(
         )
 
         if (state.rejection != null) {
-            Text(
-                state.rejection.message(),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag("import_rejection_reason"),
-            )
+            // Task 26 Step 3：错误行收口到共享 `InlineNotice`。旧锚 `import_rejection_reason` 由外层 Box 承载：
+            // 组件在调用方的 modifier 之后设自己的 `inline_notice_error` 标签，同一个 modifier 上的标签会被覆盖。
+            Box(Modifier.testTag("import_rejection_reason")) {
+                InlineNotice(state.rejection.message(), InlineNoticeKind.Error)
+            }
         }
         if (state.storageFailed) {
-            Text(
-                "本地存储暂时不可用，文章没有保存。",
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag("import_storage_failed"),
-            )
+            Box(Modifier.testTag("import_storage_failed")) {
+                InlineNotice("本地存储暂时不可用，文章没有保存。", InlineNoticeKind.Error)
+            }
         }
         if (state.submitting) {
             Text("正在保存…", color = MintTextMuted, modifier = Modifier.testTag("import_submitting"))
@@ -111,7 +112,7 @@ fun ArticleImportScreen(
             enabled = !state.submitting,
             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag("import_submit").semantics { contentDescription = "导入并阅读" },
             shape = RoundedCornerShape(18.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
         ) { Text("导入并阅读", fontWeight = FontWeight.Bold) }
     }
 }

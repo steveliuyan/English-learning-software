@@ -112,7 +112,7 @@ class AccessibilityContrastContractTest {
         val offenders = offenderLines()
         assertTrue(
             offenders.isEmpty(),
-            "MintPrimary+白字低对比主 CTA（应改 AppPalette.OnMintPrimary）：\n${offenders.joinToString("\n")}"
+            "MintPrimary+白字低对比主 CTA（Task 26 起正确写法是 `appColors().onBrand`）：\n${offenders.joinToString("\n")}"
         )
     }
 
@@ -181,8 +181,8 @@ class AccessibilityContrastContractTest {
     @Test
     fun `low contrast rule synthetic snippets keep legitimate color combinations clean`() {
         val snippets = listOf(
-            // 修复后的目标形状：深字 token 压浅薄荷底
-            "colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),",
+            // 修复后的目标形状：与套无关的深字 token 压浅薄荷底（Task 26：onBrand 明暗同值 #04241C）
+            "colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),",
             // GlobalVocabularySearchScreen:217 —— 只给容器色，不写 contentColor
             "colors = ButtonDefaults.buttonColors(containerColor = MintPrimary),",
             // TodayPlanScreen:156 等 —— 浅底深字族

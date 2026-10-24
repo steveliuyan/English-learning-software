@@ -66,11 +66,11 @@ import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
+import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -111,6 +111,7 @@ fun PhotoTranslationScreen(
     onSave: () -> Unit,
     onDeleteSaved: (String) -> Unit,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -184,7 +185,7 @@ fun PhotoTranslationScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MintPrimary,
-                    contentColor = AppPalette.OnMintPrimary,
+                    contentColor = appColors().onBrand,
                     disabledContainerColor = MintSurface,
                     disabledContentColor = MintTextMuted,
                 ),
@@ -300,7 +301,7 @@ fun PhotoTranslationScreen(
                 shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MintPrimary,
-                    contentColor = AppPalette.OnMintPrimary,
+                    contentColor = appColors().onBrand,
                     disabledContainerColor = MintTint,
                     disabledContentColor = MintPrimaryDark,
                 ),
@@ -315,7 +316,12 @@ fun PhotoTranslationScreen(
 
         when (val issue = state.translationIssue) {
             null -> Unit
-            is PhotoTranslationFailureCategory.NotConfigured -> NotConfiguredCard(issue.reason)
+            is PhotoTranslationFailureCategory.NotConfigured -> NotConfiguredCard(
+                featureLabel = "拍照翻译",
+                onConfigure = onOpenAiSettings,
+                modifier = Modifier.testTag("photo_translation_not_configured"),
+                detail = issue.reason.guidance(),
+            )
             is PhotoTranslationFailureCategory.Ai -> FailureCard(issue.failure.uiText)
         }
 
@@ -430,7 +436,7 @@ private fun CameraCaptureBox(
                 enabled = visible,
                 modifier = Modifier.testTag("photo_translation_shutter_button"),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
             ) { Text("快门 · 拍照", fontWeight = FontWeight.Bold) }
         }
     }
@@ -628,7 +634,7 @@ private fun OfflineModelCard(
                         enabled = progress == null,
                         modifier = Modifier.testTag("photo_translation_model_install"),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
                     ) { Text(if (progress == null) "下载模型（约 4.1 MB）" else "下载中…", fontWeight = FontWeight.Bold) }
                 }
                 is OcrModelAssetStatus.Installed -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -704,23 +710,19 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
     }
 }
 
-@Composable
-private fun NotConfiguredCard(reason: PhotoTranslationNotConfiguredReason) {
-    val message = when (reason) {
-        PhotoTranslationNotConfiguredReason.NoDefaultProfile ->
-            "还没有默认的 AI 服务，先去「设置 · AI」添加一套并设为默认。"
-        PhotoTranslationNotConfiguredReason.DefaultProfileUnavailable ->
-            "默认 AI 服务不可用或缺少密钥，去「设置 · AI」检查。"
-        PhotoTranslationNotConfiguredReason.InvalidEndpoint ->
-            "AI 服务的地址无效，去「设置 · AI」修正后再试。"
-    }
-    IssueCard(tag = "photo_translation_not_configured") {
-        Text(
-            message,
-            color = MintPrimaryDark,
-            modifier = Modifier.semantics { contentDescription = "AI 未配置提示" },
-        )
-    }
+/**
+ * 各拒绝原因对应的**补路指引**（卡的第二行）；第一行「一句现状」由共享 `NotConfiguredCard` 统一措辞。
+ *
+ * Task 26 Step 3 删掉了本文件同名的私有 `NotConfiguredCard`：旧卡只有一段文字、**没有出口**
+ * （spec §3 点名的死屏）；出口现在由共享件提供并接到 `onOpenAiSettings`。
+ */
+private fun PhotoTranslationNotConfiguredReason.guidance(): String = when (this) {
+    PhotoTranslationNotConfiguredReason.NoDefaultProfile ->
+        "去「设置 · AI」添加一套并设为默认。"
+    PhotoTranslationNotConfiguredReason.DefaultProfileUnavailable ->
+        "去「设置 · AI」检查默认服务或补上密钥。"
+    PhotoTranslationNotConfiguredReason.InvalidEndpoint ->
+        "去「设置 · AI」修正服务地址后再试。"
 }
 
 @Composable

@@ -5,7 +5,6 @@ import androidx.compose.ui.graphics.toArgb
 import com.example.englishlearning.ui.theme.AppColorDark
 import com.example.englishlearning.ui.theme.AppColorLight
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.DomainDark
 import com.example.englishlearning.ui.theme.DomainLight
 import kotlin.test.Test
@@ -258,59 +257,72 @@ class ReadingHomeLayoutContractTest {
     }
 
     /**
-     * 「前景单迁、容器未迁」这一族的反向护栏（Task 23 的 Blocker 在本屏的对偶形态）。
+     * 品牌亮薄荷底上的前景必须是**与主题无关的深墨**（Task 26 Step 3 收口）。
      *
-     * `ReadingAccessScreen` 的四枚 `AppPalette.OnMintPrimary` 会被深色令牌消费棘轮算成「待迁静态读点」，
-     * 但**迁成 `appColors().onMint` 就是当场回归**：容器 `MintPrimary` 读 `LocalDomainColors` 的
-     * `AiSpeech.base`，浅套 #2EC99C、深套 #35E0AC **两套都是亮面**，所以两套都要深墨；
-     * `appColors().onMint` 的深套取值是浅墨 #DFF6EC，压亮薄荷底只有 1.49:1。
-     * 本条把三件事一次钉死：现配两套合格、迁移目标深档不合格、屏内确实还是那四枚现配。
-     * 结论与剩余台账一并登记在 `docs/verification/ui-redesign-2026-10.md` 的 Task 24 节，交 Task 26 收口。
+     * 容器 `MintPrimary` 读 `LocalDomainColors` 的 `AiSpeech.base`：浅套 #2EC99C、深套 #35E0AC，
+     * **两套都是亮面**，所以前景不能随套翻转——`appColors().onMint` 浅套 #174C44 / 深套 #DFF6EC，
+     * 深套压亮薄荷只有 1.49:1（当场回归）。Task 24 时期这四枚是静态 `AppPalette.OnMintPrimary`，
+     * 与棘轮「静态读点」口径冲突；Task 26 迁到 `appColors().onBrand`（明暗两套同值 #04241C），
+     * 既满足**与套无关**，又把浅套比值从 4.62 抬到 7.81（深套 9.74）。
+     *
+     * 本条钉四件事：`onBrand` 两套同值；两套压亮薄荷都 ≥4.5；`onMint` 深档不达线（禁迁）；
+     * 屏内四枚站点逐枚换到 `appColors().onBrand`，且没有一枚混进 `onMint`。
      */
     @Test
     fun `the mint primary pair stays dark ink on both theme sets`() {
         val bodyAa = 4.5
-        val mintInkLight = ratio(rgbOf(AppPalette.OnMintPrimary), rgbOf(DomainLight.getValue(AppDomain.AiSpeech).base))
-        val mintInkDarkContainer = ratio(rgbOf(AppPalette.OnMintPrimary), rgbOf(DomainDark.getValue(AppDomain.AiSpeech).base))
-        val onMintDark = ratio(rgbOf(AppColorDark.onMint), rgbOf(DomainDark.getValue(AppDomain.AiSpeech).base))
+        val lightMintBase = DomainLight.getValue(AppDomain.AiSpeech).base
+        val darkMintBase = DomainDark.getValue(AppDomain.AiSpeech).base
+        val onBrandLight = ratio(rgbOf(AppColorLight.onBrand), rgbOf(lightMintBase))
+        val onBrandDark = ratio(rgbOf(AppColorDark.onBrand), rgbOf(darkMintBase))
+        val onMintDark = ratio(rgbOf(AppColorDark.onMint), rgbOf(darkMintBase))
 
-        assertTrue(
-            mintInkLight >= bodyAa,
-            "浅套：OnMintPrimary 压 MintPrimary 应 ≥$bodyAa，实测 ${"%.4f".format(mintInkLight)}",
+        assertEquals(
+            AppColorLight.onBrand,
+            AppColorDark.onBrand,
+            "品牌前景必须明暗同值：容器两套都是亮薄荷，前景区分套就等于至少一套配错",
         )
         assertTrue(
-            mintInkDarkContainer >= bodyAa,
-            "深套：现配静态深墨压亮薄荷底应 ≥$bodyAa，实测 ${"%.4f".format(mintInkDarkContainer)}——" +
-                "这一条成立才说明这四枚是「与主题无关的合法残留」而不是待迁债务",
+            onBrandLight >= bodyAa,
+            "浅套：onBrand 压 MintPrimary 应 ≥$bodyAa，实测 ${"%.4f".format(onBrandLight)}",
+        )
+        assertTrue(
+            onBrandDark >= bodyAa,
+            "深套：onBrand 压 MintPrimary 应 ≥$bodyAa，实测 ${"%.4f".format(onBrandDark)}",
         )
         assertTrue(
             onMintDark < bodyAa,
             "若 `appColors().onMint` 压深套 MintPrimary 也过正文线，那本条就该反向要求迁移；" +
-                "现实测 ${"%.4f".format(onMintDark)} 必须不达线，四枚才许留在原配",
+                "现实测 ${"%.4f".format(onMintDark)} 必须不达线，才证明不能拿套内墨来配这四枚",
         )
-        // 屏内形状：四枚现配逐枚绑在同一枚容器表达式上，且没有混进 onMint。
+        // 屏内形状：四枚现配逐枚绑在同一枚容器表达式上，且没有混进 onMint / 旧静态符号。
         assertEquals(
             4,
+            countMatches(home, Regex("""appColors\(\)\.onBrand\b""")),
+            "阅读主页的 onBrand 站点数必须与 DarkTokenConsumptionRatchetTest 的口径同步（现 4）",
+        )
+        assertEquals(
+            0,
             countMatches(home, Regex("""AppPalette\.OnMintPrimary""")),
-            "阅读主页的 OnMintPrimary 站点数必须与 DarkTokenConsumptionRatchetTest 的 seed 同格相等（现 4）",
+            "静态 `AppPalette.OnMintPrimary` 已迁净，屏内不得复现（棘轮会把它重新算成待迁读点）",
         )
         assertEquals(
             0,
             countMatches(home, Regex("""appColors\(\)\.onMint\b""")),
             "阅读主页不得出现 `appColors().onMint`：它配的是暗薄荷容器，不是本屏的亮 MintPrimary 容器",
         )
-        // 配对的**写法**有两种（同一行的 `containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary`
+        // 配对的**写法**有两种（同一行的 `containerColor = MintPrimary, contentColor = appColors().onBrand`
         // 与 TypeButton 那种逐枚换行的 `colors = ButtonDefaults.buttonColors(...)`），所以按两侧符号各自点数，
         // 两数相等才说明四枚深墨没有一枚压到别的容器上；不按单行正则判，那种判法会把换行写法静默漏掉。
         assertEquals(
             4,
             countMatches(home, Regex("""containerColor = MintPrimary\b""")),
-            "阅读主页应恰四枚 `MintPrimary` 亮面容器（站点数一变，本条与 OnMintPrimary 那两枚计数必须同步改，" +
+            "阅读主页应恰四枚 `MintPrimary` 亮面容器（站点数一变，本条与 onBrand 那两枚计数必须同步改，" +
                 "否则等于放开「深墨压到别的容器」的口子）",
         )
         assertEquals(
             4,
-            countMatches(home, Regex("""contentColor = AppPalette\.OnMintPrimary""")),
+            countMatches(home, Regex("""contentColor = appColors\(\)\.onBrand\b""")),
             "四枚深墨前景必须逐枚挂在 MintPrimary 容器档上：与上一枚计数相等才配对",
         )
     }

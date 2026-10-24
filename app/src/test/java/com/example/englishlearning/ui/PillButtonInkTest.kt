@@ -50,8 +50,13 @@ class PillButtonInkTest {
     private val nonBrandDomains = AppDomain.entries.filter { it != AppDomain.AiSpeech }
     private val solidStyles = listOf(PillStyle.Primary, PillStyle.Secondary, PillStyle.Text)
 
-    /** 品牌前景那枚主题无关深墨：按值比对（`AppPalette.OnMintPrimary` 的取值），不经生产符号。 */
-    private val brandForeground: Color = Color(0xFF174C44)
+    /**
+     * 品牌前景那枚主题无关深墨：按值比对 `AppColorSet.onBrand`（明暗两套同值 `0xFF04241C`），
+     * 不经生产符号。批 3 Task 26 把旧静态 `AppPalette.OnMintPrimary`（#174C44）迁到这里：
+     * 品牌渐变三端明暗两套相同，两套都压亮薄荷，所以前景必须**与套无关**；
+     * `onBrand` 正是裁决 3「品牌渐变用深字」那枚 token（压浅套 7.81:1 / 深套 9.74:1）。
+     */
+    private val brandForeground: Color = Color(0xFF04241C)
 
     private fun rgbOf(color: Color): Int = color.toArgb() and 0xFFFFFF
 
@@ -301,8 +306,29 @@ class PillButtonInkTest {
         val source = uiComponentSource("GlassButton.kt", "/components/glass/")
         assertEquals(0, countMatches(source, Regex("""\.base\b""")), "GlassButton.kt 不许再读域色 base（容器禁令）")
         assertEquals(0, countMatches(source, Regex("""\bDomainColors\.[A-Za-z0-9_]+""")), "静态色对读点必须清零：形参已迁 AppDomain")
-        assertEquals(1, countMatches(source, Regex("""\bAppPalette\.[A-Za-z0-9_]+""")), "AppPalette. 只许剩品牌前景一枚（R-14.4 归属债）")
-        assertEquals(1, countMatches(source, Regex("""Color\(0x""")), "裸 hex 只许品牌渐变末端那一枚，与裸 hex 棘轮 seed 同值")
+        assertEquals(0, countMatches(source, Regex("""\bAppPalette\.[A-Za-z0-9_]+""")), "AppPalette 静态读点必须清零：品牌前景已随 Task 26 迁 `set.onBrand`")
+        // Task 26 Step 3（AC-R-02）：药片渐变末端的裸 hex 已移进主题静态源 `MintPalette.AppleMintPillEnd`。
+        // 旧断言「组件内恰 1 枚裸 hex」随之作废，但强度不降——拆成三段，各挡一种退化：
+        //  ① 组件内零裸 hex：末端退回组件内裸 hex 时，裸 hex 棘轮会红，本类先在此点名；
+        //  ② 三端列表逐字引 Start/Middle/PillEnd：有人把末端换成同为静态源的 `AppleMintEnd`（启动页那枚
+        //     0xFF35B9B5）时，零裸 hex 与裸 hex 棘轮两条都看不见，只有这条形状锚能挡（换色 = 本类亮度复算失真）；
+        //  ③ `AppleMintPillEnd` 取值仍逐字是旧组件内裸 hex 0xFF65D3B9：静态源里改值同样绕开组件侧一切锚。
+        assertEquals(0, countMatches(source, Regex("""Color\(0x""")), "组件内裸 hex 必须清零：药片渐变末端已移进 MintPalette.AppleMintPillEnd（AC-R-02）")
+        assertEquals(
+            1,
+            countMatches(
+                source,
+                Regex("""val BrandMintGradientStops: List<Color> = listOf\(\s*AppleMintStart,\s*AppleMintMiddle,\s*AppleMintPillEnd,\s*\)"""),
+            ),
+            "品牌药片渐变三端必须逐字是 AppleMintStart → AppleMintMiddle → AppleMintPillEnd" +
+                "（换成启动页那枚 AppleMintEnd 即换色，且两侧棘轮都看不见）",
+        )
+        val pillEndSource = uiFiles().filter { it.name == "MintPalette.kt" }.single().readText()
+        assertEquals(
+            1,
+            countMatches(pillEndSource, Regex("""val AppleMintPillEnd: Color = Color\(0xFF65D3B9\)""")),
+            "MintPalette.AppleMintPillEnd 取值必须逐字仍是旧组件内裸 hex 0xFF65D3B9（改值 = 药片渐变换色，本类亮度复算随之失真）",
+        )
         assertEquals(2, countMatches(source, Regex("""fun pillButtonInk\(""")), "纯表 + 组合期壳各一处定义")
         assertEquals(4, countMatches(source, Regex("""pillButtonInk\(""")), "2 定义 + 壳转调 + PillButton 取用，多一处即在组件里凑色")
         assertEquals(

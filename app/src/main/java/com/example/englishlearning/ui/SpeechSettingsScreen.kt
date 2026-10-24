@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +36,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.language.domain.PronunciationEngine
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.components.glass.pressableScale
@@ -43,7 +46,6 @@ import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
@@ -108,7 +110,7 @@ fun SpeechSettingsScreen(
                 if (state.autoSpeakOnCardReady) "开" else "关",
                 modifier = Modifier.testTag("speech_auto_speak_state"),
                 style = AppType.Label,
-                color = DomainColors.AiSpeech.deep,
+                color = appDomain(AppDomain.AiSpeech).deep,
             )
         }
 
@@ -139,7 +141,7 @@ fun SpeechSettingsScreen(
                 speechRateLabel,
                 modifier = Modifier.testTag("speech_rate_value"),
                 style = AppType.Label,
-                color = DomainColors.AiSpeech.deep,
+                color = appDomain(AppDomain.AiSpeech).deep,
             )
         }
 
@@ -178,7 +180,7 @@ fun SpeechSettingsScreen(
                                     "当前绑定",
                                     modifier = Modifier.testTag("speech_bound_profile_${candidate.profileId}"),
                                     style = AppType.Label,
-                                    color = DomainColors.AiSpeech.deep,
+                                    color = appDomain(AppDomain.AiSpeech).deep,
                                 )
                             }
                             Text(if (candidate.status == SpeechProfileStatus.Available) "可用" else "缺少密钥", style = AppType.Label)
@@ -217,7 +219,12 @@ fun SpeechSettingsScreen(
                 Text("$name · 待接入", style = AppType.Footnote, modifier = Modifier.testTag("speech_pending_$tag"))
             }
         }
-        state.message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = AppType.Footnote, modifier = Modifier.testTag("speech_message")) }
+        state.message?.let {
+            // Task 26 Step 3：错误行收口到共享 `InlineNotice`；旧锚留在外层（组件的标签后设，会覆盖同一 modifier）。
+            Box(Modifier.testTag("speech_message")) {
+                InlineNotice(it, InlineNoticeKind.Error)
+            }
+        }
     }
 }
 
@@ -309,7 +316,7 @@ private fun EngineRow(
                 "当前供应商",
                 modifier = Modifier.testTag("speech_current_${engine.name.lowercase()}"),
                 style = AppType.Label,
-                color = DomainColors.AiSpeech.deep,
+                color = appDomain(AppDomain.AiSpeech).deep,
             )
         }
         if (detail != null) {

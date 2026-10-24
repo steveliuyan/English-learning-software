@@ -35,7 +35,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Idle,
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = { backed++ },
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = { backed++ }, onOpenAiSettings = {},
             )
         }
 
@@ -53,7 +53,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Idle,
-                onGeneratePrompt = { subject = it }, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = { subject = it }, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -68,7 +68,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Idle,
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -87,7 +87,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.PromptReady("a watercolor apple"),
-                onGeneratePrompt = {}, onGenerateImage = { generated++ }, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = { generated++ }, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -105,7 +105,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.AwaitingConfirmation("api.example.com", ImageStudioConfirmationStage.Prompt),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = { answer = it }, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = { answer = it }, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -121,7 +121,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.AwaitingConfirmation("image.example.com", ImageStudioConfirmationStage.Image),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -135,7 +135,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.DraftingPrompt,
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
         composeRule.onNodeWithTag("image_studio_drafting").assertExists()
@@ -154,7 +154,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.ImageReady(cacheFile.absolutePath),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -166,7 +166,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.ImageReady("/does/not/exist.png"),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -178,7 +178,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.NotConfigured(ImageStudioNotConfiguredReason.NoDefaultProfile),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
         composeRule.onNodeWithTag("image_studio_not_configured")
@@ -190,7 +190,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Failed(AiFailure.InvalidResponse),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
         composeRule.onNodeWithTag("image_studio_failure")

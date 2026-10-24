@@ -79,3 +79,11 @@ internal val AppleMintStart: Color = Color(0xFFA8F3C8)
 internal val AppleMintMiddle: Color = Color(0xFF5DDFB4)
 internal val AppleMintEnd: Color = Color(0xFF35B9B5)
 internal val AppleMintLight: Color = Color(0xFFD9FFF0)
+
+/**
+ * 品牌**药片**渐变（`BrandMintGradientStops`）的末端，与启动页渐变末端的 [AppleMintEnd] **不是同一枚**：
+ * 药片三段是 `Start → Middle → 本枚`，启动页三段是 `Start → Middle → End`，两个渐变视觉不同。
+ * Task 26 Step 3（AC-R-02）把这枚裸 hex 从 `components/glass/GlassButton.kt` 移到这里——它属品牌不变族
+ * （浅深两套同值，静态度量见文件头），所以落在主题静态源而不是 `AppColorSet`。取值逐字未变（`0xFF65D3B9`）。
+ */
+internal val AppleMintPillEnd: Color = Color(0xFF65D3B9)

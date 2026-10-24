@@ -24,7 +24,8 @@ import kotlin.test.assertTrue
  *     这张纯表承载（与 `entryRowInks` / `noticeInk` 同族），本类逐槽等值 + 逐槽复算比值；
  *  ② 死屏禁令——「必须给出口」是**签名形状**问题（`onConfigure` 不可空、不可有默认空实现），
  *     connected 用例只能证明「这一处渲染出了出口」，证明不了「组件不允许不渲染出口」；
- *     那要靠源码契约钉形参形状（屏侧「重排后必须调用 `NotConfiguredCard(`」那条按 brief Step 2 归批 3 收口）。
+ *     屏侧接线由 [every_ai_screen_wires_the_shared_unconfigured_card_to_a_real_exit] 钉住
+ *     （Task 26 Step 3 兑现 brief Step 2 顺延的那条：四屏私有卡删除 + 出口接到 `onOpenAiSettings`）。
  *
  * 比值口径照抄 `EntryRowInkTest`：共享夹具 [ratio]（int 域 WCAG）当场复算、只写进断言消息，注释不抄数值；
  * 装饰档（chevron）按 3:1 **加余量**判 ≥3.1（Task 1 裁决 #1 / `EntryRowInkTest` 同口径：卡在边界不算合格）。
@@ -221,6 +222,94 @@ class NotConfiguredCardContractTest {
         assertEquals(1, countMatches(source, Regex("""val set = appColors\(\)""")), "容器色必须取自当前套 appColors()，不得写死某一套")
         // 负控：静态读点形态一条都不许出现（正控已由上面两条恰一处承担）
         assertEquals(0, countMatches(source, Regex("""AppPalette\.(Surface|Separator)""")), "容器色不得退回静态 token")
+    }
+
+    /**
+     * 屏侧接线（Task 26 Step 3 兑现 brief Step 2 顺延的「批 3 收口」）：四枚 AI 屏的未配置态必须调用
+     * **共享** `NotConfiguredCard(`，把出口接到必填的 `onOpenAiSettings`，且私有同形态定义必须已删净。
+     *
+     * 为什么不能只靠 `SharedComponentUniquenessRatchetTest`：那条按「出现 `private fun NotConfiguredCard(`」
+     * 判违规，删掉私有份它就绿了——删完**不接共享件**（或接了一个空 lambda）同样绿。本用例把
+     * 「接上了、且接的是真出口」补成可执行判据：
+     *  - 每屏恰一处 `onConfigure = onOpenAiSettings`；
+     *  - `onOpenAiSettings` 是**必填形参**（不许可空、不许默认空实现，同组件侧的死屏禁令口径）；
+     *  - `AppScreen` 里每个**接收 `onOpenAiSettings` 的屏**的调用点都传了 `onOpenAiSettings = {`（调用点数
+     *    由屏名出现次数推导，不写死 5——加屏/减屏时判据自动跟随；重算：`grep -cE 'ImageStudioScreen\(|
+     *    SentenceAnalysisScreen\(|PhotoTranslationScreen\(|WordAiQaScreen\(|ReadingAccessScreen\('
+     *    app/src/main/java/com/example/englishlearning/ui/AppScreen.kt`，WordAiQa 有两处宿主）。
+     *    Task 26 Step 3 现场复算：`onOpenAiSettings = {` 在 AppScreen 共 6 处，四枚 AI 屏占 5 处，
+     *    第 6 处属**阅读主页** `ReadingAccessScreen(`——它同样接收该出口（「与 AI 学」同一跳转规则）。
+     *    名单漏掉它，等式就会把已全部接线的现状误判成漏接（实测 expected 5 / actual 6）；把接收者写全，
+     *    「新增接收者却忘了传」才会继续当场红。
+     */
+    @Test
+    fun every_ai_screen_wires_the_shared_unconfigured_card_to_a_real_exit() {
+        val screens = listOf(
+            "ImageStudioScreen.kt" to "AI 生图",
+            "SentenceAnalysisScreen.kt" to "长难句分析",
+            "PhotoTranslationScreen.kt" to "拍照翻译",
+            "WordAiQaScreen.kt" to "AI 问词",
+        )
+        screens.forEach { (file, label) ->
+            val source = uiScreenSource(file)
+            assertEquals(
+                0,
+                countMatches(source, Regex("""private fun NotConfiguredCard\(""")),
+                "$file 仍留着私有未配置卡（同名遮蔽会让共享件永远进不来；删私有份见批 3 收口）",
+            )
+            assertEquals(
+                1,
+                countMatches(source, Regex("""onConfigure = onOpenAiSettings""")),
+                "$file 的未配置态必须恰一处把共享卡的出口接到 `onOpenAiSettings`" +
+                    "（0 处 = 没接共享件或接了空 lambda；2 处 = 长了第二枚未配置卡）",
+            )
+            assertTrue(
+                source.contains("featureLabel = \"$label\""),
+                "$file 的现状句必须点名本屏功能（期望 featureLabel = \"$label\"，四个消费屏同屏时可区分）",
+            )
+            assertEquals(
+                1,
+                countMatches(source, Regex("""onOpenAiSettings: \(\) -> Unit,""")),
+                "$file 的 `onOpenAiSettings` 必须恰一处必填形参",
+            )
+            assertEquals(
+                0,
+                countMatches(source, Regex("""onOpenAiSettings: \(\) -> Unit =""")),
+                "$file 的 `onOpenAiSettings` 不得有默认空实现（= 允许出口不接线，死屏后门）",
+            )
+            assertEquals(
+                0,
+                countMatches(source, Regex("""onOpenAiSettings: \(\(\) -> Unit\)\?""")),
+                "$file 的 `onOpenAiSettings` 不得可空（同组件侧死屏禁令口径）",
+            )
+        }
+        // 宿主侧：每个接收 `onOpenAiSettings` 的屏调用点都必须传出口，否则未配置卡渲染出来也点不动。
+        // 名单含阅读主页：它是该出口的第 5 个宿主类型（四枚 AI 屏 + ReadingAccessScreen，共 6 个调用点）。
+        val appSource = uiScreenSource("AppScreen.kt")
+        val callSites = listOf(
+            "ImageStudioScreen(",
+            "SentenceAnalysisScreen(",
+            "PhotoTranslationScreen(",
+            "WordAiQaScreen(",
+            "ReadingAccessScreen(",
+        ).sumOf { name -> countMatches(appSource, Regex(Regex.escape(name))) }
+        assertTrue(callSites > 0, "AppScreen 里找不到四枚 AI 屏的调用点：本用例空转")
+        assertEquals(
+            callSites,
+            countMatches(appSource, Regex("""onOpenAiSettings = \{""")),
+            "AppScreen 的接点（$callSites 处）与 `onOpenAiSettings = {` 实参数不一致：" +
+                "漏传 = 未配置卡的出口点了没反应",
+        )
+        // 反空转：探针认得出「接了空 lambda」与「没接」两种退化，也不会把组件本体误判成屏侧接线。
+        assertTrue(
+            countMatches("notConfiguredCardTests", Regex("""onConfigure = onOpenAiSettings""")) == 0,
+            "合成负例被误判：没有接线的文本不应命中",
+        )
+        assertEquals(
+            1,
+            countMatches("NotConfiguredCard(featureLabel = \"x\", onConfigure = onOpenAiSettings)", Regex("""onConfigure = onOpenAiSettings""")),
+            "合成正例漏判：接上出口的写法必须被认出来",
+        )
     }
 
     // M-3（Task 12 兑现）：本类原先自带一份私有 uiComponentSource，与另外三份逐字相同，已提升为

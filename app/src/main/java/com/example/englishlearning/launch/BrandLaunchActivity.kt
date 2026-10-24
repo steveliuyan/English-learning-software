@@ -14,11 +14,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.MainActivity
 import com.example.englishlearning.R
+import com.example.englishlearning.ui.theme.AppleMintEnd
+import com.example.englishlearning.ui.theme.AppleMintMiddle
+import com.example.englishlearning.ui.theme.AppleMintStart
 import kotlinx.coroutines.delay
 
 // 宿主矩阵守卫（D-5 推广，BiometricHostActivityContractTest）：Manifest 声明的每个生产 Activity
@@ -30,8 +32,10 @@ class BrandLaunchActivity : FragmentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
+            // Task 26 Step 3（AC-R-02）：三段品牌渐变改引主题静态源，取值逐字未变
+            // （`AppleMintStart/Middle/End`，与 `ui/` 内三处顶层 Brush 同源）。
             val gradient = Brush.linearGradient(
-                listOf(Color(0xFFA8F3C8), Color(0xFF5DDFB4), Color(0xFF35B9B5)),
+                listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd),
             )
             Box(
                 modifier = Modifier.fillMaxSize().background(gradient),

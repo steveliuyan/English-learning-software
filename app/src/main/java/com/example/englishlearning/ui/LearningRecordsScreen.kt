@@ -34,7 +34,8 @@ import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.learning.domain.DailyLearningHistory
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.components.WordRow
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -162,7 +163,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
         Button(
             onClick = onRetry,
             modifier = Modifier.testTag("learning_records_retry").semantics { contentDescription = "重试读取学习记录" },
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
         ) { Text("重试") }
     }
 }
@@ -206,46 +207,41 @@ private fun HistoryHeader(group: LearningHistoryGroup, stats: DailyLearningHisto
     }
 }
 
+/**
+ * 一条学习记录：卡面（enabled/disabled 底色与描边、testTag、可点面）留在本屏，行本体换共享 [WordRow]
+ * ——与 `WordBookWordsScreen.WordBookWordsRow`（Task 20-B）同形同口径。
+ *
+ * 三处迁移决定：
+ *  ① **可点面只给卡**：`WordRow` 的 `onClick` 不传（传了会多出第二个可点节点），禁用态由「不挂 clickable」表达；
+ *  ② **禁用行的行墨与可用行统一**：旧的 `textColor` 双档随私有 `RecordRow` 一起删掉，口径与 WordBookWords
+ *     一致（那里已登记「设备侧读不到颜色」的说法不准确——文本节点的 `textLayout().layoutInput.style` 读得到，
+ *     只是本屏没有这条用例；要补取证走同一读法）；
+ *  ③ **不可用原因走 gloss 槽，不走 meta**：原因是 11 枚汉字，`meta` 在右列 `widthIn(max = 120.dp)` 下会被
+ *     卡成省略号；`gloss` 在左列 `weight(1f)`、两行、无宽度上限。成立前提是「禁用 ⇒ `wordCard == null`」，
+ *     与 WordBookWords 同一条互斥链：`LearningRecord.canOpenDetail` 默认值 `= wordCard != null`，
+ *     生产构造只有两处——`LearningRecord.missing(...)` 显式传 `null`/`false`，`RoomLearningRecordRepository`
+ *     查到卡时走默认值。前提若放开（`wordCard != null` 却 `canOpenDetail == false`），原因串会被释义吃掉；
+ *     本屏的互斥链由 `LearningRecordsRowContractTest` 的 JVM 锚钉住（改动前先读那条用例）。
+ */
 @Composable
 private fun LearningRecordRow(row: LearningRecord, onOpenRow: (LearningRecord) -> Unit) {
-    val label = row.displayLemma
     val safeId = row.safeId()
-    RecordRow(
-        lemma = label,
-        meaning = row.wordCard?.meaningZh,
-        status = "反馈：${row.feedback.label()}",
-        enabled = row.canOpenDetail,
-        reason = if (row.canOpenDetail) null else "这个词已不在当前词书中",
-        tag = if (row.canOpenDetail) "learning_record_row_$safeId" else "learning_record_missing_$safeId",
-        onClick = { onOpenRow(row) },
-    )
-}
-
-@Composable
-private fun RecordRow(
-    lemma: String,
-    meaning: String?,
-    status: String,
-    enabled: Boolean,
-    reason: String?,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    val textColor = if (enabled) MintPrimaryDark else MintTextMuted
+    val enabled = row.canOpenDetail
+    val unavailableNotice = if (enabled) null else "这个词已不在当前词书中"
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .testTag(tag),
+            .then(if (enabled) Modifier.clickable(onClick = { onOpenRow(row) }) else Modifier)
+            .testTag(if (enabled) "learning_record_row_$safeId" else "learning_record_missing_$safeId"),
         colors = CardDefaults.cardColors(containerColor = if (enabled) MintSurface else MintTint.copy(alpha = 0.55f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) MintOutline else MintOutline.copy(alpha = 0.65f)),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(lemma, color = textColor, fontWeight = FontWeight.Bold)
-            if (!meaning.isNullOrBlank()) Text("释义：$meaning", color = textColor)
-            Text(status, color = textColor)
-            reason?.let { Text(it, color = MintTextMuted) }
-        }
+        WordRow(
+            lemma = row.displayLemma,
+            gloss = row.wordCard?.meaningZh?.takeIf { it.isNotBlank() }?.let { "释义：$it" } ?: unavailableNotice,
+            status = "反馈：${row.feedback.label()}",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
     }
 }
 

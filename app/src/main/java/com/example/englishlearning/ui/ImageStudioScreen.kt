@@ -38,11 +38,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.imagegen.DrawingPromptPolicy
 import com.example.englishlearning.imagegen.ImageStudioNotConfiguredReason
+import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
@@ -67,6 +67,7 @@ fun ImageStudioScreen(
     onGenerateImage: () -> Unit,
     onConfirm: (Boolean) -> Unit,
     onBack: () -> Unit,
+    onOpenAiSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var subject by rememberSaveable { mutableStateOf("") }
@@ -114,7 +115,7 @@ fun ImageStudioScreen(
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MintPrimary,
-                contentColor = AppPalette.OnMintPrimary,
+                contentColor = appColors().onBrand,
                 disabledContainerColor = MintTint,
                 disabledContentColor = MintPrimaryDark,
             ),
@@ -141,7 +142,15 @@ fun ImageStudioScreen(
                 modifier = Modifier.testTag("image_studio_generating"),
             )
             is ImageStudioUiState.ImageReady -> ResultImage(state.filePath)
-            is ImageStudioUiState.NotConfigured -> NotConfiguredCard(state.reason)
+            is ImageStudioUiState.NotConfigured -> NotConfiguredCard(
+                featureLabel = "AI 生图",
+                onConfigure = onOpenAiSettings,
+                modifier = Modifier
+                    .testTag("image_studio_not_configured")
+                    // 旧私有卡按整卡合并朗读；共享件不预置合并，调用方保留这一层（connected 断言按整卡取文本）。
+                    .semantics(mergeDescendants = true) {},
+                detail = state.reason.guidance(),
+            )
             is ImageStudioUiState.Failed -> FailureCard(state.failure.uiText.message)
         }
     }
@@ -172,7 +181,7 @@ private fun PromptCard(prompt: String, onGenerateImage: () -> Unit) {
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = AppPalette.OnMintPrimary,
+            contentColor = appColors().onBrand,
         ),
     ) { Text("生成图片", fontWeight = FontWeight.Bold) }
     Text(
@@ -248,34 +257,20 @@ private fun ResultImage(filePath: String) {
     )
 }
 
-@Composable
-private fun NotConfiguredCard(reason: ImageStudioNotConfiguredReason) {
-    val message = when (reason) {
-        ImageStudioNotConfiguredReason.NoDefaultProfile ->
-            "还没有默认的生图服务，先去「设置 · AI」添加一套并设为生图默认。"
-        ImageStudioNotConfiguredReason.DefaultProfileUnavailable ->
-            "默认生图服务不可用或缺少密钥，去「设置 · AI」检查。"
-        ImageStudioNotConfiguredReason.InvalidEndpoint ->
-            "生图服务的地址无效，去「设置 · AI」修正后再试。"
-    }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("image_studio_not_configured")
-            // 卡片作为整体被朗读/断言：文本合并到本节点上。
-            .semantics(mergeDescendants = true) {},
-    ) {
-        Text(
-            message,
-            color = MintPrimaryDark,
-            modifier = Modifier
-                .padding(18.dp)
-                .semantics { contentDescription = "生图未配置提示" },
-        )
-    }
+/**
+ * 各拒绝原因对应的**补路指引**（卡的第二行）；第一行「一句现状」由共享 `NotConfiguredCard` 统一措辞。
+ *
+ * Task 26 Step 3 删掉了本文件同名的私有 `NotConfiguredCard`（同名遮蔽让共享件永远进不来）：旧卡把
+ * 「一句现状 + 补路」揉成一段文字、且**没有出口**，正是 spec §3 点名的死屏；现在出口「去配置 ›」由
+ * 共享件提供并接到 `onOpenAiSettings`。
+ */
+private fun ImageStudioNotConfiguredReason.guidance(): String = when (this) {
+    ImageStudioNotConfiguredReason.NoDefaultProfile ->
+        "去「设置 · AI」添加一套并设为生图默认。"
+    ImageStudioNotConfiguredReason.DefaultProfileUnavailable ->
+        "去「设置 · AI」检查默认生图服务或补上密钥。"
+    ImageStudioNotConfiguredReason.InvalidEndpoint ->
+        "去「设置 · AI」修正生图服务地址后再试。"
 }
 
 @Composable

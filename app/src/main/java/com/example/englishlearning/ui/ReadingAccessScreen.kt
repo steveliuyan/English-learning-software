@@ -36,9 +36,11 @@ import com.example.englishlearning.reading.NotConfiguredReason
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.PayloadKind
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -197,11 +199,11 @@ private fun ReadyContent(
             color = MintTextMuted,
             modifier = Modifier.testTag("generation_status"),
         )
-        GenerationUiState.StorageFailed -> Text(
-            "本地存储暂时不可用，文章没有保存。",
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.testTag("generation_storage_failed"),
-        )
+        GenerationUiState.StorageFailed -> Box(Modifier.testTag("generation_storage_failed")) {
+            // Task 26 Step 3：错误行收口到共享 `InlineNotice`；标签留在外层（组件的 `inline_notice_error`
+            // 是后设的，同一 modifier 会被覆盖）。
+            InlineNotice("本地存储暂时不可用，文章没有保存。", InlineNoticeKind.Error)
+        }
         is GenerationUiState.Failed -> GenerationFailureBanner(generation.failure, onOpenAiSettings)
         is GenerationUiState.NotConfigured -> NotConfiguredBanner(generation.reason, onOpenAiSettings)
         // 出站确认走共享件（本席是它第一枚生产接线）：载荷档位显式给 `PayloadKind.Text`。
@@ -244,12 +246,13 @@ private fun ReadyContent(
 }
 
 /**
- * 主 CTA 一档：`MintPrimary` 容器 + `AppPalette.OnMintPrimary` 前景。
+ * 主 CTA 一档：`MintPrimary` 容器 + `appColors().onBrand` 前景。
  *
- * 这对配值**刻意不改成 `appColors().onMint`**（深色令牌消费棘轮会把它算作「待迁静态读点」，
- * 迁了反而是回归）：容器 `MintPrimary` 是 `LocalDomainColors` 的组合期读点，两套都落在**亮**薄荷上
- * （浅 #2EC99C / 深 #35E0AC），所以前景两套都得取**深墨**；`appColors().onMint` 的深套取值是
- * 浅墨 #DFF6EC，压 #35E0AC 只有 1.49:1，而现在的静态深墨 #174C44 压同一枚深套容器实测 5.76:1。
+ * 容器 `MintPrimary` 是 `LocalDomainColors` 的组合期读点，两套都落在**亮**薄荷上
+ * （浅 #2EC99C / 深 #35E0AC），所以前景必须**与套无关**：
+ *  - 不能用 `appColors().onMint`——它随套翻转，深套取值是浅墨 #DFF6EC，压 #35E0AC 只有 1.49:1；
+ *  - `onBrand` 明暗两套同值 #04241C（裁决 3「品牌渐变用深字」那枚 token），
+ *    压浅套 7.81:1 / 深套 9.74:1，两套都过正文线。
  * 亮度复算与这条判据见 `ReadingHomeLayoutContractTest` 的姊妹用例
  * `[the mint primary pair stays dark ink on both theme sets]`；本文件四枚站点同一形状。
  */
@@ -259,7 +262,7 @@ private fun PrimaryCtaButton(title: String, tag: String, description: String, on
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag(tag).semantics { contentDescription = description },
         shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
     ) { Text(title, fontWeight = FontWeight.Bold) }
 }
 
@@ -314,7 +317,7 @@ private fun NotConfiguredBanner(reason: NotConfiguredReason, onOpenAiSettings: (
             Button(
                 onClick = onOpenAiSettings,
                 modifier = Modifier.testTag("generation_failure_action"),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
             ) { Text("去配置", fontWeight = FontWeight.Bold) }
         }
     }
@@ -333,7 +336,7 @@ private fun GenerationFailureBanner(failure: AiFailure, onOpenAiSettings: () -> 
                 Button(
                     onClick = onOpenAiSettings,
                     modifier = Modifier.testTag("generation_failure_action"),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
                 ) { Text(UserAction.ConfigureProfile.label, fontWeight = FontWeight.Bold) }
             }
         }
@@ -363,7 +366,7 @@ private fun TypeButton(type: ArticleType, enabled: Boolean, onSelectType: (Artic
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MintPrimary,
-            contentColor = AppPalette.OnMintPrimary,
+            contentColor = appColors().onBrand,
             disabledContainerColor = MintTint,
             disabledContentColor = MintPrimaryDark,
         ),

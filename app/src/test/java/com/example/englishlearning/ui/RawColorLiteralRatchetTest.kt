@@ -24,6 +24,18 @@ import kotlin.test.assertTrue
  * 不管什么：本棘轮不宣称「全站零裸 hex」。AC-R-02 的那个「零」由批 3 收口时把 seed 表清零、或只剩经计划
  * 修订确认的不可迁移站点（逐条写明理由）来兑现；批 1 只负责把债务冻住，并让它在批 2/批 3 的每屏迁移里单调递减。
  *
+ * **批 3 Task 26 Step 3 的收口结果**（AC-R-02 兑现面）：
+ *  - `AppScreen.kt` 两枚 `0xFFCDEFE1`（开关未选中轨 / 滑轨 inactive）→ `appColors().tint3`。**不是逐值相同**：
+ *    浅套 `tint3 = 0xFFCDEDD9`（与旧值 CDEFE1 肉眼同族，差 2 个低位），深套随主题变暗 `0xFF27392F`——
+ *    这正是「深底浅轨」的深色修正；观感变化记入验证文档，不冒充零变化。
+ *  - `components/glass/GlassButton.kt` 的品牌药片渐变末端 → 移进主题静态源 `AppleMintPillEnd`（逐值相同：
+ *    仍是 `0xFF65D3B9`；它是品牌不变族，与 `AppleMintStart/Middle` 同处 `ui/theme/MintPalette.kt`）。
+ *  - `launch/BrandLaunchActivity.kt` 的三段渐变 → 直接引用 `AppleMintStart/Middle/End`（逐值相同），
+ *    `ui/` 之外的裸 hex 台账随之清空。
+ *  - `mascot/AiMascot.kt` 的 `EyeColor` → **保留**，理由是该文件 KDoc 已写死的产品决定：表情是自撰插画，
+ *    眼睛必须与白玻璃体保持明确对比，引用随主题变浅的 token 会让眼睛在白底上消失。它属计划 Step 3
+ *    允许的「与主题无关、写明理由」残留，不是待迁债务。
+ *
  * 主题侧豁免口径（修复轮 1 的 I1，替代旧版「整目录豁免 `ui/theme/`」）：
  *  - 旧版把 `ui/theme/` 整个目录划出视野，可洗债：往 `ui/theme/AppShape.kt` 这种「非定义文件」加一枚裸 hex，
  *    目录豁免让它对 `violations` 隐形，seed 又只覆盖 `ui` 非主题文件 → 16 条全绿，AC-R-02 出现可绕过缺口。
@@ -51,18 +63,15 @@ import kotlin.test.assertTrue
 /**
  * 债务台账：`ui` 包内（`ui/theme/` 除外）裸 hex 的按文件计数，key 为相对 `ui` 根的路径。
  * 批 2/批 3 每屏迁移的收口证据就是这张表对应行减到 0；批 3 收口时清零，或只剩经计划修订确认的不可迁移站点。
+ *
+ * **Task 26 Step 3 收口后只剩一枚**（同类收口动作见文件头 KDoc）：
+ * `mascot/AiMascot.kt` 的 `EyeColor` 是画在白色玻璃体上的眼睛，必须主题不变才保证任何主题下都有对比；
+ * 该文件 KDoc 已把「刻意不引用 token」写死，属计划允许的「与主题无关，理由是 X」残留。
+ * `AppScreen.kt` / `components/glass/GlassButton.kt` / `launch/BrandLaunchActivity.kt` 三行已由本批迁走。
+ * 重算（口径必须与 [actualCounts] 一致：先剥注释、排除 `theme/`）：
+ * `grep -rn "Color(0x" app/src/main/java/com/example/englishlearning/ui --include=*.kt | grep -v "/theme/"` ⇒ 只应剩 EyeColor 一枚。
  */
 internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
-    "AppScreen.kt" to 2,
-    // Task 24（裁决⑤ 附带债）：英文正文屏（Article 阅读那一屏）的裸 hex 已 token 化，本行随站点行同批摘除。
-    // 摘的是同一枚债务的两张表——只摘一张当场红（本测试核验两表互相吻合）。
-    // 重算口径（修复轮 1 F-6②订正；原文给的 `grep -c "ReadingScreen.kt" <本文件>` 口径是错的：台账 key 写的是
-    // `"ArticleReadingScreen.kt"`，而另一格 `"AppScreen.kt"` 并不含 `ReadingScreen.kt` 子串，
-    // 摘干净后那条命令只会命中注释自己，与「只应剩 AppScreen 之外零条登记」的说法自相矛盾）：
-    // `grep -nE '"Article[A-Za-z]+Screen\.kt" to' app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` ⇒ 零命中
-    // （口径必须锚成「台账 key + ` to`」的形状；且正则要写成自己命中不了自己的形式——
-    // 直接写文件名的话本段注释自己会被 grep 到：控制者现跑 `grep -c "ArticleReadingScreen" <本文件>` = 2，全在注释里）。
-    "components/glass/GlassButton.kt" to 1,
     "mascot/AiMascot.kt" to 1,
 )
 
@@ -79,9 +88,6 @@ internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
  * 与本轮验收一起裁决。
  */
 internal val RawColorSeedSiteLines: List<String> = listOf(
-    "AppScreen.kt: colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = Color(0xFFCDEFE1)),",
-    "AppScreen.kt: inactiveTrackColor = Color(0xFFCDEFE1),",
-    "GlassButton.kt: Color(0xFF65D3B9),",
     "AiMascot.kt: private val EyeColor: Color = Color(0xFF188F76)",
 )
 
@@ -99,24 +105,22 @@ internal val RawHexThemeDefinitionFiles: Map<String, String> = mapOf(
 
 /**
  * `ui/` 之外的全仓裸 hex 台账（修复轮 1 的 I3，承接 Task 4 交回 Task 8 的清算项）。
- * `launch/BrandLaunchActivity.kt` 是 `ui/` 之外唯一携带裸 hex 的文件：三段品牌渐变三端
+ * `launch/BrandLaunchActivity.kt` 曾是 `ui/` 之外唯一携带裸 hex 的文件：三段品牌渐变三端
  * （`AppleMintStart/Middle/End` 的逐字副本）。AppleMint* 保持静态是 Task 3 已验收的「品牌渐变模式不变」口径，
- * 本条只负责「别让它成为唯一没人管的裸 hex、并长出第二份副本」；具体迁法（改引 AppleMint* 还是 token 化）
- * 由批 3 的 Task 26 收口时定。三枚色值同在一条物理行上，故折叠后只有一条站点行，计数（3）以按文件计数为准。
+ * 本条只负责「别让它成为唯一没人管的裸 hex、并长出第二份副本」；**Task 26 Step 3 已按「改引 AppleMint*」收口**
+ * （计划当时把两种迁法的选择权留给本任务）：渐变面板逐值不变，台账清空。空表不是 no-op——
+ * 任何 `ui/` 之外的新裸 hex 仍由 `no raw hex outside the seed` / `raw hex outside ui is exactly the
+ * registered launch ledger` 的「未登记即红」挡住。
  *
  * key 口径（批 1 终审 F8 的 M-3 前半）：**相对 `src/main/java/com/example/englishlearning` 根的精确路径**，
  * 与 [RawColorSeedAllowlist]（相对 `ui` 根）同形，避免 `ui/` 外未来同名 `.kt` 在 `associate` 里互相顶替；
  * [BrandLaunchSeedSiteLines] 保持「裸文件名: 折叠行」形状，因为那是共享夹具 [violations] 的 offender 形状，
  * 本轮不改夹具签名（`scan scope resolves to real ui sources` 那条重名守卫负责盯住它不冒名）。
  */
-internal val BrandLaunchSeedAllowlist: Map<String, Int> = mapOf(
-    "launch/BrandLaunchActivity.kt" to 3,
-)
+internal val BrandLaunchSeedAllowlist: Map<String, Int> = emptyMap()
 
 /** 与 [BrandLaunchSeedAllowlist] 同形状的「文件名: 折叠源码行」行集，喂 `violations` 作 `ui/` 外扫描的行级 allowlist。 */
-internal val BrandLaunchSeedSiteLines: List<String> = listOf(
-    "BrandLaunchActivity.kt: listOf(Color(0xFFA8F3C8), Color(0xFF5DDFB4), Color(0xFF35B9B5)),",
-)
+internal val BrandLaunchSeedSiteLines: List<String> = emptyList()
 
 class RawColorLiteralRatchetTest {
     private val uiDir = File(UI_MAIN_SOURCE_PATH)
@@ -297,8 +301,8 @@ class RawColorLiteralRatchetTest {
         assertTrue(
             offenders.isEmpty(),
             "ui 之外新增了未登记的裸 hex：\n${offenders.joinToString("\n")} —— " +
-                "全仓裸 hex 只允许 launch 的三段品牌渐变（与 AppleMint* 重复，Task 4 路由给本棘轮），" +
-                "新增副本会先撞这里；迁法由批 3 的 Task 26 收口时定"
+                "Task 26 Step 3 已把 launch 的三段品牌渐变改引 AppleMint*，`ui/` 之外现应为零裸 hex；" +
+                "新增副本会先撞这里"
         )
         val actual = nonUiActualCounts()
         val staleSeed = BrandLaunchSeedAllowlist.filterKeys { it !in actual }

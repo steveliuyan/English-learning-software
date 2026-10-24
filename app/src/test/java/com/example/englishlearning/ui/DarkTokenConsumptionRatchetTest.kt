@@ -36,7 +36,12 @@ import kotlin.test.assertTrue
  *  - 浅套硬编码：`AppPalette.TextPrimary` / `TextSecondary` / `Surface` / `Separator` /
  *    `OnMintPrimary` 与 `DomainColors` 各域的 `deep`。这些是浅底取值，深底压深字直接不可读，
  *    必须改成 `appColors().x` / `appDomain(AppDomain.X).deep`。`theme/AppType.kt` 的顶层 `TextStyle`
- *    写死 `TextPrimary`/`TextSecondary` 正是这一族的真实债务，所以它进 seed、不享有任何豁免。
+ *    写死 `TextPrimary`/`TextSecondary` 正是这一族的真实债务——**批 3 Task 26 已迁净**（六档改成
+ *    `@Composable` getter），本族在 seed 里只剩白胶囊那一处「容器不随主题」的对偶残留（见下）。
+ *  - **主题不变白胶囊**：`AiLearningScreen` 头卡状态徽章的容器是 `Color.White.copy(alpha = 0.85f)`
+ *    压在品牌渐变上（深浅两套都是亮面），前景只能保持两枚静态墨。它不属于蒙版 token 族（`GlassHighlight` /
+ *    `Scrim`），所以不进 [ThemeInvariantMaskReadLedger]，只在 seed 行内写明理由并交由
+ *    `AiBadgeContrastFixTest` 钉站点形状与两套复算。
  *
  * 五张表的分工（修复轮 1 的 C1，替代旧版「不设第三张永久豁免表」那句已被 a90f4fe 自身推翻的措辞；
  * 第五张由批 1 终审 F4 补）：
@@ -67,37 +72,19 @@ import kotlin.test.assertTrue
  * （[ThemeInvariantMaskReadLedger]、[ParameterDefaultStaticReadLedger]）承载其理由，本表仍是「还欠多少」的唯一权威。
  */
 internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
-    "AiProfileSettingsScreen.kt" to 8,
-    "SpeechSettingsScreen.kt" to 5,
-    "components/glass/GlassButton.kt" to 1,
-    "CheckInScreen.kt" to 7,
-    "WordCardScreen.kt" to 7,
-    "PhotoTranslationScreen.kt" to 4,
-    "ReadingAccessScreen.kt" to 4,
-    "theme/AppType.kt" to 6,
-    "WordAiQaScreen.kt" to 3,
-    "ImageStudioScreen.kt" to 2,
-    // Task 23（R-23.6）：`AiFeatureScreen.kt`（原 3 枚）整行随迁移摘除——三枚前景全部改走组合期取值，
-    // 修复轮 R-23.13 只在其上补「按容器主题归属分档」的守卫，不新增静态读点，本行保持摘除。
-    // 修复轮 1（R-23.14）：`AiLearningScreen.kt` 一行按 seed 恢复为 2——白胶囊容器主题不变
-    // （`Color.White.copy`，RawColorLiteralRatchet 地盘），批 3 把前景单迁主题访问器属 B1 回归，
-    // 已回退为批前两枚登记静态墨（deep/TextSecondary，理由见站点注记与 `AiBadgeContrastFixTest`）。
-    "AiLearningScreen.kt" to 2,
-    "AppScreen.kt" to 3,
-    "SentenceAnalysisScreen.kt" to 1,
+    // ---- Task 26 Step 3 收口后的仅存两类（8 处）：蒙版族 6 + 主题不变白胶囊 2 ----
+    // 蒙版族（GlassHighlight / Scrim）：压在图片或玻璃面板上，深浅两套同值都合法，
+    // 逐文件理由见 [ThemeInvariantMaskReadLedger]。
     "components/glass/GlassOverlay.kt" to 2,
+    "AiProfileSettingsScreen.kt" to 1,
     "components/glass/GlassDialog.kt" to 1,
-    "ArticleImportScreen.kt" to 1,
-    "CardDetailScreen.kt" to 1,
-    "GlobalVocabularySearchScreen.kt" to 1,
-    "LearningRecordsScreen.kt" to 1,
-    "ReadingHistoryScreen.kt" to 1,
-    "RecoveryScreen.kt" to 1,
-    "ReminderSettingsScreen.kt" to 1,
-    "WordBookWordsScreen.kt" to 1,
-    "WorksheetPreviewScreen.kt" to 1,
-    "WorksheetSettingsScreen.kt" to 1,
+    "SpeechSettingsScreen.kt" to 1,
     "components/IconBadge.kt" to 1,
+    // 白胶囊族（R-23.14）：`AiLearningScreen` 头卡状态徽章的容器是 `Color.White.copy(alpha = 0.85f)`，
+    // 压在品牌渐变上、深浅两套都是亮面，所以前景必须保持两枚**主题不变**的静态墨
+    // （`DomainColors.AiSpeech.deep` / `AppPalette.TextSecondary`）；迁成 themed 墨 =
+    // 深套亮墨压白（1.69:1 / 2.21:1，B1 第三站形状）。复算与站点钉法见 `AiBadgeContrastFixTest`。
+    "AiLearningScreen.kt" to 2,
 )
 
 /**
@@ -183,7 +170,9 @@ internal val ThemeInvariantMaskReadLedger: Map<String, Int> = mapOf(
  * color = AppPalette.TextPrimary)`）。它与「写在 `@Composable` 函数体里的可就地迁移局部 `val myStyle = TextStyle(...
  * AppPalette.X)`」文本形状完全相同，按行取样无法区分二者——若把它补进本表，就会同时误伤可迁移的体内局部（反向假阳），
  * 或漏掉日后新冒出的成员初始化器（重蹈本表被判的过度声称）。故本表**故意不采样**该形态，明确交由 [DarkTokenSeedAllowlist]
- * 里 `theme/AppType.kt` 的 seed 承载（深色下正文不可读的迁移由批 3 的排印改造 / `appTypography()` 摘色版负责）；
+ * 兜底。**历史站点（批 3 Task 26 已消失）**：`theme/AppType.kt` 六档 `val Display = TextStyle(... color = AppPalette.TextPrimary)`
+ * 整族改成 `@Composable @ReadOnlyComposable` getter（墨由 `appColors().text1/text2` 当场读取），object 成员初始化器的
+ * 静态读点随之为零，seed 行已摘除。
  * `parameter default ledger excludes object member initializer by design` 用合成片段钉住这一排除不是靠运气。
  *
  * 计数仍以 [DarkTokenSeedAllowlist] 为准，本表只是注记，修掉一处时两张表一起减 1；两张表都由「精确相等」守着，

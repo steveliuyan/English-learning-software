@@ -60,7 +60,8 @@ data class PillInk(
 private val BrandMintGradientStops: List<Color> = listOf(
     AppleMintStart,
     AppleMintMiddle,
-    Color(0xFF65D3B9),
+    // Task 26 Step 3（AC-R-02）：药片渐变末端的裸 hex 已移进主题静态源（`AppleMintPillEnd`，取值逐字未变）。
+    AppleMintPillEnd,
 )
 
 /**
@@ -83,8 +84,8 @@ private fun domainInkOnLightSurface(
  *
  * 决策表（阈值口径同上，逐档理由写在 R-14.1／R-14.4 与用例 KDoc）：
  *  - 禁用（三档共用）：前景 `text2`；容器 Primary `tint2` / Secondary `surface` / Text 透明；描边只给 Secondary。
- *  - Primary + AiSpeech：品牌渐变三端 + 主题无关深墨 `AppPalette.OnMintPrimary`（本文件唯一保留的静态读点，
- *    归属债结转批 3 Task 26 Step 3）。
+ *  - Primary + AiSpeech：品牌渐变三端 + 主题无关深墨 `set.onBrand`（明暗两套同值 #04241C，
+ *    压渐变三端与浅/深两套 MintPrimary 均过正文线；禁止换成随套翻转的 `set.onMint`，深套只有 1.49:1）。
  *  - Primary 其余六域：**纯色** `palette.deep` 容器（禁止任何含 `base` 端的渐变），前景按套分叉
  *    浅套 `Color.White` / 深套 `set.surface`。
  *  - Secondary：容器 `surface`、描边 `outlineSoft`（浅套取值与旧 `AppPalette.Separator` 逐字相同，观感不变）、
@@ -124,7 +125,7 @@ fun pillButtonInk(
 
     style == PillStyle.Primary && domain == AppDomain.AiSpeech -> PillInk(
         container = Color.Transparent,
-        foreground = AppPalette.OnMintPrimary,
+        foreground = set.onBrand,
         border = null,
         gradient = BrandMintGradientStops,
     )

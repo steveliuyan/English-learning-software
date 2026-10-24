@@ -57,6 +57,7 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appColors
 
 private val AiHeaderGradient = Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))
 
@@ -175,17 +176,21 @@ private fun AiHeaderCard(aiConfigured: Boolean) {
             // 表情居中独占一行：手机屏宽约 360dp，与文字并排会把它压到 110dp 左右，
             // 既与「要大」冲突，也会把副标题挤成四五行的窄条。取舍理由见设计文档 §4.5。
             AiMascot(aiConfigured = aiConfigured, modifier = Modifier.size(AI_MASCOT_SIZE))
+            // 批 3 收口（Task 26）：品牌渐变上的文案墨从 `Color.White` 改读 `appColors().onBrand`。
+            // 白字压三段渐变最亮端 #A8F3C8 只有 1.29:1（现算），是批 2 I-3 登记的结转债；
+            // on-brand 压三段 12.81 / 9.95 / 6.87:1 全过正文 4.5（2026-10-18 裁决 #3「渐变上一律 on-brand」，
+            // 与 AiFeatureScreen 徽标同规则）。判据见 `AiBadgeContrastFixTest`。
             Text(
                 "AI 学",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = appColors().onBrand,
                 textAlign = TextAlign.Center,
             )
             Text(
                 text = "用你学过的词，生成专属的阅读与练习",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
+                color = appColors().onBrand,
                 textAlign = TextAlign.Center,
             )
             Box(
@@ -200,6 +205,9 @@ private fun AiHeaderCard(aiConfigured: Boolean) {
                     text = if (aiConfigured) "AI 已配置" else "AI 尚未接通",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
+                    // R-23.14：白胶囊容器 `Color.White.copy(alpha = 0.85f)` 不随主题（品牌渐变头卡之上恒为亮面），
+                    // 前景必须同为主题不变的两枚静态墨；改成 `appDomain(...)` / `colors.text2` 在深套就是
+                    // 亮墨压白（1.69:1 / 2.21:1，B1 第三站形状）。理由与复算见 `AiBadgeContrastFixTest`。
                     color = if (aiConfigured) DomainColors.AiSpeech.deep else AppPalette.TextSecondary,
                 )
             }

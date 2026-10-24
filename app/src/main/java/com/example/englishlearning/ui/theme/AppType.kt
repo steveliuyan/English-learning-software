@@ -2,30 +2,72 @@ package com.example.englishlearning.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-/** 字体阶梯：系统 sans（不引入字体文件），层级靠字号/字重/字距。 */
+/**
+ * 字体阶梯：系统 sans（不引入字体文件），层级靠字号/字重/字距。
+ *
+ * ## 六档的墨：组合期读当前主题（批 3 Task 26 排印墨色族收口）
+ *
+ * 批 1–批 2 时期六档各自带一枚浅套静态墨（`AppPalette.TextPrimary` / `TextSecondary`），
+ * 于是 `style = AppType.X` 的**直读**在深色档把近黑墨压到近黑底上。现在六档改成
+ * `@Composable @ReadOnlyComposable` getter，墨由 `appColors().text1`（Display/Headline/Title/Body）
+ * 与 `appColors().text2`（Footnote/Label）当场读取；浅套取值与旧静态值逐字相同，深套跟着换套。
+ *
+ * spec §2.2 只钉字号/字重/字距与 M3 角色对位，从未钉 `color`；这些钉值原样留在
+ * [DisplaySpec] 等私有度量表里（`MaterialThemeAssemblyContractTest` 逐档钉住），摘色不构成规格改动。
+ */
 object AppType {
-    val Display = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp, color = AppPalette.TextPrimary)
-    val Headline = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp, color = AppPalette.TextPrimary)
-    val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = AppPalette.TextPrimary)
-    val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, color = AppPalette.TextPrimary)
-    val Footnote = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, color = AppPalette.TextSecondary)
-    val Label = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp, color = AppPalette.TextSecondary)
+    val Display: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = DisplaySpec.copy(color = appColors().text1)
+
+    val Headline: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = HeadlineSpec.copy(color = appColors().text1)
+
+    val Title: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = TitleSpec.copy(color = appColors().text1)
+
+    val Body: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = BodySpec.copy(color = appColors().text1)
+
+    val Footnote: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = FootnoteSpec.copy(color = appColors().text2)
+
+    val Label: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = LabelSpec.copy(color = appColors().text2)
 }
 
+/** spec §2.2 钉值：字号/字重/字距。墨不在这里，见 [AppType] 的 getter。 */
+private val DisplaySpec = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp)
+private val HeadlineSpec = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp)
+private val TitleSpec = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+private val BodySpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)
+private val FootnoteSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal)
+private val LabelSpec = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
+
 /**
- * 装进 M3 `Typography` 前必须摘掉六档自带的静态墨：`AppType` 各档的 `color` 是
- * `AppPalette.TextPrimary` / `TextSecondary`（浅套硬编码值），原样装配会让全部
- * `MaterialTheme.typography.*` 读点在深色模式下也带着近黑色，深色文字压深色底。摘色后前景由
- * `LocalContentColor` 决定，而它由 [MintGlassTheme] 显式提供为当前 `AppColorSet` 的 `text1`
- * （`ColorScheme` 本身不喂 `LocalContentColor`）；`Surface` / `Scaffold` 等 M3 容器会按
- * `contentColorFor` 再覆盖一层，所以嵌套容器内的前景同样跟着主题换套，深浅两套各自成立。
+ * 装进 M3 `Typography` 前必须摘掉六档自带的墨：即便它已跟着主题换套，M3 角色的前景仍应由
+ * `LocalContentColor` 决定——`Surface` / `Scaffold` 等容器会按 `contentColorFor` 覆盖一层，
+ * 让面板/按钮上的排印跟着容器内容色走；不摘色时角色自带墨会压过容器语义。
+ * 而 `MintGlassTheme` 已把根 `LocalContentColor` 提供为当前套的 `text1`，深浅两套各自成立。
  *
- * 六档声明本身不动：`AppType.*` 的直接读点仍靠这些颜色取值，摘色只发生在装配路径上。
+ * 六档声明本身不动：`AppType.*` 的直接读点仍靠 getter 当场取主题墨。
  */
 private fun TextStyle.neutralForTheme(): TextStyle = copy(color = Color.Unspecified)
 

@@ -25,14 +25,14 @@ class WordAiQaScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     private fun setIdle() = composeRule.setContent {
-        WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {})
+        WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {})
     }
 
     @Test
     fun idleShowsTheThreeFixedQuestionChipsAndBack() {
         var backed = false
         composeRule.setContent {
-            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = { backed = true })
+            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = { backed = true }, onOpenAiSettings = {})
         }
 
         WordQaKind.entries.forEach { kind ->
@@ -50,7 +50,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Answered(WordQaKind.Sentence, "I ate an apple."),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = { saved += 1 }, onBack = {},
+                onAsk = {}, onConfirmOutbound = {}, onSaveNote = { saved += 1 }, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -67,7 +67,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Answered(WordQaKind.Sentence, "答案", saved = true),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {},
+                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -81,7 +81,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.NeedsOutboundConfirmation("api.example.com"),
-                onAsk = {}, onConfirmOutbound = { confirmed = it }, onSaveNote = {}, onBack = {},
+                onAsk = {}, onConfirmOutbound = { confirmed = it }, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -100,7 +100,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Failed(AiFailure.Unauthorized),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {},
+                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -114,7 +114,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.NotConfigured(WordQaNotConfiguredReason.NoDefaultProfile),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {},
+                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -124,7 +124,7 @@ class WordAiQaScreenTest {
     @Test
     fun askingStateShowsProgressAndDisablesChips() {
         composeRule.setContent {
-            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Asking, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {})
+            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Asking, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {})
         }
 
         composeRule.onNodeWithText("正在询问…").assertExists()

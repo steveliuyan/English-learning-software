@@ -49,7 +49,6 @@ import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.appColors
@@ -149,7 +148,7 @@ private fun AiProfileList(
             )
             is AiProfileListUiState.Ready -> {
                 state.message?.let {
-                    Text(it, style = AppType.Body, color = DomainColors.Reading.deep, modifier = Modifier.testTag("ai_profiles_message"))
+                    Text(it, style = AppType.Body, color = appDomain(AppDomain.Reading).deep, modifier = Modifier.testTag("ai_profiles_message"))
                 }
                 if (state.items.isEmpty()) {
                     Text(
@@ -215,9 +214,9 @@ private fun AiProfileRow(
                 Text(
                     text = if (item.hasKey) "已设置密钥" else "还没有设置密钥",
                     style = AppType.Label,
-                    color = DomainColors.AiSpeech.deep,
+                    color = appDomain(AppDomain.AiSpeech).deep,
                     modifier = Modifier
-                        .background(DomainColors.AiSpeech.base.copy(alpha = 0.12f), AppShape.Pill)
+                        .background(appDomain(AppDomain.AiSpeech).base.copy(alpha = 0.12f), AppShape.Pill)
                         .padding(horizontal = 9.dp, vertical = 4.dp)
                         .testTag("ai_profile_key_state_${item.profile.profileId}"),
                 )
@@ -231,7 +230,7 @@ private fun AiProfileRow(
                 item.isDefaultTextProfile -> Text(
                     text = "文章默认",
                     style = AppType.Label,
-                    color = DomainColors.AiSpeech.deep,
+                    color = appDomain(AppDomain.AiSpeech).deep,
                     modifier = Modifier.testTag("ai_profile_default_${item.profile.profileId}"),
                 )
                 item.canBeDefaultTextProfile -> PillButton(
@@ -247,7 +246,7 @@ private fun AiProfileRow(
                 item.isDefaultImageProfile -> Text(
                     text = "生图默认",
                     style = AppType.Label,
-                    color = DomainColors.AiSpeech.deep,
+                    color = appDomain(AppDomain.AiSpeech).deep,
                     modifier = Modifier.testTag("ai_profile_image_default_${item.profile.profileId}"),
                 )
                 item.canBeDefaultImageProfile -> PillButton(
@@ -426,12 +425,12 @@ private fun AiProfileEditor(
                 Text(
                     text = it.message,
                     style = AppType.Body,
-                    color = DomainColors.Reading.deep,
+                    color = appDomain(AppDomain.Reading).deep,
                     modifier = Modifier.testTag("ai_profile_field_error"),
                 )
             }
             state.message?.let {
-                Text(it, style = AppType.Body, color = DomainColors.Reading.deep, modifier = Modifier.testTag("ai_profile_message"))
+                Text(it, style = AppType.Body, color = appDomain(AppDomain.Reading).deep, modifier = Modifier.testTag("ai_profile_message"))
             }
 
             PillButton(

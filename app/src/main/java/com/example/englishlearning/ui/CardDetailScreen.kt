@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -51,12 +52,14 @@ import androidx.compose.ui.unit.sp
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SpeakerButton
 import com.example.englishlearning.ui.components.SpeakerState
 import com.example.englishlearning.ui.components.WordRow
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
@@ -64,6 +67,8 @@ import com.example.englishlearning.ui.theme.MintPrimaryDark
 import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 
 /**
  * Static, read-only detail view for a single word card (spec F1-06).
@@ -447,11 +452,10 @@ private fun PersonalNoteEditor(
         )
     }
     when (saveStatus) {
-        PersonalNoteSaveStatus.Failed -> Text(
-            "笔记保存失败，请重试。",
-            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-            modifier = Modifier.testTag("card_detail_personal_note_save_failed"),
-        )
+        PersonalNoteSaveStatus.Failed -> Box(Modifier.testTag("card_detail_personal_note_save_failed")) {
+            // Task 26 Step 3：错误行收口到共享 `InlineNotice`；旧锚留在外层（组件的标签后设，会覆盖同一 modifier）。
+            InlineNotice("笔记保存失败，请重试。", InlineNoticeKind.Error)
+        }
         PersonalNoteSaveStatus.Saved -> Text(
             "笔记已保存。",
             color = MintPrimaryDark,
@@ -504,7 +508,9 @@ private fun PersonalNotesDialog(
                                     .testTag("card_detail_note_delete_${note.noteId}")
                                     .semantics { contentDescription = "删除这条笔记" },
                             ) {
-                                Text("删除", color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                                // Task 26 Step 3：这是**破坏性动作标签**（不是错误提示行），取值与 `colorScheme.error`
+                                // 逐字同值（`MintGlassTheme.kt: error = set.error`），改读主题访问器只为止住族 2 读点。
+                                Text("删除", color = appColors().error)
                             }
                         }
                     }
@@ -590,12 +596,14 @@ private fun DetailSection(title: String, tag: String? = null, content: @Composab
     }
 }
 
-/** 例句里把单词加粗、用品牌深绿标出，其余保持正文样式。 */
+/** 例句里把单词加粗、用当前主题的品牌深绿标出，其余保持正文样式。 */
+@Composable
 private fun highlightLemma(sentence: String, lemma: String): AnnotatedString {
     val range = lemmaRangeIn(sentence, lemma) ?: return AnnotatedString(sentence)
+    val lemmaInk = appDomain(AppDomain.AiSpeech).deep
     return buildAnnotatedString {
         append(sentence.substring(0, range.first))
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = DomainColors.AiSpeech.deep)) {
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = lemmaInk)) {
             append(sentence.substring(range.first, range.last + 1))
         }
         append(sentence.substring(range.last + 1))

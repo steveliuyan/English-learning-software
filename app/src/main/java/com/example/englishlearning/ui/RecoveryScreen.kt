@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -52,7 +52,7 @@ internal fun RecoveryScreen(reason: String, onRetry: () -> Unit) {
         Button(
             onClick = onRetry,
             modifier = Modifier.testTag("recovery_retry"),
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
         ) {
             Text("重试")
         }

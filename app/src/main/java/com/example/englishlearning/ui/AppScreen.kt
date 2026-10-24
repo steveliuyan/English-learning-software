@@ -83,12 +83,13 @@ import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.components.ListSkeleton
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintLight
@@ -198,6 +199,17 @@ fun AppScreen(
             var showBackupHub by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLicenses by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // Task 26 Step 3：四枚 AI 屏的「未配置卡」出口统一送到 AI 配置页（共享 `NotConfiguredCard` 的
+            // 必填 `onConfigure`）。少了这个 ViewModel（预览/测试夹具）时退回「设置」栏，不假装能直达——
+            // 与 AiFeatureScreen 的 `onOpenSettings` 同一口径。
+            val openAiProfilesOrSettings: () -> Unit = {
+                aiProfileViewModel?.load()
+                if (aiProfileViewModel != null) {
+                    showAiProfiles = true
+                } else {
+                    selectedTab = AppTab.SETTINGS
+                }
+            }
             // Task 22-B（R-22.1）：原 `showFavorites` 独立叠层路由已摘除，收藏改由合并页 MyWordsScreen 承载；
             // 下面三枚收藏详情宿主变量（selectedFavoriteCard / favoritesPronunciation*）保留——合并页的
             // 收藏段点开单词时复用的正是这套详情覆盖层。
@@ -1071,6 +1083,10 @@ fun AppScreen(
                                 onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
                                 savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
                                 onBack = { showWordQaCard = null },
+                                onOpenAiSettings = {
+                                    showWordQaCard = null
+                                    openAiProfilesOrSettings()
+                                },
                             )
                         }
                     }
@@ -1286,6 +1302,10 @@ fun AppScreen(
                     onAnalyze = { sentence -> sentenceAnalysisViewModel?.analyze(sentence, state.profile.id) },
                     onConfirmOutbound = { sentenceAnalysisViewModel?.confirmOutbound(it) },
                     onBack = { selectedFeatureKey = null },
+                    onOpenAiSettings = {
+                        selectedFeatureKey = null
+                        openAiProfilesOrSettings()
+                    },
                 )
             } else if (selectedFeature == AiFeature.PHOTO_TRANSLATION) {
                 // F3-03：拍照翻译。图片只进临时工作区（零残留由状态机保证）；翻译每次出站都确认。
@@ -1332,6 +1352,10 @@ fun AppScreen(
                         photoTranslationViewModel?.reset()
                         selectedFeatureKey = null
                     },
+                    onOpenAiSettings = {
+                        selectedFeatureKey = null
+                        openAiProfilesOrSettings()
+                    },
                 )
             } else if (selectedFeature == AiFeature.IMAGE_STUDIO) {
                 val studioState = imageStudioViewModel?.uiState?.collectAsState()?.value
@@ -1342,6 +1366,10 @@ fun AppScreen(
                     onGenerateImage = { imageStudioViewModel?.generateImage() },
                     onConfirm = { imageStudioViewModel?.confirm(it) },
                     onBack = { selectedFeatureKey = null },
+                    onOpenAiSettings = {
+                        selectedFeatureKey = null
+                        openAiProfilesOrSettings()
+                    },
                 )
             } else if (selectedFeature != null) {
                 AiFeatureScreen(
@@ -1567,6 +1595,10 @@ fun AppScreen(
                                 onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
                                 savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
                                 onBack = { showWordQaCard = null },
+                                onOpenAiSettings = {
+                                    showWordQaCard = null
+                                    openAiProfilesOrSettings()
+                                },
                             )
                         }
                     }
@@ -1843,7 +1875,7 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
                 // AppleMintGradient 是浅薄荷渐变，白字 ≈1.29–2.40:1；按禁令2 同口径改深字 token。
-                contentColor = AppPalette.OnMintPrimary,
+                contentColor = appColors().onBrand,
                 disabledContainerColor = MintTint,
                 disabledContentColor = MintTextMuted,
             ),
@@ -1865,7 +1897,7 @@ internal fun ErrorScreen(onRetry: () -> Unit) {
         Button(
             onClick = onRetry,
             modifier = Modifier.semantics { contentDescription = "返回重新填写" },
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = AppPalette.OnMintPrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
         ) {
             Text("返回重新填写")
         }
@@ -2050,7 +2082,7 @@ internal fun LearningSetupScreen(
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
                 // 同上：品牌渐变底用深字 token，不沿用白字（≥4.5:1 口径见 GlassButton）。
-                contentColor = AppPalette.OnMintPrimary,
+                contentColor = appColors().onBrand,
             ),
         ) {
             Text(if (state.saving) "保存中…" else "保存并开始学习", fontWeight = FontWeight.Bold)
@@ -2065,7 +2097,12 @@ internal fun LearningSetupScreen(
             )
         }
         state.message?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 10.dp))
+            // Task 26 Step 3：错误行收口到共享 `InlineNotice`（族 2 的清零动作），墨色/底线/字形由组件承担。
+            InlineNotice(
+                text = it,
+                kind = InlineNoticeKind.Error,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
         }
     }
 }
@@ -2231,7 +2268,10 @@ internal fun SwipableWordBookCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.error, WordBookCardShape)
+                    // Task 26 Step 3：这是滑动删除的**底面色块**（不是错误提示行），取值与装配点的
+                    // `colorScheme.error` 逐字同值（`MintGlassTheme.kt: error = set.error`），改读主题
+                    // 访问器只为止住族 2 的 forbidden 读点，不改任何像素。
+                    .background(appColors().error, WordBookCardShape)
                     .padding(end = 20.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
@@ -2413,7 +2453,9 @@ private fun DetailToggleRow(
             Switch(
                 checked = checked,
                 onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = Color(0xFFCDEFE1)),
+                // Task 26 Step 3（AC-R-02）：未选中轨从裸 hex `0xFFCDEFE1` 改读 `tint3`
+                // （浅套 #CDEDD9 与旧值同族、深套随主题变暗；值差异已登记进验证文档，不冒充零变化）。
+                colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = appColors().tint3),
                 modifier = Modifier.semantics { contentDescription = label },
             )
         }
@@ -2457,7 +2499,8 @@ private fun DailyTargetCard(target: Int, onTargetChange: (Int) -> Unit) {
                 colors = SliderDefaults.colors(
                     thumbColor = AppleMintLight,
                     activeTrackColor = MintPrimary,
-                    inactiveTrackColor = Color(0xFFCDEFE1),
+                    // 同 DetailToggleRow：滑轨 inactive 段改读 `tint3`（Task 26 Step 3，AC-R-02）。
+                    inactiveTrackColor = appColors().tint3,
                 ),
                 modifier = Modifier.fillMaxWidth().padding(top = 14.dp).semantics { contentDescription = "每日新词目标，当前 ${displayedTarget} 词" },
             )

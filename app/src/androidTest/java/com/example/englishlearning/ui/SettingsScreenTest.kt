@@ -5,11 +5,15 @@ import android.content.res.Configuration
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
@@ -460,6 +464,44 @@ class SettingsScreenTest {
      * 取样点在 `settings_screen` 节点左侧 2% 宽的竖条、高度中线（左 padding 20dp ≈ 5% 屏宽，
      * 这条带里任何内容都碰不到，量到的必定是页底填充）；容差与自检同 `ThemeModeSwitchTest` 口径。
      */
+    /**
+     * Task 26 Step 4 TalkBack 走查补牙：主题三态是**单选**控件，但现盘只有 `clickable`，
+     * 读屏只会念「跟随系统 / 浅色 / 深色」三个词，不告诉用户哪一档正在生效。
+     *
+     * 判据：当前档必须暴露 `Selected = true`、另两档 `Selected = false`，且角色为 RadioButton
+     * （`selectableGroup` + `selectable(role = RadioButton)` 的形状），三档都保留点击动作。
+     * 合成形状不依赖像素，也不改主题三态的视觉——`theme_segments_flip_the_whole_settings_background`
+     * 的像素腿照常承重。
+     */
+    @Test
+    fun the_theme_segments_expose_their_selected_state_to_talkback() {
+        val mode = if (platformInDark) ThemeMode.Dark else ThemeMode.Light
+        AppThemePreferences.write(appContext, mode)
+        composeRule.setContent {
+            MintGlassTheme(themeMode = rememberAppThemeMode()) {
+                SettingsScreen(
+                    profileName = "Tom",
+                    wordBookName = "小学",
+                    onOpenSetup = {},
+                    onOpenWorksheet = {},
+                    onOpenAiProfiles = {},
+                )
+            }
+        }
+
+        ThemeMode.entries.forEach { option ->
+            val node = composeRule.onNodeWithTag("settings_theme_${option.storageKey}").performScrollTo()
+            node.assertHasClickAction()
+            if (option == mode) {
+                node.assertIsSelected()
+            } else {
+                node.assertIsNotSelected()
+            }
+        }
+        composeRule.onNodeWithTag("settings_theme_${mode.storageKey}")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+    }
+
     @Test
     fun theme_segments_flip_the_whole_settings_background() {
         val first = if (platformInDark) ThemeMode.Light else ThemeMode.Dark

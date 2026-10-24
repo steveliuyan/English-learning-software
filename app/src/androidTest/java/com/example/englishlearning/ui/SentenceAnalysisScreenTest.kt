@@ -34,7 +34,7 @@ class SentenceAnalysisScreenTest {
     fun idleBlankInputDisablesAnalyzeAndBackReportsCallback() {
         var backed = 0
         composeRule.setContent {
-            SentenceAnalysisScreen(state = SentenceAnalysisUiState.Idle, onAnalyze = {}, onConfirmOutbound = {}, onBack = { backed++ })
+            SentenceAnalysisScreen(state = SentenceAnalysisUiState.Idle, onAnalyze = {}, onConfirmOutbound = {}, onBack = { backed++ }, onOpenAiSettings = {})
         }
 
         composeRule.onNodeWithTag("sentence_analysis_input").assertExists()
@@ -49,7 +49,7 @@ class SentenceAnalysisScreenTest {
     fun typingEnablesAnalyzeAndReportsTheSentence() {
         var analyzed: String? = null
         composeRule.setContent {
-            SentenceAnalysisScreen(state = SentenceAnalysisUiState.Idle, onAnalyze = { analyzed = it }, onConfirmOutbound = {}, onBack = {})
+            SentenceAnalysisScreen(state = SentenceAnalysisUiState.Idle, onAnalyze = { analyzed = it }, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {})
         }
 
         composeRule.onNodeWithTag("sentence_analysis_input").performTextInput("Birds fly.")
@@ -63,7 +63,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Analyzed(segments()),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {},
+                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -79,7 +79,7 @@ class SentenceAnalysisScreenTest {
     @Test
     fun analyzingShowsProgressAndDisablesInputAndButton() {
         composeRule.setContent {
-            SentenceAnalysisScreen(state = SentenceAnalysisUiState.Analyzing, onAnalyze = {}, onConfirmOutbound = {}, onBack = {})
+            SentenceAnalysisScreen(state = SentenceAnalysisUiState.Analyzing, onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {})
         }
 
         composeRule.onNodeWithText("正在分析…").assertExists()
@@ -93,7 +93,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.NeedsOutboundConfirmation("api.example.com"),
-                onAnalyze = {}, onConfirmOutbound = { confirmed = it }, onBack = {},
+                onAnalyze = {}, onConfirmOutbound = { confirmed = it }, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -111,7 +111,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Failed(AiFailure.Unauthorized),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {},
+                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -124,7 +124,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.NotConfigured(SentenceAnalysisNotConfiguredReason.NoDefaultProfile),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {},
+                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
