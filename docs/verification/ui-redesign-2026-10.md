@@ -663,6 +663,138 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
   「徽标换 `AppIcon.Spark`」这一枚形状，**未授权**七枚逐功能分形。该映射需要一份决策文档再落码，
   现登记为缺口，不当作已完成。
 
+## 阅读主页版面收敛与外刊 Feed 拆层（Task 24，2026-10-24 登记）
+
+裁决⑤：阅读主页第一屏只留「今日文章」这一件主任务，外刊 Feed 从主页内联区拆成独立二级层，
+类型与长度偏好下沉到「生成前参数」，文章正文墨脱离裸 hex。落码在本文件的三个提交面：
+`feat` 主页版面、`feat` Feed 二级层、`fix` 正文墨 token 化（哈希见本节末「凭据」）。
+
+### 已落地面
+
+1. **主任务上提第一屏 + 两枚主 CTA 合为一枚**：`ReadingAccessScreen.kt` 的 Ready 列首枚现在是
+   「阅读今天的文章 / 生成今天的文章」（`reading_open_today` / `reading_source_ai`，同一时间只出现一枚），
+   「换一篇」降为次级按钮且只在已有今日文章时在场；connected 侧由
+   `ReadingAccessScreenTest.mainTaskCtaSitsAboveTheFoldWithoutScrolling`（不滚动、`boundsInRoot().top`
+   落在屏幕高度一半以内）与 `primaryGenerationCtaAndRegenerateNeverShareTheScreen`（两枚主 CTA 不同屏）钉住。
+2. **外刊 Feed 拆成带返回的二级层**：新增 `ui/ReadingFeedScreen.kt`（共享页头 `AppScreenHeader` +
+   `BackHandler` 由宿主承担），主页只留 `reading_source_feed` 一枚入口。四枚 Feed 状态文案、
+   `feed_item_<index>` 与「来源：+ sourceDisplayName」署名逐字照搬；connected 侧新增
+   `ReadingFeedScreenTest`（9 例）覆盖五枚状态、列表点击、返回腿与浅/深两档像素。
+   **本层必须另立文件**：写进 `ReadingAccessScreen.kt` 会让那枚文件出现 `AppScreenHeader(`，
+   把页头族棘轮的 offender 判定（`headlineRead && !contains("AppScreenHeader(")`）整体翻面。
+3. **出站确认接共享件**：删掉本屏私有的 `private fun OutboundConfirmationDialog`（GlassDialog 手搓面板），
+   改接 `components/OutboundConfirmDialog`；`ui/` 生产树里 `OutboundConfirmDialog(` 的调用点数从 0 变 1
+   （重算：`grep -rc "OutboundConfirmDialog(" app/src/main/java --include=*.kt | grep -v ":0"` ⇒
+   组件自身 1 处声明 + `ReadingAccessScreen.kt` 1 处调用）。
+4. **类型与长度偏好下沉**：四枚类型行与 `reading_preference` 卡只在 `reading_generation_params_toggle`
+   展开后出现（锁定分支的类型行不属本件，仍常驻并置灰——`lockedStateShowsReasonAndDisablesArticleChoices`
+   一字未动，故 `ArticleType.entries` 在生产源码里的读点数被钉成 2）。
+5. **文章正文墨 token 化**：`ArticleReadingScreen.kt` 正文那行由 `MaterialTheme.typography.bodyLarge
+   .copy(color = …17342A…)` 换成 `AppType.Body.copy(color = appColors().text1)`。
+   **容器出处先查过**：它压的 `MintBackground` 是 `LocalAppColors` 的组合期读点（容器随主题换套），
+   所以前景走套色才是正解；旧值在深套页底上现算只有 1.3758:1，连装饰档 3.1 都不达标。
+   三选一的读数（浅/深两套 `text1` 压本套页底）：16.0891 / 16.1957；被否掉的正文候选 `text2`
+   压浅页底 4.8711（余量太薄且语义是次要档）。重算命令见本节末。
+
+### 台账动作（四张逐张交代，不合并成一句「seed 递减」）
+
+- **页头族**：一字未动。重算 `grep -c "AppScreenHeader(" app/src/main/java/com/example/englishlearning/ui/ReadingAccessScreen.kt` ⇒ 0
+  （二级层那份是 `ReadingFeedScreen.kt`，只作为消费者出现）。
+- **裸 hex 族（`RawColorLiteralRatchetTest`）**：`RawColorSeedAllowlist` 与 `RawColorSeedSiteLines`
+  两张表**同批**摘掉 `ArticleReadingScreen.kt` 那两枚条目（只动这两处，阈值与别的条目一字未动）。
+  摘后重算 `grep -n "ArticleReadingScreen" app/src/test/java/com/example/englishlearning/ui/RawColorLiteralRatchetTest.kt` ⇒ 零命中；
+  `grep -nE "Color\(0x|0xFF[0-9A-Fa-f]{6,8}" app/src/main/java/com/example/englishlearning/ui/ArticleReadingScreen.kt` ⇒ 零命中。
+  派工块 §二.4 给的现算命令 `grep -nE "#[0-9A-Fa-f]{6,8}"` 在本仓取不到东西（生产写法是 `0xFF…` 不是 `#…`），
+  本席以盘面为准换成上面那条，并把它登记为 §二.4 的正式重算口径。
+- **暗色令牌消费族（`DarkTokenConsumptionRatchetTest`）**：`"ReadingAccessScreen.kt"` 那一格 **保持 4，未减未删**。
+  理由不是「忘了迁」，而是**迁了会造出 Task 23 B1 的镜像回归**：那四枚是 `MintPrimary` 容器上的
+  `AppPalette.OnMintPrimary`，而 `MintPrimary` 本身就是**主题不变**的域色容器（浅 `2EC99C` / 深 `35E0AC`
+  两档都亮），容器不换套 ⇒ 前景必须分档。实算：`174C44` 压浅域底 4.6204、压深域底 5.7619（两档都过正文 AA），
+  而 `appColors().onMint` 在深档是 `DFF6EC`，压深域底只有 **1.4933**。浅档两枚 token 逐值同为 `174C44`，
+  所以「迁过去」在浅档看不出问题——正是最容易假绿的一条腿。
+  本席把这件事同时钉成判据：`ReadingHomeLayoutContractTest` 新增一例
+  `the mint primary pair stays dark ink on both theme sets`（活 token 现算 + `containerColor = MintPrimary`
+  与 `contentColor = AppPalette.OnMintPrimary` 两个符号各 4 枚 + 反空转：深套 `onMint` 压深域底必须 < 4.5）。
+  重算：`grep -n '"ReadingAccessScreen.kt"' app/src/test/java/com/example/englishlearning/ui/DarkTokenConsumptionRatchetTest.kt`
+  ⇒ `"ReadingAccessScreen.kt" to 4`；逐成员现跑 `grep -oE "\b(AppPalette|DomainColors)\.[A-Za-z0-9_]+" app/src/main/java/com/example/englishlearning/ui/ReadingAccessScreen.kt | wc -l` ⇒ 5，
+  其中 1 枚在 KDoc 里（该棘轮按 `stripComments` 后计数 ⇒ 4，与 seed 相符；`grep -c` 按行会少算，别用它）。
+- **玻璃面板配对族（`GlassPanelInkPairingContractTest`）**：`expectedPanels` 花名册摘掉
+  `Panel("ReadingAccessScreen.kt", …)` 那一行（8→7），因为那枚手搓面板已换成共享件；
+  `AppScreenOverlayContainerContractTest` 只改了一处**断言消息**里的会漂移行号取样指引，判据算式未动。
+- **`outbound_confirmation_text` 锚语义收窄（必须交代）**：共享件的锚是 `outbound_confirm_body` /
+  `outbound_confirm_dismiss` / `outbound_confirm_confirm`，组件不许改；屏侧保留了
+  `Box(Modifier.testTag("outbound_confirmation_text"))` 这层槽位包装，于是这枚锚的含义从
+  「那枚私有对话框」收窄成「本屏的出站确认槽位」。connected 侧因此**同时**断言槽位锚与
+  `outbound_confirm_body`，并改点共享件的两个答案位（旧 `outbound_cancel` / `outbound_confirm` 已随私有面板消失）。
+- **`Mint*` 快捷色名**：不属本批（`DarkTokenConsumptionRatchetTest` 不计它们）。
+  剩余枚数重算 `grep -oE "\bMint[A-Za-z0-9]+" app/src/main/java/com/example/englishlearning/ui/ReadingAccessScreen.kt | wc -l` ⇒ 41
+  （含 import 与注释提及；`grep -c "Mint[A-Za-z]*"` 现算同为 41）。留给 Task 26。
+
+### 代价（可达性与观感变化，登记为目视项，不宣称「未变」）
+
+- **Feed 由「一屏内联」变成「多一层导航」**：想看外刊列表必须先进二级层再返回列表，
+  比原先多一次进入与一次返回；换来的是主页首屏不再被几十枚标题按钮撑成流水账。
+  重算：`grep -c "FeedSection(" app/src/main/java/com/example/englishlearning/ui/ReadingAccessScreen.kt` ⇒ 0。
+- **类型与长度偏好由常驻变成生成前才出现**：不展开 `reading_generation_params_toggle` 就看不到当前偏好；
+  锁定分支的类型行仍常驻，两条路径形状不再一致（这是裁决③「参数归生成前」的同形代价）。
+- **浅色档正文墨可见变化**：文章正文由 `17342A`（带绿相的深墨）换成浅套 `text1` `1C1C1E`（中性近黑）。
+  旧值在浅档本来就读得动（现算 12.7205:1），换后 16.0891:1，浅档只是「去绿相 + 对比更宽」；
+  真正被修掉的是深档那一侧（旧值 1.3758:1）。
+- **`AppScreen.kt` 的浮层族多一路由位**：`showReadingFeed` 照抄 `showReadingHistory` 的四枚站点
+  （`rememberSaveable` 状态位 / `overlayOpen` 的 `||` 链追加一项 / `BackHandler` / 挂载分支），
+  其余半边一字未动；`AppScreenOverlayContainerContractTest` 的浮层计数判据随之必须仍绿（现绿）。
+
+### `fontScale 2.0` 大字号轮（本批改版面，必跑）
+
+三次原始回显（跑前 / 置档 / 收工）在 `.superpowers/sdd/2026-10-17-ui-redesign/t24-device-fontscale-2.log`：
+跑前 `1.0`、置档回读 `2.0`、收工回读 `1.0`（设备只有 `emulator-5574`）。
+2.0 档判红一枚、处置一枚：`unlockedStateShowsFourTypesPreferenceAndOfflineHistoryEntry`
+在 2.0 档 `selected == null`——`performClick()` 打在未进视口的节点上是把事件注入窗口之外且**静默不触发**，
+不抛「点击失败」，所以这条腿必须显式 `performScrollTo()`（判据一字未减）。修后 2.0 与 1.0 两档各 17/17 皆绿。
+`mainTaskCtaSitsAboveTheFoldWithoutScrolling`（首屏判据）在 2.0 档**未判红**，即大字号下主任务仍在首屏以内。
+
+### 对比现算口径（本席所有比值的唯一来源）
+
+`luminance` / `ratio` 与 JVM 侧 `app/src/test/java/com/example/englishlearning/ui/SourceRatchet.kt` 的
+包级实现同式；connected 侧那份按同一公式在 `ReadingFeedScreenTest` 内复刻（`src/test` 对 `androidTest`
+编译期不可见），两处改公式必须一起改。文档散文里的每个数字可用下面这条现算复核：
+
+```
+awk 'function lin(v){v=v/255;return (v<=0.04045)?v/12.92:((v+0.055)/1.055)^2.4}
+function lum(h){return 0.2126*lin(strtonum("0x" substr(h,1,2)))+0.7152*lin(strtonum("0x" substr(h,3,2)))+0.0722*lin(strtonum("0x" substr(h,5,2)))}
+function ratio(f,b){x=lum(f);y=lum(b);if(x<y){t=x;x=y;y=t}return (x+0.05)/(y+0.05)}
+BEGIN{split("174C44 2EC99C|174C44 35E0AC|DFF6EC 35E0AC|17342A 0E1512|1C1C1E F1FBF5|E9F2EC 0E1512|4E756A F1FBF5|17342A F1FBF5",r,"|");
+for(i in r){split(r[i],p," ");printf "%s/%s %.4f\n",p[1],p[2],ratio(p[1],p[2])}}'
+```
+
+期望读数依次为 4.6204 / 5.7619 / 1.4933 / 1.3758 / 16.0891 / 16.1957 / 4.8711 / 12.7205（hex 取自
+`AppPalette.OnMintPrimary`、`AppColors.kt` 的 `DomainLight`/`DomainDark` 的 `AppDomain.AiSpeech.base`
+与 `AppColorLight`/`AppColorDark` 三处活符号，不另抄色板）。
+
+### 凭据
+
+- JVM 全门（`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
+  --no-daemon --no-build-cache --rerun-tasks --offline`）：BUILD SUCCESSFUL，
+  `suites=239 tests=1775 skipped=0 failures=0 errors=0`（基线 238/1770，只增不减：
+  新增 `ReadingHomeLayoutContractTest` 5 例）。日志 `t24-gate-jvm-2.log`；
+  RED 阶段的四枚自证红样在 `t24-red-jvm-contract.log`，主 CTA 的 connected 红样在
+  `t24-red-connected-maincta.log`。
+- 计数 awk（唯一口径）：`awk -F'"' '/<testsuite /{n++;t+=$4;s+=$6;f+=$8;e+=$10}
+  END{printf "suites=%d tests=%d skipped=%d failures=%d errors=%d\n",n,t,s,f,e}'
+  app/build/test-results/testDebugUnitTest/*.xml`。
+- connected（逐类 `adb -s emulator-5574 install -r` + `am instrument`，禁 `connectedDebugAndroidTest`）：
+  `ReadingFeedScreenTest` 9/9、`ReadingAccessScreenTest` 17/17、`ArticleReadingScreenTest` 23/23、
+  `ui.glass.GlassDialogTest` 1/1、`AppScreenTest` 50/50。
+  **深色档证据**：`ReadingFeedScreenTest` 的两例像素腿走测试内显式 `MintGlassTheme(themeMode = ThemeMode.Dark)`
+  （先例 `ThemeModeSwitchTest`、`ui/glass/GlassPanelThemeInkTest.kt`），不靠 `cmd uimode night yes`；
+  内含三条自检（换套判别力 / 取样点离墨够远 / 反空转把浅套 `text1` 喂进同一条 4.5 闸必判红）。
+- 设备面一次噪声：`AppScreenTest` 首跑 50 里 1 红（`startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan`
+  的 5 秒 `waitUntil` 超时，单词卡→今日计划那条腿与本席改动无关），单例复跑 1/1 绿、整类复跑 50/50 绿；
+  两次读数都留在 `t24-connected-appscreen.log`，登记为时序 flake 而不是回归。
+- 提交：`3a016c0`（三族判据 RED 先行）→ `aa7acb5`（Feed 二级层 + connected 类）→
+  `8474110`（正文墨 token 化 + 两张裸 hex 表同批摘）→ `cae692b`（主页版面 + 宿主接线 + 两枚在册判据）→
+  `4ff98d6`（大字号档先滚再点）。
+
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
 
 `app/src/test/java/com/example/englishlearning/ui/SourceRatchet.kt` 的 `stripComments` 现为**字符串感知**扫描实现：
