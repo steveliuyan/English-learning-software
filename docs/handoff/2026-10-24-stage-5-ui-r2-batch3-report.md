@@ -63,7 +63,10 @@ AC-R-12 六屏节点树读数与主题分段修复复核，全部在验证文档
 - 分支 `stage-5-ui-r2-learning-path`，工作树干净。本批最近三次提交（作者身份按仓库既有 `steveliuyan <2021250388@qq.com>` 逐提交传入）：
   - `ff2df33` refactor(ui): 批 3 令牌迁移、棘轮收口与真机取证修复（Task 26 Step 3-4）——43 files，含 `MyWordsFirstFrameTimingTest` 与 `LearningRecordsRowContractTest` 两枚新测试；
   - `78d84ee` docs(ui): 批 3 收口证据表与工作报告（Task 26 Step 4-6）——2 files；
-  - `93ee511` docs(ui): 修正 AC-R-21 行内命令的表格竖线转义。
+  - `93ee511` docs(ui): 修正 AC-R-21 行内命令的表格竖线转义；
+  - `fb7def4` fix(ui-icons): 圆形图标补显式圆弧命令（2026-10-25，用户真机指认「学习提醒只有一半」后现场定位，
+    `Clock`/`Info`/`Search`/`Camera`/`Person` 五枚在描边档只剩半圈；TDD 红样 `t27-RED-1-jvm.log`，
+    门控 `241/1789/0/0/0`，真机 `bf353dda` 已装修复包并复核；细节见验证文档「2026-10-25 图标半圈修复」节）。
   更早两步为 `759126f`（Step 1 逐词朗读）与 `1afd30f`（Step 2 契约补牙）。
 - **未推送 GitHub**（本地领先远端 93 个提交，远端 `origin/stage-5-ui-r2-learning-path` tip 仍为 `d73a3cb`）；合 `main` 未做。两项均需用户明确批准，推送后须 `git ls-remote` 核验远端 tip。
 - 已知未入库物：`.git/qa-scratch/`（截图与 dump，按红线不入库）。
@@ -76,7 +79,9 @@ AC-R-12 六屏节点树读数与主题分段修复复核，全部在验证文档
   根因是批 3 计划只把备份文案派进 Task 25。已立 **Task 38**，需用户决定本批补做还是转下一批。
 - **AC-R-07 仍部分通过**：今日计划主体卡、设置族、阅读正文、词典/词书族仍缺设备档 2.0 断言（已立 **Task 40**）。
 - **Task 14 裁决三自留项未兑现**：删两条切 tab 入口、调整词书与目标压进汇总卡（已立 **Task 39**）。
-- **新账**：Task 27 图标缺件与入口配色、Task 35 页头收编、Task 36 我的词 LazyColumn、Task 37 AI 副标题文案。
+- **新账**：Task 27 图标缺件与入口配色（其中「圆形图标只剩半圈」已于 2026-10-25 修复并真机复核；
+  余下是弱档 `StrokeOnly` 下识别特征缺失与 `Star`/`Bookmark` 同形）、Task 35 页头收编、
+  Task 36 我的词 LazyColumn、Task 37 AI 副标题文案。
 - **待用户目视 9 条**（①–⑤、⑦–⑩；⑧ AI 副标题、⑨ 今日计划 Hero、⑩ 阅读锁定态为批 3 新列）。
 - **Step 7 推送**：待用户批准；**Step 8 真机手工试用**：真机 `bf353dda` 上已装最新 debug 包（`lastUpdateTime=2026-10-24 20:05:17`，与 19:57:38 的 `assembleDebug` 产物一致；此后唯一变动的源文件是 `androidTest` 侧的 `MyWordsFirstFrameTimingTest.kt`，不进 app 包），已用 `monkey -p … LAUNCHER` 拉起并核对 `mCurrentFocus` 落在 `MainActivity`，等待用户手工走链。
 
