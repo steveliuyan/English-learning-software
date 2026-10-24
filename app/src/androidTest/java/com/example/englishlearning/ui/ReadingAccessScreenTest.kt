@@ -82,7 +82,10 @@ class ReadingAccessScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reading_type_news").assertExists()
         composeRule.onNodeWithTag("reading_type_story").assertExists()
-        composeRule.onNodeWithTag("reading_type_science").assertExists().performClick()
+        // 大字号 2.0 实测：四枚类型行会落到视口外，而 `performClick()` 对未入视口的节点是把事件
+        // 注入到窗口之外——**静默不触发**（判红只停在 `selected == null`，不抛「点击失败」）。
+        // 故先滚进视口再点：点数四枚与「点中的那枚必须交给宿主」这两条判据一字未减。
+        composeRule.onNodeWithTag("reading_type_science").performScrollTo().assertExists().performClick()
         composeRule.onNodeWithTag("reading_type_workplace").assertExists()
         composeRule.onNodeWithTag("reading_preference").assertExists()
         composeRule.onNodeWithTag("reading_history_entry").performScrollTo().assertExists().performClick()
