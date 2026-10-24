@@ -120,7 +120,7 @@ object AppIcons {
         // Search：手柄折线、圆环与圆形填充转录 §6.2（视觉稿 `<circle cx=11 cy=11 r=6>` 写成两段圆弧 + 标记串）
         AppIconSpec(
             name = "Search",
-            strokePaths = listOf("M11 5a6 6 0 010 12 6 6 0 010-12", "M20 20l-4.6-4.6"),
+            strokePaths = listOf("M11 5a6 6 0 010 12a6 6 0 010-12", "M20 20l-4.6-4.6"),
             fillPaths = listOf("CircleFill(11, 11, 6)"),
         ),
         // Book：书壳与书脊原创自绘（B 案度量）；填充层转录 §6.2 左页半幅
@@ -156,7 +156,7 @@ object AppIcons {
         // Clock：指针与圆环转录 §6.2（视觉稿 `<circle cx=12 cy=12 r=8>` 写成两段圆弧）
         AppIconSpec(
             name = "Clock",
-            strokePaths = listOf("M12 4a8 8 0 010 16 8 8 0 010-16", "M12 7.6V12l3.2 2"),
+            strokePaths = listOf("M12 4a8 8 0 010 16a8 8 0 010-16", "M12 7.6V12l3.2 2"),
             fillPaths = listOf("CircleFill(12, 12, 8)"),
         ),
         // Chart：折线与坐标轴转录 §6.1；折线下方面积原创自绘（B 案度量）
@@ -218,7 +218,7 @@ object AppIcons {
         // Camera：机身与镜头圆转录 §7 屏⑥（视觉稿 `<circle cx=12 cy=13 r=3.2>` 写成两段圆弧 + 标记串）
         AppIconSpec(
             name = "Camera",
-            strokePaths = listOf("M4 8h4l2-2h4l2 2h4v11H4z", "M12 9.8a3.2 3.2 0 010 6.4 3.2 3.2 0 010-6.4"),
+            strokePaths = listOf("M4 8h4l2-2h4l2 2h4v11H4z", "M12 9.8a3.2 3.2 0 010 6.4a3.2 3.2 0 010-6.4"),
             fillPaths = listOf("CircleFill(12, 13, 3.2)"),
         ),
         // Image：原创自绘（B 案度量）——画框 + 山形，日光圆作填充层
@@ -248,13 +248,13 @@ object AppIcons {
         // Person：原创自绘（B 案度量）——头部圆环 + 肩线半环，头圆作填充层
         AppIconSpec(
             name = "Person",
-            strokePaths = listOf("M12 4a4 4 0 010 8 4 4 0 010-8", "M4.5 20a7.5 7.5 0 0115 0"),
+            strokePaths = listOf("M12 4a4 4 0 010 8a4 4 0 010-8", "M4.5 20a7.5 7.5 0 0115 0"),
             fillPaths = listOf("CircleFill(12, 8, 4)"),
         ),
         // Info：圆环、字干与点转录 §6.1「关于 / 许可」（视觉稿 `<circle cx=12 cy=12 r=8>` 写成两段圆弧）
         AppIconSpec(
             name = "Info",
-            strokePaths = listOf("M12 4a8 8 0 010 16 8 8 0 010-16", "M12 11v6", "M12 7.5v.5"),
+            strokePaths = listOf("M12 4a8 8 0 010 16a8 8 0 010-16", "M12 11v6", "M12 7.5v.5"),
             fillPaths = listOf("CircleFill(12, 12, 8)"),
         ),
         // Bell：骨架层两笔转录 §6.1；钟体内幅原创自绘（B 案度量）

@@ -47,6 +47,12 @@
 - Observed: 转录时把稿里的 `<circle>` / 内幅形状一律塞进 `fillPaths`，于是「弱档 + 底导」这条主路径上它们集体蒸发。
 - Expected: 稿面口径 —— 识别性形状在任何档位都可见；`Clock`/`Search`/`Camera`/`Person`/`Info` 五枚已经是**双层同形**的正确先例
   （同一个圆既在 `strokePaths` 又在 `fillPaths`），`Gear`/`List`/`Book`/`Image` 没跟上。
+  **2026-10-25 订正**：这条「五枚是正确先例」的前提被证伪——它们的整圆在 `strokePaths` 里写成
+  「圆弧后跟隐式重复坐标组」，compose-ui 1.10 的 `PathParser` 只解析第一段，描边层实际只有半圈
+  （真机即「学习提醒月牙、开源许可 D 形」）。双层是「两条半圈」而不是「两个整圆」。
+  已补显式命令字母并由 `AppIconsStructureContractTest#every authored path segment survives parsing` 钉住；
+  细节与真机前后对照见 `docs/verification/ui-redesign-2026-10.md` 的「2026-10-25 图标半圈修复」节。
+  本节其余诊断（弱档不画填充层、Gear/List 等缺识别特征）不受影响，仍按原结论处置。
 - User/design impact: 「图标生成不全 / 一半一半」的直接来源；两行图标不可区分还会让「设置」与「列表」两类入口在扫读时混成一片。
 - Recommended fix（**属范围变化，先改决策文档再动码**）：
   1. 给圆形加一枚**描边档**标记（例如 `CircleStroke(cx, cy, r)`），由 `AppIcon.kt` 解释成同一段圆弧、进 `strokePaths`；

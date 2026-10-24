@@ -138,7 +138,7 @@ brief 点名但现场无 connected 侧此类：`AppTabTest`（仅存 JVM 侧 `ap
 | AC-R-06 | `AppTabTest` 与既有业务规则测试零修改通过；JVM 基线只增不减（每次重算，不得引用陈旧数） | 门禁命令 + 上面的 awk 重算。零修改核验三条（本次实跑：第 1、2 条为空，第 3 条只列出 `MainActivity.kt`）：<br>`git diff --name-only main..HEAD -- app/src/test/java/com/example/englishlearning/ui/AppTabTest.kt app/src/main/java/com/example/englishlearning/di app/src/main/java/com/example/englishlearning/learning`<br>`git diff --name-only main..HEAD -- 'app/src/test/java/**' \| grep -v '/ui/'`（测试侧改动应全在 `ui/` 下）<br>`git diff --name-only main..HEAD -- 'app/src/main/**' \| grep -v '/ui/'`（生产侧越出 `ui/` 只允许 `MainActivity.kt`，它是主题装配点）。**批 3 收口（2026-10-24）**：同三条命令本轮复跑结论不变（仅 `MainActivity.kt` 越出 `ui/`）；基线由 231/1708 增至 **241/1788/0/0/0**（逐文件相加，见 Step 5 节），`AppTabTest` 零改动 | 通过（本次实跑：AppTabTest/di/learning 零改动；测试侧改动全在 `ui/`；生产侧仅 `MainActivity.kt`；批 3 基线 241/1788） |
 | AC-R-07 | `fontScale = 2.0` 的 connected 用例覆盖六屏重排后的标题与卡片 | **批 2 已覆盖（Task 18i 收口，2026-10-20 复跑在案）**：① `AppScreenOverlayContainerTest` 名带 `AtDoubleFontScale` 的大字号用例（17B 收口时 2 枚，现盘 3 枚，枚数与重算命令见上节「陈旧枚数订正」）——17B 修复轮口径：运行前置为**设备级** `font_scale=2.0` + 行高哨兵 `assertScaleTookEffect` 防「scale 1.0 空转」（自然 scale 整类 `Failures: 2` 响亮红样留档 `t18-connected-AppScreenOverlayContainerTest-scale1-naturalred.log`；前置 2.0 下整类 `OK (4 tests)`）；② `WordCardScreenTest.lemmaAndRevealedMeaningStayFullyVisibleAtMaximumLargeFontScale`（Task 15 Step 3 护栏，组合级 `fontScale = 2f` 下词卡主词与揭晓释义不被裁出卡片，`OK (17 tests)` 类内通过）；③ 护栏出处 `CheckInScreenTest.headerKeepsLinksReachableAndTitleReadableAtMaximumLargeFontScale`（`OK (7 tests)`）。**批 3 未覆盖，批 3 续**：今日计划屏主体卡、词卡详情屏正文、文章阅读、设置族、词典/词书族屏的大字号用例仍缺（本轮逐类 connected 全绿但未为其新增 scale 断言，不虚报）。**批 3 收口（2026-10-24 Step 5）**：设备 `font_scale=2.0`（置档回读 2.0，跑完回 1.0）下 `AppScreenOverlayContainerTest` **OK (6 tests)**，其中三条 `…AtDoubleFontScale` 由行高哨兵 `assertScaleTookEffect` 证明 scale 真落进对话框窗口（scale 1.0 下先红：`fontScale=2.0 未落进对话框窗口…实测 size=510 x 73`，红样在 `.git/qa-scratch/t26-step5/conn-4.log`）；本批屏级大字号腿随类复跑全绿：`WordCardScreenTest` 17（含 `lemmaAndRevealedMeaningStayFullyVisibleAtMaximumLargeFontScale`）、`MyWordsScreenTest` 15（含 `metaSlotsKeepTheTwoLineBudgetAndTheColumnCapAtDoubleFontScale`）、`CheckInScreenTest` 8（含 `headerTitleStaysReadableAtMaximumLargeFontScale`）、`BackupEntryUnificationTest` 6（含 `hubEntriesRemainReachableAtDoubleFontScale`）。**仍未覆盖**：今日计划主体卡、设置族、阅读正文/文章阅读、词典/词书族未新增设备档 2.0 断言 | 部分通过（批 2 覆盖屏证据齐；批 3 补了玻璃遮罩与四处屏级腿；上列四族仍缺，批 4 续） |
 | AC-R-08 | §3 每个共享组件有「全站唯一实现」的静态检查；被替换的私有份数降到 1 | `SharedComponentUniquenessRatchetTest`：四族（页头 / 错误提示条 / 未配置卡 / 词行）按形态规则逐族**精确集合相等**，seed 是债务台账（只减不增，接线一屏删一行）；批 1 组件文件按「点名文件必须存在 + 公开组件在 `ui/` 扫描面恰一处顶层定义」钉；预登记豁免（本棘轮不管「就地改既有组件取值面」，Task 14 改 `PillButton` 本体不受挡）由 `the_ratchet_blocks_a_second_component_but_never_an_in_place_value_edit` 双向证明。**批 1 终审 F7 登记的第三条边界**：族 1/2/4 的判定面各带「本文件调了共享组件即整体合规」出口，出口同时是**已知失明面**——接线后同屏残留的私有 forbidden 形态会整体隐形；`family_compliance_exits_are_a_declared_known_blindness_surface` 双向钉住该语义，批 2 的删 seed 判据因此是「该屏 forbidden 读点清零」而不是「补一行调用就准删」，收紧（seed 改读点计数）属计划修订事项。**批 3 终态（Task 26 Step 3，2026-10-24）**：四族 seed —— 页头 16 行（逐条保留理由见「批 3 收口 Step 3」节，含自定义返回语义与非页头 headline 读点两类硬阻塞）、错误提示条 0、未配置卡 0、词行 2 行（`GlobalVocabularySearchScreen` 按 R-20C.1、`VocabularyScreen` 为 0 调用孤儿屏）；两族清空后规则本身仍由合成负例保活 | 通过（批 3 收口：提示条 / 未配置卡两族清零，页头 / 词行两族按计划 Step 3 留档写明理由；见「本族规则形状的已知边界」） |
-| AC-R-10 | 六屏 360dp 真机浅/深两套截图逐屏比对设计稿 | **批 3 已取（2026-10-24，`bf353dda`，`wm density 480`⇒360dp）**：六屏 × 浅/深 = 12 张 + 滚动/取样/修复后重拍共 19 张，产物与重算命令见「批 3 收口 Step 4」节。逐屏结论：①词书选取结构/选中四重态一致（标题文案与稿不同，未擅改）；②今日计划 1 CTA + 入口行组成立，入口组六行可读（首屏之下已滚动取证），但稿面渐变 Hero/日期头部未落地；③词卡回忆/揭晓 + 三档反馈一致；④设置 4 组 9 行一致，行副标题单行省略、图标缺件归 Task 27；⑤阅读锁定态仍画 4 枚 `enabled=false` 类型块（稿要求只留状态点 + 回到今日计划，未在 Task 24 范围）；⑥ AI 三枚能力默认可见，副标题文案与稿 ⑥ 冲突。三处稿面差异列「仍待用户目视」⑧⑨⑩，本行不判为逐像素一致 | 通过（两套截图与逐屏比对完成；三处稿面差异已列账） |
+| AC-R-10 | 六屏 360dp 真机浅/深两套截图逐屏比对设计稿 | **批 3 已取（2026-10-24，`bf353dda`，`wm density 480`⇒360dp）**：六屏 × 浅/深 = 12 张 + 滚动/取样/修复后重拍共 19 张，产物与重算命令见「批 3 收口 Step 4」节。逐屏结论：①词书选取结构/选中四重态一致（标题文案与稿不同，未擅改）；②今日计划 1 CTA + 入口行组成立，入口组六行可读（首屏之下已滚动取证），但稿面渐变 Hero/日期头部未落地；③词卡回忆/揭晓 + 三档反馈一致；④设置 4 组 9 行一致，行副标题单行省略、圆形图标半圈已于 2026-10-25 修复、同形图标仍归 Task 27；⑤阅读锁定态仍画 4 枚 `enabled=false` 类型块（稿要求只留状态点 + 回到今日计划，未在 Task 24 范围）；⑥ AI 三枚能力默认可见，副标题文案与稿 ⑥ 冲突。三处稿面差异列「仍待用户目视」⑧⑨⑩，本行不判为逐像素一致 | 通过（两套截图与逐屏比对完成；三处稿面差异已列账） |
 | AC-R-11 | 玻璃层与域色容器在深色下文字可读性实测 | **覆盖方式（批 1 终审登记 → 批 2 收口兑现，裁决 R-18-R1）**：本行原本的实测面是全站 `AppPalette.GlassFill` 的四枚容器消费点（`glass/GlassDialog.kt`、`glass/GlassOverlay.kt`、`AiProfileSettingsScreen.kt` 的 `SectionCard`、`SpeechSettingsScreen.kt` 的 `PreviewCard`）。批 2 收口把「容器填充与面板内前景墨色同批迁」真的同批迁完：四枚填充改读 `appColors().surfaceGlass`，面板内排印点（A 席 8 枚消费者 16 处 + B 席三块面板内的墨）一并按套。现盘可重算：`grep -rn 'color *= *AppPalette\.GlassFill' app/src/main/java --include=*.kt` 为空（余下命中全在注释/KDoc）。浅套逐值不变有契约腿钉着（`surfaceGlass`=`0xEFFFFFFF`、`text1`=`0xFF1C1C1E`、`surface`=`0xFFFFFFFF`、`outlineSoft`=`0xFFE4EFE9`、`text2`=`0xFF4E756A` 五对与旧静态逐字相同）；`GlassHighlight` / `Scrim` 属主题无关蒙版族（`ThemeInvariantMaskMembers`），有意不迁。<br>**深套那侧的证据不再是纸面推断**：connected 取样类 `GlassPanelThemeInkTest`（8 例）与 `GlassDialogThemeInkTest`（3 例）在设备上取真实像素带，逐枚断言「容器 = 套内深玻璃合成底、前景 = 套内墨、且 WCAG 现算 ≥ `BODY_AA_RATIO`」，并各带反空转腿（拿迁移前那枚静态墨喂同一条闸必须判红）。<br>**八枚玻璃对话框消费者的 connected 面已随修复轮复跑**（`ArticleReadingScreenTest` 23、`ImageStudioScreenTest` 11、`ReadingAccessScreenTest` 13、`SentenceAnalysisScreenTest` 7、`WordAiQaScreenTest` 8、`AiProfileSettingsScreenTest` 23、`PillButtonTest` 9、`GlassDialogTest` 1，11 类 109 例 0 失败，逐类出处见上面「批 2 全分支终审与修复轮复跑」段）。<br>**本批顺带闭掉一枚既有 AA 债**：浅套 `AiSpeech.deep`（`#188F76`）压浅玻璃合成实底 `#FEFFFE` 现算只有 **4.006:1**，而它落的那两行是 `style = AppType.Body`（正文档，线是 4.5）——取样类一度用 `DECOR_AA_RATIO = 3.1` 把它钉成「合格」，那是按装饰档放行正文档。按房内既有先例 `AppBottomBar.kt:95`（17A 修复轮 `0ed3984`）的形状按套归位：浅套取 `appColors().onMint`（`#174C44` 压同底 **9.727:1**）、深套沿用 `deep`（`#35E0AC` 压 `#161F1B` **9.960:1**），站点是 `AiProfileSettingsScreen.kt` 的密钥态行与音色浮层选中行；`DECOR_AA_RATIO` 常量随之删除。浅套这一处观感会变（薄荷绿墨→深墨），属修 AA 失败，已列入 18-ii 用户目检。同族其余把 `AiSpeech.deep`／`Reading.deep` 用在**文字**上的静态读点（可重算：`grep -rn 'DomainColors\.\(AiSpeech\|Reading\)\.deep' app/src/main/java --include=*.kt` 现盘 **12 枚命中**，再逐枚看它的 `style` 与所在容器），批 3 迁按套时按同一条规则落 `onMint`（浅）／`appDomain(...).deep`（深）、**不得再迁成静态 `deep`**；非文字图形档不受本条约束（例如 `TodayPlanScreen.kt:127` 那枚加载进度环的 `color`，装饰档 ≥3.1 已达标）。<br>**这批残留站点的比值本席已现算入册（不是留给批 3 再发现）**：`AiSpeech.deep` `#188F76` 压浅页底 `#F1FBF5` = **3.797:1**、压浅玻璃 `#FEFFFE` = 4.006、压深卡底 `#17201C` = 4.151、压深页底 `#0E1512` = 4.609（三档浅侧与深卡底都不达正文 4.5）；`Reading.deep` `#C81E46` 压浅页底 = 5.324（达标）、压深页底 = **3.287**、压深卡底 = **2.961**（后者连装饰档 3.1 都不达）。落点面（现盘行号，随批 3 改动会漂）：`AiProfileSettingsScreen.kt:152/218/234/250/429/434`、`SpeechSettingsScreen.kt:111/142/181/312`、`AiLearningScreen.kt:177`、`CardDetailScreen.kt:598`（后者已在交接报告 §5.2.8 在册；`AiLearningScreen.kt:177` 是窄复评 P1 席用同一条命令数出来的——本席一度把这族写成「10 枚」，P1 席实跑得 12，订正见 §5.2.10。那一枚还带同族两笔：`else` 分支的 `AppPalette.TextSecondary` 静态浅墨与徽章底 `Color.White.copy(alpha = 0.85f)`（`:167`）），全是 `AppType.Label`／`AppType.Body`／`labelMedium`／`SpanStyle` 文字。**为什么本批不动**：这些行的容器底都不是批 2 迁的那四枚玻璃面板（`PreviewCard` 之外、`SectionCard` 块在 :423 已闭合），比值劣化不是批 2 造成的；且 `Mint*` 页底族与 `AppType` 直读墨的摘色本身就是批 3 的任务面（结转条目见交接报告 §5.2），在这里单点改墨会把批 3 的成套迁移拆成碎改。<br>**批 3 硬约束（本行当场钉为验收口径）**：批 3 迁完这一族后，上述每一枚文字站点必须 ≥4.5（浅深两套各自现算，取样用 `GlassPanelThemeInkTest` 同一条 `assertContrastAtLeast` 腿，不许再按 3.1 放行）。<br>**当时未做（批 3 已补，见下）**：六屏浅/深两套真机截图与设计稿逐屏目视比对（那是 AC-R-10 的面，归 18-ii 用户侧 + 批 3），以及非玻璃容器族（`Mint*` 页底族）的深色实测。<br>**批 3 收口（Task 26 Step 4，2026-10-24）**：上面两项已补——六屏深色真机截图与关键配对现算见「批 3 收口 Step 4」节：`text1` 压 `background` **16.196:1**、压 `surface` **14.587:1**，`text2` 压 `surface` **7.543:1**，选中胶囊白字压 `tint3 #27392F` **12.262:1**，阅读类型块 `text1` 压 `tint3` **10.731:1**；人眼六屏深色均清晰。同批闭掉品牌渐变白字结转债（旧白字 1.287/1.656/2.398 → `onBrand` 12.807/9.950/6.873，`AiBadgeContrastFixTest` 新腿 RED→GREEN，前后截图在 `.git/qa-scratch/t26-step4/`） | 通过（迁移侧、设备取样与真机六屏深色目视均完成；`Mint*` 页底族按 token 现算 + 六屏实拍覆盖） |
 | AC-R-12 | TalkBack 走查重做一遍 | **批 2 做到的是「语义契约 + connected 走查」两件事**：① 语义契约——duotone 底导四 tab 的 `testTag("app_tab_*")` + `Role.Tab` + `stateDescription` 与字形锚由 JVM 契约钉（17A/17A 修复轮，`R-17A.2` 后升级为体内夹击形状）；② connected 走查——`AppBottomBarTest` `OK (8 tests)`、`AppScreenTest` `OK (46 tests)`（2026-10-20 Task 18i 批 2 子集清单复跑在案，口径见上文订正）。**批 3 收口（Task 26 Step 4，2026-10-24）已在真 TalkBack 引擎下走查六屏**：真机 `bf353dda`，前置把 `enabled_accessibility_services` 覆盖为 TalkBack-only（摘掉 MIUI 自动附加的 `MiuiEnhanceTBService`），证据形态是 TalkBack 消费的同一棵无障碍节点树，逐屏读数见「批 3 收口 Step 4」节的 AC-R-12 表。**走查中发现并修复一枚缺陷**：设置页主题三态原为三枚各自 `.clickable` 的 Box，树中只有文本、无 Selected/Role，读屏报不出当前是「跟随系统 / 浅色 / 深色」；改为容器 `.selectableGroup()` + 每档 `.selectable(selected, role = Role.RadioButton)`，判据 `SettingsScreenTest#the_theme_segments_expose_their_selected_state_to_talkback`（修前 RED `Failed to assert the following: (Selected = 'false')`，修后单条 GREEN、整类 `OK (18 tests)`，`emulator-5574` `install -r` + `am instrument`），真机重装后复 dump 得三档 `checkable="true"` + 子节点 `android.widget.RadioButton` + 当前档 `checked="true"`，从「浅色」点回「跟随系统」后首档 `checked` 翻转——选中态随交互真实变化，不是静态写死。**覆盖边界（明写不虚报）**：未配置卡出口（走查机 AI 已配置，卡片不出现）与逐词朗读（设备上没有已解锁文章）两面真机未触达，分别由 `NotConfiguredCardContractTest`（宿主传参 + `not_configured_goto` 标签）与 Step 1 的 `WordRange`/connected 判据（`759126f`）代证；本轮以「屏」为单位取证，未逐 tab 录底导四 tab 的播报文本（其语义仍由批 2 契约腿钉着） | 通过（真机引擎走查六屏；两处不可达面用自动化代证，边界如上） |
 | AC-R-20 | 今日计划屏「8 枚整宽按钮 → 1 CTA + 入口行组」重排（批 2 Task 14） | 实现 `4d3c2e8` + 修复轮 `02f84da`（I-1 查词出口回四态常驻、I-2 数字权威取样防空转）+ `920eabe`（排印覆写禁令堵 `copy(fontSize)` 间接升档）；数字一处权威判据防 tag 上提与第二枚大字号（`R-14.3`/`R-14.4` 裁决落地）。**现场证据（2026-10-20 Task 18i）**：`TodayPlanScreenTest` connected `OK (21 tests)`（`emulator-5574`，`t18-connected-TodayPlanScreenTest.log`）；相关词卡与详情改动见 Task 15（`369395b`，`WordCardScreenTest OK (17)`）与 Task 16（`0414334`，`CardDetailScreenTest OK (25)`）。入口组连排节奏与常驻查词卡的**观感判断归 18-ii 用户目检**（task-18-brief §一.2），本行不替人眼判定。**批 3 收口复跑（2026-10-24 Step 5）**：`TodayPlanScreenTest` 整类 **OK (21 tests)** 在案；真机 360dp 截图确认 1 CTA + 入口组六行（见 Step 4 ②）。**未兑现的同源差值**：Task 14 裁决三把「删两条切 tab 入口」「调整词书与目标压进汇总卡」留到批 3 处理，本轮未做（入口组里 `today_plan_learning_tools` 与 `today_plan_open_setup_entry` 仍在），已立新任务跟踪——它不改变 AC-R-20 的「1 CTA + 一组入口行」形态，但属计划自留项，不冒充已清 | 通过（自动化侧；观感目检归用户侧；裁决三差值另立新账） |
@@ -1012,7 +1012,7 @@ token 化后变 0 枚，属预期变化。已改成三段等价强度：① 组�
 | ① 词书选取（设置 → 词书与每日目标，`AppScreen.kt` 内联子页） | 返回 + 标题 + 说明 + 每册卡（单选圈 / 册名 / 考纲码 / 已学·共·未学 / 进度轨 / 选中态「已选」胶囊） | 结构、层级、选中四重态一致；**文案与稿不同**（现盘标题「选好词书，开始今天的积累」，稿为「选一本在学的词书」）——文字差，不属视觉回归，未擅自改稿。稿面「首帧 3 行骨架」是仅持续一帧的过渡态，静态截图不覆盖，本行不宣称抓到了它 |
 | ② 今日计划 | 查词常驻卡 + 词书/进度卡 + 两枚计数卡 + 进度卡 + 未解锁条 + **唯一 CTA「开始复习」** + 入口行组（首屏之下，滚动可见） | AC-R-20 的「1 CTA + 入口行组」成立；入口组六行齐全（`dump-tb-today2.xml`：词书单词 / 我的词 / 学习记录 / 查看打卡与成就 / 学习工具与设置 / 调整词书与目标）。**与稿的视觉差**：稿是「日期 → 渐变 Hero → 单一数字」的头部，现盘保留进度卡与图例（Task 14 只收数字权威与按钮，未做 Hero）——列入待目视 ⑨，不当作已达成 |
 | ③ 词卡学习 | 「词卡学习 / 第 1 张，共 2 张 / 到期复习」+ 词卡（主词、音标、词性、显示释义、发音药片组）+ 三档反馈（不认识 / 模糊 / 认识） | 回忆→揭晓结构与三档反馈一致；发音药片 48dp、深色档前景随套；稿的「形近词」栏在本词无数据时不画，属数据空态而非缺件 |
-| ④ 设置 | 4 组 9 行 + 主题三态分段 + 开源许可 / 数据与安全 | 分组与行数一致；行副标题单行省略号（`EntryRow` 登记口径：入口行副标题允许省略）；**图标缺件**：学习提醒呈月牙、开源许可与隐私说明呈「D」形、学习工具与设置/调整词书与目标同为三横——Task 27 在册，本行不判通过 |
+| ④ 设置 | 4 组 9 行 + 主题三态分段 + 开源许可 / 数据与安全 | 分组与行数一致；行副标题单行省略号（`EntryRow` 登记口径：入口行副标题允许省略）；**图标缺件（2026-10-25 已修其一）**：学习提醒原呈月牙、开源许可与隐私说明原呈「D」形，根因是 Compose 1.10 `PathParser` 把「圆弧后隐式重复的坐标组」静默丢掉，`Clock`/`Info`/`Search`/`Camera`/`Person` 五枚只剩右半圈（细节与判据见下文「2026-10-25 图标半圈修复」节）；已改成显式命令字母并真机复核为完整时钟与完整「i」。**仍在册**：学习工具与设置 / 调整词书与目标同为三横（弱档 `StrokeOnly` 下识别特征只在填充层，属 QA 报告 B-1 的其余清单），Task 27 在册，本行不判全通过 |
 | ⑤ 每日阅读（锁定态） | 「文章尚未解锁」卡 + 4 枚类型块（新闻/故事/科普/职场）+ 本地历史入口 | 深色可读；**与稿的版面差**：稿明确「未解锁时只留一行状态点 + 回到今日计划，不放 4 个禁用按钮」，现盘锁定分支仍画 4 枚 `enabled=false` 的类型块（`ReadingAccessScreen.kt:130-137`）。该收法不在 Task 24 计划内，属未落地稿面项，列待目视 ⑩ |
 | ⑥ AI 学 | 品牌渐变头卡 + 三枚「现在能用」能力行 + 底导 | 三枚 implemented 能力默认可见（AC-R-23）；头卡两行文案已改 `onBrand`（见下）；**副标题文案与稿冲突**：稿要求改中性一句（「用你学过的词…」三项能力都不成立），现盘未改——列待目视 ⑧，已单独立账 |
 
@@ -1133,6 +1133,56 @@ GRADLE=$(ls -1 "$HOME/.gradle/wrapper/dists/$V-bin/"*/"$V/bin/gradle.bat" | head
   因此拍译屏与提醒屏的 connected 面**本轮无新增证据**，其回归由 JVM 门禁与既有批 2 记录承担。
 
 设备复原（逐条回读）：`font_scale` 回 `1.0`；density 保持 420；未改动画档、未开无障碍服务。
+
+## 2026-10-25 图标半圈修复（Task 27 首项，控制者亲修）
+
+**用户真机指认**：设置页「学习提醒」图标只有一半（月牙形），「开源许可与隐私说明」呈「D」形。当晚在真机
+`bf353dda` 现盘取样确认（`t27-cur.png`，产物见 `.git/qa-scratch/t27-icon-check/`，**不入库**），并逐像素判定：
+橙色像素只落在字形框的右半（canvas x 12–21.6，y 4–21.6），左半与圆心区域与徽标底色逐值相同——不是抗锯齿，是真的没画。
+
+**根因（不是「填充层缺件」，也不是「没发包」）**：compose-ui 1.10 的 `PathParser` 对**圆弧后隐式重复的坐标组**
+只产出第一段，第二段静默丢弃。生产路径把整圆写成
+`M12 4a8 8 0 010 16 8 8 0 010-16`（第二段没有命令字母，语法上合法），于是只剩右半圈。
+JVM 侧直接读解析结果可复现：该串解析出 `MoveTo + 1 个 RelativeArcTo`，而作者写了 3 段。
+受影响 **5 枚**：`Clock`（学习提醒）、`Info`（开源许可 / 隐私说明）、`Search`（查词）、`Camera`（拍照翻译镜头）、
+`Person`（资料卡头像）。设置行的徽标走弱档 `EntryIconTone.Tint` → `AppGlyphLayer.StrokeOnly`，
+而圆形只有描边层——所以半圈在弱档上是「可见的半圈」，不是「整个圆消失」。
+2026-10-22 的图标 QA 报告 B-1 把 `Clock`/`Search`/`Camera`/`Person`/`Info` 列为「双层同形」的正确先例，
+这条前提现被证伪：它们的描边层本身就只有半圈，双层的「同形」是两条半圈，不是两个整圆。
+
+**判据（TDD，先红后绿）**：`AppIconsStructureContractTest#every authored path segment survives parsing`
+——对每枚图标的每条路径（圆形标记先经 `circleFillPathData` 展开）比较「作者写下的段数」与
+「`PathParser` 解析出的节点数（不含 `Close`）」，不等即红。作者侧段数由测试内的小扫描器数：圆弧两个旗标按单字符读，
+允许与相邻数字粘连（`010` = 大弧 0、顺时针 1、x 0）。
+- **RED**（`t27-RED-1-jvm.log`）：五枚各报「写 3 段、解析出 2 段」，其余 28 枚与全部填充层段数守恒。
+- **反空转**：月牙串断言 `authoredSegmentCount == 3` 且 `parsedSegmentCount == 2`（证明判据不会永久绿）；
+  显式写法 `M12 4a8 8 0 010 16a8 8 0 010-16` 两边相等（证明修复后的形状不被误判）。
+- **GREEN**：`AppIconsStructureContractTest tests=14 failures=0`。
+
+**修法**：五枚的整圆串补上显式 `a`（只改路径数据，不碰几何、不碰容器、不碰墨色）：
+
+```
+Search  M11 5a6 6 0 010 12a6 6 0 010-12
+Clock   M12 4a8 8 0 010 16a8 8 0 010-16
+Camera  M12 9.8a3.2 3.2 0 010 6.4a3.2 3.2 0 010-6.4
+Person  M12 4a4 4 0 010 8a4 4 0 010-8
+Info    M12 4a8 8 0 010 16a8 8 0 010-16
+```
+
+**真机复核**（`bf353dda`，`adb install -r` 02:24:26 的 `assembleDebug` 包，未清数据、未跑 instrument）：
+设置页「学习提醒」为完整时钟（圆环 + 指针）、「开源许可与隐私说明」为完整「i」。前后对照
+`t27-reminder-before-after.png`（左：修前月牙；右：修后整钟）、`t27-after-info-icon-zoom.png`。
+重算命令：`ls .git/qa-scratch/t27-icon-check/*.png`（现盘 8 张）。
+
+**未做（仍在 Task 27）**：2026-10-22 QA 报告 B-1 的其余清单——`Gear` 旋钮、`List` 三圆点、`Book`/`BookOpen` 左页、
+`Image` 日头、`Newspaper` 报头带、`Document` 正文块等「识别特征只在填充层」的字形在弱档 `StrokeOnly` 下仍消失
+（设置页「学习工具与设置」与「调整词书与目标」仍同为三横）；B-2 的 `Star` 与 `Bookmark` 同形也仍在册。
+那两笔要动决策文档与字形清单，不在本次半圈修复的范围。
+
+**门控**（`t27-gate.log`，本机 Gradle 8.13，命令同 Step 5）：`BUILD SUCCESSFUL in 58s`；
+`suites=241 tests=1789 skipped=0 failures=0 errors=0`（基线 1788，净 **+1 枚**，`@Test` 只增不减）；
+`verifyThirdPartyNotices` → 76 条、`verifyAcTraceabilityMatrix` → 56 ids；`assembleDebug` 与
+`compileDebugAndroidTestKotlin` 通过。重算命令同 Step 5 那一行。
 
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
 

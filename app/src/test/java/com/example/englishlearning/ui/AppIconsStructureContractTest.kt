@@ -1,7 +1,10 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.ui.graphics.vector.PathNode
+import androidx.compose.ui.graphics.vector.PathParser
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppIcons
+import com.example.englishlearning.ui.components.circleFillPathData
 import com.example.englishlearning.ui.components.spec
 import java.io.File
 import kotlin.test.Test
@@ -191,6 +194,73 @@ class AppIconsStructureContractTest {
     private fun shapeViolations(name: String, field: String, paths: List<String>): List<String> = paths.mapNotNull { path ->
         val legal = if (field == "fillPaths") svgPath.matches(path) || circleFillMarker.matches(path) else svgPath.matches(path)
         if (legal) null else "$name 的 $field 形状不合法（$path）"
+    }
+
+    /**
+     * 作者写下的段数（每个命令组一段，`Z` 也算一段）。只看「组数」，不解释几何——
+     * 判据的另一半由 [PathParser] 给出，两边相等才说明没有几何被解析器悄悄吞掉。
+     *
+     * 为什么要自己数一遍：compose-ui 1.10 的 `PathParser` 对「圆弧后紧跟隐式重复的坐标组」
+     * （`a8 8 0 010 16 8 8 0 010-16`，第二段没有命令字母）只产出**第一段**，第二段静默丢弃，
+     * 于是圆形图标只剩半圈——真机「学习提醒月牙、开源许可 D 形」即此。语法上这是合法 SVG，
+     * 解析器不报错，所以只有把「作者段数」与「解析节点数」对齐才抓得住。
+     *
+     * 圆弧的 7 个参数里有两个是单字符旗标，可能与相邻数字粘连（`010` = 大弧 0、顺时针 1、x 0），
+     * 所以圆弧单独走 [readArc]，旗标按字符读。
+     */
+    private fun authoredSegmentCount(data: String): Int {
+        var i = 0
+        var command = ' '
+        var count = 0
+        fun separators() { while (i < data.length && (data[i].isWhitespace() || data[i] == ',')) i++ }
+        fun number() {
+            separators()
+            val start = i
+            if (i < data.length && (data[i] == '+' || data[i] == '-')) i++
+            while (i < data.length && data[i].isDigit()) i++
+            if (i < data.length && data[i] == '.') {
+                i++
+                while (i < data.length && data[i].isDigit()) i++
+            }
+            check(i > start) { "路径里出现读不动的数值：$data（位置 $start）" }
+        }
+        fun flag() {
+            separators()
+            check(i < data.length && (data[i] == '0' || data[i] == '1')) { "圆弧旗标不是 0/1：$data（位置 $i）" }
+            i++
+        }
+        while (i < data.length) {
+            separators()
+            if (i >= data.length) break
+            val ch = data[i]
+            if (ch.isLetter()) {
+                command = ch
+                i++
+                if (ch == 'z' || ch == 'Z') continue
+            }
+            check(command.isLetter()) { "坐标组前没有命令字母：$data（位置 $i）" }
+            when (command.lowercaseChar()) {
+                'm', 'l', 't' -> repeat(2) { number() }
+                'h', 'v' -> number()
+                'c' -> repeat(6) { number() }
+                's', 'q' -> repeat(4) { number() }
+                'a' -> {
+                    repeat(3) { number() }
+                    flag()
+                    flag()
+                    repeat(2) { number() }
+                }
+                else -> error("未知的 SVG 命令 $command：$data")
+            }
+            count++
+        }
+        return count
+    }
+
+    /** 解析后的节点表：圆形标记先展开，`Close` 不算独立段（它不消耗坐标组，作者侧已单独计数）。 */
+    private fun parsedSegmentCount(data: String): Int {
+        val expanded = if (data.startsWith("CircleFill(")) circleFillPathData(data) else data
+        return PathParser().parsePathString(expanded).toNodes().count { it !is PathNode.Close }
     }
 
     /** 「逐枚清单」到「两层豁免表」之间的小节文本；任一锚点缺失返回 null。 */
@@ -466,6 +536,35 @@ class AppIconsStructureContractTest {
             shapeViolations("Search", "fillPaths", listOf("CircleFill(11, 11, 6)", "M5 6h5v5H5z")),
             "合成正片段被误判：填充层两种合法形状被拒",
         )
+    }
+
+    // ---------- 用例：段数守恒（真机「图标一半一半」的判据） ----------
+
+    @Test
+    fun `every authored path segment survives parsing`() {
+        val dropped = mutableListOf<String>()
+        specBlocks(codeText()).forEach { (name, block) ->
+            listOf("strokePaths", "fillPaths").forEach { field ->
+                fieldPaths(block, field).orEmpty().forEach { data ->
+                    val authored = authoredSegmentCount(data.let { if (it.startsWith("CircleFill(")) circleFillPathData(it) else it })
+                    val parsed = parsedSegmentCount(data)
+                    if (authored != parsed) dropped += "$name.$field 写 $authored 段、解析出 $parsed 段：$data"
+                }
+            }
+        }
+        assertTrue(
+            dropped.isEmpty(),
+            "路径段被解析器静默吞掉（真机表现即「图标只画一半」）。" +
+                "compose-ui 的 PathParser 不支持圆弧后的隐式重复，第二段圆弧必须带命令字母：$dropped",
+        )
+
+        // 反空转：真机现网那枚「月牙」路径必须在作者侧数出 3 段（M + 两段弧），解析侧只有 2 段。
+        val halfCircle = "M12 4a8 8 0 010 16 8 8 0 010-16"
+        assertEquals(3, authoredSegmentCount(halfCircle), "作者侧段数算法失效：圆弧隐式重复没数成两段")
+        assertEquals(2, parsedSegmentCount(halfCircle), "解析侧段数变了：本判据的立论前提需要重新核实")
+        // 显式命令字母的形状必须两边一致（这是修复后的口径，也是本条判据不会永久红的证明）。
+        val fullCircle = "M12 4a8 8 0 010 16a8 8 0 010-16"
+        assertEquals(authoredSegmentCount(fullCircle), parsedSegmentCount(fullCircle), "显式圆弧写法被判成缺段")
     }
 
     // ---------- 用例：全站零 material-icons（brief Step 1 断言 4） ----------
