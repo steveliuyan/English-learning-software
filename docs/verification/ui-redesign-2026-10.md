@@ -785,12 +785,22 @@ for(i in r){split(r[i],p," ");printf "%s/%s %.4f\n",p[1],p[2],ratio(p[1],p[2])}}
 - connected（逐类 `adb -s emulator-5574 install -r` + `am instrument`，禁 `connectedDebugAndroidTest`）：
   `ReadingFeedScreenTest` 9/9、`ReadingAccessScreenTest` 17/17、`ArticleReadingScreenTest` 23/23、
   `ui.glass.GlassDialogTest` 1/1、`AppScreenTest` 50/50。
+  **订正（接续席 2026-10-24）**：`AppScreenTest` 那一枚 50/50 只在 **font_scale 1.0** 成立（接续席在合并态 `1d95454`
+  整类复跑 3×50/50 皆绿，Time 74.977 / 77.478 / 76.114，`t24-connected-final-appscreen-flake3.log`）；
+  **2.0 大字号档该类 `Tests run: 50, Failures: 3` 稳定复现**（整类 3 次 + 单跑 3 次全红，位置一致），
+  三枚都在 Task 24 未改动的域（我的词行 / 学习流词卡 / 文章词详情），登记为 Task 26 的账，证据与复现步骤见接续席报告 §九 C-1。
   **深色档证据**：`ReadingFeedScreenTest` 的两例像素腿走测试内显式 `MintGlassTheme(themeMode = ThemeMode.Dark)`
   （先例 `ThemeModeSwitchTest`、`ui/glass/GlassPanelThemeInkTest.kt`），不靠 `cmd uimode night yes`；
   内含三条自检（换套判别力 / 取样点离墨够远 / 反空转把浅套 `text1` 喂进同一条 4.5 闸必判红）。
 - 设备面一次噪声：`AppScreenTest` 首跑 50 里 1 红（`startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan`
   的 5 秒 `waitUntil` 超时，单词卡→今日计划那条腿与本席改动无关），单例复跑 1/1 绿、整类复跑 50/50 绿；
-  两次读数都留在 `t24-connected-appscreen.log`，登记为时序 flake 而不是回归。
+  **订正（接续席 2026-10-24）**：原文「两次读数都留在 `t24-connected-appscreen.log`」与盘面不符——该日志只含首跑那枚
+  `Tests run: 50, Failures: 1`，没有任何复跑读数。复跑读数由接续席在合并态 `1d95454` 现跑补齐：单跑 5/5 绿
+  （Time 3.357 / 3.262 / 3.921 / 3.303 / 3.339，`t24-connected-final-appscreen-flake-single.log`）、
+  整类 3×50/50 绿（Time 74.977 / 77.478 / 76.114，`t24-connected-final-appscreen-flake3.log`）；
+  登记为时序 flake 而不是回归（两次红都发生在装包后首跑）。
+  口径写清：`font_scale 1.0` 档整类累计 **6 枚读数＝2 红 4 绿**，
+  该枚用例单跑累计 **6/6 全绿**（Task 23 一枚 + 接续席五枚）。
 - 提交：`3a016c0`（三族判据 RED 先行）→ `aa7acb5`（Feed 二级层 + connected 类）→
   `8474110`（正文墨 token 化 + 两张裸 hex 表同批摘）→ `cae692b`（主页版面 + 宿主接线 + 两枚在册判据）→
   `4ff98d6`（大字号档先滚再点）。
