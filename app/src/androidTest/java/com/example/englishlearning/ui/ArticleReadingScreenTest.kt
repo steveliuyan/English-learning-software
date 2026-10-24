@@ -1,6 +1,7 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -129,6 +130,65 @@ class ArticleReadingScreenTest {
         composeRule.onNodeWithTag("article_english").performClick()
 
         org.junit.Assert.assertEquals(listOf(appleCard), opened)
+    }
+
+    /**
+     * Task 26 Step 1（F5-03 移交账）：正文整段是一个合并语义节点，TalkBack 聚焦时只能念整篇；
+     * 每个高亮词必须以**自定义动作**（朗读时逐词可选出）暴露，且动作标签带上目标词。
+     * 同时钉住 `TextRange`：`word` 注解的区间必须逐词落在正文里，不是整段一个注解。
+     */
+    @Test
+    fun everyHighlightExposesAPerWordActionWithItsTextRange() {
+        val twoWords = article(englishText = "apple banana", coveredLemmas = listOf("apple", "banana"))
+        composeRule.setContent {
+            ArticleReadingScreen(
+                state(twoWords, cards = listOf(appleCard)),
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        val node = composeRule.onNodeWithTag("article_english").fetchSemanticsNode()
+        val labels = node.config[SemanticsActions.CustomActions].map { it.label }
+        org.junit.Assert.assertEquals(listOf("打开词卡：apple", "查词：banana"), labels)
+
+        val body = node.config[SemanticsProperties.Text].first()
+        val ranges = body.getStringAnnotations("word", 0, body.length)
+        org.junit.Assert.assertEquals(
+            listOf("apple" to (0 to 5), "banana" to (6 to 12)),
+            ranges.map { it.item to (it.start to it.end) },
+        )
+    }
+
+    /** 逐词动作必须与点按同一落点：有词卡的开词卡，没词卡的走词典占位。 */
+    @Test
+    fun perWordActionsRouteExactlyLikeTappingTheWord() {
+        val opened = mutableListOf<WordCard>()
+        var dictionaryOpened = false
+        val twoWords = article(englishText = "apple banana", coveredLemmas = listOf("apple", "banana"))
+        composeRule.setContent {
+            ArticleReadingScreen(
+                state(twoWords, cards = listOf(appleCard)),
+                onBack = {},
+                onOpenCard = { opened += it },
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = { dictionaryOpened = true },
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        val actions = composeRule.onNodeWithTag("article_english")
+            .fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        actions.first { it.label == "打开词卡：apple" }.action()
+        actions.first { it.label == "查词：banana" }.action()
+
+        org.junit.Assert.assertEquals(listOf(appleCard), opened)
+        org.junit.Assert.assertTrue(dictionaryOpened)
     }
 
     @Test

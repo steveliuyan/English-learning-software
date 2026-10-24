@@ -29,8 +29,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -340,9 +342,38 @@ private fun HighlightedEnglish(
             withStyle(SpanStyle(color = MintPrimary, fontWeight = FontWeight.Bold)) {
                 append(englishText, highlight.start, highlight.end)
             }
+            // Task 26 Step 1（F5-03 移交账）：词区间以字符串注解留在正文上，供语义层与判据
+            // 逐词取回（整段只有一个合并节点，读屏无法按字切分，靠区间 + 自定义动作逐词可达）。
+            addStringAnnotation(
+                tag = WORD_ANNOTATION_TAG,
+                annotation = highlight.lemma,
+                start = highlight.start,
+                end = highlight.end,
+            )
             cursor = highlight.end
         }
         append(englishText, cursor, englishText.length)
+    }
+
+    // 点按与读屏自定义动作共用同一条落点解析：有词卡开词卡，否则走词典。
+    fun openHighlight(highlight: com.example.englishlearning.reading.WordHighlight) {
+        val card = cards.firstOrNull { it.cardId == highlight.cardId || it.lemma == highlight.lemma }
+        if (card != null) onOpenCard(card) else onOpenDictionary(highlight.matched.ifBlank { highlight.lemma })
+    }
+
+    // 逐词动作（TalkBack：聚焦正文后打开「操作」逐个词选择）。同一 lemma 在正文里出现多次时
+    // 落点相同，去重后只留一枚，避免读屏动作列表里出现同名重复项。
+    val wordActions = highlights.sortedBy { it.start }.distinctBy { it.lemma }.map { highlight ->
+        val card = cards.firstOrNull { it.cardId == highlight.cardId || it.lemma == highlight.lemma }
+        val label = if (card != null) {
+            "打开词卡：${highlight.lemma}"
+        } else {
+            "查词：${highlight.matched.ifBlank { highlight.lemma }}"
+        }
+        CustomAccessibilityAction(label) {
+            openHighlight(highlight)
+            true
+        }
     }
     androidx.compose.foundation.text.ClickableText(
         text = annotated,
@@ -356,14 +387,18 @@ private fun HighlightedEnglish(
         // 形状按 R-22.3 归 `AppType.Body` 并显式给墨（房内配平先例：面板内前景必须逐枚给 `appColors()`，
         // 只借 `AppType` 会连着它自带的浅套静态墨一起落下）。**只改这一行**，整屏 typography 归 Task 26。
         style = AppType.Body.copy(color = appColors().text1),
-        modifier = Modifier.testTag("article_english"),
+        modifier = Modifier
+            .testTag("article_english")
+            .semantics { customActions = wordActions },
         onClick = { offset ->
             val hit = highlights.firstOrNull { offset in it.start until it.end } ?: return@ClickableText
-            val card = cards.firstOrNull { it.cardId == hit.cardId || it.lemma == hit.lemma }
-            if (card != null) onOpenCard(card) else onOpenDictionary(hit.matched.ifBlank { hit.lemma })
+            openHighlight(hit)
         },
     )
 }
+
+/** 正文逐词注解的 tag；判据侧按同一字面量取区间（`getStringAnnotations`）。 */
+private const val WORD_ANNOTATION_TAG = "word"
 
 /**
  * 来源区（Task E）。AC2-07：来源标识不得包含 Key / Endpoint——AI 分支只渲染 `modelName`，
