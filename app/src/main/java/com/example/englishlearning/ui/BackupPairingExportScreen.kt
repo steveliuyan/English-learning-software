@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.example.englishlearning.backup.device.AndroidMigrationKey
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 
 /**
  * F4-04 旧设备受保护导出页：系统认证（BiometricPrompt，含凭据降级）→ 一次性挑战
@@ -178,9 +180,8 @@ fun BackupPairingExportScreen(
             }
         }
 
-        state.error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("backup_pairing_export_error"))
-        }
+        // Task 25：私有错误提示条换共享 `InlineNotice`（棘轮「错误提示条」族摘行同批）。
+        state.error?.let { InlineNotice(text = it, kind = InlineNoticeKind.Error) }
 
         Spacer(Modifier.height(8.dp))
     }

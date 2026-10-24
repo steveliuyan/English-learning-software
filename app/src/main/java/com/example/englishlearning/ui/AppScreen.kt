@@ -193,6 +193,9 @@ fun AppScreen(
             var showBackupExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupRestore by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showBackupPairingExport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 裁决⑥：设置页「备份与恢复」不再就地折叠，改成这枚真子页路由；
+            // 打开子屏时它保持 true（`else if` 先真先赢，子屏压在上面），子屏返回自然回到本页。
+            var showBackupHub by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLicenses by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // Task 22-B（R-22.1）：原 `showFavorites` 独立叠层路由已摘除，收藏改由合并页 MyWordsScreen 承载；
@@ -408,6 +411,32 @@ fun AppScreen(
             // 打卡/学习记录/错词只刷已打开的）。文章与收藏保留面不动，不重放。
             val learningDataDeletionUi = learningDataDeletionViewModel?.uiState?.collectAsState()?.value
                 ?: LearningDataDeletionUiState()
+            // F4-01 Spec 04 L18：删除全部学习数据先报级联条数、再二次确认；
+            // 「删除全部学习数据」入口只做 request，仓储删除只从「确认删除」进入。
+            // 裁决⑥：入口已搬进 BackupHubScreen 末节，本框必须住在 `Ready` 顶层——三级层是
+            // if/else if 串，设置分支与 hub 分支互斥，留在设置分支里的对话框在子页打开时根本不会组合。
+            val pending = learningDataDeletionUi.pending
+            if (pending != null) {
+                ConfirmDestructiveDialog(
+                    state = true,
+                    title = "删除全部学习数据？",
+                    // 条数与保留面逐字沿用站点原文（F4-01 Spec 04 L18 的口径）；
+                    // 自写的「删除不可撤销。」交组件固定句承载。
+                    cascadeLines = listOf(
+                        "将删除学习记录 ${pending.eventCount} 条、复习调度 " +
+                            "${pending.reviewStateCount} 条、每日计划 ${pending.planCount} 天、" +
+                            "阅读完成 ${pending.completionCount} 条、迁移审计 ${pending.migrationAuditCount} 条。",
+                    ),
+                    keepLines = listOf(
+                        "文章 ${pending.keptArticleCount} 篇与收藏 ${pending.keptFavoriteCount} 条保留；" +
+                            "词书、搜索历史与设置不受影响。",
+                    ),
+                    irreversible = true,
+                    confirmLabel = "确认删除",
+                    onConfirm = { learningDataDeletionViewModel?.confirmDelete(state.profile.id) },
+                    onDismiss = { learningDataDeletionViewModel?.cancelDelete() },
+                )
+            }
             val learningDataDeleteCount = learningDataDeletionViewModel?.dataDeletions?.collectAsState()?.value ?: 0
             LaunchedEffect(learningDataDeleteCount) {
                 if (learningDataDeleteCount > 0) {
@@ -458,7 +487,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBookWords ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null || showMyWords
@@ -568,6 +597,9 @@ fun AppScreen(
             // 因此从编辑页按返回键先关编辑页，而不是直接退掉整层。
             BackHandler(enabled = showSpeechSettings) { showSpeechSettings = false }
             BackHandler(enabled = showReminderSettings) { showReminderSettings = false }
+            // 裁决⑥：hub 声明在三枚子屏**之前**（后声明者优先）——子屏开着时返回键先关子屏，
+            // 再从 hub 回到设置页。
+            BackHandler(enabled = showBackupHub) { showBackupHub = false }
             BackHandler(enabled = showBackupExport) { showBackupExport = false }
             BackHandler(enabled = showBackupRestore) { showBackupRestore = false }
             BackHandler(enabled = showBackupPairingExport) { showBackupPairingExport = false }
@@ -1222,6 +1254,19 @@ fun AppScreen(
                     onBack = { showBackupPairingExport = false },
                     viewModel = backupPairingExportViewModel,
                 )
+            } else if (showBackupHub) {
+                // 裁决⑥：三节子页。它挂在三枚子屏**之后**（先真先赢）——子屏开着时压在上面，
+                // 子屏 onBack 只置子屏 false，自然回到本页；本页返回键再回设置页。
+                BackupHubScreen(
+                    onBack = { showBackupHub = false },
+                    onOpenBackupExport = { showBackupExport = backupExportViewModel != null },
+                    onOpenBackupPairingExport = { showBackupPairingExport = backupPairingExportViewModel != null },
+                    onOpenBackupRestore = { showBackupRestore = backupRestoreViewModel != null },
+                    onDeleteAllLearningData = {
+                        learningDataDeletionViewModel?.requestDelete(state.profile.id)
+                    },
+                    deleteAllLearningDataNotice = learningDataDeletionUi.notice,
+                )
             } else if (showLicenses) {
                 // F5-04：许可台账页。数据源=构建期从 docs/third-party-notices.md 同步的 assets；
                 // 读不到传空串，页面如实显示「许可台账暂不可读」，零假台账零假入口。
@@ -1677,15 +1722,8 @@ fun AppScreen(
                                         reminderSettingsViewModel?.load()
                                         showReminderSettings = reminderSettingsViewModel != null
                                     },
-                                    onOpenBackupExport = {
-                                        showBackupExport = backupExportViewModel != null
-                                    },
-                                    onOpenBackupRestore = {
-                                        showBackupRestore = backupRestoreViewModel != null
-                                    },
-                                    onOpenBackupPairingExport = {
-                                        showBackupPairingExport = backupPairingExportViewModel != null
-                                    },
+                                    // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
+                                    onOpenBackupHub = { showBackupHub = true },
                                     onOpenLicenses = { showLicenses = true },
                                     speechEngineStatuses = speechState.engineStatuses(),
                                     aiProfileSubtitle = aiProfiles?.let { ready ->
@@ -1714,35 +1752,7 @@ fun AppScreen(
                                     importedBookCount = transferState?.books?.size ?: 0,
                                     transferBusy = transferState?.busy == true,
                                     transferMessage = transferState?.message,
-                                    onDeleteAllLearningData = {
-                                        learningDataDeletionViewModel?.requestDelete(state.profile.id)
-                                    },
-                                    deleteAllLearningDataNotice = learningDataDeletionUi.notice,
                                 )
-                                // F4-01 Spec 04 L18：删除全部学习数据先报级联条数、再二次确认；
-                                // 「删除全部学习数据」入口只做 request，仓储删除只从「确认删除」进入。
-                                val pending = learningDataDeletionUi.pending
-                                if (pending != null) {
-                                    ConfirmDestructiveDialog(
-                                        state = true,
-                                        title = "删除全部学习数据？",
-                                        // 条数与保留面逐字沿用站点原文（F4-01 Spec 04 L18 的口径）；
-                                        // 自写的「删除不可撤销。」交组件固定句承载。
-                                        cascadeLines = listOf(
-                                            "将删除学习记录 ${pending.eventCount} 条、复习调度 " +
-                                                "${pending.reviewStateCount} 条、每日计划 ${pending.planCount} 天、" +
-                                                "阅读完成 ${pending.completionCount} 条、迁移审计 ${pending.migrationAuditCount} 条。",
-                                        ),
-                                        keepLines = listOf(
-                                            "文章 ${pending.keptArticleCount} 篇与收藏 ${pending.keptFavoriteCount} 条保留；" +
-                                                "词书、搜索历史与设置不受影响。",
-                                        ),
-                                        irreversible = true,
-                                        confirmLabel = "确认删除",
-                                        onConfirm = { learningDataDeletionViewModel?.confirmDelete(state.profile.id) },
-                                        onDismiss = { learningDataDeletionViewModel?.cancelDelete() },
-                                    )
-                                }
                             }
                         }
                     }

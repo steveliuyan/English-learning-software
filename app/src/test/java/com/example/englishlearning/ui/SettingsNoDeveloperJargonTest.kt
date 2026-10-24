@@ -18,6 +18,10 @@ import kotlin.test.assertTrue
  */
 private const val SETTINGS_FILE = "src/main/java/com/example/englishlearning/ui/SettingsScreen.kt"
 
+/** Task 25（AC-R-22）：备份导出声明所在的文件（固定文案 `DEFAULT_DISCLOSURE`）。 */
+private const val BACKUP_EXPORT_VIEW_MODEL_FILE =
+    "src/main/java/com/example/englishlearning/ui/BackupExportViewModel.kt"
+
 class SettingsNoDeveloperJargonTest {
     @Test fun settings_screen_speaks_user_language() {
         val src = stripComments(File(SETTINGS_FILE).readText())
@@ -31,6 +35,27 @@ class SettingsNoDeveloperJargonTest {
         assertFalse(
             Regex("""后续版本|敬请期待|暂未开放""").containsMatchIn(src),
             "设置页不得保留「后续版本」占位行（裁决②）",
+        )
+    }
+
+    /**
+     * Task 25（AC-R-22 / 审计 §4）：备份导出的固定声明**不得否认已实现的认证恢复**。
+     *
+     * 旧文案写「当前包不可用于认证恢复，F4-04 完成后才支持恢复」——认证恢复（F4-04）早已实现，
+     * 这句话既过期又让用户以为换机恢复不存在；`Salvage` 还是内部术语。新文案必须指向真实出口
+     * 「认证导出」。注释里的历史说明不计入本契约（先剥注释）。
+     */
+    @Test fun backup_export_disclosure_points_at_the_real_restore_exit() {
+        val src = stripComments(File(BACKUP_EXPORT_VIEW_MODEL_FILE).readText())
+        listOf("Salvage", "F4-04", "暂不可用于认证恢复", "完成后才支持").forEach { term ->
+            assertFalse(
+                src.contains(term),
+                "备份导出声明出现「$term」：不得否认已实现的认证恢复，也不得把内部编号写给用户（AC-R-22）",
+            )
+        }
+        assertTrue(
+            src.contains("认证导出"),
+            "备份导出声明必须指向真实出口「认证导出」（只说「不能换机恢复」而不给出口，用户读完仍不知道怎么办）",
         )
     }
 

@@ -209,14 +209,14 @@ private val ThemeMode.userLabel: String
  * - 资料卡刻意**不显示任何今日计划数字**：当日统计的职责归打卡页（裁决③），
  *   而 `newTarget` 在词书新词学完时会小于用户配置的每日目标（PRD FR-01 第 8 条），
  *   把它当「每日新增」印在设置页更是错的。资料卡只报昵称与词书名。
- * - 「词书内容包」「备份与恢复」各收成**一行折叠入口**：展开后才是原来的 SAF 子行
- *   （导入/导出词书；留档导出、认证导出、从旧设备恢复），两枚折叠件的 chevron 随展开态取
- *   `ChevronDown`/`ChevronRight`，展开态另经 `EntryRow(expanded = …)` 注册成
+ * - 「词书内容包」仍收成**一行折叠入口**：展开后才是原来的 SAF 子行（导入/导出词书），
+ *   chevron 随展开态取 `ChevronDown`/`ChevronRight`，展开态经 `EntryRow(expanded = …)` 注册成
  *   `SemanticsActions.Expand`/`Collapse`（AC-R-12）。**结果提示住在折叠行外侧**（修复轮 1 / I4）：
  *   回执是「上一次操作的结果」，收起态也必须读得到，不该被折叠藏起来。
- *   SAF 拉起、认证与删除确认链路一行未动，本屏只改呈现层级。
- * - 「删除全部学习数据」退出设置一级页（裁决⑥的方向），下沉到「备份与恢复」展开区末节；
- *   级联预览 + 二次确认仍由 AppScreen 宿主承载（F4-01 Spec 04 L18），语义不变。
+ *   SAF 拉起链路一行未动，本屏只改呈现层级。
+ * - 「备份与恢复」是**导航行**（裁决⑥）：点击进入 [BackupHubScreen] 三节子页（导出 / 恢复 /
+ *   删除全部学习数据），不再就地折叠。删除行只在子页末节出现，级联预览 + 二次确认仍由
+ *   AppScreen 宿主承载（F4-01 Spec 04 L18），语义不变。
  * - 「主题」为三态分段选择：选中即 `AppThemePreferences.write`，回读经
  *   [rememberAppThemeMode] 的监听让整棵树即时换套，无需重启。
  * - 九行标题、图标、域色与 testTag 只在 [SettingsGroups] 定义一处，渲染侧按 tag 经
@@ -227,8 +227,8 @@ private val ThemeMode.userLabel: String
  *   副标题显示处理中），避免重复拉起文件选择器；一级 9 行不受牵连，始终可点。
  * @param transferMessage 导入/导出的一句结果提示，`null` 时不占位；在「词书内容包」折叠行**外侧**呈现
  *   （收起态也读得到）。档位仍取 `InlineNoticeKind.Info`：宿主传来的是裸 `String`，不做文本嗅探。
- * @param deleteAllLearningDataNotice 「删除全部学习数据」的一句结果回执，`null` 时不占位；
- *   在「备份与恢复」折叠行**外侧**呈现。
+ * @param onOpenBackupHub 「备份与恢复」导航入口：打开三节子页 [BackupHubScreen]（裁决⑥）。
+ *   删除回执与删除回调都在子页，本屏不再持有它们。
  */
 @Composable
 fun SettingsScreen(
@@ -239,11 +239,8 @@ fun SettingsScreen(
     onOpenAiProfiles: () -> Unit,
     onOpenSpeechSettings: () -> Unit = {},
     onOpenReminderSettings: () -> Unit = {},
-    /** 备份导出入口：打开无认证留档包导出确认页（SAF 另存为，F4-03）。 */
-    onOpenBackupExport: () -> Unit = {},
-    onOpenBackupRestore: () -> Unit = {},
-    /** 认证导出入口：旧设备系统认证 + 配对二维码 + 可选密码的受保护备份导出（F4-04）。 */
-    onOpenBackupPairingExport: () -> Unit = {},
+    /** 备份与恢复导航入口：打开三节子页（留档导出 / 认证导出 / 认证恢复 / 删除全部学习数据）。 */
+    onOpenBackupHub: () -> Unit = {},
     /** 已配置的 AI 服务摘要；`null` 表示还没读出本地配置。 */
     aiProfileSubtitle: String? = null,
     speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
@@ -254,9 +251,6 @@ fun SettingsScreen(
     importedBookCount: Int = 0,
     transferBusy: Boolean = false,
     transferMessage: String? = null,
-    /** 危险操作入口（F4-01 决策 §9）：打开「删除全部学习数据」的级联预览+二次确认框。 */
-    onDeleteAllLearningData: () -> Unit = {},
-    deleteAllLearningDataNotice: String? = null,
     /** F5-04「关于与开源许可」入口（AC5-04）：必须是真实可达页面，不许做假入口。 */
     onOpenLicenses: () -> Unit = {},
 ) {
@@ -264,7 +258,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val themeMode = rememberAppThemeMode()
     var wordBooksExpanded by rememberSaveable { mutableStateOf(false) }
-    var backupExpanded by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -407,63 +400,14 @@ fun SettingsScreen(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            // 裁决⑥：「备份与恢复」是导航行——四枚备份入口与删除行都搬进子页三节，
+            // 本屏不再持有折叠态、删除回调与删除回执（回执在子页内呈现）。
             LedgerEntryRow(
                 tag = "settings_backup",
                 subtitle = "导出本机文件、换机恢复与清空学习数据",
                 topDivider = true,
-                expanded = backupExpanded,
-                onClick = { backupExpanded = !backupExpanded },
+                onClick = onOpenBackupHub,
             )
-            if (backupExpanded) {
-                EntryRow(
-                    icon = AppIcon.Download,
-                    domain = AppDomain.Settings,
-                    title = "导出学习数据留档",
-                    subtitle = "生成 `.elpbak` 文件（不含密钥，暂不可用于认证恢复）",
-                    iconTone = EntryIconTone.Tint,
-                    topDivider = true,
-                    modifier = Modifier.testTag("settings_open_backup_export"),
-                    onClick = onOpenBackupExport,
-                )
-                EntryRow(
-                    icon = AppIcon.Shield,
-                    domain = AppDomain.Settings,
-                    title = "认证导出（可用于新设备恢复）",
-                    subtitle = "旧设备系统认证后生成配对码与受保护备份",
-                    iconTone = EntryIconTone.Tint,
-                    topDivider = true,
-                    modifier = Modifier.testTag("settings_open_backup_pairing_export"),
-                    onClick = onOpenBackupPairingExport,
-                )
-                EntryRow(
-                    icon = AppIcon.Upload,
-                    domain = AppDomain.Settings,
-                    title = "从旧设备恢复（认证恢复）",
-                    subtitle = "扫描旧设备配对码并替换本机数据",
-                    iconTone = EntryIconTone.Tint,
-                    topDivider = true,
-                    modifier = Modifier.testTag("settings_open_backup_restore"),
-                    onClick = onOpenBackupRestore,
-                )
-                // F4-01 Spec 04 L18：级联影响 + 二次确认在 AppScreen 宿主；本行只发 request。
-                EntryRow(
-                    icon = AppIcon.Trash,
-                    domain = AppDomain.Danger,
-                    title = "删除全部学习数据",
-                    subtitle = "清空学习记录、复习调度、每日计划与阅读完成；文章与收藏保留",
-                    iconTone = EntryIconTone.Tint,
-                    topDivider = true,
-                    modifier = Modifier.testTag("settings_delete_all_learning_data"),
-                    onClick = onDeleteAllLearningData,
-                )
-            }
-            deleteAllLearningDataNotice?.let { message ->
-                InlineNotice(
-                    text = message,
-                    kind = InlineNoticeKind.Info,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
         }
     }
 }

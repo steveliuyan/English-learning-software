@@ -38,6 +38,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.englishlearning.backup.device.QrFrameAnalyzer
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import java.io.InputStream
 
 /**
@@ -162,9 +164,8 @@ fun BackupRestoreScreen(
             BackupRestorePhase.Done -> Unit
         }
 
-        state.errorMessage?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("backup_restore_error"))
-        }
+        // Task 25：私有错误提示条换共享 `InlineNotice`（棘轮「错误提示条」族摘行同批）。
+        state.errorMessage?.let { InlineNotice(text = it, kind = InlineNoticeKind.Error) }
         state.resultMessage?.let { Text(it, modifier = Modifier.testTag("backup_restore_result")) }
 
         // AC4-07（D-12）：替换提交后本进程数据库访问已终止，唯一出路是重启应用。

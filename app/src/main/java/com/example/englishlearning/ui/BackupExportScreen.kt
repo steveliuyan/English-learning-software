@@ -23,13 +23,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.englishlearning.ui.theme.AppPalette
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 
 /**
  * F4-03 备份导出确认页（接线级，不做视觉打磨）。
  *
  * 两段式：先「生成备份包」得到诚实的范围/数量/大小估算，再经 SAF「另存为」落盘；取消不写文件。
- * 声明固定为「不可用于认证恢复的 Salvage 包 / 不含 API Key」。可空 ViewModel 是生产组装点
+ * 声明固定为「数据留档包 / 不能换机恢复 / 不含 API Key」，并指向「认证导出」这条真实恢复出口。
+ * 可空 ViewModel 是生产组装点
  * 防回归约定（见 AppScreenProductionWiringTest）；为 null 时页面退化为只读提示、不崩溃。
  */
 @Composable
@@ -98,8 +100,9 @@ fun BackupExportScreen(
             ) { Text("生成备份包") }
         }
 
-        state.error?.let { Text(it, color = AppPalette.ErrorText, modifier = Modifier.testTag("backup_export_error")) }
-        state.message?.let { Text(it, color = AppPalette.SuccessText, modifier = Modifier.testTag("backup_export_message")) }
+        // Task 25：私有错误/成功提示条换共享 `InlineNotice`（棘轮「错误提示条」族摘行同批）。
+        state.error?.let { InlineNotice(text = it, kind = InlineNoticeKind.Error) }
+        state.message?.let { InlineNotice(text = it, kind = InlineNoticeKind.Success) }
     }
 }
 

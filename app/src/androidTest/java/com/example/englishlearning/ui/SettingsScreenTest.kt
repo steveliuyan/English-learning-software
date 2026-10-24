@@ -55,7 +55,7 @@ import org.junit.runner.RunWith
  * `System`，不把人为档留给下一枚用例。
  *
  * **修复轮 1（评审席 C1/I1/I2/I3/I4）加进来的三类判据**：
- *  - 台账唯一真值 + 可点节点数精确相等（[CLICKABLE_WHEN_COLLAPSED] / [CLICKABLE_WHEN_BOTH_FOLDS_OPEN]）；
+ *  - 台账唯一真值 + 可点节点数精确相等（[CLICKABLE_WHEN_COLLAPSED] / [CLICKABLE_WHEN_WORD_BOOKS_OPEN]）；
  *  - 折叠子行的**禁用态是真禁用**（`assertHasNoClickAction` + `assertIsNotEnabled`），
  *    一级 9 行在任何在途状态下都保持可点；
  *  - 折叠件的展开态进语义（`SemanticsActions.Expand`/`Collapse`），结果回执在收起态也读得到，
@@ -88,10 +88,7 @@ class SettingsScreenTest {
         onOpenSpeechSettings: () -> Unit = {},
         onOpenReminderSettings: () -> Unit = {},
         onOpenLicenses: () -> Unit = {},
-        onOpenBackupExport: () -> Unit = {},
-        onOpenBackupRestore: () -> Unit = {},
-        onOpenBackupPairingExport: () -> Unit = {},
-        onDeleteAllLearningData: () -> Unit = {},
+        onOpenBackupHub: () -> Unit = {},
         aiProfileSubtitle: String? = null,
         speechEngineStatuses: SpeechEngineStatuses = SpeechEngineStatuses(),
         onImportWordBook: () -> Unit = {},
@@ -99,7 +96,6 @@ class SettingsScreenTest {
         importedBookCount: Int = 0,
         transferBusy: Boolean = false,
         transferMessage: String? = null,
-        deleteAllLearningDataNotice: String? = null,
     ) {
         composeRule.setContent {
             SettingsScreen(
@@ -111,10 +107,7 @@ class SettingsScreenTest {
                 onOpenSpeechSettings = onOpenSpeechSettings,
                 onOpenReminderSettings = onOpenReminderSettings,
                 onOpenLicenses = onOpenLicenses,
-                onOpenBackupExport = onOpenBackupExport,
-                onOpenBackupRestore = onOpenBackupRestore,
-                onOpenBackupPairingExport = onOpenBackupPairingExport,
-                onDeleteAllLearningData = onDeleteAllLearningData,
+                onOpenBackupHub = onOpenBackupHub,
                 aiProfileSubtitle = aiProfileSubtitle,
                 speechEngineStatuses = speechEngineStatuses,
                 onImportWordBook = onImportWordBook,
@@ -122,7 +115,6 @@ class SettingsScreenTest {
                 importedBookCount = importedBookCount,
                 transferBusy = transferBusy,
                 transferMessage = transferMessage,
-                deleteAllLearningDataNotice = deleteAllLearningDataNotice,
             )
         }
     }
@@ -145,9 +137,10 @@ class SettingsScreenTest {
      *    另抄一份字面量时，台账改了、界面没改（或反之）都会在这里红——不再只钉 tag。
      *  - **分组按 `group.tag` 配对**，不用 `SettingsGroups.all[0..3]` 下标：版面重排不漂。
      *  - **可点节点数精确相等**（上下界都钉）：收起态恰 [CLICKABLE_WHEN_COLLAPSED]
-     *    （8 枚一级行 + 3 枚主题分段；「主题」卡片本体不可点），两组折叠都展开、且已导入 2 册时
-     *    恰 [CLICKABLE_WHEN_BOTH_FOLDS_OPEN]（再 +导入/导出 +备份四行 = 17）。
-     *    下界抓「看起来是行却不可点」，上界抓「行外长出可点节点」；两个数字都是现盘读数，
+     *    （8 枚一级行 + 3 枚主题分段；「主题」卡片本体不可点），「词书内容包」展开、且已导入 2 册时
+     *    恰 [CLICKABLE_WHEN_WORD_BOOKS_OPEN]（再 +导入/导出 = 13）。
+     *    「备份与恢复」自 Task 25 起是**导航行**（裁决⑥），不再展开出四枚子行，所以本页的展开计数
+     *    只剩词书一组。下界抓「看起来是行却不可点」，上界抓「行外长出可点节点」；两个数字都是现盘读数，
      *    版面一动就必须一起动——那正是 AC-R-21 的 9 行形状被动了的信号。
      */
     @Test
@@ -186,11 +179,10 @@ class SettingsScreenTest {
         )
 
         expand("settings_word_books")
-        expand("settings_backup")
         assertEquals(
-            "两组都展开、已导入 2 册且空闲时可点节点必须恰 $CLICKABLE_WHEN_BOTH_FOLDS_OPEN" +
-                "（收起态 $CLICKABLE_WHEN_COLLAPSED + 词书 2 行 + 备份 4 行）",
-            CLICKABLE_WHEN_BOTH_FOLDS_OPEN,
+            "「词书内容包」展开、已导入 2 册且空闲时可点节点必须恰 $CLICKABLE_WHEN_WORD_BOOKS_OPEN" +
+                "（收起态 $CLICKABLE_WHEN_COLLAPSED + 词书 2 行；备份已是导航行，不再有展开子行）",
+            CLICKABLE_WHEN_WORD_BOOKS_OPEN,
             clickableNodeCount(),
         )
         listOf("settings_pending_reading", "settings_pending_profile").forEach { tag ->
@@ -382,17 +374,18 @@ class SettingsScreenTest {
 
 
     /**
-     * 「备份与恢复」收成一行折叠入口（R-B / 裁决⑥方向）：展开后四行子入口可达——
-     * 留档导出、认证导出、从旧设备恢复、以及下沉进来的「删除全部学习数据」；
-     * 子行文案只留用户语言，不再出现内部编号。删除行只断可达，
-     * 级联预览 + 二次确认的宿主链路归 `AppScreenOverlayContainerTest` 钉。
+     * 「备份与恢复」是**导航行**（裁决⑥ / Task 25）：点击进入三节子页，本页**不再就地展开**。
+     *
+     * 判据三面：
+     *  ① 四枚旧子行 tag（留档导出 / 认证导出 / 恢复 / 删除）在本页一律不存在——子行已搬进
+     *    `BackupHubScreen`，它们的文案与可达性由 `BackupEntryUnificationTest` 承重；
+     *  ② 这一行仍可点，且**不再**注册 `Expand`/`Collapse` 语义（导航行不是折叠件）；
+     *  ③ 点击后只发一条 `onOpenBackupHub`，本页形状不变（没有子行冒出来）。
      */
     @Test
-    fun backup_row_expands_to_all_data_entries_including_the_delete_row() {
-        setScreen()
-        composeRule.onNodeWithTag("settings_open_backup_export").assertDoesNotExist()
-
-        expand("settings_backup")
+    fun backup_row_opens_the_hub_without_expanding_inline() {
+        var hubOpened = 0
+        setScreen(onOpenBackupHub = { hubOpened++ })
 
         listOf(
             "settings_open_backup_export",
@@ -400,30 +393,20 @@ class SettingsScreenTest {
             "settings_open_backup_restore",
             "settings_delete_all_learning_data",
         ).forEach { tag ->
-            composeRule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHasClickAction()
+            composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
-        composeRule.onNodeWithText("生成 `.elpbak` 文件（不含密钥，暂不可用于认证恢复）").assertExists()
-        composeRule.onNodeWithText("旧设备系统认证后生成配对码与受保护备份").assertExists()
-        composeRule.onNodeWithText("扫描旧设备配对码并替换本机数据").assertExists()
-        listOf("F4-04", "F4-03").forEach { jargon ->
-            assertTrue(
-                "设置页可见文案不得出现内部编号「$jargon」（AC-R-21 用户语言）",
-                composeRule.onAllNodesWithText(jargon, substring = true).fetchSemanticsNodes().isEmpty(),
-            )
-        }
-    }
 
-    /**
-     * 删除回执（成功或预览读取失败的一句话）同样住在折叠行**外侧**（修复轮 1 / I4）：
-     * 收起态也要读得到结果，不为它保留第二版私有提示条。
-     */
-    @Test
-    fun delete_notice_stays_readable_when_the_backup_fold_is_closed() {
-        val receipt = "学习数据已删除；文章与收藏保留。"
-        setScreen(deleteAllLearningDataNotice = receipt)
-        composeRule.onNodeWithText(receipt).assertExists()
-        expand("settings_backup")
-        composeRule.onNodeWithText(receipt).assertExists()
+        composeRule.onNodeWithTag("settings_backup").performScrollTo()
+            .assertHasClickAction()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Expand))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Collapse))
+            .performClick()
+        composeRule.waitForIdle()
+        assertEquals("点击「备份与恢复」必须只发一条导航回调", 1, hubOpened)
+
+        // 导航行点击后本页形状不变：不得有子行冒出来（旧折叠实现会在这里留下四行）。
+        composeRule.onNodeWithTag("settings_delete_all_learning_data").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_open_backup_export").assertDoesNotExist()
     }
 
     /**
@@ -432,26 +415,23 @@ class SettingsScreenTest {
      * 并且**执行 Expand 这条语义动作本身**就能展开（TalkBack 用户不走 performClick 也到得了子行）。
      * 现盘 Compose（BOM 2025.12.00 / ui 1.10.0）没有布尔 `expanded` 属性，只有 Expand/Collapse
      * 两枚动作键，所以判据取这一条路。
+     *
+     * Task 25 起本页只剩「词书内容包」一枚折叠件（「备份与恢复」改为导航行，不再有展开态）。
      */
     @Test
     fun fold_rows_expose_expand_and_collapse_semantics() {
         setScreen(importedBookCount = 2)
-        listOf("settings_word_books", "settings_backup").forEach { tag ->
-            composeRule.onNodeWithTag(tag).performScrollTo()
-                .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
-                .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Collapse))
-        }
-        expand("settings_word_books")
+        composeRule.onNodeWithTag("settings_word_books").performScrollTo()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Collapse))
+
+        composeRule.onNodeWithTag("settings_word_books")
+            .performSemanticsAction(SemanticsActions.Expand)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_import_word_book").assertExists()
         composeRule.onNodeWithTag("settings_word_books")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.Expand))
-
-        composeRule.onNodeWithTag("settings_backup").performScrollTo()
-            .performSemanticsAction(SemanticsActions.Expand)
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("settings_delete_all_learning_data").assertExists()
-        composeRule.onNodeWithTag("settings_backup").performScrollTo()
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse))
     }
 
 
@@ -562,12 +542,13 @@ private const val BACKGROUND_CHANNEL_TOLERANCE = 2
 private const val CLICKABLE_WHEN_COLLAPSED = 11
 
 /**
- * 两组折叠都展开、且已导入 2 册（`transferBusy = false`）时的现盘读数：
- * 收起态 11 + 词书子行 2 + 备份子行 4 = 17。
- * 空闲且有册时 6 枚子行全部可点；任一子行被禁用（busy / 未导入）时它就不在该态的计数里，
+ * 「词书内容包」展开、且已导入 2 册（`transferBusy = false`）时的现盘读数：
+ * 收起态 11 + 词书子行 2 = 13。
+ * Task 25（裁决⑥）起「备份与恢复」是导航行、不再就地展开，所以这一档不再含备份子行。
+ * 空闲且有册时两枚子行都可点；任一子行被禁用（busy / 未导入）时它就不在该态的计数里，
  * 所以那两个禁用态各另有自己的用例，不混进这一条。
  */
-private const val CLICKABLE_WHEN_BOTH_FOLDS_OPEN = 17
+private const val CLICKABLE_WHEN_WORD_BOOKS_OPEN = 13
 
 /**
  * 「待接入」厂商名占位清单：这一族护栏钉的是「六枚厂商名一律不得回到设置一级页」，
@@ -576,7 +557,7 @@ private const val CLICKABLE_WHEN_BOTH_FOLDS_OPEN = 17
  * （一条走注入 MiMo 状态的路径、一条走默认态，两条的正断腿不同，缺席腿同文）。
  *
  * 修复轮 2 的 M-2 把它从「两条各抄一遍逐字相同的 `listOf(...)`」提成本文件一枚 private 常量，
- * 与本文件既有的 [CLICKABLE_WHEN_COLLAPSED] / [CLICKABLE_WHEN_BOTH_FOLDS_OPEN] 同一惯例
+ * 与本文件既有的 [CLICKABLE_WHEN_COLLAPSED] / [CLICKABLE_WHEN_WORD_BOOKS_OPEN] 同一惯例
  * （同一份现盘读数只留一个真值）。理由：这两串是**同一条规则**的两份拷贝，
  * 生产侧新增第七枚占位名时只补一处就会让另一处静默失去覆盖——漂移风险比「共享夹具被顺手改」更大，
  * 且本常量只被这两条缺席断言读、不参与任何正断。**断言语义零改动**：缺席侧仍逐枚 `assertDoesNotExist()`。

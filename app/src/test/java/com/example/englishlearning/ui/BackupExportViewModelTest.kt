@@ -103,11 +103,16 @@ class BackupExportViewModelTest {
     }
 
     @Test
-    fun `initial state shows honest salvage disclosure and no ready package`() {
+    fun `initial state shows archival-only disclosure pointing at the real restore exit`() {
         val state = viewModel.state.value
 
-        assertTrue(state.disclosure.contains("不可用于认证恢复"))
+        // AC-R-22：留档包只许自陈「只能留档」，且必须指回真做得到的认证恢复出口。
+        // 旧口径「暂不可用于认证恢复」把已实现的认证恢复说成不存在，随 Task 25 一并下线。
+        assertTrue(state.disclosure.contains("只能用于留档"))
+        assertTrue(state.disclosure.contains("不能用于换机恢复"))
+        assertTrue(state.disclosure.contains("认证导出"))
         assertTrue(state.disclosure.contains("不包含 API Key"))
+        assertFalse(state.disclosure.contains("不可用于认证恢复"), state.disclosure)
         assertFalse(state.packageReady)
         assertFalse(state.busy)
     }

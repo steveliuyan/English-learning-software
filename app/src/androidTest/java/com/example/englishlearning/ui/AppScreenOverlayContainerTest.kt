@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import android.view.KeyEvent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.learning.BundledWordBookIdSource
 import com.example.englishlearning.learning.ImportedWordBookIdSource
@@ -387,6 +390,56 @@ class AppScreenOverlayContainerTest {
         }
     }
 
+    /**
+     * Task 25（裁决⑥）宿主编排腿：**设置页那一行真的导航到备份子页，返回键真的回到设置页**。
+     *
+     * 子页直测（`BackupEntryUnificationTest`）只证子页自身的形状；这里证宿主那三件接线：
+     *  ① `settings_backup` 点击把 `showBackupHub` 置真（不再就地展开）；
+     *  ② `overlayOpen` 链挂了 hub——底导整棵不组合（Scaffold 在 `else` 分支，子页分支一真就不组合）；
+     *  ③ `BackHandler` 把返回键交回设置页。
+     *
+     * 这条**不**证子屏返回栈（导出 / 认证导出 / 恢复三枚子屏需要各自的真实 ViewModel 装配，
+     * 本类夹具没有那套依赖）；子屏返回栈的缺口已在 Task 25 报告「未覆盖」里登记。
+     */
+    @Test
+    fun hostedBackupRowOpensTheHubAndBackReturnsToSettings() {
+        composeRule.setContent {
+            AppScreen(
+                viewModel = appViewModel(),
+                learningSetupViewModel = setupViewModel(
+                    RecordingProfileRepository(),
+                    RecordingDeletionPreview(WordBookDeletionPreview(1, 1, 1)),
+                ),
+                todayPlanViewModel = TodayPlanViewModel({ placeholderCardPlan() }, RecordingProfileRepository()),
+                wordCardViewModel = wordCardFixtureViewModel(),
+            )
+        }
+        createProfile()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("settings_backup").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("settings_backup").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("backup_hub_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        assertTrue(
+            "子页打开时底导必须不可见（overlayOpen 没挂 hub 时设置页与底导会同时在场）",
+            composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isEmpty(),
+        )
+
+        pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("backup_hub_screen").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_settings").assertExists()
+    }
+
     // ---------- 宿主驱动 ----------
 
     /**
@@ -397,6 +450,31 @@ class AppScreenOverlayContainerTest {
     private fun createProfile() {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
+    }
+
+    /**
+     * 真实系统返回（Task 25 的 hub 返回腿）：`Espresso.pressBack()` 在本仓 no compile classpath，
+     * 走 instrumentation 注入 key event——与 `AppScreenTest.pressSystemBack()` 同一口径。
+     *
+     * **先等窗口真拿到焦点再注入**：`install -r` 之后的第一枚用例里，组合树已经可查
+     * （`settings_backup`/`backup_hub_screen` 都在），但测试活动的窗口焦点还没落定，
+     * 此时 `sendKeyDownUpSync` 会落到别的窗口、静默丢键（2026-10-24 实测两次，
+     * 都发生在装包后首跑；紧接着重跑同一条即绿）。焦点没到不许猜——等到为止。
+     */
+    private fun pressSystemBack() {
+        composeRule.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var focused = false
+            instrumentation.runOnMainSync {
+                focused = ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(Stage.RESUMED)
+                    .any { it.hasWindowFocus() }
+            }
+            focused
+        }
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        composeRule.waitForIdle()
     }
 
     /** 路 A 驱动链：建资料 → 必填的「调整词书与目标」屏把导入册画出来。 */

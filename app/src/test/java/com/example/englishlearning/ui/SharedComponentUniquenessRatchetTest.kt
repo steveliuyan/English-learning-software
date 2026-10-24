@@ -53,7 +53,8 @@ import kotlin.test.assertTrue
  *    「星斜星斜」那一枚会让块注释正则吞掉其后几十行真代码，使 `BackupRestoreScreen.kt` 的错误色裸用点
  *    从棘轮视野里消失。现夹具是字符串感知的扫描式实现，由
  *    [stripComments keeps code after a string literal that contains a comment marker] 与
- *    [notice family ledger pins the backup restore site that comment stripping used to swallow] 两条钉住，勿改回正则版。
+ *    [notice family real anchor follows the backup screens to inline notice] 两条钉住，勿改回正则版。
+ *    （Task 25 起三枚备份屏已迁共享 `InlineNotice`，后一条锚随之改成迁移后形状。）
  *  - **同名遮蔽**：四屏的私有 `NotConfiguredCard` 与共享份**同名**（precheck §2），所以「文件里出现
  *    `NotConfiguredCard(`」不能当合规证据；规则形状必须是「出现 `private fun NotConfiguredCard(` 即违规」
  *    +「`components/NotConfiguredCard.kt` 恰 1 处 `fun NotConfiguredCard(`」两条并立。
@@ -195,9 +196,6 @@ class SharedComponentUniquenessRatchetTest {
         "错误提示条（应调 InlineNotice）" to setOf(
             "AppScreen.kt",
             "ArticleImportScreen.kt",
-            "BackupExportScreen.kt",
-            "BackupPairingExportScreen.kt",
-            "BackupRestoreScreen.kt",
             "CardDetailScreen.kt",
             "ReadingAccessScreen.kt",
             "ReminderSettingsScreen.kt",
@@ -875,26 +873,42 @@ class SharedComponentUniquenessRatchetTest {
     }
 
     /**
-     * 同一条修复的**真实文件锚**（Fix 1 的第二半）：把这次踩到的现场钉进台账，
-     * 防止有人日后改写 `BackupRestoreScreen.kt` 的 MIME 字面量来「绕过」夹具，也防止夹具再退化成正则版
-     * （退化后 :166 那枚错误色 `Text` 会重新被吞掉，本条先红）。
+     * 同一条修复的**真实文件锚**（Fix 1 的第二半；Task 25 迁移后改写形状）。
+     *
+     * 批 1 现场钉的是「剥注释夹具别把 `BackupRestoreScreen.kt` 的错误色读点吞掉」；Task 25 把三枚备份屏的
+     * 私有错误/结果提示条迁到共享 `InlineNotice` 之后，旧的「错误色读点恰 1 处且必须在违规集」断言
+     * **必须不存在**（留着等于禁止迁移）。本条改成**迁移后形状**：
+     *  ① 文件读得到（夹具退化到谁都判红同样是事故）；
+     *  ② 剥注释后仍命中 `InlineNotice(`（不是注释里的假锚）；
+     *  ③ 该文件**不再**是 `isNoticeOffender`；
+     *  ④ 也不在 seed 里（seed 是债务台账不是永久豁免）。
+     * 另配一枚合成反例自证 [isNoticeOffender] 没空转：同样一行错误色 `Text` 去掉共享调用后必须判违规。
      */
     @Test
-    fun notice_family_ledger_pins_the_backup_restore_site_that_comment_stripping_used_to_swallow() {
+    fun notice_family_real_anchor_follows_the_backup_screens_to_inline_notice() {
         val source = uiScreenSource("BackupRestoreScreen.kt")
-        assertEquals(
-            1,
-            countMatches(source, Regex("""AppPalette\.ErrorText|colorScheme\.error""")),
-            "BackupRestoreScreen.kt 的错误色读点应恰 1 处（:166 渲染 state.errorMessage）；" +
-                "0 处 = 剥注释夹具又把它吞了，2 处 = 现场多了裸用点，两种都要先改本条与 seed 说明",
+        assertTrue(
+            source.isNotBlank(),
+            "合规屏文件必须读得到（夹具退化到谁都判红同样是事故）"
         )
         assertTrue(
-            offendersOf(::isNoticeOffender).contains("BackupRestoreScreen.kt"),
-            "BackupRestoreScreen.kt:166 裸用 colorScheme.error 渲染提示，必须出现在提示条族台账里（剥注释夹具若退化，这里先红）",
+            source.contains("InlineNotice("),
+            "BackupRestoreScreen.kt 剥注释后必须命中 InlineNotice( —— Task 25 迁移已发生，" +
+                "本锚随迁移改写而不是删掉（0 命中 = 迁移被回退，或剥注释夹具又把它吞了）",
         )
         assertTrue(
-            "BackupRestoreScreen.kt" in componentFamilySeeds.getValue("错误提示条（应调 InlineNotice）"),
-            "真实文件锚与 seed 台账脱节：seed 若删了这行，上面那条断言就变成没人认领的违规",
+            !isNoticeOffender(source),
+            "BackupRestoreScreen.kt 已调共享 InlineNotice(，不得再被判为错误提示条违规" +
+                "（判成违规 = 私有读点又长回来了，或者合规出口被拆了）",
+        )
+        assertTrue(
+            "BackupRestoreScreen.kt" !in componentFamilySeeds.getValue("错误提示条（应调 InlineNotice）"),
+            "迁移完成后 seed 必须摘行：seed 是债务台账不是永久豁免",
+        )
+        // 反空转：同一行错误色 Text 只要没有共享调用，规则必须仍判违规。
+        assertTrue(
+            isNoticeOffender("""Text(it, color = MaterialTheme.colorScheme.error)"""),
+            "isNoticeOffender 空转：没有 InlineNotice( 的错误色 Text 也被判合规，上面三条断言就成了空判",
         )
     }
 }
