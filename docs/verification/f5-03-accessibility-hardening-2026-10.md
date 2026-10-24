@@ -21,28 +21,31 @@
 | 禁令2 | 禁同一 `buttonColors(...)` 调用内 `containerColor = MintPrimary` + `contentColor = Color.White` 共存；修复色统一 `AppPalette.OnMintPrimary`（≈4.6:1）；仓库级新口径「薄荷系渐变/浅底一律不用白字」 | `AccessibilityContrastContractTest` | `339d3da`+`c710c38` |
 | 禁令3 | main 源码禁裸 `Color.Red`；错误文字用 `AppPalette.ErrorText`（0xFFB30000，白底≈7.2:1），成功文字用 `AppPalette.SuccessText`（0xFF1B5E20） | `AccessibilityColorTokenContractTest` | `f2d8875` |
 
-契约已知漏判面（终审与设备走查须知，均已在各类 KDoc 记录）：变量传色、`containerColor = MintPrimary.copy(...)` 等嵌套右括号、内联 `if`、非 `buttonColors` 形态（`background(...)` + `color = ...`）、`//`-in-string 截断。这些形态源码不可判 → 需设备像素取证。设置徽标 `accent.deep` 底白字七域中六域 ≥5:1，`AiSpeech.deep≈4.1:1` 为临界值，终值归重设计轮 token 化。
+契约已知漏判面（终审与设备走查须知，均已在各类 KDoc 记录）：变量传色、`containerColor = MintPrimary.copy(...)` 等嵌套右括号、内联 `if`、非 `buttonColors` 形态（`background(...)` + `color = ...`）。这些形态源码不可判 → 需设备像素取证。原列的「`//`-in-string 截断」已由共享字符串感知 `stripComments` 闭合、空白/换行/`+=` 刚性亦已补测闭合，详见 §1.1。设置徽标 `accent.deep` 底白字七域中六域 ≥5:1，`AiSpeech.deep≈4.1:1` 为临界值，终值归重设计轮 token 化。
 
-### 1.1 契约测试匹配面局限（已知债 M-B1 / M-B2，本轮登记不改判定逻辑）
+### 1.1 契约测试匹配面局限（M-B1 已闭合 / M-B2 已由共享剥离闭合，Task 26 Step 2 结清）
 
 源码扫描型契约只能锁「字面形状」，以下两个匹配面缺口经测试切片终审（终审 B §M-B1/M-B2）确认，
-**登记为已知债**，任何一条被绕过都不等于禁令本身失效，但等于护栏失守：
+并在 UI 重设计轮批 3 Task 26 Step 2 处置（不改禁令语义、不放宽判定对象，只补匹配面）：
 
-- **M-B1 空格/换行/`+=` 刚性**：禁令1a 的 `contentDescription = "([^"]*)"` 要求「恰一个空格 + 同行」
-  （`AccessibilityLabelContractTest.kt:35`）；写成 `contentDescription="x"`、`contentDescription =\n  "x"`
-  或 `contentDescription += "x"` 即逃逸，该类 KDoc 原文未登记此面。禁令2
-  （`AccessibilityContrastContractTest.kt:54-57`）同样锁 `containerColor = MintPrimary` /
-  `contentColor = Color.White` 的精确空格，压缩空格写法的同调用共存可逃逸（嵌套括号面已登记、空格面未登记）。
-  本轮清除的**原始违规形状**塞回去仍必红，证伪力主张不受影响。
-- **M-B2 `stripComments` 的 `//.*` 吞同行字符串**：注释剥离会把含 `//` 的字符串字面量（典型是 URL）
-  同一行的后半段一起抹掉，锚点/声明与之同行则静默逃逸。此前只在
-  `AccessibilitySwitchLabelContractTest.kt:34-38` 与 `AccessibilityStateSemanticsContractTest.kt:34-37`
-  如实登记（原写「待整支终审统一处理」）；终审确认**禁令 1/2/3 三个类同款缺陷未记**
-  （`AccessibilityLabelContractTest.kt:31-33`、`AccessibilityContrastContractTest.kt:43-45`、
-  `AccessibilityColorTokenContractTest.kt:48-50`）。逃逸需要「同行 URL 字面量」，概率低。
-  两处 KDoc 的「整支终审统一处理」承诺已改为指向本小节；统一修 `stripComments`（字符串感知剥离）
-  或补全五处 KDoc 登记，归下一次契约面改动一并处理，本分支不动判定逻辑。
-- 共同处置口径：这两条都不构成升级 AC5-03 的证据，**不得**据此宣称「禁令已由契约穷尽防护」；
+- **M-B1 空格/换行/`+=` 刚性 → 已闭合**。禁令1a 的 `cjkLiteral` 与禁令1b 的 `tagAssignment` 现为
+  `contentDescription\s*\+?=\s*…`：`contentDescription="x"`、`contentDescription =\n  "x"`、
+  `contentDescription += "x"` / `+= tag` 均落判定面；禁令2 的 `lowContrastCombo` 在参数名与 `=` 两侧
+  改用 `\s*`（`containerColor=MintPrimary`、`containerColor =\n MintPrimary` 均被抓）。判定对象不变
+  （仍是「字面量有无中文」「同调用内两参数共存」）。合成先红后绿：
+  `literal rule tolerates whitespace newlines and plus-assign without missing the violation`、
+  `low contrast rule tolerates compressed whitespace and newlines without missing the combination`，
+  以及 `tag ban synthetic snippets flag every tag named identifier on the right hand side` 的 `+=` 用例。
+  重算命令：`gradle.bat :app:testDebugUnitTest --tests "com.example.englishlearning.ui.AccessibilityLabelContractTest" --tests "com.example.englishlearning.ui.AccessibilityContrastContractTest" --tests "com.example.englishlearning.ui.AccessibilityColorTokenContractTest"`。
+- **M-B2 `//`-in-string 截断 → 已由共享 `stripComments` 闭合**。批 1 终审 F6 起五类契约统一调用
+  `SourceRatchet.kt` 的**字符串感知** `stripComments`（三引号/单行串/字符字面量整段保留），
+  「同行 URL 字面量吞掉后半个语句」的旧私有正则缺陷已不存在。Task 26 Step 2 为禁令 1/2/3 各类补一条
+  回归钉（`… keeps code after a string literal that contains a line-comment marker`），防日后退回正则实现。
+  该钉在补测时**当场即绿**（缺陷早于 F6 修复），属回归护栏而非先红后绿，登记以免误读。
+- 仍不可判、需设备像素取证的形态（各 KDoc 已登记）：变量传色、`containerColor = MintPrimary.copy(...)`
+  等嵌套右括号、内联 `if`、非 `buttonColors` 形态（`background(...)` + `color = ...`）。
+  设置徽标 `accent.deep` 底白字七域中六域 ≥5:1，`AiSpeech.deep≈4.1:1` 为临界值，终值归重设计轮 token 化。
+- 共同处置口径不变：上述闭合**不构成升级 AC5-03 的证据**，**不得**据此宣称「禁令已由契约穷尽防护」；
   像素与语义的最终判定仍归设备走查 + 代码审查。
 
 

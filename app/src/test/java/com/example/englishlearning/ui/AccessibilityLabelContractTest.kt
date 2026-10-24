@@ -28,7 +28,13 @@ import kotlin.test.assertTrue
 class AccessibilityLabelContractTest {
     private val uiDir = File(UI_SOURCE_PATH)
 
-    private val cjkLiteral = Regex("""contentDescription = "([^"]*)"""")
+    /**
+     * 禁令1a 的匹配面：`contentDescription` 后允许任意空白（含换行）与 `+=` 追加形式。
+     * M-B1 修复（Task 26 Step 2）：旧正则锁「恰一个空格 + 同行」，`contentDescription="x"`、
+     * `contentDescription =\n "x"`、`contentDescription += "x"` 三种真实可写形状全部逃逸；
+     * 现按 Kotlin 语法允许的空白自由度匹配，判定对象仍是「字面量里有没有中文」。
+     */
+    private val cjkLiteral = Regex("""contentDescription\s*\+?=\s*"([^"]*)"""")
 
     /** 禁令1a 纯函数：源码文本 → 无中文 contentDescription 字面量 offender 列表。 */
     private fun nonCjkLiteralOffenders(source: String): List<String> =
@@ -41,8 +47,9 @@ class AccessibilityLabelContractTest {
      * 禁令1b 的匹配面：contentDescription 右侧的整条限定访问（a.b.c 每一段都看）。
      * 只认标识符，不认字符串字面量与 if/when 表达式，故合法的中文标签代码
      * （tab.contentDescription、label、card.lemma）不受影响。
+     * `+=` 拼接与任意空白同属 M-B1 修复面：把 tag 变量拼进描述与直接赋值同样违规。
      */
-    private val tagAssignment = Regex("""contentDescription\s*=\s*([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)""")
+    private val tagAssignment = Regex("""contentDescription\s*\+?=\s*([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)""")
 
     /**
      * 禁令1b 纯函数：源码文本 → tag 变量直赋 contentDescription 的 offender 列表。
@@ -119,12 +126,14 @@ class AccessibilityLabelContractTest {
             "testTag" to "Modifier.clickable { onToggle() }.semantics { contentDescription = testTag }",
             "TAB_TAG" to ".semantics { contentDescription = TAB_TAG }",
             "tabTag" to ".semantics {\n    contentDescription =\n        tabTag\n}",
+            // M-B1 同款空白刚性：`+=` 拼接 tag 变量同样是「把 tag 当描述」
+            "tag" to ".semantics { contentDescription += tag }",
         )
         cases.forEach { (identifier, snippet) ->
             val offenders = tagVariableOffenders(snippet)
             assertTrue(
                 offenders.isNotEmpty(),
-                "禁令1b 漏判：contentDescription = $identifier 未被识别（tag 禁令只认字面 tag 变量名，换名即失效）"
+                "禁令1b 漏判：contentDescription = $identifier 未被识别（tag 禁令只认字面 tag 变量名，换名即失效）；片段：$snippet"
             )
             assertTrue(
                 offenders.single().contains(identifier),
@@ -147,6 +156,41 @@ class AccessibilityLabelContractTest {
         )
         snippets.forEach { snippet ->
             assertTrue(tagVariableOffenders(snippet).isEmpty(), "禁令1b 误判合法中文标签代码：$snippet")
+        }
+    }
+
+    @Test
+    fun `literal rule tolerates whitespace newlines and plus-assign without missing the violation`() {
+        // M-B1（登记于 docs/verification/f5-03-accessibility-hardening-2026-10.md §1.1）：
+        // 旧匹配面要求「恰一个空格 + 同行」，压缩空格 / 换行 / `+=` 三种真实可写形状全部逃逸。
+        val cases = mapOf(
+            "压缩空格" to """Modifier.semantics { contentDescription="english_tag" }""",
+            "换行" to ".semantics {\n    contentDescription =\n        \"english_tag\"\n}",
+            "+= 追加" to """.semantics { contentDescription += "english_tag" }""",
+            "制表符" to ".semantics { contentDescription\t=\t\"english_tag\" }",
+            "限定前缀 + 压缩空格" to """Modifier.semantics { this.contentDescription="english_tag" }""",
+        )
+        cases.forEach { (shape, snippet) ->
+            assertTrue(
+                nonCjkLiteralOffenders(snippet).isNotEmpty(),
+                "禁令1a M-B1 漏判（$shape）：英文 contentDescription 字面量未被识别：$snippet"
+            )
+        }
+    }
+
+    @Test
+    fun `label rule keeps code after a string literal that contains a line-comment marker`() {
+        // M-B2（同上 §1.1）：剥注释必须是字符串感知的，否则「同行含 // 的字符串」后半段被当注释抹掉，
+        // 与之同行的违规静默逃逸。本用例钉住共享 stripComments 的字符串感知性质，防退回正则实现。
+        val snippets = listOf(
+            "val url = \"https://example.com/a//b\"; val x = Modifier.semantics { contentDescription = \"english_tag\" }",
+            "val raw = \"\"\"https://example.com//path\"\"\"; Modifier.semantics { contentDescription = \"english_tag\" }",
+        )
+        snippets.forEach { snippet ->
+            assertTrue(
+                nonCjkLiteralOffenders(snippet).isNotEmpty(),
+                "禁令1a M-B2 回归：同行 URL 字面量之后的英文 contentDescription 被剥注释吞掉：$snippet"
+            )
         }
     }
 

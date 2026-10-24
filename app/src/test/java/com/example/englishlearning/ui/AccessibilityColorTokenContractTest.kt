@@ -161,6 +161,22 @@ class AccessibilityColorTokenContractTest {
     }
 
     @Test
+    fun `raw red rule keeps code after a string literal that contains a line-comment marker`() {
+        // M-B2（登记于 docs/verification/f5-03-accessibility-hardening-2026-10.md §1.1）：
+        // 剥注释是字符串感知的，同行 URL 字面量不得把其后的裸红一起抹掉。
+        val cases = listOf(
+            "val url = \"https://example.com/a//b\"; Text(it, color = Color.Red)",
+            "val raw = \"\"\"https://example.com//path\"\"\"; Text(it, color = Color.Red)",
+        )
+        cases.forEach { snippet ->
+            assertTrue(
+                rawRedOffenders(snippet).isNotEmpty(),
+                "禁令3 M-B2 回归：同行 URL 字面量之后的裸 Color.Red 被剥注释吞掉：$snippet"
+            )
+        }
+    }
+
+    @Test
     fun `raw red rule synthetic snippets keep material semantic colors and tokens clean`() {
         val snippets = listOf(
             // 修复后的目标形状：状态文字 token

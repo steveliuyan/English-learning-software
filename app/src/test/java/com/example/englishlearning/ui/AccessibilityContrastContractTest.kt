@@ -49,10 +49,12 @@ class AccessibilityContrastContractTest {
      * 反参数序写法同样判违规，不接受「换个书写顺序就绕过契约」。
      * `(?![A-Za-z])` 让 MintPrimary 必须是完整 token 名，不前缀匹配 MintPrimaryDark（深底白字 ≈15:1 合法）。
      * Kotlin Regex 的 `[^)]` 默认跨行，多行参数写法同样被抓住。
+     * 参数名与 `=` 两侧的空白用 `\s*` 承接（M-B1 修复，Task 26 Step 2）：`containerColor=MintPrimary`、
+     * `containerColor =\n MintPrimary` 这类真实可写形状不得因空白刚性逃逸；判定的仍是「同调用内共存」。
      */
     private val lowContrastCombo = Regex(
-        """buttonColors\([^)]*containerColor = MintPrimary(?![A-Za-z])[^)]*contentColor = Color\.White[^)]*\)""" +
-            """|buttonColors\([^)]*contentColor = Color\.White[^)]*containerColor = MintPrimary(?![A-Za-z])[^)]*\)"""
+        """buttonColors\([^)]*containerColor\s*=\s*MintPrimary(?![A-Za-z])[^)]*contentColor\s*=\s*Color\.White[^)]*\)""" +
+            """|buttonColors\([^)]*contentColor\s*=\s*Color\.White[^)]*containerColor\s*=\s*MintPrimary(?![A-Za-z])[^)]*\)"""
     )
 
     /** 禁令2 纯函数：源码文本 → 低对比 buttonColors 调用 offender 列表（折叠空白便于阅读）。 */
@@ -136,6 +138,42 @@ class AccessibilityContrastContractTest {
                 offenders.single().contains("containerColor = MintPrimary") &&
                     offenders.single().contains("contentColor = Color.White"),
                 "禁令2 offender 应同时点名两个参数，实际：$offenders"
+            )
+        }
+    }
+
+    @Test
+    fun `low contrast rule tolerates compressed whitespace and newlines without missing the combination`() {
+        // M-B1（登记于 docs/verification/f5-03-accessibility-hardening-2026-10.md §1.1）：
+        // 旧匹配面锁 `containerColor = MintPrimary` / `contentColor = Color.White` 的精确空格，
+        // 压缩空格与「= 后换行」两种真实可写形状可逃逸。
+        val cases = listOf(
+            "colors = ButtonDefaults.buttonColors(containerColor=MintPrimary, contentColor=Color.White),",
+            "colors = ButtonDefaults.buttonColors(\n  containerColor =\n      MintPrimary,\n  contentColor =\n      Color.White,\n),",
+            "colors = ButtonDefaults.buttonColors(containerColor =  MintPrimary,   contentColor =  Color.White),",
+            ".semantics { } // 反参数序 + 压缩空格\ncolors = ButtonDefaults.buttonColors(contentColor=Color.White, containerColor=MintPrimary),",
+        )
+        cases.forEach { snippet ->
+            val offenders = lowContrastOffenders(snippet)
+            assertTrue(offenders.isNotEmpty(), "禁令2 M-B1 漏判低对比组合（空白刚性）：$snippet")
+            assertTrue(
+                offenders.single().contains("MintPrimary") && offenders.single().contains("Color.White"),
+                "禁令2 offender 应同时点名两个参数，实际：$offenders"
+            )
+        }
+    }
+
+    @Test
+    fun `contrast rule keeps code after a string literal that contains a line-comment marker`() {
+        // M-B2（同上 §1.1）：字符串感知剥离的回归护栏——同行 URL 字面量不得吞掉其后的真实调用。
+        val cases = listOf(
+            "val url = \"https://example.com/a//b\"; colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),",
+            "val raw = \"\"\"https://example.com//path\"\"\"; colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = Color.White),",
+        )
+        cases.forEach { snippet ->
+            assertTrue(
+                lowContrastOffenders(snippet).isNotEmpty(),
+                "禁令2 M-B2 回归：同行 URL 字面量之后的低对比组合被剥注释吞掉：$snippet"
             )
         }
     }
