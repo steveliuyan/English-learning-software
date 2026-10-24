@@ -54,7 +54,9 @@ import kotlin.test.assertTrue
  */
 internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
     "AppScreen.kt" to 2,
-    "ArticleReadingScreen.kt" to 1,
+    // Task 24（裁决⑤ 附带债）：英文正文屏（Article 阅读那一屏）的裸 hex 已 token 化，本行随站点行同批摘除。
+    // 摘的是同一枚债务的两张表——只摘一张当场红（本测试核验两表互相吻合）。重算本文件对那枚屏文件名
+    // 的 grep 应零命中：`grep -c "ReadingScreen.kt" <本文件>` 只应剩 AppScreen 之外零条登记。
     "components/glass/GlassButton.kt" to 1,
     "mascot/AiMascot.kt" to 1,
 )
@@ -74,7 +76,6 @@ internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
 internal val RawColorSeedSiteLines: List<String> = listOf(
     "AppScreen.kt: colors = SwitchDefaults.colors(checkedTrackColor = MintPrimary, uncheckedTrackColor = Color(0xFFCDEFE1)),",
     "AppScreen.kt: inactiveTrackColor = Color(0xFFCDEFE1),",
-    "ArticleReadingScreen.kt: style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF17342A)),",
     "GlassButton.kt: Color(0xFF65D3B9),",
     "AiMascot.kt: private val EyeColor: Color = Color(0xFF188F76)",
 )

@@ -346,7 +346,16 @@ private fun HighlightedEnglish(
     }
     androidx.compose.foundation.text.ClickableText(
         text = annotated,
-        style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF17342A)),
+        // Task 24（裁决⑤ 附带债）：这一行原先把浅套深墨以裸 hex 写死，深色档下英文正文直接不可读。
+        // 落底是屏根 `Column` 的 `MintBackground`，而它是读 `LocalAppColors.current.background` 的组合期
+        // getter（`theme/MintPalette.kt`）——**容器随主题换套**，所以前景同样换套才成立：
+        // 旧墨压深套底只有 1.38:1（正文线 4.5，连装饰线 3.1 都不过），换 `appColors().text1` 后
+        // 浅/深两套实测 16.09 / 16.20。判据与复算见 `ReadingHomeLayoutContractTest`
+        // `[the english body ink clears the AA gate on both theme sets]`，那两条比值由包级
+        // `SourceRatchet.ratio` 现场算，不在这里抄数。
+        // 形状按 R-22.3 归 `AppType.Body` 并显式给墨（房内配平先例：面板内前景必须逐枚给 `appColors()`，
+        // 只借 `AppType` 会连着它自带的浅套静态墨一起落下）。**只改这一行**，整屏 typography 归 Task 26。
+        style = AppType.Body.copy(color = appColors().text1),
         modifier = Modifier.testTag("article_english"),
         onClick = { offset ->
             val hit = highlights.firstOrNull { offset in it.start until it.end } ?: return@ClickableText
