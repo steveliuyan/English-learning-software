@@ -395,7 +395,10 @@ class AppScreenOverlayContainerTest {
      *
      * 子页直测（`BackupEntryUnificationTest`）只证子页自身的形状；这里证宿主那三件接线：
      *  ① `settings_backup` 点击把 `showBackupHub` 置真（不再就地展开）；
-     *  ② `overlayOpen` 链挂了 hub——底导整棵不组合（Scaffold 在 `else` 分支，子页分支一真就不组合）；
+     *  ② hub 是全屏层——底导整棵不组合。注意这只由挂载链决定（`showBackupHub` 的 `else if`
+     *     排在 Scaffold 的 `else` 之前），**不是** `overlayOpen` 的功劳：`overlayOpen` 全仓唯一
+     *     消费者是全局返回键（AppScreen.kt 里那一处）；`overlayOpen` 挂没挂 hub 由 JVM 源契约
+     *     `BackupEntryUnificationContractTest#host_wires_backup_hub_at_every_station` 承重；
      *  ③ `BackHandler` 把返回键交回设置页。
      *
      * 这条**不**证子屏返回栈（导出 / 认证导出 / 恢复三枚子屏需要各自的真实 ViewModel 装配，
@@ -428,7 +431,7 @@ class AppScreenOverlayContainerTest {
         }
 
         assertTrue(
-            "子页打开时底导必须不可见（overlayOpen 没挂 hub 时设置页与底导会同时在场）",
+            "子页打开时底导必须不可见（hub 分支排在 Scaffold 的 else 之前，若被顶掉底导会与子页同时在场）",
             composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isEmpty(),
         )
 

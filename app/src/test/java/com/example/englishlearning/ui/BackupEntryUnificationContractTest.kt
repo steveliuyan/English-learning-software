@@ -84,6 +84,51 @@ class BackupEntryUnificationContractTest {
                     "≥4 的计数会被其余站点凑满，所以每条必须单独判红",
             )
         }
+
+        // 站点不仅要「在」，**相对顺序**也得钉（评审 MA-1：两处顺序原先零锚）：
+        // ① 挂载分支：hub 必须排在三枚子屏之后——`else if` 先真先赢，前移会让「从 hub 点导出」
+        //    变成屏幕不动的静默失效；
+        // ② BackHandler：hub 必须声明在三枚子屏之前——后声明者优先，颠倒会让子屏里的返回把 hub 关掉。
+        val hubMount = src.indexOf("} else if (showBackupHub) {")
+        val hubBack = src.indexOf("BackHandler(enabled = showBackupHub)")
+        assertTrue(hubMount > 0 && hubBack > 0, "取不到 hub 的挂载/返回站点下标（$hubMount / $hubBack）")
+        listOf("showBackupExport", "showBackupRestore", "showBackupPairingExport").forEach { child ->
+            val childMount = src.indexOf("} else if ($child) {")
+            assertTrue(
+                childMount in 0 until hubMount,
+                "「$child」的挂载分支必须排在 `else if (showBackupHub)` 之前（实测下标 $childMount vs $hubMount）" +
+                    "——hub 前移会把子屏入口顶掉，点了没反应",
+            )
+            val childBack = src.indexOf("BackHandler(enabled = $child)")
+            assertTrue(
+                hubBack in 0 until childBack,
+                "hub 的 BackHandler 必须声明在「$child」之前（实测下标 $hubBack vs $childBack）" +
+                    "——后声明者优先，颠倒后子屏里按返回会先关 hub",
+            )
+        }
+
+        // 删除动作的接线零覆盖是评审 MA-2 的原始缺口：四个回调里只有这一枚会**改动用户数据**，
+        // 而且它调用的是另一台 VM。形参名对、方法名错（requestDelete → cancelDelete）或回执
+        // 传错字段，全仓没有第二条判据能抓。这里按去空白后的形状钉死三行。
+        val hubBody = src.substringAfter("} else if (showBackupHub) {")
+            .substringBefore("} else if (showLicenses) {")
+            .replace(Regex("""\s+"""), " ")
+        assertTrue(
+            hubBody.contains("BackupHubScreen("),
+            "hub 挂载体取样失真：区间里没有 BackupHubScreen(（长度 ${hubBody.length}）",
+        )
+        listOf(
+            "onOpenBackupExport = { showBackupExport = backupExportViewModel != null }" to "留档导出 → 真实 ViewModel 守卫",
+            "onOpenBackupPairingExport = { showBackupPairingExport = backupPairingExportViewModel != null }" to "认证导出 → 真实 ViewModel 守卫",
+            "onOpenBackupRestore = { showBackupRestore = backupRestoreViewModel != null }" to "认证恢复 → 真实 ViewModel 守卫",
+            "onDeleteAllLearningData = { learningDataDeletionViewModel?.requestDelete(state.profile.id) }" to "删除 → requestDelete（不是 cancelDelete）",
+            "deleteAllLearningDataNotice = learningDataDeletionUi.notice" to "删除回执 → 删除 VM 的 notice（不是别的提示字段）",
+        ).forEach { (expected, what) ->
+            assertTrue(
+                hubBody.contains(expected),
+                "hub 挂载体的「$what」接线缺失或走样（期望片段：$expected）",
+            )
+        }
     }
 
     /** 子页：三枚节 tag 与四枚入口 tag 各恰一次（tag 是 connected 判据的身份证）。 */

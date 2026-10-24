@@ -31,8 +31,9 @@ import com.example.englishlearning.ui.components.InlineNoticeKind
  *
  * 两段式：先「生成备份包」得到诚实的范围/数量/大小估算，再经 SAF「另存为」落盘；取消不写文件。
  * 声明固定为「数据留档包 / 不能换机恢复 / 不含 API Key」，并指向「认证导出」这条真实恢复出口。
- * 可空 ViewModel 是生产组装点
- * 防回归约定（见 AppScreenProductionWiringTest）；为 null 时页面退化为只读提示、不崩溃。
+ *
+ * 可空 ViewModel 是生产组装点，为 null 时页面退化为只读提示、不崩溃
+ * 防回归约定（见 AppScreenProductionWiringTest）。
  */
 @Composable
 fun BackupExportScreen(

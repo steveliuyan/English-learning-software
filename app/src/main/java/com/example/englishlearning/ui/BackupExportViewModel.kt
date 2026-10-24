@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * F4-03 备份导出（无认证 Salvage 包）确认页状态。
+ * F4-03 备份导出（数据留档包：只能留档，不能换机恢复）确认页状态。
  *
  * 两段式：先在内存生成受完整性校验的包并展示诚实的范围/数量/大小估算，再让用户经 SAF
  * 选保存位置；只有选中位置才落盘，取消不写任何文件。改动范围会让旧的待写包失效，避免写入
