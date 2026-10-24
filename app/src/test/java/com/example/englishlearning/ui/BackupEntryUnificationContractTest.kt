@@ -110,9 +110,14 @@ class BackupEntryUnificationContractTest {
         // 删除动作的接线零覆盖是评审 MA-2 的原始缺口：四个回调里只有这一枚会**改动用户数据**，
         // 而且它调用的是另一台 VM。形参名对、方法名错（requestDelete → cancelDelete）或回执
         // 传错字段，全仓没有第二条判据能抓。这里按去空白后的形状钉死三行。
-        val hubBody = src.substringAfter("} else if (showBackupHub) {")
-            .substringBefore("} else if (showLicenses) {")
-            .replace(Regex("""\s+"""), " ")
+        // 右界本身也要在册：`showLicenses` 分支被删或改名时，substringBefore 会静默返回文件尾，
+        // 五条接线断言就退化成「全文件包含」，hub 之外的同一片段也能凑绿。
+        val hubBodyEnd = src.indexOf("} else if (showLicenses) {")
+        assertTrue(
+            hubBodyEnd > hubMount,
+            "hub 挂载体取样失真的右界 `else if (showLicenses)` 不在 hub 之后（实测下标 $hubBodyEnd vs $hubMount）",
+        )
+        val hubBody = src.substring(hubMount, hubBodyEnd).replace(Regex("""\s+"""), " ")
         assertTrue(
             hubBody.contains("BackupHubScreen("),
             "hub 挂载体取样失真：区间里没有 BackupHubScreen(（长度 ${hubBody.length}）",
