@@ -676,6 +676,22 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
    「换一篇」降为次级按钮且只在已有今日文章时在场；connected 侧由
    `ReadingAccessScreenTest.mainTaskCtaSitsAboveTheFoldWithoutScrolling`（不滚动、`boundsInRoot().top`
    落在屏幕高度一半以内）与 `primaryGenerationCtaAndRegenerateNeverShareTheScreen`（两枚主 CTA 不同屏）钉住。
+   - **裁决⑤ 这条口径写死（修复轮 1 F-4）**：「主 CTA 恰一枚」指的是**主任务叙事位**那一枚
+     （`reading_open_today` 与 `reading_source_ai` 互斥，永不并列），
+     **错误恢复动作按钮另有口径、不计入主 CTA 数**——`NotConfiguredBanner` 的「去配置」与
+     `GenerationFailureBanner` 的动作位各自是一枚实心薄荷，形状事实登记如下：
+     无当日文章 + `NotConfigured`/`Failed` 时首屏可见**两枚实心薄荷按钮**（主任务 + 恢复动作）。
+     重算：`grep -c "containerColor = MintPrimary" app/src/main/java/com/example/englishlearning/ui/ReadingAccessScreen.kt` ⇒ 4
+     （主 CTA、两枚横幅动作位、`TypeButton` 选中态各一枚），JVM 侧
+     `assertEquals(4, countMatches(home, …containerColor = MintPrimary…))` 钉住「不许长出第五枚」。
+     两枚横幅的配色属 Task 26/27 面，本批一字未动；Task 26 目视收口**不得**把这两枚读成「主 CTA 长出了第二枚」。
+   - **两支首屏各有一条腿（修复轮 1 F-2）**：原批只量了「已有当日文章」那一支，
+     现补 `mainGenerationTaskCtaSitsAboveTheFoldWithoutScrolling`（无当日文章 ⇒ 主任务是
+     `reading_source_ai`，阈值口径同形：根容器高度的一半，Dp 域、不写死 dp）；
+     同批删掉 `assertTrue(rootBottom > 0.dp)` 那类自我确认断言（根高恒正、永不红）。
+     变异自证：把两枚主 CTA 整体挪到长列末尾 ⇒ 两条腿同时红（`top=421.33334.dp` vs 根高 `659.4286.dp` 的一半），
+     见 `t24-fix1-device.log`。另记一条实跑教训：第一版更弱的变异（只把来源入口提到 CTA 上方）**没有判红**
+     （两枚 54dp 次级行 + 一张卡不足以把顶部位推过半屏线），所以这条腿的量的是「埋进长列」而不是「顺序微调」。
 2. **外刊 Feed 拆成带返回的二级层**：新增 `ui/ReadingFeedScreen.kt`（共享页头 `AppScreenHeader` +
    `BackHandler` 由宿主承担），主页只留 `reading_source_feed` 一枚入口。四枚 Feed 状态文案、
    `feed_item_<index>` 与「来源：+ sourceDisplayName」署名逐字照搬；connected 侧新增
@@ -743,6 +759,21 @@ R-23.11 不扩面）。以上均需真机深浅两档目视，本席不替用户
 - **`AppScreen.kt` 的浮层族多一路由位**：`showReadingFeed` 照抄 `showReadingHistory` 的四枚站点
   （`rememberSaveable` 状态位 / `overlayOpen` 的 `||` 链追加一项 / `BackHandler` / 挂载分支），
   其余半边一字未动；`AppScreenOverlayContainerContractTest` 的浮层计数判据随之必须仍绿（现绿）。
+- **（修复轮 1 F-5① 补登记）Feed 列表行多了一枚 54dp 行高下限**：`ReadingFeedScreen.kt` 的
+  `feed_item_$index` 带 `.heightIn(min = 54.dp)`，而旧的內联 `FeedSection` 同一枚 Button **没有**这条约束
+  ⇒ 几十枚标题行的那一层必然要滚，比原形状更长。这是搬家时顺手统一触控目标带来的形状代价，
+  原批「逐字照搬」的交代漏了它（不是文案/取源变化，列表语义与来源署名口径一字未动）。
+  重算：`grep -n "heightIn" app/src/main/java/com/example/englishlearning/ui/ReadingFeedScreen.kt`
+  ⇒ 一行 import + 一行 `heightIn(min = 54.dp)`（行号会漂，按内容认）。
+- **（修复轮 1 F-5② 补登记并处置）`Idle` 档一度是整页空白**：宿主 `AppScreen.kt` 的
+  `val feedState = (readingState as? Ready)?.feed ?: FeedUiState.Idle` 会在状态非 Ready
+  （Ready→非 Ready 翻转、或装配里没有 `readingAccessViewModel`）时把二级层停在 `Idle`，
+  而本层旧形状是 `Idle -> Unit` ⇒ 点进去只有页头。可达性经控制者现跑确认正常路径进得来
+  （主页入口 `reading_source_feed` 只在 `ReadyContent` 里渲染），但空白面是真的。
+  处置：`Idle` 改为一行文案级兜底 `Text("外刊列表正在准备，请稍候。", tag = feed_idle)`，
+  措辞与 `feed_loading` 逐字不同、两枚 tag 可分别点名；**未**新增重试按钮、**未**碰取源与 ViewModel。
+  判据：connected `idleFeedStateShowsTheWaitingFallbackNotABlankBody`（先留红样）+
+  JVM 锚台账记上 `feed_idle`。重算：`grep -n "feed_idle" app/src/main/java/com/example/englishlearning/ui/ReadingFeedScreen.kt` ⇒ 1 处。
 
 ### `fontScale 2.0` 大字号轮（本批改版面，必跑）
 
@@ -774,11 +805,21 @@ for(i in r){split(r[i],p," ");printf "%s/%s %.4f\n",p[1],p[2],ratio(p[1],p[2])}}
 ### 凭据
 
 - JVM 全门（`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
-  --no-daemon --no-build-cache --rerun-tasks --offline`）：BUILD SUCCESSFUL，
-  `suites=239 tests=1775 skipped=0 failures=0 errors=0`（基线 238/1770，只增不减：
-  新增 `ReadingHomeLayoutContractTest` 5 例）。日志 `t24-gate-jvm-2.log`；
+  --no-daemon --no-build-cache --rerun-tasks --offline`）：**BUILD SUCCESSFUL 有原始件，计数行没有**。
+  `suites=239 tests=1775 skipped=0 failures=0 errors=0` 这个读数来自**控制者复跑记录**（基线 238/1770，只增不减：
+  新增 `ReadingHomeLayoutContractTest` 5 例），而它原先被归因的两份日志 `t24-gate-jvm-2.log`、
+  `t24-controller-gate.log` 里只有 `BUILD SUCCESSFUL in 4m 7s` / `in 3m 11s` 两行，
+  **不含任何 `suites`/`tests=`/`Tests run` 行**——把计数绑给这两个文件名是假线索（修复轮 1 F-0，Major，订正）。
+  复核命令与读数见 `.superpowers/sdd/2026-10-17-ui-redesign/t24-fix1-f0-recalc.log`：
+  `grep -nE "suites|tests=|Tests run" t24-controller-gate.log t24-gate-jvm-2.log` ⇒ 零命中；
+  磁盘结果目录现只反映最后一次 `--tests` 过滤运行（单类比值复算会**覆写**全量结果，此后按下面那条 awk
+  只会得到 `suites=1 tests=5`，拿不到 239/1775）。
+  **订正后的口径**：计数以控制者复跑记录为准，带计数行的原始件由控制者在收口复跑时补 tee（Task 26 收口全门时执行）。
+  **本批新立凭据口径**：此后任何门控/自证日志必须**同一份**里同时落 `BUILD` 行与本席 awk 算出的
+  `suites=/tests=/skipped=/failures=/errors=` 计数行，否则文档与报告不得把计数绑给某个日志名。
   RED 阶段的四枚自证红样在 `t24-red-jvm-contract.log`，主 CTA 的 connected 红样在
-  `t24-red-connected-maincta.log`。
+  `t24-red-connected-maincta.log`；修复轮 1 的红样与门控读数在 `t24-fix1-red-jvm-f1-mutation.log`、
+  `t24-fix1-gate-jvm-c1c2.log`、`t24-fix1-gate-jvm-final.log`、`t24-fix1-device.log`。
 - 计数 awk（唯一口径）：`awk -F'"' '/<testsuite /{n++;t+=$4;s+=$6;f+=$8;e+=$10}
   END{printf "suites=%d tests=%d skipped=%d failures=%d errors=%d\n",n,t,s,f,e}'
   app/build/test-results/testDebugUnitTest/*.xml`。
@@ -804,6 +845,53 @@ for(i in r){split(r[i],p," ");printf "%s/%s %.4f\n",p[1],p[2],ratio(p[1],p[2])}}
 - 提交：`3a016c0`（三族判据 RED 先行）→ `aa7acb5`（Feed 二级层 + connected 类）→
   `8474110`（正文墨 token 化 + 两张裸 hex 表同批摘）→ `cae692b`（主页版面 + 宿主接线 + 两枚在册判据）→
   `4ff98d6`（大字号档先滚再点）。
+  **提交诚实性补记（修复轮 1 F-8）**：`ReadingHomeLayoutContractTest` 自 `3a016c0` 就在树里（RED 先行），
+  其中「feed 不再内联」「出站确认走共享件」「偏好下沉」三条读的是 `ReadingAccessScreen.kt` / `AppScreen.kt`，
+  这两枚文件直到 `cae692b` 才改 ⇒ **`aa7acb5` 与 `8474110` 两枚提交上该类 5 例里有 3 例是红的**，
+  全绿点只从 `cae692b` 起算；`3a016c0`/`aa7acb5`/`8474110` 是流程要求的 RED 先行单元，不是可交付的全绿单元。
+
+### 修复轮 1（评审席 findings 处置，2026-10-24 登记）
+
+评审席结论 PASS_WITH_MINORS（Blocker 0 / Major 1 / Minor 8），控制者裁定 F-0/F-1/F-2/F-3/F-5/F-6/F-8 本批修、
+F-4/F-7 只做文档与卫生、C-1 维持既有债裁决。本席提交：`2eaa53c`（F-1/F-6 判据与注释）→
+`8c50738`（F-2/F-3 connected 判据）→ `59bd14f`（F-5② 生产兜底 + 其 connected 判据 + `feed_idle` 台账）。
+
+- **F-1（判据补牙）**：`ReadingHomeLayoutContractTest` 里那枚永真断言（右腿读的就是它自己那份源码）改为
+  **按花括号配对取 `if (generationParamsExpanded)` 分支本体**，再断偏好卡与 `ArticleType.entries` 都在分支内——
+  窗口式写法抓不住「平铺回主页但顺序仍在开关之后」，配对式抓得住。
+  「共享件全树 ≥1 枚调用方」那枚与上一行 `assertEquals(1, …)` 同源、零增量，**删断言并把口径写进注释**
+  （不能改成「除本屏外 ≥1」：本屏就是共享件当前唯一的生产接线，现算
+  `grep -rn "OutboundConfirmDialog(" app/src/main --include=*.kt` ⇒ 组件声明 1 处 + `ReadingAccessScreen.kt` 1 处）。
+  `outbound_confirmation_text` 的零尺寸 tag 垫片形状按实写进注释（行为面归 `outbound_confirm_body` + 两枚答案位），本批不改形状。
+  变异自证：生产把偏好卡平铺回主页（位置仍在开关之后）⇒ 该类恰 1 例红、红样文案点名 `reading_preference`
+  （`t24-fix1-red-jvm-f1-mutation.log`）。
+- **F-3（命名与断言对齐）**：`feedEmptyStateIsExplicit` / `feedUnreachableStateIsExplicit` /
+  `feedReadyListsItemsWithSourceName` → `…IsNotPaintedOnReadingHome` 一族，**断言一字未动**。
+  历史文档 `docs/handoff/2026-10-12-stage-2-acceptance-record.md` 里那两个旧用例名是当时的快照，不属本席授权面，未改。
+- **F-6（注释里的自漂移绝对数与错命令）**：`GlassPanelInkPairingContractTest` 的「八处 / 份数恰 8」四处
+  改为「按 `expectedPanels` 现数」（判据算式本来就用 `expectedPanels.size`，没写死数字；
+  `grep -c 'Panel("' <本文件>` 现跑 = 9，其中 2 枚是判据夹具里的 `FakeScreen.kt`，台账实数按现表读）。
+  `RawColorLiteralRatchetTest` 摘除处的重算命令改为
+  `grep -n "ArticleReadingScreen" <本文件>` ⇒ 零命中（原 `grep -c "ReadingScreen.kt" <本文件>` 现跑 = 1，
+  只命中注释自己，`"AppScreen.kt"` 并不含该子串——口径自相矛盾，本批改掉以免 Task 26 照抄）。
+- **F-7（大字号证据补齐 + 卫生）**：`font_scale` 2.0 轮补跑本批唯一改到排版的屏与其连带件，三次回显
+  落同一份日志 `t24-fix1-device.log`（跑前 `1.0` / 置档 `2.0` / 收工 `1.0`，全程 `-s emulator-5574`，
+  未用 `connectedDebugAndroidTest`）：`ArticleReadingScreenTest` **OK (23 tests)**、
+  `ui.glass.GlassDialogTest` **OK (1 test)**、`ReadingFeedScreenTest` **OK (9 tests)**、
+  `ReadingAccessScreenTest` **OK (18 tests)**。
+  重复 import（`ReadingFeedScreenTest.kt` 两枚 `assertIsDisplayed`）摘掉一枚。
+  `t24-device-fontscale-before.log` 里 `List of devices attached` 段落落的真机序列号行已就地删除并注明原因。
+- **@Test 计数（只增不减）**：`ReadingAccessScreenTest` 17 → **18**（F-2 新腿；一支一次 `setContent` 的真机怪癖
+  决定了它必须另立用例）；`ReadingFeedScreenTest` 仍 **9**（F-5② 的兜底腿并进原 Idle 用例并改名，未新增用例）；
+  `ReadingHomeLayoutContractTest` 仍 **5**（F-1 只换断言、F-5② 只往台账列表加一枚锚）。
+- **本批门控读数**（§九 五类，未跑全量门）：`t24-fix1-gate-jvm-final.log` ⇒
+  `BUILD SUCCESSFUL in 20s` + `suites=5 tests=54 skipped=0 failures=0 errors=0`；
+  中间态（判据先行）`t24-fix1-gate-jvm-c1c2.log` ⇒ `BUILD SUCCESSFUL in 20s` + 同上计数。
+  connected 修后读数：1.0 档 `ReadingFeedScreenTest` 9/9、`ReadingAccessScreenTest` 18/18；
+  2.0 档 9/9、18/18、`ArticleReadingScreenTest` 23/23、`GlassDialogTest` 1/1。
+- **未在本批做**：F-4 的两枚横幅配色（Task 26/27 面，只登记口径与形状事实）；
+  C-1 三枚 2.0 红（既有债，维持裁决）；全量 JVM 门与带计数行原始件（控制者收工复跑）；
+  `outbound_confirmation_text` 垫片的形状改造（本批只写注释）。
 
 ## 剥注释夹具的债（Task 12 修复轮 1 的 Fix 1，登记口径）
 
