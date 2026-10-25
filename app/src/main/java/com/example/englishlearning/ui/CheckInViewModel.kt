@@ -25,6 +25,10 @@ sealed interface CheckInUiState {
         val totalsText: String = "暂无学习记录",
         val streakText: String = "连续学习 0 天",
         val recentDays: List<DailyLearningStats> = emptyList(),
+        // 批 1 Task 6：我的页三格统计要的是**数字**（页面用自己的 Headline 排版），
+        // 不从 streakText / totalsText 里反解析——同一份快照喂两个面，文本与数字同源。
+        val streakDays: Int = 0,
+        val learnedWordCount: Int = 0,
     ) : CheckInUiState
     data object Unavailable : CheckInUiState
 }
@@ -37,17 +41,28 @@ class CheckInViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<CheckInUiState>(CheckInUiState.Loading)
     val uiState: StateFlow<CheckInUiState> = _uiState
 
-    fun load(profileId: String) {
-        _uiState.value = CheckInUiState.Loading
+    /**
+     * 读一次打卡快照。
+     *
+     * [keepReady]：批 1 Task 6 的预加载口径——我的页与学习页会在切 tab 时各调一次，
+     * 这时**不许**先把状态打回 `Loading`（页头连续天数与统计格会闪成 0，等于先撒谎再改口），
+     * 失败时也保留上一份 Ready（页面停留在上一次的真数据，而不是整页换成不可用）。
+     * 打卡页自己的显式加载仍走默认值 `false`：那时重读就该显示进度。
+     */
+    fun load(profileId: String, keepReady: Boolean = false) {
+        val previous = _uiState.value
+        if (!keepReady) _uiState.value = CheckInUiState.Loading
         viewModelScope.launch {
             val today = clock.instant().atZone(clock.zoneId()).toLocalDate()
             val month = YearMonth.from(today)
             val from = month.atDay(1)
             val to = month.atEndOfMonth()
+            fun unavailable(): CheckInUiState =
+                if (keepReady && previous is CheckInUiState.Ready) previous else CheckInUiState.Unavailable
             try {
                 val result = repository.range(profileId, from, to)
                 if (result.isFailure) {
-                    _uiState.value = CheckInUiState.Unavailable
+                    _uiState.value = unavailable()
                 } else {
                     val byDate = result.getOrThrow().associateBy { it.localDate }
                     fun stats(date: LocalDate): DailyLearningStats = byDate[date]
@@ -64,7 +79,7 @@ class CheckInViewModel @Inject constructor(
                     val streak = streakResult.getOrNull()
                     if (totals == null || streak == null) {
                         // 统计口径任一不可得即整页诚实降级，不显示半真数据。
-                        _uiState.value = CheckInUiState.Unavailable
+                        _uiState.value = unavailable()
                     } else {
                         val totalsText = if (totals.learnedWordCount == 0 && totals.reviewEventCount == 0) {
                             "暂无学习记录"
@@ -79,13 +94,15 @@ class CheckInViewModel @Inject constructor(
                             totalsText = totalsText,
                             streakText = "连续学习 $streak 天",
                             recentDays = (6L downTo 0L).map { stats(today.minusDays(it)) },
+                            streakDays = streak,
+                            learnedWordCount = totals.learnedWordCount,
                         )
                     }
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Throwable) {
-                _uiState.value = CheckInUiState.Unavailable
+                _uiState.value = unavailable()
             }
         }
     }

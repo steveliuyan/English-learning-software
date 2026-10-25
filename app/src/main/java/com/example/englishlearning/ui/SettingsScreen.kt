@@ -257,10 +257,6 @@ fun SettingsScreen(
     onOpenLicenses: () -> Unit = {},
 ) {
     val colors = appColors()
-    val context = LocalContext.current
-    val themeMode = rememberAppThemeMode()
-    var wordBooksExpanded by rememberSaveable { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -275,7 +271,59 @@ fun SettingsScreen(
             title = "设置",
             subtitle = "$profileName · API Key 只保存在本机加密区。",
         )
+        SettingsGroupsContent(
+            wordBookName = wordBookName,
+            onOpenSetup = onOpenSetup,
+            onOpenWorksheet = onOpenWorksheet,
+            onOpenAiProfiles = onOpenAiProfiles,
+            onOpenSpeechSettings = onOpenSpeechSettings,
+            onOpenReminderSettings = onOpenReminderSettings,
+            onOpenBackupHub = onOpenBackupHub,
+            aiProfileSubtitle = aiProfileSubtitle,
+            speechEngineStatuses = speechEngineStatuses,
+            onImportWordBook = onImportWordBook,
+            onExportWordBook = onExportWordBook,
+            importedBookCount = importedBookCount,
+            transferBusy = transferBusy,
+            transferMessage = transferMessage,
+            onOpenLicenses = onOpenLicenses,
+        )
+    }
+}
 
+/**
+ * 设置的「四组九行」内容本体（批 1 Task 6 抽出）。
+ *
+ * 抽出的动机是版面：设置 tab 的根页从「设置」变成「我的」（[ProfileScreen]）——档案头 + 三格统计 +
+ * 学习记录行之后，仍是这四组九行。内容原样搬过来，**不带** `fillMaxSize` / `verticalScroll` /
+ * `testTag("settings_screen")`：滚动与屏根归宿主，否则我的页里会套出第二个滚动容器与第二个根锚。
+ *
+ * 台账纪律不变：九行标题、图标、域色与 testTag 仍只在 [SettingsGroups] 定义一处，本函数按 tag
+ * 经 [settingsEntry] 取；`SettingsNoDeveloperJargonTest` 的「标题各只写一次」判据跨这次抽出依然成立。
+ */
+@Composable
+internal fun SettingsGroupsContent(
+    wordBookName: String?,
+    onOpenSetup: () -> Unit,
+    onOpenWorksheet: () -> Unit,
+    onOpenAiProfiles: () -> Unit,
+    onOpenSpeechSettings: () -> Unit,
+    onOpenReminderSettings: () -> Unit,
+    onOpenBackupHub: () -> Unit,
+    aiProfileSubtitle: String?,
+    speechEngineStatuses: SpeechEngineStatuses,
+    onImportWordBook: () -> Unit,
+    onExportWordBook: () -> Unit,
+    importedBookCount: Int,
+    transferBusy: Boolean,
+    transferMessage: String?,
+    onOpenLicenses: () -> Unit,
+) {
+    val context = LocalContext.current
+    val themeMode = rememberAppThemeMode()
+    var wordBooksExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         // 「学习」组三条入口行按稿 §7④：词书与每日目标走强档渐变底，其余弱档 tint；
         // 「学习提醒」保持导航行（开关状态在二级页），副标题沿用既有文案。
         // 标题/图标/域色一律从台账取（修复轮 1 / I3），这里只写动态的副标题与回调。

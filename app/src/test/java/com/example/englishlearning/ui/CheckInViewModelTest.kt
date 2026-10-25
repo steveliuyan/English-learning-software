@@ -119,6 +119,53 @@ class CheckInViewModelTest {
         Dispatchers.resetMain()
     }
 
+    /**
+     * 批 1 Task 6：我的页三格统计要**数字**，不是已经拼好的中文句子
+     * （「连续学习 5 天」这枚字符串无法再拆回 5，页面要在自己的排版里用 Headline 数）。
+     * 同一份快照喂两个面：打卡页读文本，我的页读数。
+     */
+    @Test
+    fun `ready carries the streak and learned totals for the profile page`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val stats = (1..30).map { day -> DailyLearningStats(LocalDate.of(2026, 9, day), 1, 0, 1, 2) }
+        val repository = FakeStats(Result.success(stats))
+        repository.totals = Result.success(com.example.englishlearning.learning.domain.LearningTotals(42, 17))
+        repository.streakResult = Result.success(5)
+        val vm = CheckInViewModel(repository, clock)
+        vm.load("p"); advanceUntilIdle()
+        val state = vm.uiState.value as CheckInUiState.Ready
+        assertEquals(5, state.streakDays)
+        assertEquals(42, state.learnedWordCount)
+        // 文本与数字同源：句子仍按同一份 shot 拼，不许一条从别处取数。
+        assertEquals("连续学习 5 天", state.streakText)
+        Dispatchers.resetMain()
+    }
+
+    /**
+     * 批 1 Task 6 的预加载口径：我的页与学习页会在切 tab 时各调一次 `load(keepReady = true)`。
+     * 若这次重载先把状态打回 `Loading`，页头的连续天数会闪成 0、三格统计会闪成占位——
+     * 于是「刷新」变成了「先撒谎再改口」。keepReady 下：不回落 Loading，失败也保留上一份 Ready。
+     */
+    @Test
+    fun `keepReady refresh neither flashes loading nor drops a good snapshot on failure`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val repository = FakeStats(Result.success(listOf(DailyLearningStats(date, 1, 0, 1, 1))))
+        repository.totals = Result.success(com.example.englishlearning.learning.domain.LearningTotals(7, 3))
+        repository.streakResult = Result.success(2)
+        val vm = CheckInViewModel(repository, clock)
+        vm.load("p"); advanceUntilIdle()
+        val first = vm.uiState.value as CheckInUiState.Ready
+        assertEquals(2, first.streakDays)
+
+        // 第二次刷新失败：不许打回 Loading，也不许把上一份好快照换成 Unavailable。
+        repository.totals = Result.failure(IllegalStateException())
+        vm.load("p", keepReady = true)
+        assertTrue(vm.uiState.value is CheckInUiState.Ready, "keepReady 刷新不得先打回 Loading")
+        advanceUntilIdle()
+        assertEquals(first, vm.uiState.value, "刷新失败时应保留上一份 Ready，而不是闪成不可用")
+        Dispatchers.resetMain()
+    }
+
     private class FakeStats(private val result: Result<List<DailyLearningStats>>) : LearningStatsRepository {
         var totals: Result<com.example.englishlearning.learning.domain.LearningTotals> =
             Result.success(com.example.englishlearning.learning.domain.LearningTotals(0, 0))

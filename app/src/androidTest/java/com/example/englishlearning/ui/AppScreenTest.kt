@@ -502,13 +502,17 @@ class AppScreenTest {
     }
 
     @Test
-    fun settingsTabOpensTheSettingsScreenAndKeepsTheWorksheetEntry() {
+    fun settingsTabOpensTheProfilePageAndKeepsTheWorksheetEntry() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("settings_screen").assertExists()
-        composeRule.onNodeWithTag("settings_open_worksheet").assertExists().assertHasClickAction()
+        // 批 1 Task 6：「我的」这个 tab 现在的根是 `ProfileScreen`（档案头 + 三格统计 + 学习记录），
+        // 原设置四组九行原样接在它尾部（`SettingsGroupsContent`）。所以这里同时断两件事——
+        // 新根在、旧根不在——否则「ProfileScreen 套在 SettingsScreen 里」这种双滚动壳也能过。
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_open_worksheet").performScrollTo().assertExists().assertHasClickAction()
     }
 
     @Test
@@ -583,7 +587,7 @@ class AppScreenTest {
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
-        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
     }
 
     @Test
@@ -598,7 +602,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys.clear()
         pressSystemBack()
-        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
         // 一级页不再有引擎状态行；刷新语义下沉到语音二级页——直接进入 AI Profile 改完 Key
         // 返回后再进语音设置，状态必须是新鲜的。
         composeRule.onNodeWithTag("settings_speech_openai").assertDoesNotExist()
@@ -628,7 +632,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
-        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
         composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
     }
@@ -672,7 +676,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
 
         pressSystemBack()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()

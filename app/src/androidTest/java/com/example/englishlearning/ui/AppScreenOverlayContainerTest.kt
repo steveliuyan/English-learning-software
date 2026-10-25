@@ -270,7 +270,7 @@ class AppScreenOverlayContainerTest {
                 composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isEmpty()
             }
             composeRule.onNodeWithTag("settings_export_book_overlay-pack-a").assertDoesNotExist()
-            composeRule.onNodeWithTag("settings_screen").assertExists()
+            composeRule.onNodeWithTag("profile_screen").assertExists()
         } finally {
             books.forEach { it.deleteRecursively() }
         }
@@ -439,7 +439,7 @@ class AppScreenOverlayContainerTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("backup_hub_screen").fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
         composeRule.onNodeWithTag("app_tab_settings").assertExists()
     }
 

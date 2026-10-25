@@ -145,8 +145,9 @@ class MyWordsScreenContractTest {
     }
 
     /**
-     * 入口挂载（R-20A.3「只建不摘」→ 22-A / 22-B 两席摘除 → 版式重做批 1 的 Task 4 + Task 5 合并）：
-     * 词汇域现在只有**一条**入口面——学习页的「词库」行，落点是四分段 `WordBankScreen`。
+     * 入口挂载（R-20A.3「只建不摘」→ 22-A / 22-B 两席摘除 → 版式重做批 1 的 Task 4 + Task 5 合并，
+     * Task 6 补第二站点）：词汇域现在有**两处**入口面——学习页的「词库」行与我页的「词库」统计格，
+     * 落点同为四分段 `WordBankScreen`（词书段）。
      *
      * 期望值随形改的三处（判据形状一律保留「恰一处」的精确计数，不是放宽）：
      *  - 入口标签 `today_plan_open_my_words` → `today_plan_open_word_bank`（Task 4 把五个入口行换成
@@ -154,6 +155,8 @@ class MyWordsScreenContractTest {
      *  - 入口行标题「我的词」→ 四段枚举文案「词书 · 生词 · 错词 · 收藏」（词库页把三族词表并成四段后，
      *    学习页那行必须逐字说明行里有什么——旧名「我的词」消失，唯一的可发现性凭据就是这行副标题）；
      *  - 宿主挂载 `MyWordsScreen(` → `WordBankScreen(`（Task 5：合并页降为词库页的一段 pane）。
+     *
+     * Task 6 的第四个翻面：`onOpenWordBank` 从「全文件恰一处」变成「两个站点各恰一处、全文件恰两处」。
      *
      * 反向控同步翻面：`today_plan_open_wordbook_words` 从「必须在册」改成「必须离场」（Task 4 迁入口、
      * Task 5 把宿主那枚 `showWordBookWords` 并进 `showWordBank`）；`today_plan_search_entry` 仍在册
@@ -191,17 +194,49 @@ class MyWordsScreenContractTest {
         // 两条打开通路都必须**同时**点名段位：只赋 showWordBank 不赋段位 = 「复习生词本」落到词书段，
         // 用户点的是「复习」却看到列表第一页。逐环点名形状而不是数计数：
         // 「点了真的会开吗、开在哪一段」的用户面由 connected `AppScreenTest` 的端到端用例承重。
-        listOf(
-            "onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true }",
-            "onReviewWords = { wordBankSection = WordBankSection.New; showWordBank = true }",
-        ).forEach { wiring ->
-            assertEquals(
-                1,
-                countMatches(appScreen, Regex(Regex.escape(wiring))),
-                "入口接线「$wiring」必须恰一处：段位与开关同点同赋（0 = 这条通路断了，" +
-                    "2 = 长出第二条打开通路）",
-            )
-        }
+        //
+        // 批 1 Task 6 长出第二处**合法**出口：我的页三格统计里的「词库」格开的也是词库页（同为词书段）。
+        // 因此 onOpenWordBank 的期望值从「全文件恰一处」改为「每个站点各恰一处 **且** 全文件恰两处」：
+        // 站点内仍是精确等号，第三人偷偷补出第三条打开通路时总数变 3，照样当场红。
+        val wordBankWiring = "onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true }"
+        val reviewWiring = "onReviewWords = { wordBankSection = WordBankSection.New; showWordBank = true }"
+        val learningStation = appScreen
+            .substringAfter("AppTab.LEARNING -> TodayPlanScreen(")
+            .substringBefore("AppTab.READING ->")
+        val profileStation = appScreen
+            .substringAfter("ProfileScreen(")
+            .substringBefore("settingsContent = {")
+        // 取样器自检：两段必须真的切得开，否则 substringAfter 落空会把整份源码当成一个站点、
+        // 「各恰一处」退化成「整体恰一处」。
+        assertTrue(
+            "ProfileScreen(" !in learningStation && "onReviewWords" in learningStation,
+            "学习页站点切片落空或越界（必须切到 AppTab.READING 之前、且不含 ProfileScreen）",
+        )
+        assertTrue(
+            "TodayPlanScreen(" !in profileStation && "profileName =" in profileStation,
+            "我的页站点切片落空或越界（必须切到 settingsContent 之前、且不含 TodayPlanScreen）",
+        )
+        assertEquals(
+            1,
+            countMatches(learningStation, Regex(Regex.escape(wordBankWiring))),
+            "入口接线「$wordBankWiring」在学习页站点必须恰一处（0 = 这条通路断了，2 = 同屏长出第二条）",
+        )
+        assertEquals(
+            1,
+            countMatches(profileStation, Regex(Regex.escape(wordBankWiring))),
+            "入口接线「$wordBankWiring」在我的页站点必须恰一处（0 = 统计格成了死链，2 = 同屏长出第二条）",
+        )
+        assertEquals(
+            2,
+            countMatches(appScreen, Regex(Regex.escape(wordBankWiring))),
+            "打开词库的接线全文件必须恰两处（学习页词库行 + 我的页词库格）；再多一处就是绕过台账的新入口",
+        )
+        assertEquals(
+            1,
+            countMatches(appScreen, Regex(Regex.escape(reviewWiring))),
+            "入口接线「$reviewWiring」必须恰一处：段位与开关同点同赋（0 = 这条通路断了，" +
+                "2 = 长出第二条打开通路）",
+        )
         val overlayOpenBlock = appScreen.substringAfter("val overlayOpen =").substringBefore("BackHandler(")
         assertTrue(
             "showWordBank" in overlayOpenBlock,

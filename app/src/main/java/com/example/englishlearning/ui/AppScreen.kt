@@ -402,7 +402,9 @@ fun AppScreen(
             }
             // 进入阅读 tab 才算准入；今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
             LaunchedEffect(selectedTab, state.profile.id, todayReady?.isUnlocked) {
-                if (selectedTab == AppTab.READING) {
+                // 批 1 Task 6：我的页第三格统计是「文章数」，它读的就是这份阅读历史；
+                // 只在进阅读 tab 时取数会让那一格在没进过阅读 tab 前恒为 0（假数字）。
+                if (selectedTab == AppTab.READING || selectedTab == AppTab.SETTINGS) {
                     readingAccessViewModel?.load(
                         profileId = state.profile.id,
                         isUnlocked = todayReady?.isUnlocked == true,
@@ -413,6 +415,24 @@ fun AppScreen(
             val readingState: ReadingAccessUiState =
                 readingAccessViewModel?.uiState?.collectAsState()?.value ?: ReadingAccessUiState.Loading
             val readingTarget = readingAccessViewModel?.readingTarget?.collectAsState()?.value
+            // 批 1 Task 6：打卡快照在宿主层**只收一次**（原先只在打卡页分支里收）——学习页的
+            // 「连续天数 / 今日文章已读」与我的页三格统计都读它，两处各收一份就是两份真源。
+            val checkInState by checkInViewModel?.uiState?.collectAsState()
+                ?: remember { mutableStateOf<CheckInUiState>(CheckInUiState.Loading) }
+            // 两个页面读的是同一份快照里的同一批数字，所以在宿主层派生一次、按名传两处：
+            // 学习页（连续天数 + 今日文章已读）与我的页（连续天数 + 已学词）。派生只此一处，
+            // 免得某一页自己再 `as? Ready` 一遍、兜底值各写各的。
+            val checkInReady = checkInState as? CheckInUiState.Ready
+            val streakDays = checkInReady?.streakDays ?: 0
+            val learnedWordCount = checkInReady?.learnedWordCount ?: 0
+            val todayArticleRead = (checkInReady?.today?.completedReadingCount ?: 0) > 0
+            // 预加载：学习页与我的页一露面就要有这两个数字。keepReady 保证这次重载
+            // 不把页面闪回 Loading、失败也保留上一份好快照（CheckInViewModelTest 钉着口径）。
+            LaunchedEffect(selectedTab, state.profile.id) {
+                if (selectedTab == AppTab.LEARNING || selectedTab == AppTab.SETTINGS) {
+                    checkInViewModel?.load(state.profile.id, keepReady = true)
+                }
+            }
             // F4-01 决策 §8：删除某个文章版本成功后，按现参重放历史加载刷新列表；
             // 计数只在「真删成功」时递增，拒删与失败都不该触发无谓重读。
             val versionDeleteCount = articleVersionViewModel?.versionDeletions?.collectAsState()?.value ?: 0
@@ -1136,7 +1156,7 @@ fun AppScreen(
                     onBack = { showWorksheetSettings = false },
                 )
             } else if (showCheckIn) {
-                val checkInState by checkInViewModel?.uiState?.collectAsState() ?: remember { mutableStateOf<CheckInUiState>(CheckInUiState.Loading) }
+                // 批 1 Task 6：快照在宿主层统一收（见上方 checkInState），这里不再收第二份。
                 CheckInScreen(
                     state = checkInState,
                     onBack = { showCheckIn = false },
@@ -1663,6 +1683,10 @@ fun AppScreen(
                                     globalVocabularySearchViewModel?.openSearch("")
                                     showGlobalVocabularySearch = globalVocabularySearchViewModel != null
                                 },
+                                // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
+                                // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
+                                streakDays = streakDays,
+                                todayArticleRead = todayArticleRead,
                             )
                             AppTab.READING -> ReadingAccessScreen(
                                 state = readingState,
@@ -1758,56 +1782,73 @@ fun AppScreen(
                                         )
                                     }
                                 }
-                                SettingsScreen(
+                                // 批 1 Task 6：设置 tab 的根页换成「我的」（spec §3.6）——档案头 + 三格统计
+                                // + 学习记录行，设置的四组九行原样作为内容槽挂在下面。SettingsScreen 本身
+                                // 保留为装载缝（connected 设置页测试直接挂它），但宿主只挂这一页：
+                                // 同一 tab 里再挂一枚 SettingsScreen 就是两个滚动容器、两枚页头。
+                                ProfileScreen(
                                     profileName = state.profile.displayName,
-                                    wordBookName = todayReady?.wordBookName,
-                                    onOpenSetup = { showSetup = true },
-                                    onOpenWorksheet = {
-                                        worksheetViewModel?.load(state.profile.id)
-                                        showWorksheetSettings = worksheetViewModel != null
+                                    streakDays = streakDays,
+                                    learnedWordCount = learnedWordCount,
+                                    // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
+                                    // 所以锁定态下这一格也是真数。
+                                    articleCount = readingState.historyOrEmpty.size,
+                                    onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
+                                    onOpenCheckIn = { showCheckIn = true },
+                                    onOpenReadingHistory = { showReadingHistory = true },
+                                    onOpenLearningRecords = { showLearningRecords = true },
+                                    settingsContent = {
+                                        SettingsGroupsContent(
+                                            wordBookName = todayReady?.wordBookName,
+                                            onOpenSetup = { showSetup = true },
+                                            onOpenWorksheet = {
+                                                worksheetViewModel?.load(state.profile.id)
+                                                showWorksheetSettings = worksheetViewModel != null
+                                            },
+                                            onOpenAiProfiles = {
+                                                aiProfileViewModel?.load()
+                                                showAiProfiles = aiProfileViewModel != null
+                                            },
+                                            onOpenSpeechSettings = {
+                                                speechSettingsViewModel?.load()
+                                                showSpeechSettings = speechSettingsViewModel != null
+                                            },
+                                            onOpenReminderSettings = {
+                                                reminderSettingsViewModel?.load()
+                                                showReminderSettings = reminderSettingsViewModel != null
+                                            },
+                                            // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
+                                            onOpenBackupHub = { showBackupHub = true },
+                                            onOpenLicenses = { showLicenses = true },
+                                            speechEngineStatuses = speechState.engineStatuses(),
+                                            aiProfileSubtitle = aiProfiles?.let { ready ->
+                                                if (ready.items.isEmpty()) {
+                                                    "尚未添加，点这里添加第一套 OpenAI 兼容服务"
+                                                } else {
+                                                    "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                                                }
+                                            },
+                                            onImportWordBook = {
+                                                wordBookTransferViewModel?.consumeMessage()
+                                                importLauncher.launch(arrayOf("*/*"))
+                                            },
+                                            onExportWordBook = {
+                                                val books = transferState?.books.orEmpty()
+                                                if (transferState?.canExport == true) {
+                                                    wordBookTransferViewModel?.consumeMessage()
+                                                    if (books.size == 1) {
+                                                        exportWordBookId = books.single()
+                                                        exportLauncher.launch("${books.single()}.wbpack")
+                                                    } else {
+                                                        showWordBookExportPicker = true
+                                                    }
+                                                }
+                                            },
+                                            importedBookCount = transferState?.books?.size ?: 0,
+                                            transferBusy = transferState?.busy == true,
+                                            transferMessage = transferState?.message,
+                                        )
                                     },
-                                    onOpenAiProfiles = {
-                                        aiProfileViewModel?.load()
-                                        showAiProfiles = aiProfileViewModel != null
-                                    },
-                                    onOpenSpeechSettings = {
-                                        speechSettingsViewModel?.load()
-                                        showSpeechSettings = speechSettingsViewModel != null
-                                    },
-                                    onOpenReminderSettings = {
-                                        reminderSettingsViewModel?.load()
-                                        showReminderSettings = reminderSettingsViewModel != null
-                                    },
-                                    // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
-                                    onOpenBackupHub = { showBackupHub = true },
-                                    onOpenLicenses = { showLicenses = true },
-                                    speechEngineStatuses = speechState.engineStatuses(),
-                                    aiProfileSubtitle = aiProfiles?.let { ready ->
-                                        if (ready.items.isEmpty()) {
-                                            "尚未添加，点这里添加第一套 OpenAI 兼容服务"
-                                        } else {
-                                            "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
-                                        }
-                                    },
-                                    onImportWordBook = {
-                                        wordBookTransferViewModel?.consumeMessage()
-                                        importLauncher.launch(arrayOf("*/*"))
-                                    },
-                                    onExportWordBook = {
-                                        val books = transferState?.books.orEmpty()
-                                        if (transferState?.canExport == true) {
-                                            wordBookTransferViewModel?.consumeMessage()
-                                            if (books.size == 1) {
-                                                exportWordBookId = books.single()
-                                                exportLauncher.launch("${books.single()}.wbpack")
-                                            } else {
-                                                showWordBookExportPicker = true
-                                            }
-                                        }
-                                    },
-                                    importedBookCount = transferState?.books?.size ?: 0,
-                                    transferBusy = transferState?.busy == true,
-                                    transferMessage = transferState?.message,
                                 )
                             }
                         }
