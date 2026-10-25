@@ -57,15 +57,18 @@ detekt/ktlint 未运行：本仓门禁是单测，静态分析为存量债基线
 
 ## 4. Git 状态
 
-- 分支：`stage-5-ui-r2-learning-path`（本地领先 origin 97 提交，本批文档提交后 98）。
-- 本批代码+测试提交：`65cf464`（14 文件，+664/-138）；文档提交紧随其后。
-- 推送：**未推送**，按仓库约定逐批请示用户后再执行；本节在推送成功后补远端 tip。
+- 分支：`stage-5-ui-r2-learning-path`，**已推送**（用户 2026-10-25 批准）。
+- 本批代码+测试提交：`65cf464`（14 文件，+664/-138）；文档提交 `a99dc9b`。
+- 远端核验：`git ls-remote origin stage-5-ui-r2-learning-path` == `git rev-parse HEAD` ==
+  `a99dc9bd40033bb5d441f3755ff962f8fc77d55a`。
+- 真机装机（里程碑）：`adb -s bf353dda install -r` **Success**；monkey 启动后
+  `mCurrentFocus=com.example.englishlearning/.MainActivity`。未在真机跑任何 instrument。
 - 前序提交：`fb7def4`（圆形图标补显式圆弧，修「描边档只剩半圈」，Task 27 首项）。
 
 ## 5. 未完成 / 遗留问题
 
-- **真机目视**：`emulator-5574` 或真机手工走查今日计划六行（弱档 `tint` 底、六枚字形辨识、`Chart`/`List`/`Book`
-  是否易区分）与 `AiProfileSettingsScreen` 危险红；本批只有自动化证据。
+- **真机目视**：APK 已装到 `bf353dda` 并正常启动；待用户手工确认今日计划六行（弱档 `tint` 底、
+  六枚字形辨识、`Chart`/`List`/`Book` 是否易区分）与 `AiProfileSettingsScreen` 危险红。
 - **`EntryIconTone.Gradient`**：`SettingsScreen` 卡内主行仍有 2 处生产消费，故未登记死码、未摘档。
 - **Task 42（R-B）**：目标页 18 屏 71 处 `MintPrimary` 迁移待用户拍板三案；本批未夹带。
 - **批 3 结转**：Task 26 Step 8 真机全链、Task 35/36/37/38/39/40 仍在台账。
