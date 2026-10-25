@@ -954,6 +954,8 @@ token 化的取值代价与两处**测试侧**陈旧预期的订正。所有数�
    `contentDescription = "词卡学习"`，离开靠系统 BackHandler，另有全宽「返回今日计划」按钮）、
    `WorksheetPreviewScreen`（`← 返回修改` 文字按钮、无独立语义标签）。
 4. **孤儿屏（1）**：`VocabularyScreen`（`VocabularyScreen(` 在全仓 0 处调用；与词行族同一口径留档，随屏删除时两表同摘）。
+   **2026-10-25 已销账**：该屏整文件随简化批删除，页头族与词行族 seed 的同名条目同批摘除；
+   状态类型仍留在 `VocabularyUiState` 等文件里供合并页消费。裁决见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
 
 **为什么不「先接组件把 seed 删掉」**：族规则有「本文件调了共享组件即整体合规」的出口（AC-R-08 的已知失明面）。
 对这 16 个文件补一行 `AppScreenHeader(` 会让 seed 立刻变绿，但上面 8 条自定义返回语义、2 条根 tab 标题色、

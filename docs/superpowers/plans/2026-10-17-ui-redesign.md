@@ -1647,6 +1647,12 @@ internal val MintBackground: Color
   停在「AC-R-20 + 行为回归」，不扩成版面复审。**批 3 兑现时会连带触发** `TodayPlanScreenTest`
   那条可点集合闭合断言（现值 9）——那是预期的红，改测试即可，别当成 AC-R-20 回退。
 
+  **2026-10-25 简化批（用户批准）**：闭合集合再减一枚——「学习工具与设置」行随
+  `onOpenLearningTools` 形参一并删除（它落的设置 tab 与底部导航完全重复），
+  `TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta` 的 `rowTags` 已同批改为 5 行；
+  同批还删了两张并排计数卡与独立的「已解锁 / 未解锁」文案行（数字与状态在进度卡、阅读按钮 enabled 态里已有）。
+  完整清单与保留项见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
+
 - **14A 开工前必读**：本轮已确认 `appDomain(...)` 域色在两套里有独立取值
   （`AppColors.kt:95` 浅 Learn `base #0A84FF / deep #075EB4`；`:106` 深 Learn `#5AC0FF` 两端同值），
   14A 算 Text/Secondary 档「深套前景改读 `accent.base`」时，**深套的 base/deep 是同一个值**这条会直接改变结论，
