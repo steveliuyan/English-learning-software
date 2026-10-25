@@ -796,20 +796,40 @@ class MaterialThemeAssemblyContractTest {
         )
         // M-2：仓库级唯一性——per-file 计数挡不住第二个文件在子树里换掉 token 集。
         val mainSources = scanMainSources()
+        fun hitsOf(regex: Regex): List<String> =
+            mainSources.flatMap { file -> regex.findAll(stripComments(file.readText())).map { file.name } }.toList()
         listOf(
             Regex("""LocalAppColors\s+provides""") to "LocalAppColors provides",
             Regex("""LocalDomainColors\s+provides""") to "LocalDomainColors provides",
             Regex("""LocalIsDark\s+provides""") to "LocalIsDark provides",
-            contentInkProvide to "LocalContentColor provides",
         ).forEach { (regex, label) ->
-            val hits = mainSources.flatMap { file -> regex.findAll(stripComments(file.readText())).map { file.name } }.toList()
             assertEquals(
                 listOf(MINT_GLASS_THEME_NAME),
-                hits,
-                "$label 在整个 src/main/java 必须恰好命中一次且位于 $MINT_GLASS_THEME_NAME，实际命中：$hits" +
+                hitsOf(regex),
+                "$label 在整个 src/main/java 必须恰好命中一次且位于 $MINT_GLASS_THEME_NAME，实际命中：${hitsOf(regex)}" +
                     "（第二处提供者能在子树里换掉 token 集）",
             )
         }
+        // `LocalContentColor` 与上面三枚 token local 不同类：它是**子树级的前景墨覆盖**，不是 token 集。
+        // 根装配那一次仍是唯一真值（MintGlassTheme 的 `set.text1`），但容器语义合法地需要子树覆盖——
+        // 批 1 的 `StrongCard`（深墨实底）必须把前景提供成 `onStrong`：`AppType` 六档 getter 自带 `text1`，
+        // 不覆盖时卡内未显式着色的 `Text` 会落到近黑墨，深底深字不可读。
+        //
+        // 判据从「恰一处」改成**登记制**（不是放宽）：提供点被逐条点名，新增第三处、或把某条挪到别的文件，
+        // 都当场红；「在子树里整批换掉 token 集」这一原始风险仍由上面三枚 token local 的「恰一处」承担，
+        // 两份判据分工不重叠。登记表里的文件必须真实存在——`hitsOf` 扫的是全量主源码，
+        // 登记了却没有命中同样被判红（Map 不等）。
+        val contentInkOverrides = mapOf(
+            MINT_GLASS_THEME_NAME to 1,
+            CONTINUOUS_CARD_CONTAINERS to 1,
+        )
+        val actualInkProviders = hitsOf(contentInkProvide)
+        assertEquals(
+            contentInkOverrides,
+            actualInkProviders.groupingBy { it }.eachCount(),
+            "LocalContentColor provides 的提供点必须逐条登记：$contentInkOverrides（根装配 + StrongCard 深底前景）；" +
+                "实际 $actualInkProviders。新增覆盖点先登记并写明容器语义理由，未登记即红",
+        )
         assertTrue(
             Regex("""val domains = if \(dark\) DomainDark else DomainLight""").containsMatchIn(body),
             "域色必须整张 DomainLight/DomainDark 提供：给子集会让 appDomain() 与 MintPrimary 的 " +
@@ -945,6 +965,8 @@ private const val MAIN_SOURCE_PATH = "src/main/java"
 private const val MAIN_ACTIVITY_PATH = "src/main/java/com/example/englishlearning/MainActivity.kt"
 private const val MAIN_ACTIVITY_NAME = "MainActivity.kt"
 private const val MINT_GLASS_THEME_NAME = "MintGlassTheme.kt"
+/** 三档容器的宿主文件：`StrongCard` 是 `LocalContentColor` 唯一登记的子树覆盖点（深墨实底前景）。 */
+private const val CONTINUOUS_CARD_CONTAINERS = "Containers.kt"
 private const val APP_TYPE_NAME = "AppType.kt"
 private const val APP_COLORS_NAME = "AppColors.kt"
 private const val MINT_PALETTE_NAME = "MintPalette.kt"

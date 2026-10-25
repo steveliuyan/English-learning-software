@@ -221,6 +221,10 @@ fun AppScreen(
             // `showFavorites` / `showWrongWords` 另两条连同打卡页那两条裸文字链由 **Task 22-B** 摘除；
             // 三者合并后「我的词汇」全站只剩 MyWordsScreen 这一处入口。
             var showMyWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 合并页的**初始落位段**：默认真实入口（收藏），学习页 CTA 的「复习生词本」把它改指生词本段。
+            // 只保存「该落在哪一段」，段内滚动与读数仍由 MyWordsScreen 自己持有（该屏的
+            // `LaunchedEffect(section)` 只在 section 变化时落位一次，本变量不参与它的键集）。
+            var myWordsSection by rememberSaveable(state.profile.id) { mutableStateOf(MyWordsSection.Favorites) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             val wordBookWordsListState = key(state.profile.id, showWordBookWords) {
@@ -306,10 +310,6 @@ fun AppScreen(
             // 错词状态在「错词本」与「我的词」两处叠层里是同一份，所以在这里收一次（原先只在错词页本地收）。
             val wrongWordsState = wrongWordsViewModel?.uiState?.collectAsState()?.value
                 ?: WrongWordsUiState.Loading
-            // 「我的词」入口行的尾部计数串：规则本体在 `MyWordsSummary.kt` 的 myWordsSummaryOf
-            // （三段全 Ready 才给数，宁缺；I-3 修复轮 1 抽成可测纯函数，JVM 判据在 MyWordsSummaryTest）。
-            // 宿主这里只留唯一一处聚合调用，静态形状由 MyWordsScreenContractTest 点名。
-            val myWordsSummary = myWordsSummaryOf(favoritesState, vocabularyState, wrongWordsState)
             val openedFavoriteCard = favoritesViewModel?.openedCard?.collectAsState()?.value
             LaunchedEffect(openedFavoriteCard, showMyWords) {
                 val opened = openedFavoriteCard ?: return@LaunchedEffect
@@ -1157,6 +1157,7 @@ fun AppScreen(
                     favoritesState = favoritesState ?: FavoritesUiState.Loading,
                     vocabularyState = vocabularyState,
                     wrongWordsState = wrongWordsState,
+                    section = myWordsSection,
                     onBack = { showMyWords = false },
                     onOpenFavoriteWord = { favoritesViewModel?.open(it) },
                     onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
@@ -1621,13 +1622,16 @@ fun AppScreen(
                                 // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
                                 // 全屏页，避免出现「底导之上再压一层」的混乱层级。
                                 onOpenReading = { selectedTab = AppTab.READING },
-                                onOpenCheckIn = { showCheckIn = true },
-                                onOpenLearningRecords = { showLearningRecords = true },
-                                onOpenWordBookWords = { showWordBookWords = true },
-                                // 裁决①「我的词」入口：尾部计数只在三段都真读出来时才给（见上面 myWordsSummary），
-                                // 没读出来就是 null，EntryRow 不渲染尾部——空着比给个 0 诚实。
-                                myWordsSummary = myWordsSummary,
-                                onOpenMyWords = { showMyWords = true },
+                                // 批 1 Task 4：学习页只剩两条裸行，目的地分别是今日文章与本机词库。
+                                // 词库页（WordBankScreen）在 Task 5 落地，此前先接老词书单词页，
+                                // 保证这一行点了有去处（不留空回调）。
+                                onOpenWordBank = { showWordBookWords = true },
+                                // 「复习生词本」落在合并页的生词本段（`MyWordsSection.Wordbook`）：
+                                // 只改落位，不新建数据通路——三段 ViewModel 与 retry 口径全不动。
+                                onReviewWords = {
+                                    myWordsSection = MyWordsSection.Wordbook
+                                    showMyWords = true
+                                },
                                 onOpenSearch = {
                                     // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
                                     // 「浏览词书」——那属于词书管理语义，不是「查一个词」。

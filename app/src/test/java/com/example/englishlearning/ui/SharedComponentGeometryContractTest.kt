@@ -45,6 +45,9 @@ class SharedComponentGeometryContractTest {
         const val ENTRY_ROW = "EntryRow.kt"
         const val INLINE_NOTICE = "InlineNotice.kt"
         const val ICON_BADGE = "IconBadge.kt"
+
+        /** 发丝线助手 `hairlineTop` 的家（批 1 从 EntryRow.kt 迁出，三档容器与 EntryRow 共用一份）。 */
+        const val CONTAINERS = "Containers.kt"
     }
 
     // 读法（M-3，Task 12 兑现）：本类原先自带一份私有 `uiComponentSource`，与另外三份逐字相同，
@@ -74,14 +77,21 @@ class SharedComponentGeometryContractTest {
     /** chevron：16dp 且显式单层。锚点**按顺序承重**（size 写在 layer 之前，与 `IconBadgeContrastContractTest.strokeOnlyBeforeSize` 同理）。 */
     private val chevronStroke16 = Regex("""size = 16\.dp, layer = AppGlyphLayer\.StrokeOnly""")
 
-    /** 发丝线宽度取值。 */
+    /**
+     * 发丝线宽度取值。
+     *
+     * 批 1 把这枚取值连同 `hairlineTop` 一起从 `EntryRow.kt` 迁到 `Containers.kt`（三档容器与入口行共用一份）：
+     * 判据的**对象**不变（1dp 发丝线的取值与「先画线、再让位」的顺序），**主人**变了。所以下面的用例
+     * 改读 `Containers.kt`，并在 `EntryRow.kt` 上补一条零计数反向锚——旧家留一份私有副本就是
+     * 「同一根线两份实现」，那正是这次收编要消掉的形。
+     */
     private val hairlineToPx = Regex("""1\.dp\.toPx\(\)""")
 
     /**
      * 发丝线顺序锚（R-10.5）：`drawBehind { …1.dp.toPx()… }` 之后紧跟 `.padding(top = 1.dp)`——
      * 先画线再让位，线才在内容外侧；写反（padding 后 drawBehind）就把线画进内容顶边。
-     * 全文件 `padding(top = 1.dp)` 剥注释后是 2 处（另一处是副标题的 1dp 间隙，稿 `.ed`），
-     * 所以「恰 1 处」必须由这条带 `drawBehind` 前件顺序的形状来钉。
+     * [CONTAINERS] 剥注释后 `padding(top = 1.dp)` 只有 `hairlineTop` 那一处，所以「恰 1 处」既由
+     * 计数承重、也由这条带 `drawBehind` 前件顺序的形状承重（顺序错了正则数到 0）。
      */
     private val hairlineOutsideContent =
         Regex("""drawBehind\s*\{[^{}]*1\.dp\.toPx\(\)[^{}]*\}\s*\.padding\(top = 1\.dp\)""")
@@ -162,8 +172,20 @@ class SharedComponentGeometryContractTest {
         assertEquals(3, countMatches(source, overflowEllipsis), "同一批三处必须都是 Ellipsis，恰 3 处")
         assertEquals(0, countMatches(source, overflowClip), "入口行文本禁 Clip：裁掉字形就是 not_clipping 用例名说谎")
         assertEquals(1, countMatches(source, chevronStroke16), "chevron 必须恰一处 size = 16.dp 且带 StrokeOnly（锚点按 size→layer 顺序承重）")
-        assertEquals(1, countMatches(source, hairlineToPx), "发丝线宽度必须恰一处 1.dp.toPx()")
-        assertEquals(1, countMatches(source, hairlineOutsideContent), "发丝线必须恰一处「drawBehind 在前、padding(top = 1.dp) 让位在后」（顺序即契约，R-10.5）")
+        // 发丝线的取值/顺序锚改读它现在的家（[CONTAINERS]）；旧家 EntryRow.kt 必须零命中——
+        // 那里再出现 `1.dp.toPx()` 就是第二份画线实现（批 1 收编的唯一目的就是消掉它）。
+        val containers = uiComponentSource(CONTAINERS)
+        assertEquals(1, countMatches(containers, hairlineToPx), "发丝线宽度必须恰一处 1.dp.toPx()（在 $CONTAINERS 的 hairlineTop 里）")
+        assertEquals(
+            1,
+            countMatches(containers, hairlineOutsideContent),
+            "发丝线必须恰一处「drawBehind 在前、padding(top = 1.dp) 让位在后」（顺序即契约，R-10.5）",
+        )
+        assertEquals(
+            0,
+            countMatches(source, hairlineToPx),
+            "EntryRow.kt 不得自带发丝线实现：三档容器与入口行共用 $CONTAINERS 的 hairlineTop 一份",
+        )
         assertTrue(
             clickableCoversWholeBox(source),
             "可点面必须覆盖整盒：clickable 排在 fillMaxWidth() 之后、本条链里没有任何早于它的 padding（计划 :1049 的实测教训；" +

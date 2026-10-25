@@ -1,6 +1,5 @@
 package com.example.englishlearning.ui
 
-import com.example.englishlearning.ui.theme.AppDomain
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
@@ -56,6 +55,17 @@ import kotlin.test.fail
  *    #6 的口径同时收窄为「封掉本文件字面量形，跨文件 style 符号由 #10 这条白名单封」；
  *  #11 [samplers_fail_loudly_when_the_anchor_is_missing_or_the_region_cannot_be_closed]：
  *    缺锚 / 未闭合 / 形参表未闭合三条合成负控，钉住 #8/#9 的「响亮红而不是静默降级」。
+ *
+ * **批 1（2026-10-25 版式重做）改的是期望值，判据一条没松**：
+ *  - 权威数字搬进深墨强档卡，前景墨从 `text1/text2` 换成 `onStrong`（[NeutralInk] 随之改口径——
+ *    这不是放宽：强档卡上的中性墨**只有** `onStrong` 一枚，`text1` 压深底反而不可读）；
+ *  - 入口组离场：本屏 `EntryRow` 恒 0、裸行恰 2，原「EntryRow ≥3」的下界换成「`BareRow` 恰 2」+「`EntryRow` 恒 0」；
+ *  - 阅读文章从受解锁态约束的 M3 `Button` 降为裸行，`Button(` 计数从 1 归 0（阅读的解锁说明改由
+ *    行标题与强档卡里的 `unlockReason` 承载，`today_plan_reading_status` 这枚锚不动）；
+ *  - 词书卡并入词库裸行，`today_plan_learned_percent` / `today_plan_book_words` /
+ *    `today_plan_book_unlearned` 三枚锚随卡下线，注脚墨清单只留本屏仍存在的两枚。
+ * 工作量分段条（含三档图例）随本页重排整段下线，其配色同源判据的**具名替代**是同提交的
+ * `TodayPlanBareRowContractTest.the_two_bare_rows_carry_their_own_domain_ink_and_nothing_else`。
  */
 class TodayPlanNumberAuthorityTest {
 
@@ -338,9 +348,6 @@ class TodayPlanNumberAuthorityTest {
     @Test
     fun every_other_number_on_the_screen_is_footnote_with_neutral_ink() {
         listOf(
-            "today_plan_learned_percent",
-            "today_plan_book_words",
-            "today_plan_book_unlearned",
             "today_plan_progress",
             "today_plan_empty",
         ).forEach { tag ->
@@ -358,20 +365,20 @@ class TodayPlanNumberAuthorityTest {
     }
 
     /**
-     * 布局收成的源码侧判据（AC-R-20「8 个整宽按钮 → 1 CTA + 入口行组」）：
-     *  - M3 `Button(` 只剩阅读文章那一枚受解锁态约束的支撑动作（`PillButton`/`TextButton`/`ButtonDefaults`
+     * 布局收成的源码侧判据（批 1 §3.2：搜索 / 强档卡 / 两条裸行四段）：
+     *  - M3 `Button(` 恒 0：阅读文章的解锁动作降为裸行（`PillButton`/`TextButton`/`ButtonDefaults`
      *    都不入计数：左侧词界断言只认独立成名的 `Button(`）；
-     *  - 其余动作改调共享 `EntryRow`，且 Ready 分支里 `[PillButton(` 恰一处（主 CTA 唯一），
-     *    入口行 ≥3 条，页头走 `AppScreenHeader`；
+     *  - Ready 分支里 `PillButton(` 恰一处（主 CTA 唯一）、`BareRow(` 恰 2、`EntryRow(` 恒 0，
+     *    页头走 `AppScreenHeader`；
      *  - **查词条的位置**（修复轮 1 的 F3）：`today_plan_search_entry` 必须出现在 `when (state)` 之前，
-     *    即四态常驻，不许跟着 Ready 分支走。
+     *    即四态常驻，不许跟着 Ready 分支走；且它由 `SearchBox` 承载，不是一枚 `EntryRow`。
      */
     @Test
     fun the_screen_keeps_one_primary_cta_and_entry_rows_for_every_other_action() {
         assertEquals(
-            1,
+            0,
             countMatches(source, Regex("""(?<![A-Za-z0-9_])Button\(""")),
-            "整宽 M3 Button 只许留下「阅读文章」那一枚支撑动作，其余动作一律换成 EntryRow / PillButton",
+            "本屏不再有整宽 M3 Button：阅读文章已降为裸行，主操作由 PillButton 唯一承载",
         )
         // 评审 I-4：旧写法 `source.substringAfter("is TodayPlanUiState.Ready")` 自称「Ready 分支」，
         // 实为**无界尾切片**（吞到文件末，把 `TodayPlanEntryGroup`/`TodayWorkloadBar` 等私有组合全算进分支），
@@ -397,42 +404,74 @@ class TodayPlanNumberAuthorityTest {
         // F3（修复轮 1 / 评审 I-1）：**查词条必须常驻**。上一版把它收进只在 Ready 分支渲染的
         // `TodayPlanEntryGroup`，于是缺配置 / 不可用 / 加载三态下学习 tab 内没有任何查词出口
         // （四个 tab 里没有查词 tab），与 `AGENTS.md`「无网络或无 AI Key 时……离线查词仍应可用」相抵。
-        // 静态位置的口径：`today_plan_search_entry` 的首次出现必须**早于** `when (state)`——
-        // 即它由 `TodayPlanScreen` 主体渲染，而不是任何分支内部。运行时那一半由 connected 的
+        // 静态位置的口径：查词条的**唯一渲染调用点**必须**早于** `when (state)`——即它由
+        // `TodayPlanScreen` 主体渲染，而不是任何分支内部。运行时那一半由 connected 的
         // `search_entry_is_reachable_in_non_ready_state_missing_setup` / `..._unavailable` 罩住。
+        //
+        // 批 1 把查词条的整段内联 Row 收成 `SearchBox` 组件，于是标签字面量搬到了文件末尾的私有
+        // 组合件里——旧写法「标签字面量的首次出现早于 `when (state)`」当场失效。判据改成**两条合取**，
+        // 强度不减：① 唯一调用点 `SearchBox(onClick = onOpenSearch)` 的偏移早于 `when (state)`；
+        // ② 标签确实长在 `SearchBox` 的组件体里。只判①会被「调用点在前、组件体里其实没有标签」绕过，
+        // 只判②会被「调用点挪进分支、组件体照旧带标签」绕过。
         val whenAnchor = "when (state)"
         val whenAt = source.indexOf(whenAnchor)
         assertTrue(whenAt >= 0, "本屏源码里找不到 \"$whenAnchor\" 锚点，无法判定查词条的位置")
-        val searchEntryAt = source.indexOf(quoted("today_plan_search_entry"))
+        val searchCall = "SearchBox(onClick = onOpenSearch)"
+        val searchCallAt = source.indexOf(searchCall)
+        assertTrue(searchCallAt >= 0, "本屏源码里找不到查词条调用点 \"$searchCall\"（被内联或改名）")
         assertTrue(
-            searchEntryAt in 0 until whenAt,
-            "查词入口标签 today_plan_search_entry 必须写在 `when (state)` **之前**（四态常驻），" +
-                "实际位置：标签=$searchEntryAt / `when (state)`=$whenAt——" +
-                "把它挪进任何分支（含 TodayPlanEntryGroup）都会让非 Ready 态失去查词出口",
+            searchCallAt in 0 until whenAt,
+            "查词条调用点必须写在 `when (state)` **之前**（四态常驻），" +
+                "实际位置：调用点=$searchCallAt / `when (state)`=$whenAt——" +
+                "把它挪进任何分支（含入口组）都会让非 Ready 态失去查词出口",
+        )
+        val searchBoxBody = bodyOf(source, "private fun SearchBox(", "SearchBox 组件体取样")
+        assertTrue(
+            quoted("today_plan_search_entry") in searchBoxBody,
+            "查词条的标签 ${quoted("today_plan_search_entry")} 必须长在 `SearchBox` 组件体内" +
+                "（调用点在前 + 组件体带标签，两条合取才是「非 Ready 态也能看见查词」的完整静态口径）",
         )
         val entryRows = countMatches(source, Regex("""(?<![A-Za-z0-9_])EntryRow\("""))
-        assertTrue(
-            entryRows >= 3,
-            "AC-R-20 要求入口行组：本屏至少 3 条共享 EntryRow（名单权威在下方白名单与 " +
-                "TodayPlanScreenTest.ready_groups_entry_actions_and_keeps_one_primary_cta，此处只封下界）",
+        assertEquals(
+            0,
+            entryRows,
+            "入口行组已离场：词书单词/我的词去词库页，学习记录/打卡/调整目标去我的页——本屏再出现 EntryRow 即回潮",
+        )
+        assertEquals(
+            2,
+            countMatches(source, Regex("""(?<![A-Za-z0-9_])BareRow\(""")),
+            "本屏只剩两条裸行（今日文章状态 / 词库），枚数的落点判据在 TodayPlanBareRowContractTest",
         )
         assertEquals(
             1,
             countMatches(source, Regex("""AppScreenHeader\(""")),
             "页标题必须由共享 AppScreenHeader 承载（页头族 seed 删行的判据是 headline 读点清零，见 R-13.1）",
         )
+        assertTrue(
+            "SearchBox(onClick = onOpenSearch)" in source,
+            "查词条必须由 SearchBox 组件承载（不是一枚 EntryRow，也不是内联的 Row）：" +
+                "它在四态常驻位，样式与入口行不同类",
+        )
         listOf(
-            "today_plan_open_wordbook_words",
-            "today_plan_open_my_words",
-            "today_plan_open_learning_records",
-            "today_plan_open_check_in",
-            "today_plan_open_setup_entry",
             "today_plan_search_entry",
+            "today_plan_summary",
+            "today_plan_secondary_card",
+            "today_plan_progress_summary",
+            "today_plan_total_progress",
+            "today_plan_task_total",
+            "today_plan_progress",
+            "today_plan_empty",
+            "today_plan_start_learning",
+            "today_plan_reading_status",
+            "today_plan_new_progress",
+            "today_plan_review_progress",
+            "today_plan_plan_footnote",
+            "today_plan_open_word_bank",
         ).forEach { tag ->
             assertTrue(
                 tag in source,
-                "入口行标签 $tag 不得改名或删除（既有 connected 用例与 AppScreenTest 依赖它；" +
-                    "**本名单就是这批入口标签的名册，名单本身是唯一真值**——增删或改名入口标签必须同批改这份名单，" +
+                "本屏标签 $tag 不得改名或删除（既有 connected 用例与 AppScreenTest 依赖它；" +
+                    "**本名单就是本屏标签的名册，名单本身是唯一真值**——增删或改名标签必须同批改这份名单，" +
                     "并同步 TodayPlanScreenTest 的闭合集合判据与 TodayPlanScreen KDoc；" +
                     "I-2 修复轮 1 的教训：旧消息写着「6 条组内行 + 1 常驻 = 本屏入口的全部」，" +
                     "新增 today_plan_open_my_words 后这句当场为假且无人认领新标签）",
@@ -515,39 +554,6 @@ class TodayPlanNumberAuthorityTest {
     }
 
     /**
-     * Workload 三档图例必须同源、且取自域色（brief Step 2「复习 `Review` 系」）：
-     * 复习 → `Review`、今日新学/新增 → `Learn`、已学 → 品牌 `AiSpeech`；同一概念在本屏只许一套颜色
-     * （`TodayWorkloadBar` 上方那段 KDoc 早已写明这条）。
-     */
-    @Test
-    fun today_markers_and_workload_segments_read_the_same_domain_colors() {
-        listOf(AppDomain.Review, AppDomain.Learn, AppDomain.AiSpeech).forEach { domain ->
-            assertTrue(
-                source.contains("appDomain(AppDomain.${domain.name})"),
-                "本屏必须按 appDomain(AppDomain.${domain.name}) 取域色（色点与分段条同源）",
-            )
-        }
-        assertEquals(
-            0,
-            countMatches(source, Regex("""private val Workload\w+Color""")),
-            "工作量色表不得再以顶层裸色常量存在（顶层 val 是「非可组合上下文」静态读点那一族）",
-        )
-        // 评审 I-3：旧写法 `source.substringAfter("private fun WorkloadKind.color()").substringBefore("\n}")`
-        // 缺锚时 Kotlin 返回**整份原文**，再截到第一枚第 0 列闭括号 ⇒ 取样面换成主屏函数体
-        // （`TodayPlanScreen.kt` 的 `:224/:225` 已含 Review/Learn 两枚域色读点），本条照旧绿而分段条失去保护。
-        // 现走 [bodyOf]：先钉锚在位、再按花括号配平取 `when` 体本身。
-        val colorFun = bodyOf(source, "private fun WorkloadKind.color()", "分段条配色取样")
-        assertTrue(
-            colorFun.contains("AppDomain.Review") && colorFun.contains("AppDomain.Learn"),
-            "分段条的 REVIEW/NEW 两档必须读 Review/Learn 域色，实际：$colorFun",
-        )
-        assertTrue(
-            colorFun.contains("AppDomain.AiSpeech"),
-            "分段条的已学档必须与页头色点同源（AiSpeech 域色），不得另调一套静态色，实际：$colorFun",
-        )
-    }
-
-    /**
      * 窗口提取器自身的防空转自证（修订 #7 / 评审 I-2）：**真调用** [textCallContaining] 与 [textWindows]，
      * 三种合成源各打一次——旧实现只对正则谓词做合成断言，KDoc 声称的「窗口取样自证」落空，
      * 于是 C-1 那条形（tag 上提到包裹容器）能在六条窗口判据下全绿。
@@ -555,8 +561,8 @@ class TodayPlanNumberAuthorityTest {
      *  ① tag 写在 `Text(` 实参内 ⇒ 取到窗口，且窗口就是那一枚调用（含 `AppType.Display`）；
      *  ② tag 上提到包裹 `Row(...)` ⇒ 当场红，且消息点名「包裹容器」（这就是 M1 变形的形状）；
      *  ③ 同一 tag 出现在两枚 `Text(` 内 ⇒ 红（歧义命中，禁止静默取第一个）；
-     *  ④ 对本屏真实源码逐枚取样 ⇒ 每枚窗口都必须回含它自己的标签，且六枚窗口互不相同
-     *     （这条才真正兑现「判据罩的是目标站点」，也是评审 `/tmp/win2.py` 手工验过的那六次命中）。
+     *  ④ 对本屏真实源码逐枚取样 ⇒ 每枚窗口都必须回含它自己的标签，且各枚窗口互不相同
+     *     （这条才真正兑现「判据罩的是目标站点」，也是评审 `/tmp/win2.py` 手工验过的那几次命中）。
      *
      * 末尾保留正则谓词的合成自检：`NeutralInk` / `AccentInk` 若对正确写法判红、对补色缺失放行，
      * 上面两条按窗口判档位的用例同样是空转。
@@ -591,14 +597,13 @@ class TodayPlanNumberAuthorityTest {
             "③ 同一标签命中两枚 Text( 调用时取样器没有判红（静默取第一个 = 假绿入口）：实际消息「${duplicateFailure.message}」",
         )
 
-        // ④ 真实源码逐枚自证：每枚受判标签都要回含自身，且六枚窗口两两不同
+        // ④ 真实源码逐枚自证：每枚受判标签都要回含自身，且各枚窗口两两不同
         val sampledTags = listOf(
             "today_plan_total_progress",
-            "today_plan_learned_percent",
-            "today_plan_book_words",
-            "today_plan_book_unlearned",
+            "today_plan_task_total",
             "today_plan_progress",
             "today_plan_empty",
+            "today_plan_plan_footnote",
         )
         val realWindows = sampledTags.map { tag -> tag to textCallContaining(quoted(tag)) }
         realWindows.forEach { (tag, window) ->
@@ -607,12 +612,13 @@ class TodayPlanNumberAuthorityTest {
         assertEquals(
             sampledTags.size,
             realWindows.map { it.second }.distinct().size,
-            "④ 六个受判标签取回了重复窗口——取样器把不同站点归到了同一枚 Text( 调用上",
+            "④ 受判标签取回了重复窗口——取样器把不同站点归到了同一枚 Text( 调用上",
         )
 
         // 谓词自检（旧有内容，保留）：缺 color 的那枚必须被中性墨谓词判红、补齐的那枚必须放过。
+        // 批 1 起本屏的中性墨是强档卡前景 `onStrong`，故合成正片段同步换墨（判据形状不变）。
         val uncolored = "Text(\"3/5\", style = AppType.Display, modifier = Modifier.testTag(\"probe_tag\"))"
-        val colored = "Text(\"3/5\", style = AppType.Display, color = appColors().text1, modifier = Modifier.testTag(\"probe_tag\"))"
+        val colored = "Text(\"3/5\", style = AppType.Display, color = appColors().onStrong, modifier = Modifier.testTag(\"probe_tag\"))"
         assertEquals(1, Regex("""\bText\(""").findAll(uncolored).count(), "合成片段自检：窗口取样前提（Text 调用存在）不成立")
         assertTrue(
             !NeutralInk.containsMatchIn(uncolored.substring(3, uncolored.length - 1)),
@@ -676,8 +682,14 @@ class TodayPlanNumberAuthorityTest {
     }
 
     private companion object {
-        /** 显式中性墨读法（字面形与 `val colors = appColors()` 别名形都算）。 */
-        val NeutralInk = Regex("""\bcolor\s*=\s*(?:appColors\(\)\.|colors\.|set\.)(?:text1|text2)\b""")
+        /**
+         * 显式中性墨读法（字面形与 `val colors = appColors()` 别名形都算）。
+         *
+         * 批 1 起本屏的数字全部住在深墨强档卡里，卡上的中性墨**只有** `onStrong` 一枚
+         * （`text1`/`text2` 压 `strongSurface` 不可读，跨套都一样）。这是换口径，不是放宽：
+         * 同一处仍然只认「具名中性 token」，强调色由 [AccentInk] 反面钉住。
+         */
+        val NeutralInk = Regex("""\bcolor\s*=\s*(?:appColors\(\)\.|colors\.|set\.)onStrong\b""")
 
         /** 任何强调色读法：`Mint*` 快捷名、静态/动态域色、以及状态色。 */
         val AccentInk = Regex("""\bcolor\s*=\s*(?:Mint\w+|AppPalette\.\w+|DomainColors\.\w+|appDomain\(|appColors\(\)\.(?:success|error|errorFill|onMint|tint\d*)|colors\.(?:success|error|errorFill|onMint))""")

@@ -1815,3 +1815,25 @@ git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit -m "docs(han
 **占位扫描**：本计划未使用「TBD / 同 Task N / 类似上面」；「其余实参照搬」「以现签名为准」两类均点名了具体数量与文件位置，执行时逐枚核对。**不允许**把这两处理解成可以少传。
 
 **类型一致性**：`WordBankSection`（四段：Book/New/Wrong/Favorite）在 Task 5 定义、Task 6 复用；`MyWordsSection`（三段：Favorites/Wordbook/Wrong）保持原枚举不动，`visibleSections` 收窄时用原枚举值。`CheckInUiState.Ready.streakDays` 在 Task 6 定义、Task 4 的 `streakDays` 形参与 Task 8 的 Display 同源（都来自 AppScreen 的 `checkInState`）。
+
+---
+
+## 现场移交（Task 4 执行时新立的账）
+
+Task 4 只改学习页，却把 §3.2 的五枚入口锚从 `TodayPlanScreen` 上摘了。三处**跨文件**的契约与 connected
+用例因此红/将红，落点按批 1 的任务顺序分清。**Task 4 的提交允许这三笔在账上红灯**：判据不许为了变绿
+而删或放宽，只能等对应任务的真实目的地就位后**改期望值**。
+
+| 债 | 现况（Task 4 提交时实测） | 落点 |
+|---|---|---|
+| `MyWordsScreenContractTest.the_new_entry_is_mounted_in_the_vocabulary_domain_surface` | 红。四条断言读的旧口径全部离场：`today_plan_open_my_words`、`"我的词"`、`today_plan_open_wordbook_words` 在 `TodayPlanScreen` 上，`myWordsSummaryOf(` 在 `AppScreen` 上 | **Task 5**：前两者改指 `today_plan_open_word_bank`（「我的词」文案改由口令「复习生词本」+ 词库行副标题承担），`myWordsSummaryOf(` 随 `WordBankScreen` 的输入恢复 |
+| `AppScreenTest`（connected）8 条端到端用例 | 9 处取点 `today_plan_open_wordbook_words` / `today_plan_open_my_words` 已不存在 → Task 9 的模拟器跑必红 | **Task 5**：入口改 `today_plan_open_word_bank`，目的地断言改 `word_bank_screen` / 词库段 |
+| `AppScreenTest` 的打卡深链 1 处 | `today_plan_open_check_in` 已离场 | **Task 6**：改走我的页的统计深链 tag（Task 6 定义） |
+
+**顺带清掉的两笔 Task 2 债**（Task 4 是本轮第一次跑全量 JVM，实测暴露；判据改的是主人/登记制，不是放宽）：
+
+- `MaterialThemeAssemblyContractTest` 的 `LocalContentColor provides`「全仓恰一处」红在 `StrongCard`
+  的深底前景覆盖上。改为**登记制**：三枚 token local 仍「恰一处」，`LocalContentColor` 逐条登记
+  （根装配 1 + `Containers.kt` 的 `StrongCard` 1），新增第三处即红。
+- `SharedComponentGeometryContractTest` 的发丝线取值/顺序锚仍读 `EntryRow.kt`，而 `hairlineTop` 已迁到
+  `Containers.kt`。改读新家，并在 `EntryRow.kt` 补一条零计数反向锚（旧家不许留第二份画线实现）。

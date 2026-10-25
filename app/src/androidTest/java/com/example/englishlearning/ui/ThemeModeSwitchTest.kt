@@ -160,20 +160,31 @@ class ThemeModeSwitchTest {
     }
 
     /**
-     * 深色偏好下，今日计划屏「今日学习进度」卡的**容器像素**必须落在深套 `surface` 那一档。
+     * 深色偏好下，今日计划屏那块承载两条裸行的**软档卡**（`today_plan_secondary_card`）的容器像素
+     * 必须落在深套 `surface` 那一档。
      *
      * 为什么这条排在批 2 最前面（Task 12.5 的行为面）：批 1 Task 3 已把 `Mint*` 墨色改成组合期读取，
      * 而业务屏容器仍写静态 `AppPalette.Surface`（浅套写死白）。两者配对后，真机 `bf353dda` 深色档实测到
      * 「白底 + 主题浅墨」的近不可读文案（`docs/verification/ui-redesign-2026-10.md`「真机深色实勘」）。
      * 本用例就是把那枚缺陷钉成像素判据：容器底必须是**当前主题的 surface**，而不是永远 `#FFFFFFFF`。
      *
+     * **判据对象在批 1 Task 4 换过一次**，换的理由留在原处而不是悄悄改锚：原先取的是「今日学习进度」卡
+     * （`today_plan_progress_summary`）；版式重做后那张卡升格为强档卡，容器画 `strongSurface`
+     * （浅套 #0C2A22 / 深套 #1E2B25，前景 `onStrong`），它与深套 `tint`（#1C2C26）只差 2 个通道，
+     * 本用例的「容差 2 / 相邻档门槛 4」在强档卡上会当场失守，而放大容差就是放「漏画容器」过去。
+     * 于是对象换成**仍然画 `surface` 的那块业务容器**——两条裸行同住的软档卡：缺陷形状不变
+     * （容器读点跟不跟主题）、期望 token 不变、三条自检的实测数值也不变（它们本来就是按 `surface`
+     * 与相邻三档的间距算的）。强档卡自己的配对（`strongSurface` 底 + `onStrong` 墨）由 connected 的
+     * `TodayPlanScreenTest.ready_strong_card_paints_strong_surface_with_on_strong_ink` 承担。
+     *
      * 三条取样口径，都不是随手写的：
      *  - **偏好显式写 `ThemeMode.Dark`，不再走「与平台相反」那一档**：本类前两已经把「prefs 压过平台」与
      *    「prefs 改动翻活组合」两条链路证完了；这一条要证的是**业务容器的读点跟不跟主题**。
      *    若把偏好读取链路再复制一遍，本用例就成了前两件的影子；此处刻意只留「容器色 == 深套 surface」这一件事。
-     *  - **取样点取本节点宽 9/10、高 1/2，而不是几何中心**：卡片里是左对齐的三行文案，中心像素会落在字身上，
-     *    量到的是墨色而不是容器底；宽 9/10 仍在这张卡的水平内边距（16dp）之内，量到的必定是容器填充，
-     *    且离 1dp 描边与 18dp 圆角都足够远。
+     *  - **取样用「整节点不透明像素直方图的众数」，不再固定取宽 9/10、高 1/2**：旧进度卡里是三行左对齐
+     *    文案，9/10 那一列是它的内边距；软档卡里是两条带前导图标、副标题与右侧尖头的裸行，同一列会落到
+     *    尖头或两行之间的 1dp 发丝线上。众数不依赖「这一行右边排了什么」这种版面细节（版面重排不会把
+     *    判据挪到图标上）：填色是面积最大的一档，字身、图标、描边都只是少数派（与 AI 服务行那条同一取样器）。
      *  - **逐通道容差比较（评审 m-1 后的口径：容差取小，判别力靠三条自检钉住）**：`captureToImage()` 是离屏
      *    渲染成位图，不经显示链的色彩管理，本卡实测取样像素与 `AppColorDark.surface` 逐通道差为 0；
      *    容差留 2 只抗实现侧取整。曾经取 24，那是「覆盖显示链取整」的误判——24 宽到能把深套相邻三档填充
@@ -184,10 +195,10 @@ class ThemeModeSwitchTest {
      *    卡内排版重排都可能把取样点挪到笔画上，动态字体 2.0 档正是这条兜住的方向，见下）；
      *    ③相邻档判别力（容差必须容不下深套相邻填充，证「漏画容器」会在本用例判红而不是蒙过）。
      *    **①的前提写在主题侧**：本主题把 `surfaceTint` 设为 `set.onMint`（`MintGlassTheme.kt:113/151`），
-     *    它与 `surface` 逐通道差 200 上下；当前不混色是**实测事实**——这张卡没显式传 `tonalElevation`
-     *    （`TodayPlanScreen.kt:168-175` 只给了 colors/shape/modifier），`DefaultElevationOverlay`
-     *    的叠加 alpha 因此为 0，取样与 token 的逐通道差实测 0。注意混色通道并没有被关掉：主题把 M3
-     *    `surface` 也设成了同一枚 `set.surface`
+     *    它与 `surface` 逐通道差 200 上下；当前不混色是**实测事实**——这张软档卡没显式传 `tonalElevation`
+     *    （`SoftCard` 自身也不传，见 `components/Containers.kt` 的「不描边、不提权」口径），
+     *    `DefaultElevationOverlay` 的叠加 alpha 因此为 0，取样与 token 的逐通道差实测 0。
+     *    注意混色通道并没有被关掉：主题把 M3 `surface` 也设成了同一枚 `set.surface`
      *    （`MintGlassTheme.kt:109/147`），`isSurfaceColor` 按数值成立，所以一旦有人给这张卡显式加
      *    `tonalElevation` 到 ≥3dp，十几个百分点的 tint 会立刻把 2 档容差撑破——
      *    届时必须重算期望值（改用 `surfaceColorAtElevation`）而不是放大容差。
@@ -197,7 +208,8 @@ class ThemeModeSwitchTest {
      *
      * 动态字体（m-3 的处置）：本用例的 `composeRule` 没有钉 fontScale 的公开口子（`setDensity` 只管密度），
      * 所以按「默认档为判据、非默认档允许判红并转人工」执行；判红时先看自检②的消息——
-     * 若它说取样离墨不够远，就是大字号把 9/10 那一列推到了笔画上，属取样点问题而非容器回归。
+     * 若它说取样离墨不够远，就是大字号把字身面积推到了压倒填充的程度（众数被墨抢走），
+     * 属取样问题而非容器回归。
      */
     @Test
     fun a_business_container_paints_the_stored_set_surface_in_dark_mode() {
@@ -217,13 +229,13 @@ class ThemeModeSwitchTest {
                 )
             }
         }
-        composeRule.onNodeWithTag(TODAY_PLAN_PROGRESS_TAG).performScrollTo()
+        composeRule.onNodeWithTag(TODAY_PLAN_SURFACE_TAG).performScrollTo()
 
-        val actual = probeSurfaceRgb(TODAY_PLAN_PROGRESS_TAG)
+        val actual = dominantRgb(TODAY_PLAN_SURFACE_TAG)
         val dark = surfaceRgb(AppColorDark)
         val light = surfaceRgb(AppColorLight)
         assertEquals(
-            "今日计划屏进度卡容器必须画深套 surface（写静态 AppPalette.Surface 时这里是白底，" +
+            "今日计划屏的软档卡容器必须画深套 surface（写静态 AppPalette.Surface 时这里是白底，" +
                 "即真机实勘那处「白底 + 主题浅墨」）：期望 $dark ±$SURFACE_CHANNEL_TOLERANCE，实际 $actual",
             0,
             maxChannelDelta(actual, dark).let { if (it <= SURFACE_CHANNEL_TOLERANCE) 0 else it },
@@ -393,16 +405,6 @@ class ThemeModeSwitchTest {
             bitmap.getPixel(bitmap.width / 2, bitmap.height / 2) and 0xFFFFFF
         }
 
-    /**
-     * 指定容器节点的**填充取样点**像素：宽 9/10、高 1/2。
-     * 与 [probeCenterRgb] 同一套 `captureToImage` + `getPixel` + 丢 alpha 口径，只是取样点让开了左对齐的字身
-     * （理由见 [a_business_container_paints_the_stored_set_surface_in_dark_mode] 的注释）。
-     */
-    private fun probeSurfaceRgb(tag: String): Int =
-        composeRule.onNodeWithTag(tag).captureToImage().asAndroidBitmap().let { bitmap ->
-            bitmap.getPixel(bitmap.width * 9 / 10, bitmap.height / 2) and 0xFFFFFF
-        }
-
     /** 按 testTag 取节点离屏位图（本类所有像素取样点的唯一入口）。 */
     private fun nodeBitmapByTag(tag: String): Bitmap =
         composeRule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
@@ -491,8 +493,12 @@ class ThemeModeSwitchTest {
 private const val MATERIAL_PROBE_TAG = "theme_probe_material_channel"
 private const val TOKEN_PROBE_TAG = "theme_probe_token_channel"
 
-/** 批 1 里程碑真机实勘判红的那枚卡（今日计划屏「今日学习进度」），容器读点迁移的行为面就钉在这里。 */
-private const val TODAY_PLAN_PROGRESS_TAG = "today_plan_progress_summary"
+/**
+ * 批 1 里程碑真机实勘判红的那枚卡（今日计划屏「今日学习进度」，容器读点迁移的行为面）在版式重做后
+ * 升格为强档卡（画 `strongSurface`）；**仍然画 `surface`** 的那块业务容器是两条裸行同住的软档卡，
+ * 本用例的判据对象随之落到它上面（理由见用例 KDoc）。
+ */
+private const val TODAY_PLAN_SURFACE_TAG = "today_plan_secondary_card"
 
 /** AI 服务列表行的 testTag 前缀（生产码里为 `ai_profile_item_<profileId>`）。 */
 private const val AI_PROFILE_ROW_TAG_PREFIX = "ai_profile_item_"
