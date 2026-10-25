@@ -72,8 +72,46 @@ class LearningRecordsRowContractTest {
             "不可用原因必须仍走 gloss 槽的 `?: unavailableNotice` 形态（改走 meta 会被右列宽度卡成省略号）",
         )
         assertTrue(
-            screen.contains("status = \"反馈：\${row.feedback.label()}\""),
-            "反馈状态文案必须保持原样（connected 用例按可见文本/行标签取证）",
+            screen.contains("status = row.feedback.label()"),
+            "批 1 Task 8：状态列只写「认识 / 模糊 / 不认识」。" +
+                "「反馈：」三枚汉字＋冒号会把右列挤成省略号（右列 widthIn(max = 120.dp)），" +
+                "而列的语义已经被行位与右对齐表达——前缀是纯冗余",
+        )
+        assertTrue(
+            "反馈：" !in stripComments(screen),
+            "「反馈：」前缀必须从**代码**里删净（注释允许保留这段历史说明——本判据只咬代码，" +
+                "否则登记理由本身就会把判据变成永远红、逼下一个人放宽它）",
+        )
+    }
+
+    /**
+     * 批 1 Task 8：学习记录从「每条一张卡」改成**裸行列表**（spec §4.1 裸行族）。
+     *
+     * 判据的两半：
+     *  ① 同日多条记录之间靠 `WordRow` 的 `topDivider` 画发丝线——`topDivider = index > 0`
+     *     是「首行不画线、其后每行一条」的唯一写法（计划原文此处写作 `topDivider = true`，
+     *     与同页 GREEN 本体的 `topDivider = index > 0` 自相矛盾；以本体形状为准；
+     *     若哪天退化成「每行都画线」，首行线会贴在标签页下沿，本条不改口径即可判红——
+     *     因为本锚要求的是**逐行按 index 决定**）；
+     *  ② 行不再套 `Card(`：卡面是本屏「卡片汤」的来源，行与行之间只留一条线。
+     */
+    @Test
+    fun `the record row is a bare word row with a hairline between rows`() {
+        val screen = stripComments(uiScreenSource("LearningRecordsScreen.kt"))
+        assertTrue(
+            "topDivider = index > 0" in screen,
+            "同日/同组多条记录靠 `topDivider = index > 0` 画分隔线（首行不画、其后每行一条，§4.1 裸行族）",
+        )
+        assertEquals(
+            2,
+            countMatches(screen, Regex("""itemsIndexed\(""")),
+            "今日与历史两个分支都必须用 itemsIndexed 拿到行号（行号是 topDivider 的唯一依据；" +
+                "漏一处就有一半记录没有分隔线）",
+        )
+        assertEquals(
+            0,
+            countMatches(screen, Regex("""\bCard\(""")),
+            "学习记录不再套卡：每条记录就是一行（卡面 + 描边是「卡片汤」的原样，§4.1）",
         )
     }
 

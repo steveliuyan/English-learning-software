@@ -137,6 +137,12 @@ fun WordRow(
     domain: AppDomain = AppDomain.Library,
     leading: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    /**
+     * 批 1 Task 8：裸行列表里「行与行之间一条发丝线」（spec §4.1）。由调用方按行号给
+     * （`topDivider = index > 0`）：首行不画线，否则线会贴在列表/分组的上沿。
+     * 缩进 15dp 与行的横向让位同档，线从文字/图标起点起笔。
+     */
+    topDivider: Boolean = false,
     actions: @Composable (RowScope.() -> Unit)? = null,
 ) {
     // 四枚墨一律从纯表取（源码契约钉「本文件恰一处 wordRowInks(appColors())」）。
@@ -152,6 +158,9 @@ fun WordRow(
         modifier = modifier
             .fillMaxWidth()
             .then(touchModifier)
+            // 线画在 padding 外侧：`hairlineTop` 自带 `padding(top = 1.dp)` 让出那条缝，
+            // 于是 48dp 的最小内容高不被 1dp 线吃掉（与 BareRow 同口径）。
+            .then(if (topDivider) hairlineTop(inks.meta, startIndent = 15.dp) else Modifier)
             .heightIn(min = 48.dp)
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

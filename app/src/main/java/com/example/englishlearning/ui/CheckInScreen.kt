@@ -1,8 +1,6 @@
 package com.example.englishlearning.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,38 +9,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.DailyLearningStats
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
@@ -91,60 +79,74 @@ fun CheckInScreen(
 @Composable
 private fun ReadyContent(state: CheckInUiState.Ready) {
     val today = state.today
-    // 复习域的深墨在本屏复用 6 处（含 Canvas 的 onDraw）：组合期取一次，
-    // 因为 `Canvas { }` 的绘制 lambda 不是 composable 作用域，不能在里面读 `appDomain()`。
+    val colors = appColors()
+    // 复习域的深墨贯穿本屏的强调位（周柱、今日完成状态、月历已打卡日期）。
     val reviewInk = appDomain(AppDomain.Review).deep
-    Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(22.dp)).testTag("check_in_today")) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("今日", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Text("完成任务 ${today.completedTaskCount}/${today.targetTaskCount}", color = MintPrimaryDark)
-            Text("复习 ${today.reviewedWordCount} 词 · 阅读 ${today.completedReadingCount} 篇", color = MintTextMuted)
-            Text(if (state.completed) "今日已完成" else "继续保持学习", color = if (state.completed) reviewInk else MintTextMuted, fontWeight = FontWeight.Bold)
-        }
+    SoftCard(modifier = Modifier.testTag("check_in_today")) {
+        Text("今日", style = AppType.Title, color = colors.text1)
+        Text(
+            "完成任务 ${today.completedTaskCount}/${today.targetTaskCount}",
+            style = AppType.Body,
+            color = colors.text1,
+        )
+        Text(
+            "复习 ${today.reviewedWordCount} 词 · 阅读 ${today.completedReadingCount} 篇",
+            style = AppType.Footnote,
+            color = colors.text2,
+        )
+        Text(
+            if (state.completed) "今日已完成" else "继续保持学习",
+            style = AppType.Footnote,
+            color = if (state.completed) reviewInk else colors.text2,
+        )
     }
-    // F4-01 基础统计卡：累计学习/复习、连续天数（按快照解锁口径，不要求阅读）。
-    Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_totals")) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("累计与连续", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Text(state.totalsText, color = MintPrimaryDark, modifier = Modifier.testTag("check_in_totals_text"))
-            Text(state.streakText, color = MintTextMuted, modifier = Modifier.testTag("check_in_streak_text"))
+    // 批 1 Task 8（§5）：连续天数是本屏**唯一**的大数字（Display），累计统计降一档（Title）。
+    // 旧版把完成度另画成一枚 132dp 的 Canvas 环，与「完成任务 x/y」重复表达同一件事——
+    // 环整块删除，今日卡是这条信息的唯一出处（`CheckInDisplayAuthorityTest` 钉住）。
+    SoftCard(modifier = Modifier.testTag("check_in_totals")) {
+        Text("连续学习", style = AppType.Label, color = colors.text2)
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                state.streakDays.toString(),
+                style = AppType.Display,
+                color = reviewInk,
+                modifier = Modifier.testTag("check_in_streak_days"),
+            )
+            Text(
+                "天",
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.padding(bottom = 8.dp).testTag("check_in_streak_text"),
+            )
         }
+        Text(
+            state.totalsText,
+            style = AppType.Title,
+            color = colors.text1,
+            modifier = Modifier.testTag("check_in_totals_text"),
+        )
     }
-    Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_week_chart")) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("本周学习", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Row(Modifier.fillMaxWidth().heightIn(min = 120.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                state.week.take(7).forEachIndexed { index, day ->
-                    val ratio = if (day.targetTaskCount > 0) (day.completedTaskCount.toFloat() / day.targetTaskCount).coerceIn(0f, 1f) else 0f
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) reviewInk else appColors().outlineSoft).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
-                        Text(day.localDate.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA), color = MintTextMuted, style = MaterialTheme.typography.labelSmall)
-                    }
+    SoftCard(modifier = Modifier.testTag("check_in_week_chart")) {
+        Text("本周学习", style = AppType.Title, color = colors.text1)
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            state.week.take(7).forEachIndexed { index, day ->
+                val ratio = if (day.targetTaskCount > 0) (day.completedTaskCount.toFloat() / day.targetTaskCount).coerceIn(0f, 1f) else 0f
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) reviewInk else colors.outlineSoft).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
+                    Text(
+                        day.localDate.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA),
+                        color = colors.text2,
+                        style = AppType.Label,
+                    )
                 }
             }
-        }
-    }
-    val ratio = today.completionRatio
-    Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_completion_ratio")) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("今日完成度", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            // Task 22-A §二.2 / R-22.2：那枚裸 hex `#FFF1DB`（奶油环轨道）token 化为现成语义槽 `tint`，
-            // 不新增 AppColorSet 槽（新增会牵动明暗两套装配与三张棘轮，属越面）。
-            // 代价照写：tint 明档 = 0xFFDDF7E8、暗档 = 0xFF1C2C26（theme/AppColors.kt），
-            // 观感从「奶油环」变「薄荷环」，且**暗档下轨道由奶油变深**（此前一枚裸 hex 在明暗两档是同一枚奶油）。
-            // 已登记为 Task 26 目视项。Canvas 的 onDraw 不是 composable 作用域，取色必须在它外面。
-            val ringTrack = appColors().tint
-            Box(Modifier.size(132.dp).align(Alignment.CenterHorizontally), contentAlignment = Alignment.Center) {
-                Canvas(Modifier.fillMaxSize().testTag("check_in_completion_arc")) {
-                    val strokeWidth = 12.dp.toPx()
-                    drawArc(color = ringTrack, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
-                    if (ratio > 0f) {
-                        drawArc(color = reviewInk, startAngle = -90f, sweepAngle = ratio * 360f, useCenter = false, style = Stroke(strokeWidth, cap = StrokeCap.Round))
-                    }
-                }
-                Text("${(ratio * 100).toInt()}%", modifier = Modifier.testTag("check_in_completion_percent"), style = AppType.Headline, fontWeight = FontWeight.Bold, color = reviewInk)
-            }
-            Text("目标 ${today.targetTaskCount} 项，已完成 ${today.completedTaskCount} 项", color = MintTextMuted)
         }
     }
     MonthCalendar(state.month)
@@ -154,22 +156,32 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
 private fun MonthCalendar(days: List<DailyLearningStats>) {
     val month = days.firstOrNull()?.localDate?.let { YearMonth.from(it) } ?: return
     val byDate = days.associateBy { it.localDate }
-    Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_calendar")) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Row(Modifier.fillMaxWidth()) { listOf("一", "二", "三", "四", "五", "六", "日").forEach { Text(it, modifier = Modifier.weight(1f), color = MintTextMuted, style = MaterialTheme.typography.labelSmall) } }
-            val offset = month.atDay(1).dayOfWeek.value - 1
-            val cells = List(offset) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
-            cells.chunked(7).forEach { week ->
-                Row(Modifier.fillMaxWidth()) { week.forEach { date ->
-                    Box(Modifier.weight(1f).heightIn(min = 34.dp), contentAlignment = Alignment.Center) {
-                        if (date != null) {
-                            val done = (byDate[date]?.completedTaskCount ?: 0) > 0
-                            Text(date.dayOfMonth.toString(), color = if (done) appDomain(AppDomain.Review).deep else MintTextMuted, fontWeight = if (done) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.semantics { contentDescription = if (done) "$date 已完成" else date.toString() })
-                        }
-                    }
-                }; repeat(7 - week.size) { Box(Modifier.weight(1f).heightIn(min = 34.dp)) } }
+    val colors = appColors()
+    val reviewInk = appDomain(AppDomain.Review).deep
+    SoftCard(modifier = Modifier.testTag("check_in_calendar")) {
+        Text("${month.year}年${month.monthValue}月", style = AppType.Title, color = colors.text1)
+        Row(Modifier.fillMaxWidth()) {
+            listOf("一", "二", "三", "四", "五", "六", "日").forEach {
+                Text(it, modifier = Modifier.weight(1f), color = colors.text2, style = AppType.Label)
             }
+        }
+        val offset = month.atDay(1).dayOfWeek.value - 1
+        val cells = List(offset) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
+        cells.chunked(7).forEach { week ->
+            Row(Modifier.fillMaxWidth()) { week.forEach { date ->
+                Box(Modifier.weight(1f).heightIn(min = 34.dp), contentAlignment = Alignment.Center) {
+                    if (date != null) {
+                        val done = (byDate[date]?.completedTaskCount ?: 0) > 0
+                        // 已打卡日期只靠墨色区分（不再叠字重）：颜色不是唯一线索——语义里也写了「已完成」。
+                        Text(
+                            date.dayOfMonth.toString(),
+                            color = if (done) reviewInk else colors.text2,
+                            style = AppType.Footnote,
+                            modifier = Modifier.semantics { contentDescription = if (done) "$date 已完成" else date.toString() },
+                        )
+                    }
+                }
+            }; repeat(7 - week.size) { Box(Modifier.weight(1f).heightIn(min = 34.dp)) } }
         }
     }
 }

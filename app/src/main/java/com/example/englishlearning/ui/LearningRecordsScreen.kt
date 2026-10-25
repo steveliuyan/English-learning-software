@@ -1,7 +1,6 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,11 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -37,12 +34,9 @@ import com.example.englishlearning.learning.domain.DailyLearningHistory
 import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
 import com.example.englishlearning.ui.theme.MintTextMuted
-import com.example.englishlearning.ui.theme.MintTint
 
 @Composable
 fun LearningRecordsScreen(
@@ -102,8 +96,10 @@ fun LearningRecordsScreen(
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            // 批 1 Task 8：横向缩进由行内 20dp 承担（`hairlineTop` 的线才能从行内起点起笔、
+            // 而且行与行之间零间隙——分隔线替代了旧版卡与卡之间的 10dp 空当）。
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             when {
                 isLoading -> item { LoadingState() }
@@ -113,8 +109,8 @@ fun LearningRecordsScreen(
                         if (state.today.isEmpty()) {
                             item { EmptyState("今天还没有学习记录", "learning_records_empty_today") }
                         } else {
-                            items(state.today, key = { "today-${it.planId}-${it.cardId}" }) { row ->
-                                LearningRecordRow(row, onOpenRecord)
+                            itemsIndexed(state.today, key = { _, it -> "today-${it.planId}-${it.cardId}" }) { index, row ->
+                                LearningRecordRow(row, index, onOpenRecord)
                             }
                         }
                     }
@@ -126,8 +122,8 @@ fun LearningRecordsScreen(
                                 item(key = "date-${group.localDate}") {
                                     HistoryHeader(group, state.historyStats.firstOrNull { it.localDate == group.localDate })
                                 }
-                                items(group.records, key = { "history-${it.planId}-${it.cardId}" }) { row ->
-                                    LearningRecordRow(row, onOpenRecord)
+                                itemsIndexed(group.records, key = { _, it -> "history-${it.planId}-${it.cardId}" }) { index, row ->
+                                    LearningRecordRow(row, index, onOpenRecord)
                                 }
                             }
                         }
@@ -208,41 +204,42 @@ private fun HistoryHeader(group: LearningHistoryGroup, stats: DailyLearningHisto
 }
 
 /**
- * 一条学习记录：卡面（enabled/disabled 底色与描边、testTag、可点面）留在本屏，行本体换共享 [WordRow]
- * ——与 `WordBookWordsScreen.WordBookWordsRow`（Task 20-B）同形同口径。
+ * 一条学习记录：**裸行**（批 1 Task 8，spec §4.1 裸行族）。
  *
  * 三处迁移决定：
- *  ① **可点面只给卡**：`WordRow` 的 `onClick` 不传（传了会多出第二个可点节点），禁用态由「不挂 clickable」表达；
- *  ② **禁用行的行墨与可用行统一**：旧的 `textColor` 双档随私有 `RecordRow` 一起删掉，口径与 WordBookWords
- *     一致（那里已登记「设备侧读不到颜色」的说法不准确——文本节点的 `textLayout().layoutInput.style` 读得到，
- *     只是本屏没有这条用例；要补取证走同一读法）；
- *  ③ **不可用原因走 gloss 槽，不走 meta**：原因是 11 枚汉字，`meta` 在右列 `widthIn(max = 120.dp)` 下会被
- *     卡成省略号；`gloss` 在左列 `weight(1f)`、两行、无宽度上限。成立前提是「禁用 ⇒ `wordCard == null`」，
- *     与 WordBookWords 同一条互斥链：`LearningRecord.canOpenDetail` 默认值 `= wordCard != null`，
- *     生产构造只有两处——`LearningRecord.missing(...)` 显式传 `null`/`false`，`RoomLearningRecordRepository`
- *     查到卡时走默认值。前提若放开（`wordCard != null` 却 `canOpenDetail == false`），原因串会被释义吃掉；
- *     本屏的互斥链由 `LearningRecordsRowContractTest` 的 JVM 锚钉住（改动前先读那条用例）。
+ *  ① **行本体就是可点面**：`WordRow` 的 `onClick` 直接传——`WordRow` 把 `clickable` 挂在
+ *     `fillMaxWidth()` 之后、`heightIn`/`padding` 之前，可点面是整盒；旧版「卡负责可点、行不管」
+ *     的双节点写法随 `Card` 一并删掉。禁用态由「不传 `onClick`」表达（`WordRow` 不给空
+ *     `onClick` 挂 `clickable`，也就没有 `Role.Button`），原因仍写进 gloss 槽。
+ *  ② **禁用行不再自带灰底**（旧版是 `MintTint.copy(alpha = 0.55f)` + 淡描边）：裸行族里
+ *     一屏不许有第二种「行皮肤」，否则同一列表中两种底色的行又成了卡片汤的小号版本。
+ *     禁用与可用的区分落在「不响应点击」+「gloss 写明原因」这两件事上；代价是不可用行
+ *     与可用行外观接近，故原因串必须写清（「这个词已不在当前词书中」那类），不能只靠灰。
+ *  ③ **不可用原因走 gloss 槽，不走 meta**：原因是 11 枚汉字，`meta` 在右列 `widthIn(max = 120.dp)`
+ *     下会被卡成省略号；`gloss` 在左列 `weight(1f)`、两行、无宽度上限。成立前提是「禁用 ⇒
+ *     `wordCard == null`」，与 WordBookWords 同一条互斥链：`LearningRecord.canOpenDetail` 默认值
+ *     `= wordCard != null`，生产构造只有两处——`LearningRecord.missing(...)` 显式传 `null`/`false`，
+ *     `RoomLearningRecordRepository` 查到卡时走默认值。前提若放开（`wordCard != null` 却
+ *     `canOpenDetail == false`），原因串会被释义吃掉；本屏的互斥链由
+ *     `LearningRecordsRowContractTest` 的 JVM 锚钉住（改动前先读那条用例）。
  */
 @Composable
-private fun LearningRecordRow(row: LearningRecord, onOpenRow: (LearningRecord) -> Unit) {
+private fun LearningRecordRow(row: LearningRecord, index: Int, onOpenRow: (LearningRecord) -> Unit) {
     val safeId = row.safeId()
     val enabled = row.canOpenDetail
     val unavailableNotice = if (enabled) null else "这个词已不在当前词书中"
-    Card(
+    WordRow(
+        lemma = row.displayLemma,
+        gloss = row.wordCard?.meaningZh?.takeIf { it.isNotBlank() } ?: unavailableNotice,
+        // 批 1 Task 8：右列只写三档反馈词本身。「反馈：」前缀在 120dp 上限里占掉三枚汉字宽度，
+        // 把「认识/模糊/不认识」挤进省略号；行的位置与右对齐已经说明这一列是什么。
+        status = row.feedback.label(),
+        topDivider = index > 0,
+        onClick = if (enabled) ({ onOpenRow(row) }) else null,
         modifier = Modifier
-            .fillMaxWidth()
-            .then(if (enabled) Modifier.clickable(onClick = { onOpenRow(row) }) else Modifier)
-            .testTag(if (enabled) "learning_record_row_$safeId" else "learning_record_missing_$safeId"),
-        colors = CardDefaults.cardColors(containerColor = if (enabled) MintSurface else MintTint.copy(alpha = 0.55f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) MintOutline else MintOutline.copy(alpha = 0.65f)),
-    ) {
-        WordRow(
-            lemma = row.displayLemma,
-            gloss = row.wordCard?.meaningZh?.takeIf { it.isNotBlank() } ?: unavailableNotice,
-            status = "反馈：${row.feedback.label()}",
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        )
-    }
+            .testTag(if (enabled) "learning_record_row_$safeId" else "learning_record_missing_$safeId")
+            .padding(horizontal = 20.dp),
+    )
 }
 
 private fun LearningRecordsTab.label(): String = when (this) {

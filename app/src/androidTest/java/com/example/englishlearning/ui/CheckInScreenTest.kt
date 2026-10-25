@@ -38,10 +38,16 @@ class CheckInScreenTest {
         composeRule.setContent { CheckInScreen(CheckInUiState.Ready(stats(today), (0..6).map { stats(today.minusDays(it.toLong())) }, (1..today.lengthOfMonth()).map { stats(today.withDayOfMonth(it)) }, true), onBack = {}) }
         composeRule.onNodeWithTag("check_in_screen").assertExists()
         composeRule.onNodeWithText("完成任务 2/4", substring = true).assertExists()
+        // 批 1 Task 8（§5）：连续天数是唯一大数字；完成度环整块删除。
+        composeRule.onNodeWithTag("check_in_totals").assertExists()
+        composeRule.onNodeWithTag("check_in_streak_days").assertExists()
+        composeRule.onNodeWithTag("check_in_streak_text").assertExists()
+        composeRule.onNodeWithTag("check_in_totals_text").assertExists()
+        composeRule.onNodeWithTag("check_in_completion_ratio").assertDoesNotExist()
+        composeRule.onNodeWithTag("check_in_completion_percent").assertDoesNotExist()
+        composeRule.onNodeWithTag("check_in_completion_arc").assertDoesNotExist()
         composeRule.onNodeWithTag("check_in_week_chart").assertExists()
         (0..6).forEach { index -> composeRule.onNodeWithTag("check_in_week_bar_$index").assertExists() }
-        composeRule.onNodeWithTag("check_in_completion_ratio").assertExists()
-        composeRule.onNodeWithTag("check_in_completion_percent").assertTextContains("50%")
         composeRule.onNodeWithTag("check_in_calendar").assertExists()
         composeRule.onNodeWithContentDescription("2026-09-25 已完成").assertExists()
         composeRule.onNodeWithContentDescription("2026-09-01 已完成").assertExists()
@@ -54,8 +60,8 @@ class CheckInScreenTest {
         val orange = DomainColors.Review.deep.toArgb()
         assertTrue("progress graphics need 3:1 against white", contrastRatio(orange, AndroidColor.WHITE) >= 3.0)
         assertContainsColor("check_in_week_bar_0", orange)
-        assertArcColor(orange)
-        assertContainsColor("check_in_completion_percent", orange)
+        // 环删除后，强调色的三处落点是：周柱、连续天数（唯一大数字）、月历已打卡日期。
+        assertContainsColor("check_in_streak_days", orange)
         assertContainsColor("check_in_calendar", DomainColors.Review.deep.toArgb())
     }
 
@@ -68,13 +74,6 @@ class CheckInScreenTest {
         }
         val (lighter, darker) = listOf(luminance(a), luminance(b)).sortedDescending()
         return (lighter + 0.05) / (darker + 0.05)
-    }
-
-    private fun assertArcColor(color: Int) {
-        val bitmap = composeRule.onNodeWithTag("check_in_completion_arc").performScrollTo().captureToImage().asAndroidBitmap()
-        val y = bitmap.height / 2
-        val xRange = (bitmap.width * 11 / 12) until bitmap.width
-        assertTrue("completion arc should render accessible review orange", xRange.any { x -> bitmap.getPixel(x, y) == color })
     }
 
     private fun assertContainsColor(tag: String, color: Int) {
@@ -143,12 +142,18 @@ class CheckInScreenTest {
         composeRule.onNodeWithTag("check_in_open_wrong_words").assertDoesNotExist()
     }
 
-    @Test fun zero_target_shows_zero_percent() {
+    /**
+     * 零目标日的空态：旧版这里断言的是完成度环上的「0%」；批 1 Task 8 把环删了，
+     * 空态的真实证据改由两处承担——连续天数的 Display 数字仍是「0」（不因零目标而消失），
+     * 今日卡显示「完成任务 0/0」，而环的三枚锚一枚都不许回来。
+     */
+    @Test fun zero_target_shows_zero_counts_without_a_completion_ring() {
         val date = LocalDate.of(2026, 9, 25)
         val zero = DailyLearningStats(date, 0, 0, 0, 0)
         composeRule.setContent { CheckInScreen(CheckInUiState.Ready(zero, List(7) { zero }, listOf(zero), false), onBack = {}) }
-        composeRule.onNodeWithTag("check_in_completion_percent").assertTextContains("0%")
-        composeRule.onNodeWithText("目标 0 项，已完成 0 项", substring = true).assertExists()
+        composeRule.onNodeWithTag("check_in_streak_days").assertTextContains("0")
+        composeRule.onNodeWithText("完成任务 0/0", substring = true).assertExists()
+        composeRule.onNodeWithTag("check_in_completion_ratio").assertDoesNotExist()
     }
 
     /**

@@ -47,6 +47,10 @@ class LearningRecordsScreenTest {
         composeRule.setContent { LearningRecordsScreen(LearningRecordsUiState(today = listOf(row)), {}, {}, {}, {}) }
         composeRule.onNodeWithTag("learning_record_missing_parent").assertIsDisplayed()
         composeRule.onAllNodesWithTag("learning_record_row_parent").assertCountEquals(0)
+        // 批 1 Task 8：右列只写三档反馈词本身（`AppType.Footnote` 13sp），不再带「反馈：」前缀——
+        // 前缀在 120dp 的右列上限里占掉三枚汉字，把「认识/模糊/不认识」挤成省略号。
+        composeRule.onNodeWithText("模糊").assertIsDisplayed()
+        composeRule.onNodeWithText("反馈：模糊").assertDoesNotExist()
     }
 
     /**
