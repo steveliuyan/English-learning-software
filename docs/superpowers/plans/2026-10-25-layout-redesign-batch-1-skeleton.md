@@ -224,10 +224,11 @@ git -c user.name=steveliuyan -c user.email=2021250388@qq.com commit -m "feat(ui)
 
        @Test
        fun `the strong card is at most one per screen`() {
-           assertEquals(
-               1,
-               countMatches(todayPlan, Regex("""\bStrongCard\(""")),
-               "学习页必须恰一枚强档卡（spec §4.1：一屏至多一枚；0 = 主区没落地，2 = 又回到卡片汤）",
+           // 本任务先立「至多一枚」的上界；学习页「恰一枚」的落地断言归 Task 4 的
+           // TodayPlanBareRowContractTest（那里才真写 StrongCard）。
+           assertTrue(
+               countMatches(todayPlan, Regex("""\bStrongCard\(""")) <= 1,
+               "学习页最多一枚强档卡（spec §4.1：2 = 又回到卡片汤）",
            )
            assertTrue(
                "colors.strongSurface" in containers,
@@ -582,6 +583,7 @@ class TodayPlanBareRowContractTest {
     @Test
     fun `the learning home keeps only two bare rows`() {
         assertEquals(2, countMatches(screen, Regex("""\bBareRow\(""")), "学习页只留两条裸行（今日文章 / 词库）")
+        assertEquals(1, countMatches(screen, Regex("""\bStrongCard\(""")), "学习页恰一枚强档卡（§3.2 主区）")
         assertEquals(0, countMatches(screen, Regex("""\bEntryRow\(""")), "五个入口行必须离场：两个去词库、三个去我的")
         listOf("today_plan_reading_status", "today_plan_open_word_bank").forEach { tag ->
             assertEquals(1, countMatches(screen, Regex(Regex.escape(tag))), "裸行锚「$tag」必须恰一处")

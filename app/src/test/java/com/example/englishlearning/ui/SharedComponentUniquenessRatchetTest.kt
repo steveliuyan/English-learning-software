@@ -238,14 +238,15 @@ class SharedComponentUniquenessRatchetTest {
     // ---------- 组件面（存在 + 恰一处定义） ----------
 
     /**
-     * 批 1 结束时 `components` 目录下的 12 枚 `.kt`（precheck §1 / R-12.3：Task 11 后 10 枚 + 本任务 2 枚）。
-     * **按「点名文件必须存在」写，不按总数写**——总数会随后续批次漂移（R-12.3 明令）。
+     * `components` 目录下必须存在的组件文件（**按「点名文件必须存在」写，不按总数写**——总数会随后续批次漂移，
+     * R-12.3 明令。批 1 时点 10 枚 + Task 12 两枚 + 批 1 版式重做的 [Containers.kt]；`Skeleton.kt` 尚未入册）。
      */
     private val canonicalComponentFiles = listOf(
         "AppIcon.kt",
         "AppIcons.kt",
         "AppScreenHeader.kt",
         "ConfirmDestructiveDialog.kt",
+        "Containers.kt",
         "EntryRow.kt",
         "IconBadge.kt",
         "InlineNotice.kt",
@@ -261,6 +262,9 @@ class SharedComponentUniquenessRatchetTest {
         "AppGlyph" to "AppIcon.kt",
         "AppScreenHeader" to "AppScreenHeader.kt",
         "ConfirmDestructiveDialog" to "ConfirmDestructiveDialog.kt",
+        "StrongCard" to "Containers.kt",
+        "SoftCard" to "Containers.kt",
+        "BareRow" to "Containers.kt",
         "EntryRow" to "EntryRow.kt",
         "EntryIconBadge" to "IconBadge.kt",
         "InlineIconBadge" to "IconBadge.kt",

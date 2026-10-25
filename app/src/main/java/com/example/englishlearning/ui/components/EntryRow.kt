@@ -12,10 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.collapse
@@ -107,6 +104,8 @@ fun entryRowInks(set: AppColorSet): EntryRowInk = EntryRowInk(
  * 5 屏 × 3~8 行要抄 30 余次）。线画在内容**外侧**：先 `drawBehind` 出 1dp 发丝线、再 `padding(top = 1.dp)`
  * 把内容整块推下去，`heightIn(min = 56.dp)` 落在这条 padding 的**内侧**——所以 56dp 的最小内容高
  * 一动不动（R-10.5 禁的正是「把 56 吃成 55/57」），行的整体外框才是 56+1。
+ * 这条线由 `Containers.kt` 的共享 `hairlineTop(color, startIndent)` 画（批 1 从本文件迁出，三档容器同用一份）；
+ * 本文件不再持有私有副本，`SharedComponentUniquenessRatchetTest` 与 `ContainerContractTest` 各钉一面。
  *
  * [onClick] 是最后一个**必填**形参：调用方用尾随 lambda 写法 `EntryRow(icon, domain, "今日计划") { … }`
  * 即可，其余可选项一律具名传。
@@ -210,26 +209,3 @@ fun EntryRow(
     }
 }
 
-/**
- * 顶线装饰：墨色为 `null` 时返回空链（不占位、不画线），非空时「先画线、再让出 1dp」。
- *
- * 两步的**顺序**就是契约：`drawBehind` 在 `padding` 外侧，线才落在让出来的那条 1dp 里；
- * 反过来写（`padding` 后 `drawBehind`）会把线画进内容顶边。`heightIn` 由调用方接在这条链之后，
- * 于是最小内容高仍是 56dp（R-10.5）。线宽 1dp 居中于 y = 0.5dp，避免 1dp 描边被上边缘切掉一半。
- */
-private fun hairlineTop(color: Color?): Modifier = if (color == null) {
-    Modifier
-} else {
-    Modifier
-        .drawBehind {
-            val thickness = 1.dp.toPx()
-            drawLine(
-                color = color,
-                start = Offset(0f, thickness / 2f),
-                end = Offset(size.width, thickness / 2f),
-                strokeWidth = thickness,
-                cap = StrokeCap.Butt,
-            )
-        }
-        .padding(top = 1.dp)
-}
