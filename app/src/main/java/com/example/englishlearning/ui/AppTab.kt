@@ -10,5 +10,5 @@ enum class AppTab(val label: String, val contentDescription: String) {
     LEARNING("学习", "学习"),
     READING("阅读", "阅读"),
     AI("AI 学", "AI 学"),
-    SETTINGS("设置", "设置"),
+    SETTINGS("我的", "我的"),
 }

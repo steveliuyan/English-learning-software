@@ -71,7 +71,9 @@ fun AppBottomBar(
 }
 
 /**
- * 四枚 tab 与图标台账定稿字形的对位（学习=合上的书、阅读=报面、AI=星芒、设置=滑杆）；
+ * 四枚 tab 与图标台账定稿字形的对位（学习=合上的书、阅读=报面、AI=星芒、我的=人像）；
+ * 「我的」这一格取 `Person` 而不是滑杆：第四格从「设置」升成个人中心（档案 / 统计 / 设置三合一），
+ * 滑杆只说得清设置，说不清存档与统计。`Gear` 字形仍在枚举里，设置组内部照旧可用。
  * 台账出处与许可结论见 `components/AppIcons.kt` 文件头，枚名与几何不在这里复制。
  */
 private val AppTab.glyph: AppIcon
@@ -79,7 +81,7 @@ private val AppTab.glyph: AppIcon
         AppTab.LEARNING -> AppIcon.Book
         AppTab.READING -> AppIcon.Newspaper
         AppTab.AI -> AppIcon.Spark
-        AppTab.SETTINGS -> AppIcon.Gear
+        AppTab.SETTINGS -> AppIcon.Person
     }
 
 @Composable

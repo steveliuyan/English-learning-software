@@ -38,7 +38,7 @@ class AppBottomBarTest {
 
     @Test fun every_slot_carries_its_label_so_the_bar_reads_by_itself() {
         composeRule.setContent { AppBottomBar(selected = AppTab.LEARNING, onSelect = {}) }
-        listOf("学习", "阅读", "AI 学", "设置").forEach { label ->
+        listOf("学习", "阅读", "AI 学", "我的").forEach { label ->
             composeRule.onNodeWithText(label).assertExists()
         }
     }

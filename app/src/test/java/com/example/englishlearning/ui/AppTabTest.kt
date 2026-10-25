@@ -38,4 +38,14 @@ class AppTabTest {
         assertEquals("AI 学", AppTab.AI.label)
         assertEquals("AI 学", AppTab.AI.contentDescription)
     }
+
+    /**
+     * 第四格是「我的」而不是「设置」：设置内容并入我的页（档案头 + 统计条 + 原 4 组 9 行），
+     * 所以底导标签与无障碍播报都得跟着走，不能只换字形（2026-10-25 规范 §3.1）。
+     */
+    @Test
+    fun `the fourth destination is the profile hub rather than plain settings`() {
+        assertEquals("我的", AppTab.SETTINGS.label)
+        assertEquals("我的", AppTab.SETTINGS.contentDescription)
+    }
 }

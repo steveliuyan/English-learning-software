@@ -259,8 +259,8 @@ class AppBottomBarContractTest {
     @Test
     fun `the four tabs map to the pinned duotone glyphs exactly once each`() {
         val bar = appBottomBarSource()
-        listOf("AppIcon.Book", "AppIcon.Newspaper", "AppIcon.Spark", "AppIcon.Gear").forEach { glyph ->
-            assertEquals(1, count(bar, glyph), "底导字形映射里「$glyph」必须恰一处（学习 Book / 阅读 Newspaper / AI Spark / 设置 Gear）")
+        listOf("AppIcon.Book", "AppIcon.Newspaper", "AppIcon.Spark", "AppIcon.Person").forEach { glyph ->
+            assertEquals(1, count(bar, glyph), "底导字形映射里「$glyph」必须恰一处（学习 Book / 阅读 Newspaper / AI Spark / 我的 Person）")
         }
         assertTrue(
             bar.contains("tab.glyph"),
