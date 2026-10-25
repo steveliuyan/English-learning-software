@@ -218,7 +218,6 @@ class SharedComponentUniquenessRatchetTest {
             "ImageStudioScreen.kt",
             "LicensesScreen.kt",
             "PhotoTranslationScreen.kt",
-            "ReadingAccessScreen.kt",
             "ReadingHistoryScreen.kt",
             "SentenceAnalysisScreen.kt",
             "WordAiQaScreen.kt",

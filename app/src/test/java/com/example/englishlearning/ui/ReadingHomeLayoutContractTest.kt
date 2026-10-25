@@ -27,6 +27,9 @@ import kotlin.test.assertTrue
  * 判据一律**符号锚定**，不锚行号（版面一改行号就漂，注释却看起来仍然权威）。
  * 亮度复算用包级共享夹具 [luminance]/[ratio]（`SourceRatchet.kt`），不在此另写第二份公式、
  * 也不把 hex 抄进断言字面量——断言读的是 `AppColorLight` / `AppColorDark` 的**活符号**。
+ *
+ * 第四族 [the_home_leads_with_a_today_article_card_and_a_single_more_group] 是版式重做批 1 Task 7
+ * （spec §3.4）：页头 + 今日文章卡 + 单个「更多」组，锁定态一句说明替代四枚类型按钮。
  */
 class ReadingHomeLayoutContractTest {
 
@@ -167,13 +170,14 @@ class ReadingHomeLayoutContractTest {
                 Regex("""if \(generationParamsExpanded\)""").containsMatchIn(home),
             "展开态必须用 `generationParamsExpanded` 这一个开关承重：不许把偏好区改成第三层导航",
         )
-        // 持久化路径不动：四枚类型仍由 `ArticleType.entries` 全量驱动（Locked 一支 + 展开区一支），
-        // 少一枚 = 搬家时顺手裁了类型，多一枚 = 主页又长出常驻类型列。
+        // 持久化路径不动：四枚类型仍由 `ArticleType.entries` 全量驱动，但**只剩展开区一支**——
+        // 批 1 Task 7 把锁定态那四枚 disabled 类型按钮换成一句说明（`reading_access_locked_types`），
+        // 锁定态不再有类型入口。计数因此 2 → 1：这是「摘掉一支」，不是放宽到 ≥1。
         assertEquals(
-            2,
+            1,
             countMatches(home, Regex("""ArticleType\.entries""")),
-            "类型行必须由 `ArticleType.entries` 全量驱动且恰两处（锁定态一支、生成前参数展开区一支）：" +
-                "偏好只是下沉到开关之后，取源与写入参数一枚都不许多、一枚都不许少",
+            "类型行必须由 `ArticleType.entries` 全量驱动且恰一处（生成前参数展开区）：" +
+                "锁定态的类型按钮已退役（改用一句说明），少到 0 = 展开区把类型裁了，回到 2 = 锁定态又把按钮铺回来了",
         )
         assertTrue(
             "onSelectType: (ArticleType) -> Unit" in home,
@@ -181,7 +185,82 @@ class ReadingHomeLayoutContractTest {
         )
     }
 
-    // ---------- 4. 英文正文前景 token 化后的两套 AA ----------
+    // ---------- 4. 版式重做批 1 Task 7：页头 + 今日文章卡 + 更多组 ----------
+
+    /**
+     * 批 1 Task 7（版式重做 §3.4 阅读页）的四件：
+     *  ① 换用共享页头——「换一篇」从页内次级按钮搬进页头 `action` 槽，只在有今日文章时出现；
+     *  ② 今日文章收进一枚具名卡（`reading_today_article`），标题/译文/类型长度/主 CTA 都在这枚卡里；
+     *  ③ 外刊 / 粘贴 / 历史三枚入口收进同一个「更多」组（`reading_more_group`），不再三条平铺大按钮；
+     *  ④ 锁定态四枚 disabled 类型按钮换成一句说明（`reading_access_locked_types`）——锁定只挡「生成」，
+     *    类型选择属于生成前参数，没生成入口时就不该占版面。
+     *
+     * 「换一篇」的二次确认（Task 7 Step 1 第 7 条）：重生成会替换当天文章，必须过共享
+     * [com.example.englishlearning.ui.components.ConfirmDestructiveDialog]，且屏内恰一处。
+     */
+    @Test
+    fun `the home leads with a today article card and a single more group`() {
+        assertEquals(
+            1,
+            countMatches(home, Regex("""AppScreenHeader\(""")),
+            "阅读主页必须换用共享页头（页头族 seed 已摘此屏）",
+        )
+        assertEquals(
+            1,
+            countMatches(home, Regex("""reading_today_article""")),
+            "今日文章卡锚必须恰一处",
+        )
+        assertEquals(
+            1,
+            countMatches(home, Regex("""reading_more_group""")),
+            "外刊/导入/历史必须收进同一个更多组",
+        )
+        assertEquals(
+            0,
+            countMatches(home, Regex("""SecondaryCtaButton\("换一篇"|"换一篇",\s*"reading_regenerate"""")),
+            "换一篇不再是页内次级按钮",
+        )
+        // 页头 action 的形状：换一篇只在「有今日文章」时进槽，且 tag 仍是 connected 侧点名的 `reading_regenerate`。
+        assertTrue(
+            "state.todayArticle != null" in home && "reading_regenerate" in home,
+            "页头 action 必须按「今天有没有文章」决定在场，并把换一篇的锚 `reading_regenerate` 留在槽里",
+        )
+        // 锁定态：一句说明替代四枚类型按钮。
+        assertTrue("reading_access_locked_types" in home, "锁定态用一句说明替代四枚类型按钮")
+        assertEquals(
+            0,
+            countMatches(home, Regex("""TypeButton\(type, false""")),
+            "锁定态不得再平铺四枚类型按钮",
+        )
+        // 重生成二次确认：恰一处共享对话框，且三条文案逐字点名（替换什么 / 什么不受影响 / 不是不可逆）。
+        assertEquals(
+            1,
+            countMatches(home, Regex("""ConfirmDestructiveDialog\(""")),
+            "「换一篇」必须过共享二次确认对话框：0 = 一键就把当天文章换掉，2 = 长出第二份确认",
+        )
+        listOf(
+            "当前这篇文章会被新生成的文章替换",
+            "已解锁的历史文章与阅读记录不受影响",
+            "irreversible = false",
+        ).forEach { line ->
+            assertTrue(line in home, "换一篇确认框缺一句「$line」：替换面、保留面与可逆档必须逐字说清")
+        }
+        // 更多组的三枚入口各带自己的 tag：connected 用例按 tag 点，而不是回到「按文本猜按钮」。
+        listOf("reading_more_feed", "reading_more_import", "reading_more_history").forEach { tag ->
+            assertEquals(1, countMatches(home, Regex(tag)), "更多组缺入口锚「$tag」或出现两份")
+        }
+        // 旧的三枚平铺入口与历史大按钮在 Ready 态必须离场（锁定态保留历史按钮一支）。
+        listOf("reading_source_feed", "reading_source_import").forEach { old ->
+            assertEquals(0, countMatches(home, Regex(old)), "旧入口锚「$old」必须随三枚平铺大按钮一起离场")
+        }
+        assertEquals(
+            1,
+            countMatches(home, Regex("""HistoryButton\(onOpenHistory,""")),
+            "HistoryButton 只留锁定态一支：Ready 态的历史入口归更多组裸行（2 = 同一屏两处历史入口）",
+        )
+    }
+
+    // ---------- 5. 英文正文前景 token 化后的两套 AA ----------
 
     /**
      * `ArticleReadingScreen` 英文正文那一枚裸 hex 的处置判据。
@@ -266,7 +345,13 @@ class ReadingHomeLayoutContractTest {
      * 既满足**与套无关**，又把浅套比值从 4.62 抬到 7.81（深套 9.74）。
      *
      * 本条钉四件事：`onBrand` 两套同值；两套压亮薄荷都 ≥4.5；`onMint` 深档不达线（禁迁）；
-     * 屏内四枚站点逐枚换到 `appColors().onBrand`，且没有一枚混进 `onMint`。
+     * 屏内**唯一**一枚主色按钮（今日文章 / 生成那一枚）换到 `appColors().onBrand`，且没有一枚混进 `onMint`。
+     *
+     * 批 1 Task 7 把站点数 4 → 1：计划 §Task 7 Step 1 的口径是「一屏只剩主 CTA 一枚薄荷主色」。
+     * 原四枚里另外三枚不在页面上、而在三个辅助函数里——四枚类型行（`TypeButton`）、
+     * 生成失败横幅与未配置横幅里的「去配置」各一枚。Task 7 把它们降为次级档（`MintSurface` / `MintTint`
+     * 容器 + 1dp `MintOutline` 描边），于是「一屏一枚主色」既是运行时事实、也是源码级计数：
+     * 类型行与横幅动作都不再抢主任务叙事。主 CTA 本体（`PrimaryCtaButton`）的配平与亮度判据一字未改。
      */
     @Test
     fun `the mint primary pair stays dark ink on both theme sets`() {
@@ -295,11 +380,11 @@ class ReadingHomeLayoutContractTest {
             "若 `appColors().onMint` 压深套 MintPrimary 也过正文线，那本条就该反向要求迁移；" +
                 "现实测 ${"%.4f".format(onMintDark)} 必须不达线，才证明不能拿套内墨来配这四枚",
         )
-        // 屏内形状：四枚现配逐枚绑在同一枚容器表达式上，且没有混进 onMint / 旧静态符号。
+        // 屏内形状：主 CTA 这一枚绑在同一枚容器表达式上，且没有混进 onMint / 旧静态符号。
         assertEquals(
-            4,
+            1,
             countMatches(home, Regex("""appColors\(\)\.onBrand\b""")),
-            "阅读主页的 onBrand 站点数必须与 DarkTokenConsumptionRatchetTest 的口径同步（现 4）",
+            "阅读主页的 onBrand 站点数必须与 DarkTokenConsumptionRatchetTest 的口径同步（现 1：只有主 CTA 一枚）",
         )
         assertEquals(
             0,
@@ -313,17 +398,17 @@ class ReadingHomeLayoutContractTest {
         )
         // 配对的**写法**有两种（同一行的 `containerColor = MintPrimary, contentColor = appColors().onBrand`
         // 与 TypeButton 那种逐枚换行的 `colors = ButtonDefaults.buttonColors(...)`），所以按两侧符号各自点数，
-        // 两数相等才说明四枚深墨没有一枚压到别的容器上；不按单行正则判，那种判法会把换行写法静默漏掉。
+        // 两数相等才说明深墨没有压到别的容器上；不按单行正则判，那种判法会把换行写法静默漏掉。
         assertEquals(
-            4,
+            1,
             countMatches(home, Regex("""containerColor = MintPrimary\b""")),
-            "阅读主页应恰四枚 `MintPrimary` 亮面容器（站点数一变，本条与 onBrand 那两枚计数必须同步改，" +
-                "否则等于放开「深墨压到别的容器」的口子）",
+            "阅读主页应恰一枚 `MintPrimary` 亮面容器（主 CTA）：站点数一变，本条与 onBrand 那两枚计数必须同步改，" +
+                "否则等于放开「深墨压到别的容器」的口子",
         )
         assertEquals(
-            4,
+            1,
             countMatches(home, Regex("""contentColor = appColors\(\)\.onBrand\b""")),
-            "四枚深墨前景必须逐枚挂在 MintPrimary 容器档上：与上一枚计数相等才配对",
+            "唯一一枚深墨前景必须挂在 MintPrimary 容器档上：与上一枚计数相等才配对",
         )
     }
 }

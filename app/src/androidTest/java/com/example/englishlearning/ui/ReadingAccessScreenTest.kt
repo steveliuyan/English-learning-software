@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -31,7 +30,7 @@ class ReadingAccessScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun lockedStateShowsReasonAndDisablesArticleChoices() {
+    fun lockedStateShowsReasonAndOneSentenceInsteadOfTypeButtons() {
         composeRule.setContent {
             ReadingAccessScreen(
                 state = ReadingAccessUiState.Locked("还差 2 个新词、1 个复习词"),
@@ -41,8 +40,16 @@ class ReadingAccessScreenTest {
         }
 
         composeRule.onNodeWithTag("reading_access_locked_reason").assertExists()
-        composeRule.onNodeWithTag("reading_type_story").assertExists().assertIsNotEnabled()
-        composeRule.onNodeWithTag("reading_history_entry").assertExists().assertHasClickAction()
+        // 批 1 Task 7：锁定态不再铺四枚 disabled 类型按钮（类型属于「生成前参数」，锁定态没有生成入口），
+        // 改成一句说明；历史入口照常可点。
+        composeRule.onNodeWithTag("reading_access_locked_types")
+            .performScrollTo()
+            .assertExists()
+        composeRule.onNodeWithText("今日计划完成后可生成新文章", substring = true).assertExists()
+        ArticleType.entries.forEach { type ->
+            composeRule.onNodeWithTag("reading_type_${type.name.lowercase()}").assertDoesNotExist()
+        }
+        composeRule.onNodeWithTag("reading_history_entry").performScrollTo().assertExists().assertHasClickAction()
     }
 
     @Test
@@ -87,7 +94,8 @@ class ReadingAccessScreenTest {
         composeRule.onNodeWithTag("reading_type_science").performScrollTo().assertExists().performClick()
         composeRule.onNodeWithTag("reading_type_workplace").assertExists()
         composeRule.onNodeWithTag("reading_preference").assertExists()
-        composeRule.onNodeWithTag("reading_history_entry").performScrollTo().assertExists().performClick()
+        // Ready 态的历史入口归「更多」组的裸行（批 1 Task 7）；`reading_history_entry` 只剩锁定态一支。
+        composeRule.onNodeWithTag("reading_more_history").performScrollTo().assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(ArticleType.SCIENCE, selected)
         assertEquals(1, historyOpened)
@@ -98,8 +106,9 @@ class ReadingAccessScreenTest {
         composeRule.setContent { readyScreen() }
 
         composeRule.onNodeWithTag("reading_source_ai").assertExists().assertHasClickAction()
-        composeRule.onNodeWithTag("reading_source_feed").assertExists().assertHasClickAction()
-        composeRule.onNodeWithTag("reading_source_import").assertExists().assertHasClickAction()
+        // 外刊与粘贴从三条平铺大按钮收进同一个「更多」组（批 1 Task 7 §3.4），tag 随之落到裸行上。
+        composeRule.onNodeWithTag("reading_more_feed").performScrollTo().assertExists().assertHasClickAction()
+        composeRule.onNodeWithTag("reading_more_import").performScrollTo().assertExists().assertHasClickAction()
         // 费用提示必须逐字可读；绝不能再出现「本阶段不会发起网络生成」这类假话。
         composeRule.onNodeWithText("每次生成都会真实调用你配置的 AI 服务并可能产生费用", substring = true).assertExists()
         composeRule.onNodeWithText("本阶段不会发起网络生成", substring = true).assertDoesNotExist()
@@ -174,7 +183,7 @@ class ReadingAccessScreenTest {
     }
 
     @Test
-    fun todayArticleExposesReadAndRegenerateButtons() {
+    fun todayArticleExposesReadAndConfirmedRegenerateButtons() {
         var opened = 0
         var regenerated = 0
         composeRule.setContent {
@@ -185,10 +194,26 @@ class ReadingAccessScreenTest {
             )
         }
 
+        // 今日文章卡（批 1 Task 7）：标题 + 阅读 CTA 同住一枚具名卡。
+        composeRule.onNodeWithTag("reading_today_article").assertExists()
         composeRule.onNodeWithTag("reading_open_today").assertExists().performClick()
-        composeRule.onNodeWithTag("reading_regenerate").assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(1, opened)
+
+        // 「换一篇」搬进页头 action，且**点一下不会直接换**：先弹共享二次确认，
+        // 取消则一次生成都不发生（这是它会替换当天文章的代价换来的必答问题）。
+        composeRule.onNodeWithTag("reading_regenerate").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("confirm_destructive_confirm").assertExists()
+        assertEquals(0, regenerated)
+        composeRule.onNodeWithTag("confirm_destructive_dismiss").performClick()
+        composeRule.waitForIdle()
+        assertEquals(0, regenerated)
+
+        composeRule.onNodeWithTag("reading_regenerate").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("confirm_destructive_confirm").performClick()
+        composeRule.waitForIdle()
         assertEquals(1, regenerated)
     }
 
@@ -200,7 +225,7 @@ class ReadingAccessScreenTest {
         // 名字与断言相反会让后来人把这三枚当成冗余判据删掉——它们是「不许把 Feed 搬回主页」的唯一行为面护栏。
         composeRule.setContent { readyScreen(feed = FeedUiState.Empty) }
         composeRule.onNodeWithTag("feed_empty").assertDoesNotExist()
-        composeRule.onNodeWithTag("reading_source_feed").assertExists().assertHasClickAction()
+        composeRule.onNodeWithTag("reading_more_feed").performScrollTo().assertExists().assertHasClickAction()
     }
 
     @Test
@@ -210,7 +235,7 @@ class ReadingAccessScreenTest {
             readyScreen(feed = FeedUiState.Unreachable, onOpenFeed = { feedOpened++ })
         }
         composeRule.onNodeWithTag("feed_error").assertDoesNotExist()
-        composeRule.onNodeWithTag("reading_source_feed").performClick()
+        composeRule.onNodeWithTag("reading_more_feed").performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals(1, feedOpened)
     }
@@ -317,8 +342,8 @@ class ReadingAccessScreenTest {
         // 本测试要求根容器可滚动，历史入口必须能滚到并保持可点击。
         composeRule.setContent { readyScreen(todayArticle = todayArticle()) }
         composeRule.onNodeWithTag("reading_access_screen")
-            .performScrollToNode(hasTestTag("reading_history_entry"))
-        composeRule.onNodeWithTag("reading_history_entry").assertExists().assertHasClickAction()
+            .performScrollToNode(hasTestTag("reading_more_history"))
+        composeRule.onNodeWithTag("reading_more_history").assertExists().assertHasClickAction()
     }
 
     @Composable

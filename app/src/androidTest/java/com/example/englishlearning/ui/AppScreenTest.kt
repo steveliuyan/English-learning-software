@@ -1003,7 +1003,9 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("reading_history_entry").performScrollTo().performClick()
+        // 批 1 Task 7：Ready 态的历史入口搬进「更多」组（`reading_more_history`）；
+        // 锁定态那枚仍是 `reading_history_entry`（锁定屏只有一条说明 + 历史入口，不需要分组）。
+        composeRule.onNodeWithTag("reading_more_history").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("reading_history_item_a1").fetchSemanticsNodes().isNotEmpty()
         }
