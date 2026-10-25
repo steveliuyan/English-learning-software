@@ -57,9 +57,12 @@ class BackupEntryUnificationContractTest {
         // 共用链不许只摘一半：其余半边必须原样留着。
         // 取样必须止于**下一条真代码**（`BackHandler(`）：注释在 [stripComments] 后已不存在，
         // 拿注释行当界会让这段"链"一路吃到文件尾，链内断言变成全文件包含，删项也判绿（变异 M2 实测）。
+        // 批 1 Task 5：`showWordBookWords` / `showMyWords` 两枚状态位已并进 `showWordBank`，
+        // 取样健康判据随形换到新别名（链前段）＋链尾的 `selectedFavoriteCard != null`——
+        // 两条同时在场才证明切片真落在整条链上；只查一条时半截链也能凑绿，那是放宽。
         val overlay = src.substringAfter("val overlayOpen =").substringBefore("BackHandler(")
         assertTrue(
-            overlay.contains("showWordBookWords") && overlay.contains("showMyWords"),
+            overlay.contains("showWordBank") && overlay.contains("selectedFavoriteCard != null"),
             "overlayOpen 取样失真：截取区间没有落在链尾（取样长度 ${overlay.length}）",
         )
         listOf("showWorksheetSettings", "showReadingFeed").forEach { route ->

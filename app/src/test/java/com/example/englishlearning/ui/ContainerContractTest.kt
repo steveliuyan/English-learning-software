@@ -12,7 +12,15 @@ import kotlin.test.assertTrue
  */
 class ContainerContractTest {
     private val containers: String by lazy { stripComments(uiComponentSource("Containers.kt")) }
-    private val todayPlan: String by lazy { stripComments(uiScreenSource("TodayPlanScreen.kt")) }
+
+    /**
+     * 「一屏最多一枚强档卡」的适用范围。批 1 Task 4 立了学习页，Task 5 把词库页并进来；
+     * 用 map 而不是逐屏写死：批 1 余下两屏（我的 / 每日阅读）落地时只在这里加一行。
+     */
+    private val screens: Map<String, String> by lazy {
+        listOf("TodayPlanScreen.kt", "WordBankScreen.kt")
+            .associateWith { stripComments(uiScreenSource(it)) }
+    }
 
     @Test
     fun `the three tiers are defined exactly once in the shared file`() {
@@ -31,10 +39,12 @@ class ContainerContractTest {
     fun `the strong card is at most one per screen`() {
         // 本任务先立「至多一枚」的上界；学习页「恰一枚」的落地断言归 Task 4 的
         // TodayPlanBareRowContractTest（那里才真写 StrongCard）。
-        assertTrue(
-            countMatches(todayPlan, Regex("""\bStrongCard\(""")) <= 1,
-            "学习页最多一枚强档卡（spec §4.1：2 = 又回到卡片汤）",
-        )
+        screens.forEach { (name, source) ->
+            assertTrue(
+                countMatches(source, Regex("""\bStrongCard\(""")) <= 1,
+                "$name 最多一枚强档卡（spec §4.1：2 = 又回到卡片汤）",
+            )
+        }
         assertTrue(
             "colors.strongSurface" in containers,
             "强档卡底色必须取 appColors().strongSurface，不许回退到 surface + 描边",

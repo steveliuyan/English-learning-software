@@ -145,69 +145,89 @@ class MyWordsScreenContractTest {
     }
 
     /**
-     * 入口挂载（R-20A.3「只建不摘」→ Task 22-A 已摘第一条）：新入口挂进词汇域入口面。
-     * 本条里的两份「老入口仍在册」反向控已按 R-22.1 的两席拆分**收敛到剩余枚数**：
-     *  `today_plan_open_vocabulary` 与 `VocabularyScreen(` 已由 22-A 摘除（从名单里删行，不是把断言改松），
-     *  另两条老路由（`showFavorites` / `showWrongWords` 及其屏挂载）连同打卡页那两条裸文字链归 22-B。
-     * 断言本体保留，枚数权威就是下面两份名单自己（本注释不抄枚数）。
+     * 入口挂载（R-20A.3「只建不摘」→ 22-A / 22-B 两席摘除 → 版式重做批 1 的 Task 4 + Task 5 合并）：
+     * 词汇域现在只有**一条**入口面——学习页的「词库」行，落点是四分段 `WordBankScreen`。
+     *
+     * 期望值随形改的三处（判据形状一律保留「恰一处」的精确计数，不是放宽）：
+     *  - 入口标签 `today_plan_open_my_words` → `today_plan_open_word_bank`（Task 4 把五个入口行换成
+     *    两条裸行，词库行是这一族的唯一去向）；
+     *  - 入口行标题「我的词」→ 四段枚举文案「词书 · 生词 · 错词 · 收藏」（词库页把三族词表并成四段后，
+     *    学习页那行必须逐字说明行里有什么——旧名「我的词」消失，唯一的可发现性凭据就是这行副标题）；
+     *  - 宿主挂载 `MyWordsScreen(` → `WordBankScreen(`（Task 5：合并页降为词库页的一段 pane）。
+     *
+     * 反向控同步翻面：`today_plan_open_wordbook_words` 从「必须在册」改成「必须离场」（Task 4 迁入口、
+     * Task 5 把宿主那枚 `showWordBookWords` 并进 `showWordBank`）；`today_plan_search_entry` 仍在册
+     * （查词条是四态常驻的第二段，与词库行并列）。
      */
     @Test
     fun the_new_entry_is_mounted_in_the_vocabulary_domain_surface() {
         val todayPlan = uiScreenSource("TodayPlanScreen.kt")
         assertTrue(
-            "today_plan_open_my_words" in todayPlan,
-            "「我的词」入口必须挂在 TodayPlanScreen 的词汇域入口行组里（标签 today_plan_open_my_words）",
+            "today_plan_open_word_bank" in todayPlan,
+            "「词库」入口必须挂在 TodayPlanScreen 的词库裸行上（标签 today_plan_open_word_bank）",
         )
         assertTrue(
-            countMatches(todayPlan, Regex(Regex.escape("\"我的词\""))) >= 1,
-            "入口行标题必须是「我的词」（与查词 / 词表并列的三入口文案，裁决①）",
+            countMatches(todayPlan, Regex(Regex.escape("\"词书 · 生词 · 错词 · 收藏\""))) >= 1,
+            "词库行的副标题必须逐字列出四段（「词书 · 生词 · 错词 · 收藏」）：旧名「我的词」随入口合并消失后，" +
+                "这是用户在学习页判断「这行里有什么」的唯一凭据（§3.2 第 4 块）",
         )
-        // 老入口标签的反向控（只建不摘期遗留的形状，按 22-A/22-B 拆分收敛到剩余枚数）：
-        // `today_plan_open_vocabulary` 已于 22-A 随老路由一起摘除，这里不再钉它；剩余两枚仍不得被摘，
-        // 它们的摘除归 22-B / 批 3 收口。
-        listOf(
-            "today_plan_open_wordbook_words",
-            "today_plan_search_entry",
-        ).forEach { tag ->
-            assertTrue(tag in todayPlan, "旧入口标签 $tag 不得被摘（本席只建不摘，摘除归 22-B）")
-        }
+        // 反向控（Task 4/5 的迁移账）：词书单词那枚老入口已离场，谁把它补回学习页本条当场红。
+        assertEquals(
+            0,
+            countMatches(todayPlan, Regex(Regex.escape("today_plan_open_wordbook_words"))),
+            "老入口标签 today_plan_open_wordbook_words 已随五入口迁移离场（§3.2 移出清单），不得残留",
+        )
+        assertTrue(
+            "today_plan_search_entry" in todayPlan,
+            "查词入口必须仍在册：它是四态常驻的独立一段，不是词库行的一部分",
+        )
 
         val appScreen = uiScreenSource("AppScreen.kt")
-        assertTrue(
-            countMatches(appScreen, Regex("""(^|[^A-Za-z0-9_])MyWordsScreen\(""")) == 1,
-            "AppScreen 必须挂载 MyWordsScreen 恰一处（0 = 新入口没有宿主，2 = 长出第二份挂载）",
-        )
-        // I-3（修复轮 1）：`>= 3` 点不住名——把入口回调体删空、甚至删掉 overlayOpen 里的 `|| showMyWords`，
-        // 计数仍在 3 以上，「接线断一环」对静态侧隐形。改为逐环点名形状；
-        // 「点了真的会开吗」的用户面由 connected `AppScreenTest` 的两枚端到端用例承重。
         assertEquals(
             1,
-            countMatches(appScreen, Regex("""showMyWords = true""")),
-            "赋值 `showMyWords = true` 在 AppScreen 恰一处 = 入口回调挂载点（onOpenMyWords）；" +
-                "0 = 入口是点了不开的死入口，2 = 长出了第二条打开通路",
+            countMatches(appScreen, Regex("""(^|[^A-Za-z0-9_])WordBankScreen\(""")),
+            "AppScreen 必须挂载 WordBankScreen 恰一处（0 = 词库没有宿主，2 = 长出第二份挂载）",
         )
+        // 两条打开通路都必须**同时**点名段位：只赋 showWordBank 不赋段位 = 「复习生词本」落到词书段，
+        // 用户点的是「复习」却看到列表第一页。逐环点名形状而不是数计数：
+        // 「点了真的会开吗、开在哪一段」的用户面由 connected `AppScreenTest` 的端到端用例承重。
+        listOf(
+            "onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true }",
+            "onReviewWords = { wordBankSection = WordBankSection.New; showWordBank = true }",
+        ).forEach { wiring ->
+            assertEquals(
+                1,
+                countMatches(appScreen, Regex(Regex.escape(wiring))),
+                "入口接线「$wiring」必须恰一处：段位与开关同点同赋（0 = 这条通路断了，" +
+                    "2 = 长出第二条打开通路）",
+            )
+        }
         val overlayOpenBlock = appScreen.substringAfter("val overlayOpen =").substringBefore("BackHandler(")
         assertTrue(
-            "|| showMyWords" in overlayOpenBlock,
-            "overlayOpen 聚合式里必须含 `|| showMyWords`：这是「我的词」开着时返回键被叠层接管" +
+            "showWordBank" in overlayOpenBlock,
+            "overlayOpen 聚合式里必须含 showWordBank：这是词库开着时返回键被叠层接管" +
                 "（而不是退出整屏/穿透到底层导航）的唯一静态凭据",
         )
         assertEquals(
             1,
-            countMatches(appScreen, Regex("""BackHandler\(\s*enabled = showMyWords[\s\S]*?showMyWords = false""")),
-            "enabled 以 showMyWords 打头的 BackHandler 体内必须恰一处 `showMyWords = false`（0 = 返回键退不出这一页）",
+            countMatches(appScreen, Regex("""BackHandler\(\s*enabled = showWordBank[\s\S]*?showWordBank = false""")),
+            "enabled 以 showWordBank 打头的 BackHandler 体内必须恰一处 `showWordBank = false`（0 = 返回键退不出这一页）",
         )
         assertEquals(
             1,
-            countMatches(appScreen, Regex("""else if \(showMyWords\)[\s\S]*?MyWordsScreen\(""")),
-            "渲染分支 `else if (showMyWords)` 后必须紧跟 MyWordsScreen 挂载（0 = 状态位与渲染脱节）",
+            countMatches(appScreen, Regex("""else if \(showWordBank\)[\s\S]*?WordBankScreen\(""")),
+            "渲染分支 `else if (showWordBank)` 后必须紧跟 WordBankScreen 挂载（0 = 状态位与渲染脱节）",
         )
-        // myWordsSummary 的「三段全 Ready 才非 null」规则本体在 MyWordsSummary.kt（JVM 判据 MyWordsSummaryTest）；
-        // 这里钉「宿主只有一处聚合调用」，防止第二份口径长在别处。
+        // myWordsSummary 的「三段全 Ready 才非 null」规则本体仍在 MyWordsSummary.kt（判据 MyWordsSummaryTest），
+        // 但它的**显示面**（旧「我的词」入口行的尾部计数，稿 mockups:916 的 `34 · 12 · 8`）已随 Task 4 的
+        // 五入口迁移退役，四分段词库页按 spec §3.3 的版面（标题 + 词书名 + 分段，无计数）也不承接它。
+        // 于是这条反向控从「宿主恰一处调用」翻成「宿主零调用」：规则不许另长一份内联实现，
+        // 将来哪个显示面要这三枚计数，必须回来改这一行并指名那块面（不是把函数悄悄接回去）。
         assertEquals(
-            1,
+            0,
             countMatches(appScreen, Regex("""myWordsSummaryOf\(""")),
-            "AppScreen 必须恰一处调用纯函数 myWordsSummaryOf（0 = 规则没接线或在别处内联了第二份，2 = 两处真源）",
+            "AppScreen 不得再调用 myWordsSummaryOf：旧「我的词」入口行的尾部计数已退役，" +
+                "词库页版面不显示计数。接回必须同改本条并指明新的显示面，0 → 1 是一次有意的决定，不是顺手",
         )
     }
 
@@ -319,8 +339,10 @@ class MyWordsScreenContractTest {
                 "对话框份数棘轮判新增债务；2 = 一页两枚确认框）",
         )
         val appScreen = uiScreenSource("AppScreen.kt")
+        // Task 5 起合并页是词库页的一段 pane：挂载分支由 `showMyWords` 改名为 `showWordBank`，
+        // 定界符随形改，判据形状（挂载段内逐条点名）一字未动。
         val myWordsMount = appScreen
-            .substringAfter("else if (showMyWords)")
+            .substringAfter("else if (showWordBank)")
             .substringBefore("else if (showAiProfiles)")
         assertTrue(
             "onStartRelearn = { showVocabularyRelearn = true }" in myWordsMount,
@@ -397,12 +419,14 @@ class MyWordsScreenContractTest {
         }
 
         val appScreen = uiScreenSource("AppScreen.kt")
+        // Task 5：合并页降为词库页的复用面（三段共用同一处 `myWordsPane` 形参表），挂载分支改名
+        // `showWordBank`；切片里仍必须恰一枚 `MyWordsScreen(`——它就是那块复用面本体。
         val myWordsMount = appScreen
-            .substringAfter("else if (showMyWords)")
+            .substringAfter("else if (showWordBank)")
             .substringBefore("else if (showAiProfiles)")
         assertTrue(
             myWordsMount.contains("MyWordsScreen("),
-            "挂载段定界符失效（`else if (showMyWords)` 之后必须紧跟 MyWordsScreen 挂载），" +
+            "挂载段定界符失效（`else if (showWordBank)` 之后必须紧跟 MyWordsScreen 复用面），" +
                 "否则下面的恰一处判定会在错位切片上假绿",
         )
         assertEquals(

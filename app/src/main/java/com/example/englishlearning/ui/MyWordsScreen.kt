@@ -74,6 +74,11 @@ import kotlinx.coroutines.flow.first
  */
 enum class MyWordsSection { Favorites, Wordbook, Wrong }
 
+// 批 1 Task 5：本屏多了一种用法——词库页 `WordBankScreen` 把三段各当一「面」复用（`visibleSections`
+// 参数收窄到一段、`showHeader = false` 关掉页头）。**默认值仍是全集 + 带页头**，所以「一次组合三段齐现」
+// 的既有行为判据（connected `MyWordsScreenTest`）、R-20A.2 的落位语义与原挂载点一格不动；
+// 收窄只是让同一块代码能被一段一段地借出去，不是把本屏改成 tab 页（本屏依然没有 `when (section)`）。
+
 // m-5 / m-6（修复轮 2）：日期档、时分档、来源档、释义档四枚 helper 已从本屏的私有副本
 // 收敛到 `ui/WordListFormat.kt`（与 `VocabularyScreen` 共用同一份，逐字同文），
 // 本屏不再自拼时间戳或来源文案。
@@ -106,6 +111,12 @@ fun MyWordsScreen(
     // m-2（修复轮 1）：重试带段标，只刷用户点的那一册。原先三段共用一个无参 onRetry，
     // 任一段的「重试」都会把另外两册打回 Loading（还连带触发 I-1 的旧缺陷）。
     onRetry: (MyWordsSection) -> Unit = {},
+    // 批 1 Task 5：词库页把本屏的三段各当一「面」复用（`WordBankScreen` 的 new / wrong / favorite pane）。
+    // 两枚形参都追加在末尾且带默认值（全集 / 显示页头），所以既有的整屏挂载点、connected 夹具与
+    // 「三段同屏」的行为判据一格不动——本屏自己仍是「一页三段」，只是**也能**被裁成一段来用。
+    // `visibleSections` 只裁剪渲染，不改变 `section` 的语义（仍是初始落位/聚焦，R-20A.2）。
+    visibleSections: List<MyWordsSection> = MyWordsSection.entries,
+    showHeader: Boolean = true,
 ) {
     val colors = appColors()
     val scrollState = rememberScrollState()
@@ -119,7 +130,12 @@ fun MyWordsScreen(
     // 把它们放进键集等于「每次数据发射都重做一次落位」——用户读到一半会被拽回段首。
     // `section` 的语义是初始落位/聚焦（R-20A.2），落位每段组合只发生一次；判红形状见
     // connected `MyWordsScreenTest.state_emit_after_landing_does_not_yank_the_viewport_back`。
+    //
+    // Task 5 补充：被裁成一段时（词库页的 pane）不落位——那一段本身就是视口起点，滚到自己的顶边
+    // 只会把本屏的 24dp 上边距吃掉。落位语义只对「多段同屏」成立，所以这里按可见段数早退，
+    // 而不是把 `section` 换成一个假的「无落位」值（那会让 R-20A.2 的语义在两种用法间分裂）。
     LaunchedEffect(section) {
+        if (visibleSections.size < 2) return@LaunchedEffect
         // 等第一个非空偏移再滚：段容器的顶边只有在这次 layout 之后才量得到，而 LaunchedEffect 可能跑在
         // 测量之前，那时 scrollTo 一个不存在的偏移就是空滚（connected 的落位用例正是抓这条）。
         snapshotFlow { sectionTops[section] }.filterNotNull().first().let { top ->
@@ -135,119 +151,53 @@ fun MyWordsScreen(
             .testTag("my_words_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        AppScreenHeader(
-            title = "我的词",
-            subtitle = "收藏 · 生词本 · 错词，三处攒下来的词都在这一页",
-            onBack = onBack,
-        )
-        MyWordsSectionCard(
-            title = "收藏",
-            sectionTag = "my_words_section_favorites",
-            count = (favoritesState as? FavoritesUiState.Ready)?.words?.size,
-            onTopChanged = { sectionTops[MyWordsSection.Favorites] = it },
-        ) {
-            when (favoritesState) {
-                FavoritesUiState.Loading -> SectionLoading("my_words_favorites_loading", "正在读取收藏…")
-                FavoritesUiState.Unavailable -> SectionUnavailable(
-                    tag = "my_words_favorites_unavailable",
-                    reason = "收藏暂时无法读取，请稍后重试",
-                    onRetry = { onRetry(MyWordsSection.Favorites) },
-                )
-                is FavoritesUiState.Ready -> {
-                    favoritesState.notice?.let {
-                        Text(it, style = AppType.Footnote, color = colors.text2)
-                    }
-                    if (favoritesState.words.isEmpty()) {
-                        SectionEmpty(
-                            tag = "my_words_favorites_empty",
-                            text = "还没有收藏。在词卡详情页点星标即可收藏。",
-                        )
-                    } else {
-                        favoritesState.words.forEachIndexed { index, favorite ->
-                            WordRow(
-                                lemma = favorite.lemma,
-                                gloss = null,
-                                meta = "收藏于 ${wordListDateLabel(favorite.addedAt, zoneId)}",
-                                modifier = Modifier
-                                    .testTag("my_words_favorite_row_$index")
-                                    .semantics { contentDescription = "收藏 ${favorite.lemma}" },
-                                onClick = { onOpenFavoriteWord(favorite) },
-                                actions = {
-                                    PillButton(
-                                        text = "取消收藏",
-                                        onClick = { onUnfavorite(favorite) },
-                                        style = PillStyle.Secondary,
-                                        testTag = "my_words_favorite_unfavorite_$index",
-                                        contentDescription = "取消收藏 ${favorite.lemma}",
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-            }
+        if (showHeader) {
+            AppScreenHeader(
+                title = "我的词",
+                subtitle = "收藏 · 生词本 · 错词，三处攒下来的词都在这一页",
+                onBack = onBack,
+            )
         }
-        MyWordsSectionCard(
-            title = "生词本",
-            sectionTag = "my_words_section_wordbook",
-            count = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
-            onTopChanged = { sectionTops[MyWordsSection.Wordbook] = it },
-        ) {
-            when (vocabularyState) {
-                VocabularyUiState.Loading -> SectionLoading("my_words_wordbook_loading", "正在读取生词本…")
-                VocabularyUiState.Unavailable -> SectionUnavailable(
-                    tag = "my_words_wordbook_unavailable",
-                    reason = "生词本暂时无法读取，请稍后重试",
-                    onRetry = { onRetry(MyWordsSection.Wordbook) },
-                )
-                is VocabularyUiState.Ready -> {
-                    if (vocabularyState.items.isEmpty()) {
-                        SectionEmpty(
-                            tag = "my_words_wordbook_empty",
-                            text = "还没有生词，提交“不认识”后会自动加入。",
-                            // m-7：逐字搬旧生词页那条专属朗读描述（缺它即比旧页少一层）。
-                            readingDescription = "生词本为空，提交不认识后会自动加入",
-                        )
-                    } else {
-                        // I-4：整册「开始重新学习」——老生词页 Ready 非空时列表上方的同名动作，
-                        // 合并页同规格补回（空册时这一段根本没有词，按钮不出现，由 connected 反向钉）。
-                        PillButton(
-                            text = "开始重新学习",
-                            onClick = onStartRelearn,
-                            testTag = "my_words_wordbook_start_relearn",
-                            contentDescription = "开始重新学习，共 ${vocabularyState.items.size} 个生词",
-                        )
-                        vocabularyState.items.forEachIndexed { index, item ->
-                            val card = item.card
-                            if (card == null) {
+        if (MyWordsSection.Favorites in visibleSections) {
+            MyWordsSectionCard(
+                title = "收藏",
+                sectionTag = "my_words_section_favorites",
+                count = (favoritesState as? FavoritesUiState.Ready)?.words?.size,
+                onTopChanged = { sectionTops[MyWordsSection.Favorites] = it },
+            ) {
+                when (favoritesState) {
+                    FavoritesUiState.Loading -> SectionLoading("my_words_favorites_loading", "正在读取收藏…")
+                    FavoritesUiState.Unavailable -> SectionUnavailable(
+                        tag = "my_words_favorites_unavailable",
+                        reason = "收藏暂时无法读取，请稍后重试",
+                        onRetry = { onRetry(MyWordsSection.Favorites) },
+                    )
+                    is FavoritesUiState.Ready -> {
+                        favoritesState.notice?.let {
+                            Text(it, style = AppType.Footnote, color = colors.text2)
+                        }
+                        if (favoritesState.words.isEmpty()) {
+                            SectionEmpty(
+                                tag = "my_words_favorites_empty",
+                                text = "还没有收藏。在词卡详情页点星标即可收藏。",
+                            )
+                        } else {
+                            favoritesState.words.forEachIndexed { index, favorite ->
                                 WordRow(
-                                    lemma = item.entry.cardId,
-                                    gloss = "词卡内容暂不可用",
-                                    status = wordListSourceLabel(item.entry.lastFeedback),
-                                    meta = "加入于 ${wordListDateTimeLabel(item.entry.addedAt, zoneId)}",
+                                    lemma = favorite.lemma,
+                                    gloss = null,
+                                    meta = "收藏于 ${wordListDateLabel(favorite.addedAt, zoneId)}",
                                     modifier = Modifier
-                                        .testTag("my_words_wordbook_row_$index")
-                                        .semantics { contentDescription = "生词本条目 ${item.entry.cardId}" },
-                                )
-                            } else {
-                                WordRow(
-                                    lemma = card.lemma,
-                                    gloss = wordListMeaning(card),
-                                    status = wordListSourceLabel(item.entry.lastFeedback),
-                                    meta = "加入于 ${wordListDateTimeLabel(item.entry.addedAt, zoneId)}",
-                                    modifier = Modifier
-                                        .testTag("my_words_wordbook_row_$index")
-                                        .semantics { contentDescription = "生词本 ${card.lemma}" },
-                                    onClick = { onOpenVocabularyCard(card) },
+                                        .testTag("my_words_favorite_row_$index")
+                                        .semantics { contentDescription = "收藏 ${favorite.lemma}" },
+                                    onClick = { onOpenFavoriteWord(favorite) },
                                     actions = {
-                                        // I-4：逐行「标记为已掌握」。只落待确认态，
-                                        // 真回交在页尾共享确认框的确认回调里（无 card 的行没有可提交的对象，不给这枚出口）。
                                         PillButton(
-                                            text = "标记为已掌握",
-                                            onClick = { pendingMastery = item },
+                                            text = "取消收藏",
+                                            onClick = { onUnfavorite(favorite) },
                                             style = PillStyle.Secondary,
-                                            testTag = "my_words_wordbook_mastered_$index",
-                                            contentDescription = "将 ${card.lemma} 标记为已掌握并移出生词本",
+                                            testTag = "my_words_favorite_unfavorite_$index",
+                                            contentDescription = "取消收藏 ${favorite.lemma}",
                                         )
                                     },
                                 )
@@ -257,35 +207,109 @@ fun MyWordsScreen(
                 }
             }
         }
-        MyWordsSectionCard(
-            title = "错词",
-            sectionTag = "my_words_section_wrong",
-            count = (wrongWordsState as? WrongWordsUiState.Ready)?.cards?.size,
-            onTopChanged = { sectionTops[MyWordsSection.Wrong] = it },
-        ) {
-            when (wrongWordsState) {
-                WrongWordsUiState.Loading -> SectionLoading("my_words_wrong_loading", "正在统计错词…")
-                WrongWordsUiState.Unavailable -> SectionUnavailable(
-                    tag = "my_words_wrong_unavailable",
-                    reason = "错词暂时无法读取，请稍后重试",
-                    onRetry = { onRetry(MyWordsSection.Wrong) },
-                )
-                is WrongWordsUiState.Ready -> {
-                    if (wrongWordsState.cards.isEmpty()) {
-                        SectionEmpty(
-                            tag = "my_words_wrong_empty",
-                            text = "当前没有待纠正的错词。复习中标记「不认识」的词会出现在这里，重新答对后自动消失。",
-                        )
-                    } else {
-                        wrongWordsState.cards.forEachIndexed { index, card ->
-                            WordRow(
-                                lemma = card.lemma,
-                                gloss = wordListMeaning(card),
-                                modifier = Modifier
-                                    .testTag("my_words_wrong_row_$index")
-                                    .semantics { contentDescription = "错词 ${card.lemma}" },
-                                onClick = { onOpenWrongWord(card) },
+        if (MyWordsSection.Wordbook in visibleSections) {
+            MyWordsSectionCard(
+                title = "生词本",
+                sectionTag = "my_words_section_wordbook",
+                count = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
+                onTopChanged = { sectionTops[MyWordsSection.Wordbook] = it },
+            ) {
+                when (vocabularyState) {
+                    VocabularyUiState.Loading -> SectionLoading("my_words_wordbook_loading", "正在读取生词本…")
+                    VocabularyUiState.Unavailable -> SectionUnavailable(
+                        tag = "my_words_wordbook_unavailable",
+                        reason = "生词本暂时无法读取，请稍后重试",
+                        onRetry = { onRetry(MyWordsSection.Wordbook) },
+                    )
+                    is VocabularyUiState.Ready -> {
+                        if (vocabularyState.items.isEmpty()) {
+                            SectionEmpty(
+                                tag = "my_words_wordbook_empty",
+                                text = "还没有生词，提交“不认识”后会自动加入。",
+                                // m-7：逐字搬旧生词页那条专属朗读描述（缺它即比旧页少一层）。
+                                readingDescription = "生词本为空，提交不认识后会自动加入",
                             )
+                        } else {
+                            // I-4：整册「开始重新学习」——老生词页 Ready 非空时列表上方的同名动作，
+                            // 合并页同规格补回（空册时这一段根本没有词，按钮不出现，由 connected 反向钉）。
+                            PillButton(
+                                text = "开始重新学习",
+                                onClick = onStartRelearn,
+                                testTag = "my_words_wordbook_start_relearn",
+                                contentDescription = "开始重新学习，共 ${vocabularyState.items.size} 个生词",
+                            )
+                            vocabularyState.items.forEachIndexed { index, item ->
+                                val card = item.card
+                                if (card == null) {
+                                    WordRow(
+                                        lemma = item.entry.cardId,
+                                        gloss = "词卡内容暂不可用",
+                                        status = wordListSourceLabel(item.entry.lastFeedback),
+                                        meta = "加入于 ${wordListDateTimeLabel(item.entry.addedAt, zoneId)}",
+                                        modifier = Modifier
+                                            .testTag("my_words_wordbook_row_$index")
+                                            .semantics { contentDescription = "生词本条目 ${item.entry.cardId}" },
+                                    )
+                                } else {
+                                    WordRow(
+                                        lemma = card.lemma,
+                                        gloss = wordListMeaning(card),
+                                        status = wordListSourceLabel(item.entry.lastFeedback),
+                                        meta = "加入于 ${wordListDateTimeLabel(item.entry.addedAt, zoneId)}",
+                                        modifier = Modifier
+                                            .testTag("my_words_wordbook_row_$index")
+                                            .semantics { contentDescription = "生词本 ${card.lemma}" },
+                                        onClick = { onOpenVocabularyCard(card) },
+                                        actions = {
+                                            // I-4：逐行「标记为已掌握」。只落待确认态，
+                                            // 真回交在页尾共享确认框的确认回调里（无 card 的行没有可提交的对象，不给这枚出口）。
+                                            PillButton(
+                                                text = "标记为已掌握",
+                                                onClick = { pendingMastery = item },
+                                                style = PillStyle.Secondary,
+                                                testTag = "my_words_wordbook_mastered_$index",
+                                                contentDescription = "将 ${card.lemma} 标记为已掌握并移出生词本",
+                                            )
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (MyWordsSection.Wrong in visibleSections) {
+            MyWordsSectionCard(
+                title = "错词",
+                sectionTag = "my_words_section_wrong",
+                count = (wrongWordsState as? WrongWordsUiState.Ready)?.cards?.size,
+                onTopChanged = { sectionTops[MyWordsSection.Wrong] = it },
+            ) {
+                when (wrongWordsState) {
+                    WrongWordsUiState.Loading -> SectionLoading("my_words_wrong_loading", "正在统计错词…")
+                    WrongWordsUiState.Unavailable -> SectionUnavailable(
+                        tag = "my_words_wrong_unavailable",
+                        reason = "错词暂时无法读取，请稍后重试",
+                        onRetry = { onRetry(MyWordsSection.Wrong) },
+                    )
+                    is WrongWordsUiState.Ready -> {
+                        if (wrongWordsState.cards.isEmpty()) {
+                            SectionEmpty(
+                                tag = "my_words_wrong_empty",
+                                text = "当前没有待纠正的错词。复习中标记「不认识」的词会出现在这里，重新答对后自动消失。",
+                            )
+                        } else {
+                            wrongWordsState.cards.forEachIndexed { index, card ->
+                                WordRow(
+                                    lemma = card.lemma,
+                                    gloss = wordListMeaning(card),
+                                    modifier = Modifier
+                                        .testTag("my_words_wrong_row_$index")
+                                        .semantics { contentDescription = "错词 ${card.lemma}" },
+                                    onClick = { onOpenWrongWord(card) },
+                                )
+                            }
                         }
                     }
                 }

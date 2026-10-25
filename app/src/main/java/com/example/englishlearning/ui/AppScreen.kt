@@ -216,18 +216,19 @@ fun AppScreen(
             var selectedFavoriteCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             var favoritesPronunciationMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
             var favoritesPronunciationRequest by remember { mutableIntStateOf(0) }
-            // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词本 · 错词 一页三段，是这一族唯一在册的路由叠层。
-            // 三条老路由的摘除按 R-22.1 拆成两席：`showVocabulary`（生词本页）已由 **Task 22-A** 摘除，
-            // `showFavorites` / `showWrongWords` 另两条连同打卡页那两条裸文字链由 **Task 22-B** 摘除；
-            // 三者合并后「我的词汇」全站只剩 MyWordsScreen 这一处入口。
-            var showMyWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            // 合并页的**初始落位段**：默认真实入口（收藏），学习页 CTA 的「复习生词本」把它改指生词本段。
-            // 只保存「该落在哪一段」，段内滚动与读数仍由 MyWordsScreen 自己持有（该屏的
-            // `LaunchedEffect(section)` 只在 section 变化时落位一次，本变量不参与它的键集）。
-            var myWordsSection by rememberSaveable(state.profile.id) { mutableStateOf(MyWordsSection.Favorites) }
+            // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词本 · 错词 一页三段。三条更老的路由按 R-22.1 拆成两席
+            // 摘除（`showVocabulary` 归 **Task 22-A**；`showFavorites` / `showWrongWords` 归 **Task 22-B**）。
+            // 批 1 Task 4 + Task 5 再往前并一层：学习页的「词库」行与「复习生词本」CTA 都进**词库页**
+            // （四分段），合并页从此是词库页的一段 pane，不再自己持有全屏路由。
+            // 批 1 Task 5（spec §3.3）：词库页是词汇域**唯一**的路由叠层。旧的两条独立路由
+            // （`showWordBookWords` = 词书单词页、`showMyWords` = 我的词合并页）并进这一枚开关：
+            // 四分段（词书 / 生词 / 错词 / 收藏）由 `wordBankSection` 持有，两条打开通路各自点名落哪一段。
+            // 段位随开关一起 rememberSaveable：关掉再开回到「词书」段（默认落点也是唯一带筛选与字母栏的一段）。
+            var showWordBank by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var wordBankSection by rememberSaveable(state.profile.id) { mutableStateOf(WordBankSection.Book) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            var showWordBookWords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            val wordBookWordsListState = key(state.profile.id, showWordBookWords) {
+            // 词书段的列表滚动位置：键带开关，关掉再开回到 A 组顶部（Task 21 的会话口径逐字保留）。
+            val wordBookWordsListState = key(state.profile.id, showWordBank) {
                 rememberLazyListState()
             }
             var showVocabularyRelearn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -302,21 +303,17 @@ fun AppScreen(
             LaunchedEffect(state.profile.id, favoritesViewModel) {
                 favoritesViewModel?.load(state.profile.id)
             }
-            // Task 22-B：错词数据源原按 `showWrongWords || showMyWords` 共享；错词本页已下线，
-            // 这一半并入合并页 `showMyWords`（wrongWordsViewModel 仍是合并页错词段的数据源，数据通路不动）。
-            LaunchedEffect(showMyWords, state.profile.id) {
-                if (showMyWords) wrongWordsViewModel?.load(state.profile.id)
-            }
-            // 错词状态在「错词本」与「我的词」两处叠层里是同一份，所以在这里收一次（原先只在错词页本地收）。
+            // 错词状态在词库页的错词段与详情层两处是同一份，所以在这里收一次（原先只在错词页本地收）。
             val wrongWordsState = wrongWordsViewModel?.uiState?.collectAsState()?.value
                 ?: WrongWordsUiState.Loading
             val openedFavoriteCard = favoritesViewModel?.openedCard?.collectAsState()?.value
-            LaunchedEffect(openedFavoriteCard, showMyWords) {
+            LaunchedEffect(openedFavoriteCard, showWordBank, wordBankSection) {
                 val opened = openedFavoriteCard ?: return@LaunchedEffect
                 favoritesViewModel?.consumeOpenedCard()
                 // Task 22-B：收藏详情原有两个宿主页（收藏页与「我的词」的收藏段），收藏页下线后
-                // 只剩合并页这一宿主页；仍开着本页时才把回源结果交给详情层。
-                if (!showMyWords) return@LaunchedEffect
+                // 只剩词库页的收藏段这一宿主段；仍开着那一段时才把回源结果交给详情层
+                // （批 1 Task 5：关掉整页或切到别段，迟到的回源结果一律丢弃）。
+                if (!showWordBank || wordBankSection != WordBankSection.Favorite) return@LaunchedEffect
                 favoritesPronunciationRequest++
                 favoritesPronunciationMessage = PronunciationStatus.Idle
                 selectedFavoriteCard = opened
@@ -391,8 +388,17 @@ fun AppScreen(
             LaunchedEffect(showLearningRecords, state.profile.id, todayReady?.planId, todayReady?.activeWordBookId) {
                 if (showLearningRecords) learningRecordsViewModel?.load(state.profile.id, todayReady?.planId, todayReady?.activeWordBookId)
             }
-            LaunchedEffect(showWordBookWords, state.profile.id, todayReady?.activeWordBookId) {
-                if (showWordBookWords) wordBookWordsViewModel?.load(todayReady?.activeWordBookId)
+            // 批 1 Task 5：词库页按**段**取数——只有当前那一段的数据源会被点名加载，切段才拉该段
+            // （旧形状是两枚独立 effect 各盯一枚开关：`LaunchedEffect(showWordBookWords, …)` 与
+            // 错词页那枚，现在并成这一条按段分派的通路）。位置在 `todayReady` 之后：词书段按活动词书取数。
+            LaunchedEffect(showWordBank, wordBankSection, state.profile.id, todayReady?.activeWordBookId) {
+                if (!showWordBank) return@LaunchedEffect
+                when (wordBankSection) {
+                    WordBankSection.Book -> wordBookWordsViewModel?.load(todayReady?.activeWordBookId)
+                    WordBankSection.New -> vocabularyViewModel?.load(state.profile.id)
+                    WordBankSection.Wrong -> wrongWordsViewModel?.load(state.profile.id)
+                    WordBankSection.Favorite -> favoritesViewModel?.load(state.profile.id)
+                }
             }
             // 进入阅读 tab 才算准入；今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
             LaunchedEffect(selectedTab, state.profile.id, todayReady?.isUnlocked) {
@@ -457,9 +463,11 @@ fun AppScreen(
                     if (showLearningRecords) {
                         learningRecordsViewModel?.load(state.profile.id, todayReady?.planId, todayReady?.activeWordBookId)
                     }
-                    // Task 22-B：删除数据后回刷可见屏——原按 `showWrongWords` 刷错词页，错词页下线后
-                    // 把这一刷原样改挂到承载错词段的合并页 `showMyWords`，保持「删除后当前可见的错词数据刷新」这一口径。
-                    if (showMyWords) wrongWordsViewModel?.load(state.profile.id)
+                    // Task 22-B：删除数据后回刷可见屏。批 1 Task 5：错词那一刷只在词库页正停在
+                    // 「错词」段时执行（停在别段时那一段不可见，刷了也没人看）。
+                    if (showWordBank && wordBankSection == WordBankSection.Wrong) {
+                        wrongWordsViewModel?.load(state.profile.id)
+                    }
                 }
             }
             // 任一来源产出文章都会设置 readingTarget：此时导入页让位给文章页，
@@ -500,9 +508,9 @@ fun AppScreen(
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
                 showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
-                showWordBookWords ||
+                showWordBank ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
-                showWordQaCard != null || selectedFavoriteCard != null || showMyWords
+                showWordQaCard != null || selectedFavoriteCard != null
             // BackHandler 按「后声明者优先」分派，所以下面严格按优先级从低到高排列：层级越靠内
             // 越晚声明，越先拿到返回键。调整顺序会直接改变返回键行为，别随手重排。
             BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING) {
@@ -530,20 +538,19 @@ fun AppScreen(
                 favoritesPronunciationRequest++
                 favoritesPronunciationMessage = PronunciationStatus.Idle
             }
-            // 裁决①「我的词」：三段各自复用现成的详情宿主（收藏→selectedFavoriteCard、
-            // 生词本→selectedSearchCard、错词→selectedLearningRecordCard），
-            // 任一详情开着时本处理器让位，返回键先关详情再退这一页。
+            // 批 1 Task 5：词库页三段各自复用现成的详情宿主（收藏→selectedFavoriteCard、
+            // 生词本→selectedSearchCard、错词 / 词书段→selectedLearningRecordCard），
+            // 任一详情开着时本处理器让位，返回键先关详情再退整页。
+            // 旧的两枚退页处理器（合并页 `showMyWords` / 词书单词页 `showWordBookWords`）在这里合成一枚：
+            // 如今只剩这一条路由，两枚并存会让返回键按声明序落到其中一枚、行为随任务顺序漂。
             BackHandler(
-                enabled = showMyWords && selectedFavoriteCard == null &&
+                enabled = showWordBank && selectedFavoriteCard == null &&
                     selectedSearchCard == null && selectedLearningRecordCard == null,
-            ) { showMyWords = false }
+            ) { showWordBank = false }
             BackHandler(enabled = showGlobalVocabularySearch && selectedSearchCard == null) {
                 showGlobalVocabularySearch = false
             }
             BackHandler(enabled = showLearningRecords && selectedLearningRecordCard == null) { showLearningRecords = false }
-            BackHandler(enabled = showWordBookWords && selectedLearningRecordCard == null) {
-                showWordBookWords = false
-            }
             BackHandler(enabled = selectedRelearnCard != null) {
                 selectedRelearnCard = null
                 vocabularyRelearnViewModel?.load(state.profile.id, todayReady?.activeWordBookId)
@@ -901,21 +908,6 @@ fun AppScreen(
                         selectedLearningRecordCard = it.wordCard
                     },
                 )
-            } else if (showWordBookWords) {
-                // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
-                WordBookWordsScreen(
-                    state = wordBookWordsState,
-                    listState = wordBookWordsListState,
-                    onBack = { showWordBookWords = false },
-                    onFilter = { wordBookWordsViewModel?.selectFilter(it) },
-                    onRetry = { wordBookWordsViewModel?.retry() },
-                    onOpenWord = {
-                        detailPronunciationMessage = PronunciationStatus.Idle
-                        learningRecordPronunciationRequest++
-                        detailSource = DetailSource.RECORDS
-                        selectedLearningRecordCard = it.card
-                    },
-                )
             } else if (setupRequired || showSetup) {
                 LearningSetupScreen(
                     profileId = state.profile.id,
@@ -1150,47 +1142,81 @@ fun AppScreen(
                     onBack = { showCheckIn = false },
                     onRetry = { checkInViewModel?.load(state.profile.id) },
                 )
-            } else if (showMyWords) {
-                // 裁决①：收藏 · 生词本 · 错词 合成一页三段。三段各自复用现成的详情宿主与动作口径，
-                // 本屏不新造任何数据通路（state-in：三份 UiState 从上面已经收好的状态直接喂进来）。
-                MyWordsScreen(
-                    favoritesState = favoritesState ?: FavoritesUiState.Loading,
-                    vocabularyState = vocabularyState,
-                    wrongWordsState = wrongWordsState,
-                    section = myWordsSection,
-                    onBack = { showMyWords = false },
-                    onOpenFavoriteWord = { favoritesViewModel?.open(it) },
-                    onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
-                    onOpenVocabularyCard = {
-                        detailSource = DetailSource.VOCABULARY
-                        selectedSearchCard = it
+            } else if (showWordBank) {
+                // 词库页（spec §3.3）：一枚壳 + 四分段，一段一面。两枚旧页降级为 pane——
+                // 词书段复用 WordBookWordsScreen（自带筛选与字母栏），其余三段复用合并页 MyWordsScreen
+                // 并靠 visibleSections 收窄到点名的那一段（三段共用同一处形参表，见 myWordsPane）。
+                // 页头只留壳上那一枚：两枚 pane 都以 showHeader = false 挂进来。
+                val myWordsPane: @Composable (MyWordsSection) -> Unit = { paneSection ->
+                    MyWordsScreen(
+                        favoritesState = favoritesState ?: FavoritesUiState.Loading,
+                        vocabularyState = vocabularyState,
+                        wrongWordsState = wrongWordsState,
+                        section = paneSection,
+                        // 收窄到点名段：合并页默认三段同屏（老行为与 connected 夹具不破），
+                        // 词库页里每格只该看见自己那一段。
+                        visibleSections = listOf(paneSection),
+                        showHeader = false,
+                        onBack = { showWordBank = false },
+                        onOpenFavoriteWord = { favoritesViewModel?.open(it) },
+                        onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
+                        onOpenVocabularyCard = {
+                            detailSource = DetailSource.VOCABULARY
+                            selectedSearchCard = it
+                        },
+                        onOpenWrongWord = {
+                            detailPronunciationMessage = PronunciationStatus.Idle
+                            learningRecordPronunciationRequest++
+                            detailSource = DetailSource.RECORDS
+                            selectedLearningRecordCard = it
+                        },
+                        // I-4（修复轮 1）：生词本段两枚能力接宿主**现成**通路，不新建任何线路——
+                        // 重学走 showVocabularyRelearn 分支（其渲染早于本页、自带 BackHandler），
+                        // 行内标记走老页挂载处同一回调 vocabularyViewModel?.markMastered。
+                        onStartRelearn = { showVocabularyRelearn = true },
+                        onMarkMastered = { vocabularyViewModel?.markMastered(state.profile.id, it) },
+                        // N-1（修复轮 3）：结果态必须由本页消费并复位——与老页挂载处 :852/:853 **同一来源**
+                        // （vocabularyMasteryState 在宿主层恒收集，复位回调就是 clearMasteryMessage），
+                        // 不新建通路。少了这两行时：失败静默（StorageUnavailable 不 reload、合并页零反馈），
+                        // 而残留的 Success 会让随后打开的老生词页弹出一枚属于另一页动作的结果框。
+                        masteryState = vocabularyMasteryState,
+                        onDismissMasteryMessage = { vocabularyViewModel?.clearMasteryMessage() },
+                        // m-2（修复轮 1）：重试只刷用户点的那一册，不再一次拉三册
+                        // （旧写法会把另外两段打回 Loading，连带闪 loading 与历史 I-1 的重复落位）。
+                        onRetry = { retrySection ->
+                            when (retrySection) {
+                                MyWordsSection.Favorites -> favoritesViewModel?.load(state.profile.id)
+                                MyWordsSection.Wordbook -> vocabularyViewModel?.load(state.profile.id)
+                                MyWordsSection.Wrong -> wrongWordsViewModel?.load(state.profile.id)
+                            }
+                        },
+                    )
+                }
+                WordBankScreen(
+                    wordBookName = todayReady?.wordBookName ?: "未选择词书",
+                    section = wordBankSection,
+                    onSelectSection = { wordBankSection = it },
+                    onBack = { showWordBank = false },
+                    bookPane = {
+                        // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
+                        WordBookWordsScreen(
+                            state = wordBookWordsState,
+                            listState = wordBookWordsListState,
+                            onBack = {},
+                            onFilter = { wordBookWordsViewModel?.selectFilter(it) },
+                            onRetry = { wordBookWordsViewModel?.retry() },
+                            onOpenWord = {
+                                detailPronunciationMessage = PronunciationStatus.Idle
+                                learningRecordPronunciationRequest++
+                                detailSource = DetailSource.RECORDS
+                                selectedLearningRecordCard = it.card
+                            },
+                            showHeader = false,
+                        )
                     },
-                    onOpenWrongWord = {
-                        detailPronunciationMessage = PronunciationStatus.Idle
-                        learningRecordPronunciationRequest++
-                        detailSource = DetailSource.RECORDS
-                        selectedLearningRecordCard = it
-                    },
-                    // I-4（修复轮 1）：生词本段两枚能力接宿主**现成**通路，不新建任何线路——
-                    // 重学走 showVocabularyRelearn 分支（其渲染早于本页、自带 BackHandler），
-                    // 行内标记走老页挂载处同一回调 vocabularyViewModel?.markMastered。
-                    onStartRelearn = { showVocabularyRelearn = true },
-                    onMarkMastered = { vocabularyViewModel?.markMastered(state.profile.id, it) },
-                    // N-1（修复轮 3）：结果态必须由本页消费并复位——与老页挂载处 :852/:853 **同一来源**
-                    // （vocabularyMasteryState 在宿主层恒收集，复位回调就是 clearMasteryMessage），
-                    // 不新建通路。少了这两行时：失败静默（StorageUnavailable 不 reload、合并页零反馈），
-                    // 而残留的 Success 会让随后打开的老生词页弹出一枚属于另一页动作的结果框。
-                    masteryState = vocabularyMasteryState,
-                    onDismissMasteryMessage = { vocabularyViewModel?.clearMasteryMessage() },
-                    // m-2（修复轮 1）：重试只刷用户点的那一册，不再一次拉三册
-                    // （旧写法会把另外两段打回 Loading，连带闪 loading 与历史 I-1 的重复落位）。
-                    onRetry = { section ->
-                        when (section) {
-                            MyWordsSection.Favorites -> favoritesViewModel?.load(state.profile.id)
-                            MyWordsSection.Wordbook -> vocabularyViewModel?.load(state.profile.id)
-                            MyWordsSection.Wrong -> wrongWordsViewModel?.load(state.profile.id)
-                        }
-                    },
+                    newPane = { myWordsPane(MyWordsSection.Wordbook) },
+                    wrongPane = { myWordsPane(MyWordsSection.Wrong) },
+                    favoritePane = { myWordsPane(MyWordsSection.Favorites) },
                 )
             } else if (showAiProfiles) {
                 val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
@@ -1622,16 +1648,13 @@ fun AppScreen(
                                 // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
                                 // 全屏页，避免出现「底导之上再压一层」的混乱层级。
                                 onOpenReading = { selectedTab = AppTab.READING },
-                                // 批 1 Task 4：学习页只剩两条裸行，目的地分别是今日文章与本机词库。
-                                // 词库页（WordBankScreen）在 Task 5 落地，此前先接老词书单词页，
-                                // 保证这一行点了有去处（不留空回调）。
-                                onOpenWordBank = { showWordBookWords = true },
-                                // 「复习生词本」落在合并页的生词本段（`MyWordsSection.Wordbook`）：
+                                // 批 1 Task 4/5：学习页只剩两条裸行，目的地分别是今日文章与本机词库。
+                                // 两条打开通路都必须**同时**点名段位：只赋 showWordBank 不赋段位 =
+                                // 「复习生词本」落到词书段（用户点的是复习，看到的是列表第一页）。
+                                onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
+                                // 「复习生词本」落在词库页的生词段（`WordBankSection.New`）：
                                 // 只改落位，不新建数据通路——三段 ViewModel 与 retry 口径全不动。
-                                onReviewWords = {
-                                    myWordsSection = MyWordsSection.Wordbook
-                                    showMyWords = true
-                                },
+                                onReviewWords = { wordBankSection = WordBankSection.New; showWordBank = true },
                                 onOpenSearch = {
                                     // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
                                     // 「浏览词书」——那属于词书管理语义，不是「查一个词」。

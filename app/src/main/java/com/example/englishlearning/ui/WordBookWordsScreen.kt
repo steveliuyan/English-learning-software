@@ -56,6 +56,10 @@ import com.example.englishlearning.ui.theme.MintTint
 /**
  * 词书单词浏览页（D2）：字母分组 + 顶部横向可滚的 A–Z 快速索引（Task 21 起为 48dp 芯片条）。
  * 默认落在 A 组顶部，点索引字母直接跳到对应组，不用长滑找词。
+ *
+ * 批 1 Task 5 起本屏还是词库页 `WordBankScreen` 的「词书段」：那种用法下由壳提供页头与四分段，
+ * 本屏只出「筛选 chip + 字母栏 + 词行」，故 [showHeader] 可关（默认 true，既有挂载点与 connected 夹具不动）。
+ * 两枚新形参都追加在末尾且有默认值，调用处不需要改。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -66,6 +70,8 @@ fun WordBookWordsScreen(
     onRetry: () -> Unit,
     onOpenWord: (WordBookRecord) -> Unit,
     listState: LazyListState = rememberLazyListState(),
+    showHeader: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     val groups = state.groups
     val railScope = rememberCoroutineScope()
@@ -91,29 +97,31 @@ fun WordBookWordsScreen(
         }
     }
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(MintBackground)
             .testTag("wordbook_words_screen"),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-            Text(
-                text = "← 返回",
-                modifier = Modifier
-                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                    .clickable(onClick = onBack)
-                    .padding(8.dp)
-                    .testTag("wordbook_words_back")
-                    .semantics { contentDescription = "返回" },
-                color = MintPrimaryDark,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "词书单词",
-                modifier = Modifier.padding(start = 12.dp, top = 8.dp),
-                color = MintPrimaryDark,
-                fontWeight = FontWeight.Bold,
-            )
+        if (showHeader) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+                Text(
+                    text = "← 返回",
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        .clickable(onClick = onBack)
+                        .padding(8.dp)
+                        .testTag("wordbook_words_back")
+                        .semantics { contentDescription = "返回" },
+                    color = MintPrimaryDark,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "词书单词",
+                    modifier = Modifier.padding(start = 12.dp, top = 8.dp),
+                    color = MintPrimaryDark,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
         WordBookWordsFilterBar(state, onFilter)
         // Task 21：字母索引从右侧竖排压缩槽搬到正文上方的横向可滚 48dp 芯片条

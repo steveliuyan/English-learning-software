@@ -201,8 +201,10 @@ class AppScreenTest {
             )
         }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
         composeRule.waitForIdle()
+        // 批 1 Task 5 起词书单词列表是词库页的第一段（默认落点），词库壳先在场。
+        composeRule.onNodeWithTag("word_bank_screen").assertExists()
         composeRule.onNodeWithTag("wordbook_words_screen").assertExists()
         composeRule.onNodeWithTag("wordbook_words_row_aword").assertExists()
         scrollToRailLetter("W")
@@ -234,13 +236,14 @@ class AppScreenTest {
             )
         }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
         scrollToRailLetter("W")
         composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
-        composeRule.onNodeWithTag("wordbook_words_back").performClick()
-        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        // Task 5 后词书段没有自己的返回位：退页只由词库页页头那一枚承载。
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_rail_active_A").assertExists()
         composeRule.onNodeWithTag("wordbook_words_row_aword").assertExists()
@@ -256,7 +259,7 @@ class AppScreenTest {
             )
         }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_wordbook_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
         scrollToRailLetter("W")
         composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
         composeRule.waitForIdle()
@@ -282,14 +285,17 @@ class AppScreenTest {
     }
 
     @Test
-    fun myWordsEntryOpensTheMergedPageAndSystemBackReturnsToTheTodayPlan() {
+    fun wordBankEntryOpensTheFourSegmentPageAndSystemBackReturnsToTheTodayPlan() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("my_words_screen").assertExists()
+        composeRule.onNodeWithTag("word_bank_screen").assertExists()
+        WordBankSection.entries.forEach { cell ->
+            composeRule.onNodeWithTag(cell.tag).assertExists()
+        }
         pressSystemBack()
-        composeRule.onNodeWithTag("my_words_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_bank_screen").assertDoesNotExist()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
@@ -300,12 +306,16 @@ class AppScreenTest {
      * 所以这一枚必须喂一枚真有词条的 `VocabularyViewModel`（宿主在 LEARNING 页会自动 load）。
      */
     @Test
-    fun myWordsSystemBackClosesAnOpenWordDetailBeforeLeavingTheMergedPage() {
+    fun wordBankSystemBackClosesAnOpenWordDetailBeforeLeavingTheBank() {
         composeRule.setContent {
             readyAppScreen(vocabularyViewModel = vocabularyViewModelWithOneEntry())
         }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("word_bank_screen").assertExists()
+        // 合并页的三段现在各是一格：生词本段要从第二格切过去。
+        composeRule.onNodeWithTag("word_bank_segment_new").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("my_words_screen").assertExists()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -320,6 +330,7 @@ class AppScreenTest {
 
         pressSystemBack()
         composeRule.onNodeWithTag("my_words_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_bank_screen").assertDoesNotExist()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
@@ -348,7 +359,10 @@ class AppScreenTest {
             readyAppScreen(vocabularyViewModel = vocabularyViewModelWithOneEntry())
         }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        // 词库页默认落词书段；生词本段（原来「我的词」直达的那一段）在第二格。
+        composeRule.onNodeWithTag("word_bank_segment_new").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("my_words_screen").assertExists()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -403,14 +417,14 @@ class AppScreenTest {
             )
         }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_my_words").performScrollTo().performClick()
+        composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        // 批 1 Task 5 起收藏 / 错词各是一格：三段不再同屏，验证顺序改为「切到哪段看哪段」。
+        composeRule.onNodeWithTag("word_bank_segment_favorite").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("my_words_screen").assertExists()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("my_words_favorite_row_0").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("my_words_wrong_row_0").fetchSemanticsNodes().isNotEmpty()
         }
 
         // ① 收藏详情经宿主：详情层的星标 PillButton 描述由 `favoriteIds`（宿主从同一份收藏状态派生）决定，
@@ -430,10 +444,14 @@ class AppScreenTest {
             composeRule.onAllNodesWithTag("my_words_favorites_empty").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag("my_words_favorite_row_0").assertDoesNotExist()
-        composeRule.onNodeWithTag("my_words_wrong_row_0").assertExists()
 
-        // ③ 错词重学入口经宿主：错词行的 onClick 走 `selectedLearningRecordCard` 那条只读详情，
+        // ③ 错词重学入口经宿主：切到错词段后，错词行的 onClick 走 `selectedLearningRecordCard` 那条只读详情，
         // 「重新学习」PillButton 由 `onRelearn` 是否为 null 决定，正是旧错词页独有的那枚出口。
+        composeRule.onNodeWithTag("word_bank_segment_wrong").performClick()
+        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("my_words_wrong_row_0").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("my_words_wrong_row_0").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("card_detail_screen").fetchSemanticsNodes().isNotEmpty()
