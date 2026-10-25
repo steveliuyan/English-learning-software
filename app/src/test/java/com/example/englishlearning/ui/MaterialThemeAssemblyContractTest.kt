@@ -45,9 +45,9 @@ class MaterialThemeAssemblyContractTest {
      * 改由 `AppType six tiers take their ink from the current theme set` 逐档钉「取哪一枚主题墨」。
      */
     private val appTypeSpecSegments: Map<String, String> = linkedMapOf(
-        "Display" to "private val DisplaySpec = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, " +
-            "letterSpacing = 0.4.sp)",
-        "Headline" to "private val HeadlineSpec = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, " +
+        "Display" to "private val DisplaySpec = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold, " +
+            "letterSpacing = (-0.5).sp, fontFeatureSettings = \"tnum\")",
+        "Headline" to "private val HeadlineSpec = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, " +
             "letterSpacing = 0.2.sp)",
         "Title" to "private val TitleSpec = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)",
         "Body" to "private val BodySpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)",
@@ -332,6 +332,8 @@ class MaterialThemeAssemblyContractTest {
         "error" -> set.error
         "errorFill" -> set.errorFill
         "success" -> set.success
+        "strongSurface" -> set.strongSurface
+        "onStrong" -> set.onStrong
         else -> error("AppColorSet 没有字段：$name")
     }
 

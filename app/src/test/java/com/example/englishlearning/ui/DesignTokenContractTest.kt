@@ -157,6 +157,8 @@ class DesignTokenContractTest {
         "error" to 0xFFB30000L,
         "errorFill" to 0xFFFF3B30L,
         "success" to 0xFF1B5E20L,
+        "strongSurface" to 0xFF0C2A22L,
+        "onStrong" to 0xFFE9F2ECL,
     )
 
     /**
@@ -182,6 +184,8 @@ class DesignTokenContractTest {
         "error" to 0xFFFF8177L,
         "errorFill" to 0xFFFF6B61L,
         "success" to 0xFF6BD98AL,
+        "strongSurface" to 0xFF1E2B25L,
+        "onStrong" to 0xFFE9F2ECL,
     )
 
     /**
@@ -192,8 +196,11 @@ class DesignTokenContractTest {
      * `onBrand`：spec §2.1 明写「品牌渐变保持现状不动」，裁决 3 只钉「渐变上的文字统一取 `on-brand #04241C`」，
      * 未给深套另立值（深套沿用浅值，见 [darkHex] 的缺项调和说明）；品牌渐变两套同三段时前景本就同一枚墨，
      * 所以它是**有据可依的主题无关值**，不是无人认领的死 token。深色下玻璃面板上的前景最终核验归 AC-R-11 真机实测。
+     *
+     * `onStrong`：2026-10-25 规范 §4.1 的强档卡配对。容器 `strongSurface` 两套都是**深底**
+     * （浅 #0C2A22 / 深 #1E2B25），前景必须与套无关，故两套同取 #E9F2EC；复算 13.4:1 / 12.9:1。
      */
-    private val crossSetIdenticalNeutralTokenExemptions: Set<String> = setOf("onBrand")
+    private val crossSetIdenticalNeutralTokenExemptions: Set<String> = setOf("onBrand", "onStrong")
 
     /** 域浅套：spec §2.1 域色表 / 既有 DomainColors 逐值（base, deep）。hex 串同时供正则拼接，避免 Long 十进制插值。 */
     private val domainLightHex: Map<String, Pair<String, String>> = linkedMapOf(
@@ -397,7 +404,7 @@ class DesignTokenContractTest {
     fun `light neutral set hexes match spec 2_1 verbatim`() {
         val light = section(appColorsText(), "val AppColorLight")
         assertFieldTablesCoverProduction(lightHex.keys, "浅套")
-        assertEquals(16, appColorSetFieldNames(appColorsText()).size, "生产 AppColorSet 解析出的字段数应为 16（spec §2.1 中性 16 枚；真加第 17 枚要先改 spec 再改本条）")
+        assertEquals(18, appColorSetFieldNames(appColorsText()).size, "生产 AppColorSet 解析出的字段数应为 18（spec §2.1 中性 16 枚 + 2026-10-25 新增 strongSurface/onStrong；真加第 19 枚要先改 spec 再改本条）")
         lightHex.forEach { (token, expected) ->
             assertEquals(expected, unsigned(hexOf(light, token, "AppColorLight")), "浅套 $token 偏离 spec §2.1 浅套钉值")
         }
@@ -407,7 +414,7 @@ class DesignTokenContractTest {
     fun `dark neutral set hexes match spec 2_1 verbatim`() {
         val dark = section(appColorsText(), "val AppColorDark")
         assertFieldTablesCoverProduction(darkHex.keys, "深套")
-        assertEquals(16, appColorSetFieldNames(appColorsText()).size, "生产 AppColorSet 解析出的字段数应为 16（与浅套用例同一口径）")
+        assertEquals(18, appColorSetFieldNames(appColorsText()).size, "生产 AppColorSet 解析出的字段数应为 18（与浅套用例同一口径）")
         darkHex.forEach { (token, expected) ->
             assertEquals(expected, unsigned(hexOf(dark, token, "AppColorDark")), "深套 $token 偏离 spec §2.1 深套钉值")
         }
@@ -595,6 +602,9 @@ class DesignTokenContractTest {
         assertAtLeast("dark text2/surface", d("text2"), d("surface"), 4.5)  // 7.54（本测试复算）
         assertAtLeast("dark error/surface", d("error"), d("surface"), 4.5)  // 6.87（本测试复算）
         assertAtLeast("dark onMint/tint", d("onMint"), d("tint"), 4.5)      // 12.89
+        // 强档卡（2026-10-25 §4.1）：明暗两套都是浅墨压深底。
+        assertAtLeast("onStrong/strongSurface-light", l("onStrong"), l("strongSurface"), 4.5) // 13.4
+        assertAtLeast("dark onStrong/strongSurface", d("onStrong"), d("strongSurface"), 4.5)  // 12.9
     }
 
     /** brief「必须出现的配对断言」字面量原文：钉住比值表本身（文档事实层；.toInt() 见上方说明）。 */
@@ -615,6 +625,9 @@ class DesignTokenContractTest {
         assertAtLeast("dark text2/surface", 0xFF9FB3AA.toInt(), 0xFF17201C.toInt(), 4.5)  // 7.54
         assertAtLeast("dark error/surface", 0xFFFF8177.toInt(), 0xFF17201C.toInt(), 4.5)  // 6.87
         assertAtLeast("dark onMint/tint", 0xFFDFF6EC.toInt(), 0xFF1C2C26.toInt(), 4.5) // 12.89
+        // 强档卡（2026-10-25 §4.1）
+        assertAtLeast("onStrong/strongSurface", 0xFFE9F2EC.toInt(), 0xFF0C2A22.toInt(), 4.5)      // 13.4
+        assertAtLeast("dark onStrong/strongSurface", 0xFFE9F2EC.toInt(), 0xFF1E2B25.toInt(), 4.5) // 12.9
 
         // 禁配（本禁配由 Task 1 裁决 #1/#2/#3 立；字面量层与源码层双钉，见下一用例）
         assertTrue(ratio(0xFF7A9088.toInt(), 0xFFFFFFFF.toInt()) < 4.5, "text-3 若已合格，裁决 #1 需重议")   // 3.40

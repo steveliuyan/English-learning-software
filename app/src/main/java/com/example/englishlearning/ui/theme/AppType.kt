@@ -54,8 +54,8 @@ object AppType {
 }
 
 /** spec §2.2 钉值：字号/字重/字距。墨不在这里，见 [AppType] 的 getter。 */
-private val DisplaySpec = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp)
-private val HeadlineSpec = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp)
+private val DisplaySpec = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp, fontFeatureSettings = "tnum")
+private val HeadlineSpec = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp)
 private val TitleSpec = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
 private val BodySpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)
 private val FootnoteSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal)

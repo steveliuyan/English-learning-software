@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
  * 的最终核验按 AC-R-11 真机实测走（决策文档「影响」节），跌破阈值时另立补充决策。
  */
 
-/** 16 个中性 token；字段名即 camelCase token 名（对应 spec §2.1 的 kebab 名，如 `background`↔`bg`）。 */
+/** 18 个中性 token；字段名即 camelCase token 名（对应 spec §2.1 的 kebab 名，如 `background`↔`bg`）。 */
 data class AppColorSet(
     val background: Color,
     val surface: Color,
@@ -38,6 +38,10 @@ data class AppColorSet(
     val error: Color,
     val errorFill: Color,
     val success: Color,
+    /** 强档卡容器底（学习页主卡 / 我的页统计条）：两套都是深底，前景配 [onStrong]。 */
+    val strongSurface: Color,
+    /** 强档卡前景：明暗同值，压两套 strongSurface 均 ≥4.5（§4.1）。 */
+    val onStrong: Color,
 )
 
 /** 浅套中性 token（spec §2.1 浅色行）。 */
@@ -58,6 +62,8 @@ val AppColorLight = AppColorSet(
     error = Color(0xFFB30000),
     errorFill = Color(0xFFFF3B30),
     success = Color(0xFF1B5E20),
+    strongSurface = Color(0xFF0C2A22),
+    onStrong = Color(0xFFE9F2EC),
 )
 
 /** 深套中性 token（spec §2.1 深色行；`onBrand` 见文件头说明）。 */
@@ -78,6 +84,8 @@ val AppColorDark = AppColorSet(
     error = Color(0xFFFF8177),
     errorFill = Color(0xFFFF6B61),
     success = Color(0xFF6BD98A),
+    strongSurface = Color(0xFF1E2B25),
+    onStrong = Color(0xFFE9F2EC),
 )
 
 /**
