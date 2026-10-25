@@ -1,6 +1,6 @@
 # 2026-10-22 图标描边层可识别性 + 入口容器配色收敛
 
-状态：**已拍板，待实施**（实施落点 = 批 3 之后的 Task 27；本文件是那份实施的权威依据）
+状态：**已实施**（Task 27，2026-10-25；落点见文末「实施记录」）
 取证：[`docs/verification/2026-10-22-icon-duotone-and-color-load-qa.md`](../verification/2026-10-22-icon-duotone-and-color-load-qa.md)
 
 ## 背景
@@ -95,3 +95,47 @@
   `InlineIconBadge` 的注释已写明）。
 - **排期**：不塞进 Task 22-A/22-B（席位在飞、`AppIcons.kt` 与 `IconBadge.kt` 都牵动契约测试），
   登记为批 3 之后的 **Task 27**，与 Task 26 的真机 + TalkBack 取证同批做目视。
+
+## 实施记录（2026-10-25，Task 27）
+
+实施计划：[`docs/superpowers/plans/2026-10-25-ui-icon-and-entry-color-convergence.md`](../superpowers/plans/2026-10-25-ui-icon-and-entry-color-convergence.md)。
+按 TDD 推进：先写契约并亲眼看到 6 条红（缺 `circleStrokePathData` 编译失败 → 锚点/混色/域色断言红），再最小实现。
+
+### 22-1 落点
+
+- `AppIcon.kt`：新增 `CircleStroke(cx, cy, r)` 标记与 `circleStrokePathData`，与 `circleFillPathData` 共用
+  私有 `expandCircleMarker`（同一 triple 展开串逐字相等，契约钉住）；`pathNodesOf` 按前缀分流。
+- `AppIcons.kt`：`List` 三圆点、`Gear` 旋钮、`Image` 日头、`Newspaper` 报头带、`Document` 正文框、`Bell`
+  钟口横沿与钟舌补进 `strokePaths`（`List` 的填充层同时由方块改为同 triple 的 `CircleFill`，避免方块+圆环混形）；
+  `BookOpen` 重绘为对称双页（左 8 段 / 右 8 段，中线 x=12）；文件头两句禁令改写为「两枚标记分层专配」。
+- 撞形处理：`Star` 撤出今日计划，「打卡与成就」改 `Chart`；`Clock` 不再出现在今日计划入口组（归提醒行）。
+  **补充裁定**（原裁决未点名 `学习记录` 的替代形）：`学习记录` → `List`、`调整词书与目标` → `Book`，
+  六行六形，避免同组内再造相邻同形。该补充写进计划与 `TodayPlanEntryColorContractTest` KDoc。
+- 豁免表与枚数未动：仍 33 枚 / `StrokeOnlyIcons` 5 枚。
+
+### 22-2 落点
+
+- `IconBadge.kt`：`EntryIconTone.Tint` 底 `lerp(colors.surface, palette.deep, 0.16f)` → `appColors().tint`，
+  删除 `lerp` import；KDoc 同步。
+- `TodayPlanScreen.kt`：三组同色——`词书单词` `Learn`；`我的词`/`学习记录`/`打卡与成就` `Review`；
+  `学习工具与设置`/`调整词书与目标` `Settings`；常驻查词行仍在组外（`Library`）。
+- `SettingsScreen.kt` 无需改码：两行入口本就同属 `Library`；`Gradient` 在该屏仍有 2 处生产消费
+  （卡内主行），故本批**未**把 `Gradient` 登记为死码、未摘档。
+- 视觉稿：`.ic-tint` 底改 `var(--tint)`，`BookOpen` 七处路径改对称双页，§6.2 补 22-2 说明。
+
+### 危险红归位（随批实施）
+
+- `AiProfileSettingsScreen.kt`：五处 `AppDomain.Reading` → `AppDomain.Danger`（列表消息、清除密钥、
+  字段错误、表单消息、删除配置）。
+- 四屏出站确认按钮：`ImageStudio` / `PhotoTranslation` / `SentenceAnalysis` / `WordAiQa` 各两枚
+  `domain = AppDomain.Learn` → `AppDomain.AiSpeech`。
+
+### 验证
+
+- 新增/改写契约：`TodayPlanEntryColorContractTest`（新）、`DangerInkPlacementContractTest`（新）、
+  `AppIconsStructureContractTest`（CircleStroke 形状与识别锚点）、`IconBadgeContrastContractTest`（tint 配对与源码钉）、
+  `SharedComponentGeometryContractTest`（弱档配方腿改口径）。
+- 门禁：`:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin verifyThirdPartyNotices
+  verifyAcTraceabilityMatrix` 全绿；单测 **243 类 / 1798 例 / 0 失败 / 0 错误 / 0 跳过**
+  （批 3 关账基线 241 / 1789，+2 类 +9 例）。
+- 真机目视：本批只做自动化与静态取证；`bf353dda` 的手工目视（入口弱档双层对比、六行字形辨识）列入交接遗留。

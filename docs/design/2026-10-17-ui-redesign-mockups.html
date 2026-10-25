@@ -151,7 +151,7 @@ html[data-theme="dark"] .fail { color:#FF8177; }
 .entry + .entry { border-top:1px solid var(--outline-soft); }
 .ic { width:40px; height:40px; flex:0 0 auto; border-radius:var(--r-icon); display:grid; place-items:center; color:#fff; }
 .ic svg { width:22px; height:22px; }
-.ic-tint { color:var(--d); background:color-mix(in srgb,var(--d) 16%,var(--surface)); }
+.ic-tint { color:var(--d); background:var(--tint); }
 .ic-tint svg { stroke:currentColor; }
 .entry .en { font-size:calc(15px * var(--k)); font-weight:600; line-height:1.3; }
 .entry .ed { font-size:calc(12px * var(--k)); color:var(--text-2); line-height:1.4; margin-top:1px; }
@@ -535,7 +535,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
         <div style="background:var(--bg);border-radius:var(--r-card);padding:14px 16px" class="stack">
           <div class="card card-hero">
             <div style="display:flex;align-items:center;gap:12px">
-              <span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+              <span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z"/><path d="M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"/></svg></span>
               <div style="min-width:0">
                 <div style="font-size:calc(15px * var(--k));font-weight:700">CET-4 核心词</div>
                 <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:2px">共 4634 词 · 已学 128 词</div>
@@ -635,7 +635,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
         <div class="icon-cell"><span class="ic" style="background:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>查词</div>
         <div class="icon-cell"><span class="ic" style="background:var(--d-ai)"><svg class="g" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3V7L8 10z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11"/></svg></span>发音</div>
         <div class="icon-cell"><span class="ic" style="background:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4l2.4 5.2L20 10l-4.4 1.6L13 17l-1-5z"/><path d="M6 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg></span>AI 生成</div>
-        <div class="icon-cell"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>词书</div>
+        <div class="icon-cell"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z"/><path d="M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"/></svg></span>词书</div>
         <div class="icon-cell"><span class="ic" style="background:var(--d-reading)"><svg class="g" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3-6 3z"/></svg></span>收藏</div>
         <div class="icon-cell"><span class="ic" style="background:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="17" cy="17" r="2.5"/></svg></span>设置</div>
         <div class="icon-cell"><span class="ic" style="background:var(--d-settings)"><svg class="g" viewBox="0 0 24 24"><path d="M12 4v9"/><path d="M8 10l4 4 4-4"/><path d="M5 19h14"/></svg></span>导出</div>
@@ -659,7 +659,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
     <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
       <symbol id="i-book-f" viewBox="0 0 24 24"><path d="M5 6h5.2v10.6H5z"/></symbol>
       <symbol id="i-book-o" viewBox="0 0 24 24">
-        <path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/>
+        <path d="M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z"/><path d="M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"/>
       </symbol>
       <symbol id="i-search-f" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/></symbol>
       <symbol id="i-search-o" viewBox="0 0 24 24">
@@ -696,7 +696,10 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
       而不是它具体的图形。下面三案用的是<b>同一套造型骨架</b>，只差容器与内部层次，
       你只需要判"要几层"，不必判"画得好不好"（真机与深浅两套都由顶栏控件现切）。
       <b>拍板结果 2026-10-18：选 B</b>——入口层拿渐变容器 + 双色层次，行内仍是单层描边；
-      过程、实测数字与许可影响见 <span class="mono">docs/decisions/2026-10-18-ui-redesign-icon-duotone.md</span>。下面三案保留作选型依据，A/C 不再实施。</p>
+      过程、实测数字与许可影响见 <span class="mono">docs/decisions/2026-10-18-ui-redesign-icon-duotone.md</span>。下面三案保留作选型依据，A/C 不再实施。
+      <b>2026-10-22 补一条容器收敛（裁决 22-2）：</b>入口弱档 <span class="mono">.ic-tint</span> 的底统一取
+      <span class="mono">var(--tint)</span>（全站一档），域色只留在字形描边上；同组入口行同色，
+      <span class="mono">.ic</span> 实底渐变退出入口行族。今日计划的六行已按 学习 / 记录 / 系统 三组收敛。</p>
     <div class="panel">
       <div class="trial">
         <h4>方案 A · 单色描边 + 域色实底（现稿定的方案）</h4>
@@ -839,7 +842,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
           <div class="stack">
             <div class="card card-sel" style="padding:14px">
               <div style="display:flex;align-items:center;gap:12px">
-                <span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+                <span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z"/><path d="M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"/></svg></span>
                 <div style="min-width:0;flex:1">
                   <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:calc(15px * var(--k));font-weight:700">CET-4 核心词</span>
                     <span class="pill-status">在学</span></div>
@@ -850,7 +853,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
             </div>
             <div class="card" style="padding:14px">
               <div style="display:flex;align-items:center;gap:12px">
-                <span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+                <span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z"/><path d="M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"/></svg></span>
                 <div style="min-width:0;flex:1">
                   <div style="font-size:calc(15px * var(--k));font-weight:700">考研词汇</div>
                   <div style="font-size:calc(12px * var(--k));color:var(--text-2);margin-top:3px">共 5215 词 · <span style="color:var(--d-review)">正在加载进度…</span></div>
@@ -911,7 +914,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
           <div class="card" style="padding:6px 16px">
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-library)"><svg class="g" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span>
               <div><div class="en">查词</div><div class="ed">离线词典 · 覆盖本机已装词书</div></div><span class="chev">›</span></div>
-            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+            <div class="entry"><span class="ic ic-tint" style="--d:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z"/><path d="M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"/></svg></span>
               <div><div class="en">词书单词</div><div class="ed">整册浏览 · CET-4 核心词 4,634</div></div><span class="chev">›</span></div>
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-reading)"><svg class="g" viewBox="0 0 24 24"><path d="M6 4h12v16l-6-3-6 3z"/></svg></span>
               <div><div class="en">我攒的词</div><div class="ed">收藏 · 生词本 · 错词，一页三段</div></div><span class="val">34 · 12 · 8</span><span class="chev">›</span></div>
@@ -1017,7 +1020,7 @@ html[data-theme="dark"] .ix-sm .ux-o { stroke:var(--d); }
           </div>
           <div class="sec-title"><span class="t">学习</span></div>
           <div class="card" style="padding:4px 16px">
-            <div class="entry"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z"/><path d="M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"/></svg></span>
+            <div class="entry"><span class="ic" style="background:var(--d-learn)"><svg class="g" viewBox="0 0 24 24"><path d="M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z"/><path d="M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"/></svg></span>
               <div><div class="en">词书与每日目标</div><div class="ed">CET-4 核心词 · 每天 10 新词</div></div><span class="chev">›</span></div>
             <div class="entry"><span class="ic ic-tint" style="--d:var(--d-review)"><svg class="g" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
               <div><div class="en">学习提醒</div><div class="ed">已关闭 · 每天最多一次，不补发</div></div><span class="tail"><span class="pill-status pill-muted">关</span></span></div>
