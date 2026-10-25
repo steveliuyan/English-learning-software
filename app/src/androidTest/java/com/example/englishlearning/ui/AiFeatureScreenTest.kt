@@ -33,8 +33,6 @@ class AiFeatureScreenTest {
      * 而不是在循环里反复 setContent。
      */
     private fun setScreen(
-        todayWordCount: Int? = 12,
-        dueWordCount: Int? = 5,
         onBack: () -> Unit = {},
         onOpenSettings: () -> Unit = {},
         onOpenLearning: () -> Unit = {},
@@ -43,8 +41,6 @@ class AiFeatureScreenTest {
         composeRule.setContent {
             AiFeatureScreen(
                 feature = current.value,
-                todayWordCount = todayWordCount,
-                dueWordCount = dueWordCount,
                 onBack = onBack,
                 onOpenSettings = onOpenSettings,
                 onOpenLearning = onOpenLearning,
@@ -55,7 +51,8 @@ class AiFeatureScreenTest {
 
     /**
      * 骨架页只属于**未实现**的功能（已实现的渲染各自的真实屏幕）。
-     * 骨架也必须是完整的：标题、进度、依赖、数据、动作一个不少。
+     * 骨架保留标题、进度、动作；2026-10-25 简化批删掉的「还差什么」「会用到的数据」两张卡
+     * 在这里反向钉住（见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`）。
      */
     @Test fun every_unimplemented_feature_renders_a_complete_skeleton() {
         val current = setScreen()
@@ -67,21 +64,9 @@ class AiFeatureScreenTest {
             composeRule.onNodeWithText(feature.title).assertExists()
             composeRule.onNodeWithTag("ai_feature_status_card").assertExists()
             composeRule.onNodeWithTag("ai_feature_status").assertExists()
-            composeRule.onNodeWithTag("ai_feature_dependencies_card").assertExists()
-            composeRule.onNodeWithTag("ai_feature_data_card").assertExists()
+            composeRule.onNodeWithTag("ai_feature_dependencies_card").assertDoesNotExist()
+            composeRule.onNodeWithTag("ai_feature_data_card").assertDoesNotExist()
             composeRule.onNodeWithTag("ai_feature_open_settings").assertExists()
-        }
-    }
-
-    @Test fun dependency_list_matches_the_feature_catalogue() {
-        val current = setScreen()
-        AiFeature.entries.filter { !it.implemented }.forEach { feature ->
-            current.value = feature
-            composeRule.waitForIdle()
-            feature.dependencies.indices.forEach { index ->
-                composeRule.onNodeWithTag("ai_feature_dependency_$index").assertExists()
-            }
-            composeRule.onNodeWithTag("ai_feature_dependency_${feature.dependencies.size}").assertDoesNotExist()
         }
     }
 
@@ -113,16 +98,11 @@ class AiFeatureScreenTest {
         composeRule.onNodeWithText(featureStatusBadge(false)).assertDoesNotExist()
     }
 
-    @Test fun data_block_reports_the_real_counts() {
-        setScreen(todayWordCount = 12, dueWordCount = 5)
-        composeRule.onNodeWithText("今日新词 12 个 · 待复习 5 个（来自本机，不会离开设备除非发起 AI 请求）").assertExists()
-    }
-
-    @Test fun data_block_does_not_fake_zero_when_the_plan_is_unavailable() {
-        setScreen(todayWordCount = null, dueWordCount = null)
-        composeRule.onNodeWithText("今日计划还没读出来，稍后重试。").assertExists()
-    }
-
+    /**
+     * 2026-10-25 简化批：原先的两条 `data_block_*` 用例随「会用到的数据」卡一并删除
+     * （卡片下线，不是把断言改松）。本机词数仍在 AI 主页的导航卡上如实汇报，
+     * 口径由 `AiLearningScreenTest` 的 wordListLine 用例继续钉住。
+     */
     @Test fun the_usable_actions_report_their_callbacks() {
         var toSettings = 0
         var toLearning = 0
@@ -166,8 +146,6 @@ class AiFeatureScreenTest {
             MintGlassTheme(themeMode = ThemeMode.Dark) {
                 AiFeatureScreen(
                     feature = AiFeature.CLOZE,
-                    todayWordCount = 12,
-                    dueWordCount = 5,
                     onBack = {},
                     onOpenSettings = {},
                     onOpenLearning = {},
@@ -197,8 +175,6 @@ class AiFeatureScreenTest {
             MintGlassTheme(themeMode = ThemeMode.Dark) {
                 AiFeatureScreen(
                     feature = AiFeature.SENTENCE_ANALYSIS,
-                    todayWordCount = 12,
-                    dueWordCount = 5,
                     onBack = {},
                     onOpenSettings = {},
                     onOpenLearning = {},

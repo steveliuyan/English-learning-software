@@ -1374,8 +1374,6 @@ fun AppScreen(
             } else if (selectedFeature != null) {
                 AiFeatureScreen(
                     feature = selectedFeature,
-                    todayWordCount = todayReady?.newTarget,
-                    dueWordCount = todayReady?.dueTarget,
                     onBack = { selectedFeatureKey = null },
                     onOpenSettings = {
                         selectedFeatureKey = null
@@ -1623,7 +1621,6 @@ fun AppScreen(
                                 // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
                                 // 全屏页，避免出现「底导之上再压一层」的混乱层级。
                                 onOpenReading = { selectedTab = AppTab.READING },
-                                onOpenLearningTools = { selectedTab = AppTab.SETTINGS },
                                 onOpenCheckIn = { showCheckIn = true },
                                 onOpenLearningRecords = { showLearningRecords = true },
                                 onOpenWordBookWords = { showWordBookWords = true },
@@ -2014,7 +2011,6 @@ internal fun LearningSetupScreen(
             subtitle = "每天一点点，学习会自然变成习惯。",
             onBack = null,
         )
-        SetupIntroductionCard()
         Text(
             text = "选择词书",
             style = MaterialTheme.typography.titleMedium,
@@ -2107,24 +2103,6 @@ internal fun LearningSetupScreen(
     }
 }
 
-
-@Composable
-private fun SetupIntroductionCard() {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintTint),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("从一个舒服的目标开始", color = MintPrimary, style = MaterialTheme.typography.labelLarge)
-            Text(
-                "先选一套适合你的词书，再确定每天愿意投入的量。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MintPrimaryDark,
-            )
-        }
-    }
-}
 
 /** 首帧骨架的行数：够填满「选择词书」下方一屏，又不至于让真实列表到位后滚动位置大幅跳动。 */
 internal const val WORD_BOOK_PLACEHOLDER_ROWS = 3

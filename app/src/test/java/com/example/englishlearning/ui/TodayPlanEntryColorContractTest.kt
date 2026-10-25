@@ -5,12 +5,17 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Task 27（裁决 22-2）的今日计划入口组契约：**同组同色 + 六行六形**。
+ * Task 27（裁决 22-2）的今日计划入口组契约：**同组同色 + 行形互不相同**。
  *
  * 背景是真机取证的两条：一屏九块彩色容器让用户读成「颜色太杂」；`Gear`/`List` 相邻两行在
- * `StrokeOnly` 档下都是三条横线（`entry-group.png`）。裁决把六行收成三组颜色
+ * `StrokeOnly` 档下都是三条横线（`entry-group.png`）。裁决把入口行收成三组颜色
  * （学习 `Learn` / 记录 `Review` / 系统 `Settings`），并要求同组内字形仍然互不相同
  * ——颜色收敛不能顺手把「两行长得一样」留下来。
+ *
+ * 2026-10-25 简化批删掉了「学习工具与设置」行：它落的设置 tab 与紧随其后的「调整词书与目标」
+ * 同属系统组，而用户从底部导航一步就能到设置页，组内这一行是同一目的地的第二入口。
+ * 行数从六降到五，判据本身（组内同域、跨组换色、组内字形互异）一字未松。
+ * 裁决见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
  *
  * 读法是源码文本（先过 `stripComments`），不渲染 Compose：本仓 JVM 单测没有渲染运行时，
  * 同组同色是「具名实参相同」这件事，文本即可判定。像素侧由 connected 用例承担。
@@ -23,14 +28,13 @@ class TodayPlanEntryColorContractTest {
      * `学习记录` 取 `List`（事件流水），`调整词书与目标` 取 `Book`（词书实体）——裁决 22-1 只点名
      * 「`Star`→`Chart`」与「`Clock` 归提醒行」，没给 `学习记录` 指定替代形；若两行都用 `Chart`
      * 会在同组内重新造出一对相邻同形，与本裁决的立法目的相反。故 `Chart` 只给打卡页，
-     * `学习记录` 走 `List`、`调整词书与目标` 从 `List` 让位给 `Book`，六行六形。
+     * `学习记录` 走 `List`、`调整词书与目标` 从 `List` 让位给 `Book`，组内字形互异。
      */
     private val expectedRows = listOf(
         Row("词书单词", "BookOpen", "Learn"),
         Row("我的词", "Bookmark", "Review"),
         Row("学习记录", "List", "Review"),
         Row("打卡与成就", "Chart", "Review"),
-        Row("学习工具与设置", "Gear", "Settings"),
         Row("调整词书与目标", "Book", "Settings"),
     )
 
@@ -38,11 +42,11 @@ class TodayPlanEntryColorContractTest {
     private val expectedGroups = mapOf(
         "Learn" to listOf("词书单词"),
         "Review" to listOf("我的词", "学习记录", "打卡与成就"),
-        "Settings" to listOf("学习工具与设置", "调整词书与目标"),
+        "Settings" to listOf("调整词书与目标"),
     )
 
     @Test
-    fun entry_rows_keep_one_domain_per_group_and_six_distinct_glyphs() {
+    fun entry_rows_keep_one_domain_per_group_and_distinct_glyphs() {
         val source = source()
         val rows = entryRows(entryGroupSource(source))
         assertEquals(
@@ -62,7 +66,7 @@ class TodayPlanEntryColorContractTest {
         assertEquals(expectedGroups, groups, "今日计划入口组的分组与裁决 22-2 不符")
         assertEquals(3, groups.size, "入口组应恰好 3 个域色，实际 ${groups.size}：${groups.keys}")
 
-        // 六行六形：颜色收敛不能留下相邻同形。
+        // 组内字形互异：颜色收敛不能留下相邻同形。
         val icons = rows.map { it.icon }
         assertEquals(icons.size, icons.distinct().size, "入口组出现同形字形：$icons")
 

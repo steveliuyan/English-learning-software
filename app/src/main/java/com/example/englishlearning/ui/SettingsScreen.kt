@@ -273,32 +273,8 @@ fun SettingsScreen(
     ) {
         AppScreenHeader(
             title = "设置",
-            subtitle = "学习、AI、语音、数据与外观。API Key 只保存在本机加密区。",
+            subtitle = "$profileName · API Key 只保存在本机加密区。",
         )
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = colors.surface),
-            shape = RoundedCornerShape(18.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
-                .testTag("settings_profile_card"),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(profileName, style = AppType.Title, color = colors.text1)
-                Text(
-                    text = wordBookName ?: "尚未选择词书",
-                    style = AppType.Footnote,
-                    color = colors.text2,
-                    modifier = Modifier.testTag("settings_profile_word_book"),
-                )
-            }
-        }
 
         // 「学习」组三条入口行按稿 §7④：词书与每日目标走强档渐变底，其余弱档 tint；
         // 「学习提醒」保持导航行（开关状态在二级页），副标题沿用既有文案。
@@ -306,7 +282,7 @@ fun SettingsScreen(
         SettingsGroupSection(settingsGroup("settings_group_learning")) {
             LedgerEntryRow(
                 tag = "settings_open_setup",
-                subtitle = "换词书、改每日新增量、改反馈后的详情开关",
+                subtitle = wordBookName?.let { "当前：$it · 换词书与目标" } ?: "尚未选择词书 · 去选一本",
                 iconTone = EntryIconTone.Gradient,
                 onClick = onOpenSetup,
             )

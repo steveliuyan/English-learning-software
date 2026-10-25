@@ -28,20 +28,6 @@ internal val headerSeedRetentionReason: String =
         "共享 AppScreenHeader 的返回位固定为「返回」+ app_screen_header，迁移需先扩组件 API 并逐屏复跑 connected。"
 
 /**
- * 词行族 `VocabularyScreen.kt` 的**保留理由**（计划 Step 4b 明许「接线清零」或「留档写理由」的后者）。
- *
- * 该屏自 Task 22-A 把生词本并入「我的词」合并页之后，`VocabularyScreen(` 在全仓 `src/main` **0 处调用**
- * （重算：`grep -rn "VocabularyScreen(" app/src/main --include=*.kt`，只应命中它自己的定义行；
- * 状态类型 `VocabularyUiState` / `VocabularyMasteryState` / `VocabularyItem` 仍被 `VocabularyViewModel`、
- * `MyWordsScreen` 等消费，故文件不能连同类型一起删）。它的 `VocabularyRow` 是
- * 「lemma + 来源 + 加入时间 + IPA + 逐条词性释义 + 例句/译文 + 派生词 + 短语 + 近义词 + 两枚按钮」的
- * **详情卡**，不是 spec §3 的「一行 lemma + 释义 + 状态 + 动作」词行；把它压进 `WordRow` 四槽会丢信息，
- * 与 R-20C.1 对词典结果行的裁定同构。屏若日后复活，正确做法是重做版面而不是继承这张旧卡。
- */
-internal val vocabularyRowRetentionReason: String =
-    "孤儿屏（22-A 后 0 处调用）+ 行是十余字段详情卡而非词行形态；状态类型仍被 MyWords 链路消费，文件暂不能删。"
-
-/**
  * 共享组件唯一性棘轮（批 1 Task 12 Step 3，承接 Task 8 Step 4「顺延到 Task 12」那一棒）。
  *
  * 管什么：**同一形态不得有第二份组件**。批 1 把 12 枚共享组件建齐之后，屏侧那些「各自手写一遍」的私有份
@@ -208,7 +194,8 @@ class SharedComponentUniquenessRatchetTest {
      *    按上面「接线完毕就删一行」的口径把这三行从台账删除。Task 20-C 按 **R-20C.1** 把词典结果行
      *    降级为「留档」——五枚信息 vs 四槽必丢 IPA 或截断词书名，强迁的三种出路全被否决，理由见验证文档；
      *    Task 26 Step 3 把 `LearningRecordsScreen.kt` 的 `RecordRow` 换成共享 `WordRow` 并摘行；
-     *    `VocabularyScreen.kt` 按**留档**收（屏已无宿主、行是详情卡而非词行形态），理由见 [vocabularyRowRetentionReason]。
+     *    原留档的孤儿屏 `VocabularyScreen.kt` 于 2026-10-25 简化批随屏删除（全仓零调用点，
+     *    见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`），台账与「页头族」同名条目同批摘除。
      *    删行的合法性由
      *    [word_row family seed is the spec list minus the wired screens and pins the window rule boundary]
      *    当场复核（已摘行的屏必须真调 `WordRow(` 且私有词行窗口清零），不是「补一行调用即准删」。
@@ -234,7 +221,6 @@ class SharedComponentUniquenessRatchetTest {
             "ReadingAccessScreen.kt",
             "ReadingHistoryScreen.kt",
             "SentenceAnalysisScreen.kt",
-            "VocabularyScreen.kt",
             "WordAiQaScreen.kt",
             "WordCardScreen.kt",
             "WorksheetPreviewScreen.kt",
@@ -246,9 +232,6 @@ class SharedComponentUniquenessRatchetTest {
             // R-20C.1：词典结果行五枚信息 + 两枚诊断标签 vs WordRow 四槽，强迁必丢 IPA 或截断词书名，
             // 收窄规则 / 另立组件 / 给组件加槽三条出路全被否决，留档理由见验证文档。
             "GlobalVocabularySearchScreen.kt",
-            // 留档：屏已无宿主（Task 22-A 后 `VocabularyScreen(` 在全仓 0 处调用），其 VocabularyRow 是
-            // 十余字段 + 两枚按钮的详情卡而非词行形态；理由见 [vocabularyRowRetentionReason]。
-            "VocabularyScreen.kt",
         ),
     )
 
@@ -750,9 +733,9 @@ class SharedComponentUniquenessRatchetTest {
         val specWordRowFiles = setOf(
             // Task 22-B：名单原另含 `"FavoritesScreen.kt"` 与 `"WrongWordsScreen.kt"` 两枚——两屏已随 22-B 下线，
             // 私有词行随屏消失，spec §3 的「证据」列已同步改述（先改 spec、再改本字面抄录、与删屏文件同枚提交）。
+            // 2026-10-25 简化批同口径摘掉孤儿屏 `"VocabularyScreen.kt"`（全仓零调用点，spec §3 证据列同批改述）。
             "GlobalVocabularySearchScreen.kt",
             "LearningRecordsScreen.kt",
-            "VocabularyScreen.kt",
             "WordBookWordsScreen.kt",
         )
         val seed = componentFamilySeeds.getValue("词行（应调 WordRow）")

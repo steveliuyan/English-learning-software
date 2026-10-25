@@ -238,7 +238,7 @@ private fun LearningRecordRow(row: LearningRecord, onOpenRow: (LearningRecord) -
     ) {
         WordRow(
             lemma = row.displayLemma,
-            gloss = row.wordCard?.meaningZh?.takeIf { it.isNotBlank() }?.let { "释义：$it" } ?: unavailableNotice,
+            gloss = row.wordCard?.meaningZh?.takeIf { it.isNotBlank() } ?: unavailableNotice,
             status = "反馈：${row.feedback.label()}",
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )

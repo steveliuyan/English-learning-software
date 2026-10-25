@@ -208,17 +208,6 @@ fun SpeechSettingsScreen(
             }
         }
 
-        // 待接入厂商与本地方向收进折叠区：这是「以后可能有」的信息，不该常驻占用主列表。
-        var moreProvidersExpanded by rememberSaveable { mutableStateOf(false) }
-        TextButton(onClick = { moreProvidersExpanded = !moreProvidersExpanded }, modifier = Modifier.testTag("speech_more_providers")) {
-            Text(if (moreProvidersExpanded) "收起更多语音厂商" else "更多语音厂商 · 待接入", style = AppType.Label)
-        }
-        if (moreProvidersExpanded) {
-            Text("本地 ZipVoice-Distill · 未下载", style = AppType.Footnote, modifier = Modifier.testTag("speech_zipvoice"))
-            listOf("Azure" to "azure", "火山引擎" to "volcengine", "腾讯云" to "tencent", "阿里云百炼" to "bailian", "MiniMax" to "minimax").forEach { (name, tag) ->
-                Text("$name · 待接入", style = AppType.Footnote, modifier = Modifier.testTag("speech_pending_$tag"))
-            }
-        }
         state.message?.let {
             // Task 26 Step 3：错误行收口到共享 `InlineNotice`；旧锚留在外层（组件的标签后设，会覆盖同一 modifier）。
             Box(Modifier.testTag("speech_message")) {

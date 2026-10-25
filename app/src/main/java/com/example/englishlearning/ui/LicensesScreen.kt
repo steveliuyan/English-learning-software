@@ -88,12 +88,6 @@ fun LicensesScreen(markdown: String, onBack: () -> Unit) {
                 modifier = Modifier.testTag("licenses_unavailable"),
             )
         } else {
-            Text(
-                "共收录 ${notices.size} 项第三方资源",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MintTextMuted,
-                modifier = Modifier.testTag("licenses_entry_count"),
-            )
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

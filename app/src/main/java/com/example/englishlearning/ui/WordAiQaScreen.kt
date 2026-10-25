@@ -131,7 +131,7 @@ fun WordAiQaScreen(
             }
         }
 
-        WordQaKind.entries.forEach { kind ->
+        WordQaKind.entries.filter { it != WordQaKind.Personal }.forEach { kind ->
             QuestionChip(kind, enabled = state != WordAiQaUiState.Asking, onAsk)
         }
 

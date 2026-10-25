@@ -47,8 +47,10 @@ class LicensesScreenTest {
         var backCalls = 0
         composeRule.setContent { LicensesScreen(markdown = sampleLedger, onBack = { backCalls++ }) }
         composeRule.onNodeWithText("关于与开源许可").assertIsDisplayed()
-        composeRule.onNodeWithTag("licenses_entry_count").assertIsDisplayed()
-        composeRule.onNodeWithText("共收录 2 项第三方资源").assertIsDisplayed()
+        // 2026-10-25 简化批删掉了「共收录 N 项第三方资源」计数行：下面的台账本身就是完整名单，
+        // 计数既不帮用户核对（条目会随台账滚动出现）也不帮决策。反向钉住删除结果。
+        composeRule.onNodeWithTag("licenses_entry_count").assertDoesNotExist()
+        composeRule.onNodeWithText("共收录", substring = true).assertDoesNotExist()
         composeRule.onNodeWithTag("license_entry-lib-a").assertExists()
         composeRule.onNodeWithTag("license_entry-lib-b").performScrollTo().performClick()
         composeRule.onNodeWithText("用途：测试用途").assertExists()

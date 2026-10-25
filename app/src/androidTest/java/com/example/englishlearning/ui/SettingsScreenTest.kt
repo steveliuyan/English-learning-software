@@ -201,24 +201,27 @@ class SettingsScreenTest {
     }
 
 
-    /** 资料卡只报昵称与词书名；今日计划数字按裁决③移出设置页（统计职责归打卡页）。 */
+    /**
+     * 2026-10-25 简化批删掉了独立资料卡：昵称进页头副标题、词书名进「词书与每日目标」行副标题。
+     * 信息一条不少，只是不再用一张卡把两行字隔开；今日计划数字仍按裁决③留在打卡页。
+     */
     @Test
-    fun profile_card_shows_name_and_wordbook_without_plan_numbers() {
+    fun profile_name_and_wordbook_survive_without_a_profile_card() {
         setScreen(profileName = "Tom", wordBookName = "大学英语四级")
-        composeRule.onNodeWithTag("settings_profile_card").assertExists()
-        composeRule.onNodeWithText("Tom").assertExists()
-        composeRule.onNodeWithText("大学英语四级").assertExists()
+        composeRule.onNodeWithTag("settings_profile_card").assertDoesNotExist()
+        composeRule.onNodeWithText("Tom", substring = true).assertExists()
+        composeRule.onNodeWithText("大学英语四级", substring = true).assertExists()
         assertTrue(
             "今日计划数字已按裁决③移出设置页，整页不该再出现「今日计划」字样",
             composeRule.onAllNodesWithText("今日计划", substring = true).fetchSemanticsNodes().isEmpty(),
         )
     }
 
-    /** 未选词书时资料卡要如实说「尚未选择词书」，不拿 null 冒充空词书名。 */
+    /** 未选词书时「词书与每日目标」行要如实说「尚未选择词书」，不拿 null 冒充空词书名。 */
     @Test
-    fun profile_card_admits_when_no_word_book_is_chosen() {
+    fun setup_row_admits_when_no_word_book_is_chosen() {
         setScreen(wordBookName = null)
-        composeRule.onNodeWithText("尚未选择词书").assertExists()
+        composeRule.onNodeWithText("尚未选择词书", substring = true).assertExists()
     }
 
     /** 「学习」组三行 + 「AI 与语音」两行 + 许可行：点下去必须真把回调送到（假入口禁令的行为面）。 */

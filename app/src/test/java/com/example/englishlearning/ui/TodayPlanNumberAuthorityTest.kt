@@ -275,8 +275,12 @@ class TodayPlanNumberAuthorityTest {
 
     /**
      * 今日数字的唯一权威：`AppType.Display` 全屏恰一处，且必须落在 `today_plan_total_progress`
-     * 那一格（今日完成数），并且真的在 `today_plan_progress_summary` 容器与 `today_plan_unlock_status`
-     * 之间——进度卡才是「今天读了多少」的权威位置，别处再摆一枚同尺寸数字即破坏单一权威。
+     * 那一格（今日完成数），并且真的在 `today_plan_progress_summary` 容器与主 CTA
+     * （`today_plan_start_learning`）之间——进度卡才是「今天读了多少」的权威位置，别处再摆一枚同尺寸数字即破坏单一权威。
+     *
+     * 原第二枚顺序锚 `today_plan_unlock_status`（解锁文案）已在 2026-10-25 简化批删除
+     * （见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`），锚换成紧随其后的主 CTA：
+     * 判据强度不变（仍在钉「权威数字不许跑出进度卡这一节」），只是锚点改成屏上必然存在的下一个站点。
      */
     @Test
     fun display_is_used_exactly_once_and_anchors_the_total_progress_slot() {
@@ -314,10 +318,10 @@ class TodayPlanNumberAuthorityTest {
             "唯一那处 Display 必须就是 today_plan_total_progress 那一格，实际窗口：$window",
         )
         val cardAt = source.indexOf("\"today_plan_progress_summary\"")
-        val unlockAt = source.indexOf("\"today_plan_unlock_status\"")
+        val ctaAt = source.indexOf("\"today_plan_start_learning\"")
         val displayAt = source.indexOf("AppType.Display")
         assertTrue(cardAt in 0 until displayAt, "Display 必须在 today_plan_progress_summary 之后（进度卡里）")
-        assertTrue(displayAt < unlockAt, "Display 必须在 today_plan_unlock_status 之前（不得跑到解锁文案下方另起一节）")
+        assertTrue(ctaAt > displayAt, "Display 必须在主 CTA today_plan_start_learning 之前（不得跑到主操作下方另起一节）")
         assertTrue(NeutralInk.containsMatchIn(window), "权威数字也得显式给中性墨（AppType 各档自带浅套静态墨）：$window")
     }
 
@@ -326,8 +330,10 @@ class TodayPlanNumberAuthorityTest {
      * 逐个呈现位取窗口，要求 Footnote + 中性墨，且窗口内看不见任何强调色读法
      * （`Mint*` 快捷名、`DomainColors.` 静态域色、`appDomain(...)` 动态域色、`AppType.Display`）。
      *
-     * 两张计数卡是同一个私有组合（`CountCard`）的两个实例，故按函数体窗口判一次即可——
-     * 卡内那条数值行才是数字，标签行按 `Label` 档走，都在同一段里被这条判据覆盖。
+     * 2026-10-25 简化批删掉了两张计数卡（`today_plan_new_count` / `today_plan_due_count` 与私有
+     * `RowScope.CountCard`）：今日新增/复习的精确数字在进度卡的
+     * 「新增 x/y · 复习 x/y」一行里已经给出，计数卡是同一信息的第二遍。裁决见
+     * `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
      */
     @Test
     fun every_other_number_on_the_screen_is_footnote_with_neutral_ink() {
@@ -349,15 +355,6 @@ class TodayPlanNumberAuthorityTest {
                 "$tag 不该再带强调色（数字的权威只有一处），实际窗口：$window",
             )
         }
-        val countCard = bodyOf(source, "private fun RowScope.CountCard(", "计数卡排印取样")
-        assertTrue(
-            "AppType.Footnote" in countCard && NeutralInk.containsMatchIn(countCard),
-            "计数卡里的数值行必须降到 Footnote + 中性墨（色点才是该卡的强调色载体），实际段：$countCard",
-        )
-        assertTrue(
-            Regex("""AppType\.(?:Display|Headline|Title)""").find(countCard) == null,
-            "计数卡里不得再出现大字号档——今日数字的权威尺寸只许一处，实际段：$countCard",
-        )
     }
 
     /**
@@ -377,7 +374,7 @@ class TodayPlanNumberAuthorityTest {
             "整宽 M3 Button 只许留下「阅读文章」那一枚支撑动作，其余动作一律换成 EntryRow / PillButton",
         )
         // 评审 I-4：旧写法 `source.substringAfter("is TodayPlanUiState.Ready")` 自称「Ready 分支」，
-        // 实为**无界尾切片**（吞到文件末，把 `TodayPlanEntryGroup`/`CountCard`/`TodayWorkloadBar` 全算进分支），
+        // 实为**无界尾切片**（吞到文件末，把 `TodayPlanEntryGroup`/`TodayWorkloadBar` 等私有组合全算进分支），
         // 于是「把主 CTA 抽进分支锚点之后新加的未被调用的私有组合件」这种写法 tail 计数仍是 1、全绿，
         // 而 Ready 分支实际渲染出空。现按花括号配平取**分支体本身**，药片计数、主 CTA 的 tag 与
         // 本分支自己的进度卡标签都在体内判；缺锚或未闭合由 [bodyOf] 响亮红。
@@ -429,7 +426,6 @@ class TodayPlanNumberAuthorityTest {
             "today_plan_open_my_words",
             "today_plan_open_learning_records",
             "today_plan_open_check_in",
-            "today_plan_learning_tools",
             "today_plan_open_setup_entry",
             "today_plan_search_entry",
         ).forEach { tag ->
@@ -456,7 +452,7 @@ class TodayPlanNumberAuthorityTest {
         assertEquals(
             0,
             countMatches(source, rawColorLiteral),
-            "今日计划屏不得留裸 hex：三形五处（计数卡色点、打卡棕、工作量图例色）都要换成域色",
+            "今日计划屏不得留裸 hex：打卡棕、工作量图例色等点位都要换成域色",
         )
         assertEquals(
             0,
@@ -519,7 +515,7 @@ class TodayPlanNumberAuthorityTest {
     }
 
     /**
-     * Workload 三档与两张计数卡的色点必须同源、且取自域色（brief Step 2「复习 `Review` 系」）：
+     * Workload 三档图例必须同源、且取自域色（brief Step 2「复习 `Review` 系」）：
      * 复习 → `Review`、今日新学/新增 → `Learn`、已学 → 品牌 `AiSpeech`；同一概念在本屏只许一套颜色
      * （`TodayWorkloadBar` 上方那段 KDoc 早已写明这条）。
      */
@@ -671,7 +667,7 @@ class TodayPlanNumberAuthorityTest {
         )
 
         val paramFailure = assertFailsWith<AssertionError> {
-            bodyOf("private fun RowScope.CountCard(text: String, tag: String", "private fun RowScope.CountCard(", "合成自检：形参表")
+            bodyOf("private fun SampleRow(text: String, tag: String", "private fun SampleRow(", "合成自检：形参表")
         }
         assertTrue(
             "形参表" in (paramFailure.message ?: ""),

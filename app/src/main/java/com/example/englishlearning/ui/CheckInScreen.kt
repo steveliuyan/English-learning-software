@@ -102,23 +102,12 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
             Text(if (state.completed) "今日已完成" else "继续保持学习", color = if (state.completed) reviewInk else MintTextMuted, fontWeight = FontWeight.Bold)
         }
     }
-    // F4-01 基础统计卡：累计学习/复习、连续天数（按快照解锁口径，不要求阅读）、近 7 日完成率条。
+    // F4-01 基础统计卡：累计学习/复习、连续天数（按快照解锁口径，不要求阅读）。
     Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_totals")) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("累计与连续", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
             Text(state.totalsText, color = MintPrimaryDark, modifier = Modifier.testTag("check_in_totals_text"))
             Text(state.streakText, color = MintTextMuted, modifier = Modifier.testTag("check_in_streak_text"))
-            if (state.recentDays.isNotEmpty()) {
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 88.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                    state.recentDays.forEachIndexed { index, day ->
-                        val ratio = day.completionRatio
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(Modifier.fillMaxWidth().height((56 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) reviewInk else appColors().outlineSoft).testTag("check_in_recent_bar_$index").semantics { contentDescription = "${day.localDate} 完成率 ${(ratio * 100).toInt()}%" })
-                            Text(day.localDate.dayOfMonth.toString(), color = MintTextMuted, style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-            }
         }
     }
     Card(colors = CardDefaults.cardColors(containerColor = MintSurface), shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().testTag("check_in_week_chart")) {

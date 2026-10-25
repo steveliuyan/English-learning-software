@@ -311,13 +311,6 @@ private fun AiProfileEditor(
                     onValueChange = { onDraftChange(draft.copy(displayName = it)) },
                 )
                 EditorField(
-                    label = "官网",
-                    value = draft.websiteUrl,
-                    tag = "ai_profile_website",
-                    hint = "https://example.com",
-                    onValueChange = { onDraftChange(draft.copy(websiteUrl = it)) },
-                )
-                EditorField(
                     label = "Endpoint",
                     value = draft.endpoint,
                     tag = "ai_profile_endpoint",

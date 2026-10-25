@@ -52,15 +52,16 @@ private val AiFeatureGradient = Brush.linearGradient(listOf(AppleMintStart, Appl
 /**
  * 单个 AI 功能的页面骨架。
  *
- * 这一页刻意不做「空白占位」：它把**当前进度**、**还差什么**、**会用哪些数据**都摆出来，
- * 并给出一个此刻真的能用的动作。用户此前反复遇到「点开是坏的」，所以这里的规则是：
- * 宁可把「没做完」写清楚，也不假装能用。
+ * 这一页刻意不做「空白占位」：它把**当前进度**摆出来，并给出一个此刻真的能用的动作。
+ * 用户此前反复遇到「点开是坏的」，所以这里的规则是：宁可把「没做完」写清楚，也不假装能用。
+ *
+ * 2026-10-25 简化批删掉了「还差什么（依赖）」与「会用到的数据」两张卡：前者是给开发者看的
+ * 阻塞项清单，后者把同一批本机数据连同来源说明再说一遍，两张卡都排在唯一可执行动作之前，
+ * 让没上线的功能页长了三屏解释。裁决见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
  */
 @Composable
 fun AiFeatureScreen(
     feature: AiFeature,
-    todayWordCount: Int?,
-    dueWordCount: Int?,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenLearning: () -> Unit,
@@ -122,34 +123,6 @@ fun AiFeatureScreen(
             }
             Spacer(Modifier.height(8.dp))
             Text(feature.status, style = MaterialTheme.typography.bodyMedium, color = MintTextMuted, modifier = Modifier.testTag("ai_feature_status"))
-        }
-
-        SectionCard(tag = "ai_feature_dependencies_card") {
-            Text("还差什么", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Spacer(Modifier.height(8.dp))
-            feature.dependencies.forEachIndexed { index, dependency ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("ai_feature_dependency_$index"),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Text("·", color = MintPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 8.dp))
-                    Text(dependency, style = MaterialTheme.typography.bodyMedium, color = MintTextMuted)
-                }
-            }
-        }
-
-        SectionCard(tag = "ai_feature_data_card") {
-            Text("会用到的数据", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = when {
-                    todayWordCount == null || dueWordCount == null -> "今日计划还没读出来，稍后重试。"
-                    else -> "今日新词 $todayWordCount 个 · 待复习 $dueWordCount 个（来自本机，不会离开设备除非发起 AI 请求）"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MintTextMuted,
-                modifier = Modifier.testTag("ai_feature_data"),
-            )
         }
 
         Card(

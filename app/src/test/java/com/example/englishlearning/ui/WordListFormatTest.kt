@@ -56,7 +56,7 @@ class WordListFormatTest {
         assertEquals(
             "2026-10-19 00:30",
             wordListDateTimeLabel(instant, ZoneOffset.UTC),
-            "时分档必须是 yyyy-MM-dd HH:mm（`VocabularyScreen` 的「加入时间」与合并页的「加入于」共用它）",
+            "时分档必须是 yyyy-MM-dd HH:mm（合并页「加入于」用它；原生词本页的「加入时间」同口径，该屏已删）",
         )
         // 同一时刻换时区就换日期：两页都按调用方传入的 zoneId 换算，不在 helper 里偷读系统时区。
         assertEquals(
@@ -112,8 +112,10 @@ class WordListFormatTest {
         )
 
         // Task 22-B：名单里的收藏页屏已下线（`FavoritesScreen.kt` 随屏摘除）——本行是**消费方减少**，
-        // 循环体内三条禁令逐字未动；`VocabularyScreen.kt` 按 R-22.4 留册，归 Task 26 收口。
-        listOf("MyWordsScreen.kt", "VocabularyScreen.kt").forEach { screenName ->
+        // 循环体内三条禁令逐字未动。2026-10-25 简化批又删掉了孤儿屏 `VocabularyScreen.kt`
+        // （全仓零调用点），消费方只剩合并页 MyWordsScreen。裁决见
+        // `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
+        listOf("MyWordsScreen.kt").forEach { screenName ->
             val screen = uiScreenSource(screenName)
             assertEquals(
                 0,
@@ -163,18 +165,18 @@ class WordListFormatTest {
                 "$name 不得再自己拼日期（m-6 的缺陷形状就是两页各拼各的）",
             )
         }
-        // 生词本两页的时分档与来源档同样只能走共享入口（m-5 收敛的另一半）。
-        val vocabulary = uiScreenSource("VocabularyScreen.kt")
-        listOf(myWords, vocabulary).forEach { source ->
-            assertTrue(
-                countMatches(source, Regex("""wordListSourceLabel\(""")) >= 1,
-                "来源档必须调共享 wordListSourceLabel（旧生词页与合并页同文）",
-            )
-            assertTrue(
-                countMatches(source, Regex("""wordListDateTimeLabel\(""")) >= 1,
-                "加入时间档必须调共享 wordListDateTimeLabel（时分档只在这一处口径里保留）",
-            )
-        }
+        // 生词本段的时分档与来源档同样只能走共享入口（m-5 收敛的另一半）。
+        // 旧生词页 `VocabularyScreen.kt` 已于 2026-10-25 简化批删除（全仓零调用点，
+        // 见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`）；断言强度不变，
+        // 取样面从两页收成一页。
+        assertTrue(
+            countMatches(myWords, Regex("""wordListSourceLabel\(""")) >= 1,
+            "来源档必须调共享 wordListSourceLabel（生词段 / 错词段共用同一句口径）",
+        )
+        assertTrue(
+            countMatches(myWords, Regex("""wordListDateTimeLabel\(""")) >= 1,
+            "加入时间档必须调共享 wordListDateTimeLabel（时分档只在这一处口径里保留）",
+        )
         assertTrue(
             File("${UI_MAIN_SOURCE_PATH}/WordListFormat.kt").isFile,
             "WordListFormat.kt 必须真实存在于 ui/ 根（缺失时上面的扫描会静默放行）",

@@ -53,11 +53,16 @@ import com.example.englishlearning.ui.theme.appDomain
  *
  * 三条版面裁决（稿 `mockups.html:893-940`、内容审计 `docs/design/2026-10-17-content-placement-audit.md:116`）：
  *  1. **数字的权威只有一处**：`AppType.Display` 全屏恰好一枚，落在进度卡的「今日完成数」那一格；
- *     词书百分比、卡上的两个计数、明细行、工作量图例全部降到 `AppType.Footnote`，且一律取中性墨
+ *     词书百分比、明细行、工作量图例全部降到 `AppType.Footnote`，且一律取中性墨
  *     （`text1`/`text2`）不带强调色——「今天到底做了多少」只有一个视觉重量，其余数字是同一条信息的注脚。
+ *     2026-10-25 简化批又摘掉了两张并排计数卡（`today_plan_new_count` / `today_plan_due_count`）：
+ *     同一组「新增 / 复习」的分子分母已经在进度卡的「新增 x/y · 复习 x/y」一行里给出，
+ *     再摆两张卡是把同一信息说第二遍（裁决见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`）。
  *  2. **八枚整宽按钮收成 1 CTA + 入口行组**：只有「继续学习/复习」回答「今天做什么」，它留在主操作位；
  *     阅读文章是**受解锁态约束**的支撑动作（enabled 态与解锁文案都要留在行为面上，批 3 才并成状态点），
  *     故保持本屏唯一一枚 M3 `Button`；其余目录型动作全部收进 [TodayPlanEntryGroup]。
+ *     简化批同批摘掉了组内的「学习工具与设置」行（目的地与底部导航的设置 tab 重复），
+ *     并删掉了与进度卡重复的「已解锁 / 未解锁」独立文案行。
  *     **查词条例外**（修复轮 1 的 F3）：它是四态常驻的出口，留在 `when (state)` **之前**的独立卡里，
  *     跟着入口组走会让缺配置 / 不可用 / 加载态失去查词出口，与 `AGENTS.md` 的离线可用口径相抵。
  *     于是本屏可点节点的**闭合集合 = 1 主 CTA + 1 阅读文章 + 1 常驻查词 + 组内入口行各一枚**；
@@ -78,7 +83,6 @@ fun TodayPlanScreen(
     onOpenSetup: () -> Unit = {},
     onStartLearning: () -> Unit = {},
     onOpenReading: () -> Unit = {},
-    onOpenLearningTools: () -> Unit = {},
     onOpenCheckIn: () -> Unit = {},
     onOpenLearningRecords: () -> Unit = {},
     onOpenWordBookWords: () -> Unit = {},
@@ -222,10 +226,6 @@ fun TodayPlanScreen(
                         }
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    CountCard("今日新增 ${state.newTarget} 词", "今日新增 ${state.newTarget} 词", "today_plan_new_count", appDomain(AppDomain.Learn).deep)
-                    CountCard("今日复习 ${state.dueTarget} 词", "今日复习 ${state.dueTarget} 词", "today_plan_due_count", appDomain(AppDomain.Review).deep)
-                }
                 val totalDone = state.newDone + state.dueDone
                 val totalTarget = state.newTarget + state.dueTarget
                 // 这张卡的容器/描边/前景是同批迁移的（Task 12.5 那轮），且**不得**给它显式
@@ -259,12 +259,6 @@ fun TodayPlanScreen(
                         }
                     }
                 }
-                Text(
-                    if (state.isUnlocked) "已解锁：文章已解锁" else "未解锁",
-                    style = AppType.Footnote,
-                    color = if (state.isUnlocked) colors.success else colors.text2,
-                    modifier = Modifier.testTag("today_plan_unlock_status"),
-                )
                 // 这里原本是「优先复习 N 个到期词，再学习新增词」的文字提示。
                 // 按用户要求改成图解：一条分段条把「已学 / 今日复习 / 今日新学」各画成一节，
                 // 精确数字下沉到条下的图例里。所以这一段不再保留对应文案——同一件事
@@ -323,7 +317,6 @@ fun TodayPlanScreen(
                     onOpenMyWords = onOpenMyWords,
                     onOpenLearningRecords = onOpenLearningRecords,
                     onOpenCheckIn = onOpenCheckIn,
-                    onOpenLearningTools = onOpenLearningTools,
                     onOpenSetup = onOpenSetup,
                 )
             }
@@ -340,20 +333,19 @@ fun TodayPlanScreen(
  * 分支渲染，导致缺配置 / 不可用 / 加载三态下学习 tab 内没有任何查词出口。查词现在是页头下方那张
  * **常驻**卡里的一行（见 [TodayPlanScreen] 里 `when (state)` 之前那段），域色对位（`Library`）不变。
  *
- * 域色对位（每枚都有来历，不是凑色）：
- *  - 词书单词 → `Learn`、我的词 → `Reading`：逐字对应稿 `mockups.html:911-916` 的
- *    `--d-library` / `--d-learn` / `--d-reading` 三行（`--d-library` 那一行现在由常驻查词条读；
- *    `--d-reading` 原先由「生词本」老行与「我的词」两枚共读，那条老行已由 Task 22-A 摘除，
- *    现在这一族在本组只剩「我的词」一枚读点）；
- *  - 学习记录 → `Learn`（它记的是学习行为本身，与「词书单词」同一域，本屏不给它第二种颜色）；
- *  - 打卡与成就 → `Review`：稿「连续与记录」那一组用的就是 `--d-review`（`mockups.html:930`），
- *    打卡页自身的强调色也是复习域（`CheckInScreen.kt` 通体 `DomainColors.Review.deep`）。**这一枚同时
- *    了结了那处无对应令牌的棕色裸 hex `#795B36`**：它的语义是「打卡/成就」，最近且成体系的对应值就是
+ * 域色对位（每枚都有来历，不是凑色；Task 27 裁决 22-2 把入口组收成三组同色）：
+ *  - 词书单词 → `Learn`：逐字对应稿 `mockups.html:911-916` 里 `--d-learn` 那一行；
+ *    `--d-library` 由常驻查词条读；
+ *  - 我的词 / 学习记录 / 打卡与成就 → `Review`：Task 27 把三枚目录型入口并进记录组。
+ *    稿里 `--d-reading` 原先由「生词本」老行与「我的词」两枚共读，那条老行已由 Task 22-A 摘除；
+ *    打卡页自身的强调色也是复习域（`CheckInScreen.kt` 通体 `DomainColors.Review.deep`），稿
+ *    「连续与记录」那一组用的就是 `--d-review`（`mockups.html:930`）。打卡这一枚同时
+ *    了结了那处无对应令牌的棕色裸 hex `#795B36`：它的语义是「打卡/成就」，最近且成体系的对应值就是
  *    复习域 `deep`（浅套 #AB5700，压白 5.13:1），不是随便挑一枚像棕色的色（登记优于蒙混）；
- *  - 学习工具与设置 / 调整词书与目标 → `Settings`：`onOpenLearningTools` 落的是设置 tab
- *    （`AppScreen.kt` 里 `TodayPlanScreen(...)` 调用点的 `onOpenLearningTools = { selectedTab = AppTab.SETTINGS }`
- *    这一行是唯一锚点；锚绝不用绝对行号——行号会随别处接线漂移，I-2 修复轮 1 就是被一个漂移的行指针点名的），
- *    `调整词书与目标` 打开的是学习设置，稿也把它并进设置页同名条目。
+ *  - 调整词书与目标 → `Settings`：它打开的是学习设置，稿也把它并进设置页同名条目。
+ *    简化批摘掉的「学习工具与设置」原本同落设置 tab，与底部导航的设置 tab 构成同一目的的重复入口，
+ *    故只保留这一枚真正回答「改词书 / 改目标」的行。
+ *  - 组内字形互异（Task 27 裁决补充：颜色收敛不得留下同形行）。
  *
  * 图标容器一律 [EntryIconTone.Tint]（R-10.2）：本屏的饱和底归主 CTA 一处，入口行用弱档底色，
  * 免得组内各行连同一枚常驻查词行都上渐变底，把「今天做什么」压下去。
@@ -368,7 +360,6 @@ private fun TodayPlanEntryGroup(
     onOpenMyWords: () -> Unit,
     onOpenLearningRecords: () -> Unit,
     onOpenCheckIn: () -> Unit,
-    onOpenLearningTools: () -> Unit,
     onOpenSetup: () -> Unit,
 ) {
     val colors = appColors()
@@ -434,17 +425,8 @@ private fun TodayPlanEntryGroup(
                 modifier = Modifier.testTag("today_plan_open_check_in").semantics { contentDescription = "查看打卡与成就" },
                 onClick = onOpenCheckIn,
             )
-            EntryRow(
-                icon = AppIcon.Gear,
-                domain = AppDomain.Settings,
-                title = "学习工具与设置",
-                iconTone = EntryIconTone.Tint,
-                topDivider = true,
-                modifier = Modifier.testTag("today_plan_learning_tools").semantics { contentDescription = "学习工具与设置" },
-                onClick = onOpenLearningTools,
-            )
             // 调整词书与目标取 `Book`（词书实体）：`List` 让位给上一行的「学习记录」，
-            // 六行六形（Task 27 裁决补充：颜色收敛不得留下同形行）。
+            // 组内字形互异（Task 27 裁决补充：颜色收敛不得留下同形行）。
             EntryRow(
                 icon = AppIcon.Book,
                 domain = AppDomain.Settings,
@@ -454,33 +436,6 @@ private fun TodayPlanEntryGroup(
                 modifier = Modifier.testTag("today_plan_open_setup_entry").semantics { contentDescription = "调整词书与目标" },
                 onClick = onOpenSetup,
             )
-        }
-    }
-}
-
-/**
- * 两张计数卡（今日新增 / 今日复习）。
- *
- * 数字降到 `AppType.Footnote` + `text1` 中性墨：这两个数说的是「今天排了多少」，
- * 与进度卡里的「今天做了多少」是同一件事的两端，尺寸上不许压过后者；
- * 卡自己的强调色载体是 [marker] 那枚圆点（[WorkloadKind.color] 同一套域色，同一概念在本屏只一套颜色）。
- */
-@Composable
-private fun RowScope.CountCard(text: String, description: String, tag: String, marker: Color) {
-    val shape = RoundedCornerShape(18.dp)
-    Card(
-        colors = CardDefaults.cardColors(containerColor = appColors().surface),
-        shape = shape,
-        modifier = Modifier.weight(1f).border(1.dp, appColors().outlineSoft, shape).testTag(tag)
-            .semantics { contentDescription = description },
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(Modifier.size(7.dp).background(marker, CircleShape))
-            Text(text, style = AppType.Footnote, color = appColors().text1)
         }
     }
 }

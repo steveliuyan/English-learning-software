@@ -37,7 +37,13 @@ class SpeechSettingsScreenTest {
         composeRule.waitForIdle()
     }
 
-    @Test fun marksCurrentProviderAndLeavesPendingProvidersUnclickable() {
+    /**
+     * 当前供应商如实播报；2026-10-25 简化批删掉了「更多供应商」折叠区——六枚未接入厂商只报状态、
+     * 点不了，展开之后用户拿到的仍是一条死路。这里反向钉住它们不再出现，
+     * 正向仍保留「现在能选什么」（系统 TTS / MiMo）与试听卡。
+     * 裁决见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
+     */
+    @Test fun marksCurrentProviderAndKeepsPendingVendorsOut() {
         composeRule.setContent {
             var selected by remember { mutableStateOf(PronunciationEngine.SystemTts) }
             SpeechSettingsScreen(
@@ -56,16 +62,17 @@ class SpeechSettingsScreenTest {
         composeRule.onNodeWithTag("speech_preview_input").assertExists()
         composeRule.onNodeWithTag("speech_preview_button").assertHasClickAction()
         composeRule.onNodeWithText("Hello! 你好，世界！").assertExists()
-        // 待接入厂商默认收进折叠区：一级语音页主体不再被 6 行死占位淹没。
-        composeRule.onNodeWithTag("speech_zipvoice").assertDoesNotExist()
-        composeRule.onNodeWithTag("speech_pending_azure").assertDoesNotExist()
-        composeRule.onNodeWithTag("speech_more_providers").assertHasClickAction().performScrollTo().performClick()
-        composeRule.onNodeWithTag("speech_zipvoice").assertExists().assertHasNoClickAction()
-        listOf("azure", "volcengine", "tencent", "bailian", "minimax").forEach {
-            composeRule.onNodeWithTag("speech_pending_$it").assertExists().assertHasNoClickAction()
+        listOf(
+            "speech_more_providers",
+            "speech_zipvoice",
+            "speech_pending_azure",
+            "speech_pending_volcengine",
+            "speech_pending_tencent",
+            "speech_pending_bailian",
+            "speech_pending_minimax",
+        ).forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
-        composeRule.onNodeWithTag("speech_more_providers").performScrollTo().performClick()
-        composeRule.onNodeWithTag("speech_pending_azure").assertDoesNotExist()
     }
 
     @Test fun openAiEngineRowNoLongerExists() {

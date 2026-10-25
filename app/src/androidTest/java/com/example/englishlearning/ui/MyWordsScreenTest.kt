@@ -237,8 +237,16 @@ class MyWordsScreenTest {
      * 空态侧不得出现这行由既有 `empty_sections_show_their_own_honest_copy` 的整段形状间接承重，
      * 本条不复述（一次 `setContent` 是本仓硬约束，两种形态不能塞进同一枚方法）。
      */
+    /**
+     * 2026-10-25 简化批：错词段顶部那行排序说明（「最近一次标记为「不认识」的词，按到期先后排列。」）
+     * 已删除。错词段本身按到期先后排列，段标题下的词行顺序已经把这个规则演给用户看；
+     * 再写一句「按到期先后排列」是同一规则的第二次说明。
+     * 原 `wrongWordsSectionKeepsTheOrderingHintFromTheLegacyPage`（含逐字 / 在容器内 / 顺序四条腿）
+     * 随控件一起下线，这里反向钉住删除结果，并保留「错词行仍在」的正向腿。
+     * 裁决见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
+     */
     @Test
-    fun wrongWordsSectionKeepsTheOrderingHintFromTheLegacyPage() {
+    fun wrongWordsSectionNoLongerCarriesASeparateOrderingHint() {
         composeRule.setContent {
             MintGlassTheme {
                 MyWordsScreen(
@@ -248,33 +256,8 @@ class MyWordsScreenTest {
                 )
             }
         }
-        val hint = composeRule.onNodeWithTag("my_words_wrong_order_hint")
-        hint.assertExists()
-        hint.assertTextEquals("最近一次标记为「不认识」的词，按到期先后排列。")
+        composeRule.onNodeWithTag("my_words_wrong_order_hint").assertDoesNotExist()
         composeRule.onNodeWithTag("my_words_wrong_row_0").assertExists()
-        hint.performScrollTo()
-        val containerBox = composeRule.onNodeWithTag("my_words_section_wrong").fetchSemanticsNode().boundsInRoot
-        val hintBox = hint.fetchSemanticsNode().boundsInRoot
-        assertEquals(
-            "排序说明行没有落在错词段容器内（挂到别的段就等于该段的解释仍然缺失）：" +
-                "容器 $containerBox，说明行 $hintBox",
-            true,
-            hintBox.top >= containerBox.top - 1f && hintBox.bottom <= containerBox.bottom + 1f &&
-                hintBox.left >= containerBox.left - 1f && hintBox.right <= containerBox.right + 1f,
-        )
-
-        // 第四腿（R-22B.12）：钉**顺序**，不只是在册。前三腿读的是「存在 / 逐字 / 在容器内」，
-        // 把说明行从 cards.forEachIndexed 之前挪到之后（不删文案、不换段、不丢行）三腿照样全绿，
-        // 而旧错词页的这行说明在列表**上方**——「先解释再列词」才是这层文案的意义。
-        // 容差沿用本方法既有的 ±1f 形状（同一把尺子，不新造阈值）。
-        val rowBox = composeRule.onNodeWithTag("my_words_wrong_row_0").fetchSemanticsNode().boundsInRoot
-        assertEquals(
-            "排序说明行必须排在第一枚词行**之上**（先解释再列词）：说明行 $hintBox，第一枚词行 $rowBox。" +
-                "把 `my_words_wrong_order_hint` 挪到 `wrongWordsState.cards.forEachIndexed` 之后，" +
-                "前三腿（逐字 / 同屏在册 / 落在段容器内）全部测不出来，本腿红。",
-            true,
-            hintBox.top <= rowBox.top + 1f,
-        )
     }
 
     /**

@@ -201,19 +201,6 @@ fun WordCardScreen(
                         .testTag("word_card_progress")
                         .semantics { contentDescription = "第 ${state.position} 张，共 ${state.total} 张" },
                 )
-                Text(
-                    text = if (state.isReview) {
-                        "到期复习 ${state.taskCompletedCount}/${state.taskTotal}"
-                    } else {
-                        "今日新增 ${state.taskCompletedCount}/${state.taskTotal}"
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (state.isReview) appDomain(AppDomain.Review).deep else appDomain(AppDomain.Learn).deep,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .testTag("word_card_task_type")
-                        .semantics { contentDescription = if (state.isReview) "到期复习" else "今日新增" },
-                )
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MintSurface),
                     shape = RoundedCornerShape(24.dp),

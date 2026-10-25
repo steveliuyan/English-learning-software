@@ -80,12 +80,9 @@ fun WorksheetPreviewScreen(
             .testTag("worksheet_preview_screen"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = MintPrimaryDark)) {
-            Text("← 返回修改", fontWeight = FontWeight.Bold)
-        }
         Text("预览默写纸", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
         Text(
-            text = if (rendering) "正在生成 PDF 预览…" else "共 ${pageImages.size} 页 · 以下就是将要导出的 PDF 页面",
+            text = if (rendering) "正在生成 PDF 预览…" else "共 ${pageImages.size} 页",
             color = MintTextMuted,
         )
         message?.let { Text(it, color = MintPrimaryDark, style = MaterialTheme.typography.bodySmall) }

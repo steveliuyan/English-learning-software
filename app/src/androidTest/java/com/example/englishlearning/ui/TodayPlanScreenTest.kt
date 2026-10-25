@@ -89,11 +89,15 @@ class TodayPlanScreenTest {
             TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5), onStartLearning = { started++ })
         }
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
-        composeRule.onNodeWithTag("today_plan_new_count").assertExists()
-        composeRule.onNodeWithContentDescription("今日新增 2 词").assertExists()
-        composeRule.onNodeWithTag("today_plan_due_count").assertExists()
-        composeRule.onNodeWithContentDescription("今日复习 3 词").assertExists()
+        // 2026-10-25 简化批：两张并排计数卡（今日新增 / 今日复习）已删——同一组分子分母在进度卡的
+        // 「新增 x/y · 复习 x/y」一行里已经给出，计数卡是把同一信息说第二遍。这里反向钉住删除结果，
+        // 并保留「合并明细行仍在」的正向断言，免得哪天两处一起消失还没人发现。
+        composeRule.onNodeWithTag("today_plan_new_count").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_due_count").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("今日新增 2 词").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("今日复习 3 词").assertDoesNotExist()
         composeRule.onNodeWithTag("today_plan_task_total").assertExists()
+        composeRule.onNodeWithTag("today_plan_progress").assertExists()
         composeRule.onNodeWithTag("today_plan_start_learning").assertExists().assertHasClickAction().performClick()
         composeRule.waitForIdle()
         assertEquals(1, started)
@@ -116,7 +120,10 @@ class TodayPlanScreenTest {
         }
         composeRule.onNodeWithTag("today_plan_progress_summary").assertExists()
         composeRule.onNodeWithTag("today_plan_total_progress").assertExists()
-        composeRule.onNodeWithTag("today_plan_unlock_status").assertExists()
+        // 2026-10-25 简化批删掉了独立的「已解锁 / 未解锁」文案行：解锁状态由阅读文章的 enabled 态
+        // 与紧随其后的解锁原因说明共同承载，单起一行是同一状态的第二遍播报。
+        composeRule.onNodeWithTag("today_plan_unlock_status").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_reading_status").assertExists()
         composeRule.onAllNodesWithText("今日计划共 5 项").assertCountEquals(0)
     }
 
@@ -161,11 +168,16 @@ class TodayPlanScreenTest {
         composeRule.onNodeWithTag("today_plan_open_reading").assertIsNotEnabled()
     }
 
-    /** 同级按钮都有 contentDescription；这一个是本轮改名后新加的，不能漏掉无障碍标注。 */
-    @Test fun ready_offers_a_labelled_learning_tools_entry() {
+    /**
+     * 2026-10-25 简化批：入口组里的「学习工具与设置」行已删除——它的目的地（设置 tab）与底部导航
+     * 完全重复，而紧随其后的「调整词书与目标」才是真正回答「改词书 / 改目标」的那一行。
+     * 原 `ready_offers_a_labelled_learning_tools_entry` 用例随之删除（功能与标签一起下线，
+     * 不是把断言改松）；裁决见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`。
+     */
+    @Test fun ready_no_longer_offers_a_learning_tools_entry() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        composeRule.onNodeWithTag("today_plan_learning_tools").assertExists().assertHasClickAction()
-        composeRule.onNodeWithContentDescription("学习工具与设置").assertExists()
+        composeRule.onNodeWithTag("today_plan_learning_tools").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("学习工具与设置").assertDoesNotExist()
     }
 
     @Test fun reading_is_after_primary_learning_action() {
@@ -207,18 +219,15 @@ class TodayPlanScreenTest {
         assertEquals(1, opened)
     }
 
-    @Test fun task_cards_use_neutral_surfaces_with_quiet_distinct_markers() {
+    /**
+     * 2026-10-25 简化批把两张计数卡合并进进度卡后，像素侧改钉进度卡自己：中性 surface 容器 +
+     * 权威数字的中性墨（原用例里两枚色点随计数卡一起下线；色点语义由工作量条的分段与图例承担，
+     * 见 [ready_presents_todays_numbers_with_one_display_authority] 的高度判据）。
+     */
+    @Test fun progress_card_uses_neutral_surface_with_quiet_ink() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        listOf("today_plan_new_count", "today_plan_due_count").forEach { tag ->
-            assertRenderedColor(tag, 0xFFFFFFFF.toInt())
-            assertRenderedColor(tag, 0xFF1C1C1E.toInt())
-        }
-        // Task 14B：两枚色点从两枚裸 hex 改读域色 deep（浅套值）——
-        // 「今日新增」= 学习域 #075EB4（原 #68BDA6），「今日复习」= 复习域 #AB5700（原 #C7A47D）。
-        // 浅套像素值因此**本来就该变**：这不是回归，而是 AC-R-20 要求的新语义，
-        // 且与 `TodayWorkloadBar` 的分段条同源（同一概念在本屏只允许一套颜色）。
-        assertRenderedColor("today_plan_new_count", 0xFF075EB4.toInt())
-        assertRenderedColor("today_plan_due_count", 0xFFAB5700.toInt())
+        assertRenderedColor("today_plan_progress_summary", 0xFFFFFFFF.toInt())
+        assertRenderedColor("today_plan_total_progress", 0xFF1C1C1E.toInt())
         assertTrue("neutral text needs 4.5:1", contrastRatio(0xFF1C1C1E.toInt(), 0xFFFFFFFF.toInt()) >= 4.5)
     }
 
@@ -332,7 +341,6 @@ class TodayPlanScreenTest {
             "today_plan_open_my_words",
             "today_plan_open_learning_records",
             "today_plan_open_check_in",
-            "today_plan_learning_tools",
             "today_plan_open_setup_entry",
         )
         val persistentSearchTag = "today_plan_search_entry"
