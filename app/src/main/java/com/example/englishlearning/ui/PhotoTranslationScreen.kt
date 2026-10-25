@@ -695,7 +695,7 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
                 onClick = { onConfirmOutbound(false) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Secondary,
-                domain = AppDomain.Learn,
+                domain = AppDomain.AiSpeech,
                 testTag = "photo_translation_decline_outbound",
             )
             PillButton(
@@ -703,7 +703,7 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
                 onClick = { onConfirmOutbound(true) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Primary,
-                domain = AppDomain.Learn,
+                domain = AppDomain.AiSpeech,
                 testTag = "photo_translation_confirm_outbound",
             )
         }

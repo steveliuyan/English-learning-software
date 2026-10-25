@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppDomain
@@ -75,8 +74,11 @@ fun allowsInEntryContainer(icon: AppIcon): Boolean = icon !in StrokeOnlyIcons
 
 /**
  * 入口容器的两档强度（裁决 R-10.2）：稿 `.ic`（实底域渐变 + 白墨）与 `.ic-tint`（同 40dp 容器、
- * 底 = `deep` 混 16% surface、字形 = `deep` 单层描边、**无描边高光**）是同族两档，稿里 `.ic-tint`
- * 出现 21 次，且批 2「今日计划」的三条入口行全部用弱档（`mockups.html:912-916`）。
+ * 底 = 共享中性 `tint` 令牌、字形 = `deep` 单层描边、**无描边高光**）是同族两档。
+ *
+ * Task 27（裁决 22-2）把弱档底色从「每域各混 16% surface」改成共享的 `appColors().tint`：
+ * 逐域混色意味着七个域有七个近似却不同的浅底，同屏入口行读成「九块彩色」；收敛后同组行共用同一底色，
+ * 域色只染字形。`.ic` 实底渐变档保留在枚举里，但退出入口行族（今日计划六行全走 Tint）。
  *
  * 加档位而不是再造组件：弱档另起一份容器 = 让批 2 手搓第二份 40dp 容器，正撞计划 Task 12 的组件份数棘轮。
  * 两档共用同一枚外层 `Box`（`size(40.dp)` 与 `clip(AppShape.Icon)` 各只写一遍），差别只在底色、
@@ -90,8 +92,8 @@ enum class EntryIconTone { Gradient, Tint }
  *
  * - [EntryIconTone.Gradient]（稿 `.ic`，默认档）：域渐变底（亮端 = deep 混 35% base，暗端 = deep）
  *   + 两层字形 + 1dp 玻璃高光内描边；
- * - [EntryIconTone.Tint]（稿 `.ic-tint`）：底 = `lerp(surface, deep, 0.16)`（稿
- *   `color-mix(in srgb, var(--d) 16%, var(--surface))` 的同口径 sRGB 逐通道插值）+ `deep` 单层描边字形，
+ * - [EntryIconTone.Tint]（稿 `.ic-tint`）：底 = 共享中性 `tint` 令牌（`appColors().tint`，深浅两套随主题翻；
+ *   Task 27 / 裁决 22-2 的口径，不再是逐域 `lerp(surface, deep, 0.16)`）+ `deep` 单层描边字形，
  *   **不描 1dp 玻璃高光边**（稿 `.ic-tint` 无描边，高光边属于 `.ic` 实底档）。
  *
  * 字形度量按稿 `.ic svg { width:22px; height:22px }`（`mockups.html:153`）取 22dp（裁决 R-10.3，
@@ -101,8 +103,10 @@ enum class EntryIconTone { Gradient, Tint }
  * 深色下就是浅底（`DomainDark.deep` 与 base 合一），白描边压它不达非文本 3:1 线，故视觉稿在深色下
  * 也把白描边改成墨色。具体比值不抄在这里（与 `AppColors.kt` 同一口径：抄进注释就会随取值漂移），
  * 两条配对各由 `IconBadgeContrastContractTest` 当场按相对亮度复算并钉住 3:1。弱档那对「`deep` 字形压
- * 16% 混色底」同样由该契约按 7 域 × 2 档 × 2 主题共 28 个组合复算（R-10.2 的控制者预演算：浅套最低
- * 是 `AiSpeech`、深套最低是 `Danger`，都在 3:1 线以上；数值只写进断言消息，这里不抄）。
+ * 共享 `tint` 底」同样由该契约按 7 域 × 2 主题逐对复算（浅套最低是 `AiSpeech`、深套最低是 `Danger`，
+ * 都在 3:1 线以上；数值只写进断言消息，这里不抄）。
+ * Task 27 之后弱档底换成共享 `tint`（浅 `#DDF7E8` / 深 `#1C2C26`）；
+ * 旧「16% 混色」与活 token 的差异由 `IconBadgeContrastContractTest` 的反空转断言钉住。
  *
  * 开头那条 `require` 是豁免表的执行点：表里的开放折线（返回、箭头、关闭、勾选一类）没有可闭合的
  * 内部区域，放进这一族容器只会得到一枚「看起来缺了层」的字形，属于设计层面的误用，直接拦死。
@@ -125,7 +129,7 @@ fun EntryIconBadge(
     val tintTone = tone == EntryIconTone.Tint
     // 两档共用同一枚外层容器：底色与描边的差异收进这一条链，尺寸与裁角只写一遍（R-10.2）。
     val backdropModifier = if (tintTone) {
-        Modifier.background(lerp(colors.surface, palette.deep, 0.16f))
+        Modifier.background(appColors().tint)
     } else {
         Modifier
             .background(

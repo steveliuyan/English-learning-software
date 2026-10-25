@@ -21,9 +21,12 @@ package com.example.englishlearning.ui.components
  * 没有任何一方自带私有字形），不依赖任何已删除的历史绘制函数。仅参考 Material Symbols 的
  * 24dp 网格与 2px 重量，未内嵌其路径数据。
  *
- * 圆形填充写作 `CircleFill(cx, cy, r)` 标记串：该标记由 `AppGlyph` 渲染器（Task 7）解释，
- * 圆心的填充不走 SVG path 语法，所以它只允许出现在 `fillPaths`，绝不允许出现在 `strokePaths`；
- * 视觉稿里对应的形状是 `<circle cx=.. cy=.. r=..>`，转录到本文件时换成标记串。
+ * 圆形写作 `CircleFill(cx, cy, r)` / `CircleStroke(cx, cy, r)` 两枚标记串：都由 `AppGlyph` 渲染器（Task 7）
+ * 解释，几何同源（过上下极点的两段圆弧），差别只在所属层——`CircleFill` 只允许出现在 `fillPaths`，
+ * 绝不允许出现在 `strokePaths`；`CircleStroke` 反之，只允许出现在 `strokePaths`。
+ * 这条分层的理由是真机缺陷（裁决 22-1）：`StrokeOnly` 档只画描边层，识别特征（点、旋钮、圆章）
+ * 若只写在填充层，行内徽标与弱档入口上就整层蒸发；凡识别特征只在 `fillPaths` 的字形，必须同时
+ * 补一条 `strokePaths`。视觉稿里对应的形状是 `<circle cx=.. cy=.. r=..>`，转录到本文件时换成标记串。
  *
  * 逐枚清单（用途（落点）｜两层，逐枚转录自决策文档的清单表；名字与顺序即 `AppIcon` 枚举的顺序）
  *   1. `Back` — 二级层与浮层页头返回键（Task 9 `AppScreenHeader`）｜豁免（描边only）
@@ -70,7 +73,8 @@ package com.example.englishlearning.ui.components
 
 /**
  * 一枚图标的两层几何：[strokePaths] 是描边骨架层（每枚至少一条），[fillPaths] 是内部半透明层
- * （除豁免表外每枚至少一条）。两种合法形状：24×24 画布的 SVG path data 串，或 `CircleFill(cx, cy, r)` 标记串。
+ * （除豁免表外每枚至少一条）。合法形状：24×24 画布的 SVG path data 串；[strokePaths] 另接受
+ * `CircleStroke(cx, cy, r)`，[fillPaths] 另接受 `CircleFill(cx, cy, r)`（两枚标记分层专配，互不越层）。
  * 本类不含也不接受任何不透明度取值：填充层透明度是主题属性，取值见 [DuotoneFillAlpha]。
  */
 data class AppIconSpec(
@@ -129,17 +133,22 @@ object AppIcons {
             strokePaths = listOf("M6.5 5h11a2 2 0 012 2v11a2 2 0 01-2 2h-11a2 2 0 01-2-2V7a2 2 0 012-2z", "M12 5v14"),
             fillPaths = listOf("M5 6h5.2v10.6H5z"),
         ),
-        // BookOpen：骨架层两页转录 §6.2 双页形；左页内幅原创自绘（B 案度量）
+        // BookOpen：骨架层两页转录 §6.2 双页形（左 8 段 / 右 8 段、中线 x=12，Task 27 对称重绘：
+        // 旧版右页 `h-4` 起笔，两页不等宽，真机上读成「一厚一薄」）；填充只给左页内幅（B 案度量）。
         AppIconSpec(
             name = "BookOpen",
-            strokePaths = listOf("M4 5h7a2 2 0 012 2v12a3 3 0 00-3-2H4z", "M20 5h-4a2 2 0 00-2 2v12a3 3 0 013-2h3z"),
-            fillPaths = listOf("M5 6h5.5a2 2 0 012 2v9.6a3 3 0 00-2.5-1.6H5z"),
+            strokePaths = listOf("M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z", "M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z"),
+            fillPaths = listOf("M5 6h5.5a1 1 0 011 1v10.4a3 3 0 00-2.6-1.4H5z"),
         ),
-        // List：原创自绘（B 案度量）——三条文字线 + 圆点条目作填充层
+        // List：原创自绘（B 案度量）——三条文字线 + 三枚圆点条目。圆点必须留在描边层（Task 27 / 裁决 22-1）：
+        // 行内与弱档入口只画描边，旧版把圆点写成填充方块，StrokeOnly 下退化成三条横线。
         AppIconSpec(
             name = "List",
-            strokePaths = listOf("M8 6h12", "M8 12h12", "M8 18h12"),
-            fillPaths = listOf("M4 4.8h2.4v2.4H4z", "M4 10.8h2.4v2.4H4z", "M4 16.8h2.4v2.4H4z"),
+            strokePaths = listOf(
+                "M8 6h12", "M8 12h12", "M8 18h12",
+                "CircleStroke(5.2, 6, 0.5)", "CircleStroke(5.2, 12, 0.5)", "CircleStroke(5.2, 18, 0.5)",
+            ),
+            fillPaths = listOf("CircleFill(5.2, 6, 1.2)", "CircleFill(5.2, 12, 1.2)", "CircleFill(5.2, 18, 1.2)"),
         ),
         // Bookmark：骨架层转录 §6.1；左半内幅原创自绘（B 案度量）
         AppIconSpec(
@@ -221,28 +230,33 @@ object AppIcons {
             strokePaths = listOf("M4 8h4l2-2h4l2 2h4v11H4z", "M12 9.8a3.2 3.2 0 010 6.4a3.2 3.2 0 010-6.4"),
             fillPaths = listOf("CircleFill(12, 13, 3.2)"),
         ),
-        // Image：原创自绘（B 案度量）——画框 + 山形，日光圆作填充层
+        // Image：原创自绘（B 案度量）——画框 + 山形，日光圆作填充层；
+        // 日光圆同时描边一份（Task 27 / 裁决 22-1：StrokeOnly 档不能只剩空画框）。
         AppIconSpec(
             name = "Image",
-            strokePaths = listOf("M4 5h16v14H4z", "M7 16l3.5-4.5 3 3.5 3-4 2.5 3"),
+            strokePaths = listOf("M4 5h16v14H4z", "M7 16l3.5-4.5 3 3.5 3-4 2.5 3", "CircleStroke(9, 9, 2)"),
             fillPaths = listOf("CircleFill(9, 9, 2)"),
         ),
-        // Document：原创自绘（B 案度量）——折角页 + 折线，正文区作填充层
+        // Document：原创自绘（B 案度量）——折角页 + 折线，正文区作填充层；
+        // 正文框同时进描边层（Task 27 / 裁决 22-1：否则 StrokeOnly 下正文区整块消失）。
         AppIconSpec(
             name = "Document",
-            strokePaths = listOf("M6 4h8l4 4v12H6z", "M14 4v4h4"),
+            strokePaths = listOf("M6 4h8l4 4v12H6z", "M14 4v4h4", "M7.4 10h9.2v8.6H7.4z"),
             fillPaths = listOf("M7.4 10h9.2v8.6H7.4z"),
         ),
-        // Newspaper：原创自绘（B 案度量）——报面 + 两行正文，报头横带作填充层
+        // Newspaper：原创自绘（B 案度量）——报面 + 两行正文，报头横带作填充层；
+        // 报头横带同时进描边层（Task 27 / 裁决 22-1：StrokeOnly 下报头不能只剩空白顶边）。
         AppIconSpec(
             name = "Newspaper",
-            strokePaths = listOf("M4 5h16v14H4z", "M7 12h10", "M7 15.5h6"),
+            strokePaths = listOf("M4 5h16v14H4z", "M7 12h10", "M7 15.5h6", "M5.4 6.4h13.2v3H5.4z"),
             fillPaths = listOf("M5.4 6.4h13.2v3H5.4z"),
         ),
-        // Gear：滑杆三条与旋钮圆转录 §6.1「设置」（视觉稿 `<circle cx=17 cy=17 r=2.5>` 写成标记串）
+        // Gear：滑杆三条转录 §6.1「设置」（视觉稿 `<circle cx=17 cy=17 r=2.5>` 写成标记串）；
+        // 旋钮圆两枚标记同 triple：填充层给实心、描边层给轮廓（Task 27 / 裁决 22-1：
+        // 旧版旋钮只在填充层，与 List 一起在行内退化成三条横线）。
         AppIconSpec(
             name = "Gear",
-            strokePaths = listOf("M4 7h16", "M4 12h16", "M4 17h10"),
+            strokePaths = listOf("M4 7h16", "M4 12h16", "M4 17h10", "CircleStroke(17, 17, 2.5)"),
             fillPaths = listOf("CircleFill(17, 17, 2.5)"),
         ),
         // Person：原创自绘（B 案度量）——头部圆环 + 肩线半环，头圆作填充层
@@ -257,10 +271,17 @@ object AppIcons {
             strokePaths = listOf("M12 4a8 8 0 010 16a8 8 0 010-16", "M12 11v6", "M12 7.5v.5"),
             fillPaths = listOf("CircleFill(12, 12, 8)"),
         ),
-        // Bell：骨架层两笔转录 §6.1；钟体内幅原创自绘（B 案度量）
+        // Bell：骨架层两笔转录 §6.1；钟体内幅原创自绘（B 案度量）。
+        // 钟口横沿与钟舌同时进描边层（Task 27 / 裁决 22-1：旧版钟体只有填充块，StrokeOnly 下
+        // 只剩一个开口圆弧，读不出「铃」；`Bell` 也归提醒行，与 `Clock` 成对出现）。
         AppIconSpec(
             name = "Bell",
-            strokePaths = listOf("M5 12a7 7 0 0114 0", "M9 15h6"),
+            strokePaths = listOf(
+                "M5 12a7 7 0 0114 0",
+                "M9 15h6",
+                "M5 12v2.6h14V12",
+                "M10.5 17.6a1.5 1.5 0 003 0",
+            ),
             fillPaths = listOf("M6 12a6 6 0 0112 0v3H6z"),
         ),
         // Shield：盾体与对勾转录 §6.2（骨架层与填充层同串）

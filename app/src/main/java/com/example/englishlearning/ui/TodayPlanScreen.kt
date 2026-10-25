@@ -391,14 +391,13 @@ private fun TodayPlanEntryGroup(
                 onClick = onOpenWordBookWords,
             )
             // 裁决① 的第三枚入口（Task 20-A「只建不摘」→ Task 22-A 已摘老路由）：收藏 · 生词本 · 错词
-            // 合成的一页三段。图标与域色逐字照稿 `mockups.html:914-916`（书签形 + `--d-reading`，
-            // 尾部是三段计数串）。
-            // 本组原先与它同形同色的那条「生词本」老行已于 22-A 摘除（新入口可用是摘旧入口的前置，
-            // 铁律见 plan Task 22 Step 1），所以 `--d-reading` 这一族在本组只剩这一枚读点，
-            // 「临时同形」的陈述随之作废；这里不提前给一枚新图形去凑独特。
+            // 合成的一页三段，尾部是三段计数串。
+            // Task 27（裁决 22-2）把入口组收成三组同色：学习 `Learn` / 记录 `Review` / 系统 `Settings`。
+            // 本行原用 `--d-reading`，与「学习记录」「打卡与成就」一起并入记录组——域名只染字形，
+            // 底色统一取 `appColors().tint`，同屏不再出现九块彩色容器。
             EntryRow(
                 icon = AppIcon.Bookmark,
-                domain = AppDomain.Reading,
+                domain = AppDomain.Review,
                 title = "我的词",
                 subtitle = "收藏 · 生词本 · 错词，一页三段",
                 trailing = myWordsSummary,
@@ -415,9 +414,11 @@ private fun TodayPlanEntryGroup(
                     },
                 onClick = onOpenMyWords,
             )
+            // 学习记录取 `List`（事件流水）：裁决 22-1 只点名「`Star`→`Chart`」与「`Clock` 归提醒行」，
+            // 未指定本行的替代形；若与「打卡与成就」同用 `Chart`，会在同一记录组里重新造出相邻同形。
             EntryRow(
-                icon = AppIcon.Clock,
-                domain = AppDomain.Learn,
+                icon = AppIcon.List,
+                domain = AppDomain.Review,
                 title = "学习记录",
                 iconTone = EntryIconTone.Tint,
                 topDivider = true,
@@ -425,7 +426,7 @@ private fun TodayPlanEntryGroup(
                 onClick = onOpenLearningRecords,
             )
             EntryRow(
-                icon = AppIcon.Star,
+                icon = AppIcon.Chart,
                 domain = AppDomain.Review,
                 title = "打卡与成就",
                 iconTone = EntryIconTone.Tint,
@@ -442,8 +443,10 @@ private fun TodayPlanEntryGroup(
                 modifier = Modifier.testTag("today_plan_learning_tools").semantics { contentDescription = "学习工具与设置" },
                 onClick = onOpenLearningTools,
             )
+            // 调整词书与目标取 `Book`（词书实体）：`List` 让位给上一行的「学习记录」，
+            // 六行六形（Task 27 裁决补充：颜色收敛不得留下同形行）。
             EntryRow(
-                icon = AppIcon.List,
+                icon = AppIcon.Book,
                 domain = AppDomain.Settings,
                 title = "调整词书与目标",
                 iconTone = EntryIconTone.Tint,

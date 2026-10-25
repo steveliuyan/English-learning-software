@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppIcons
 import com.example.englishlearning.ui.components.circleFillPathData
+import com.example.englishlearning.ui.components.circleStrokePathData
 import com.example.englishlearning.ui.components.spec
 import java.io.File
 import kotlin.test.Test
@@ -59,6 +60,33 @@ class AppIconsStructureContractTest {
 
     /** 圆形填充的自定标记串（不走 SVG path 语法，由 Task 7 的 `AppGlyph` 渲染器解释）。 */
     private val circleFillMarker = Regex("""^CircleFill\(-?\d+(?:\.\d+)?, -?\d+(?:\.\d+)?, -?\d+(?:\.\d+)?\)$""")
+
+    /**
+     * 圆形描边标记（裁决 22-1）：描边层里的圆只能走这一枚，`CircleFill` 仍只进填充层。
+     * 与 [circleFillMarker] 同一语法，只有前缀不同——避免「实心圆当描边用」在 22dp 下糊成一坨。
+     */
+    private val circleStrokeMarker = Regex("""^CircleStroke\(-?\d+(?:\.\d+)?, -?\d+(?:\.\d+)?, -?\d+(?:\.\d+)?\)$""")
+
+    /**
+     * 「识别特征必须在描边层」的逐枚锚点（裁决 22-1 第一步的 JVM 侧判据）。
+     *
+     * 这些字形原先的识别特征只写在 `fillPaths`：`StrokeOnly` 档（入口弱档、底部导航）整层不画，
+     * 真机表现是「设置 = 三条横线」「Gear 与 List 同形」。锚点钉到具体几何串，几何一漂就红；
+     * 没有列进表的字形（`Book`/`Bookmark`/`Play`/`Pause`/`Stop`/`Warning`/`Translate`/`Upload`/`Download`/
+     * `Trash`）已核对识别特征本就在描边层，填充层只作层次暗示，不重复加线（重复加线会得到双轮廓）。
+     */
+    private val strokeRecognitionAnchors = mapOf(
+        "Gear" to listOf("CircleStroke(17, 17, 2.5)"),
+        "List" to listOf(
+            "CircleStroke(5.2, 6, 0.5)",
+            "CircleStroke(5.2, 12, 0.5)",
+            "CircleStroke(5.2, 18, 0.5)",
+        ),
+        "Image" to listOf("CircleStroke(9, 9, 2)"),
+        "Newspaper" to listOf("M5.4 6.4h13.2v3H5.4z"),
+        "Document" to listOf("M7.4 10h9.2v8.6H7.4z"),
+        "Bell" to listOf("M5 12v2.6h14V12", "M10.5 17.6a1.5 1.5 0 003 0"),
+    )
 
     /** 禁止 AndroidX material-icons：它会牵动 `material-icons-extended` 与 lockfile（本轮零新增依赖）。 */
     private val androidxIconRef = Regex("""\bIcons\.""")
@@ -190,9 +218,15 @@ class AppIconsStructureContractTest {
         return offenders
     }
 
-    /** 路径形状纯函数：描边层必须是 SVG path；填充层允许 SVG path 或 `CircleFill` 标记。 */
+    /**
+     * 路径形状纯函数（裁决 22-1 改写）：描边层允许 SVG path 或 `CircleStroke`；
+     * 填充层允许 SVG path 或 `CircleFill`。两枚圆形标记**按层分流**，互不冒充。
+     */
     private fun shapeViolations(name: String, field: String, paths: List<String>): List<String> = paths.mapNotNull { path ->
-        val legal = if (field == "fillPaths") svgPath.matches(path) || circleFillMarker.matches(path) else svgPath.matches(path)
+        val legal = when (field) {
+            "fillPaths" -> svgPath.matches(path) || circleFillMarker.matches(path)
+            else -> svgPath.matches(path) || circleStrokeMarker.matches(path)
+        }
         if (legal) null else "$name 的 $field 形状不合法（$path）"
     }
 
@@ -259,7 +293,11 @@ class AppIconsStructureContractTest {
 
     /** 解析后的节点表：圆形标记先展开，`Close` 不算独立段（它不消耗坐标组，作者侧已单独计数）。 */
     private fun parsedSegmentCount(data: String): Int {
-        val expanded = if (data.startsWith("CircleFill(")) circleFillPathData(data) else data
+        val expanded = when {
+            data.startsWith("CircleFill(") -> circleFillPathData(data)
+            data.startsWith("CircleStroke(") -> circleStrokePathData(data)
+            else -> data
+        }
         return PathParser().parsePathString(expanded).toNodes().count { it !is PathNode.Close }
     }
 
@@ -491,7 +529,7 @@ class AppIconsStructureContractTest {
     // ---------- 用例：路径形状（brief Step 1 断言 3 + 控制器追加的填充层形状） ----------
 
     @Test
-    fun `stroke layers are svg paths and fill layers are svg paths or circle markers`() {
+    fun `stroke layers are svg paths or circle strokes and fill layers are svg paths or circle fills`() {
         specBlocks(codeText()).forEach { (name, block) ->
             val strokes = fieldPaths(block, "strokePaths").orEmpty()
             assertTrue(strokes.isNotEmpty(), "$name 缺 strokePaths：形状用例的前提是每枚至少一条描边")
@@ -513,8 +551,12 @@ class AppIconsStructureContractTest {
         assertTrue(svgPath.matches("m4 6h16"), "合成正片段失效：小写起锚与相对命令被判不合格")
         assertTrue(circleFillMarker.matches("CircleFill(11, 11, 6)"), "合成正片段失效：圆形标记被判不合格")
         assertTrue(circleFillMarker.matches("CircleFill(17, 17, 2.5)"), "合成正片段失效：小数半径被判不合格")
+        assertTrue(circleStrokeMarker.matches("CircleStroke(17, 17, 2.5)"), "合成正片段失效：圆形描边标记被判不合格")
 
         assertFalse(svgPath.matches("CircleFill(11, 11, 6)"), "合成负例被放行：CircleFill 混进描边层也算合法")
+        assertFalse(svgPath.matches("CircleStroke(17, 17, 2.5)"), "合成负例被放行：CircleStroke 混进 SVG 路径也算合法")
+        assertFalse(circleStrokeMarker.matches("CircleFill(11, 11, 6)"), "合成负例被放行：两枚圆形标记前缀不分")
+        assertFalse(circleFillMarker.matches("CircleStroke(11, 11, 6)"), "合成负例被放行：两枚圆形标记前缀不分（反向）")
         assertFalse(svgPath.matches("M20 20l-4.6-4.6)"), "合成负例被放行：多余括号混进路径也算合法")
         assertFalse(svgPath.matches("L11 5a6 6 0 010 12"), "合成负例被放行：不起锚于 M/m 也算合法")
         assertFalse(svgPath.matches("drawPath(icon)"), "合成负例被放行：代码片段混进路径也算合法")
@@ -536,7 +578,73 @@ class AppIconsStructureContractTest {
             shapeViolations("Search", "fillPaths", listOf("CircleFill(11, 11, 6)", "M5 6h5v5H5z")),
             "合成正片段被误判：填充层两种合法形状被拒",
         )
+        assertEquals(
+            emptyList(),
+            shapeViolations("Gear", "strokePaths", listOf("M4 7h16", "CircleStroke(17, 17, 2.5)")),
+            "合成正片段被误判：描边层里的 CircleStroke 被拒",
+        )
+        assertEquals(
+            listOf("Gear 的 fillPaths 形状不合法（CircleStroke(17, 17, 2.5)）"),
+            shapeViolations("Gear", "fillPaths", listOf("CircleStroke(17, 17, 2.5)")),
+            "合成负例被放行：填充层里的 CircleStroke 也算合格",
+        )
     }
+
+    /**
+     * 裁决 22-1 第一步的 JVM 侧判据：识别特征必须同时出现在 `strokePaths`。
+     *
+     * 这条契约的立法背景是 `AppGlyphLayer.StrokeOnly` 不画填充层：凡把识别特征只放在 `fillPaths`
+     * 的字形，在这条主路径上会整层蒸发（真机「设置 = 三条横线」「Gear 与 List 同形」）。
+     * 锚点表见 [strokeRecognitionAnchors]；不在表里的字形已逐个核对，识别特征本就在描边层。
+     */
+    @Test
+    fun `recognition features that used to live only in the fill layer survive stroke only`() {
+        val specs = specBlocks(codeText())
+        val misses = strokeRecognitionAnchors.flatMap { (name, anchors) ->
+            val block = specs[name] ?: return@flatMap listOf("$name 没有 AppIconSpec：锚点表与图标库脱节")
+            val strokes = fieldPaths(block, "strokePaths").orEmpty()
+            anchors.filterNot { it in strokes }.map { "$name 的描边层缺识别特征：$it" }
+        }
+        assertTrue(
+            misses.isEmpty(),
+            "StrokeOnly 档下这些字形会整层蒸发（裁决 22-1；真机缺陷：底导设置=三条线、Gear/List 同形）：$misses",
+        )
+
+        // 反空转 1：锚点表必须有对象，且每条锚点都必须真的出现在某处（拼写漂移会让契约变成空循环）。
+        assertTrue(strokeRecognitionAnchors.size >= 6, "识别特征锚点表被清空：本契约没有对象")
+        val allAnchors = strokeRecognitionAnchors.values.flatten()
+        assertTrue(allAnchors.all { it.isNotBlank() }, "锚点表里有空串：恒真命中")
+
+        // 反空转 2：旧 Gear 的描边串（旋钮只在填充层）必须判不过——这正是缺陷当年的形状。
+        val legacyGearStrokes = "strokePaths = listOf(\"M4 7h16\", \"M4 12h16\", \"M4 17h10\")"
+        assertTrue(
+            strokeRecognitionAnchors.getValue("Gear").none { it in legacyGearStrokes },
+            "合成负例被放行：旧 Gear 描边（无旋钮）竟满足识别特征锚点",
+        )
+        // 反空转 3：List 的三枚圆点必须逐个钉住——只补一枚也算「三圆点」缺两枚。
+        val listAnchors = strokeRecognitionAnchors.getValue("List")
+        assertEquals(3, listAnchors.size, "List 的圆点锚点不是三枚：三圆点缺一枚就退化成三条线")
+        assertEquals(3, listAnchors.distinct().size, "List 的圆点锚点重复：同一枚圆点数了三次")
+    }
+
+    /** 两枚圆形标记必须走同一个「圆 → 过上下极点的两段弧」算法（裁决 22-1：只是层不同，几何同源）。 */
+    @Test
+    fun `circle stroke expands through the same two arcs as circle fill`() {
+        listOf(Triple(11.0, 11.0, 6.0), Triple(17.0, 17.0, 2.5), Triple(5.2, 6.0, 0.5)).forEach { (cx, cy, r) ->
+            val fill = circleFillPathData("CircleFill(${plain(cx)}, ${plain(cy)}, ${plain(r)})")
+            val stroke = circleStrokePathData("CircleStroke(${plain(cx)}, ${plain(cy)}, ${plain(r)})")
+            assertEquals(fill, stroke, "圆形描边与圆形填充的展开算法分家了：($cx, $cy, $r)")
+            assertEquals(2, Regex("""[Aa]\s""").findAll(stroke).count(), "展开产物不是两段圆弧：$stroke")
+        }
+        // 反空转：坏标记必须同样响亮失败，不得静默回落给 SVG 解析器。
+        listOf("CircleStroke(1, 2)", "CircleStroke(1, 2, 3", "CircleStroke(1, 2, 0)").forEach { bad ->
+            kotlin.test.assertFailsWith<IllegalArgumentException> { circleStrokePathData(bad) }
+        }
+    }
+
+    /** 测试侧数值整形：与生产 `plain` 同形，避免 `11.0` 这类尾数让合成片段对不上。 */
+    private fun plain(value: Double): String =
+        if (value == Math.floor(value) && !value.isInfinite()) value.toLong().toString() else value.toString()
 
     // ---------- 用例：段数守恒（真机「图标一半一半」的判据） ----------
 
@@ -546,7 +654,12 @@ class AppIconsStructureContractTest {
         specBlocks(codeText()).forEach { (name, block) ->
             listOf("strokePaths", "fillPaths").forEach { field ->
                 fieldPaths(block, field).orEmpty().forEach { data ->
-                    val authored = authoredSegmentCount(data.let { if (it.startsWith("CircleFill(")) circleFillPathData(it) else it })
+                    val expanded = when {
+                        data.startsWith("CircleFill(") -> circleFillPathData(data)
+                        data.startsWith("CircleStroke(") -> circleStrokePathData(data)
+                        else -> data
+                    }
+                    val authored = authoredSegmentCount(expanded)
                     val parsed = parsedSegmentCount(data)
                     if (authored != parsed) dropped += "$name.$field 写 $authored 段、解析出 $parsed 段：$data"
                 }

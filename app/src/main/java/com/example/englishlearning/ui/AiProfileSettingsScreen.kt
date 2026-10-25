@@ -148,7 +148,7 @@ private fun AiProfileList(
             )
             is AiProfileListUiState.Ready -> {
                 state.message?.let {
-                    Text(it, style = AppType.Body, color = appDomain(AppDomain.Reading).deep, modifier = Modifier.testTag("ai_profiles_message"))
+                    Text(it, style = AppType.Body, color = appDomain(AppDomain.Danger).deep, modifier = Modifier.testTag("ai_profiles_message"))
                 }
                 if (state.items.isEmpty()) {
                     Text(
@@ -414,7 +414,7 @@ private fun AiProfileEditor(
                         text = "清除已保存的密钥",
                         onClick = { onDeleteKey(state.profileId) },
                         style = PillStyle.Text,
-                        domain = AppDomain.Reading,
+                        domain = AppDomain.Danger,
                         testTag = "ai_profile_key_clear",
                         contentDescription = "清除已保存的密钥",
                     )
@@ -425,12 +425,12 @@ private fun AiProfileEditor(
                 Text(
                     text = it.message,
                     style = AppType.Body,
-                    color = appDomain(AppDomain.Reading).deep,
+                    color = appDomain(AppDomain.Danger).deep,
                     modifier = Modifier.testTag("ai_profile_field_error"),
                 )
             }
             state.message?.let {
-                Text(it, style = AppType.Body, color = appDomain(AppDomain.Reading).deep, modifier = Modifier.testTag("ai_profile_message"))
+                Text(it, style = AppType.Body, color = appDomain(AppDomain.Danger).deep, modifier = Modifier.testTag("ai_profile_message"))
             }
 
             PillButton(
@@ -452,7 +452,7 @@ private fun AiProfileEditor(
                     onClick = { onDeleteProfile(state.profileId) },
                     modifier = Modifier.fillMaxWidth(),
                     style = PillStyle.Text,
-                    domain = AppDomain.Reading,
+                    domain = AppDomain.Danger,
                     testTag = "ai_profile_delete",
                     contentDescription = "删除这套配置",
                 )

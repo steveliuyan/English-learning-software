@@ -221,7 +221,7 @@ private fun ConfirmationDialog(state: ImageStudioUiState.AwaitingConfirmation, o
                 onClick = { onConfirm(false) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Secondary,
-                domain = AppDomain.Learn,
+                domain = AppDomain.AiSpeech,
                 testTag = "image_studio_decline_outbound",
             )
             PillButton(
@@ -229,7 +229,7 @@ private fun ConfirmationDialog(state: ImageStudioUiState.AwaitingConfirmation, o
                 onClick = { onConfirm(true) },
                 modifier = Modifier.weight(1f),
                 style = PillStyle.Primary,
-                domain = AppDomain.Learn,
+                domain = AppDomain.AiSpeech,
                 testTag = "image_studio_confirm_outbound",
             )
         }

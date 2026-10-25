@@ -25,10 +25,11 @@ import kotlin.test.assertTrue
  * 生产提示条 `vertical = 12.dp`→`vertical = 14.dp` 与本文件 padding 锚红。
  *
  * **修复轮 2 追加一条「配方腿」（R2-4 / 二轮评审 I-1，R-10.7③）**：`IconBadgeContrastContractTest`
- * 那张 28 组合弱档对比表在测试端自己 `mixHex(surface, deep, 0.16)` 现算底色，全文没有一条正则读生产
- * 那枚 `lerp` → 表只对**理想配方**成立。`icon_badge_weak_tone_backdrop_recipe_is_pinned_to_source`
- * 补的就是这条生产绑定腿（变异自证 ⑪：生产 `0.16f`→`0.30f` → 本用例红）。几何值与配色配方从此同属
- * 一份契约：**connected 钉下限、本类钉取值与取色来源**。
+ * 那张弱档对比表在测试端自己现算底色，全文没有一条正则读生产那枚表达式 → 表只对**理想配方**成立。
+ * `icon_badge_weak_tone_backdrop_recipe_is_pinned_to_source` 补的就是这条生产绑定腿。
+ * Task 27（裁决 22-2）把配方从「逐域 `lerp(surface, deep, 0.16f)`」换成共享令牌 `appColors().tint`，
+ * 本锚同步改口径：正锚钉 token 底，旧混色降为禁形（换分数继续混也判红）。
+ * 几何值与配色配方从此同属一份契约：**connected 钉下限、本类钉取值与取色来源**。
  *
  * **Task 19 修复轮 2 的 I-1（几何锚补牙）**：`entryRowOrderIndices` 的链头原先用「clickable 之前最近的
  * `modifier`/`Modifier` 接收者」定位，被 Task 19 引入的 `.then(if (enabled) Modifier.clickable(…) else Modifier)`
@@ -325,22 +326,17 @@ class SharedComponentGeometryContractTest {
     private val entryBox40 = Regex("""size\(40\.dp\)""")
 
     /**
-     * 弱档底色配方锚（R-10.7③ / I-1）：稿 `.ic-tint` 的
-     * `color-mix(in srgb, var(--d) 16%, var(--surface))` 在生产里就是这一枚 `lerp`；
-     * `\s*` 只容忍换行缩进，不容忍参数换位（换位的写法该由 `IconBadgeContrastContractTest` 的复算先红）。
+     * 弱档底色配方锚（Task 27 / 裁决 22-2 改口径）：弱档底 = 共享中性令牌 `appColors().tint`，
+     * 与行内徽标同一枚取色入口（全站一档）。`\s*` 不放宽，参数换位由
+     * `IconBadgeContrastContractTest.entry_tint_tone_uses_the_shared_tint_token_not_a_per_domain_mix` 先红。
      */
-    private val weakToneRecipe = Regex("""lerp\(colors\.surface,\s*palette\.deep,\s*0\.16f\)""")
-
-    /** 禁形一（brief 原文正则）：混色基色被换成 `colors.background`——稿混的是 `--surface`，不是 `--background`。 */
-    private val weakToneOnBackground = Regex("""lerp\(colors\.background,""")
+    private val weakToneRecipe = Regex("""Modifier\.background\(appColors\(\)\.tint\)""")
 
     /**
-     * 禁形二：同一枚 lerp 的系数漂到 0.16 之外（`0.30f`/`0.40f`/`0.24f` 全判红）。
-     * 窄口径靠两点收：前件必须是 `colors.surface` + `palette.deep` 这两枚实参，负向预查 `(?!16f)`
-     * 只放行那个已裁决的系数——所以 `GRADIENT_START_FRACTION = 0.35`、玻璃高光 alpha、
-     * `InlineNotice` 的 `lerp(set.surface, set.errorFill, 0.12f)` 都不在本锚视野里。
+     * 禁形：裁决 22-2 退役的「逐域 `surface` 混 `deep`」口径。不锚系数——
+     * `0.16f` / `0.08f` / `0.30f` 都是同一套按域混色，换个数继续混也要抓住。
      */
-    private val weakToneCoefficientDrift = Regex("""lerp\(colors\.surface,\s*palette\.deep,\s*0\.(?!16f)\d+f\)""")
+    private val weakToneRetiredMix = Regex("""lerp\(colors\.surface,\s*palette\.deep,""")
 
     @Test
     fun icon_badge_entry_container_is_one_shared_40dp_box() {
@@ -359,15 +355,15 @@ class SharedComponentGeometryContractTest {
     /**
      * 弱档（稿 `.ic-tint`）底色的**配方**在生产源码里必须就是那张对比表所依据的那一枚表达式。
      *
-     * 这条是给 `IconBadgeContrastContractTest.both_entry_tones_clear_3_to_1_in_both_theme_sets`
-     * 那张「7 域 × 2 档 × 2 主题 = 28 组合」表**补的生产绑定腿**（R-10.7③，修复轮 2 的 I-1）：
-     * 那张表在测试端自己按 `mixHex(surface, deep, 0.16)` 现算底色，读的**不是**生产
-     * `IconBadge.kt` 的 `lerp(colors.surface, palette.deep, 0.16f)` —— 于是表算的是**理想配方**：
-     * 生产把 `colors.surface` 写成 `colors.background`、或把系数改成 `0.30f/0.40f`，那 26 条契约全绿
-     * （控制者补算：漂移后深套最低仍在 3:1 以上，所以这是「偏离稿面配方」而非当场破线，故 I-1 不列
-     * Critical——但「配方 = 稿面那一个」这件事得有人守，就是本锚）。
+     * **Task 27（裁决 22-2）改口径**：弱档底从「逐域 `lerp(surface, deep, 0.16f)`」收敛为共享中性
+     * 令牌 `appColors().tint`（深浅两套随主题翻），域色只染字形。旧锚钉的是被退役的 16% 配方，
+     * 继续留着会让正确实现判红；这里换成新配方，并把旧写法改写成禁形（分数换成 0.08/0.30 也要抓——
+     * 裁决说的是「换底」，不是「调淡」）。
+     *
+     * 这条仍是给 `IconBadgeContrastContractTest.both_entry_tones_clear_3_to_1_in_both_theme_sets`
+     * 补的**生产绑定腿**：那张表按活 token 复算底色，读的必须就是生产这一枚表达式；
+     * 生产若改回混色或换成别的 token 字段，这里当场红。
      * 与同族几何锚一个口径：先剥注释再匹配、配合成正/负片段自证正则承重。
-     * 变异自证 ⑪：生产 `0.16f`→`0.30f` → 本用例正锚红（恰 1 处判成 0 处）。
      */
     @Test
     fun icon_badge_weak_tone_backdrop_recipe_is_pinned_to_source() {
@@ -375,44 +371,35 @@ class SharedComponentGeometryContractTest {
         assertEquals(
             1,
             countMatches(source, weakToneRecipe),
-            "弱档底色必须恰一处 lerp(colors.surface, palette.deep, 0.16f)（稿 .ic-tint 的 color-mix 16% 配方）",
+            "弱档底色必须恰一处 Modifier.background(appColors().tint)（裁决 22-2：共享 tint 令牌，域色只染字形）",
         )
         assertEquals(
             0,
-            countMatches(source, weakToneOnBackground),
-            "禁形：混色基色不得换成 colors.background（稿 .ic-tint 混的是 --surface，不是 --background）",
+            countMatches(source, weakToneRetiredMix),
+            "弱档仍在按域混色（裁决 22-2 已退役「surface 混 deep」：同屏九块彩色容器就是它）",
+        )
+
+        // 合成正片段：生产那枚写法必须被正锚认出、且不被禁形锚误伤；行内徽标也取同一 token（两处合计 2）。
+        val goodRecipe = "Modifier.background(appColors().tint)"
+        assertEquals(1, countMatches(goodRecipe, weakToneRecipe), "合成正片段漏判：共享 tint 配方没被锚认出")
+        assertEquals(0, countMatches(goodRecipe, weakToneRetiredMix), "合成正片段越界：token 底被旧混色禁形锚误判")
+
+        // 合成负片段：原系数与换分数的混色都必须被禁形锚抓住，且都不得被正锚放行。
+        listOf("0.16f", "0.08f", "0.30f").forEach { fraction ->
+            val mix = "Modifier.background(lerp(colors.surface, palette.deep, $fraction))"
+            assertEquals(0, countMatches(mix, weakToneRecipe), "合成负片段被放行：$fraction 混色底也算 token 底")
+            assertEquals(1, countMatches(mix, weakToneRetiredMix), "合成负片段失控：$fraction 混色没被禁形锚数出来")
+        }
+        // 跨文件冒名：InlineNotice 的 12% 混底与渐变亮端的 0.35 常量都不在本锚视野里。
+        assertEquals(
+            0,
+            countMatches("backdrop = lerp(set.surface, set.errorFill, 0.12f)", weakToneRetiredMix),
+            "合成负片段被放行：提示条 12% 混底被本锚冒名命中（本锚只管 colors.surface + palette.deep 那枚）",
         )
         assertEquals(
             0,
-            countMatches(source, weakToneCoefficientDrift),
-            "禁形：同一枚 lerp 的系数不得漂到 0.16 之外（0.30f/0.40f 都算偏离稿面配方，28 组合表只对理想配方成立）",
+            countMatches("private const val GRADIENT_START_FRACTION = 0.35", weakToneRecipe),
+            "合成负片段被放行：渐变亮端常量被弱档 token 锚冒名命中",
         )
-
-        // 合成正片段：生产那枚写法（含 background(...) 外壳）必须被正锚认出、且不被两枚禁形锚误伤。
-        val goodRecipe = "Modifier.background(lerp(colors.surface, palette.deep, 0.16f))"
-        assertEquals(1, countMatches(goodRecipe, weakToneRecipe), "合成正片段漏判：16% 混 surface 的配方没被锚认出")
-        assertEquals(0, countMatches(goodRecipe, weakToneOnBackground), "合成正片段越界：surface 配方被 background 禁形锚误判")
-        assertEquals(0, countMatches(goodRecipe, weakToneCoefficientDrift), "合成正片段越界：0.16f 被系数漂移禁形锚误判")
-
-        // 合成负片段：三种漂移形状各必须被对应禁形锚命中、且不被正锚放行。
-        val backgroundDrift = "Modifier.background(lerp(colors.background, palette.deep, 0.16f))"
-        assertEquals(1, countMatches(backgroundDrift, weakToneOnBackground), "合成负片段失控：background 换色没被禁形锚数出来")
-        assertEquals(0, countMatches(backgroundDrift, weakToneRecipe), "合成负片段被放行：colors.background 换色竟也过 16% 配方锚")
-        val coefficientDrift = "Modifier.background(lerp(colors.surface, palette.deep, 0.30f))"
-        assertEquals(1, countMatches(coefficientDrift, weakToneCoefficientDrift), "合成负片段失控：0.30f 没被系数漂移锚数出来（变异 ⑪ 的形状）")
-        assertEquals(0, countMatches(coefficientDrift, weakToneRecipe), "合成负片段被放行：0.30f 竟也过 16% 配方锚")
-        assertEquals(
-            1,
-            countMatches("Modifier.background(lerp(colors.surface, palette.deep, 0.40f))", weakToneCoefficientDrift),
-            "合成负片段失控：0.40f 没被系数漂移锚数出来",
-        )
-        // 跨文件冒名：InlineNotice 的 12% 混底（set.surface / set.errorFill，另一套取色口径）
-        // 既不得命中入口弱档配方锚，也不得被系数漂移锚误判成「同一枚 lerp 漂了」。
-        val noticeBackdrop = "backdrop = lerp(set.surface, set.errorFill, 0.12f)"
-        assertEquals(0, countMatches(noticeBackdrop, weakToneRecipe), "合成负片段被放行：提示条 12% 混底被入口弱档配方锚冒名命中")
-        assertEquals(0, countMatches(noticeBackdrop, weakToneCoefficientDrift), "合成负片段被放行：提示条 12% 混底被系数漂移禁形锚冒名命中（本锚只管 palette.deep 那枚）")
-        // 邻近字段冒名：GRADIENT_START_FRACTION = 0.35（Double 常量、无 f 后缀、不在 lerp 调用位上）
-        // 不得被任何一枚配方锚命中——禁形锚只管同一枚 lerp(colors.surface, palette.deep, …) 里的系数。
-        assertEquals(0, countMatches("private const val GRADIENT_START_FRACTION = 0.35", weakToneCoefficientDrift), "合成负片段被放行：禁形锚宽到误伤了渐变亮端的 0.35 常量")
     }
 }

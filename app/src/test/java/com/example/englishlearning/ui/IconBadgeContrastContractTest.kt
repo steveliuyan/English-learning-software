@@ -59,6 +59,9 @@ import kotlin.test.fail
  *    口径按档分开把守（Task 10 R-10.3 重写，见 [entry_glyph_shapes_are_pinned_tone_by_tone]）：
  *    弱档那处**必须**显式单层（[entryStrokeOnlyCall]），实底档那处 `layer =` 出现 0 次
  *    （[explicitLayerArgument]）——旧版「入口一律不得显式 layer」的口径在有了弱档之后正好反了。
+ *    Task 27（裁决 22-2）再把弱档底从「`surface` 混 16% deep」改为活 token `appColors().tint`：
+ *    28 个组合的弱档那一半改按 `deep` 压 `tint` 复算，另加一条源码钉
+ *    （[entry_tint_tone_uses_the_shared_tint_token_not_a_per_domain_mix]）把旧混色写成禁止形状。
  *
  * [mixArgb] 是本测试自带的第二份混色实现（int 域），与生产的 `gradientStartForDomain` 不共享一行代码：
  * 这是**有意的重复**——两端点必须算出同一个颜色才算契约成立（逐通道比对见
@@ -161,6 +164,12 @@ class IconBadgeContrastContractTest {
 
     /** 行内容器底色必须取主题 tint（深浅两套随主题翻，写死浅绿就是第二套真值）。 */
     private val inlineTintBackdrop = Regex("""background\(appColors\(\)\.tint\)""")
+
+    /**
+     * 裁决 22-2 退役的弱档底色写法：逐域 `lerp(surface, deep, 0.16f)`。
+     * 正则不锚分数（0.16 / 0.08 / 0.10 都是同一套「按域混色」口径），换个数继续混也要抓住。
+     */
+    private val retiredEntryTintMix = Regex("""lerp\(colors\.surface,\s*palette\.deep,""")
 
     /** 入口容器圆角：`IconBadge.kt` 里 `clip(AppShape.Icon)` 恰 1 处（12dp 档只归 ≥40dp 入口）。 */
     private val entryShapeClip = Regex("""clip\(AppShape\.Icon\)""")
@@ -773,16 +782,17 @@ class IconBadgeContrastContractTest {
      * 两档的配对各按生产取：
      *  - 实底档：底 = 渐变亮端 = deep 混 35% base（与 [white_glyph_on_every_domain_gradient_start_clears_3_to_1]
      *    同一条端点算法），字形墨浅套白、深套 `onBrand`（深套 `DomainDark` 里 deep == base，混色不改变端点）；
-     *  - 弱档：底 = `surface` 混 16% deep（稿 `.ic-tint` 的 `color-mix(in srgb, var(--d) 16%, var(--surface))`，
-     *    底色是**本套 surface**、不是 `background`），字形墨 = 同域 `deep`。
+     *  - 弱档（裁决 22-2 改写）：底 = **活 token** `appColors().tint`（全站一档，不再是 `surface` 混 16% deep），
+     *    字形墨 = 同域 `deep`。底色必须读 `AppColorLight.tint` / `AppColorDark.tint` 活符号：
+     *    抄一份 hex 就会让 token 漂移后契约与实现各说各话。
      *
-     * 两条反空转分别证明「混色分数承重」与「3:1 阈值抓得住取错字段」——少一条，28 个组合都可能恒真。
+     * 两条反空转分别证明「弱档底色不是随手混出来的」与「3:1 阈值抓得住取错字段」——少一条，28 个组合都可能恒真。
      */
     @Test
     fun both_entry_tones_clear_3_to_1_in_both_theme_sets() {
         listOf(false to DomainLight, true to DomainDark).forEach { (isDark, table) ->
             val set = if (isDark) AppColorDark else AppColorLight
-            val surface = argbOf(set.surface)
+            val tintBackdrop = rgbOf(set.tint)
             val solidInk = if (isDark) rgbOf(set.onBrand) else 0xFFFFFF
             table.forEach { (domain, p) ->
                 val deep = rgbOf(p.deep)
@@ -794,11 +804,10 @@ class IconBadgeContrastContractTest {
                         solidInk, solidBackdrop, solidRatio
                     )
                 )
-                val tintBackdrop = mixHex(surface, deep, 0.16)
                 val tintRatio = ratio(deep, tintBackdrop)
                 assertTrue(
                     tintRatio >= 3.0,
-                    "$domain 弱档：deep 字形 #%06X 压 surface 混 16%% 的底 #%06X 只有 %.2f:1，不足非文本 3:1".format(
+                    "$domain 弱档：deep 字形 #%06X 压 tint #%06X 只有 %.2f:1，不足非文本 3:1".format(
                         deep, tintBackdrop, tintRatio
                     )
                 )
@@ -807,21 +816,52 @@ class IconBadgeContrastContractTest {
             }
         }
         val ai = DomainLight.getValue(AppDomain.AiSpeech)
-        val lightSurface = argbOf(AppColorLight.surface)
-        // 反空转（混色分数承重）：fraction 推到 1.0 时底 == 字形，比值必须掉到 1.00，
-        // 否则「≥3.0」跟分数无关，上面 28 条全是空转。
-        assertEquals(
-            1.0,
-            ratio(rgbOf(ai.deep), mixHex(lightSurface, rgbOf(ai.deep), 1.0)),
-            0.001,
-            "亮度公式失控：底与字形同色竟不算 1:1",
+        // 反空转（弱档底色不是随手混出来的）：旧的「surface 混 16% deep」必须与活 token tint 不等，
+        // 否则 22-2 的改底在数值上不可见，上面 14 条弱档断言仍然恒真。
+        val legacyTintBackdrop = mixHex(argbOf(AppColorLight.surface), rgbOf(ai.deep), 0.16)
+        assertNotEquals(
+            rgbOf(AppColorLight.tint),
+            legacyTintBackdrop,
+            "旧的 16% 混色底恰等于 tint token：弱档改底在数值上不可见，契约失去判别力",
         )
-        // 反空转（阈值抓得住取错字段）：同一枚弱档底上换用装饰性细线（浅套 outline）必须不合格。
-        val decoy = ratio(rgbOf(AppColorLight.outline), mixHex(lightSurface, rgbOf(ai.deep), 0.16))
+        // 反空转（阈值抓得住取错字段）：同一枚 tint 底上换用装饰性细线（浅套 outline）必须不合格。
+        val decoy = ratio(rgbOf(AppColorLight.outline), rgbOf(AppColorLight.tint))
         assertTrue(
             decoy < 3.0,
-            "合成负例被放行：装饰性细线压弱档混色底竟也过非文本 3:1（%.2f:1），阈值或公式失控".format(decoy)
+            "合成负例被放行：装饰性细线压 tint 竟也过非文本 3:1（%.2f:1），阈值或公式失控".format(decoy)
         )
+    }
+
+    /**
+     * 裁决 22-2 的源码面：入口弱档的底必须与行内共用 `appColors().tint`，
+     * 旧的 `lerp(colors.surface, palette.deep, 0.16f)` 必须整条消失（不是改个分数继续混）。
+     *
+     * 为什么不用「比值过 3:1」代替这条：对比契约能证明颜色合格，证明不了**用同一档容器**；
+     * 逐域 16% 混色在数值上也能过 3:1，却正是用户说的「一屏九块彩色」的来源。
+     */
+    @Test
+    fun entry_tint_tone_uses_the_shared_tint_token_not_a_per_domain_mix() {
+        val badge = uiComponentSource(BADGE_SOURCE_NAME)
+        val tintBranch = Regex("""Modifier\.background\(appColors\(\)\.tint\)""")
+        assertEquals(
+            1,
+            countMatches(badge, tintBranch),
+            "入口弱档的底必须是 background(appColors().tint)（与行内同一 token）",
+        )
+        assertEquals(
+            0,
+            countMatches(badge, retiredEntryTintMix),
+            "入口弱档仍在按域混色（lerp(colors.surface, palette.deep, …)）：裁决 22-2 要求域名只染字形",
+        )
+
+        // 合成正片段：弱档取 token、没有 lerp。
+        val good = "val backdropModifier = if (tintTone) Modifier.background(appColors().tint) else Modifier"
+        assertEquals(1, countMatches(good, tintBranch), "合成正片段漏判：token 底没被认出")
+        assertEquals(0, countMatches(good, retiredEntryTintMix), "合成正片段越界：没有 lerp 却被判成混色")
+        // 合成负片段：改个分数继续混色（16%→8%）也必须红——裁决说的是换底，不是调淡。
+        val weakMix = "Modifier.background(lerp(colors.surface, palette.deep, 0.08f))"
+        assertEquals(0, countMatches(weakMix, tintBranch), "合成负片段被放行：混色底也算 token 底")
+        assertEquals(1, countMatches(weakMix, retiredEntryTintMix), "合成负片段被放行：换分数的混色没被抓住")
     }
 
     @Test
@@ -829,7 +869,11 @@ class IconBadgeContrastContractTest {
         val badge = uiComponentSource(BADGE_SOURCE_NAME)
         assertEquals(1, countMatches(badge, entryContainerSize), "入口容器必须是 40dp（≥40dp 入口档位由本尺寸承载）")
         assertEquals(1, countMatches(badge, inlineContainerSize), "行内容器必须是 30dp")
-        assertEquals(1, countMatches(badge, inlineTintBackdrop), "行内底色必须取主题 tint，不得抄浅绿字面量")
+        assertEquals(
+            2,
+            countMatches(badge, inlineTintBackdrop),
+            "行内与入口弱档都必须取主题 tint（裁决 22-2：全站一档，不得再逐域混色；也不得抄浅绿字面量）",
+        )
         assertEquals(1, countMatches(badge, entryShapeClip), "入口容器裁角必须恰好一处 clip(AppShape.Icon)（12dp 档）")
         assertEquals(1, countMatches(badge, inlineShapeClip), "行内徽标必须裁在 clip(AppShape.Inline)（9dp 档）")
         assertEquals(1, countMatches(badge, glassHighlightBorder), "入口容器的 inset 高光必须用 1dp AppPalette.GlassHighlight 描边")
