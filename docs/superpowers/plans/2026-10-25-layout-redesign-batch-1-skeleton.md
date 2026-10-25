@@ -75,15 +75,15 @@
 
 `DesignTokenContractTest`：
 
-1. `lightHex` 末尾追加两行（`linkedMapOf` 已是命名键，顺序不影响集合比较）：
+1. `lightHex` 末尾追加两行（键是命名键，顺序不影响集合比较；值带 `L` 位形）：
    ```kotlin
-   "strongSurface" to 0xFF0C2A22,
-   "onStrong" to 0xFFE9F2EC,
+   "strongSurface" to 0xFF0C2A22L,
+   "onStrong" to 0xFFE9F2ECL,
    ```
 2. `darkHex` 末尾追加：
    ```kotlin
-   "strongSurface" to 0xFF1E2B25,
-   "onStrong" to 0xFFE9F2EC,
+   "strongSurface" to 0xFF1E2B25L,
+   "onStrong" to 0xFFE9F2ECL,
    ```
 3. `crossSetIdenticalNeutralTokenExemptions` 由 `setOf("onBrand")` 改为：
    ```kotlin
@@ -131,14 +131,9 @@ G=$(ls -d "$HOME/.gradle/wrapper/dists/gradle-8.13-bin"/*/gradle-8.13/bin/gradle
 
 - [ ] **Step 3: GREEN — 最小实现**
 
-`AppType.kt:57-58` 整两行替换：
+`AppType.kt:57-58` 整两行替换（**必须写成单行**：`appTypeSpecSegments` 是按连续字符串包含判定的，换行会当场红）：
 ```kotlin
-private val DisplaySpec = TextStyle(
-    fontSize = 44.sp,
-    fontWeight = FontWeight.Bold,
-    letterSpacing = (-0.5).sp,
-    fontFeatureSettings = "tnum",
-)
+private val DisplaySpec = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp, fontFeatureSettings = "tnum")
 private val HeadlineSpec = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp)
 ```
 > 注：`Display` 的 getter 仍只 `copy(color = …)`，`fontFeatureSettings` 必须落在 Spec 上，否则 getter 里 copy 会丢。
