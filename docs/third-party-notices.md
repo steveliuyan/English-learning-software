@@ -767,3 +767,13 @@
 - NOTICE 位置: 本文件、`docs/decisions/2026-10-17-ui-redesign-illustrations.md`、`docs/superpowers/specs/2026-10-17-ui-redesign-design.md` §4.5。**当前状态 = 待建**：`app/src/main/java/com/example/englishlearning/ui/components/AppIllustrations.kt` 尚未落码（批 3 交付），所以「实现文件顶部注释」与「应用内开源许可页 `LicensesScreen` 的对应条目」这两处 NOTICE 落点现在还不存在——批 3 落码时必须一并补上，届时删除本段「待建」标注；在此之前不要把本条目当作已随 APK 分发的 NOTICE 证据
 - 替代方案: 空态一律纯文字加一个动作（零图形资产，但五个空态全无锚点）；或采用经逐张许可核验的第三方插画（须逐项确认归属与署名）
 - 商业分发结论: 可随应用分发，无许可或署名义务。硬上限 5 张，新增第 6 张须先改决策记录与本条目；本轮为静态矢量，不含动画
+
+## newsreader-font
+- 名称: Newsreader 衬线字体（可读性英文正文/标题字族；本应用只取正体，不取 italic）
+- 版本: 原型 `assets/fonts/newsreader-regular.woff2`（可变字体，`opsz` 6–72、`wght` 200–800）经 fonttools 4.67.0 + brotli 1.2.0，在 `opsz=16` 上取 `wght` 400/500/550/600/650 五个静态实例，落盘为 `app/src/main/res/font/newsreader_{regular,medium,book,semibold,bold}.ttf`（Android 不支持 woff2 与可变字体，故转静态 TTF）；字重档与原型 `@font-face` 的 `font-weight: 400 600` 区间一致，550/650 为区间内的插值档
+- 许可证: SIL Open Font License 1.1（OFL-1.1）。允许嵌入、修改与随应用分发，须随包保留 OFL 全文与版权声明，且字体本身不得单独售卖
+- 用途: 原型 `--serif` 字族，仅用于英文/词形/数字的展示层排印（Display、StrongTitle、ArticleTitle、StatNum、PlanNum、Lemma、Prose 等档），中文与 UI 正文仍走系统 sans；不参与任何业务逻辑或数据流
+- 数据流: 五个 TTF 随 APK 打包，仅在设备内由 Compose 渲染；不下载、不上传、不联网，不参与任何 AI 或网络请求
+- NOTICE 位置: 本文件、应用内「开源许可与隐私说明」页（`LicensesScreen` 渲染同一份台账，构建期由 `docs/third-party-notices.md` 同步进 assets）、`ui/theme/AppFont.kt` 顶部注释；发布包须随附 OFL 1.1 全文
+- 替代方案: 系统衬线族（`FontFamily.Serif`，各厂商字形不一，字号度量与原型的 1.05/1.2 行高需重校）；或不设衬线层级、全部走 sans（层级只剩字号与字重）
+- 商业分发结论: 可商业分发，条件是保留 OFL 1.1 全文与版权声明、不单独售卖字体、不对字体改名后重新发布；本应用未修改字形，只做可变轴取实例的格式转换

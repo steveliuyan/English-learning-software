@@ -50,16 +50,25 @@
 > 换色只降彩度、去绿、拉平渐变，**不动品牌渐变**、不动 token 语义；逐值权威源永远是
 > `ui/theme/AppColors.kt`（可读副本见 `docs/design/visual-style-guide.md` §2.2）。
 
-浅色（`--bg #F6F9F6` 系）：`bg #F6F9F6`、`surface #FFFFFF`、`surface-glass #EFFFFFFF`、`tint #E9F4EE`、
-`tint-2 #E4EFE9`、`tint-3 #DEEAE4`、`outline #D3E7DC`、`outline-soft #EBF1ED`、
-`text-1 #1F2B26`、`text-2 #566B62`、`text-3 #7C9188`、`on-mint #174C44`、`on-brand #04241C`、
-`error #B30000`、`error-fill #FF3B30`、`success #1B5E20`、`strong-surface #1F4739`、`on-strong #E9F2EC`。
+> **2026-10-29 原型对齐（批 0，取代上面两段旧取值）**：用户提供冻结的 HTML 原型，
+> 明确「原型与文字描述冲突时以原型为准」。下面浅/深两行整段换成原型 `assets/app.css`
+> 的 `:root` / `html[data-theme='dark']` 取值，逐值映射与兼容字段见
+> [`docs/decisions/2026-10-29-ui-prototype-token-alignment.md`](../../decisions/2026-10-29-ui-prototype-token-alignment.md)。
+> 权威源仍是 `ui/theme/AppColors.kt` 与 `AppPalette.kt`；本段是副本。
+
+浅色：`bg #F1F4EF`、`surface #FFFFFF`、`surface-2 #F7F9F5`、`tint #E8F2EA`、`tint-2 #DCEBE1`、
+`line #DDE5DD`、`line-soft #EEF2ED`、`ink #15211C`、`ink-2 #55665D`、`ink-3 #65756C`、
+`brand #6CCBAB`、`brand-deep #1A7A63`、`brand-tint #E4F4EC`、`strong #1F4739`、`strong-hi #2A5A49`、
+`on-strong #E9F2EC`、`on-strong-2 rgba(233,242,236,.74)`、`danger #A5291F`、`danger-tint #FDEEEC`、
+`success #1B5E20`、`again #B3573F`、`fuzzy #A8792A`、`known #1A7A63`。
 
 品牌渐变保持现状不动：`mint-start #A8F3C8` → `mint-mid #5DDFB4` → `mint-end #35B9B5`，`mint-light #D9FFF0`。
 
-深色：`bg #111A16`、`surface #17201C`、`surface-glass #E617201C`、`tint #1B2A25`、`tint-2 #20302A`、`tint-3 #25352E`、
-`outline #2B3A33`、`outline-soft #202C26`、`text-1 #E9F2EC`、`text-2 #9FB3AA`、`text-3 #7F938A`、
-`on-mint #DFF6EC`、`error #FF8177`、`error-fill #FF6B61`、`success #6BD98A`、`strong-surface #22332C`。
+深色：`bg #101814`、`surface #161F1A`、`surface-2 #1A2420`、`tint #1C2A24`、`tint-2 #22322B`、
+`line #2A3931`、`line-soft #202D27`、`ink #E9F2EC`、`ink-2 #A5B8AE`、`ink-3 #93A69C`、
+`brand #6FD9B6`、`brand-deep #7FE3C1`、`brand-tint #1D322B`、`strong #22332C`、`strong-hi #2B4038`、
+`on-strong #E9F2EC`、`on-strong-2 rgba(233,242,236,.72)`、`danger #FF8177`、`danger-tint #34211F`、
+`success #6BD98A`、`again #E39086`、`fuzzy #EFCB92`、`known #7FE3C1`。
 
 功能域强调色（`base` = 图形/渐变起点，`deep` = 填充与文字）：
 
@@ -72,6 +81,11 @@
 | 阅读 | `#9C3B4F` / `#E297A4` | `#EDA8B4` |
 | 危险 | `#9E2B24` / `#DD8B81` | `#E39086` |
 | 设置 | `#4A5551` / `#A6B0AC` | `#B4BEBA` |
+
+> 域色与语义色是两条线：上表「危险域」只用于入口图标着色，不承担错误文字/按钮语义；
+> 错误与危险操作一律用 §2.1 的 `danger #A5291F` / `danger-tint #FDEEEC`。
+> 原型没有「设置」域色：`AppDomain.Settings` 在批 0 暂由 `ink-3` 派生，
+> 批 2 设置族屏迁移时按原型逐处核对后收敛或删除。
 
 **硬规则（F5-03 移交，不得回潮）**：浅薄荷底与品牌渐变上**禁止白字**；浅薄荷底前景取 `on-mint #174C44`，
 **品牌渐变上的文字统一取 `on-brand #04241C`**（`on-mint` 压渐变末端 `#35B9B5` 实测仅 4.07:1，
@@ -101,27 +115,49 @@
 全部过图形非文本 3:1 且连正文 4.5 都过，最低为 AiSpeech。
 本节上方那段「渐变容器 + 白字形」的实测数字仍然成立，但它管的对象收窄为 `Gradient` 档，不再是入口族的默认呈现。
 
-### 2.2 排版：六阶语义尺度 + M3 角色钉值
+### 2.2 排版：语义档 + M3 角色钉值
 
-新代码只写语义名（`AppType.Display/Headline/Title/Body/Footnote/Label`），M3 角色名留给旧调用点自然淘汰。
+> **2026-10-29 原型对齐（批 0）**：下表的字号/字重/字距换成原型 `assets/app.css` 的度量，
+> 并补入原型专用档与行高。原型用 Newsreader 衬线英文（SIL OFL 1.1），应用侧用静态 TTF
+> 覆盖 400/500/550/600/650 五档。旧「六档不写 lineHeight」的口径作废。
 
-| 语义档 | 钉值 | 对应 M3 角色 | 变化 |
+新代码只写语义名，M3 角色名留给旧调用点自然淘汰。
+
+| 语义档 | 字号 / 字重 / 字距 / 行高 | 字族 | 原型用途 |
 |---|---|---|---|
-| Display | 34sp Bold，ls 0.4 | `displaySmall` | 36→34 |
-| Headline | 24sp Bold | `headlineSmall` | 同值 |
-| Title | 17sp SemiBold | `titleMedium` | 16→17 |
-| Body | 15sp Regular | `bodyMedium` | 14→15 |
-| Footnote | 13sp | `bodySmall` | 12→13 |
-| Label | 12sp Medium，ls 0.3 | `labelMedium` | 同值 |
+| Display | 46 / 500 / -0.025em / 1.05 | Newsreader | 词卡 lemma |
+| StrongTitle | 27 / 500 / -0.01em / 1.2 | Newsreader | 深色卡标题 |
+| ArticleTitle | 30 / 500 / -0.02em / 1.18 | Newsreader | 文章标题 |
+| Headline | 24 / 650 / -0.01em / 1.25 | sans | 页头大标题 |
+| TitleLg | 28 / 650 | sans | 页面大标题（少用） |
+| Title | 17 / 650 / -0.01em | sans | 对话框标题、段标题 |
+| BodyLg | 17 / 400 / 1.55 | sans | 词义、强调正文 |
+| Body | 15 / 400 / 1.6 | sans | 正文、行标题 550 |
+| Meta | 13 / 400 / 1.55 | sans | 辅助正文、说明 |
+| Footnote | 13 / 400 / 1.6 | sans | 副行、例句译文 |
+| Caption | 12 / 400 / 1.55 | sans | 脚注、空状态说明 |
+| Label | 12 / 600 / 0.02em | sans | 字段标签、芯片 |
+| Eyebrow | 11 / 600 / 0.14em / 大写 / tnum | sans | 页眉小标、段标签 |
+| NavLabel | 11 / 600 / 0.01em / 1.0 | sans | 底栏标签 |
+| Lemma | 46 / 500 / -0.025em / 1.05 | Newsreader | 同 Display（保留别名） |
+| StatNum | 26 / 500 / -0.02em / 1.1 / tnum | Newsreader | 统计数字 |
+| Prose | 17.5 / 400 / 1.72 | Newsreader | 英文正文 |
+| ProseZh | 13 / 400 / 1.75 | sans | 中文译文 |
 
-现状没有 `MaterialTheme(...)` 装配点，206 处 `MaterialTheme.typography.*` 直接吃 M3 默认值；
-深色模式同样没有落点。批 1 的第一件事就是建立装配点，把这 206 处调用纳入统一尺度。
+M3 十五角色由最近语义档派生（`displayLarge/Medium/Small`→Display，`headline*`→Headline，
+`titleLarge`→Headline、`titleMedium`→Title、`titleSmall`→Body，`bodyLarge/Medium`→Body，
+`bodySmall`→Footnote，`label*`→Label），装配时去色，前景由 `LocalContentColor` 决定。
 
 ### 2.3 栅格
 
-圆角两档 + 控件档：`hero 24dp` / `card 18dp` / `btn 14dp` / `icon 12dp` / `pill 999dp`。
-间距 8 档：`4 / 8 / 12 / 14 / 16 / 18 / 20 / 24`；页边距 20dp、段间距 24dp、卡内间距 14dp。
-触控下限 **48dp**（`heightIn(min = 48.dp)` 或 `defaultMinSize`，禁止靠 padding 凑）。
+> **2026-10-29 原型对齐（批 0）**：取代旧的「hero 24 / card 18 / 间距 14·18」一套。
+
+圆角五档：`10dp`（小按钮、32 徽标、选择标记 7）/ `14dp`（按钮、输入框、44 徽标）/
+`20dp`（卡片、64 徽标）/ `26dp`（对话框、底部面板、强卡、空状态大图）/ `999dp`（药片）。
+间距只用 4 的倍数：`4 / 8 / 12 / 16 / 20 / 24 / 32 / 40`。
+页边距 20dp，窄屏（<480dp）18dp；段间距 24dp；卡片内距 16dp；强卡内距 20dp。
+触控下限：原型按钮 46dp、反馈键 50dp、底栏项 56dp；无障碍下限仍取 **48dp**，
+不得靠 padding 凑（`heightIn(min = 48.dp)` 或 `defaultMinSize`）。
 禁止 `Arrangement.spacedBy` 造成的幽灵间距（不可见但占位的分隔）——分隔一律用真实可见的 `outline-soft` 线或明确间距。
 
 ---
