@@ -22,6 +22,16 @@ import kotlinx.coroutines.launch
 
 enum class SpeechProfileStatus { Available, MissingKey }
 
+/**
+ * 语速四档（F3-02 决策 §2）：`0.75x → 1.0x → 1.25x → 1.5x`。
+ *
+ * 批 5 Task 1 把屏上的「点按循环」换成滑杆后，这张表同时是三件事的唯一源：
+ * 滑杆的刻度表（屏侧读它算 index 与读数）、[SpeechSettingsViewModel.setSpeechRate] 的吸附目标、
+ * [SpeechSettingsViewModel.cycleSpeechRate] 的步进序。三处若各抄一份，「滑到 1.25x 却存下 1.4x」
+ * 这类分叉会立刻出现，因此它放在 ViewModel 文件里而不是散在屏上。
+ */
+val SpeechRateSteps: List<Float> = listOf(0.75f, 1.0f, 1.25f, 1.5f)
+
 data class SpeechProfileCandidate(
     val profileId: String,
     val displayName: String,
@@ -109,12 +119,36 @@ class SpeechSettingsViewModel @Inject constructor(
      * 语速四档循环（决策 §2）：0.75x → 1.0x → 1.25x → 1.5x → 0.75x。
      * 起点以**存储值**为准（不信任 UI 快照），非标准值先就近吸附再进下一档；
      * 保存失败保持原状态并报告存储错误——与 setAutoSpeakOnCardReady 同一口径。
+     *
+     * 批 5 Task 1 起屏上不再有循环入口（语速是滑杆），本函数保留为**同一张档位表的顺序步进**，
+     * 与 [setSpeechRate] 共用 [persistSpeechRate]，两条入口不会各写一套保存/回写逻辑。
      */
     fun cycleSpeechRate() = viewModelScope.launch {
-        val steps = listOf(0.75f, 1.0f, 1.25f, 1.5f)
         val stored = preferences.get().getOrDefault(SpeechPreference())
-        val nearest = steps.indices.minByOrNull { i -> kotlin.math.abs(steps[i] - stored.speechRate) } ?: 1
-        val next = steps[(nearest + 1) % steps.size]
+        val nearest = nearestStepIndex(stored.speechRate)
+        persistSpeechRate(SpeechRateSteps[(nearest + 1) % SpeechRateSteps.size])
+    }
+
+    /**
+     * 语速滑杆（批 5 Task 1）：滑杆给的是连续值，落盘前吸附到 [SpeechRateSteps] 里最近的一档——
+     * 存储里仍只有四档合法值，播放侧读到的倍率与循环时代逐字相同。
+     * 拖到当前档位是等值操作，不写盘（但状态里的报告照样收干净）。
+     */
+    fun setSpeechRate(rate: Float) = viewModelScope.launch {
+        persistSpeechRate(SpeechRateSteps[nearestStepIndex(rate)])
+    }
+
+    /** 零基下标：把任意倍率吸到档位表里最近的一档（非标准值按绝对差就近）。 */
+    private fun nearestStepIndex(rate: Float): Int =
+        SpeechRateSteps.indices.minByOrNull { kotlin.math.abs(SpeechRateSteps[it] - rate) } ?: 1
+
+    /** 保存一档倍率并回写状态；等值不写盘，失败保持原状态并报存储错误。 */
+    private suspend fun persistSpeechRate(next: Float) {
+        val stored = preferences.get().getOrDefault(SpeechPreference())
+        if (stored.speechRate == next) {
+            _state.value = _state.value.copy(speechRate = next, message = null)
+            return
+        }
         if (preferences.save(stored.copy(speechRate = next)).isSuccess) {
             _state.value = _state.value.copy(speechRate = next, message = null)
         } else {

@@ -147,8 +147,11 @@ class LearningRecordsViewModel @Inject constructor(
                         RepositoryResult.Success(emptyList())
                     }
                     // F4-01 详展与逐词分组同页签成对加载；任一侧失败即整页签失败（不留半屏数据）。
+                    // 区间终点不用 `LocalDate.ofInstant(...)`：那是 API 34+ 的静态工厂，Android 13 真机
+                    // 切到「历史记录」页签会 NoSuchMethodError 崩溃（批 1 真机取证）。`atZone` 自 API 26 起可用。
                     val statsResult: Result<List<DailyLearningHistory>> = if (snapshot != null) {
-                        statsRepository.historyRange(snapshot.profileId, HISTORY_STATS_FROM, LocalDate.ofInstant(clock.instant(), clock.zoneId()))
+                        val rangeEnd = clock.instant().atZone(clock.zoneId()).toLocalDate()
+                        statsRepository.historyRange(snapshot.profileId, HISTORY_STATS_FROM, rangeEnd)
                     } else {
                         Result.success(emptyList())
                     }

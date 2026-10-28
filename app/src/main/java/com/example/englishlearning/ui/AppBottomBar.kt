@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -25,8 +26,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.englishlearning.ui.components.AppGlyph
-import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.InlineIconBadge
 import com.example.englishlearning.ui.theme.AppDomain
@@ -37,11 +36,23 @@ import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
 
 /**
+ * 未选中页签的字形不透明度（选中档为 1）。
+ *
+ * 具名而非散写 `0.5f`：这是「两档同一枚插画」这条判据的第二处差别（第一处是药片底有无），
+ * 设备侧按它复算淡出（`AppBottomBarTest`），散写会与同文件其它 alpha 混成一团，
+ * 也无从在测试里指名道姓地引用。
+ */
+private const val TabGlyphIdleAlpha = 0.5f
+
+/**
  * 四栏底部导航。
  *
- * 字形走批 1 定稿的共享 duotone 图标族（`AppIcon` 冻结路径 + [AppGlyph]/[InlineIconBadge] 渲染），
+ * 字形走批 1 定稿的共享 duotone 图标族（`AppIcon` 冻结路径 + [InlineIconBadge] 渲染），
  * 不再自绘画布：自绘分支既绕开图标台账，也拿不到按主题的填充层不透明度。
- * 选中态是行内徽标一档（tint 药片 + 域 `deep` 字形 + 加粗标签），未选中退化为 `text2` 单层描边——
+ *
+ * **两档画同一枚图形（2026-10-31 用户评审 ①）**：选中与未选中都经 [InlineIconBadge] 画同一枚插画位图，
+ * 差别只留两处——选中档带 tint 药片底（`backdrop = selected`）、未选中档压 [TabGlyphIdleAlpha] 半透明。
+ * 旧形是「选中换成彩色徽标、未选中退回 24×24 线框」，同一排四个格子读成两套图标，正是评审指出的不一致。
  * 字形腿与标签腿分档不同（图形 vs 正文），所以选中标签的墨在浅套另取 `onMint`，不沿用 `deep`（见 `TabSlot`）；
  * 深浅两套的墨色与底色都经 `appColors()` / `appDomain()` 现取，本文件不留静态浅套读点。
  *
@@ -95,6 +106,9 @@ private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) 
     // 未选中档两套同用 `text2`。各腿比值一律由 `AppBottomBarContrastTest` 按真实底当场复算，
     // 这里不抄数字（抄进注释就会随 token 取值漂移）。
     val labelInk = if (selected && !LocalIsDark.current) appColors().onMint else tint
+    // 图形腿两档共用同一枚插画：只看「带不带药片底」（徽标内由 backdrop 收口）与「压不压半透明」。
+    // 半透明用 if 直接给 Modifier，而不是 `.alpha(if (...) 1f else ...)`：选中档不额外套一层无用的图层。
+    val glyphModifier = if (selected) Modifier else Modifier.alpha(TabGlyphIdleAlpha)
     Column(
         modifier = Modifier
             .weight(1f)
@@ -109,11 +123,7 @@ private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) 
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (selected) {
-            InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech)
-        } else {
-            AppGlyph(icon = tab.glyph, tint = tint, size = 22.dp, layer = AppGlyphLayer.StrokeOnly)
-        }
+        InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech, modifier = glyphModifier, backdrop = selected)
         Text(
             text = tab.label,
             style = MaterialTheme.typography.labelSmall,

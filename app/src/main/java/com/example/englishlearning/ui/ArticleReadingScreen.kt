@@ -1,8 +1,11 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -10,24 +13,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -38,23 +46,24 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleDisplayMode
 import com.example.englishlearning.reading.domain.ArticleSource
-import com.example.englishlearning.ui.components.glass.GlassDialog
-import com.example.englishlearning.ui.components.glass.PillButton
-import com.example.englishlearning.ui.components.glass.PillStyle
+import com.example.englishlearning.ui.components.AppGlyph
+import com.example.englishlearning.ui.components.AppGlyphLayer
+import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
 import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -64,10 +73,46 @@ internal fun formatImportedAt(epochMillis: Long): String =
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 
 /**
- * 阅读页。正文是**单个 `Text` 的 `AnnotatedString`**：高亮区间以薄荷强调色加粗，点击回调
+ * 阅读页。正文是**单个 `Text` 的 `AnnotatedString`**：高亮区间以阅读域深色加粗，点击回调
  * `onOpenCard`。译文可见性只由 `translationExpanded` 决定——三种模式只差初始值（domain
- * 文档：译文在任何模式下都可折叠）。来源区（Task E）按 `ArticleSource` 三分支展示：
- * AI 只显示模型名；外刊显示署名与原文链接（**纯文本，绝不自动打开**）；导入显示时间与责任说明。
+ * 文档：译文在任何模式下都可折叠）。
+ *
+ * ## 版式（批 3 Task 3，spec §6 逐屏表「文章阅读」行）
+ *
+ * 换装前这屏是批 1 之前的形态，四类病灶各占一处：
+ *
+ * 1. **两枚自写页头按钮**：「返回」与「发音」都是 M3 实底 `Button`，返回位连 `testTag` 都没有，
+ *    屏标题是 `headlineSmall`。现在返回位归共享 [AppScreenHeader]，发音收进它的 `action` 槽
+ *    （40dp 视觉容器 + 48dp 可点区，与返回位同族几何），标题用页头的 `AppType.Title`。
+ *    正文标题 `article_title` **仍留在正文侧**（`AppType.Headline`）：它是文章内容本身，
+ *    connected 按这个 tag 取样，也是长标题唯一能完整显示的地方——页头两行 `Clip` 只承担
+ *    「滚动后我还知道在读哪篇」。
+ * 2. **主操作埋在流末尾**：「完成阅读」排在正文与未覆盖词之后，文章越长越够不着。现在它是
+ *    屏底吸底条里唯一的主 CTA（`article_complete_action_bar` + 发丝线），正文滚动面在它上面。
+ * 3. **覆盖词整块挡正文**：进文第一帧弹一枚居中 `GlassDialog`，用户先得点「我知道了」才看得到文章。
+ *    现在改成底部面板（`ModalBottomSheet` + `skipPartiallyExpanded`）：从下沿升起、可下滑收起，
+ *    正文留在上半屏；面板自绘标题行（含「我知道了」），词表超长时面板内滚动，标题行始终可见。
+ *    首次进文仍自动展开一次（F3-01B 的行为不变），收起后由正文里的 `article_coverage_entry` 裸行
+ *    再次打开——这条入口是**已有数据的重新呈现**，不是新数据通路。
+ * 4. **译文控件分裂成两处**：「全文对照」chip 只改偏好、「显示译文」按钮只翻展开态，用户要看全译
+ *    得点两处。现在模式行只剩两枚 chip（英文优先 / 双语），译文开关与它们同一行、同一容器；
+ *    `FULL_TRANSLATION` 折叠成「双语 + 译文已展开」的呈现等价，**ViewModel 语义零改动**。
+ *
+ * 来源区（Task E）按 `ArticleSource` 三分支展示：AI 只显示模型名；外刊显示署名与原文链接
+ * （**纯文本，绝不自动打开**）；导入显示时间与责任说明。四枚来源 tag 各恰一处（三分支原先
+ * 各写一遍 `article_source_name`，connected 按 tag 取节点会撞多份），收成两行：站名 + 行尾域名、
+ * 链接标签 + URL。域名与 URL 都不删——前者是授权署名，后者是「不会自动打开」这条安全能力的
+ * 唯一可见处。
+ *
+ * 取墨一律走 `appColors()` / `appDomain(...)` 而不是 `Mint*` 静态桥：浅色侧逐值不变，深色侧才
+ * 真正跟着换套。本文件不留一枚 `AppPalette` / `DomainColors` 静态读点，也不带裸 hex，
+ * 屏侧不自造圆角（三档容器与 `AppShape` 承载）。
+ *
+ * **不许动的既有锚**（换了就是数据/语义变更）：`style = AppType.Body.copy(color = appColors().text1)`
+ * 那一行逐字保留（`ReadingHomeLayoutContractTest` 精确子串钉住），`rememberScrollState(articleScrollPosition)`
+ * 与 `snapshotFlow { scrollState.value }.collect(onArticleScrollPositionChange)` 逐字保留
+ * （`SearchCloseReadingStateRetentionTest` 钉「搜索关闭后阅读位置不丢」），正文仍是
+ * `verticalScroll(scrollState)` 而非懒列表（滚动位置要保持「像素值」可回传）。
  */
 @Composable
 fun ArticleReadingScreen(
@@ -92,44 +137,192 @@ fun ArticleReadingScreen(
     articleScrollPosition: Int = 0,
     onArticleScrollPositionChange: (Int) -> Unit = {},
 ) {
+    val colors = appColors()
     val scrollState = rememberScrollState(articleScrollPosition)
     LaunchedEffect(scrollState) {
         snapshotFlow { scrollState.value }.collect(onArticleScrollPositionChange)
     }
+    val current = state
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MintBackground)
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .background(colors.background)
             .testTag("article_reading_screen"),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(
-                onClick = onBack,
-                colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-            ) { Text("返回") }
-            Button(
-                onClick = { state?.let { onSpeakSentence(it.article.englishText) } },
-                modifier = Modifier.testTag("article_pronunciation"),
-                colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-            ) { Text("发音") }
-        }
+        AppScreenHeader(
+            title = current?.article?.title ?: "文章阅读",
+            onBack = onBack,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
+            // 页头右侧的发音位：40dp 视觉容器 + 48dp 可点区，与共享页头的返回位同族几何（R-9.1）。
+            // 不用实底 `Button`：这一枚是页头行的附属动作，不是主操作——一屏只有一枚实底主操作
+            // （屏底「完成阅读」）。`contentDescription` 取「播放发音」而不是「发音」，TalkBack
+            // 念出来要能听出这是动作；再点即重播（系统 TTS QUEUE_FLUSH / 音频路径重走播放），
+            // 不另设重播按钮。写在 `action` 槽调用窗口内而不是抽成私有函数：页头这一行只有
+            // 返回位 + 发音两枚元素，抽出去只会让「页头到底承载了什么」在源码上分成两处。
+            action = {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(AppShape.Icon)
+                        .clickable(onClick = { current?.let { onSpeakSentence(it.article.englishText) } })
+                        .testTag("article_pronunciation")
+                        .semantics { contentDescription = "播放发音" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(AppShape.Icon)
+                            .background(colors.surface)
+                            .border(1.dp, colors.outlineSoft, AppShape.Icon),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AppGlyph(icon = AppIcon.Speaker, tint = colors.text2, size = 22.dp)
+                    }
+                }
+            },
+        )
         // F3-02 整篇朗读的状态文字与播控组**必须**位于空态早退之后（Task 9 评审 I-2）：
-        // 空态（「正在加载…」）不得组合出消息文字与播控行。发音按钮再点即重播
-        // （系统 TTS QUEUE_FLUSH / 音频路径重走播放），不另设重播按钮。
-        val current = state
+        // 空态（「正在加载…」）不得组合出消息文字与播控行。
         if (current == null) {
-            Text("正在加载…", color = MintTextMuted)
-            return@Column
+            Text(
+                text = "正在加载…",
+                style = AppType.Body,
+                color = colors.text2,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            )
+        } else {
+            // F3-01B：进文覆盖词面板——每篇文章首次打开自动展开一次。coveredLemmas 是文章自带的
+            // 落库字段，面板是纯呈现：开关状态按 articleId 记忆，切换文章重新展开。
+            var coverageOpen by rememberSaveable(current.article.articleId) {
+                mutableStateOf(current.article.coveredLemmas.isNotEmpty())
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ArticleHeadlineAndSpeech(
+                    article = current.article,
+                    pronunciationMessage = pronunciationMessage,
+                    pronunciationStatus = pronunciationStatus,
+                    pauseResumeSupported = pauseResumeSupported,
+                    onPauseResume = onPauseResume,
+                    onStopPronunciation = onStopPronunciation,
+                )
+                ArticleSourceBlock(current.article)
+                ArticleModeRow(
+                    mode = current.mode,
+                    translationExpanded = current.translationExpanded,
+                    translationAvailable = current.article.chineseText.isNotEmpty(),
+                    onModeChange = onModeChange,
+                    onToggleTranslation = onToggleTranslation,
+                )
+                ArticleMarksRow(
+                    checked = current.showLearnedMarks,
+                    onSetLearnedMarks = onSetLearnedMarks,
+                )
+                HighlightedEnglish(
+                    englishText = current.article.englishText,
+                    highlights = current.highlights,
+                    cards = current.cards,
+                    onOpenCard = onOpenCard,
+                    onOpenDictionary = onOpenDictionary,
+                )
+                if (current.article.chineseText.isEmpty()) {
+                    Text(
+                        text = "该来源没有中文翻译",
+                        style = AppType.Footnote,
+                        color = colors.text2,
+                        modifier = Modifier.testTag("article_no_translation_notice"),
+                    )
+                }
+                if (current.translationExpanded) {
+                    Text(
+                        text = current.article.chineseText,
+                        style = AppType.Body,
+                        color = colors.text1,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(AppShape.Inline)
+                            .background(colors.surface)
+                            .padding(14.dp)
+                            .testTag("article_translation"),
+                    )
+                }
+                if (current.uncoveredLemmas.isNotEmpty()) {
+                    Text(
+                        text = "未覆盖词",
+                        style = AppType.Title,
+                        color = colors.text1,
+                        modifier = Modifier.testTag("article_uncovered"),
+                    )
+                    // F5-03 / Task 11：未覆盖词 chip 数量不定，横向排布在动态字体下必然溢出 → 改 FlowRow 换行。
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        current.uncoveredLemmas.forEach { lemma ->
+                            val card = current.cards.firstOrNull { it.lemma == lemma || it.cardId == lemma }
+                            AssistChip(
+                                onClick = {
+                                    if (card != null) onOpenCard(card) else onOpenDictionary(lemma)
+                                },
+                                label = { Text(lemma) },
+                                modifier = Modifier.testTag("article_uncovered_$lemma"),
+                            )
+                        }
+                    }
+                }
+                if (current.article.coveredLemmas.isNotEmpty()) {
+                    CoverageEntryRow(
+                        count = current.article.coveredLemmas.size,
+                        onClick = { coverageOpen = true },
+                    )
+                }
+            }
+            ArticleCompleteBar(
+                completed = current.completed,
+                onCompleteReading = onCompleteReading,
+            )
+            if (coverageOpen && current.article.coveredLemmas.isNotEmpty()) {
+                CoverageSheet(
+                    lemmas = current.article.coveredLemmas,
+                    onDismiss = { coverageOpen = false },
+                )
+            }
         }
+    }
+}
 
-        // F5-03 决策 §4（Task 9 修复轮 I-4，controller 裁决）：live region 必须常驻，
-        // 靠子节点进出触发播报（Task 6 判例 WordCardScreen.word_card_status_live_region）。
-        // ①tag `article_pronunciation_message` 留在瞬时 Text 上（tag 口径不动，既有引用不破）；
-        // ②liveRegion 只在容器上，瞬时子节点不得再带；③播控 Row 保持在容器之外（B1 口径）。
-        // 已知代价：容器空态仍占外层 spacedBy 一份幽灵间距——归 UI 重设计轮，不改本轮外层布局。
+/**
+ * 正文标题 + 朗读状态活区 + 播控行。
+ *
+ * F5-03 决策 §4（Task 9 修复轮 I-4，controller 裁决）：live region 必须常驻，靠子节点进出触发播报
+ * （Task 6 判例 `WordCardScreen.word_card_status_live_region`）：
+ * ①tag `article_pronunciation_message` 留在瞬时 Text 上（tag 口径不动，既有引用不破）；
+ * ②liveRegion 只在容器上，瞬时子节点不得再带；③播控 Row 保持在容器之外（B1 口径）。
+ *
+ * 决策 §2：暂停/继续只在 Playing/Paused 窗口呈现，呈现条件按「选中引擎 ≠ SystemTts」收窄（裁决 B2）；
+ * 停止在系统 TTS 下同样可用，照常给。两枚都是 `TextButton`：播控是附属动作，不与吸底主操作抢实底。
+ */
+@Composable
+private fun ArticleHeadlineAndSpeech(
+    article: Article,
+    pronunciationMessage: String?,
+    pronunciationStatus: PronunciationStatus,
+    pauseResumeSupported: Boolean,
+    onPauseResume: () -> Unit,
+    onStopPronunciation: () -> Unit,
+) {
+    val colors = appColors()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = article.title,
+            style = AppType.Headline,
+            color = colors.text1,
+            modifier = Modifier.testTag("article_title"),
+        )
         Column(
             modifier = Modifier
                 .testTag("article_status_live_region")
@@ -138,174 +331,371 @@ fun ArticleReadingScreen(
             pronunciationMessage?.let { message ->
                 Text(
                     text = message,
-                    color = MintTextMuted,
+                    style = AppType.Footnote,
+                    color = colors.text2,
                     modifier = Modifier
                         .testTag("article_pronunciation_message")
                         .semantics { contentDescription = message },
                 )
             }
         }
-        // 决策 §2：暂停/继续只在 Playing/Paused 窗口呈现，呈现条件按「选中引擎 ≠ SystemTts」收窄
-        // （裁决 B2）；停止在系统 TTS 下同样可用，照常给。
         val speakingOrPaused =
             pronunciationStatus == PronunciationStatus.Playing || pronunciationStatus == PronunciationStatus.Paused
         if (speakingOrPaused) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (pauseResumeSupported) {
-                    Button(
+                    TextButton(
                         onClick = onPauseResume,
-                        modifier = Modifier.testTag("article_pronunciation_toggle").semantics {
-                            contentDescription = if (pronunciationStatus == PronunciationStatus.Paused) "继续播放发音" else "暂停发音"
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                    ) { Text(if (pronunciationStatus == PronunciationStatus.Paused) "继续" else "暂停") }
-                }
-                Button(
-                    onClick = onStopPronunciation,
-                    modifier = Modifier.testTag("article_pronunciation_stop").semantics { contentDescription = "停止播放发音" },
-                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                ) { Text("停止") }
-            }
-        }
-
-        // F3-01B：进文覆盖词弹窗——每篇文章首次打开显示一次。coveredLemmas 是文章自带
-        // 的落库字段，弹窗是纯呈现：关闭状态按 articleId 记忆，切换文章重新弹。
-        var coveragePopupDismissed by androidx.compose.runtime.saveable.rememberSaveable(current.article.articleId) {
-            androidx.compose.runtime.mutableStateOf(false)
-        }
-        if (!coveragePopupDismissed && current.article.coveredLemmas.isNotEmpty()) {
-            GlassDialog(
-                onDismiss = { coveragePopupDismissed = true },
-                modifier = Modifier.testTag("coverage_popup"),
-            ) {
-                Text(
-                    "本文覆盖你已背的 ${current.article.coveredLemmas.size} 个词",
-                    modifier = Modifier.testTag("coverage_popup_count"),
-                    style = AppType.Headline,
-                    color = appColors().text1,
-                )
-                Column(
-                    Modifier
-                        .padding(top = 8.dp)
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    current.article.coveredLemmas.forEach { lemma ->
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("article_pronunciation_toggle")
+                            .semantics {
+                                contentDescription =
+                                    if (pronunciationStatus == PronunciationStatus.Paused) "继续播放发音" else "暂停发音"
+                            },
+                    ) {
                         Text(
-                            lemma,
-                            Modifier
-                                .fillMaxWidth()
-                                .testTag("coverage_chip_$lemma")
-                                .padding(vertical = 3.dp),
-                            style = AppType.Body,
-                            color = appColors().text1,
+                            text = if (pronunciationStatus == PronunciationStatus.Paused) "继续" else "暂停",
+                            style = AppType.Label,
+                            color = colors.text2,
                         )
                     }
                 }
-                PillButton(
-                    text = "我知道了",
-                    onClick = { coveragePopupDismissed = true },
+                TextButton(
+                    onClick = onStopPronunciation,
                     modifier = Modifier
-                        .padding(top = 12.dp)
-                        .fillMaxWidth(),
-                    style = PillStyle.Primary,
-                    domain = AppDomain.Reading,
-                    testTag = "coverage_popup_close",
+                        .heightIn(min = 48.dp)
+                        .testTag("article_pronunciation_stop")
+                        .semantics { contentDescription = "停止播放发音" },
+                ) {
+                    Text(text = "停止", style = AppType.Label, color = colors.text2)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 来源块两行（Task E 的四行收口）。AC2-07：来源标识不得包含 Key / Endpoint——AI 分支只渲染
+ * `modelName`，`parameterSummary` 是纯审计字段，永远不进界面。
+ *
+ * 三分支**只挑文案，不各写一遍块**：原来每支各写一枚 `article_source_name`，全文件三份同名
+ * 字面量，connected 侧 `onNodeWithTag` 会撞多个节点（`ArticleReadingScreenTest` 的
+ * AI / 外刊 / 导入三条用例正是这么取的）。收成「先算文案、再渲染两行」之后四枚 tag 各恰一处。
+ *
+ * 行尾域名取 `text2` 而不是令牌表里更轻的 `text3`：`text3` 压 `background` 实测 3.17:1，
+ * 未达正文线 4.5——域名是授权署名（`attributionText`），属正文级信息，不是装饰。
+ * 链接仍是**纯文本展示**，不挂任何点击动作：原文链接绝不自动打开（spec F2-06），
+ * 但 URL 必须可见——它是这条安全能力的唯一可见处。
+ */
+@Composable
+private fun ArticleSourceBlock(article: Article) {
+    val colors = appColors()
+    val source = article.source
+    val name = when (source) {
+        is ArticleSource.AiGenerated -> "AI 生成 · ${source.modelName}"
+        is ArticleSource.WebFetched -> source.displayName
+        ArticleSource.UserImported -> "手动导入 · ${formatImportedAt(article.generatedAtEpochMillis)}"
+    }
+    val attribution = (source as? ArticleSource.WebFetched)?.attributionText
+    val articleUrl = (source as? ArticleSource.WebFetched)?.articleUrl
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = name,
+                style = AppType.Title,
+                color = colors.text1,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("article_source_name"),
+            )
+            if (attribution != null) {
+                Text(
+                    text = attribution,
+                    style = AppType.Footnote,
+                    color = colors.text2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("article_attribution"),
                 )
             }
         }
-
-        Text(
-            current.article.title,
-            modifier = Modifier.testTag("article_title"),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MintPrimaryDark,
-        )
-
-        SourceHeader(current.article)
-
-        // F5-03 / Task 11：三个模式 chip 在特大字号下会超出屏宽，横向可滚动避免裁切。
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ModeChip("英文优先", ArticleDisplayMode.ENGLISH_FIRST, "article_mode_english_first", current.mode, onModeChange)
-            ModeChip("双语", ArticleDisplayMode.BILINGUAL, "article_mode_bilingual", current.mode, onModeChange)
-            ModeChip("全文对照", ArticleDisplayMode.FULL_TRANSLATION, "article_mode_full_translation", current.mode, onModeChange)
+        if (articleUrl != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "原文链接（不会自动打开）",
+                    style = AppType.Footnote,
+                    color = colors.text2,
+                    modifier = Modifier.testTag("article_source_url_label"),
+                )
+                Text(
+                    text = articleUrl,
+                    style = AppType.Footnote,
+                    color = colors.text1,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("article_source_link"),
+                )
+            }
         }
-
-        // F3-01C：标记已背词开关。只影响高亮呈现，不动文章内容与未覆盖词 chips。
-        Row(
-            modifier = Modifier.fillMaxWidth().testTag("article_marks_row"),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        ) {
-            Text("标记已背的词", color = MintPrimaryDark)
-            Switch(
-                checked = current.showLearnedMarks,
-                onCheckedChange = onSetLearnedMarks,
-                modifier = Modifier.testTag("article_marks_switch").semantics { contentDescription = "标记已背的词" },
-            )
-        }
-
-        HighlightedEnglish(
-            englishText = current.article.englishText,
-            highlights = current.highlights,
-            cards = current.cards,
-            onOpenCard = onOpenCard,
-            onOpenDictionary = onOpenDictionary,
-        )
-
-        if (current.article.chineseText.isEmpty()) {
+        if (source is ArticleSource.UserImported) {
             Text(
-                "该来源没有中文翻译",
-                modifier = Modifier.testTag("article_no_translation_notice"),
-                color = MintTextMuted,
+                text = "内容由你自行提供，请确保你有权使用。",
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("article_import_responsibility"),
             )
         }
+    }
+}
+
+/**
+ * 模式行：两枚 chip + 译文开关，同一行同一容器。
+ *
+ * 第三枚「全文对照」chip 撤掉（`article_mode_full_translation` 归零）：它只改偏好里的初始展开值，
+ * 而「双语 + 显示译文」已经能表达同一件事——两个控件表达一个状态，用户得点两处才看得到全译。
+ * `FULL_TRANSLATION` 折叠成「双语 chip 选中 + 译文已展开」的**呈现等价**，VM 语义不动：
+ * 屏侧只在选中态的比对上把它读成双语，chip 也仍然只发前两档偏好。
+ *
+ * 横向可滚动保住 F5-03：特大字号下两枚 chip + 一枚文字按钮会超出屏宽。
+ * 译文开关是 `TextButton`：次要动作不与吸底主操作抢实底；无译文时禁用并降墨到 `text3`。
+ */
+@Composable
+private fun ArticleModeRow(
+    mode: ArticleDisplayMode,
+    translationExpanded: Boolean,
+    translationAvailable: Boolean,
+    onModeChange: (ArticleDisplayMode) -> Unit,
+    onToggleTranslation: () -> Unit,
+) {
+    val colors = appColors()
+    val presentedMode = if (mode == ArticleDisplayMode.FULL_TRANSLATION) ArticleDisplayMode.BILINGUAL else mode
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ModeChip("英文优先", ArticleDisplayMode.ENGLISH_FIRST, "article_mode_english_first", presentedMode, onModeChange)
+        ModeChip("双语", ArticleDisplayMode.BILINGUAL, "article_mode_bilingual", presentedMode, onModeChange)
         TextButton(
             onClick = onToggleTranslation,
-            enabled = current.article.chineseText.isNotEmpty(),
-            modifier = Modifier.testTag("article_translation_toggle"),
-        ) { Text(if (current.translationExpanded) "收起译文" else "显示译文") }
-        if (current.translationExpanded) {
+            enabled = translationAvailable,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .testTag("article_translation_toggle"),
+        ) {
             Text(
-                current.article.chineseText,
-                modifier = Modifier
-                    .background(MintSurface, RoundedCornerShape(14.dp))
-                    .padding(14.dp)
-                    .testTag("article_translation"),
-                color = MintPrimaryDark,
+                text = if (translationExpanded) "收起译文" else "显示译文",
+                style = AppType.Label,
+                color = if (translationAvailable) colors.text1 else colors.text3,
             )
         }
+    }
+}
 
-        // F3-02：完成阅读。落库成功后按钮转为「已完成」并禁用；幂等由 articleId 主键保证。
-        Button(
-            onClick = onCompleteReading,
-            enabled = !current.completed,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("article_complete_reading"),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (current.completed) MintSurface else MintPrimary,
-                contentColor = MintPrimaryDark,
-            ),
-        ) { Text(if (current.completed) "已完成阅读" else "完成阅读", fontWeight = FontWeight.Bold) }
+/**
+ * 标注行：F3-01C 的「标记已背的词」开关。只影响高亮呈现，不动文章内容与未覆盖词 chips。
+ *
+ * 开关的 `contentDescription` 与 `testTag` 必须**相邻**（`AccessibilitySwitchLabelContractTest`
+ * 规则1：`testTag` 之后 80 字符内必须出现 `contentDescription`），紧凑书写优先于放宽窗口。
+ */
+@Composable
+private fun ArticleMarksRow(
+    checked: Boolean,
+    onSetLearnedMarks: (Boolean) -> Unit,
+) {
+    val colors = appColors()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("article_marks_row"),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "标记已背的词",
+            style = AppType.Body,
+            color = colors.text1,
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onSetLearnedMarks,
+            modifier = Modifier.testTag("article_marks_switch").semantics { contentDescription = "标记已背的词" },
+        )
+    }
+}
 
-        if (current.uncoveredLemmas.isNotEmpty()) {
-            Text("未覆盖词", fontWeight = FontWeight.Bold, color = MintPrimaryDark, modifier = Modifier.testTag("article_uncovered"))
-            // F5-03 / Task 11：未覆盖词 chip 数量不定，横向排布在动态字体下必然溢出 → 改 FlowRow 换行。
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                current.uncoveredLemmas.forEach { lemma ->
-                    val card = current.cards.firstOrNull { it.lemma == lemma || it.cardId == lemma }
-                    AssistChip(
-                        onClick = {
-                            if (card != null) onOpenCard(card) else onOpenDictionary(lemma)
-                        },
-                        label = { Text(lemma) },
-                        modifier = Modifier.testTag("article_uncovered_$lemma"),
+/**
+ * 覆盖词入口行：面板收起之后仍能把这些词调出来。
+ *
+ * 原来是一枚居中对话框、关掉就再也看不到（每篇文章只弹一次）。改成底部面板后，关掉同样不再自弹，
+ * 所以正文侧留一条弱行作为重新打开的入口——这是**已有数据的重新呈现**（`coveredLemmas` 是文章
+ * 自带的落库字段），不新增数据通路、不改 ViewModel。
+ */
+@Composable
+private fun CoverageEntryRow(
+    count: Int,
+    onClick: () -> Unit,
+) {
+    val colors = appColors()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(AppShape.Inline)
+            .background(colors.surface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .testTag("article_coverage_entry"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "本文覆盖你已背的 $count 个词",
+            style = AppType.Body,
+            color = colors.text1,
+            modifier = Modifier.weight(1f),
+        )
+        AppGlyph(icon = AppIcon.ChevronRight, tint = colors.text2, size = 16.dp, layer = AppGlyphLayer.StrokeOnly)
+    }
+}
+
+/**
+ * 覆盖词底部面板（F3-01B 的呈现改造）。
+ *
+ * 换掉的是居中 `GlassDialog`：它进文第一帧就把正文整块挡住，用户得先点「我知道了」才看得到文章。
+ * 底部面板从下沿升起、可下滑收起，正文留在上半屏；`skipPartiallyExpanded = true` 让它一次升到
+ * 展开位而不是半展开（半展开会把正文压成一条缝）。
+ *
+ * 标题行（计数 + 「我知道了」）排在词表**之上**并留在滚动面之外：词表长时按钮仍随手可点，
+ * connected 那几处「关掉面板后正文才可读」的用例不必先滚到底。
+ * 容器取 `appColors().surface`、面板内每一处前景显式给 `appColors()` 档——容器与墨同源，
+ * 深浅两套各自成立（原口径由 `GlassPanelInkPairingContractTest` 钉在 `GlassDialog` 族上；
+ * 本屏退出该族后同一口径由 `ArticleReadingLayoutContractTest` 第 3 条接手）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CoverageSheet(
+    lemmas: List<String>,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = appColors().surface,
+        modifier = Modifier.testTag("coverage_popup"),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "本文覆盖你已背的 ${lemmas.size} 个词",
+                    style = AppType.Headline,
+                    color = appColors().text1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("coverage_popup_count"),
+                )
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("coverage_popup_close"),
+                ) {
+                    Text(text = "我知道了", style = AppType.Label, color = appColors().text2)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 4.dp),
+            ) {
+                lemmas.forEach { lemma ->
+                    Text(
+                        text = lemma,
+                        style = AppType.Body,
+                        color = appColors().text1,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("coverage_chip_$lemma")
+                            .padding(vertical = 6.dp),
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * 吸底操作条：本屏唯一的主 CTA。
+ *
+ * 「完成阅读」原来排在正文、未覆盖词之后——文章越长越点不到，而它恰恰是这一屏唯一的主操作。
+ * 现在它是页头与正文之外的第三条带：条底铺页底色 `background`（不是 `surface`），靠顶部 1dp
+ * 发丝线与滚动正文分层，正文滚动面在它上面，滚动时不动。
+ *
+ * 高度取 `heightIn(min = 50.dp)`：spec §4.5 钉主 CTA 全宽 50–52dp，计划写的 48dp 是触控下限，
+ * 这里取两者交集的下沿。实底取 `strongSurface` + `onStrong`（房内主操作档，同 `WorksheetPreviewScreen`），
+ * 禁用态落 `tint3` + `text3`（已完成阅读后按钮转为「已完成阅读」并禁用，幂等由 articleId 主键保证）。
+ */
+@Composable
+private fun ArticleCompleteBar(
+    completed: Boolean,
+    onCompleteReading: () -> Unit,
+) {
+    val colors = appColors()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.background)
+            .testTag("article_complete_action_bar")
+            .then(hairlineTop(colors.outlineSoft))
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        Button(
+            onClick = onCompleteReading,
+            enabled = !completed,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 50.dp)
+                .testTag("article_complete_reading"),
+            shape = AppShape.Button,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.strongSurface,
+                contentColor = colors.onStrong,
+                disabledContainerColor = colors.tint3,
+                disabledContentColor = colors.text3,
+            ),
+        ) {
+            Text(
+                text = if (completed) "已完成阅读" else "完成阅读",
+                style = AppType.Label,
+                color = if (completed) colors.text3 else colors.onStrong,
+            )
         }
     }
 }
@@ -326,6 +716,12 @@ private fun ModeChip(
     )
 }
 
+/**
+ * 英文正文：单节点 `AnnotatedString`，高亮区间加粗并用阅读域深色墨。
+ *
+ * 高亮墨取 `appDomain(AppDomain.Reading).deep` 而不是静态薄荷桥：浅套 9C3B4F 压背景 ≈5.9:1、
+ * 深套 EDA8B4 压深底更高——域色两套都由 `appColors()` 家族供给，屏侧不再出现第二套色源。
+ */
 @Composable
 private fun HighlightedEnglish(
     englishText: String,
@@ -334,12 +730,13 @@ private fun HighlightedEnglish(
     onOpenCard: (WordCard) -> Unit,
     onOpenDictionary: (String) -> Unit,
 ) {
+    val highlightInk = appDomain(AppDomain.Reading).deep
     val annotated = buildAnnotatedString {
         var cursor = 0
         for (highlight in highlights.sortedBy { it.start }) {
             if (highlight.start < cursor) continue // 与派生器的贪心去重双保险
             append(englishText, cursor, highlight.start)
-            withStyle(SpanStyle(color = MintPrimary, fontWeight = FontWeight.Bold)) {
+            withStyle(SpanStyle(color = highlightInk, fontWeight = FontWeight.Bold)) {
                 append(englishText, highlight.start, highlight.end)
             }
             // Task 26 Step 1（F5-03 移交账）：词区间以字符串注解留在正文上，供语义层与判据
@@ -378,15 +775,16 @@ private fun HighlightedEnglish(
     androidx.compose.foundation.text.ClickableText(
         text = annotated,
         // Task 24（裁决⑤ 附带债）：这一行原先把浅套深墨以裸 hex 写死，深色档下英文正文直接不可读。
-        // 落底是屏根 `Column` 的 `MintBackground`，而它是读 `LocalAppColors.current.background` 的组合期
-        // getter（`theme/MintPalette.kt`）——**容器随主题换套**，所以前景同样换套才成立：
-        // 旧墨压深套底只有 1.38:1（正文线 4.5，连装饰线 3.1 都不过），换 `appColors().text1` 后
-        // 浅/深两套实测 16.09 / 16.20。判据与复算见 `ReadingHomeLayoutContractTest`
-        // `[the english body ink clears the AA gate on both theme sets]`，那两条比值由包级
-        // `SourceRatchet.ratio` 现场算，不在这里抄数。
+        // 落底是屏根 `Column` 的 `background`（读 `appColors()` 的组合期取值）——**容器随主题换套**，
+        // 所以前景同样换套才成立：旧墨压深套底只有 1.38:1（正文线 4.5，连装饰线 3.1 都不过），
+        // 换 `appColors().text1` 后浅/深两套实测 16.09 / 16.20。判据与复算见
+        // `ReadingHomeLayoutContractTest` `[the english body ink clears the AA gate on both theme sets]`。
         // 形状按 R-22.3 归 `AppType.Body` 并显式给墨（房内配平先例：面板内前景必须逐枚给 `appColors()`，
-        // 只借 `AppType` 会连着它自带的浅套静态墨一起落下）。**只改这一行**，整屏 typography 归 Task 26。
-        style = AppType.Body.copy(color = appColors().text1),
+        // 只借 `AppType` 会连着它自带的主题墨一起落下——这里显式给是为了让判据能逐字取样）。
+        // 行高按 spec §4.2「多行段落在使用点给 lineHeight = fontSize × 1.5」：15sp × 1.5 = 22.5sp。
+        // 逐字保留 `style = AppType.Body.copy(color = appColors().text1)` 这一段前缀是**判据契约**，
+        // 行高因此接在第二个 `.copy` 上（`ReadingHomeLayoutContractTest:287` 按精确子串取样）。
+        style = AppType.Body.copy(color = appColors().text1).copy(lineHeight = 22.5.sp),
         modifier = Modifier
             .testTag("article_english")
             .semantics { customActions = wordActions },
@@ -399,64 +797,3 @@ private fun HighlightedEnglish(
 
 /** 正文逐词注解的 tag；判据侧按同一字面量取区间（`getStringAnnotations`）。 */
 private const val WORD_ANNOTATION_TAG = "word"
-
-/**
- * 来源区（Task E）。AC2-07：来源标识不得包含 Key / Endpoint——AI 分支只渲染 `modelName`，
- * `parameterSummary` 是纯审计字段，永远不进界面。
- */
-@Composable
-private fun SourceHeader(article: Article) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        when (val source = article.source) {
-            is ArticleSource.AiGenerated -> {
-                Text(
-                    "AI 生成 · ${source.modelName}",
-                    modifier = Modifier.testTag("article_source_name"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                )
-            }
-            is ArticleSource.WebFetched -> {
-                Text(
-                    source.displayName,
-                    modifier = Modifier.testTag("article_source_name"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                )
-                Text(
-                    source.attributionText,
-                    modifier = Modifier.testTag("article_attribution"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                )
-                // 链接是纯文本展示，不挂任何点击动作：原文链接绝不自动打开（spec F2-06）。
-                Text(
-                    "原文链接（不会自动打开）",
-                    modifier = Modifier.testTag("article_source_url_label"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                )
-                Text(
-                    source.articleUrl,
-                    modifier = Modifier.testTag("article_source_link"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintPrimaryDark,
-                )
-            }
-            ArticleSource.UserImported -> {
-                Text(
-                    "手动导入 · ${formatImportedAt(article.generatedAtEpochMillis)}",
-                    modifier = Modifier.testTag("article_source_name"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                )
-                Text(
-                    "内容由你自行提供，请确保你有权使用。",
-                    modifier = Modifier.testTag("article_import_responsibility"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                )
-            }
-        }
-    }
-}

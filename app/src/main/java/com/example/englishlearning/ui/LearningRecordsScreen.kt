@@ -139,6 +139,9 @@ private fun LoadingState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            // 批 1 Task 8：LazyColumn 的横向 contentPadding 已归 0（缩进由行内 20dp 承担），
+            // 非行内容（加载/错误/空态/日期分组头）必须自己带 20dp，否则会贴屏幕边缘。
+            .padding(horizontal = 20.dp)
             .testTag("learning_records_loading"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -152,6 +155,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 20.dp)
             .testTag("learning_records_unavailable"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -168,7 +172,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
 private fun EmptyState(text: String, tag: String) {
     Text(
         text = text,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp).testTag(tag).semantics { contentDescription = text },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp).testTag(tag).semantics { contentDescription = text },
         color = MintTextMuted,
     )
 }
@@ -178,7 +182,7 @@ private fun HistoryHeader(group: LearningHistoryGroup, stats: DailyLearningHisto
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
+            .padding(start = 20.dp, end = 20.dp, top = 8.dp)
             .testTag("learning_records_history_header_${group.localDate}")
             .semantics { contentDescription = "学习日期 ${group.localDate}，${group.count} 词" },
         verticalArrangement = Arrangement.spacedBy(2.dp),

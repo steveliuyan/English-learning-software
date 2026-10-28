@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,10 +24,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.EntryIconBadge
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.StrongCard
+import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 
@@ -79,6 +83,8 @@ fun ProfileScreen(
         AppScreenHeader(
             title = profileName,
             subtitle = "连续学习 $streakDays 天 · API Key 只保存在本机加密区。",
+            hero = true,
+            badge = { EntryIconBadge(icon = AppIcon.Person, domain = AppDomain.Settings) },
         )
         StrongCard(modifier = Modifier.testTag("profile_stats")) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -107,7 +113,9 @@ fun ProfileScreen(
  * TalkBack 读「标签，当前 数值」一整句（[contentDescription]），而不是先念一个孤零零的数字。
  * 「当前」这两个字不是文案口味，是 `AccessibilityLabelContractTest` 禁令1a 的硬要求：字面量里必须含
  * **汉字**（U+4E00–U+9FFF），纯插值模板与全角标点都不算——所以不能写成 `"$label，$value"`。
- * 墨色取 `onStrong`：本格只住在强档卡里，两套主题的 `strongSurface` 都是深底。
+ * 墨色取容器内容色 `LocalContentColor.current`（2026-10-31 用户评审 ②）：这一格只住在 [StrongCard] 里，
+ * 而强档卡的底与墨是**分套**的（浅套 `tint2` 底 + `text1` 墨、深套 `strongSurface` 底 + `onStrong` 墨）。
+ * 写死 `onStrong`（`#E9F2EC`）在浅套就是浅薄荷底上的近白字，实测不可读；取容器内容色则两套自动到位。
  */
 @Composable
 private fun ProfileStatCell(
@@ -117,7 +125,6 @@ private fun ProfileStatCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = appColors()
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -129,7 +136,7 @@ private fun ProfileStatCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(value, style = AppType.Headline, color = colors.onStrong)
-        Text(label, style = AppType.Footnote, color = colors.onStrong.copy(alpha = 0.72f))
+        Text(value, style = AppType.Headline, color = LocalContentColor.current)
+        Text(label, style = AppType.Footnote, color = LocalContentColor.current.copy(alpha = 0.72f))
     }
 }

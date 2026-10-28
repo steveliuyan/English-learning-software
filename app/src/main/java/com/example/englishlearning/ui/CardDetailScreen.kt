@@ -1,27 +1,25 @@
 package com.example.englishlearning.ui
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,19 +52,13 @@ import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.SpeakerButton
 import com.example.englishlearning.ui.components.SpeakerState
 import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
-import com.example.englishlearning.ui.theme.MintTint
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
 
@@ -113,10 +105,11 @@ fun CardDetailScreen(
     personalNoteSaveStatus: PersonalNoteSaveStatus = PersonalNoteSaveStatus.Idle,
     modifier: Modifier = Modifier,
 ) {
+    val colors = appColors()
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MintBackground)
+            .background(colors.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
             .testTag("card_detail_screen"),
@@ -147,24 +140,8 @@ fun CardDetailScreen(
             onAskAi = onAskAi,
         )
 
-        // 配图优先用词书包导入的真实文件（`imagePath`）；没有才回退到内置 drawable 映射。
-        // 两条路都渲染在同一种卡片里，界面看不出差别。
-        val importedImage = card.imagePath
-        if (!importedImage.isNullOrBlank()) {
-            ImportedIllustration(lemma = card.lemma, path = importedImage)
-        } else {
-            lemmaToDrawableRes(card.lemma)?.let { res ->
-                DetailCard {
-                    Image(
-                        painter = painterResource(res),
-                        contentDescription = "说明图 ${card.lemma}",
-                        contentScale = ContentScale.Crop,
-                        modifier = illustrationModifier.testTag("card_detail_illustration"),
-                    )
-                }
-            }
-        }
-
+        // 配图不再是通栏大图：72dp 缩略图挂在词头行尾（spec §5），
+        // 「有没有配图」这条信息留着，纵向空间还给释义。
         val example = card.example?.takeIf { it.isNotBlank() }
         val exampleZh = card.exampleZh?.takeIf { it.isNotBlank() }
         if (example != null || exampleZh != null) {
@@ -277,25 +254,67 @@ private fun WordHeroCard(
     onToggleFavorite: (() -> Unit)?,
     onAskAi: (() -> Unit)?,
 ) {
+    val colors = appColors()
+    val illustration = rememberIllustrationSource(card.lemma, card.imagePath)
     DetailCard {
-        Text(
-            text = card.lemma,
-            style = AppType.Display.copy(fontSize = 36.sp),
-            modifier = Modifier
-                .testTag("card_detail_lemma")
-                .semantics { contentDescription = card.lemma },
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // 词头行：词 + 72dp 配图缩略图。缩略图只是「有图」的凭证，读屏仍给一句说明。
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = card.lemma,
+                style = AppType.Display.copy(fontSize = 36.sp),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("card_detail_lemma")
+                    .semantics { contentDescription = card.lemma },
+            )
+            illustration.bitmap?.let { decoded ->
+                Image(
+                    bitmap = decoded.asImageBitmap(),
+                    contentDescription = "配图 ${card.lemma}",
+                    contentScale = ContentScale.Crop,
+                    modifier = illustrationThumbnailModifier.testTag("card_detail_image_file"),
+                )
+            }
+            illustration.fallbackRes?.let { res ->
+                Image(
+                    painter = painterResource(res),
+                    contentDescription = "说明图 ${card.lemma}",
+                    contentScale = ContentScale.Crop,
+                    modifier = illustrationThumbnailModifier.testTag("card_detail_illustration"),
+                )
+            }
+        }
+        // 文件被外部删掉或解码失败时不留空图框，改一行可读提示（图位在这里干脆不占面积）。
+        if (illustration.unreadable) {
+            Text(
+                text = "配图暂时读不出来，可重新导入这册词书。",
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier
+                    .testTag("card_detail_image_unreadable")
+                    .semantics { contentDescription = "配图读不出来" },
+            )
+        }
+        // 音标 + 美/英发音药片：整行**可换行**（`FlowRow`），不是挤在一行里。
+        //
+        // 真机取证（批 2 Task 7）：1080×2340 上「音标 + 两枚 `播放发音` 药片」的自然宽度超出卡内
+        // 可用宽度约 27dp，`Row` 的度量方式是按顺序扣减剩余空间，最后那枚英式药片被压到只剩字宽，
+        // 「播放发音」竖排成一列乱码。换成 `FlowRow` 后每枚药片量自然尺寸，放不下就整枚挪到下一行——
+        // 2.0 字号下同理（一片一行），只换行、不压扁、不裁字。
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
             if (card.ipa.isNotBlank()) {
                 Text(
                     text = card.ipa,
-                    style = AppType.Body.copy(color = MintTextMuted),
+                    style = AppType.Body.copy(color = colors.text2),
                     modifier = Modifier
                         .testTag("card_detail_ipa")
                         .semantics { contentDescription = "音标 ${card.ipa}" },
                 )
             }
-            Spacer(Modifier.width(4.dp))
             // 发音入口归一到共享药片（spec §3「两套同构几何」的详情页那一半）：
             // 喇叭字形、48dp 触控下限、三态可见文案都由组件一处交付，本屏只给态、动作、tag 与口音尾缀。
             // 默认美式；英式仅在调用方提供时出现，两口音靠尾缀分档，屏侧不写任何朗读定语。
@@ -311,27 +330,6 @@ private fun WordHeroCard(
                     onClick = { speakBritish() },
                     modifier = Modifier.testTag("card_detail_speak_british"),
                     accentLabel = "英",
-                )
-            }
-        }
-        // F5-03 决策 §4（Task 10 携带的 T9 复评 N-4，口径同阅读页 `article_status_live_region`）：
-        // 发音状态文字必须由**常驻 live region 容器**承载，靠子节点进出触发播报
-        // （Task 6 判例 WordCardScreen.word_card_status_live_region）。
-        // ①tag `card_detail_pronunciation_message` 留在瞬时 Text 上（既有引用不破）；
-        // ②liveRegion 只在容器上，瞬时子节点不得再带；③播控 Row 保持在容器之外（B1 口径）。
-        // 已知代价：容器空态仍占外层 spacedBy 一份幽灵间距——与阅读页同形同代价，归 UI 重设计轮。
-        Column(
-            modifier = Modifier
-                .testTag("card_detail_status_live_region")
-                .semantics { liveRegion = LiveRegionMode.Polite },
-        ) {
-            pronunciationStatus.message()?.let { message ->
-                Text(
-                    text = message,
-                    style = AppType.Footnote,
-                    modifier = Modifier
-                        .testTag("card_detail_pronunciation_message")
-                        .semantics { contentDescription = message },
                 )
             }
         }
@@ -351,13 +349,12 @@ private fun WordHeroCard(
                         modifier = Modifier.testTag("card_detail_pronunciation_toggle"),
                     )
                 }
-                OutlinedButton(
+                TextButton(
                     onClick = onStopPronunciation,
                     modifier = Modifier
                         .testTag("card_detail_pronunciation_stop")
                         .semantics { contentDescription = "停止播放发音" },
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MintPrimaryDark),
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.text1),
                 ) { Text("停止") }
             }
         }
@@ -380,42 +377,109 @@ private fun WordHeroCard(
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (favoritePresent != null && onToggleFavorite != null) {
-                PillButton(
-                    label = if (favoritePresent) "★ 已收藏" else "☆ 收藏",
-                    description = if (favoritePresent) "取消收藏 ${card.lemma}" else "收藏 ${card.lemma}",
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.testTag("card_detail_favorite_toggle"),
+        // 五枚动作药片拆两行（3 + 2）：一行放五枚时窄屏 + 大字号会把最后一枚压成竖排单字。
+        WordActionPillGrid(
+            lemma = card.lemma,
+            favoritePresent = favoritePresent,
+            onToggleFavorite = onToggleFavorite,
+            vocabularyPresent = vocabularyPresent,
+            onToggleVocabulary = onToggleVocabulary,
+            onRelearn = onRelearn,
+            onNext = onNext,
+            onAskAi = onAskAi,
+        )
+        // F5-03 决策 §4（Task 10 携带的 T9 复评 N-4，口径同阅读页 `article_status_live_region`）：
+        // 发音状态文字由**常驻 live region 容器**承载，靠子节点进出触发播报
+        // （Task 6 判例 WordCardScreen.word_card_status_live_region）。
+        // ①tag `card_detail_pronunciation_message` 留在瞬时 Text 上（既有引用不破）；
+        // ②liveRegion 只在容器上，瞬时子节点不得再带；③容器零子节点时不留任何可见/占位面积。
+        // 排版上排到卡内最后一块：外层 `spacedBy(10.dp)` 的幽灵间距只会落在卡片底部，
+        // 不再把「词头 / 音标 / 释义」之间的距离撑开（UI 重设计轮要解决的正是这条）。
+        Column(
+            modifier = Modifier
+                .testTag("card_detail_status_live_region")
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            pronunciationStatus.message()?.let { message ->
+                Text(
+                    text = message,
+                    style = AppType.Footnote,
+                    modifier = Modifier
+                        .testTag("card_detail_pronunciation_message")
+                        .semantics { contentDescription = message },
                 )
             }
-            if (vocabularyPresent != null && onToggleVocabulary != null) {
-                PillButton(
-                    label = if (vocabularyPresent) "移出生词本" else "加入生词本",
-                    description = if (vocabularyPresent) "移出 ${card.lemma} 生词本" else "加入 ${card.lemma} 生词本",
-                    onClick = onToggleVocabulary,
-                    modifier = Modifier.testTag("card_detail_vocabulary_toggle"),
-                )
-            }
-            onRelearn?.let { callback ->
-                PillButton(label = "重新学习", description = "重新学习 ${card.lemma}", onClick = callback)
-            }
-            onNext?.let { callback ->
-                PillButton(
-                    label = "下一个单词",
-                    description = "查看下一个单词",
-                    onClick = callback,
-                    modifier = Modifier.testTag("card_detail_next"),
-                )
-            }
-            onAskAi?.let { callback ->
-                PillButton(
-                    label = "问 AI",
-                    description = "问 AI（${card.lemma}）",
-                    onClick = callback,
-                    modifier = Modifier.testTag("card_detail_ask_ai"),
-                )
-            }
+        }
+    }
+}
+
+/**
+ * 动作药片网格（spec §5：5 枚改两行 3 + 2）。
+ *
+ * 分工分两行：收藏 / 生词本 / 重新学习是**对词本身**的动作，下一个 / 问 AI 是**继续读下去**的动作。
+ * 每枚拿 `weight(1f)`，窄屏和大字号下不会再把「词 + 图标」压成竖排单字。
+ */
+@Composable
+private fun WordActionPillGrid(
+    lemma: String,
+    favoritePresent: Boolean?,
+    onToggleFavorite: (() -> Unit)?,
+    vocabularyPresent: Boolean?,
+    onToggleVocabulary: (() -> Unit)?,
+    onRelearn: (() -> Unit)?,
+    onNext: (() -> Unit)?,
+    onAskAi: (() -> Unit)?,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (favoritePresent != null && onToggleFavorite != null) {
+            PillButton(
+                label = if (favoritePresent) "★ 已收藏" else "☆ 收藏",
+                description = if (favoritePresent) "取消收藏 $lemma" else "收藏 $lemma",
+                onClick = onToggleFavorite,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("card_detail_favorite_toggle"),
+            )
+        }
+        if (vocabularyPresent != null && onToggleVocabulary != null) {
+            PillButton(
+                label = if (vocabularyPresent) "移出生词本" else "加入生词本",
+                description = if (vocabularyPresent) "移出 $lemma 生词本" else "加入 $lemma 生词本",
+                onClick = onToggleVocabulary,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("card_detail_vocabulary_toggle"),
+            )
+        }
+        onRelearn?.let { callback ->
+            PillButton(
+                label = "重新学习",
+                description = "重新学习 $lemma",
+                onClick = callback,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        onNext?.let { callback ->
+            PillButton(
+                label = "下一个单词",
+                description = "查看下一个单词",
+                onClick = callback,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("card_detail_next"),
+            )
+        }
+        onAskAi?.let { callback ->
+            PillButton(
+                label = "问 AI",
+                description = "问 AI（$lemma）",
+                onClick = callback,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("card_detail_ask_ai"),
+            )
         }
     }
 }
@@ -458,7 +522,7 @@ private fun PersonalNoteEditor(
         }
         PersonalNoteSaveStatus.Saved -> Text(
             "笔记已保存。",
-            color = MintPrimaryDark,
+            color = appColors().success,
             modifier = Modifier.testTag("card_detail_personal_note_saved"),
         )
         else -> Unit
@@ -469,6 +533,9 @@ private fun PersonalNoteEditor(
  * 我的笔记弹窗：列表 + 逐条删除 + 添加，全部收在这一层；
  * 由例句下方的展示栏「添加 / 管理」按钮打开（真机反馈两轮：笔记内容要在页面直接可见，
  * 但增删集中在弹窗，页面不噪）。
+ *
+ * 标题写「管理笔记」而不是「我的笔记」：页面上的小节已经叫「我的笔记」，
+ * 弹窗再叫一遍等于同一句话读两遍，也说不清弹窗为什么存在（spec §5）。
  */
 @Composable
 private fun PersonalNotesDialog(
@@ -480,7 +547,7 @@ private fun PersonalNotesDialog(
 ) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("我的笔记", style = AppType.Title) },
+        title = { Text("管理笔记", style = AppType.Title) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -490,7 +557,7 @@ private fun PersonalNotesDialog(
                     Text(
                         text = "还没有笔记。可以记下记忆方法、易错点或例句。",
                         style = AppType.Body,
-                        color = MintTextMuted,
+                        color = appColors().text2,
                         modifier = Modifier.testTag("card_detail_notes_empty"),
                     )
                 }
@@ -546,14 +613,15 @@ private fun SenseRow(
     posModifier: Modifier = Modifier,
     meaningModifier: Modifier = Modifier,
 ) {
+    val colors = appColors()
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
         if (partOfSpeech.isNotBlank()) {
             Text(
                 text = partOfSpeech,
-                style = AppType.Label.copy(color = MintPrimaryDark, fontWeight = FontWeight.SemiBold),
+                style = AppType.Label.copy(color = colors.text1, fontWeight = FontWeight.SemiBold),
                 modifier = posModifier
                     .clip(AppShape.Pill)
-                    .background(MintTint)
+                    .background(colors.tint)
                     .padding(horizontal = 8.dp, vertical = 3.dp),
             )
         }
@@ -563,28 +631,21 @@ private fun SenseRow(
     }
 }
 
-/** 浅绿底、深色字的胶囊按钮：与薄荷绿主题一致，替代默认的紫色文字按钮。 */
+/** 浅底、深字的胶囊按钮：容器取中性 tint，墨取 text1，与卡片同一套色阶。 */
 @Composable
 private fun PillButton(label: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = appColors()
     TextButton(
         onClick = onClick,
         shape = AppShape.Pill,
-        colors = ButtonDefaults.textButtonColors(containerColor = MintTint, contentColor = MintPrimaryDark),
+        colors = ButtonDefaults.textButtonColors(containerColor = colors.tint, contentColor = colors.text1),
         modifier = modifier.semantics { contentDescription = description },
-    ) { Text(label, style = AppType.Footnote.copy(color = MintPrimaryDark, fontWeight = FontWeight.SemiBold)) }
+    ) { Text(label, style = AppType.Footnote, color = colors.text1, fontWeight = FontWeight.SemiBold) }
 }
 
 @Composable
 private fun DetailCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = AppShape.Card,
-        modifier = modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, AppShape.Card),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
-    }
+    SoftCard(modifier = modifier, contentPadding = PaddingValues(18.dp), content = content)
 }
 
 /** 例句、派生词、短语、近义词、词形变化共用的小节：一个标题 + 内容。 */
@@ -628,35 +689,42 @@ internal fun lemmaRangeIn(text: String, lemma: String): IntRange? {
     }
 }
 
-/** 配图固定 4:3、圆角裁切：一屏内能同时看到单词卡和配图，不再占满整屏。 */
-private val illustrationModifier = Modifier
-    .fillMaxWidth()
-    .aspectRatio(4f / 3f)
+/**
+ * 配图缩略图：72dp 见方、圆角裁切，挂在词头行尾。
+ *
+ * 原来是通栏 4:3 大图，一屏里单词卡被挤到看不见；缩略图把「有没有配图」这条信息留住，
+ * 又把纵向空间还给释义（spec §5）。
+ */
+private val illustrationThumbnailSize = 72.dp
+
+private val illustrationThumbnailModifier = Modifier
+    .size(illustrationThumbnailSize)
     .clip(AppShape.Button)
 
 /**
- * 导入配图的渲染：文件被外部删除或解码失败时**不留空图框**，改为一行可读提示。
- * 与内置图一样，缺图时不该让整个详情页崩掉——词卡的其他内容仍然可用。
+ * 配图来源的三种互斥结果：导入文件解码出的位图 / 内置 drawable 回退 / 读不出来。
+ *
+ * 抽成组合期就能定论的取值，是为了让「图放不放进词头行」有确定答案——
+ * 空图框和占位格子都不该占那 72dp（spec §5「有图才显示」）。
  */
+private class IllustrationSource(
+    val bitmap: Bitmap?,
+    val fallbackRes: Int?,
+    val unreadable: Boolean,
+)
+
 @Composable
-private fun ImportedIllustration(lemma: String, path: String) {
-    val bitmap = remember(path) { BitmapFactory.decodeFile(path) }
-    if (bitmap == null) {
-        Text(
-            text = "配图暂时读不出来，可重新导入这册词书。",
-            style = AppType.Footnote,
-            modifier = Modifier
-                .testTag("card_detail_image_unreadable")
-                .semantics { contentDescription = "配图读不出来" },
-        )
-        return
+private fun rememberIllustrationSource(lemma: String, path: String?): IllustrationSource {
+    // 导入配图优先：词书包里的真实文件（`imagePath`）；没有才回退到内置 drawable 映射。
+    val bitmap = remember(path) {
+        path?.takeIf { it.isNotBlank() }?.let { BitmapFactory.decodeFile(it) }
     }
-    DetailCard {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = "配图 $lemma",
-            contentScale = ContentScale.Crop,
-            modifier = illustrationModifier.testTag("card_detail_image_file"),
-        )
+    val fallbackRes = remember(lemma, path) {
+        if (path.isNullOrBlank()) lemmaToDrawableRes(lemma) else null
     }
+    return IllustrationSource(
+        bitmap = bitmap,
+        fallbackRes = fallbackRes,
+        unreadable = !path.isNullOrBlank() && bitmap == null,
+    )
 }

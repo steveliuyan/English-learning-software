@@ -63,6 +63,23 @@ class ReminderSettingsViewModel @Inject constructor(
         update { it.copy(enabled = enabled) }
     }
 
+    /**
+     * 批 5 Task 2：读失败后的「重试」。
+     *
+     * 为什么不能直接再调一次 [load]：`load()` 的落位条件是 `loading == true`（那条守卫防的是
+     * 「迟到的读取把用户刚改的开关冲回去」），而读失败后状态里 `loading` 已经是 `false`，
+     * 于是再调 `load()` 会静默什么都不做——UI 上就是一枚按下去毫无反应的假按钮。
+     * 重试必须先把 `loading` 复位成 `true`（顺带清掉旧错误），让同一条读取路径重新生效。
+     *
+     * 复位 `loading` 的代价与边界：若用户在报错后又动过开关/时间，重试成功会把存储值覆盖到 UI 上——
+     * 但那条路径上【保存】本来就已发生（`update()` 立刻 `save`），存储值就是用户刚写下的值，
+     * 覆盖结果与用户预期一致；读取仍失败时则原样回到错误态，不丢用户改动。
+     */
+    fun retry() {
+        mutable.value = mutable.value.copy(loading = true, error = null)
+        load()
+    }
+
     fun setTime(time: LocalTime) {
         update { it.copy(time = time) }
     }

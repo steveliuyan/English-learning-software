@@ -45,6 +45,7 @@ import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
+import com.example.englishlearning.ui.components.EntryIconBadge
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
@@ -146,6 +147,8 @@ fun ReadingAccessScreen(
         // 没文章可换时那枚按钮不该在场（也就不必回答「换掉的是什么」）。
         AppScreenHeader(
             title = "每日阅读",
+            hero = true,
+            badge = { EntryIconBadge(icon = AppIcon.Newspaper, domain = AppDomain.Reading) },
             action = if (state is ReadingAccessUiState.Ready && state.todayArticle != null) {
                 {
                     TextButton(

@@ -74,11 +74,20 @@ class ImageStudioViewModel @Inject constructor(
         runPrompt(subject, confirmedTextHost)
     }
 
-    fun generateImage() {
-        val prompt = pendingPrompt ?: run {
+    /**
+     * 生成图片。[promptOverride] 是「画面描述可编辑」的出口（批 4 Task 6，计划对账 6）：
+     * 屏内改过的描述从这里进来；`null` 或纯空白退回模型原稿——空描述出站等于拿一次按张计费的
+     * 请求换一张随机图，屏侧禁用是第一道防线，这里是第二道。
+     *
+     * 收下的这句同时覆盖 [pendingPrompt]：紧接着的出站确认（[confirm] 的 `Image` 分支）读的就是
+     * [pendingPrompt]，不覆盖的话「确认」会把模型原句发出去，用户改过的字在最后一步被悄悄丢弃。
+     */
+    fun generateImage(promptOverride: String? = null) {
+        val prompt = promptOverride?.trim()?.takeIf { it.isNotEmpty() } ?: pendingPrompt ?: run {
             _uiState.value = ImageStudioUiState.Idle
             return
         }
+        pendingPrompt = prompt
         _uiState.value = ImageStudioUiState.GeneratingImage
         runImage(prompt, answer = null)
     }

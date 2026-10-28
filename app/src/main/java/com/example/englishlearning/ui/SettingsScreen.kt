@@ -395,7 +395,7 @@ internal fun SettingsGroupsContent(
                     subtitle = if (transferBusy) {
                         "正在处理，请稍候…"
                     } else {
-                        "选择 `.wbpack` 文件，校验通过后加入本机词书"
+                        "选择 .wbpack 文件，校验通过后加入本机词书"
                     },
                     iconTone = EntryIconTone.Tint,
                     topDivider = true,
@@ -409,7 +409,7 @@ internal fun SettingsGroupsContent(
                     title = "导出词书",
                     subtitle = when {
                         transferBusy -> "正在处理，请稍候…"
-                        importedBookCount > 0 -> "已导入 $importedBookCount 册，导出为 `.wbpack` 分享给别的设备"
+                        importedBookCount > 0 -> "已导入 $importedBookCount 册，导出为 .wbpack 分享给别的设备"
                         else -> "先导入一册词书后才能导出"
                     },
                     iconTone = EntryIconTone.Tint,

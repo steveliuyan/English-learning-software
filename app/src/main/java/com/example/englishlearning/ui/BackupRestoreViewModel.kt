@@ -172,6 +172,6 @@ class BackupRestoreViewModel @Inject constructor(
     private companion object {
         const val RESTORED_MESSAGE =
             "恢复完成：本机数据已替换为备份内容，搜索索引与提醒已重建，" +
-                "所有 AI Profile 的 API Key 已按安全策略删除，需重新填写。请重启应用后继续使用。"
+                "所有 AI 服务的 API Key 已按安全策略删除，需重新填写。请重启应用后继续使用。"
     }
 }

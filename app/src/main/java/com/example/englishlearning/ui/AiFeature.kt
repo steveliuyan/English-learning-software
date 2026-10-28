@@ -1,7 +1,9 @@
 package com.example.englishlearning.ui
 
+import com.example.englishlearning.ui.components.AppIcon
+
 /**
- * 「AI 学」页上的功能入口。
+ * 「AI 助学」页上的功能入口。
  *
  * 这是**产品目录**，不是能力清单：`implemented` 为 `false` 表示该功能的生成逻辑尚未接通，
  * 页面上必须如实标注，因此它必须与 [status] 的措辞保持一致——这条一致性由 `AiFeatureTest`
@@ -10,6 +12,17 @@ package com.example.englishlearning.ui
  *
  * @property key 稳定的短标识，用作 testTag 与路由参数，必须是 kebab-case。
  * @property glyph 列表左侧的单字标记。各功能各用一字，避免引图标库。
+ *   **当前 UI 已不读这一栏**（单字当图标在 spec §4.2 里被否，见 [icon]）；字段保留是因为
+ *   `AiFeatureTest` 的「各功能各用一字」契约仍在，删栏要连契约一起裁，不在图标去重这条里顺手做。
+ * @property icon 列表左侧与详情页头的字形，**字形的唯一出处**。
+ *
+ *   2026-11-02 用户评审：「AI 助学」页七枚入口全从同一枚 `AppIcon.Spark` 出，扫列表时只剩标题可读，
+ *   分不出哪一行是拍照翻译、哪一行是生图。改用七枚各指一件具体的物（报纸/清单/喇叭/话筒/文档/
+ *   相机/画面）。域锚点由渲染处的 `AppDomain.AiSpeech` 配色与页头的品牌渐变承担，字形不再重复
+ *   承担「这一屏属于 AI」——那正是七行读成一行时被浪费掉的一整栏语义。
+ *
+ *   七枚必须两两不同、且逐枚钉在 `AiFeatureIconContractTest` 里：新增功能时不许再借一枚现成字形
+ *   顶上（会重新长出「两行一样」），也不许回到屏侧写死字面量（目录里的字形一行都不会生效）。
  * @property title 卡片标题。
  * @property summary 一行说明，描述这个功能做什么。
  * @property status 面向用户的一句话当前状态，未实现时必须以「未实现」开头。
@@ -19,6 +32,7 @@ package com.example.englishlearning.ui
 enum class AiFeature(
     val key: String,
     val glyph: String,
+    val icon: AppIcon,
     val title: String,
     val summary: String,
     val status: String,
@@ -28,6 +42,7 @@ enum class AiFeature(
     WORD_PASSAGE(
         key = "word-passage",
         glyph = "文",
+        icon = AppIcon.Newspaper,
         title = "词文串学",
         summary = "根据今日所学单词，匹配一篇外刊短文",
         status = "未实现：文章生成需要先接通 AI 网关，且需要你配置一个可用的模型。",
@@ -41,6 +56,7 @@ enum class AiFeature(
     CLOZE(
         key = "cloze",
         glyph = "填",
+        icon = AppIcon.List,
         title = "AI 短文填词",
         summary = "AI 生成短文，选词填空做练习",
         status = "未实现：出题与判分都依赖 AI 网关，尚未开发。",
@@ -54,6 +70,7 @@ enum class AiFeature(
     LISTENING(
         key = "listening",
         glyph = "听",
+        icon = AppIcon.Speaker,
         title = "单词随身听",
         summary = "听写听讲，把词听进耳朵里",
         status = "未实现：需要音频播放与缓存策略，尚未开发。",
@@ -67,6 +84,7 @@ enum class AiFeature(
     COACH(
         key = "coach",
         glyph = "讲",
+        icon = AppIcon.Mic,
         title = "单词串讲",
         summary = "今日词与常错词逐个讲解，可以追问",
         status = "未实现：讲解与追问需要 AI 网关与多轮对话支持，尚未开发。",
@@ -80,6 +98,7 @@ enum class AiFeature(
     SENTENCE_ANALYSIS(
         key = "sentence-analysis",
         glyph = "析",
+        icon = AppIcon.Document,
         title = "长难句分析",
         summary = "把一句英文拆成主句、从句和短语，逐段给中文解释",
         status = "已可用：去「设置 · AI」选好默认文本服务，回这里输入一句英文即可分析。",
@@ -92,6 +111,7 @@ enum class AiFeature(
     PHOTO_TRANSLATION(
         key = "photo-translation",
         glyph = "拍",
+        icon = AppIcon.Camera,
         title = "拍照翻译",
         summary = "拍一页英文或从相册选图，识别文字校对后再译成中文",
         status = "已可用：拍照或从相册选图，识别文字可直接编辑，确认后交给 AI 翻译。",
@@ -105,6 +125,7 @@ enum class AiFeature(
     IMAGE_STUDIO(
         key = "image-studio",
         glyph = "画",
+        icon = AppIcon.Image,
         title = "AI 生图",
         summary = "用文字 AI 生成画面描述，再交给生图服务出图",
         status = "已可用：去「设置 · AI」添加一套生图服务并设为生图默认，回这里输入主题即可出图。",

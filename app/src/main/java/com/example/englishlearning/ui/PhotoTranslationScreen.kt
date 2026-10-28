@@ -16,10 +16,10 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,20 +27,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,7 +49,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -66,23 +58,23 @@ import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
+import com.example.englishlearning.phototranslation.SavedPhotoTranslation
+import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.EntryIconTone
+import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.NotConfiguredCard
+import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
-import com.example.englishlearning.ui.theme.MintTint
 import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.appDomain
 
 /**
- * 拍照翻译功能页（AI 学 → 拍照翻译）。
+ * 拍照翻译功能页（AI 助学 → 拍照翻译）。
  *
  * 三段红线在这里各自落位：
  * - **图片不出设备**：相机帧与相册字节只进入 [PhotoTranslationViewModel] 的临时工作区，
@@ -91,6 +83,20 @@ import com.example.englishlearning.ui.theme.appColors
  *   [PhotoTranslationUiState.pendingConfirmationHost] 弹出，确认前零字节出网（AC3-06）。
  * - **OCR ≠ 翻译**：识别问题（不可用/失败）与翻译问题（未配置/AI 失败）分卡片、分文案，
  *   永不混排（AC3-04）。
+ *
+ * 批 4 Task 4 的版式重做（spec §5「拍照翻译」行）：这一屏原来是一根 760 行长滚动，五块说明性容器
+ * （已保存历史 / 离线备用模型 / 隐私说明 / 成本句 / 引擎标签）平铺在同一条流里，历史「删除」点了就执行。
+ * 现在：
+ *  - 页头交给共享 [AppScreenHeader]（旧「← 返回 AI 学」药片下线，返回位是固定可及名「返回」）；
+ *  - **5 块收成历史一行 + 离线模型折叠**：两块各变成一枚 [EntryRow] 折叠行、默认收起，
+ *    隐私说明搬进模型展开体；成本句只贴在翻译按钮之后一次，引擎标签全局只留一处；
+ *  - 历史删除只发 [onRequestDeleteSaved]，确认框归宿主 `AppScreen` 的 `ConfirmDestructiveDialog`
+ *    （屏内零破坏性对话框，判据见 `PhotoTranslationLayoutContractTest` 与
+ *    `AppScreenOverlayContainerContractTest`）；
+ *  - 容器走三档共享件（[SoftCard] / [EntryRow]），按钮一律 [PillButton]，排印走六档 [AppType]，
+ *    墨色走 `appColors()` / `appDomain(AppDomain.AiSpeech)`——本文件 `Mint*` 读点为零。
+ *
+ * 数据通路、tag、校验文案与出站确认三要素一字不动：这一屏只搬外观与确认路径。
  */
 internal const val CAMERA_DENIED_NOTICE =
     "相机权限被拒绝。可改用相册选图；如需拍照，请在系统设置中为本应用开启相机权限后返回重试。"
@@ -109,14 +115,17 @@ fun PhotoTranslationScreen(
     speakMessage: String?,
     onSpeak: (String) -> Unit,
     onSave: () -> Unit,
-    onDeleteSaved: (String) -> Unit,
+    onRequestDeleteSaved: (String) -> Unit,
     onBack: () -> Unit,
     onOpenAiSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val colors = appColors()
     var showCamera by rememberSaveable { mutableStateOf(false) }
     var captureNotice by rememberSaveable { mutableStateOf<String?>(null) }
+    var historyExpanded by rememberSaveable { mutableStateOf(false) }
+    var modelExpanded by rememberSaveable { mutableStateOf(false) }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -147,28 +156,24 @@ fun PhotoTranslationScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MintBackground)
+            .background(colors.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 20.dp)
             .testTag("photo_translation_screen"),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        TextButton(
-            onClick = onBack,
-            colors = ButtonDefaults.textButtonColors(contentColor = MintPrimaryDark),
-            modifier = Modifier
-                .testTag("photo_translation_back")
-                .semantics { contentDescription = "返回 AI 学" },
-        ) { Text("← 返回 AI 学", fontWeight = FontWeight.Bold) }
-
-        Text("拍照翻译", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-        Text("拍一页英文或从相册选图，先本机识别文字，校对后再交给 AI 翻译成中文。图片不会上传。", color = MintTextMuted)
+        AppScreenHeader(
+            title = "拍照翻译",
+            subtitle = "拍一页英文或从相册选图，先本机识别文字，校对后再交给 AI 翻译成中文。图片不会上传。",
+            onBack = onBack,
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Button(
+            PillButton(
+                text = "拍照",
                 onClick = {
                     if (hasCameraPermission) {
                         showCamera = true
@@ -176,51 +181,48 @@ fun PhotoTranslationScreen(
                         cameraPermission.launch(Manifest.permission.CAMERA)
                     }
                 },
+                modifier = Modifier.weight(1f),
+                style = PillStyle.Primary,
                 enabled = !state.busy,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 50.dp)
-                    .testTag("photo_translation_camera_button")
-                    .semantics { contentDescription = "拍照" },
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MintPrimary,
-                    contentColor = appColors().onBrand,
-                    disabledContainerColor = MintSurface,
-                    disabledContentColor = MintTextMuted,
-                ),
-            ) { Text("拍照", fontWeight = FontWeight.Bold) }
-            OutlinedButton(
+                testTag = "photo_translation_camera_button",
+                contentDescription = "拍照",
+            )
+            PillButton(
+                text = "从相册选图",
                 onClick = {
                     galleryPicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 },
+                modifier = Modifier.weight(1f),
+                style = PillStyle.Secondary,
                 enabled = !state.busy,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 50.dp)
-                    .testTag("photo_translation_gallery_button")
-                    .semantics { contentDescription = "从相册选图" },
-                shape = RoundedCornerShape(16.dp),
-            ) { Text("从相册选图") }
+                testTag = "photo_translation_gallery_button",
+                contentDescription = "从相册选图",
+            )
         }
+
         captureNotice?.let { message ->
-            Text(message, color = MintTextMuted, modifier = Modifier.testTag("photo_translation_permission_hint"))
+            Text(
+                text = message,
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("photo_translation_permission_hint"),
+            )
         }
         if (captureNotice == CAMERA_DENIED_NOTICE) {
             // D-1：提示必须兑现它承诺的出口——跳转系统设置为本应用开启相机权限。
-            OutlinedButton(
+            PillButton(
+                text = "去系统设置开启相机权限",
                 onClick = {
                     context.startActivity(
                         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
                     )
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("photo_translation_permission_settings"),
-                shape = RoundedCornerShape(16.dp),
-            ) { Text("去系统设置开启相机权限") }
+                modifier = Modifier.fillMaxWidth(),
+                style = PillStyle.Secondary,
+                testTag = "photo_translation_permission_settings",
+            )
         }
 
         if (showCamera && hasCameraPermission) {
@@ -237,14 +239,19 @@ fun PhotoTranslationScreen(
         }
 
         if (state.busy) {
-            Text("正在本机识别…", color = MintTextMuted, modifier = Modifier.testTag("photo_translation_busy"))
+            Text(
+                text = "正在本机识别…",
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("photo_translation_busy"),
+            )
         }
 
         when (val issue = state.ocrIssue) {
             null -> Unit
             PhotoTranslationOcrIssue.Unavailable -> OcrIssueCard(
                 title = "OCR 不可用（不是翻译失败）",
-                body = "本机文字识别暂不可用。可以安装下方离线备用模型，或稍后重试。",
+                body = "本机文字识别暂不可用。可展开下方的「离线备用识别模型」安装备用引擎，或稍后重试。",
                 tag = "photo_translation_ocr_unavailable",
             )
             is PhotoTranslationOcrIssue.Failed -> OcrIssueCard(
@@ -262,9 +269,9 @@ fun PhotoTranslationScreen(
 
         state.engine?.let { engine ->
             Text(
-                "识别引擎：${engine.label}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MintPrimary,
+                text = "识别引擎：${engine.label}",
+                style = AppType.Footnote,
+                color = colors.text2,
                 modifier = Modifier.testTag("photo_translation_engine_label"),
             )
         }
@@ -281,35 +288,29 @@ fun PhotoTranslationScreen(
                 minLines = 3,
                 maxLines = 10,
                 enabled = !state.busy,
+                shape = RoundedCornerShape(14.dp),
             )
             if (state.lowConfidenceLineIndices.isNotEmpty()) {
                 Text(
-                    "以下行识别把握较低，请重点核对：${state.lowConfidenceLineIndices.sorted().joinToString("、") { "第 ${it + 1} 行" }}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintPrimaryDark,
+                    text = "以下行识别把握较低，请重点核对：${state.lowConfidenceLineIndices.sorted().joinToString("、") { "第 ${it + 1} 行" }}",
+                    style = AppType.Footnote,
+                    color = colors.text2,
                     modifier = Modifier.testTag("photo_translation_low_confidence"),
                 )
             }
-            Button(
+            PillButton(
+                text = "翻译成中文",
                 onClick = onTranslate,
+                modifier = Modifier.fillMaxWidth(),
+                style = PillStyle.Primary,
                 enabled = !state.busy && state.ocrText.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 54.dp)
-                    .testTag("photo_translation_translate_button")
-                    .semantics { contentDescription = "翻译文本" },
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MintPrimary,
-                    contentColor = appColors().onBrand,
-                    disabledContainerColor = MintTint,
-                    disabledContentColor = MintPrimaryDark,
-                ),
-            ) { Text("翻译成中文", fontWeight = FontWeight.Bold) }
+                testTag = "photo_translation_translate_button",
+                contentDescription = "翻译文本",
+            )
             Text(
-                "翻译会把编辑后的文本发送给 AI 服务并可能产生费用；图片不发送。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MintTextMuted,
+                text = "翻译会把编辑后的文本发送给 AI 服务并可能产生费用；图片不发送。",
+                style = AppType.Footnote,
+                color = colors.text2,
                 modifier = Modifier.testTag("photo_translation_cost_hint"),
             )
         }
@@ -340,33 +341,70 @@ fun PhotoTranslationScreen(
             )
         }
 
-        if (state.history.isNotEmpty()) {
+        // 历史：常驻一枚折叠入口行，展开才渲染记录（旧「已保存的翻译」整卡下线）。
+        EntryRow(
+            icon = AppIcon.Clock,
+            domain = AppDomain.AiSpeech,
+            title = "已保存的翻译",
+            subtitle = if (state.history.isEmpty()) {
+                "还没有保存的记录：翻译后点「保存到本机」才会留下一条"
+            } else {
+                "共 ${state.history.size} 条 · 只在本机，删除前会确认"
+            },
+            trailing = if (historyExpanded) "收起" else "展开",
+            expanded = historyExpanded,
+            iconTone = EntryIconTone.Tint,
+            modifier = Modifier.testTag("photo_translation_history_entry"),
+            onClick = { historyExpanded = !historyExpanded },
+        )
+        if (historyExpanded) {
             SavedHistoryList(
                 records = state.history,
                 lastSavedRecordId = state.lastSavedRecordId,
-                onDelete = onDeleteSaved,
+                onRequestDeleteSaved = onRequestDeleteSaved,
             )
         }
 
-        OfflineModelCard(
-            status = state.modelStatus,
-            progress = state.modelInstallProgress,
-            issue = state.modelIssue,
-            onInstall = onInstallModel,
-            onUninstall = onUninstallModel,
+        // 离线备用模型：第二枚折叠入口行，隐私说明跟着它一起收起。
+        EntryRow(
+            icon = AppIcon.Download,
+            domain = AppDomain.AiSpeech,
+            title = "离线备用识别模型",
+            subtitle = modelSubtitle(state.modelStatus),
+            trailing = if (modelExpanded) "收起" else "展开",
+            expanded = modelExpanded,
+            iconTone = EntryIconTone.Tint,
+            modifier = Modifier.testTag("photo_translation_model_entry"),
+            onClick = { modelExpanded = !modelExpanded },
         )
-
-        Text(
-            "隐私说明：本机识别（ML Kit）可能向 Google 发送与图片、文字内容无关的性能指标；识别结果与图片默认不保存，只有你点「保存到本机」才会留下记录。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MintTextMuted,
-            modifier = Modifier.testTag("photo_translation_privacy_note"),
-        )
+        if (modelExpanded) {
+            OfflineModelCard(
+                status = state.modelStatus,
+                progress = state.modelInstallProgress,
+                issue = state.modelIssue,
+                onInstall = onInstallModel,
+                onUninstall = onUninstallModel,
+            )
+            Text(
+                text = "隐私说明：本机识别（ML Kit）可能向 Google 发送与图片、文字内容无关的性能指标；" +
+                    "识别结果与图片默认不保存，只有你点「保存到本机」才会留下记录。",
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("photo_translation_privacy_note"),
+            )
+        }
     }
 
     state.pendingConfirmationHost?.let { host ->
         OutboundConfirmationDialog(host, onConfirmOutbound)
     }
+}
+
+/** 折叠行副标题：模型状态一句话说完（不展开也看得出「装没装」）。 */
+private fun modelSubtitle(status: OcrModelAssetStatus?): String = when (status) {
+    null -> "状态加载中…（约 4.1 MB，仅在主识别不可用时使用）"
+    OcrModelAssetStatus.NotInstalled -> "未安装 · 约 4.1 MB，仅在主识别不可用时使用"
+    is OcrModelAssetStatus.Installed -> "已安装 · 主识别不可用时自动接管"
 }
 
 /** CameraX 取景 + 单拍。字节只在内存回调里交给状态机，不落地任何文件。 */
@@ -410,9 +448,15 @@ private fun CameraCaptureBox(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(onClick = onClose, modifier = Modifier.testTag("photo_translation_camera_close")) { Text("取消") }
+            PillButton(
+                text = "取消",
+                onClick = onClose,
+                style = PillStyle.Secondary,
+                testTag = "photo_translation_camera_close",
+            )
             Spacer(Modifier.width(4.dp))
-            Button(
+            PillButton(
+                text = "快门 · 拍照",
                 onClick = {
                     imageCapture.takePicture(
                         ContextCompat.getMainExecutor(context),
@@ -433,11 +477,11 @@ private fun CameraCaptureBox(
                         },
                     )
                 },
+                modifier = Modifier.weight(1f),
+                style = PillStyle.Primary,
                 enabled = visible,
-                modifier = Modifier.testTag("photo_translation_shutter_button"),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
-            ) { Text("快门 · 拍照", fontWeight = FontWeight.Bold) }
+                testTag = "photo_translation_shutter_button",
+            )
         }
     }
 }
@@ -449,8 +493,8 @@ private fun OcrIssueCard(
     tag: String,
 ) {
     IssueCard(tag = tag) {
-        Text(title, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-        Text(body, color = MintTextMuted)
+        Text(text = title, style = AppType.Body, color = appColors().text1)
+        Text(text = body, style = AppType.Footnote, color = appColors().text2)
     }
 }
 
@@ -462,60 +506,59 @@ private fun TranslationCompareCard(
     speakMessage: String?,
     onSpeak: (String) -> Unit,
 ) {
+    val colors = appColors()
+    val accent = appDomain(AppDomain.AiSpeech).deep
     val clipboard = LocalClipboardManager.current
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("photo_translation_result"),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("原文", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MintPrimary)
-            Text(source, color = MintPrimaryDark)
-            Text("译文", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MintPrimary)
-            Text(target, color = MintPrimaryDark)
+    SoftCard(modifier = Modifier.testTag("photo_translation_result")) {
+        Text(text = "原文", style = AppType.Label, color = accent)
+        Text(text = source, style = AppType.Body, color = colors.text1)
+        Text(text = "译文", style = AppType.Label, color = accent)
+        Text(text = target, style = AppType.Body, color = colors.text1)
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            PillButton(
+                text = "复制译文",
+                onClick = { clipboard.setText(AnnotatedString(target)) },
+                style = PillStyle.Text,
+                testTag = "photo_translation_copy_button",
+            )
+            PillButton(
+                text = "朗读原文",
+                onClick = { onSpeak(source) },
+                style = PillStyle.Text,
+                testTag = "photo_translation_speak_button",
+            )
+        }
+        speakMessage?.let { message ->
+            Text(
+                text = message,
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("photo_translation_speak_feedback"),
+            )
+        }
+
+        val words = remember(source) {
+            Regex("[A-Za-z][A-Za-z'-]+").findAll(source).map { it.value }.distinct().take(30).toList()
+        }
+        if (words.isNotEmpty()) {
+            Text(text = "点词查词典", style = AppType.Label, color = colors.text2)
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TextButton(
-                    onClick = { clipboard.setText(AnnotatedString(target)) },
-                    modifier = Modifier.testTag("photo_translation_copy_button"),
-                ) { Text("复制译文", color = MintPrimaryDark, fontWeight = FontWeight.Bold) }
-                TextButton(
-                    onClick = { onSpeak(source) },
-                    modifier = Modifier.testTag("photo_translation_speak_button"),
-                ) { Text("朗读原文", color = MintPrimaryDark, fontWeight = FontWeight.Bold) }
-            }
-            speakMessage?.let { message ->
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintTextMuted,
-                    modifier = Modifier.testTag("photo_translation_speak_feedback"),
-                )
-            }
-
-            val words = remember(source) {
-                Regex("[A-Za-z][A-Za-z'-]+").findAll(source).map { it.value }.distinct().take(30).toList()
-            }
-            if (words.isNotEmpty()) {
-                Text("点词查词典", style = MaterialTheme.typography.labelMedium, color = MintTextMuted)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    words.forEachIndexed { index, word ->
-                        TextButton(
-                            onClick = { onOpenDictionary(word) },
-                            modifier = Modifier.testTag("photo_translation_word_$index"),
-                        ) { Text(word, fontWeight = FontWeight.Bold) }
-                    }
+                words.forEachIndexed { index, word ->
+                    PillButton(
+                        text = word,
+                        onClick = { onOpenDictionary(word) },
+                        style = PillStyle.Text,
+                        testTag = "photo_translation_word_$index",
+                    )
                 }
             }
         }
@@ -529,75 +572,93 @@ private fun SaveRow(
     saveIssue: com.example.englishlearning.core.error.AppError?,
     onSave: () -> Unit,
 ) {
+    val colors = appColors()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OutlinedButton(
+        PillButton(
+            text = if (saved) "已保存" else "保存到本机",
             onClick = onSave,
+            style = PillStyle.Secondary,
             enabled = !saved,
-            modifier = Modifier
-                .testTag("photo_translation_save_button")
-                .semantics { contentDescription = if (saved) "已保存到本机" else "保存到本机" },
-            shape = RoundedCornerShape(14.dp),
-        ) { Text(if (saved) "已保存" else "保存到本机", fontWeight = FontWeight.Bold) }
+            testTag = "photo_translation_save_button",
+            contentDescription = if (saved) "已保存到本机" else "保存到本机",
+        )
         when {
-            saved -> Text("原图与译文已存到本机，可在备份中勾选导出。", style = MaterialTheme.typography.bodySmall, color = MintPrimaryDark)
+            saved -> Text(
+                text = "原图与译文已存到本机，可在备份中勾选导出。",
+                style = AppType.Footnote,
+                color = colors.text2,
+            )
             saveIssue != null -> Text(
-                "保存失败：本机存储不可用，请重试。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MintPrimaryDark,
+                text = "保存失败：本机存储不可用，请重试。",
+                style = AppType.Footnote,
+                color = colors.text2,
                 modifier = Modifier.testTag("photo_translation_save_issue"),
             )
         }
     }
 }
 
-/** 已明确保存的历史：只读列表 + 逐条删除（删除会连带清掉保存的原图）。 */
+/** 已明确保存的历史：只读列表 + 逐条删除（删除只发请求，宿主确认后才连带清掉保存的原图）。 */
 @Composable
 private fun SavedHistoryList(
-    records: List<com.example.englishlearning.phototranslation.SavedPhotoTranslation>,
+    records: List<SavedPhotoTranslation>,
     lastSavedRecordId: String?,
-    onDelete: (String) -> Unit,
+    onRequestDeleteSaved: (String) -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("photo_translation_history_card"),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("已保存的翻译", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            records.take(3).forEach { record ->
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .testTag("photo_translation_history_${record.recordId}"),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        buildString {
-                            append(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
-                                .format(java.util.Date(record.createdAtEpochMillis)))
-                            append(" · ")
-                            append(if (record.imageAssetId != null) "含原图" else "仅文本")
-                            if (record.recordId == lastSavedRecordId) append(" · 刚刚保存")
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MintTextMuted,
-                    )
-                    Text(record.sourceText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
-                    Text(record.translatedText, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, color = MintPrimaryDark)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = { onDelete(record.recordId) },
-                            modifier = Modifier.testTag("photo_translation_history_delete_${record.recordId}"),
-                        ) { Text("删除", color = MintPrimaryDark) }
-                    }
-                }
+    val colors = appColors()
+    SoftCard(modifier = Modifier.testTag("photo_translation_history_list")) {
+        if (records.isEmpty()) {
+            Text(
+                text = "还没有保存的记录。",
+                style = AppType.Footnote,
+                color = colors.text2,
+            )
+        }
+        records.take(3).forEach { record ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("photo_translation_history_${record.recordId}"),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = buildString {
+                        append(
+                            java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+                                .format(java.util.Date(record.createdAtEpochMillis)),
+                        )
+                        append(" · ")
+                        append(if (record.imageAssetId != null) "含原图" else "仅文本")
+                        if (record.recordId == lastSavedRecordId) append(" · 刚刚保存")
+                    },
+                    style = AppType.Footnote,
+                    color = colors.text2,
+                )
+                Text(
+                    text = record.sourceText,
+                    style = AppType.Body,
+                    color = colors.text1,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = record.translatedText,
+                    style = AppType.Footnote,
+                    color = colors.text2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                PillButton(
+                    text = "删除",
+                    onClick = { onRequestDeleteSaved(record.recordId) },
+                    style = PillStyle.Text,
+                    testTag = "photo_translation_history_delete_${record.recordId}",
+                    contentDescription = "删除这条翻译记录",
+                )
             }
         }
     }
@@ -611,63 +672,62 @@ private fun OfflineModelCard(
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("photo_translation_model_card"),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("离线备用识别模型", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Text(
-                "Tesseract 英文模型（约 4.1 MB，Apache-2.0 许可），仅在主识别不可用时使用；可随时删除。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MintTextMuted,
+    val colors = appColors()
+    val accent = appDomain(AppDomain.AiSpeech).deep
+    val issueText: String? = when (issue) {
+        null, is OcrModelAssetInstallOutcome.Installed -> null
+        OcrModelAssetInstallOutcome.IntegrityMismatch ->
+            "模型校验失败：大小或哈希与官方发布不符，已丢弃，未保留任何文件。请重试下载。"
+        is OcrModelAssetInstallOutcome.DownloadFailed ->
+            "下载失败：${issue.reason ?: "网络不可用"}。检查网络后重试。"
+    }
+    SoftCard(modifier = Modifier.testTag("photo_translation_model_card")) {
+        Text(
+            text = "Tesseract 英文模型（约 4.1 MB，Apache-2.0 许可），仅在主识别不可用时使用；可随时删除。",
+            style = AppType.Footnote,
+            color = colors.text2,
+        )
+        when (status) {
+            null -> Text(text = "状态加载中…", style = AppType.Footnote, color = colors.text2)
+            OcrModelAssetStatus.NotInstalled -> PillButton(
+                text = if (progress == null) "下载模型（约 4.1 MB）" else "下载中…",
+                onClick = onInstall,
+                style = PillStyle.Primary,
+                enabled = progress == null,
+                testTag = "photo_translation_model_install",
             )
-            when (status) {
-                null -> Text("状态加载中…", style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
-                OcrModelAssetStatus.NotInstalled -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = onInstall,
-                        enabled = progress == null,
-                        modifier = Modifier.testTag("photo_translation_model_install"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
-                    ) { Text(if (progress == null) "下载模型（约 4.1 MB）" else "下载中…", fontWeight = FontWeight.Bold) }
-                }
-                is OcrModelAssetStatus.Installed -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("已安装（${status.sizeBytes} 字节）", style = MaterialTheme.typography.bodySmall, color = MintPrimaryDark)
-                    OutlinedButton(
-                        onClick = onUninstall,
-                        modifier = Modifier.testTag("photo_translation_model_uninstall"),
-                    ) { Text("删除") }
-                }
-            }
-            if (progress != null) {
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("photo_translation_model_progress"),
+            is OcrModelAssetStatus.Installed -> Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "已安装（${status.sizeBytes} 字节）",
+                    style = AppType.Footnote,
+                    color = accent,
+                )
+                PillButton(
+                    text = "删除",
+                    onClick = onUninstall,
+                    style = PillStyle.Text,
+                    testTag = "photo_translation_model_uninstall",
                 )
             }
-            when (issue) {
-                null, is OcrModelAssetInstallOutcome.Installed -> Unit
-                OcrModelAssetInstallOutcome.IntegrityMismatch -> Text(
-                    "模型校验失败：大小或哈希与官方发布不符，已丢弃，未保留任何文件。请重试下载。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintPrimaryDark,
-                    modifier = Modifier.testTag("photo_translation_model_issue"),
-                )
-                is OcrModelAssetInstallOutcome.DownloadFailed -> Text(
-                    "下载失败：${issue.reason ?: "网络不可用"}。检查网络后重试。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MintPrimaryDark,
-                    modifier = Modifier.testTag("photo_translation_model_issue"),
-                )
-            }
+        }
+        if (progress != null) {
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("photo_translation_model_progress"),
+            )
+        }
+        issueText?.let { message ->
+            Text(
+                text = message,
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("photo_translation_model_issue"),
+            )
         }
     }
 }
@@ -729,8 +789,9 @@ private fun PhotoTranslationNotConfiguredReason.guidance(): String = when (this)
 private fun FailureCard(uiText: AiFailureUiText) {
     IssueCard(tag = "photo_translation_failure") {
         Text(
-            uiText.message,
-            color = MintPrimaryDark,
+            text = uiText.message,
+            style = AppType.Body,
+            color = appColors().text1,
             modifier = Modifier.semantics { contentDescription = "翻译失败原因" },
         )
     }
@@ -739,18 +800,9 @@ private fun FailureCard(uiText: AiFailureUiText) {
 @Composable
 private fun IssueCard(
     tag: String,
-    content: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag(tag),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { content() }
-    }
+    SoftCard(modifier = Modifier.testTag(tag)) { content() }
 }
 
 private val OcrEngineKind.label: String

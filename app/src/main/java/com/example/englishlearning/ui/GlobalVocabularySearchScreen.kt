@@ -2,30 +2,24 @@ package com.example.englishlearning.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -35,19 +29,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.SearchVocabularyResult
+import com.example.englishlearning.ui.components.AppGlyph
+import com.example.englishlearning.ui.components.AppGlyphLayer
+import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.SoftCard
+import com.example.englishlearning.ui.components.hairlineTop
+import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
+import com.example.englishlearning.ui.theme.appDomain
 
 /**
  * 全量词汇搜索：只回答一个问题——这个词在哪些已安装词本里、它的意思是什么。
@@ -61,6 +57,22 @@ import com.example.englishlearning.ui.theme.MintTextMuted
  * 原先那条「逐册解析整包」的路径已随旧查词页一并移除。
  *
  * 无状态：状态与回调全部由调用方注入，便于在仪器测试里直接驱动每一个分支。
+ *
+ * ## 版式（批 3 Task 5）
+ *
+ * 三条带：共享页头 / 输入区（弱卡 + 恒「搜索」的主 CTA）/ 结果或历史。
+ * 四处信息架构改动：
+ *  1. **页头归共享组件**——原来自写「← 返回上一层」可点文字 + `headlineSmall` 标题，
+ *     可见文案与可及名各写一遍。返回位改由 [AppScreenHeader] 的图标位承担：本屏两个入口
+ *     里「阅读页点未知词」回的是文章，任何写死的目的地文案都会在某个入口上说错。
+ *  2. **按钮文案恒「搜索」**——原先按输入在「查看最近搜索」/「全量搜索」之间切换，同一枚按钮
+ *     两个身份。能力不减：空输入仍可点（点下去落到最近搜索），只是不再让按钮自己解释这件事。
+ *  3. **历史行去药片**——原来每行一枚 `MintSurface + 1dp MintOutline` 的盒子，历史一多就是
+ *     一行一个盒子。换成共享裸行 [BareRow]：同组关系由发丝线 + 52dp 缩进表达，次数收进尾部值
+ *     `N 次`（行标题已经是那个查询词，再写「搜索 N 次」就是把动词讲两遍）。
+ *  4. **取色只读组合期令牌**——七枚静态薄荷桥在深浅两套里是同一枚浅墨，压深套底色即失效。
+ *     主 CTA 走主操作档 `strongSurface`/`onStrong`（同粘贴导入、文章阅读的吸底 CTA），
+ *     域色只出现在输入框的聚焦指示与光标（`AppDomain.Library`）：这屏查的是词库里的词。
  */
 @Composable
 fun GlobalVocabularySearchScreen(
@@ -74,81 +86,92 @@ fun GlobalVocabularySearchScreen(
     onSelect: (SearchVocabularyResult) -> Unit,
     onBack: () -> Unit,
 ) {
+    val colors = appColors()
     val keyboard = LocalSoftwareKeyboardController.current
     val submit: () -> Unit = {
         keyboard?.hide()
         onSubmit()
     }
     BackHandler(onBack = onBack)
-    Scaffold(containerColor = MintBackground) { padding ->
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .imePadding()
+            .testTag("global_search_screen"),
+    ) {
+        AppScreenHeader(
+            title = "查词",
+            onBack = onBack,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
+        )
+        // 内容列：输入区与主 CTA 固定在上，状态区吃掉剩余高度（历史 / 结果两条列表靠 `weight(1f)` 自己滚）。
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .imePadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .weight(1f)
+                .padding(horizontal = 20.dp)
+                .padding(top = 12.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // 两个入口（主页查词、阅读页点未知词）都会落到这里，所以只能说「返回上一层」：
-                // 从阅读页进来时回的是文章，写「返回首页」就是在指错方向。
-                Text(
-                    "← 返回上一层",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MintPrimaryDark,
+            // 输入区落在弱卡里：这屏没有「一屏一枚」的强卡需求，强卡额度留给真正要立起来的那一处。
+            SoftCard(modifier = Modifier.fillMaxWidth()) {
+                TextField(
+                    value = query,
+                    onValueChange = onQueryChange,
                     modifier = Modifier
-                        .clickable(onClick = onBack)
-                        .testTag("global_search_back")
-                        .semantics { contentDescription = "返回上一层" },
-                )
-                Text(
-                    "查词",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MintPrimaryDark,
+                        .fillMaxWidth()
+                        .testTag("global_search_input"),
+                    singleLine = true,
+                    placeholder = { Text("输入英文单词或短语", style = AppType.Body, color = colors.text3) },
+                    leadingIcon = { AppGlyph(AppIcon.Search, colors.text2, 20.dp) },
+                    // 清除是次要动作：用带可见文案的 `TextButton`（「清除」）而不是只有一枚符号的
+                    // 图标按钮——屏内不自造可及名，靠可见文案播报比靠一串语义描更稳。
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            TextButton(
+                                onClick = { onQueryChange("") },
+                                modifier = Modifier.heightIn(min = 40.dp),
+                            ) {
+                                Text("清除", style = AppType.Label, color = colors.text2)
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { submit() }),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = colors.surface,
+                        unfocusedContainerColor = colors.surface,
+                        focusedIndicatorColor = appDomain(AppDomain.Library).deep,
+                        unfocusedIndicatorColor = colors.outlineSoft,
+                        cursorColor = appDomain(AppDomain.Library).deep,
+                        focusedTextColor = colors.text1,
+                        unfocusedTextColor = colors.text1,
+                    ),
                 )
             }
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth().testTag("global_search_input"),
-                singleLine = true,
-                placeholder = { Text("输入英文单词或短语") },
-                leadingIcon = { Text("⌕", color = MintPrimary, style = MaterialTheme.typography.titleLarge) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(
-                            onClick = { onQueryChange("") },
-                            modifier = Modifier.semantics { contentDescription = "清除搜索" },
-                        ) { Text("×", style = MaterialTheme.typography.titleLarge) }
-                    }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { submit() }),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MintSurface,
-                    unfocusedContainerColor = MintSurface,
-                    focusedIndicatorColor = MintPrimary,
-                    unfocusedIndicatorColor = MintOutline,
-                    cursorColor = MintPrimary,
-                ),
-            )
-            val trimmedQuery = query.trim()
+            // 本屏唯一的主 CTA：文案一字不变地恒为「搜索」。
+            //
+            // 不设 `enabled`：空输入时点下去落回最近搜索，这是页面明说的能力（「空输入会显示最近搜索」），
+            // 按钮一禁用，用户清空输入后就回不到最近搜索，只能退出页面从主页重进。
+            // 具体落哪一支由宿主的 `onSubmit` 判定，按钮不重复判定（重复判定就是两个真值）。
             Button(
                 onClick = submit,
-                // 空输入时**也必须可用**：页面提示写着「空输入会显示最近搜索」，按钮一禁用，
-                // 用户清空输入后就回不到最近搜索，只能退出页面从主页重进——文案承诺的能力
-                // 必须真的能触发。所以这里不设 `enabled`，只是把文案切成对应的动作。
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("global_search_submit"),
-                colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
-                shape = RoundedCornerShape(14.dp),
-            ) { Text(if (trimmedQuery.isEmpty()) "查看最近搜索" else "全量搜索") }
-
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 50.dp)
+                    .testTag("global_search_submit"),
+                shape = AppShape.Button,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.strongSurface,
+                    contentColor = colors.onStrong,
+                ),
+            ) {
+                Text("搜索", style = AppType.Label, color = colors.onStrong)
+            }
             when (state) {
                 GlobalVocabularySearchUiState.Idle -> GlobalSearchHint()
                 GlobalVocabularySearchUiState.Loading -> GlobalSearchProgress("正在查询本地词库…")
-                GlobalVocabularySearchUiState.ClearingHistory -> GlobalSearchProgress("正在清空搜索历史…")
+                GlobalVocabularySearchUiState.ClearingHistory -> GlobalSearchProgress("正在清空历史…")
                 GlobalVocabularySearchUiState.Failure -> GlobalSearchFailure(onRetry = onRetry)
                 GlobalVocabularySearchUiState.Empty -> GlobalSearchEmpty()
                 is GlobalVocabularySearchUiState.Ready -> {
@@ -161,13 +184,16 @@ fun GlobalVocabularySearchScreen(
                     } else {
                         if (state.openFailed) GlobalSearchOpenFailed()
                         Text(
-                            "找到 ${state.results.size} 个结果",
-                            color = MintTextMuted,
+                            text = "找到 ${state.results.size} 个结果",
+                            style = AppType.Footnote,
+                            color = colors.text2,
                             modifier = Modifier.testTag("global_search_results_count"),
                         )
                         LazyColumn(
-                            modifier = Modifier.fillMaxWidth().weight(1f).testTag("global_search_results"),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .testTag("global_search_results"),
                         ) {
                             items(
                                 items = state.results,
@@ -185,52 +211,70 @@ fun GlobalVocabularySearchScreen(
 
 @Composable
 private fun GlobalSearchHint() {
+    val colors = appColors()
     Text(
-        "输入单词后开始全量查词；空输入会显示最近搜索。",
-        color = MintTextMuted,
+        text = "输入英文单词后点「搜索」；输入为空时，搜索会落到最近搜索。",
+        style = AppType.Body,
+        color = colors.text2,
         modifier = Modifier.testTag("global_search_hint"),
     )
 }
 
 @Composable
 private fun GlobalSearchProgress(text: String) {
+    val colors = appColors()
     Column(
-        Modifier.fillMaxWidth().padding(top = 24.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CircularProgressIndicator(color = MintPrimary)
-        Spacer(Modifier.height(12.dp))
-        Text(text, color = MintTextMuted)
+        CircularProgressIndicator(color = colors.text2)
+        Text(text, style = AppType.Footnote, color = colors.text2)
     }
 }
 
 @Composable
 private fun GlobalSearchFailure(onRetry: () -> Unit) {
+    val colors = appColors()
     Column(
-        Modifier.fillMaxWidth().padding(top = 24.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("搜索暂时不可用，请重试", color = MintPrimaryDark)
-        Spacer(Modifier.height(10.dp))
+        Text("搜索暂时不可用，请重试", style = AppType.Body, color = colors.text1)
         Button(
             onClick = onRetry,
             modifier = Modifier.testTag("global_search_retry"),
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary),
-        ) { Text("重试") }
+            shape = AppShape.Button,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.strongSurface,
+                contentColor = colors.onStrong,
+            ),
+        ) {
+            Text("重试", style = AppType.Label, color = colors.onStrong)
+        }
     }
 }
 
 @Composable
 private fun GlobalSearchEmpty() {
+    val colors = appColors()
     Column(
-        Modifier.fillMaxWidth().padding(top = 24.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("未找到匹配词卡", color = MintPrimaryDark, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
+        Text("未找到匹配词卡", style = AppType.Title, color = colors.text1)
         Text(
-            "当前只覆盖已安装词本，不是完整词典。",
-            color = MintTextMuted,
+            text = "当前只覆盖已安装词本，不是完整词典。",
+            style = AppType.Footnote,
+            color = colors.text2,
             modifier = Modifier.testTag("global_search_not_full_dictionary"),
         )
     }
@@ -239,6 +283,11 @@ private fun GlobalSearchEmpty() {
 /**
  * 历史列表是 [Column] 的直接子节点，需要 `Modifier.weight(1f)` 把剩余高度让给 `LazyColumn`，
  * 所以这里必须声明成 `ColumnScope` 的扩展——否则拿不到 Column 的作用域，列表会按内容无限撑高。
+ *
+ * 行是共享裸行 [BareRow]：同组关系由发丝线（`topDivider`）与 52dp 缩进表达，不再一行一枚药片。
+ * 次数进尾部值 `N 次`；`trailingTag` 把它单独标出来，因为 connected 用例要按
+ * `global_search_history_count_<query>` 断言「关闭次数显示时这枚节点不存在」——
+ * 尾部值的文案由组件渲染，标签只能由调用方给。
  */
 @Composable
 private fun ColumnScope.GlobalSearchHistory(
@@ -246,56 +295,53 @@ private fun ColumnScope.GlobalSearchHistory(
     onOpenHistory: (String) -> Unit,
     onClearHistory: () -> Unit,
 ) {
+    val colors = appColors()
     if (history.isEmpty()) {
         Text(
-            "还没有搜索记录",
-            color = MintTextMuted,
+            text = "还没有搜索记录",
+            style = AppType.Body,
+            color = colors.text2,
             modifier = Modifier.testTag("global_search_history_empty"),
         )
         return
     }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // 节标题与「清空」同一行：标题是「最近搜索」，「清空」的宾语由这行标题给出，不必再写一遍。
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            "最近搜索",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MintPrimaryDark,
+            text = "最近搜索",
+            style = AppType.Title,
+            color = colors.text1,
             modifier = Modifier.weight(1f),
         )
         TextButton(
             onClick = onClearHistory,
-            modifier = Modifier.testTag("global_search_clear_history"),
-        ) { Text("清空搜索历史") }
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .testTag("global_search_clear_history"),
+        ) {
+            Text("清空", style = AppType.Label, color = colors.text2)
+        }
     }
     LazyColumn(
-        modifier = Modifier.fillMaxWidth().weight(1f).testTag("global_search_history"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .testTag("global_search_history"),
     ) {
-        items(items = history, key = { it.history.normalizedQuery }) { item ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MintSurface, RoundedCornerShape(14.dp))
-                    .border(1.dp, MintOutline, RoundedCornerShape(14.dp))
-                    .clickable { onOpenHistory(item.history.displayQuery) }
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                    .semantics { contentDescription = "重新搜索 ${item.history.displayQuery}" }
-                    .testTag("global_search_history_${item.history.normalizedQuery}"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(item.history.displayQuery, style = MaterialTheme.typography.titleMedium, color = MintPrimaryDark)
-                    item.searchCountForDisplay?.let { count ->
-                        Text(
-                            "搜索 $count 次",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MintTextMuted,
-                            modifier = Modifier.testTag("global_search_history_count_${item.history.normalizedQuery}"),
-                        )
-                    }
-                }
-                Text("›", style = MaterialTheme.typography.titleLarge, color = MintPrimary)
-            }
+        itemsIndexed(
+            items = history,
+            key = { _, item -> item.history.normalizedQuery },
+        ) { index, item ->
+            BareRow(
+                title = item.history.displayQuery,
+                modifier = Modifier.testTag("global_search_history_${item.history.normalizedQuery}"),
+                trailing = item.searchCountForDisplay?.let { count -> "$count 次" },
+                trailingTag = item.searchCountForDisplay?.let { count ->
+                    "global_search_history_count_${item.history.normalizedQuery}"
+                },
+                topDivider = index > 0,
+                onClick = { onOpenHistory(item.history.displayQuery) },
+            )
         }
     }
 }
@@ -307,52 +353,64 @@ private fun ColumnScope.GlobalSearchHistory(
  */
 @Composable
 private fun GlobalSearchOpenFailed() {
+    val colors = appColors()
     Text(
-        "这个词卡暂时打不开，词书可能已被移除；可重新搜索。",
-        color = MintPrimaryDark,
-        style = MaterialTheme.typography.bodyMedium,
+        text = "这个词卡暂时打不开，词书可能已被移除；可重新搜索。",
+        style = AppType.Footnote,
+        color = colors.error,
         modifier = Modifier.testTag("global_search_open_failed"),
     )
 }
 
+/**
+ * 结果行：**五枚信息一个不少**（lemma / IPA / 释义 / 来源词书 / 次数）。
+ *
+ * R-20C.1 已裁决这枚行**不迁 `WordRow`**：`WordRow` 只有四槽，强迁必丢 IPA 或截断词书名；
+ * 它同时是词行族 seed 的落窗判据（`SharedComponentUniquenessRatchetTest` 口径「本文件恰 1 处」），
+ * 所以函数名、函数形状与信息构成都不动，只换取色源与去掉药片壳。版式改动仅两处：
+ * 盒子换成「发丝线 + 行尾 chevron」，行内墨色走六档排印（`AppType`）与令牌（`appColors()`）。
+ */
 @Composable
 private fun GlobalSearchResultRow(item: GlobalVocabularySearchResultItem, onClick: () -> Unit) {
+    val colors = appColors()
     val result = item.result
     val key = result.wordBookId + ":" + result.cardId
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MintSurface, RoundedCornerShape(14.dp))
-            .border(1.dp, MintOutline, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-            .semantics { contentDescription = "${result.lemma}，${result.meaningZh}，来源词书 ${result.wordBookName}" }
-            .testTag("global_search_result_$key"),
+            .testTag("global_search_result_$key")
+            .then(hairlineTop(colors.outlineSoft))
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(result.lemma, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            if (result.ipa.isNotBlank()) {
-                Text(result.ipa, style = MaterialTheme.typography.bodySmall, color = MintTextMuted)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(result.lemma, style = AppType.Title, color = colors.text1)
+                if (result.ipa.isNotBlank()) {
+                    Text(result.ipa, style = AppType.Footnote, color = colors.text2)
+                }
             }
-            Spacer(Modifier.height(4.dp))
-            Text(result.meaningZh, style = MaterialTheme.typography.bodyMedium, color = MintPrimaryDark)
-            Spacer(Modifier.height(4.dp))
+            Text(result.meaningZh, style = AppType.Body, color = colors.text1)
             Text(
-                "来源：${result.wordBookName}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MintTextMuted,
+                text = "来源：${result.wordBookName}",
+                style = AppType.Footnote,
+                color = colors.text3,
                 modifier = Modifier.testTag("global_search_result_book_$key"),
             )
             item.searchCountForDisplay?.let { count ->
                 Text(
-                    "搜索 $count 次",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MintTextMuted,
+                    text = "搜索 $count 次",
+                    style = AppType.Footnote,
+                    color = colors.text3,
                     modifier = Modifier.testTag("global_search_result_count_$key"),
                 )
             }
         }
-        Text("›", style = MaterialTheme.typography.headlineMedium, color = MintPrimary)
+        AppGlyph(AppIcon.ChevronRight, colors.text3, 16.dp, layer = AppGlyphLayer.StrokeOnly)
     }
 }

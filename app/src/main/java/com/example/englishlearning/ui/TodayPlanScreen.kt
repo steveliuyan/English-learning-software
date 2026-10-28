@@ -14,11 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,6 +35,10 @@ import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.EntryIconBadge
+import com.example.englishlearning.ui.components.InlineIconBadge
+import com.example.englishlearning.ui.components.ProgressRing
+import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.StrongCard
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -55,14 +60,17 @@ import com.example.englishlearning.ui.theme.appDomain
  * `_setup_entry`）随功能一起离场，判决由 `TodayPlanBareRowContractTest` 双向钉住。
  *
  * 三档容器各司其职（§4.1）：
- *  - [StrongCard] 恰一枚，深墨实底（`strongSurface`）配 `onStrong` 前景。**卡上的正文必须显式
- *    `color = colors.onStrong`**：`AppType` 六档的 getter 自带 `text1/text2`，压深底不可读，
- *    `LocalContentColor` 拦不住它们；无色的 `Text` 才吃容器内容色。
- *  - [SoftCard] 承载两条裸行，不描边——层次由 `surface` 与 `strongSurface` 的明度差表达。
+ *  - [StrongCard] 恰一枚：浅套「浅薄荷一档 `tint2` + `text1`」、深套「深墨实底 `strongSurface` +
+ *    `onStrong`」——分套由容器自己定（2026-10-31 用户评审 ③：浅套那块深墨板太重、喧宾夺主）。
+ *    **卡上的正文必须显式 `color = LocalContentColor.current`**：`AppType` 六档的 getter 自带
+ *    `text1/text2`，压深套的深底不可读，`LocalContentColor` 拦不住它们；无色的 `Text` 才吃容器内容色。
+ *    卡内一律**不写死 `onStrong`**：那是上一版「双套都是深底」的取法，浅套改浅之后会得到浅底近白字。
+ *  - [SoftCard] 承载两条裸行，不描边——层次由 `surface` 与强档卡的明度差表达。
  *  - [BareRow] 52dp 行高（≥ F5-03 的 48dp 水线），第二条带 1dp 发丝线（`topDivider`）。
  *
  * 数字的权威仍只有一处（AC-R-20）：`AppType.Display` 全屏恰一枚，落在今日完成数那一格；
- * 其余数字一律 `Footnote`/`Label`，墨色取同一个 `onStrong`。`AppType.Title` 只给词书名。
+ * 其余数字一律 `Footnote`/`Label`，墨色与卡上正文同一支取色入口（`LocalContentColor.current`）。
+ * `AppType.Title` 只给词书名。
  * 这条连同「本屏零 `EntryRow`、恰两条 `BareRow`」由 `TodayPlanNumberAuthorityTest` 与
  * `TodayPlanBareRowContractTest` 分别按源码形状钉住。
  *
@@ -78,6 +86,18 @@ import com.example.englishlearning.ui.theme.appDomain
  *
  * [streakDays] / [todayArticleRead] 由宿主（`AppScreen`）从打卡快照里取：本屏不自己去读仓库，
  * 与「业务规则在 ViewModel/仓库、版面只读状态」的分工一致。
+ *
+ * ## 2026-10-30 版式重做（可见层）
+ *
+ * 图标与配色改完之后，「页面还是旧页面」这一点由三处落点补齐，全部在既有判据内动：
+ *  - 页头走 `AppScreenHeader(hero = true)`：28sp 大标题 + 40dp 插画徽标（`AppIcon.Clock` 挂在
+ *    `AppDomain.Learn` 上），有连续天数时再加一行 `Label` 眉标——一级页靠字级与徽标讲层级，
+ *    不再和二级页共用 17sp 那档；`AppType.Display/Headline` 合计仍是 1，`Title` 仍只给词书名。
+ *  - 强档卡把「今天完成了几项」与一枚 78dp 环并排（`ProgressRing`，只读占比，不带字级）；
+ *    环里的百分比是 `Body` 档，不构成第二处数字权威（`Display` 依然是唯一大数）。
+ *  - 强档卡与软档卡之间补一行 `SectionHeading`「接下来」：一级页从此是「一件大事 + 一组小事」，
+ *    不再是一摞等价的卡片。
+ * 三处都不新增可点节点（首页用例按「可点节点闭合集合」逐枚数），组件也不读静态色。
  */
 @Composable
 fun TodayPlanScreen(
@@ -104,7 +124,12 @@ fun TodayPlanScreen(
             .testTag("today_plan_screen"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AppScreenHeader(title = "今日学习")
+        AppScreenHeader(
+            title = "今日学习",
+            hero = true,
+            eyebrow = if (streakDays > 0) "已连续学习 $streakDays 天" else null,
+            badge = { EntryIconBadge(icon = AppIcon.Clock, domain = AppDomain.Learn) },
+        )
         // 查词入口**四态常驻**，位置在 `when (state)` 之前（F3 / 评审 I-1）：计划读不出来时，
         // 用户仍要知道去哪儿查词（AGENTS.md「无网络或无 AI Key 时……离线查词仍应可用」）。
         SearchBox(onClick = onOpenSearch)
@@ -173,65 +198,94 @@ fun TodayPlanScreen(
                     }
                 }
                 StrongCard(modifier = Modifier.testTag("today_plan_summary")) {
-                    Text(state.wordBookName, style = AppType.Title, color = colors.onStrong)
-                    Text(
-                        "新学 $newDone/${state.newTarget} · 复习 $dueDone/${state.dueTarget}",
-                        style = AppType.Footnote,
-                        color = colors.onStrong.copy(alpha = 0.72f),
-                        modifier = Modifier.testTag("today_plan_task_total"),
-                    )
-                    Column(
+                    // 环只讲「总数的占比」，条讲「每类还剩多少」——两句话不重复。
+                    // 环与「今天完成了几项」同处一栏：一枚大数读精度，一枚环读比例，一左一右。
+                    Row(
                         modifier = Modifier.fillMaxWidth().testTag("today_plan_progress_summary"),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        Row(verticalAlignment = Alignment.Bottom) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(state.wordBookName, style = AppType.Title, color = LocalContentColor.current)
+                                Text(
+                                    "新学 $newDone/${state.newTarget} · 复习 $dueDone/${state.dueTarget}",
+                                    style = AppType.Footnote,
+                                    color = LocalContentColor.current.copy(alpha = 0.72f),
+                                    modifier = Modifier.testTag("today_plan_task_total"),
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    "$totalDone/$totalTarget",
+                                    style = AppType.Display,
+                                    color = LocalContentColor.current,
+                                    modifier = Modifier.testTag("today_plan_total_progress"),
+                                )
+                                Text(
+                                    " 项已完成",
+                                    style = AppType.Footnote,
+                                    color = LocalContentColor.current.copy(alpha = 0.72f),
+                                    modifier = Modifier.padding(bottom = 6.dp),
+                                )
+                            }
+                        }
+                        ProgressRing(
+                            progress = if (totalTarget <= 0) 0f else totalDone.toFloat() / totalTarget,
+                            track = LocalContentColor.current.copy(alpha = 0.18f),
+                            ink = LocalContentColor.current,
+                            diameter = 78.dp,
+                            strokeWidth = 8.dp,
+                        ) {
                             Text(
-                                "$totalDone/$totalTarget",
-                                style = AppType.Display,
-                                color = colors.onStrong,
-                                modifier = Modifier.testTag("today_plan_total_progress"),
-                            )
-                            Text(
-                                " 项已完成",
-                                style = AppType.Footnote,
-                                color = colors.onStrong.copy(alpha = 0.72f),
-                                modifier = Modifier.padding(bottom = 6.dp),
+                                text = if (totalTarget <= 0) "0%" else "${totalDone * 100 / totalTarget}%",
+                                style = AppType.Body,
+                                color = LocalContentColor.current,
+                                maxLines = 1,
                             )
                         }
+                    }
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         ThinProgress(
                             label = "新学",
                             done = newDone,
                             target = state.newTarget,
                             tag = "today_plan_new_progress",
-                            track = colors.onStrong.copy(alpha = 0.18f),
-                            ink = colors.onStrong,
+                            track = LocalContentColor.current.copy(alpha = 0.18f),
+                            ink = LocalContentColor.current,
                         )
                         ThinProgress(
                             label = "复习",
                             done = dueDone,
                             target = state.dueTarget,
                             tag = "today_plan_review_progress",
-                            track = colors.onStrong.copy(alpha = 0.18f),
-                            ink = colors.onStrong,
+                            track = LocalContentColor.current.copy(alpha = 0.18f),
+                            ink = LocalContentColor.current,
                         )
                         when {
                             totalTarget == 0 -> Text(
                                 "今天没有待办",
                                 style = AppType.Footnote,
-                                color = colors.onStrong.copy(alpha = 0.72f),
+                                color = LocalContentColor.current.copy(alpha = 0.72f),
                                 modifier = Modifier.testTag("today_plan_empty"),
                             )
                             allDone -> Text(
                                 // 没有连续天数时不摆一个「连续 0 天」：那是把「还没开始」说成了「断了」。
                                 if (streakDays > 0) "今日已完成 · 连续 $streakDays 天" else "今日已完成",
                                 style = AppType.Footnote,
-                                color = colors.onStrong.copy(alpha = 0.72f),
+                                color = LocalContentColor.current.copy(alpha = 0.72f),
                                 modifier = Modifier.testTag("today_plan_plan_footnote"),
                             )
                             else -> Text(
                                 if (state.isUnlocked) "今日已解锁文章" else state.unlockReason,
                                 style = AppType.Footnote,
-                                color = colors.onStrong.copy(alpha = 0.72f),
+                                color = LocalContentColor.current.copy(alpha = 0.72f),
                                 modifier = Modifier.testTag("today_plan_progress"),
                             )
                         }
@@ -248,6 +302,7 @@ fun TodayPlanScreen(
                 // 卡与行都不再套第二层 padding。两行之间的 8dp 间距由 SoftCard 的
                 // `Arrangement.spacedBy` 表达不了（那会让发丝线两侧各留一条空气），
                 // 所以两行收进一个零间距的 Column 里，分隔仍只有那 1dp 顶线。
+                SectionHeading(text = "接下来")
                 SoftCard(
                     modifier = Modifier.testTag("today_plan_secondary_card"),
                     contentPadding = PaddingValues(0.dp),
@@ -262,12 +317,7 @@ fun TodayPlanScreen(
                             subtitle = if (state.isUnlocked) "去读今天生成的短文" else "完成今日计划后解锁",
                             onClick = onOpenReading,
                             leading = {
-                                AppGlyph(
-                                    icon = AppIcon.Newspaper,
-                                    tint = appDomain(AppDomain.Reading).deep,
-                                    size = 24.dp,
-                                    layer = AppGlyphLayer.StrokeOnly,
-                                )
+                                InlineIconBadge(icon = AppIcon.Newspaper, domain = AppDomain.Reading)
                             },
                             modifier = Modifier.testTag("today_plan_reading_status"),
                         )
@@ -278,12 +328,7 @@ fun TodayPlanScreen(
                             topDivider = true,
                             onClick = onOpenWordBank,
                             leading = {
-                                AppGlyph(
-                                    icon = AppIcon.Book,
-                                    tint = appDomain(AppDomain.Library).deep,
-                                    size = 24.dp,
-                                    layer = AppGlyphLayer.StrokeOnly,
-                                )
+                                InlineIconBadge(icon = AppIcon.Book, domain = AppDomain.Library)
                             },
                             modifier = Modifier.testTag("today_plan_open_word_bank"),
                         )
@@ -327,7 +372,16 @@ private fun SearchBox(onClick: () -> Unit) {
 private fun ThinProgress(label: String, done: Int, target: Int, tag: String, track: Color, ink: Color) {
     val ratio = if (target <= 0) 1f else (done.toFloat() / target).coerceIn(0f, 1f)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(label, style = AppType.Label, color = ink.copy(alpha = 0.72f), modifier = Modifier.width(28.dp))
+        // 批 1 Task 9 大字号真机取证：原写 `width(28.dp)`，在图幅 2.0 时「新学」被挤成
+        // 上下两行（新 / 学），整张强档卡跟着变高。改成「至少 28dp」：常规字号读数不变，
+        // 大字号下标签按内容取宽、让进度条收缩，标签恒为一行。
+        Text(
+            label,
+            style = AppType.Label,
+            color = ink.copy(alpha = 0.72f),
+            maxLines = 1,
+            modifier = Modifier.widthIn(min = 28.dp),
+        )
         Box(
             Modifier
                 .weight(1f)
@@ -338,6 +392,6 @@ private fun ThinProgress(label: String, done: Int, target: Int, tag: String, tra
         ) {
             Box(Modifier.fillMaxWidth(ratio).fillMaxHeight().background(ink))
         }
-        Text("$done/$target", style = AppType.Label, color = ink.copy(alpha = 0.72f))
+        Text("$done/$target", style = AppType.Label, color = ink.copy(alpha = 0.72f), maxLines = 1)
     }
 }
