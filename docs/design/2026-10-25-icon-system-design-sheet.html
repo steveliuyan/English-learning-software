@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>功能入口图标 · 三层插画字形设计稿</title>
+<style>
+  :root {
+    --page-bg: #F7FAF8;
+    --page-surface: #FFFFFF;
+    --page-sunken: #EFF4F1;
+    --ink-1: #1C1C1E;
+    --ink-2: #48655C;
+    --ink-3: #6E847C;
+    --line: #E1EAE4;
+    --mint: #188F76;
+    --radius-card: 14px;
+    --font-sans: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--ink-1);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.72;
+    text-rendering: optimizeLegibility;
+  }
+  .shell { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+
+  .masthead { padding: 64px 0 32px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--mint); margin: 0 0 18px;
+  }
+  h1 {
+    font-size: clamp(30px, 4.4vw, 44px); line-height: 1.18; letter-spacing: -.02em;
+    font-weight: 650; margin: 0 0 18px; max-width: 22ch;
+  }
+  .lead { font-size: 19px; line-height: 1.66; color: var(--ink-2); max-width: 60ch; margin: 0 0 28px; }
+  .fact-row {
+    display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0; padding: 0;
+    list-style: none; font-size: 13.5px; color: var(--ink-3);
+  }
+  .fact-row b { color: var(--ink-1); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .toc {
+    margin: 32px 0 8px; padding: 20px 22px; background: var(--page-surface);
+    border: 1px solid var(--line); border-radius: var(--radius-card);
+  }
+  .toc p {
+    margin: 0 0 10px; font-size: 12px; font-family: var(--font-mono);
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 36px; font-size: 13.5px; }
+  .toc li { margin: 3px 0; break-inside: avoid; }
+  .toc a { color: var(--ink-2); text-decoration: none; border-bottom: 1px solid transparent; }
+  .toc a:hover, .toc a:focus-visible { color: var(--mint); border-bottom-color: var(--mint); }
+
+  section { padding-top: 56px; }
+  h2 {
+    font-size: 24px; line-height: 1.3; letter-spacing: -.01em; font-weight: 650;
+    margin: 0 0 6px; display: flex; align-items: baseline; gap: 12px;
+  }
+  h2 .num {
+    font-family: var(--font-mono); font-size: 13.5px; color: var(--mint);
+    font-weight: 500; letter-spacing: .08em;
+  }
+  .section-note { margin: 0 0 26px; color: var(--ink-2); max-width: 68ch; }
+  h3 { font-size: 19px; font-weight: 620; margin: 38px 0 10px; line-height: 1.4; }
+  p { margin: 0 0 14px; max-width: 70ch; }
+  .prose ul, .prose ol { max-width: 70ch; padding-left: 22px; margin: 0 0 16px; }
+  .prose li { margin: 5px 0; }
+  code {
+    font-family: var(--font-mono); font-size: .9em; background: var(--page-sunken);
+    border-radius: 5px; padding: 1px 5px;
+  }
+
+  .table-wrap {
+    overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-card);
+    background: var(--page-surface); margin: 0 0 8px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 640px; }
+  caption {
+    caption-side: top; text-align: left; padding: 16px 18px 10px;
+    font-size: 13.5px; color: var(--ink-3);
+  }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); line-height: 1.55; }
+  thead th {
+    font-size: 12px; font-weight: 600; color: var(--ink-2);
+    background: var(--page-sunken); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); white-space: nowrap; }
+  .swatch { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .chip {
+    width: 15px; height: 15px; border-radius: 4px; flex: 0 0 auto;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+  }
+  .pass { color: #146B4B; font-weight: 600; }
+  .low { color: #8A5A00; font-weight: 600; }
+
+  /* ---------- 预览容器：只在这里切深浅 ---------- */
+  .preview {
+    --p-bg: #F1FBF5; --p-surface: #FFFFFF; --p-tint: #DDF7E8; --p-line: #E4EFE9;
+    --p-text1: #1C1C1E; --p-text2: #4E756A; --p-text3: #7A9088;
+    background: var(--p-bg); color: var(--p-text1);
+    border: 1px solid var(--line); border-radius: var(--radius-card); padding: 26px;
+    transition: background-color 180ms ease-out, color 180ms ease-out;
+  }
+  .preview[data-scheme="dark"] {
+    --p-bg: #0E1512; --p-surface: #17201C; --p-tint: #1C2C26; --p-line: #233029;
+    --p-text1: #E9F2EC; --p-text2: #9FB3AA; --p-text3: #7F938A;
+  }
+  /* 轻松档中性层：底色去绿、tint 降彩度、描边变淡（§4.4 提案） */
+  .preview[data-skin="calm"] {
+    --p-bg: #F6F9F6; --p-surface: #FFFFFF; --p-tint: #E9F4EE; --p-line: #EAF1EC;
+    --p-text1: #1F2B26; --p-text2: #566B62; --p-text3: #7C9188;
+  }
+  .preview[data-skin="calm"][data-scheme="dark"] {
+    --p-bg: #111A16; --p-surface: #18231E; --p-tint: #1B2A25; --p-line: #25322C;
+    --p-text1: #E9F2EC; --p-text2: #9DB1A8; --p-text3: #82968D;
+  }
+  /* 对看表：同一行同时摆两套口径，不跟随开关 */
+  table.skin-compare { min-width: 560px; }
+  table.skin-compare td { vertical-align: middle; }
+  .skin-tag {
+    display: inline-block; margin-left: 8px;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .04em;
+    color: var(--ink-3);
+  }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; margin: 0 0 22px; }
+  .control-group { display: inline-flex; align-items: center; gap: 8px; }
+  .control-label {
+    font-size: 12px; font-family: var(--font-mono); letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+  .seg {
+    display: inline-flex; padding: 3px; gap: 3px; background: var(--page-sunken);
+    border: 1px solid var(--line); border-radius: 9px;
+  }
+  .seg button {
+    appearance: none; border: 0; background: transparent; color: var(--ink-2);
+    font: inherit; font-size: 13.5px; padding: 5px 12px; border-radius: 7px; cursor: pointer;
+    transition: background-color 160ms ease-out, color 160ms ease-out;
+  }
+  .seg button:hover { color: var(--ink-1); }
+  .seg button[aria-pressed="true"] {
+    background: var(--page-surface); color: var(--ink-1); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(28, 28, 30, .08);
+  }
+  .seg button:focus-visible { outline: 2px solid var(--mint); outline-offset: 1px; }
+  .hint { font-size: 13.5px; color: var(--ink-3); }
+
+  .icon-badge { display: grid; place-items: center; flex: 0 0 auto; }
+  .badge-40 {
+    width: 40px; height: 40px; border-radius: 12px; display: grid;
+    place-items: center; flex: 0 0 auto;
+  }
+  .badge-40.is-gradient { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .38); }
+  .badge-40.is-tint { background: var(--p-tint); }
+  .badge-30 {
+    width: 30px; height: 30px; border-radius: 9px; display: grid;
+    place-items: center; flex: 0 0 auto; background: var(--p-tint);
+  }
+
+  .wall {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+    gap: 1px; background: var(--p-line); border: 1px solid var(--p-line);
+    border-radius: 12px; overflow: hidden;
+  }
+  .wall-item {
+    background: var(--p-surface); padding: 16px 15px 14px; display: flex;
+    flex-direction: column; gap: 10px; min-height: 160px;
+  }
+  .wall-badges { display: flex; align-items: center; gap: 9px; }
+  .wall-name {
+    margin: 0; font-size: 13.5px; font-weight: 620; color: var(--p-text1);
+    line-height: 1.35; display: flex; align-items: baseline;
+    justify-content: space-between; gap: 8px;
+  }
+  .wall-key { font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--p-text3); }
+  .wall-use { margin: 0; font-size: 12px; line-height: 1.5; color: var(--p-text2); }
+  .tag {
+    align-self: flex-start; font-family: var(--font-mono); font-size: 10.5px;
+    letter-spacing: .04em; padding: 2px 7px; border-radius: 5px;
+    color: var(--p-text3); box-shadow: inset 0 0 0 1px var(--p-line);
+  }
+  .tag.three { color: var(--p-text2); box-shadow: inset 0 0 0 1px var(--p-text3); }
+
+  .dissect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .dissect-card {
+    background: var(--p-surface); border: 1px solid var(--p-line); border-radius: 12px;
+    padding: 18px 16px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .dissect-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .dissect-head strong { font-size: 13.5px; color: var(--p-text1); font-weight: 620; }
+  .dissect-head span { font-family: var(--font-mono); font-size: 11px; color: var(--p-text3); }
+  .layer-steps { display: flex; align-items: center; gap: 6px; }
+  .layer-step { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .layer-tile {
+    width: 100%; aspect-ratio: 1; display: grid; place-items: center;
+    border-radius: 9px; background: var(--p-bg); box-shadow: inset 0 0 0 1px var(--p-line);
+  }
+  .layer-step b {
+    font-size: 10.5px; font-weight: 500; color: var(--p-text3);
+    font-family: var(--font-mono); letter-spacing: .03em;
+  }
+  .dissect-note { margin: 0; font-size: 12px; color: var(--p-text2); line-height: 1.55; }
+  .is-gray { filter: grayscale(1) contrast(1.04); }
+
+  .screen-mock {
+    background: var(--p-surface); border: 1px solid var(--p-line);
+    border-radius: 12px; overflow: hidden;
+  }
+  .screen-mock + .screen-mock { margin-top: 20px; }
+  .screen-title {
+    margin: 0; padding: 12px 16px; font-size: 12px; font-family: var(--font-mono);
+    letter-spacing: .1em; text-transform: uppercase; color: var(--p-text3);
+    border-bottom: 1px solid var(--p-line); background: var(--p-bg);
+  }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; min-height: 56px; }
+  .row + .row { border-top: 1px solid var(--p-line); }
+  .row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .row-title { font-size: 14.5px; font-weight: 560; color: var(--p-text1); line-height: 1.4; }
+  .row-sub { font-size: 12.5px; color: var(--p-text2); line-height: 1.45; }
+  .row-spacer { flex: 1 1 auto; }
+  .chev { color: var(--p-text3); flex: 0 0 auto; display: grid; place-items: center; }
+  .bare { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .no-icon {
+    width: 40px; height: 40px; flex: 0 0 auto; display: grid;
+    place-items: center; color: var(--p-text3); font-size: 15px;
+  }
+  .tabbar {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 8px 6px 10px; border-top: 1px solid var(--p-line); background: var(--p-surface);
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 2px 6px; }
+  .tab-label { font-size: 11.5px; color: var(--p-text2); }
+  .tab[data-selected="true"] .tab-label { color: var(--mint); font-weight: 600; }
+
+  .note {
+    border: 1px solid var(--line); border-radius: var(--radius-card);
+    background: var(--page-surface); padding: 18px 20px; margin: 22px 0 0;
+  }
+  .note > .note-label {
+    display: block; font-family: var(--font-mono); font-size: 12px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--mint); margin-bottom: 8px;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note ul { margin: 0; padding-left: 20px; }
+  .note li { margin: 6px 0; }
+
+  .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; margin-top: 8px; }
+  .figure-caption { margin: 10px 0 0; font-size: 12px; color: var(--ink-3); max-width: 72ch; }
+  footer {
+    margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--ink-3);
+  }
+
+  @media (max-width: 720px) {
+    .shell { padding: 0 16px 72px; }
+    .masthead { padding-top: 44px; }
+    .toc ol { columns: 1; }
+    .preview { padding: 16px; }
+    .wall { grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); }
+    .row { padding: 9px 12px; gap: 10px; }
+    .badge-40, .no-icon { width: 36px; height: 36px; }
+  }
+
+  @media print {
+    :root { --page-bg: #FFFFFF; }
+    .controls, .toc { display: none; }
+    body { font-size: 11pt; }
+    .shell { max-width: none; padding: 0; }
+    section { padding-top: 26pt; }
+    h2 { break-after: avoid; }
+    .wall-item, .dissect-card, .note, .screen-mock, .preview { break-inside: avoid; }
+    thead { display: table-header-group; }
+    .table-wrap { overflow: visible; border-color: #BBB; }
+    table { min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header class="masthead">
+  <p class="eyebrow">Design sheet · 2026-10-25 · 待评审</p>
+  <h1>功能入口图标：从「一底色 + 一根线」到三层插画字形</h1>
+  <p class="lead">
+    本稿把 33 枚入口字形的三层几何（底幅 / 强调 / 骨架）按真实色值渲染出来，逐域逐档给出实测对比，
+    并在真实落点上还原「改之前 / 改之后」。所有几何逐字取自 <code>AppIcons.kt</code>，
+    所有色值取自 <code>AppColors.kt</code>；本稿不改任何 Compose 代码，只用来定口径。
+  </p>
+  <ul class="fact-row">
+    <li>字形 <b>33</b> 枚</li>
+    <li>带强调层 <b>25</b> 枚</li>
+    <li>豁免（描边 only）<b>5</b> 枚</li>
+    <li>容器 <b>40dp / 30dp</b> 两档</li>
+    <li>画布 <b>24×24</b>，描边 <b>2px</b></li>
+    <li>域色 <b>7</b> 组 × 浅深 <b>2</b> 套</li>
+  </ul>
+</header>
+
+<nav class="toc" aria-label="目录">
+  <p>目录</p>
+  <ol>
+    <li><a href="#s1">诊断：为什么现在看起来单调</a></li>
+    <li><a href="#s2">三层解剖：一层加什么</a></li>
+    <li><a href="#s3">字形墙：33 枚 × 3 档</a></li>
+    <li><a href="#s4">七域配色与实测对比</a></li>
+    <li><a href="#s5">真实落点还原</a></li>
+    <li><a href="#s6">度量与规范摘要</a></li>
+    <li><a href="#s7">实施状态与待定项</a></li>
+  </ol>
+</nav>
+
+<section id="s1">
+  <h2><span class="num">01</span>诊断：为什么现在看起来单调</h2>
+  <p class="section-note">
+    「单调」不是配色问题，是<strong>层数</strong>问题。用户看到的功能入口图标几乎全部只画了一层骨架。
+  </p>
+
+  <div class="prose">
+    <p>
+      决策记录里已经复现过结论：33 枚字形里，绝大多数在生产界面上只剩「一个 tint 底 + 一根 2px 线」。
+      <code>AppGlyphLayer.StrokeOnly</code> 只画描边骨架层，而功能入口的弱档容器（<code>EntryIconTone.Tint</code>）
+      与行内徽标（<code>InlineIconBadge</code>）走的都是这一档。两层 duotone 的底幅只在
+      <code>EntryIconTone.Gradient</code> 实底档出现，而那一档在生产里只有设置页两行。
+    </p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <caption>功能入口落点 × 当前呈现层（逐处读源码核对，含容器有无与尺寸）</caption>
+      <thead>
+        <tr><th>落点</th><th>容器</th><th>字形</th><th>当前呈现</th><th>三层后</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>底部导航 · 选中 tab</td><td><code>InlineIconBadge</code> 30dp</td><td class="num">17dp</td><td>tint 底 + 单根描边</td><td>保持单层（17dp 不上三层，理由见 §6）</td></tr>
+        <tr><td>底部导航 · 未选中 tab</td><td>无容器</td><td class="num">22dp</td><td>裸字形单层描边（<code>text2</code>）</td><td>保持单层</td></tr>
+        <tr><td>设置页 7 行</td><td><code>Tint</code> 40dp</td><td class="num">22dp</td><td>tint 底 + 单层描边</td><td>三层，<strong>变化最大的一档</strong></td></tr>
+        <tr><td>设置页 2 行（词书与每日目标 / AI 服务与密钥）</td><td><code>Gradient</code> 40dp</td><td class="num">22dp</td><td>白 42% 底幅 + 白骨架（无强调）</td><td>补上强调层</td></tr>
+        <tr><td>设置页子行（词书内容包 / 导出）</td><td><code>Gradient</code>（<code>EntryRow</code> 默认档）</td><td class="num">22dp</td><td>同上</td><td>补上强调层</td></tr>
+        <tr><td>备份与恢复 4 行</td><td><code>Gradient</code>（<code>EntryRow</code> 默认档）</td><td class="num">22dp</td><td>同上</td><td>补上强调层</td></tr>
+        <tr><td>AI 页功能入口行</td><td><code>Gradient</code>（<code>EntryRow</code> 默认档）</td><td class="num">22dp</td><td>同上</td><td>补上强调层</td></tr>
+        <tr><td>今日计划 2 行 + 常驻查词条</td><td><strong>无容器</strong>（<code>BareRow</code>）</td><td class="num">24dp / 18dp</td><td>裸字形单层描边</td><td><strong>连载体都没有</strong>，需先定容器（提案：40dp <code>Tint</code>）</td></tr>
+        <tr><td>行内指示（返回 / 箭头 / 对勾 / 关闭）</td><td>无容器</td><td class="num">16–17dp</td><td>单层描边</td><td>不变（豁免表，开放折线无内部区域）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="note-label">结论</span>
+    <ul>
+      <li>要消除「单调」，必须让<strong>功能入口</strong>这一族离开 <code>StrokeOnly</code>，而不是再调一次底色。</li>
+      <li>真正承载识别特征的仍然是骨架层（裁决 22-1 不许放松）；底幅与强调层只解决「体量感」与「笔触感」。</li>
+      <li>行内 17dp 与 30dp 容器<strong>不上三层</strong>：尺寸太小，底幅会把字形糊成一坨，这条路必须留着单层。</li>
+      <li>「今日计划」两行连徽标容器都没有，是这次唯一需要<strong>新增容器</strong>的落点——它决定了三层能不能覆盖到首屏。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s2">
+  <h2><span class="num">02</span>三层解剖：一层加什么</h2>
+  <p class="section-note">
+    同一枚字形按「底幅 → 底幅 + 强调 → 三层」逐格累加，最后一格去色，确认灰度下骨架依然可读。
+    每格都是真实的域渐变容器，不是示意色块。
+  </p>
+
+  <div class="preview" data-scheme="light">
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">主题</span>
+        <div class="seg" data-seg="scheme">
+          <button type="button" data-value="light" aria-pressed="true">浅色</button>
+          <button type="button" data-value="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">配色</span>
+        <div class="seg" data-seg="skin">
+          <button type="button" data-value="current" aria-pressed="true">现行</button>
+          <button type="button" data-value="calm" aria-pressed="false">轻松</button>
+        </div>
+      </div>
+      <span class="hint">浅色墨 = 白；深色墨 = <code>onBrand</code>，容器底色换深套域色。</span>
+    </div>
+
+    <div class="dissect-grid">
+      <div class="dissect-card" data-glyph="Book" data-domain="Learn">
+        <div class="dissect-head"><strong>Book · 合上的书</strong><span>3 层 · 25 枚之一</span></div>
+        <div class="layer-steps">
+          <div class="layer-step"><div class="layer-tile" data-step="1"></div><b>① 底幅</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="2"></div><b>② +强调</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="3"></div><b>③ +骨架</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="4"></div><b>④ 去色</b></div>
+        </div>
+        <p class="dissect-note">底幅给左页半幅，强调给书脊厚线与书签带，骨架给书壳与中缝。三层后左页有「翻开」的体量。</p>
+      </div>
+
+      <div class="dissect-card" data-glyph="Chart" data-domain="Review">
+        <div class="dissect-head"><strong>Chart · 学习记录</strong><span>3 层 · 25 枚之一</span></div>
+        <div class="layer-steps">
+          <div class="layer-step"><div class="layer-tile" data-step="1"></div><b>① 底幅</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="2"></div><b>② +强调</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="3"></div><b>③ +骨架</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="4"></div><b>④ 去色</b></div>
+        </div>
+        <p class="dissect-note">折线下方面积作底幅，三根实心柱作强调，折线与坐标轴作骨架——柱与折线是两套信息，缺一层就读成三根线。</p>
+      </div>
+
+      <div class="dissect-card" data-glyph="Spark" data-domain="AiSpeech">
+        <div class="dissect-head"><strong>Spark · AI</strong><span>3 层 · 25 枚之一</span></div>
+        <div class="layer-steps">
+          <div class="layer-step"><div class="layer-tile" data-step="1"></div><b>① 底幅</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="2"></div><b>② +强调</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="3"></div><b>③ +骨架</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="4"></div><b>④ 去色</b></div>
+        </div>
+        <p class="dissect-note">主星芒作底幅，伴星与星心作强调。强调层让「闪」有亮度差，而骨架保证伴星在灰度下不丢。</p>
+      </div>
+
+      <div class="dissect-card" data-glyph="BookOpen" data-domain="Library">
+        <div class="dissect-head"><strong>BookOpen · 摊开的书</strong><span>3 层 · 25 枚之一</span></div>
+        <div class="layer-steps">
+          <div class="layer-step"><div class="layer-tile" data-step="1"></div><b>① 底幅</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="2"></div><b>② +强调</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="3"></div><b>③ +骨架</b></div>
+          <div class="layer-step"><div class="layer-tile" data-step="4"></div><b>④ 去色</b></div>
+        </div>
+        <p class="dissect-note">强调层在这里承载「页内文字」——两根短横与书脊厚线。这是最能说明「绘画感」来源的一枚：字块比线更像印刷品。</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="figure-caption">
+    切换右上角主题可看深套：深色下墨色由白换成 <code>onBrand</code>（近黑），底幅随之从「提亮」变成「压暗」的阅读效果。
+  </p>
+</section>
+
+<section id="s3">
+  <h2><span class="num">03</span>字形墙：33 枚 × 3 档</h2>
+  <p class="section-note">
+    每枚字形给三种呈现：40dp 实底渐变档、40dp 弱档 tint、30dp 行内徽标。可切主题、按层筛选、去色核对。
+    豁免的五枚（返回 / 右箭头 / 下箭头 / 关闭 / 对勾）只出现行内格——它们进不了 40dp 入口容器，那是 <code>require</code> 拦死的行为。
+  </p>
+
+  <div class="preview" data-scheme="light">
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">主题</span>
+        <div class="seg" data-seg="scheme">
+          <button type="button" data-value="light" aria-pressed="true">浅色</button>
+          <button type="button" data-value="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">配色</span>
+        <div class="seg" data-seg="skin">
+          <button type="button" data-value="current" aria-pressed="true">现行</button>
+          <button type="button" data-value="calm" aria-pressed="false">轻松</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">层</span>
+        <div class="seg" data-seg="layers">
+          <button type="button" data-value="three" aria-pressed="true">三层</button>
+          <button type="button" data-value="noaccent" aria-pressed="false">无强调</button>
+          <button type="button" data-value="stroke" aria-pressed="false">仅骨架</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">强调层口径</span>
+        <div class="seg" data-seg="accent">
+          <button type="button" data-value="proposed" aria-pressed="true">建议</button>
+          <button type="button" data-value="current" aria-pressed="false">现行</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">灰度</span>
+        <div class="seg" data-seg="gray">
+          <button type="button" data-value="off" aria-pressed="true">彩色</button>
+          <button type="button" data-value="on" aria-pressed="false">去色</button>
+        </div>
+      </div>
+    </div>
+    <div class="wall" id="wall"></div>
+    <p class="hint" style="margin: 14px 0 0">
+      三档尺寸与代码一致：入口字形 22dp 画在 40dp 容器里（圆角 12dp），行内字形 17dp 画在 30dp 容器里（圆角 9dp）。
+      描边重量恒为 2（24 画布单位），圆头、圆角连接。
+    </p>
+  </div>
+
+  <div class="note">
+    <span class="note-label">「建议」与「现行」差在哪</span>
+    <p>
+      「现行」按 2026-10-19 决策记录第 4 条：实底渐变档的强调层取<strong>域 <code>base</code></strong>。
+      实测这条取不到的对比——<code>base</code> 正好坐在「渐变底」与「白 42% 底幅」之间，
+      强调层压底幅只有 <b>1.01–1.47</b>，等于不可见（明细见 §4）。
+      「建议」把强调层改为<strong>取墨</strong>：实底档取「域深再压暗 18%」（深套取 <code>onBrand</code>），弱档取域 <code>deep</code>，
+      强调层压底幅升到 <b>2.93–4.44</b>（深套 <b>5.91–9.74</b>）。两档切换可直接对看。
+    </p>
+  </div>
+</section>
+
+<section id="s4">
+  <h2><span class="num">04</span>七域配色与实测对比</h2>
+  <p class="section-note">
+    下列数值由 WCAG 相对亮度现算（不抄旧注释）。带 ✅ 的是承载识别特征的配对，必须 ≥ 3:1；
+    标 ⚠ 的是装饰层配对，不承担 3:1 义务，但低于 1.5 就等于白画——这正是「现行口径」的问题所在。
+  </p>
+
+  <div class="prose">
+    <p>
+      三套容器底各不一样，所以分三张表看：<code>Gradient</code> 浅套、<code>Tint</code> 弱档、<code>Gradient</code> 深套。
+      「底幅」一列给的是<strong>合成后的实际颜色</strong>（半透明墨压在容器底上的结果），便于目视核对。
+      4.1–4.3 全部按<strong>现行取值</strong>算；4.4 是这一轮新增的<strong>轻松档</strong>提案（降彩度、去绿、拉平渐变），
+      并已接进 §2 / §3 / §5 三处预览的「配色」开关。
+    </p>
+  </div>
+
+  <h3>4.1 实底渐变档 · 浅色</h3>
+  <p class="hint" style="margin: -4px 0 12px">
+    容器底 = <code>linear-gradient(140deg, deep 混 18% base → deep)</code>；墨 = 白；底幅 = 白 @ 0.42。
+    <b>（2026-10-27 定案 0.18，早期写 35%）</b>
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>域</th><th>渐变亮端</th><th>渐变暗端</th>
+          <th class="num">白压亮端 ✅</th><th class="num">白压暗端 ✅</th>
+          <th>白 42% 底幅</th><th class="num">白压底幅</th>
+          <th class="num">现行强调压底幅</th><th class="num">建议强调压底幅</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AiSpeech</td>
+          <td><span class="swatch"><i class="chip" style="background:#20A383"></i>#20A383</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#188F76"></i>#188F76</span></td>
+          <td class="num pass">3.16</td><td class="num pass">4.02</td>
+          <td><span class="swatch"><i class="chip" style="background:#7DCAB7"></i>#7DCAB7</span></td>
+          <td class="num">1.91</td><td class="num low">1.11</td><td class="num pass">2.93</td>
+        </tr>
+        <tr>
+          <td>Learn</td>
+          <td><span class="swatch"><i class="chip" style="background:#086BCE"></i>#086BCE</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#075EB4"></i>#075EB4</span></td>
+          <td class="num pass">5.22</td><td class="num pass">6.42</td>
+          <td><span class="swatch"><i class="chip" style="background:#70A9E3"></i>#70A9E3</span></td>
+          <td class="num">2.47</td><td class="num low">1.47</td><td class="num pass">3.40</td>
+        </tr>
+        <tr>
+          <td>Review</td>
+          <td><span class="swatch"><i class="chip" style="background:#C87004"></i>#C87004</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#AB5700"></i>#AB5700</span></td>
+          <td class="num pass">3.62</td><td class="num pass">5.13</td>
+          <td><span class="swatch"><i class="chip" style="background:#DFAC6D"></i>#DFAC6D</span></td>
+          <td class="num">2.04</td><td class="num low">1.01</td><td class="num pass">3.40</td>
+        </tr>
+        <tr>
+          <td>Library</td>
+          <td><span class="swatch"><i class="chip" style="background:#9F41CC"></i>#9F41CC</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#8E34B8"></i>#8E34B8</span></td>
+          <td class="num pass">5.10</td><td class="num pass">6.30</td>
+          <td><span class="swatch"><i class="chip" style="background:#C791E2"></i>#C791E2</span></td>
+          <td class="num">2.45</td><td class="num low">1.44</td><td class="num pass">3.39</td>
+        </tr>
+        <tr>
+          <td>Reading</td>
+          <td><span class="swatch"><i class="chip" style="background:#DB274F"></i>#DB274F</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#C81E46"></i>#C81E46</span></td>
+          <td class="num pass">4.75</td><td class="num pass">5.63</td>
+          <td><span class="swatch"><i class="chip" style="background:#EA8299"></i>#EA8299</span></td>
+          <td class="num">2.58</td><td class="num low">1.36</td><td class="num pass">2.93</td>
+        </tr>
+        <tr>
+          <td>Danger</td>
+          <td><span class="swatch"><i class="chip" style="background:#CE1511"></i>#CE1511</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#B30000"></i>#B30000</span></td>
+          <td class="num pass">5.64</td><td class="num pass">7.20</td>
+          <td><span class="swatch"><i class="chip" style="background:#E27775"></i>#E27775</span></td>
+          <td class="num">2.94</td><td class="num low">1.21</td><td class="num pass">3.19</td>
+        </tr>
+        <tr>
+          <td>Settings</td>
+          <td><span class="swatch"><i class="chip" style="background:#616164"></i>#616164</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#48484A"></i>#48484A</span></td>
+          <td class="num pass">6.22</td><td class="num pass">9.12</td>
+          <td><span class="swatch"><i class="chip" style="background:#A3A3A5"></i>#A3A3A5</span></td>
+          <td class="num">2.52</td><td class="num low">1.30</td><td class="num pass">4.44</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="figure-caption">
+    「现行强调」= 域 <code>base</code>，「建议强调」= 域 <code>deep</code> 压暗 18%（<code>#147561</code> / <code>#064D94</code> / <code>#8C4700</code> / <code>#742B97</code> / <code>#A41939</code> / <code>#930000</code> / <code>#3B3B3D</code>）。
+    骨架（白）与容器底的配对 3.16–9.12 全部达标，三层的加入没有动这条基线。
+  </p>
+
+  <h3>4.2 弱档 tint · 浅色与深色</h3>
+  <p class="hint" style="margin: -4px 0 12px">
+    底 = 共享中性 <code>tint</code>（浅 <code>#DDF7E8</code> / 深 <code>#1C2C26</code>）；底幅 = 域 <code>base</code> @ 0.42 / 0.30；骨架与强调 = 域 <code>deep</code>。
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>域</th><th>base / deep</th><th>浅套底幅</th>
+          <th class="num">deep 压 tint ✅</th><th class="num">deep 压底幅</th>
+          <th>深套底幅</th><th class="num">深套 deep 压深 tint ✅</th><th class="num">深套 deep 压深底幅</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AiSpeech</td>
+          <td><span class="swatch"><i class="chip" style="background:#2EC99C"></i><i class="chip" style="background:#188F76"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#94E4C8"></i>#94E4C8</span></td>
+          <td class="num pass">3.55</td><td class="num">2.71</td>
+          <td><span class="swatch"><i class="chip" style="background:#24624E"></i>#24624E</span></td>
+          <td class="num pass">8.63</td><td class="num">4.23</td>
+        </tr>
+        <tr>
+          <td>Learn</td>
+          <td><span class="swatch"><i class="chip" style="background:#0A84FF"></i><i class="chip" style="background:#075EB4"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#84C7F2"></i>#84C7F2</span></td>
+          <td class="num pass">5.67</td><td class="num pass">3.49</td>
+          <td><span class="swatch"><i class="chip" style="background:#2F5867"></i>#2F5867</span></td>
+          <td class="num pass">7.25</td><td class="num pass">3.82</td>
+        </tr>
+        <tr>
+          <td>Review</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF9F0A"></i><i class="chip" style="background:#AB5700"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#EBD28B"></i>#EBD28B</span></td>
+          <td class="num pass">4.53</td><td class="num pass">3.45</td>
+          <td><span class="swatch"><i class="chip" style="background:#60552E"></i>#60552E</span></td>
+          <td class="num pass">8.19</td><td class="num pass">4.17</td>
+        </tr>
+        <tr>
+          <td>Library</td>
+          <td><span class="swatch"><i class="chip" style="background:#BF5AF2"></i><i class="chip" style="background:#8E34B8"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#D0B5EC"></i>#D0B5EC</span></td>
+          <td class="num pass">5.56</td><td class="num pass">3.46</td>
+          <td><span class="swatch"><i class="chip" style="background:#554967"></i>#554967</span></td>
+          <td class="num pass">6.38</td><td class="num pass">3.63</td>
+        </tr>
+        <tr>
+          <td>Reading</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF375F"></i><i class="chip" style="background:#C81E46"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#EBA6AE"></i>#EBA6AE</span></td>
+          <td class="num pass">4.97</td><td class="num">2.85</td>
+          <td><span class="swatch"><i class="chip" style="background:#604347"></i>#604347</span></td>
+          <td class="num pass">5.88</td><td class="num pass">3.52</td>
+        </tr>
+        <tr>
+          <td>Danger</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF3B30"></i><i class="chip" style="background:#B30000"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#EBA89B"></i>#EBA89B</span></td>
+          <td class="num pass">6.36</td><td class="num pass">3.64</td>
+          <td><span class="swatch"><i class="chip" style="background:#603F38"></i>#603F38</span></td>
+          <td class="num pass">5.24</td><td class="num pass">3.33</td>
+        </tr>
+        <tr>
+          <td>Settings</td>
+          <td><span class="swatch"><i class="chip" style="background:#8E8E93"></i><i class="chip" style="background:#48484A"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#BCCBC4"></i>#BCCBC4</span></td>
+          <td class="num pass">8.06</td><td class="num pass">5.42</td>
+          <td><span class="swatch"><i class="chip" style="background:#485451"></i>#485451</span></td>
+          <td class="num pass">6.76</td><td class="num pass">3.67</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="figure-caption">
+    弱档是三套里最稳的一套：骨架压 tint 最低 3.55，深套最低 5.24。强调层与底幅的分离 2.71–5.42 已足够读出「块面」，
+    AiSpeech 与 Reading 的 2.7–2.9 是这套配色里的下限，靠 2px 骨架包边仍成立。
+  </p>
+
+  <h3>4.3 实底渐变档 · 深色</h3>
+  <p class="hint" style="margin: -4px 0 12px">
+    深套域色 <code>base</code> 与 <code>deep</code> 同值，所以容器底是纯色；墨 = <code>onBrand</code>（<code>#04241C</code>）；底幅 = <code>onBrand</code> @ 0.30。
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>域</th><th>容器底 = 域色</th><th>底幅（压暗）</th>
+          <th class="num">墨压底 ✅</th><th class="num">墨压底幅 ✅</th>
+          <th class="num">现行强调（= 容器底）压底</th><th class="num">建议强调（= 墨）压底幅</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AiSpeech</td>
+          <td><span class="swatch"><i class="chip" style="background:#35E0AC"></i>#35E0AC</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#26A881"></i>#26A881</span></td>
+          <td class="num pass">9.74</td><td class="num pass">5.47</td><td class="num low">1.00</td><td class="num pass">5.47</td>
+        </tr>
+        <tr>
+          <td>Learn</td>
+          <td><span class="swatch"><i class="chip" style="background:#5AC0FF"></i>#5AC0FF</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#4091BB"></i>#4091BB</span></td>
+          <td class="num pass">8.18</td><td class="num pass">4.71</td><td class="num low">1.00</td><td class="num pass">4.71</td>
+        </tr>
+        <tr>
+          <td>Review</td>
+          <td><span class="swatch"><i class="chip" style="background:#FFB340"></i>#FFB340</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#B48835"></i>#B48835</span></td>
+          <td class="num pass">9.24</td><td class="num pass">5.11</td><td class="num low">1.00</td><td class="num pass">5.11</td>
+        </tr>
+        <tr>
+          <td>Library</td>
+          <td><span class="swatch"><i class="chip" style="background:#DA8CFF"></i>#DA8CFF</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#9A6DBB"></i>#9A6DBB</span></td>
+          <td class="num pass">7.20</td><td class="num pass">4.13</td><td class="num low">1.00</td><td class="num pass">4.13</td>
+        </tr>
+        <tr>
+          <td>Reading</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF7A93"></i>#FF7A93</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#B4606F"></i>#B4606F</span></td>
+          <td class="num pass">6.64</td><td class="num pass">3.80</td><td class="num low">1.00</td><td class="num pass">3.80</td>
+        </tr>
+        <tr>
+          <td>Danger</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF6B61"></i>#FF6B61</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#B4564C"></i>#B4564C</span></td>
+          <td class="num pass">5.91</td><td class="num pass">3.42</td><td class="num low">1.00</td><td class="num pass">3.42</td>
+        </tr>
+        <tr>
+          <td>Settings</td>
+          <td><span class="swatch"><i class="chip" style="background:#B0B0B5"></i>#B0B0B5</span></td>
+          <td><span class="swatch"><i class="chip" style="background:#7C8687"></i>#7C8687</span></td>
+          <td class="num pass">7.63</td><td class="num pass">4.41</td><td class="num low">1.00</td><td class="num pass">4.41</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="figure-caption">
+    深套这一格现行口径是<strong>必然</strong>失效的：域 <code>base</code> 与 <code>deep</code> 在深色下同值，强调层取 <code>base</code>
+    就等于拿容器底色去容器底上画，对比恒为 1.00。改成取墨后 3.42–5.47，与骨架同色但成实心块，读起来是「深墨块面 + 深墨线」。
+  </p>
+
+  <h3>4.4 轻松档：把压力从三处降下来（<b>2026-10-27 已采纳并落地</b>）</h3>
+  <p class="hint" style="margin: -4px 0 12px">
+    学习软件的压力感很少来自「品牌色是青绿」这件事，而是来自三处叠加。本节给一套不换品牌识别的降压力取值；
+    §2 / §3 / §5 三处预览的「配色」开关已经接上，可以整片对看。
+    本节取值已全量落进 <code>ui/theme/AppColors.kt</code>（决策
+    <code>docs/decisions/2026-10-27-relaxed-palette-rulings.md</code>，验收
+    <code>docs/verification/2026-10-27-relaxed-palette-d7.md</code>）；容器渐变亮端也随之由 35% 收到 <b>18%</b>。
+  </p>
+
+  <div class="prose">
+    <p><b>压力来自哪三处。</b></p>
+    <ul>
+      <li><b>七个域色是系统色原值。</b><code>#0A84FF</code> / <code>#FF375F</code> / <code>#BF5AF2</code> / <code>#FF9F0A</code>
+        单看都没问题，但七组同屏、四层叠（页底 / tint / 底幅 / 描边）一直在高明度高饱和区间亮着，平均 HSL 饱和度 <b>78.6%</b>。</li>
+      <li><b>中性层也泛绿。</b>页底 <code>#F1FBF5</code>、tint <code>#DDF7E8</code>、描边 <code>#ADE7D2</code> 三级都带绿，
+        整页没有一块真正中性的休息区，眼睛一直泡在同一个色相里。</li>
+      <li><b>渐变和深卡在拉重量。</b>实底容器是 <code>deep → deep 混 35% base</code> 的多彩渐变，跨度大；
+        学习首页的强卡 <code>#0C2A22</code> 接近黑绿，是「重」的主要来源。</li>
+    </ul>
+    <p>
+      <b>轻松档只动这三点：</b>域色降彩度、抬明度（平均饱和度 78.6% → <b>49.9%</b>），中性层去绿（页底、tint、描边全部退向中性），
+      渐变亮端混比 0.35 → <b>0.18</b>（容器从「彩色渐变」变成「近乎纯色」），强卡从 <code>#0C2A22</code> 抬到 <code>#1F4739</code>。
+      品牌识别仍是青绿，只是从「七种高饱和色各喊各的」变成「一片安静的浅底 + 少量柔和域色标记」。
+    </p>
+  </div>
+
+  <div class="preview" data-scheme="light" data-skin="current">
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">主题</span>
+        <div class="seg" data-seg="scheme">
+          <button type="button" data-value="light" aria-pressed="true">浅色</button>
+          <button type="button" data-value="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+      <span class="hint">同一行左右固定，不跟下面的开关走：左半是现行，右半是轻松。</span>
+    </div>
+    <div class="table-wrap" style="background: var(--p-surface); border-color: var(--p-line)">
+      <table class="skin-compare">
+        <thead>
+          <tr>
+            <th>域（代表字形）</th>
+            <th>现行 · 40dp 实底</th><th>现行 · 40dp 弱档</th>
+            <th>轻松 · 40dp 实底</th><th>轻松 · 40dp 弱档</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AiSpeech<span class="skin-tag">Spark</span></td>
+            <td><span class="icon-badge" data-glyph="Spark" data-domain="AiSpeech" data-tone="gradient" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Spark" data-domain="AiSpeech" data-tone="tint" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Spark" data-domain="AiSpeech" data-tone="gradient" data-size="40" data-skinfixed="calm"></span></td>
+            <td><span class="icon-badge" data-glyph="Spark" data-domain="AiSpeech" data-tone="tint" data-size="40" data-skinfixed="calm"></span></td>
+          </tr>
+          <tr>
+            <td>Learn<span class="skin-tag">Book</span></td>
+            <td><span class="icon-badge" data-glyph="Book" data-domain="Learn" data-tone="gradient" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Book" data-domain="Learn" data-tone="tint" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Book" data-domain="Learn" data-tone="gradient" data-size="40" data-skinfixed="calm"></span></td>
+            <td><span class="icon-badge" data-glyph="Book" data-domain="Learn" data-tone="tint" data-size="40" data-skinfixed="calm"></span></td>
+          </tr>
+          <tr>
+            <td>Review<span class="skin-tag">Clock</span></td>
+            <td><span class="icon-badge" data-glyph="Clock" data-domain="Review" data-tone="gradient" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Clock" data-domain="Review" data-tone="tint" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Clock" data-domain="Review" data-tone="gradient" data-size="40" data-skinfixed="calm"></span></td>
+            <td><span class="icon-badge" data-glyph="Clock" data-domain="Review" data-tone="tint" data-size="40" data-skinfixed="calm"></span></td>
+          </tr>
+          <tr>
+            <td>Library<span class="skin-tag">BookOpen</span></td>
+            <td><span class="icon-badge" data-glyph="BookOpen" data-domain="Library" data-tone="gradient" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="BookOpen" data-domain="Library" data-tone="tint" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="BookOpen" data-domain="Library" data-tone="gradient" data-size="40" data-skinfixed="calm"></span></td>
+            <td><span class="icon-badge" data-glyph="BookOpen" data-domain="Library" data-tone="tint" data-size="40" data-skinfixed="calm"></span></td>
+          </tr>
+          <tr>
+            <td>Reading<span class="skin-tag">Newspaper</span></td>
+            <td><span class="icon-badge" data-glyph="Newspaper" data-domain="Reading" data-tone="gradient" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Newspaper" data-domain="Reading" data-tone="tint" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Newspaper" data-domain="Reading" data-tone="gradient" data-size="40" data-skinfixed="calm"></span></td>
+            <td><span class="icon-badge" data-glyph="Newspaper" data-domain="Reading" data-tone="tint" data-size="40" data-skinfixed="calm"></span></td>
+          </tr>
+          <tr>
+            <td>Danger<span class="skin-tag">Warning</span></td>
+            <td><span class="icon-badge" data-glyph="Warning" data-domain="Danger" data-tone="gradient" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Warning" data-domain="Danger" data-tone="tint" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Warning" data-domain="Danger" data-tone="gradient" data-size="40" data-skinfixed="calm"></span></td>
+            <td><span class="icon-badge" data-glyph="Warning" data-domain="Danger" data-tone="tint" data-size="40" data-skinfixed="calm"></span></td>
+          </tr>
+          <tr>
+            <td>Settings<span class="skin-tag">Gear</span></td>
+            <td><span class="icon-badge" data-glyph="Gear" data-domain="Settings" data-tone="gradient" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Gear" data-domain="Settings" data-tone="tint" data-size="40" data-skinfixed="current"></span></td>
+            <td><span class="icon-badge" data-glyph="Gear" data-domain="Settings" data-tone="gradient" data-size="40" data-skinfixed="calm"></span></td>
+            <td><span class="icon-badge" data-glyph="Gear" data-domain="Settings" data-tone="tint" data-size="40" data-skinfixed="calm"></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin: 14px 0 0">
+      左边两列是现在装上手机的样子，右边两列是轻松档。注意轻松档的实底容器几乎不再「渐变」，弱档底也从薄荷绿退成一层很淡的灰绿。
+    </p>
+  </div>
+
+  <h4 style="font-size:16px;font-weight:620;margin:30px 0 8px">域色取值与实测对比（浅套）</h4>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>域</th><th>现行 base / deep</th><th>轻松 base / deep</th>
+          <th class="num">白压渐变亮端 现行 → 轻松</th>
+          <th class="num">强调层压底幅 现行 → 轻松</th>
+          <th class="num">deep 压弱档底幅 现行 → 轻松</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AiSpeech</td>
+          <td><span class="swatch"><i class="chip" style="background:#2EC99C"></i><i class="chip" style="background:#188F76"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#6CCBAB"></i><i class="chip" style="background:#1A7A63"></i></span></td>
+          <td class="num">3.56 <span class="pass">→ 4.28</span></td>
+          <td class="num low">2.77 <span class="pass">→ 3.25</span></td>
+          <td class="num low">2.70 <span class="pass">→ 3.71</span></td>
+        </tr>
+        <tr>
+          <td>Learn</td>
+          <td><span class="swatch"><i class="chip" style="background:#0A84FF"></i><i class="chip" style="background:#075EB4"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#7BB4E6"></i><i class="chip" style="background:#175A93"></i></span></td>
+          <td class="num">5.75 <span class="pass">→ 5.71</span></td>
+          <td class="num">3.27 <span class="pass">→ 3.72</span></td>
+          <td class="num">3.49 <span class="pass">→ 4.88</span></td>
+        </tr>
+        <tr>
+          <td>Review</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF9F0A"></i><i class="chip" style="background:#AB5700"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#EBC68B"></i><i class="chip" style="background:#8A5712"></i></span></td>
+          <td class="num">4.28 <span class="pass">→ 4.64</span></td>
+          <td class="num">3.15 <span class="pass">→ 3.59</span></td>
+          <td class="num">3.46 <span class="pass">→ 4.65</span></td>
+        </tr>
+        <tr>
+          <td>Library</td>
+          <td><span class="swatch"><i class="chip" style="background:#BF5AF2"></i><i class="chip" style="background:#8E34B8"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#B7A0D9"></i><i class="chip" style="background:#65478A"></i></span></td>
+          <td class="num">5.64 <span class="pass">→ 5.90</span></td>
+          <td class="num">3.22 <span class="pass">→ 3.83</span></td>
+          <td class="num">3.48 <span class="pass">→ 4.98</span></td>
+        </tr>
+        <tr>
+          <td>Reading</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF375F"></i><i class="chip" style="background:#C81E46"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#E297A4"></i><i class="chip" style="background:#9C3B4F"></i></span></td>
+          <td class="num">5.14 <span class="pass">→ 5.41</span></td>
+          <td class="num low">2.81 <span class="pass">→ 3.54</span></td>
+          <td class="num low">2.90 <span class="pass">→ 4.44</span></td>
+        </tr>
+        <tr>
+          <td>Danger</td>
+          <td><span class="swatch"><i class="chip" style="background:#FF3B30"></i><i class="chip" style="background:#B30000"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#DD8B81"></i><i class="chip" style="background:#9E2B24"></i></span></td>
+          <td class="num">6.33 <span class="pass">→ 6.20</span></td>
+          <td class="num low">2.95 <span class="pass">→ 3.55</span></td>
+          <td class="num">3.68 <span class="pass">→ 4.72</span></td>
+        </tr>
+        <tr>
+          <td>Settings</td>
+          <td><span class="swatch"><i class="chip" style="background:#8E8E93"></i><i class="chip" style="background:#48484A"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#A6B0AC"></i><i class="chip" style="background:#4A5551"></i></span></td>
+          <td class="num">7.44 <span class="pass">→ 6.04</span></td>
+          <td class="num">4.08 <span class="pass">→ 3.94</span></td>
+          <td class="num">5.44 <span class="pass">→ 5.26</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="figure-caption">
+    「轻松」列按同一套数学重算（渐变亮端 = deep 混 18% base，强调层 = deep 压暗 18%）。两条底色对比不降反升：
+    白压渐变亮端最差从 3.16 抬到 <b>4.28</b>，强调层压底幅最差从 1.01 抬到 <b>3.25</b>，
+    deep 压弱档底幅从 2.70 抬到 <b>3.71</b>。唯一回落的是 Settings 灰域的亮端（7.44 → 6.04），仍远高于 3.0。
+  </p>
+
+  <h4 style="font-size:16px;font-weight:620;margin:30px 0 8px">中性层：把绿从底、tint、描边里退掉</h4>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>token</th><th>现行（浅 / 深）</th><th>轻松（浅 / 深）</th><th class="num">关键配对对比</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>background</code></td>
+          <td><span class="swatch"><i class="chip" style="background:#F1FBF5"></i></span><span class="swatch"><i class="chip" style="background:#0E1512"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#F6F9F6"></i></span><span class="swatch"><i class="chip" style="background:#111A16"></i></span></td>
+          <td class="num">正文压页底 13.83</td>
+        </tr>
+        <tr>
+          <td><code>tint</code>（弱档底）</td>
+          <td><span class="swatch"><i class="chip" style="background:#DDF7E8"></i></span><span class="swatch"><i class="chip" style="background:#1C2C26"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#E9F4EE"></i></span><span class="swatch"><i class="chip" style="background:#1B2A25"></i></span></td>
+          <td class="num">次级文字压 tint 4.55 → <span class="pass">5.07</span></td>
+        </tr>
+        <tr>
+          <td><code>outline</code></td>
+          <td><span class="swatch"><i class="chip" style="background:#ADE7D2"></i></span><span class="swatch"><i class="chip" style="background:#2E4238"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#D3E7DC"></i></span><span class="swatch"><i class="chip" style="background:#2B3A33"></i></span></td>
+          <td class="num">装饰性描边，1.31 → 1.22（更轻）</td>
+        </tr>
+        <tr>
+          <td><code>text1</code> / <code>text2</code> / <code>text3</code></td>
+          <td><span class="swatch"><i class="chip" style="background:#1C1C1E"></i><i class="chip" style="background:#4E756A"></i><i class="chip" style="background:#7A9088"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#1F2B26"></i><i class="chip" style="background:#566B62"></i><i class="chip" style="background:#7C9188"></i></span></td>
+          <td class="num">次级 4.87 → <span class="pass">5.39</span>；三级 3.22 → 3.16</td>
+        </tr>
+        <tr>
+          <td><code>strongSurface</code>（强卡底）</td>
+          <td><span class="swatch"><i class="chip" style="background:#0C2A22"></i></span><span class="swatch"><i class="chip" style="background:#1E2B25"></i></span></td>
+          <td><span class="swatch"><i class="chip" style="background:#1F4739"></i></span><span class="swatch"><i class="chip" style="background:#22332C"></i></span></td>
+          <td class="num">强卡文字 13.41 → <span class="pass">9.10</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="figure-caption">
+    三级文字 <code>text3</code> 从 3.22 落到 3.16，仍在图形/大字 3:1 线上，但它<strong>不能</strong>再拿去承载小号正文——
+    现行取值同样不合格（4.5 线），这条跟配色无关，是 <code>text3</code> 的用法问题。深套同比例下调，同级配对 5.66–15.53，无一项跌破阈值。
+  </p>
+
+  <div class="note">
+    <span class="note-label">轻松档降的是彩度，不是可达性</span>
+    <ul>
+      <li>正文对比仍是 <strong>≥ 4.5:1</strong>，字形与图形仍是 <strong>≥ 3:1</strong>，强调层可见性 ≥ 1.5 这条新契约照旧成立。</li>
+      <li>降下来的是：平均 HSL 饱和度 <b>78.6% → 49.9%</b>（浅套 base）、<b>70.7% → 51.7%</b>（deep）、渐变跨度（混比 0.35 → 0.18）、描边浓度、强卡亮度差。</li>
+      <li>品牌识别不动：主色仍是青绿，只是把「七个高饱和色同时喊」换成「一片安静浅底 + 柔和域色标记」。</li>
+      <li>深套同口径下调后：墨压容器底 5.62–8.90、墨压底幅 3.40–5.11、域色压深 tint 6.12–9.70，全部达标。</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <span class="note-label">两条不要越过的线</span>
+    <ul>
+      <li>底幅与强调层都是<strong>装饰性面</strong>，不承载识别特征；识别特征一律在骨架层（裁决 22-1）。</li>
+      <li>三层同时存在时，灰度打印下骨架必须依然可读——§3 的「去色」开关就是这条的检查口。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s5">
+  <h2><span class="num">05</span>真实落点还原</h2>
+  <p class="section-note">
+    按源码里的真实行序、真实标题与真实容器档还原四处落点。「改之前」＝ 当前代码能画出来的样子，
+    「改之后」＝ 三层落地后的样子。深浅主题同切。
+  </p>
+
+  <div class="preview" data-scheme="light">
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">主题</span>
+        <div class="seg" data-seg="scheme">
+          <button type="button" data-value="light" aria-pressed="true">浅色</button>
+          <button type="button" data-value="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">配色</span>
+        <div class="seg" data-seg="skin">
+          <button type="button" data-value="current" aria-pressed="true">现行</button>
+          <button type="button" data-value="calm" aria-pressed="false">轻松</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">呈现</span>
+        <div class="seg" data-seg="mock">
+          <button type="button" data-value="after" aria-pressed="true">改之后</button>
+          <button type="button" data-value="before" aria-pressed="false">改之前</button>
+        </div>
+      </div>
+      <span class="hint">「改之前」= 渐变档只有底幅 + 骨架，弱档只有骨架。</span>
+    </div>
+
+    <div class="screen-mock">
+      <p class="screen-title">设置页 · 4 组 9 行（按 SettingsGroups 台账逐行还原）</p>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="BookOpen" data-domain="Learn" data-tone="gradient" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">词书与每日目标</span>
+          <span class="row-sub">当前：CET-4 · 每日 20 词</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="Clock" data-domain="Review" data-tone="tint" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">学习提醒</span>
+          <span class="row-sub">每日提醒；默认关闭，可精确到每天一次</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="Document" data-domain="Learn" data-tone="tint" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">生成默写纸</span>
+          <span class="row-sub">选择中英/英英词表，预览后导出成可打印 PDF</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="Spark" data-domain="AiSpeech" data-tone="gradient" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">AI 服务与密钥</span>
+          <span class="row-sub">已配置 2 个 OpenAI 兼容服务</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="Speaker" data-domain="AiSpeech" data-tone="tint" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">语音朗读</span>
+          <span class="row-sub">当前响应方：系统 TTS</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+
+      <div class="row">
+        <span class="no-icon" aria-hidden="true">—</span>
+        <div class="row-text">
+          <span class="row-title">主题</span>
+          <span class="row-sub">跟随系统 / 浅色 / 深色</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="Info" data-domain="Settings" data-tone="tint" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">开源许可与隐私说明</span>
+          <span class="row-sub">第三方组件许可、依赖与隐私说明</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="Upload" data-domain="Library" data-tone="tint" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">词书内容包</span>
+          <span class="row-sub">导入 / 导出 .wbpack → 全部词书</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronDown"></span>
+      </div>
+
+      <div class="row">
+        <span class="icon-badge" data-glyph="Shield" data-domain="Settings" data-tone="tint" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">备份与恢复</span>
+          <span class="row-sub">导出备份文件、导入恢复全部学习数据</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+    </div>
+
+    <div class="screen-mock">
+      <p class="screen-title">备份与恢复 · 4 行（EntryRow 默认档 = 实底渐变）</p>
+      <div class="row">
+        <span class="icon-badge" data-glyph="Download" data-domain="Settings" data-tone="gradient" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">导出学习数据备份</span>
+          <span class="row-sub">生成 .elpbak 备份文件，不含密钥或个人口令</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+      <div class="row">
+        <span class="icon-badge" data-glyph="Shield" data-domain="Settings" data-tone="gradient" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">认证备份（推荐，换设备恢复）</span>
+          <span class="row-sub">由设备系统认证保护，可跨设备安全恢复</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+      <div class="row">
+        <span class="icon-badge" data-glyph="Upload" data-domain="Settings" data-tone="gradient" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">从旧设备恢复（认证恢复）</span>
+          <span class="row-sub">扫描旧设备，输入口令并替换本机数据</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+      <div class="row">
+        <span class="icon-badge" data-glyph="Trash" data-domain="Danger" data-tone="gradient" data-size="40"></span>
+        <div class="row-text">
+          <span class="row-title">删除全部学习数据</span>
+          <span class="row-sub">清空学习记录、练习进度、每日计划与阅读完成状态</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+    </div>
+
+    <div class="screen-mock">
+      <p class="screen-title">底部导航 · 选中项带 30dp 徽标，未选中项是 22dp 裸字形</p>
+      <div class="tabbar">
+        <div class="tab" data-selected="true">
+          <span class="icon-badge" data-glyph="Book" data-domain="AiSpeech" data-tone="tint" data-size="30"></span>
+          <span class="tab-label">学习</span>
+        </div>
+        <div class="tab" data-selected="false">
+          <span class="bare" data-glyph="Newspaper" data-ink="text2" data-size="22"></span>
+          <span class="tab-label">阅读</span>
+        </div>
+        <div class="tab" data-selected="false">
+          <span class="bare" data-glyph="Spark" data-ink="text2" data-size="22"></span>
+          <span class="tab-label">AI 学</span>
+        </div>
+        <div class="tab" data-selected="false">
+          <span class="bare" data-glyph="Person" data-ink="text2" data-size="22"></span>
+          <span class="tab-label">我的</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen-mock">
+      <p class="screen-title">今日计划 · 次要卡两行 + 常驻查词条（现状：无徽标容器）</p>
+      <div class="row">
+        <span class="bare" data-glyph="Newspaper" data-domain="Reading" data-ink="deep" data-size="24"></span>
+        <div class="row-text">
+          <span class="row-title">今日文章 · 可阅读</span>
+          <span class="row-sub">去读今天生成的短文</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+      <div class="row">
+        <span class="bare" data-glyph="Book" data-domain="Library" data-ink="deep" data-size="24"></span>
+        <div class="row-text">
+          <span class="row-title">CET-4 核心词 · 已学 40 / 800</span>
+          <span class="row-sub">词书 · 生词 · 错词 · 收藏</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+      <div class="row">
+        <span class="bare" data-glyph="Search" data-ink="text2" data-size="18"></span>
+        <div class="row-text"><span class="row-sub">查一个词</span></div>
+        <div class="row-spacer"></div>
+      </div>
+    </div>
+
+    <div class="screen-mock">
+      <p class="screen-title">今日计划 · 提案：这两行升成 40dp 弱档三层（固定按「改之后」渲染）</p>
+      <div class="row">
+        <span class="icon-badge" data-glyph="Newspaper" data-domain="Reading" data-tone="tint" data-size="40" data-pin="three"></span>
+        <div class="row-text">
+          <span class="row-title">今日文章 · 可阅读</span>
+          <span class="row-sub">去读今天生成的短文</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+      <div class="row">
+        <span class="icon-badge" data-glyph="Book" data-domain="Library" data-tone="tint" data-size="40" data-pin="three"></span>
+        <div class="row-text">
+          <span class="row-title">CET-4 核心词 · 已学 40 / 800</span>
+          <span class="row-sub">词书 · 生词 · 错词 · 收藏</span>
+        </div>
+        <div class="row-spacer"></div>
+        <span class="chev" data-glyph="ChevronRight"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="note-label">落点还原里读出来的三件事</span>
+    <ul>
+      <li>设置页 9 行里只有 2 行走实底档，其余 7 行都是「tint + 一根线」——这正是用户指的那块。</li>
+      <li>备份页 4 行、AI 页入口行、设置页两条子行走的都是 <code>EntryRow</code> 默认的实底档，它们已经有白 42% 底幅，只差强调层就能出块面，<strong>改动成本最低</strong>。</li>
+      <li>底部导航 4 个 tab 的域色全部硬编码成 <code>AiSpeech</code>：选中「阅读」也是青绿。这是配色口径问题，不属于本稿范围，但列在 §7 待定项里。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span class="num">06</span>度量与规范摘要</h2>
+  <p class="section-note">
+    下面每一条都能在源码里指到唯一出处；本稿所有预览都按这张表渲染，不另立一套数字。
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <caption>图标体系度量（权威出处列给出唯一真值所在）</caption>
+      <thead><tr><th>项</th><th>取值</th><th>出处</th></tr></thead>
+      <tbody>
+        <tr><td>画布 / viewport</td><td class="num">24 × 24</td><td><code>AppIcon.kt</code> · <code>GLYPH_VIEWPORT_SIZE</code></td></tr>
+        <tr><td>描边重量</td><td class="num">2（× strokeScale）</td><td><code>AppIcon.kt</code> · <code>buildAppImageVector</code></td></tr>
+        <tr><td>线端 / 连接</td><td>Round / Round</td><td><code>AppIcon.kt</code> · 统一给，路径数据不写画笔参数</td></tr>
+        <tr><td>关键几何安全区</td><td class="num">4 – 20</td><td><code>AppIcons.kt</code> 文件头</td></tr>
+        <tr><td>入口字形 / 容器</td><td class="num">22dp / 40dp</td><td><code>IconBadge.kt</code> · <code>EntryIconBadge</code></td></tr>
+        <tr><td>容器圆角（入口）</td><td class="num">12dp</td><td><code>AppShape.Icon</code></td></tr>
+        <tr><td>行内字形 / 容器</td><td class="num">17dp / 30dp</td><td><code>IconBadge.kt</code> · <code>InlineIconBadge</code></td></tr>
+        <tr><td>容器圆角（行内）</td><td class="num">9dp</td><td><code>AppShape.Inline</code>（与入口是两档不同数值）</td></tr>
+        <tr><td>底幅不透明度</td><td class="num">浅 0.42 / 深 0.30</td><td><code>DuotoneFillAlpha</code></td></tr>
+        <tr><td>渐变方向与端点</td><td>亮端 = <code>deep</code> 混 <b>18%</b> <code>base</code> → 暗端 = <code>deep</code>（2026-10-27 由 35% 下调）</td><td><code>IconBadge.kt</code> · <code>GRADIENT_START_FRACTION</code></td></tr>
+        <tr><td>玻璃高光</td><td class="num">1dp 内描边</td><td>仅 <code>Gradient</code> 档，<code>AppPalette.GlassHighlight</code></td></tr>
+        <tr><td>渲染顺序</td><td>底幅 → 强调 → 骨架</td><td>决策 2026-10-19 第 2 条</td></tr>
+        <tr><td>圆形标记</td><td><code>CircleFill</code> 只进填充/强调层；<code>CircleStroke</code> 只进描边层</td><td><code>AppIcons.kt</code> 文件头 · 裁决 22-1</td></tr>
+        <tr><td>三层结构豁免</td><td class="num">5 枚</td><td><code>StrokeOnlyIcons</code>：Back / ChevronRight / ChevronDown / Close / Check</td></tr>
+        <tr><td>强调层豁免</td><td class="num">8 枚</td><td><code>AccentlessIcons</code> = 上面 5 枚 + Play / Pause / Stop</td></tr>
+        <tr><td>准入禁令</td><td>豁免 5 枚不得进 40dp 入口容器</td><td><code>EntryIconBadge</code> 开头的 <code>require</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>四条不可越的规则</h3>
+  <div class="prose">
+    <ol>
+      <li><strong>骨架层是唯一承重层。</strong>底幅与强调层都是装饰性面，任何识别特征（点、旋钮、圆章）必须在 <code>strokePaths</code> 里有一份。</li>
+      <li><strong>强调层是可选实参，不是新枚举值。</strong><code>accent</code> / <code>bodyInk</code> 缺省时行为与上一版逐像素相同，既有调用点零改动。</li>
+      <li><strong>层开关与笔是两件事。</strong><code>AppGlyphLayer</code> 管「画几层」，<code>accent</code> 管「用第几支笔」，不合并成一个枚举。</li>
+      <li><strong>17dp 与 22dp 裸字形恒为单层。</strong>小尺寸上底幅会把字形糊成一坨；三层的准入门槛是 40dp 入口容器。</li>
+    </ol>
+  </div>
+</section>
+
+<section id="s7">
+  <h2><span class="num">07</span>实施状态与待定项</h2>
+  <p class="section-note">
+    本稿只定口径，没有改任何 Compose 代码。下表区分「数据就位」「渲染未做」「口径待拍」三类，
+    避免把设计稿读成已实现。
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <caption>当前代码状态（逐项读源码核对）</caption>
+      <thead><tr><th>项</th><th>状态</th><th>依据</th></tr></thead>
+      <tbody>
+        <tr><td>33 枚字形几何 + 25 枚强调路径</td><td class="pass">数据就位</td><td><code>AppIcons.kt</code> · <code>AppIconSpec.accentPaths</code></td></tr>
+        <tr><td>强调层参与渲染（底幅 → 强调 → 骨架）</td><td class="low">未实现</td><td><code>buildAppImageVector</code> 只画 <code>fillPaths</code> + <code>strokePaths</code>，尚未接 <code>accent</code> / <code>bodyInk</code></td></tr>
+        <tr><td><code>EntryIconBadge</code> 两档三层</td><td class="low">未实现</td><td>弱档仍传 <code>AppGlyphLayer.StrokeOnly</code></td></tr>
+        <tr><td>强调层颜色口径</td><td class="low">待拍</td><td>决策记录第 4 条（取域 <code>base</code>）经 §4 实测不可读</td></tr>
+        <tr><td>今日计划两行的徽标载体</td><td class="low">待拍</td><td><code>BareRow</code> + 24dp 裸字形，无容器</td></tr>
+        <tr><td>灰度可读性</td><td class="pass">已核</td><td>§3 去色开关；骨架在三层同时存在时仍可读</td></tr>
+        <tr><td>轻松档配色（§4.4）</td><td class="pass">已落地</td><td>2026-10-27 全量进 <code>AppColors.kt</code>（18 中性 + 七域两套），契约测试已按新值重钉</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>待定项与建议</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>待定项</th><th>建议</th><th>牵动面</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="num">D1</td>
+          <td>强调层取「域 <code>base</code>」还是「取墨」</td>
+          <td><strong>取墨</strong>：实底档取「域深再压暗 18%」，深套取 <code>onBrand</code>，弱档取域 <code>deep</code></td>
+          <td><code>IconBadge.kt</code> 两档、决策 2026-10-19 第 4 条、<code>IconBadgeContrastContractTest</code></td>
+        </tr>
+        <tr>
+          <td class="num">D2</td>
+          <td>浅套实底档的底幅是否从「白 42% 提亮」改为「墨 18% 压暗」</td>
+          <td>暂不改。改后白强调压底幅可达 4.15–7.51，视觉最像插画，但会动 <code>DuotoneFillAlpha</code> 常量与既有对比契约；先按 D1 落地看真机</td>
+          <td><code>DuotoneFillAlpha</code>、<code>IconBadgeContrastContractTest</code></td>
+        </tr>
+        <tr>
+          <td class="num">D3</td>
+          <td>今日计划两行要不要加 40dp 弱档徽标</td>
+          <td><strong>要加</strong>。否则首屏与「今日学习」主线仍是裸字形，三层覆盖不到</td>
+          <td><code>TodayPlanScreen.kt</code> 两处 <code>leading =</code>、<code>today_plan_*</code> 测试 tag</td>
+        </tr>
+        <tr>
+          <td class="num">D4</td>
+          <td>底部导航 4 个 tab 的域色全部硬编码 <code>AiSpeech</code></td>
+          <td>按 tab 取域色：学习 <code>Learn</code> / 阅读 <code>Reading</code> / AI <code>AiSpeech</code> / 我的 <code>Settings</code>，并复算选中态 tint 底配对</td>
+          <td><code>AppBottomBar.kt</code> 两处、<code>AppBottomBarContrastTest</code></td>
+        </tr>
+        <tr>
+          <td class="num">D5</td>
+          <td><code>StrokeOnly</code> 档要不要也画强调层</td>
+          <td><strong>不画</strong>。17dp / 22dp 上加实心块会糊；三层只属于 ≥40dp 入口族，这条要写进契约</td>
+          <td><code>buildAppImageVector</code> 的层判定、行内徽标</td>
+        </tr>
+        <tr>
+          <td class="num">D6</td>
+          <td>深套实底档强调层与骨架同色（都是 <code>onBrand</code>）是否读得开</td>
+          <td>静态预览成立（墨压底幅 3.42–5.47），但需真机确认「同色实心块 + 同色 2px 线」不会糊成一块</td>
+          <td>需 connected 测试 / 真机；本机无设备，只能给静态预览</td>
+        </tr>
+        <tr>
+          <td class="num">D7</td>
+          <td>是否整体换用「轻松档」配色（§4.4）</td>
+          <td><strong>已采纳 · 已落地（2026-10-27）</strong>：七域降彩度、中性层去绿、渐变混比 0.35 → 0.18、强卡 <code>#0C2A22</code> → <code>#1F4739</code>。
+            对比全部达标，且最差的三个配对反而抬高（3.16 → 4.28 / 1.01 → 3.25 / 2.70 → 3.71）</td>
+          <td><code>AppColors.kt</code> 全部 token、<code>DomainLight</code> / <code>DomainDark</code>、<code>AppPalette.kt</code>、<code>DesignTokenContractTest</code>、<code>IconBadge.kt</code> 的 <code>GRADIENT_START_FRACTION</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>落地时的测试面</h3>
+  <div class="prose">
+    <ul>
+      <li><code>AppIconsStructureContractTest</code>：强调层双向契约（25 枚必须有、8 枚必须无）已存在，落地时用它兜住几何。</li>
+      <li><code>IconBadgeContrastContractTest</code>：把「弱档恰一处单层」改成「两档都不再单层」，并新增强调层压底幅的配对复算。</li>
+      <li>建议新增一条可见性契约：<strong>强调层压底幅不得低于 1.5:1</strong>，把「取域 <code>base</code>」这类 1.0–1.47 的组合在 JVM 上直接判红。</li>
+      <li>灰度与真机观感只能靠 connected 测试或肉眼验收，本机没有设备，这两项留给有设备时补。</li>
+    </ul>
+  </div>
+
+  <footer>
+    <p>
+      设计稿 · 2026-10-25（含 4.4 轻松档配色提案）· 源数据：<code>AppIcons.kt</code>（几何，33 枚逐字照抄）、
+      <code>AppColors.kt</code>（七域浅深两套色值）、<code>IconBadge.kt</code>（容器几何与渐变数学）、
+      <code>AppShape.kt</code>（12dp / 9dp 两档圆角）。对比度与 HSL 饱和度均由 WCAG / HSL 定义现算，未抄任何注释。
+    </p>
+    <p>本文件不改变任何 Compose 代码；打开方式：双击用浏览器打开，或用 <code>Start-Process</code> 指向本文件。</p>
+  </footer>
+</section>
+
+<script>
+/* ------------------------------------------------------------------
+   1) 色值：逐字取自 AppColors.kt（DomainLight / DomainDark / tint / onBrand）
+   ------------------------------------------------------------------ */
+/* 两套口径：current = 现行（AppColors.kt 现值）；calm = 轻松档（§4.4 提案，降彩度 + 去绿 + 拉平渐变） */
+const SKINS = {
+  current: {
+    domains: {
+      AiSpeech: { light: ['#2EC99C', '#188F76'], dark: '#35E0AC' },
+      Learn:    { light: ['#0A84FF', '#075EB4'], dark: '#5AC0FF' },
+      Review:   { light: ['#FF9F0A', '#AB5700'], dark: '#FFB340' },
+      Library:  { light: ['#BF5AF2', '#8E34B8'], dark: '#DA8CFF' },
+      Reading:  { light: ['#FF375F', '#C81E46'], dark: '#FF7A93' },
+      Danger:   { light: ['#FF3B30', '#B30000'], dark: '#FF6B61' },
+      Settings: { light: ['#8E8E93', '#48484A'], dark: '#B0B0B5' }
+    },
+    tint: { light: '#DDF7E8', dark: '#1C2C26' },
+    onBrand: '#04241C',
+    textMuted: { light: '#4E756A', dark: '#9FB3AA' },
+    gFrac: 0.35,        // 渐变亮端混比：deep 混 base
+    accentDark: 0.18    // 强调层取墨：域深再压暗
+  },
+  calm: {
+    domains: {
+      AiSpeech: { light: ['#6CCBAB', '#1A7A63'], dark: '#6FD9B6' },
+      Learn:    { light: ['#7BB4E6', '#175A93'], dark: '#84C4EE' },
+      Review:   { light: ['#EBC68B', '#8A5712'], dark: '#EFCB92' },
+      Library:  { light: ['#B7A0D9', '#65478A'], dark: '#C6A9E4' },
+      Reading:  { light: ['#E297A4', '#9C3B4F'], dark: '#EDA8B4' },
+      Danger:   { light: ['#DD8B81', '#9E2B24'], dark: '#E39086' },
+      Settings: { light: ['#A6B0AC', '#4A5551'], dark: '#B4BEBA' }
+    },
+    tint: { light: '#E9F4EE', dark: '#1B2A25' },
+    onBrand: '#05342A',
+    textMuted: { light: '#566B62', dark: '#9DB1A8' },
+    gFrac: 0.18,
+    accentDark: 0.18
+  }
+};
+const FILL_ALPHA = { light: 0.42, dark: 0.30 };
+
+function hexToRgb(h) {
+  const n = parseInt(h.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(a) {
+  return '#' + a.map(v => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+function mixHex(from, to, f) {
+  const a = hexToRgb(from), b = hexToRgb(to);
+  return rgbToHex(a.map((v, i) => v + (b[i] - v) * f));
+}
+/** 压暗：向黑走 f。对应 §4「域深再压暗 18%」那一列。 */
+function darkenHex(hex, f) { return mixHex(hex, '#000000', f); }
+
+/* ------------------------------------------------------------------
+   2) 几何：逐字转录 AppIcons.kt（33 枚，三层）
+      s = strokePaths（骨架）· f = fillPaths（底幅）· a = accentPaths（强调）
+   ------------------------------------------------------------------ */
+const SPECS = {
+  Back:         { s: ['M15 5l-7 7 7 7'], f: [], a: [] },
+  ChevronRight: { s: ['M9 5l7 7-7 7'], f: [], a: [] },
+  ChevronDown:  { s: ['M5 9l7 7 7-7'], f: [], a: [] },
+  Close:        { s: ['M6 6l12 12', 'M18 6L6 18'], f: [], a: [] },
+  Check:        { s: ['M5 12l5 5 9-9'], f: [], a: [] },
+
+  Search: {
+    s: ['M11 5a6 6 0 010 12a6 6 0 010-12', 'M20 20l-4.6-4.6'],
+    f: ['CircleFill(11, 11, 6)'],
+    a: ['CircleFill(11, 11, 2.4)', 'M16.6 15.4l2.8 2.8-1.4 1.4-2.8-2.8z']
+  },
+  Book: {
+    s: ['M6.5 5h11a2 2 0 012 2v11a2 2 0 01-2 2h-11a2 2 0 01-2-2V7a2 2 0 012-2z', 'M12 5v14'],
+    f: ['M5 6h5.2v10.6H5z'],
+    a: ['M11.2 5.4h1.6v14h-1.6z', 'M14 5.4h3.4v5.4l-1.7-1.3-1.7 1.3z']
+  },
+  BookOpen: {
+    s: ['M4 5h6.5a1.5 1.5 0 011.5 1.5V19a3 3 0 00-3-2H4z', 'M20 5h-6.5a1.5 1.5 0 00-1.5 1.5V19a3 3 0 013-2H20z'],
+    f: ['M5 6h5.5a1 1 0 011 1v10.4a3 3 0 00-2.6-1.4H5z'],
+    a: ['M11.2 6.6h1.6v11.4h-1.6z', 'M5.2 7.8h4.2v1.6H5.2z', 'M5.2 10.6h3.2v1.6H5.2z']
+  },
+  List: {
+    s: ['M8 6h12', 'M8 12h12', 'M8 18h12',
+        'CircleStroke(5.2, 6, 0.5)', 'CircleStroke(5.2, 12, 0.5)', 'CircleStroke(5.2, 18, 0.5)'],
+    f: ['CircleFill(5.2, 6, 1.2)', 'CircleFill(5.2, 12, 1.2)', 'CircleFill(5.2, 18, 1.2)'],
+    a: ['M8 9.2h6.4v1.7H8z', 'M8 15.2h4.6v1.7H8z']
+  },
+  Bookmark: {
+    s: ['M6 4h12v16l-6-3-6 3z'],
+    f: ['M7.4 5.4h4.6v11.2l-4.6 2.3z'],
+    a: ['M8.4 7h7.2v1.8H8.4z']
+  },
+  Star: {
+    s: ['M6.4 4h11.2v15.2L12 15.6l-5.6 3.6z'],
+    f: ['M6.4 4h11.2v15.2L12 15.6l-5.6 3.6z'],
+    a: ['M9.4 8.4h5.2v1.8H9.4z', 'M10.8 11.8h2.4v1.8h-2.4z']
+  },
+  Clock: {
+    s: ['M12 4a8 8 0 010 16a8 8 0 010-16', 'M12 7.6V12l3.2 2'],
+    f: ['CircleFill(12, 12, 8)'],
+    a: ['CircleFill(12, 12, 1.7)', 'M12.4 11.2l3 2-1 1.4-3-2z']
+  },
+  Chart: {
+    s: ['M4 18l5-6 4 3 6-8', 'M4 6v12h16'],
+    f: ['M4 18l5-6 4 3 6-8v11z'],
+    a: ['M6 15h2.6v3H6z', 'M10 12h2.6v6H10z', 'M14 8h2.6v10H14z']
+  },
+  Spark: {
+    s: ['M11 3.5l1.8 4.5 4.5 1.8-4.5 1.8L11 16.1l-1.8-4.5L4.7 9.8l4.5-1.8z',
+        'M18.6 14.6l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z'],
+    f: ['M11 3.5l1.8 4.5 4.5 1.8-4.5 1.8L11 16.1l-1.8-4.5L4.7 9.8l4.5-1.8z'],
+    a: ['M18.6 14.6l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z', 'CircleFill(11, 9.8, 1.8)']
+  },
+  Speaker: {
+    s: ['M5 10v4h3l4 3V7L8 10z', 'M16 9a4 4 0 010 6', 'M18.6 6.4a7.6 7.6 0 010 11.2'],
+    f: ['M5 10v4h3l4 3V7L8 10z'],
+    a: ['M5.4 10v4h3.2v-4z', 'CircleFill(16.6, 12, 1)']
+  },
+  Play: { s: ['M8 5.5l10.5 6.5L8 18.5z'], f: ['M9.8 8.2l6 3.8-6 3.8z'], a: [] },
+  Pause: {
+    s: ['M9 5v14', 'M15 5v14'],
+    f: ['M7.6 5h2.8v14H7.6z', 'M13.6 5h2.8v14h-2.8z'],
+    a: []
+  },
+  Stop: { s: ['M6 6h12v12H6z'], f: ['M8 8h8v8H8z'], a: [] },
+  Mic: {
+    s: ['M12 4a3.5 3.5 0 013.5 3.5v3a3.5 3.5 0 01-7 0v-3a3.5 3.5 0 013.5-3.5z',
+        'M8 12a4 4 0 008 0', 'M12 16v3', 'M9 20h6'],
+    f: ['M12 5.5a2 2 0 012 2v3a2 2 0 01-4 0v-3a2 2 0 012-2z'],
+    a: ['M10.4 12.4h3.2v2.4h-3.2z', 'CircleFill(12, 7.4, 1.5)']
+  },
+  Translate: {
+    s: ['M4 13l3.5-8 3.5 8', 'M5.4 10h4.2', 'M13 20l3.5-6.5 3.5 6.5', 'M14.6 17h3.8'],
+    f: ['M16.5 14.5l1.75 4h-3.5z'],
+    a: ['M16.5 14.5l1.75 4h-3.5z', 'M5.7 10.6h3.4v1.4H5.7z']
+  },
+  Camera: {
+    s: ['M4 8h4l2-2h4l2 2h4v11H4z', 'M12 9.8a3.2 3.2 0 010 6.4a3.2 3.2 0 010-6.4'],
+    f: ['CircleFill(12, 13, 3.2)'],
+    a: ['CircleFill(12, 13, 1.9)', 'M15.8 9.4h2.2v2.2h-2.2z']
+  },
+  Image: {
+    s: ['M4 5h16v14H4z', 'M7 16l3.5-4.5 3 3.5 3-4 2.5 3', 'CircleStroke(9, 9, 2)'],
+    f: ['CircleFill(9, 9, 2)'],
+    a: ['CircleFill(9, 9, 2)', 'M7 16.6l3.4-4.4 2.8 3.2 2.2-2.6 1.9 2.3v1.5H7z']
+  },
+  Document: {
+    s: ['M6 4h8l4 4v12H6z', 'M14 4v4h4', 'M7.4 10h9.2v8.6H7.4z'],
+    f: ['M7.4 10h9.2v8.6H7.4z'],
+    a: ['M14 4l4 4h-4z', 'M9 12h6v1.6H9z', 'M9 15h4.4v1.6H9z']
+  },
+  Newspaper: {
+    s: ['M4 5h16v14H4z', 'M7 12h10', 'M7 15.5h6', 'M5.4 6.4h13.2v3H5.4z'],
+    f: ['M5.4 6.4h13.2v3H5.4z'],
+    a: ['M5.4 6.4h13.2v3H5.4z', 'M12.6 11.4h6v5.2h-6z']
+  },
+  Gear: {
+    s: ['M4 7h16', 'M4 12h16', 'M4 17h10', 'CircleStroke(17, 17, 2.5)'],
+    f: ['CircleFill(17, 17, 2.5)'],
+    a: ['CircleFill(17, 17, 1.3)', 'M4 6.3h8.4v1.4H4z']
+  },
+  Person: {
+    s: ['M12 4a4 4 0 010 8a4 4 0 010-8', 'M4.5 20a7.5 7.5 0 0115 0'],
+    f: ['CircleFill(12, 8, 4)'],
+    a: ['CircleFill(12, 8, 2.4)', 'M7.8 19.6l1.5-3h5.4l1.5 3z']
+  },
+  Info: {
+    s: ['M12 4a8 8 0 010 16a8 8 0 010-16', 'M12 11v6', 'M12 7.5v.5'],
+    f: ['CircleFill(12, 12, 8)'],
+    a: ['M11.2 10.8h1.6v6.2h-1.6z', 'CircleFill(12, 12, 2.4)']
+  },
+  Bell: {
+    s: ['M5 12a7 7 0 0114 0', 'M9 15h6', 'M5 12v2.6h14V12', 'M10.5 17.6a1.5 1.5 0 003 0'],
+    f: ['M6 12a6 6 0 0112 0v3H6z'],
+    a: ['M5.2 13.6h13.6v1.8H5.2z', 'CircleFill(12, 17.6, 1.5)']
+  },
+  Shield: {
+    s: ['M12 4l7 3v5c0 4.2-3 7.3-7 8.2-4-.9-7-4-7-8.2V7z', 'M9.2 12.2l2 2 4-4.2'],
+    f: ['M12 4l7 3v5c0 4.2-3 7.3-7 8.2-4-.9-7-4-7-8.2V7z'],
+    a: ['M10.4 11.4l1.6 1.6 3.2-3.4 1.2 1.2-4.4 4.6-2.8-2.8z']
+  },
+  Warning: {
+    s: ['M12 4l8 14H4z', 'M12 9v4', 'M12 15.5v.5'],
+    f: ['M12 7l5.4 9.4H6.6z'],
+    a: ['M11.1 9h1.8v4.6h-1.8z', 'CircleFill(12, 15.6, 1.1)']
+  },
+  Trash: {
+    s: ['M5 7h14', 'M9 7V5h6v2', 'M7 7l1 12h8l1-12'],
+    f: ['M7.6 8h8.8l-.9 11.2H8.5z'],
+    a: ['M5.4 6.2h13.2v1.8H5.4z', 'M8.8 9.6h6.4l-.6 8.4H9.4z']
+  },
+  Upload: {
+    s: ['M12 20V9', 'M8 13l4-4 4 4', 'M5 5h14'],
+    f: ['M12 9.6l3.4 3.4H8.6z'],
+    a: ['M4.6 4.2h14.8v1.8H4.6z']
+  },
+  Download: {
+    s: ['M12 4v9', 'M8 10l4 4 4-4', 'M5 19h14'],
+    f: ['M12 13.4l-3.4-3.4h6.8z'],
+    a: ['M4.6 18.2h14.8v1.8H4.6z']
+  }
+};
+</script>
+<script>
+/* ------------------------------------------------------------------
+   3) 逐枚清单：名字与顺序即 AppIcon 枚举顺序，用途转录自 AppIcons.kt 文件头
+   ------------------------------------------------------------------ */
+const TEXT_FAINT = { light: '#7A9088', dark: '#7F938A' };
+const STROKE_ONLY = new Set(['Back', 'ChevronRight', 'ChevronDown', 'Close', 'Check']);
+const META = [
+  ['Back', '返回', '二级层与浮层页头返回键', 'Settings'],
+  ['ChevronRight', '右箭头', '入口行 / 词行尾部指示', 'Settings'],
+  ['ChevronDown', '下箭头', '展开 / 折叠指示', 'Settings'],
+  ['Close', '关闭', '对话框、搜索框与浮层关闭键', 'Settings'],
+  ['Check', '对勾', '完成与成功回显', 'Settings'],
+  ['Search', '放大镜', '查词入口与全局搜索框', 'Library'],
+  ['Book', '合上的书', '底导「学习」tab', 'Learn'],
+  ['BookOpen', '摊开的书', '词书 / 阅读页头', 'Library'],
+  ['List', '列表', '今日计划行组、词表行', 'Learn'],
+  ['Bookmark', '书签', '收藏与「我的词」收藏段', 'Library'],
+  ['Star', '星标', '行内 / 入口通用', 'Review'],
+  ['Clock', '时钟', '时刻与提醒行', 'Review'],
+  ['Chart', '折线图', '统计与学习记录、打卡页', 'Review'],
+  ['Spark', '火花', 'AI 功能与生成入口', 'AiSpeech'],
+  ['Speaker', '喇叭', '发音药片与朗读行', 'AiSpeech'],
+  ['Play', '播放', '播放控件起播', 'AiSpeech'],
+  ['Pause', '暂停', '播放控件暂停', 'AiSpeech'],
+  ['Stop', '停止', '播放控件停止', 'AiSpeech'],
+  ['Mic', '麦克风', '语音输入与「听 / 讲」入口', 'AiSpeech'],
+  ['Translate', '翻译', '翻译功能与译文行', 'AiSpeech'],
+  ['Camera', '相机', '拍照翻译取图入口', 'AiSpeech'],
+  ['Image', '画框', '图像类 AI 功能', 'AiSpeech'],
+  ['Document', '折角页', '文本类 AI 功能与生成结果行', 'AiSpeech'],
+  ['Newspaper', '报纸', '底导「阅读」tab 与今日文章', 'Reading'],
+  ['Gear', '滑杆', '底导「设置」tab 与设置域入口', 'Settings'],
+  ['Person', '人形', '资料卡', 'Settings'],
+  ['Info', '信息圈', '关于 / 许可行', 'Settings'],
+  ['Bell', '铃铛', '提醒行', 'Review'],
+  ['Shield', '盾', '认证备份入口', 'Settings'],
+  ['Warning', '警示三角', '警示与破坏性操作行', 'Danger'],
+  ['Trash', '垃圾桶', '删除动作', 'Danger'],
+  ['Upload', '导入箭头', '导入口', 'Library'],
+  ['Download', '导出箭头', '导出入口', 'Library']
+];
+
+/* ------------------------------------------------------------------
+   4) 渲染：把三层几何拼成 SVG（圆形标记转 <circle>，与 AppGlyph 的展开同义）
+   ------------------------------------------------------------------ */
+function shapeMarkup(d, o) {
+  const m = /^Circle(Fill|Stroke)\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/.exec(d);
+  const isStrokeShape = o.kind === 'stroke';
+  if (m) {
+    const cx = m[2], cy = m[3], r = m[4];
+    return isStrokeShape
+      ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + o.color +
+        '" stroke-width="2" stroke-linecap="round"/>'
+      : '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + o.color +
+        '" fill-opacity="' + o.opacity + '"/>';
+  }
+  return isStrokeShape
+    ? '<path d="' + d + '" fill="none" stroke="' + o.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+    : '<path d="' + d + '" fill="' + o.color + '" fill-opacity="' + o.opacity + '"/>';
+}
+
+function svgGlyph(name, opt) {
+  const spec = SPECS[name];
+  if (!spec) return '';
+  const out = [];
+  if (opt.fill && opt.fillAlpha > 0) {
+    spec.f.forEach(d => out.push(shapeMarkup(d, { kind: 'fill', color: opt.fill, opacity: opt.fillAlpha })));
+  }
+  if (opt.accent) {
+    spec.a.forEach(d => out.push(shapeMarkup(d, { kind: 'fill', color: opt.accent, opacity: 1 })));
+  }
+  if (opt.stroke) {
+    spec.s.forEach(d => out.push(shapeMarkup(d, { kind: 'stroke', color: opt.stroke })));
+  }
+  return '<svg viewBox="0 0 24 24" width="' + opt.size + '" height="' + opt.size +
+    '" aria-hidden="true" focusable="false" style="display:block">' + out.join('') + '</svg>';
+}
+
+/** 容器底色与三支笔：tone × 主题 × 强调层口径 × 配色档（current / calm） */
+function paletteFor(tone, domain, scheme, accentMode, skin) {
+  const S = SKINS[skin] || SKINS.current;
+  const d = S.domains[domain] || S.domains.AiSpeech;
+  const base = scheme === 'light' ? d.light[0] : d.dark;
+  const deep = scheme === 'light' ? d.light[1] : d.dark;
+  if (tone === 'gradient') {
+    const ink = scheme === 'light' ? '#FFFFFF' : S.onBrand;
+    const gStart = mixHex(deep, base, S.gFrac);
+    const accent = accentMode === 'current'
+      ? base
+      : (scheme === 'light' ? darkenHex(deep, S.accentDark) : S.onBrand);
+    return {
+      bg: 'linear-gradient(140deg, ' + gStart + ' 0%, ' + deep + ' 100%)',
+      isGradient: true, fill: ink, accent: accent, stroke: ink
+    };
+  }
+  return { bg: S.tint[scheme], isGradient: false, fill: base, accent: deep, stroke: deep };
+}
+
+function renderBadge(el, st) {
+  const name = el.dataset.glyph;
+  const tone = el.dataset.tone || 'tint';
+  const size = Number(el.dataset.size || 40);
+  const skin = el.dataset.skinfixed || st.skin;
+  const p = paletteFor(tone, el.dataset.domain || 'AiSpeech', st.scheme, st.accent, skin);
+  let layers = size === 30 ? 'stroke' : st.layers;
+  const inMock = el.closest('.screen-mock');
+  if (inMock) {
+    layers = st.mock === 'before' ? (tone === 'gradient' ? 'noaccent' : 'stroke') : 'three';
+  }
+  if (el.dataset.pin) layers = el.dataset.pin;
+
+  const opt = {
+    size: size === 30 ? 17 : 22,
+    fill: p.fill,
+    fillAlpha: FILL_ALPHA[st.scheme],
+    accent: p.accent,
+    stroke: p.stroke
+  };
+  if (layers === 'stroke') { opt.fillAlpha = 0; opt.accent = null; }
+  if (layers === 'noaccent') { opt.accent = null; }
+
+  el.className = 'icon-badge badge-' + size;
+  el.style.background = p.bg;
+  el.style.boxShadow = p.isGradient ? 'inset 0 0 0 1px rgba(255,255,255,.38)' : 'none';
+  el.style.filter = st.gray === 'on' ? 'grayscale(1) contrast(1.04)' : '';
+  el.innerHTML = svgGlyph(name, opt);
+}
+
+function renderBare(el, st) {
+  const size = Number(el.dataset.size || 22);
+  const S = SKINS[el.dataset.skinfixed || st.skin] || SKINS.current;
+  let color;
+  if (el.dataset.ink === 'text2') {
+    color = S.textMuted[st.scheme];
+  } else {
+    const d = S.domains[el.dataset.domain || 'Settings'];
+    color = st.scheme === 'light' ? d.light[1] : d.dark;
+  }
+  el.innerHTML = svgGlyph(el.dataset.glyph, { size: size, fill: null, fillAlpha: 0, accent: null, stroke: color });
+}
+
+function renderChevron(el, st) {
+  el.innerHTML = svgGlyph(el.dataset.glyph, { size: 16, fill: null, fillAlpha: 0, accent: null, stroke: TEXT_FAINT[st.scheme] });
+}
+
+/** 解剖卡：①底幅 ②底幅 + 强调 ③三层 ④三层去色 */
+function renderDissect(root, st) {
+  root.querySelectorAll('.dissect-card').forEach(card => {
+    const p = paletteFor('gradient', card.dataset.domain, st.scheme, st.accent, st.skin);
+    card.querySelectorAll('.layer-tile').forEach(tile => {
+      const step = Number(tile.dataset.step);
+      const opt = {
+        size: 28,
+        fill: p.fill,
+        fillAlpha: FILL_ALPHA[st.scheme],
+        accent: p.accent,
+        stroke: p.stroke
+      };
+      if (step === 1) { opt.accent = null; opt.stroke = null; }
+      if (step === 2) { opt.stroke = null; }
+      tile.style.background = p.bg;
+      tile.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,.30)';
+      tile.style.filter = step === 4 ? 'grayscale(1) contrast(1.04)' : '';
+      tile.innerHTML = svgGlyph(card.dataset.glyph, opt);
+    });
+  });
+}
+
+function renderPreview(root) {
+  const st = root.__state;
+  root.dataset.scheme = st.scheme;
+  root.dataset.skin = st.skin;
+  root.querySelectorAll('.icon-badge').forEach(el => renderBadge(el, st));
+  root.querySelectorAll('.bare').forEach(el => renderBare(el, st));
+  root.querySelectorAll('.chev').forEach(el => renderChevron(el, st));
+  renderDissect(root, st);
+}
+
+function initPreview(root) {
+  root.__state = {
+    scheme: root.dataset.scheme || 'light',
+    skin: root.dataset.skin || 'current',
+    layers: 'three',
+    accent: 'proposed',
+    gray: 'off',
+    mock: 'after'
+  };
+  root.querySelectorAll('[data-seg]').forEach(seg => {
+    const key = seg.dataset.seg;
+    seg.addEventListener('click', event => {
+      const btn = event.target.closest('button');
+      if (!btn || !seg.contains(btn)) return;
+      seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+      root.__state[key] = btn.dataset.value;
+      renderPreview(root);
+    });
+  });
+  renderPreview(root);
+}
+
+/* ------------------------------------------------------------------
+   5) 字形墙
+   ------------------------------------------------------------------ */
+function buildWall() {
+  const wall = document.getElementById('wall');
+  wall.innerHTML = META.map(function (entry) {
+    const key = entry[0], label = entry[1], use = entry[2], domain = entry[3];
+    const spec = SPECS[key];
+    const exempt = STROKE_ONLY.has(key);
+    const tagText = exempt ? '描边 only' : (spec.a.length ? '3 层' : '2 层');
+    const cells = exempt
+      ? '<span class="icon-badge" data-glyph="' + key + '" data-domain="' + domain + '" data-tone="tint" data-size="30"></span>'
+      : '<span class="icon-badge" data-glyph="' + key + '" data-domain="' + domain + '" data-tone="gradient" data-size="40"></span>' +
+        '<span class="icon-badge" data-glyph="' + key + '" data-domain="' + domain + '" data-tone="tint" data-size="40"></span>' +
+        '<span class="icon-badge" data-glyph="' + key + '" data-domain="' + domain + '" data-tone="tint" data-size="30"></span>';
+    return '<div class="wall-item">' +
+      '<div class="wall-badges">' + cells + '</div>' +
+      '<p class="wall-name">' + label + '<span class="wall-key">' + key + '</span></p>' +
+      '<p class="wall-use">' + use + '</p>' +
+      '<span class="tag' + (spec.a.length ? ' three' : '') + '">' + tagText + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+buildWall();
+document.querySelectorAll('.preview').forEach(initPreview);
+</script>
+</div>
+</body>
+</html>

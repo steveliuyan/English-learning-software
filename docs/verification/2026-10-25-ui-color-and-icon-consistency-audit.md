@@ -5,6 +5,14 @@
 ③「不是选项，是选项还有图标」（即：选项行与图标两处都要看）。
 取证设备：真机 `bf353dda`（深色 · fontScale 1.0）。截图只落 `.git/qa-scratch/color-audit/`，不入库。
 
+> **2026-10-27 补注（读本文前先看这条）**：本文所有 hex 是 2026-10-25 时点的**现场快照**
+> （`MintPrimary = AiSpeech.base #2EC99C`、`bg #F1FBF5`、`tint #DDF7E8` 等），当日晚些时候整体换成了
+> 「轻松档」——`AiSpeech.base` 现为 `#6CCBAB`、`bg #F6F9F6`、`tint #E9F4EE`，域色七组全部柔化。
+> 换色依据见 `docs/decisions/2026-10-27-relaxed-palette-rulings.md`，验收见
+> `docs/verification/2026-10-27-relaxed-palette-d7.md`，现值一律以 `ui/theme/AppColors.kt` 为准。
+> **本文的判定与处置结论不因换色失效**（它判的是「用哪个域色 / 谁该统一」，不是具体色号），
+> 但文中出现的色号不能再当现值引用。
+
 ---
 
 ## 0. 结论（先读这段）

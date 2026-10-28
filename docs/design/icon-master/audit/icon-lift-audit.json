@@ -1,0 +1,254 @@
+﻿[
+    {
+        "n":  1,
+        "slug":  "book",
+        "dom":  "Learn",
+        "batch":  "baseline",
+        "pctLift":  9.1,
+        "liftRegions":  110,
+        "liftLargestShareOfNonBg":  5.2
+    },
+    {
+        "n":  2,
+        "slug":  "books",
+        "dom":  "Library",
+        "batch":  "baseline",
+        "pctLift":  29.2,
+        "liftRegions":  105,
+        "liftLargestShareOfNonBg":  9.5
+    },
+    {
+        "n":  3,
+        "slug":  "clock",
+        "dom":  "Review",
+        "batch":  "baseline",
+        "pctLift":  37.8,
+        "liftRegions":  111,
+        "liftLargestShareOfNonBg":  37
+    },
+    {
+        "n":  4,
+        "slug":  "document",
+        "dom":  "Settings",
+        "batch":  "baseline",
+        "pctLift":  8,
+        "liftRegions":  15,
+        "liftLargestShareOfNonBg":  4.2
+    },
+    {
+        "n":  5,
+        "slug":  "microphone",
+        "dom":  "AiSpeech",
+        "batch":  "baseline",
+        "pctLift":  11,
+        "liftRegions":  82,
+        "liftLargestShareOfNonBg":  5
+    },
+    {
+        "n":  6,
+        "slug":  "speaker",
+        "dom":  "Reading",
+        "batch":  "baseline",
+        "pctLift":  5.1,
+        "liftRegions":  90,
+        "liftLargestShareOfNonBg":  3.5
+    },
+    {
+        "n":  7,
+        "slug":  "spark",
+        "dom":  "AiSpeech",
+        "batch":  "recolor",
+        "pctLift":  10.1,
+        "liftRegions":  105,
+        "liftLargestShareOfNonBg":  8.7
+    },
+    {
+        "n":  8,
+        "slug":  "chart",
+        "dom":  "Learn",
+        "batch":  "recolor",
+        "pctLift":  3.3,
+        "liftRegions":  17,
+        "liftLargestShareOfNonBg":  2.1
+    },
+    {
+        "n":  9,
+        "slug":  "camera",
+        "dom":  "Danger",
+        "batch":  "baseline",
+        "pctLift":  7.7,
+        "liftRegions":  43,
+        "liftLargestShareOfNonBg":  4.3
+    },
+    {
+        "n":  10,
+        "slug":  "shield",
+        "dom":  "Settings",
+        "batch":  "recolor",
+        "pctLift":  4.5,
+        "liftRegions":  34,
+        "liftLargestShareOfNonBg":  4.3
+    },
+    {
+        "n":  11,
+        "slug":  "upload",
+        "dom":  "Library",
+        "batch":  "fix",
+        "pctLift":  4,
+        "liftRegions":  72,
+        "liftLargestShareOfNonBg":  3.3
+    },
+    {
+        "n":  12,
+        "slug":  "download",
+        "dom":  "AiSpeech",
+        "batch":  "baseline",
+        "pctLift":  53.3,
+        "liftRegions":  79,
+        "liftLargestShareOfNonBg":  48
+    },
+    {
+        "n":  13,
+        "slug":  "search",
+        "dom":  "Danger",
+        "batch":  "remake",
+        "pctLift":  32.6,
+        "liftRegions":  90,
+        "liftLargestShareOfNonBg":  31.7
+    },
+    {
+        "n":  14,
+        "slug":  "list",
+        "dom":  "Library",
+        "batch":  "remake",
+        "pctLift":  24.8,
+        "liftRegions":  29,
+        "liftLargestShareOfNonBg":  11.1
+    },
+    {
+        "n":  15,
+        "slug":  "bookmark",
+        "dom":  "Reading",
+        "batch":  "remake",
+        "pctLift":  7,
+        "liftRegions":  48,
+        "liftLargestShareOfNonBg":  5.7
+    },
+    {
+        "n":  16,
+        "slug":  "star",
+        "dom":  "Review",
+        "batch":  "remake",
+        "pctLift":  6.9,
+        "liftRegions":  26,
+        "liftLargestShareOfNonBg":  6.7
+    },
+    {
+        "n":  17,
+        "slug":  "translate",
+        "dom":  "Learn",
+        "batch":  "remake",
+        "pctLift":  30.8,
+        "liftRegions":  92,
+        "liftLargestShareOfNonBg":  26.2
+    },
+    {
+        "n":  18,
+        "slug":  "image",
+        "dom":  "AiSpeech",
+        "batch":  "remake",
+        "pctLift":  23.5,
+        "liftRegions":  34,
+        "liftLargestShareOfNonBg":  20.7
+    },
+    {
+        "n":  19,
+        "slug":  "newspaper",
+        "dom":  "Reading",
+        "batch":  "remake",
+        "pctLift":  5.1,
+        "liftRegions":  84,
+        "liftLargestShareOfNonBg":  3.7
+    },
+    {
+        "n":  20,
+        "slug":  "gear",
+        "dom":  "Settings",
+        "batch":  "remake",
+        "pctLift":  7.3,
+        "liftRegions":  56,
+        "liftLargestShareOfNonBg":  6.9
+    },
+    {
+        "n":  21,
+        "slug":  "person",
+        "dom":  "Settings",
+        "batch":  "remake",
+        "pctLift":  10.1,
+        "liftRegions":  50,
+        "liftLargestShareOfNonBg":  4.9
+    },
+    {
+        "n":  22,
+        "slug":  "info",
+        "dom":  "Settings",
+        "batch":  "remake",
+        "pctLift":  5.8,
+        "liftRegions":  48,
+        "liftLargestShareOfNonBg":  5.4
+    },
+    {
+        "n":  23,
+        "slug":  "bell",
+        "dom":  "Review",
+        "batch":  "remake",
+        "pctLift":  3.9,
+        "liftRegions":  68,
+        "liftLargestShareOfNonBg":  3.4
+    },
+    {
+        "n":  24,
+        "slug":  "warning",
+        "dom":  "Danger",
+        "batch":  "remake",
+        "pctLift":  7.4,
+        "liftRegions":  68,
+        "liftLargestShareOfNonBg":  6.1
+    },
+    {
+        "n":  25,
+        "slug":  "trash",
+        "dom":  "Danger",
+        "batch":  "remake",
+        "pctLift":  3.6,
+        "liftRegions":  51,
+        "liftLargestShareOfNonBg":  3.1
+    },
+    {
+        "n":  26,
+        "slug":  "play",
+        "dom":  "AiSpeech",
+        "batch":  "remake",
+        "pctLift":  26.2,
+        "liftRegions":  44,
+        "liftLargestShareOfNonBg":  25.8
+    },
+    {
+        "n":  27,
+        "slug":  "pause",
+        "dom":  "AiSpeech",
+        "batch":  "remake",
+        "pctLift":  4.4,
+        "liftRegions":  35,
+        "liftLargestShareOfNonBg":  4
+    },
+    {
+        "n":  28,
+        "slug":  "stop",
+        "dom":  "AiSpeech",
+        "batch":  "remake",
+        "pctLift":  5.9,
+        "liftRegions":  32,
+        "liftLargestShareOfNonBg":  5.3
+    }
+]

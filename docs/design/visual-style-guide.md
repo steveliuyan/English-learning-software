@@ -39,27 +39,34 @@
 
 ### 2.2 应用内基础色
 
-| 令牌 | 当前参考色 | 用途 |
+表内取值是 **2026-10-27 轻松档**（低压力方向：背景去黄绿、`tint` 系去饱和、文字墨微提亮但守住 AA）。
+逐值权威源是 `ui/theme/AppColors.kt` 的 `AppColorSet` 字段，本表只是它的可读副本；
+配对是否达标一律由契约测试按 WCAG 相对亮度当场复算，文档不另抄「合格」结论。
+旧名（`MintSurfaceSolid` / `MintTint2` / `MintTint3` / `MintOutlineSoft` / `MintTextStrong` /
+`MintTextFaint` / `OnMintForeground` / `OnBrandDeep` / `MintErrorFill`）与下列 token 一一对应：
+`surface` / `tint2` / `tint3` / `outlineSoft` / `text1` / `text3` / `onMint` / `onBrand` / `errorFill`。
+
+| 令牌（`AppColorSet`） | 浅色 | 用途 |
 | --- | --- | --- |
-| `MintBackground` | `#F1FBF5` | 应用页面大面积背景 |
-| `MintSurface` | `#EFFFFFFF` | 半透明白色卡片表面；仅用于轻微透出背景的场景 |
-| `MintSurfaceSolid` | `#FFFFFF` | 需要实底的卡片与弹层（不透明，避免文字压在背景纹理上） |
-| `MintTint` | `#DDF7E8` | 选中卡片、提示卡、浅青强调区域 |
-| `MintTint2` | `#DCEAE1` | 中性浅底容器（图标容器、次级标签底） |
-| `MintTint3` | `#CDEDD9` | 稍深浅底（进度轨道、图表网格） |
-| `MintPrimary` | `#2EC99C` | 主操作、选中态、滑条和单色品牌强调 |
-| `MintPrimaryDark` | `#188F76` | 标题、重要文字、深色品牌文字 |
-| `MintOutline` | `#ADE7D2` | 柔和边框、分组轮廓 |
-| `MintOutlineSoft` | `#E4EFE9` | 分隔线（唯一允许的分隔用色；禁止用 `spacedBy` 造不可见间距） |
-| `MintTextStrong` | `#1C1C1E` | 正文与标题主文字 |
-| `MintTextMuted` | `#4E756A` | 辅助文字、说明文字、次级信息 |
-| `MintTextFaint` | `#7A9088` | 仅限 ≥24sp 大数字/装饰性大字与纯图标描边；不作任何正文或标签前景（时间戳、脚注属正文，改用 `MintTextMuted`，且受其可压底限制；见 §2.3 同口径补充） |
-| `OnMintForeground` | `#174C44` | **浅薄荷底上的前景文字/图标专用色**（压 `MintTint` 实测 8.61:1）；品牌渐变上不再取该色（压渐变末端实测 4.07:1，跌破 4.5，见裁决 3） |
-| `OnBrandDeep` | `#04241C` | 品牌渐变上前景文字的**标准**取色（压渐变末端实测 6.87:1、中段 9.95、起点 12.81，处处合格；裁决 3），不再是「唯一替代」 |
-| `MintError` | `#B30000` | 错误文字与破坏性操作文字（全站唯一） |
-| `MintErrorFill` | `#FF3B30` | 破坏性操作的填充/图标底（全站唯一） |
-| `MintSuccess` | `#1B5E20` | 成功回显文字 |
-| `AppleMintLight` | `#D9FFF0` | 极浅品牌高光、装饰性背景 |
+| `background` | `#F6F9F6` | 应用页面大面积背景（旧 `MintBackground`） |
+| `surface` | `#FFFFFF` | 实底卡片与弹层（旧 `MintSurfaceSolid`） |
+| `surfaceGlass` | `#EFFFFFFF` | 半透明白玻璃（90% 不透明，仅浮层/玻璃卡） |
+| `tint` | `#E9F4EE` | 选中卡片、提示卡、浅青强调区域（旧 `MintTint`） |
+| `tint2` | `#E4EFE9` | 中性浅底容器（图标容器、次级标签底） |
+| `tint3` | `#DEEAE4` | 稍深浅底（进度轨道、开关未选中轨、图表网格） |
+| `outline` | `#D3E7DC` | 柔和边框、分组轮廓、卡片主描边 |
+| `outlineSoft` | `#EBF1ED` | 分隔线（唯一允许的分隔用色；禁止用 `spacedBy` 造不可见间距） |
+| `text1` | `#1F2B26` | 正文与标题主文字（旧 `MintTextStrong` / `MintPrimaryDark`） |
+| `text2` | `#566B62` | 辅助文字、说明文字、次级信息（旧 `MintTextMuted`） |
+| `text3` | `#7C9188` | 仅限 ≥24sp 大数字/装饰性大字与纯图标描边；不作任何正文或标签前景（时间戳、脚注属正文，改用 `text2`，且受其可压底限制；见 §2.3 同口径补充） |
+| `onMint` | `#174C44` | **浅薄荷底上的前景文字/图标专用色**（压 `tint` 实测 8.65:1）；品牌渐变上不再取该色（压渐变末端实测 4.07:1，跌破 4.5，见裁决 3） |
+| `onBrand` | `#04241C` | 品牌渐变／彩色实底上的前景标准取色（压渐变末端实测 6.87:1、中段 9.95、起点 12.81，处处合格；裁决 3），也是彩色实底（如 `errorFill`）上的唯一取墨 |
+| `error` | `#B30000` | 错误文字与破坏性操作文字（全站唯一） |
+| `errorFill` | `#FF3B30` | 破坏性操作的填充/图标底（全站唯一） |
+| `success` | `#1B5E20` | 成功回显文字 |
+| `strongSurface` | `#1F4739` | 强档卡容器底（学习页主卡、我的页统计条），前景配 `onStrong` |
+| `onStrong` | `#E9F2EC` | 强档卡前景（明暗同值，压两套 `strongSurface` ≥4.5） |
+| `AppleMintLight` | `#D9FFF0` | 极浅品牌高光、装饰性背景（品牌常数，见 §2.1） |
 
 文字必须保证足够对比度。浅色背景上不得使用低对比度的浅青文字；辅助文字只能用于非关键说明，不能承载唯一操作信息。
 
@@ -70,11 +77,10 @@
 对比度必须由 WCAG 相对亮度函数计算得出（≥4.5:1），不得凭肉眼或经验宣称达标。
 裁决全文见 `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`。
 
-**与代码现状的差值（批 1 须校准，勿当已就位）**：`ui/theme/AppPalette.kt` 已存在且全站 154 处引用，
-但其中性色取值偏 iOS 灰，与本表不一致：`Background #F5F5F7 → #F1FBF5`、`TextSecondary #6E6E73 → #4E756A`、
-`Separator #E5E5EA → #E4EFE9`、`GlassFill #CCFFFFFF → #EFFFFFFF`；`DomainColors` 七域取值与本规范 §2.3 **逐值一致**，
-`OnMintPrimary #174C44` 与 `ErrorText #B30000` 保持原样。缺的令牌（`tint2/tint3/outlineSoft/onBrand/errorFill`）
-随装配点一并补齐。
+**与代码现状的差值（已收口，勿按旧值校验）**：上表取值即 `ui/theme/AppColors.kt` 的现值，
+`AppPalette.kt`（浅套静态兼容源）与 `DesignTokenContractTest` 的 hex 钉值表逐值同步；
+旧文档里的 `Background #F1FBF5`、`TextSecondary #4E756A`、`Separator #E4EFE9`、`GlassFill #CCFFFFFF`、
+`MintPrimary #2EC99C`、`MintPrimaryDark #188F76` 一律作废。域色见 §2.3，深色见 §2.5。
 
 ### 2.3 功能域强调色（UI 重设计轮新增）
 
@@ -83,26 +89,29 @@
 
 | 域 | 浅色 `deep` / `base` | 深色（deep 与 base 合一） |
 | --- | --- | --- |
-| AI | `#188F76` / `#2EC99C` | `#35E0AC` |
-| 学习 | `#075EB4` / `#0A84FF` | `#5AC0FF` |
-| 复习 | `#AB5700` / `#FF9F0A` | `#FFB340` |
-| 词库 | `#8E34B8` / `#BF5AF2` | `#DA8CFF` |
-| 阅读 | `#C81E46` / `#FF375F` | `#FF7A93` |
-| 危险 | `#B30000` / `#FF3B30` | `#FF6B61` |
-| 设置 | `#48484A` / `#8E8E93` | `#B0B0B5` |
+| AI | `#1A7A63` / `#6CCBAB` | `#6FD9B6` |
+| 学习 | `#175A93` / `#7BB4E6` | `#84C4EE` |
+| 复习 | `#8A5712` / `#EBC68B` | `#EFCB92` |
+| 词库 | `#65478A` / `#B7A0D9` | `#C6A9E4` |
+| 阅读 | `#9C3B4F` / `#E297A4` | `#EDA8B4` |
+| 危险 | `#9E2B24` / `#DD8B81` | `#E39086` |
+| 设置 | `#4A5551` / `#A6B0AC` | `#B4BEBA` |
 
 - 两种合法呈现：域色容器（实底或渐变）+ 白色字形，或域色浅底 `tint` + 域色 `deep` 字形与文字。
   **图形本身要按非文本对比 ≥3:1 当场算**（WCAG 1.4.11），不得宣称"图标不参与对比度判定"。
-  实测：白字形在浅色 `deep` 实底上 4.02:1 ~ 9.12:1 全部合格；但**直接以浅色 `base` 作容器底时不合格**——
-  AI `#2EC99C` 上 2.11:1、复习 `#FF9F0A` 上 2.06:1。故渐变容器的高光端一律取 `deep` 混 35% `base`（不是 `base` 本体），
-  七域白字形实测 3.17:1 ~ 6.26:1（最差 AI）；深色下容器用同组域色配 `#06231A` 字形，实测 5.96:1 ~ 9.82:1（最差危险）。
+  轻松档实测（2026-10-27 复算）：白字形在浅色 `deep` 实底上 5.24:1 ~ 7.75:1 全部合格；
+  但**直接以浅色 `base` 作容器底时不合格**——AI `#6CCBAB` 上 1.95:1、复习 `#EBC68B` 上 1.62:1。
+  故入口容器的高光端取 `deep` 混 **18%** `base`（不是 `base` 本体，也不是早期的 35%），
+  七域白字形实测 4.28:1 ~ 6.20:1（最差 AI）；深色下容器用同组域色配 `onBrand #04241C` 字形，
+  实测 6.75:1 ~ 10.69:1（最差 AI）。
 - 容器上的任何**文字**仍受 §2.2 硬规则约束。
-- **同口径补充（2026-10-18 裁决）**：`text-3 #7A9088` 不作任何正文或标签前景（压 `surface`/`bg`/`tint` 实测
-  3.40/3.22/3.00，只留 ≥24sp 大数字/装饰与纯图标描边）；`text-2 #4E756A` 只许压 `surface`/`bg`/`tint`
-  （5.15/4.87/4.55），禁压 `tint-2`/`tint-3`（4.15/4.10），其上正文一律 `text-1`；品牌渐变上的文字统一取
-  `on-brand #04241C`（`on-mint` 压末端仅 4.07），§2.2 表内 `OnMintForeground`「≈4.6:1」与 `OnBrandDeep`
-  「唯一替代」两行旧措辞以此为准、随批 1 token 校准改写。裁决全文见
-  `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`。
+- **同口径补充（2026-10-18 裁决，2026-10-27 重算）**：`text3 #7C9188` 不作任何正文或标签前景（压
+  `surface`/`bg`/`tint` 实测 3.35/3.16/2.98，只留 ≥24sp 大数字/装饰与纯图标描边）；`text2 #566B62`
+  压 `surface`/`bg`/`tint`/`tint2`/`tint3` 实测 5.71/5.39/5.07/4.85/4.62 —— 轻松档起**五档全部达标**，
+  2026-10-18 那条「禁压 `tint-2`/`tint-3`」的限制随之解除（契约里已翻成正向钉）；
+  品牌渐变上的文字统一取 `onBrand #04241C`（`onMint` 压末端仅 4.07）。
+  裁决全文见 `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`，
+  轻松档改色与连带重议见 `docs/decisions/2026-10-27-relaxed-palette-rulings.md`。
 - 禁止在页面里现场调色（裸 `Color(0xFF…)`）。**本文档不抄写残留站点的文件名、行号与处数**（批 1 终审 F8/D-I-6
   ＋窄复评 N-2：原先用行号点名的站点早已漂移，而「几个文件几处」这类快照数同样会随任何一次改动失效，
   写进文档就等于再造一份会漂的副本）。权威台账两张表：
@@ -136,15 +145,21 @@
 
 | 令牌 | 浅色 | 深色 |
 | --- | --- | --- |
-| 背景 | `#F1FBF5` | `#0E1512` |
+| 背景 | `#F6F9F6` | `#111A16` |
 | 实底表面 | `#FFFFFF` | `#17201C` |
 | 玻璃表面 | `#EFFFFFFF` | `#E617201C`（90% 不透明，深色下不再叠更低透明度） |
-| 浅底容器 | `#DDF7E8` / `#DCEAE1` / `#CDEDD9` | `#1C2C26` / `#22322B` / `#27392F` |
-| 边框 | `#ADE7D2` / `#E4EFE9` | `#2E4238` / `#233029` |
-| 文字 | `#1C1C1E` / `#4E756A` / `#7A9088` | `#E9F2EC` / `#9FB3AA` / `#7F938A` |
+| 浅底容器 | `#E9F4EE` / `#E4EFE9` / `#DEEAE4` | `#1B2A25` / `#20302A` / `#25352E` |
+| 边框 | `#D3E7DC` / `#EBF1ED` | `#2B3A33` / `#202C26` |
+| 文字 | `#1F2B26` / `#566B62` / `#7C9188` | `#E9F2EC` / `#9FB3AA` / `#7F938A` |
 | 渐变/浅底上的前景 | `#174C44` | `#DFF6EC` |
+| 彩色实底上的取墨 | `#04241C` | `#04241C` |
+| 强档卡底 / 前景 | `#1F4739` / `#E9F2EC` | `#22332C` / `#E9F2EC` |
 | 错误 / 填充 | `#B30000` / `#FF3B30` | `#FF8177` / `#FF6B61` |
 | 成功 | `#1B5E20` | `#6BD98A` |
+
+深色下 `errorFill` 是浅红填充，所以 M3 `onErrorContainer` 浅套取 `onBrand #04241C`（压 `#FF3B30` 实测 4.65）、
+深套取 `background #111A16`（压 `#FF6B61` 实测 6.36）——这是 M3 角色表里唯一按模式分叉的一项
+（装配点 `MintGlassTheme.kt` 的 `appColorScheme`，判据 `MaterialThemeAssemblyContractTest`）。
 
 品牌渐变在深浅两套下保持同三段，识别关系不变。
 
@@ -346,17 +361,23 @@ UI 重设计轮（2026-10-17）的图标体系与共享组件口径见 §12、§
   集中放在 `ui/components/AppIcons.kt`；许可登记见 `docs/third-party-notices.md` 的 `app-authored-ui-icons`
   与 `material-symbols-icon-paths`（后者仅作基准说明）。选型过程见
   `docs/decisions/2026-10-18-ui-redesign-icon-duotone.md`。
-- **呈现已定（B 案 · 双色层次）**：每枚图标两层结构——描边骨架 + 内部半透明填充层。
-  入口层（≥40dp 容器）用域色渐变容器 + 白色两层字形；行内层（30dp 容器 / 17dp 图形）**退化为单层描边**，
-  浅底 `tint` + 域色 `deep`，填充层不显示。**"高级感"只存在于 ≥40dp 容器**，行内不许出现实心图形或渐变块。
-- **两层口径修订与文字同口径（2026-10-18 裁决）**：上一条「每枚图标两层结构」限定为**除豁免表内 5 枚外每枚两层**——
-  `Back`/`ChevronRight`/`ChevronDown`/`Close`/`Check` 只有描边骨架、不建填充层，且不得进入 ≥40dp 入口容器；
-  图标旁的文字同受 §2.3 补充口径约束（`text-3` 不作正文前景）。清单与裁决见
+- **呈现已定（B 案 → 2026-10-19 扩成三层）**：每枚功能字形三层——描边骨架 `strokePaths` +
+  半透明底幅 `fillPaths` + 不透明强调 `accentPaths`，渲染顺序固定「底幅 → 强调 → 骨架」。
+  入口层（≥40dp 容器）用域色容器 + 白色字形；行内层（30dp 容器 / 17dp 图形）**退化为单层描边**，
+  浅底 `tint` + 域色 `deep`，填充层与强调层不显示。**"高级感"只存在于 ≥40dp 容器**，行内不许出现实心图形或渐变块。
+  第三层分工见 `docs/decisions/2026-10-19-ui-redesign-icon-illustration-layer.md`。
+- **三层口径与豁免（2026-10-18 裁决，2026-10-19 扩层后统一为"三层"）**：上一条的结构限定为
+  **除豁免表内 5 枚外每枚三层**——`Back`/`ChevronRight`/`ChevronDown`/`Close`/`Check` 只有描边骨架、
+  不建填充层与强调层，且不得进入 ≥40dp 入口容器；口径表标题在源码里叫「三层结构豁免表」，
+  逐枚清单叫「逐枚清单」（`AppIcons.kt` 与 `AppIconsStructureContractTest` 两侧同名，改词须两边一起改）；
+  图标旁的文字同受 §2.3 补充口径约束（`text3` 不作正文前景）。清单与裁决见
   `docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`。
 - **禁止混用**：emoji、字母/数字缩写徽标、各处自绘异形图标、第三方品牌 logo（Google 明示该图标集不含第三方标志）。
   现状待清的含字徽标：「AI」「♪」「⏰」与打卡页头部两条裸文字链（后者按裁决③移出）。
 - **容器口径**：容器圆角 `12.dp`（入口块可 `14.dp`），尺寸走 §4 档位；
-  渐变亮端取 `deep` 混 35% `base` + `inset 0 0 0 1px rgba(255,255,255,.26)` 内高光，禁止直接用浅色 `base` 作白字形底。
+  渐变亮端取 `deep` 混 **18%** `base`（`IconBadge.kt` 的 `GRADIENT_START_FRACTION = 0.18`，
+  2026-10-27 由 0.35 下调；设计稿 §4.4 目标「近乎纯色」，早期 35% 的跨度让容器看着像渐变块）
+  + `inset 0 0 0 1px rgba(255,255,255,.26)` 内高光，禁止直接用浅色 `base` 作白字形底。
 - **对比度口径**：图形本身按 ≥3:1 当场计算（非文字，WCAG 1.4.11），容器上的任何文字另受 §2.2 硬规则约束。
   实测取值见 §2.3。
 - **可访问名**：图标按钮必须有真实语义 `contentDescription`；纯装饰图形为 `null`。禁止把 `testTag` 当描述用（F5-03 已有契约测试拦截）。

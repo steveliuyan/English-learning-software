@@ -1,0 +1,3265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全应用 UI 重做参考稿 · 英语学习 App</title>
+<style>
+/* ============================================================
+   0. 文档令牌（与 App 令牌同名，方便逐条对照实现）
+   ============================================================ */
+:root{
+  /* 中性浅套 */
+  --bg:#F6F9F6; --surface:#FFFFFF; --tint:#E9F4EE; --tint2:#E4EFE9; --tint3:#DEEAE4;
+  --outline:#D3E7DC; --text1:#1F2B26; --text2:#566B62; --text3:#7C9188;
+  --onMint:#174C44; --onBrand:#04241C; --strong:#1F4739; --onStrong:#E9F2EC;
+  /* 中性深套 */
+  --dbg:#111A16; --dsurface:#17201C; --dtint:#1B2A25; --dtint3:#27392F; --dstrong:#22332C;
+  --dtext1:#E9F2EC; --dtext2:#9FB6AC; --doutline:#2E4038;
+  /* 七域色板 */
+  --learn:#7BB4E6; --learn-l:#CDE6F7; --learn-d:#175A93;
+  --library:#B7A0D9; --library-l:#E4DAF2; --library-d:#65478A;
+  --review:#EBC68B; --review-l:#F7E7CB; --review-d:#8A5712;
+  --settings:#A6B0AC; --settings-l:#DCE4E0; --settings-d:#4A5551;
+  --ai:#6CCBAB; --ai-l:#CFEDE2; --ai-d:#1A7A63;
+  --reading:#E297A4; --reading-l:#F6DCE0; --reading-d:#9C3B4F;
+  --danger:#DD8B81; --danger-l:#F7DCD6; --danger-d:#9E2B24;
+  /* 品牌 */
+  --mint-l:#D9FFF0; --pill-end:#65D3B9;
+  --grad:linear-gradient(135deg,#A8F3C8 0%,#5DDFB4 52%,#35B9B5 100%);
+  /* 形状 */
+  --r-dialog:24px; --r-card:20px; --r-btn:14px; --r-icon:12px; --r-inline:9px;
+  /* 文档外壳 */
+  --ink:#12211C; --ink2:#3C4F47; --ink3:#6C7F77; --hair:#E2EDE7;
+  --paper:#FBFAF7; --chrome:#0F1A16;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,"Liberation Mono",monospace;
+  --sans:"Inter","Segoe UI",system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:15px;line-height:1.72;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+a{color:var(--onMint);text-decoration:none;border-bottom:1px solid rgba(23,76,68,.25)}
+a:hover{border-bottom-color:var(--onMint)}
+code{font-family:var(--mono);font-size:.87em;background:var(--tint);color:var(--onMint);
+  padding:1px 5px;border-radius:5px;border:1px solid var(--outline);word-break:break-word}
+hr{border:0;border-top:1px solid var(--hair);margin:44px 0}
+
+/* ============================================================
+   1. 版面骨架
+   ============================================================ */
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr);min-height:100vh}
+nav.toc{
+  position:sticky;top:0;height:100vh;overflow-y:auto;overscroll-behavior:contain;
+  background:var(--chrome);color:#C6DCD2;padding:22px 0 40px;
+  border-right:1px solid #0A120F;font-size:13px;
+}
+nav.toc::-webkit-scrollbar{width:9px}
+nav.toc::-webkit-scrollbar-thumb{background:#2A3B34;border-radius:5px}
+nav.toc .toc-brand{padding:0 20px 16px;border-bottom:1px solid #223129;margin-bottom:14px}
+nav.toc .toc-brand b{display:block;color:#EAF7F1;font-size:14px;letter-spacing:.02em;line-height:1.5}
+nav.toc .toc-brand span{display:block;color:#7E968C;font-family:var(--mono);font-size:10.5px;margin-top:6px;letter-spacing:.04em}
+nav.toc ol{list-style:none;margin:0;padding:0 10px}
+nav.toc ol ol{padding-left:10px;margin-top:2px}
+nav.toc li{margin:1px 0}
+nav.toc a{
+  display:block;padding:5px 10px;border-radius:7px;color:#B4CBC1;
+  border:0;line-height:1.45;transition:background .12s,color .12s;
+}
+nav.toc a:hover{background:#1A2A24;color:#F0FBF6}
+nav.toc a.on{background:#1E332B;color:#7FE6C0;box-shadow:inset 2px 0 0 #5DDFB4}
+nav.toc .toc-l{color:#5E766C;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  padding:16px 20px 5px;text-transform:uppercase}
+nav.toc .toc-l2{font-size:12px;padding-left:22px}
+main{padding:56px 64px 140px;max-width:1180px}
+@media(max-width:1080px){
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;max-height:none}
+  nav.toc ol{columns:2;column-gap:14px}
+  main{padding:34px 22px 100px}
+  .dlg{grid-template-columns:1fr}
+}
+@media(max-width:620px){nav.toc ol{columns:1}}
+
+/* ============================================================
+   2. 标题与正文
+   ============================================================ */
+h1{font-size:40px;line-height:1.15;letter-spacing:-.02em;margin:0 0 14px;font-weight:800}
+h2{font-size:27px;line-height:1.25;letter-spacing:-.015em;margin:0 0 6px;font-weight:800;
+  padding-top:8px;scroll-margin-top:28px}
+h3{font-size:19.5px;line-height:1.35;margin:38px 0 4px;font-weight:750;letter-spacing:-.01em;
+  scroll-margin-top:28px}
+h4{font-size:16.5px;margin:26px 0 2px;font-weight:700;letter-spacing:-.005em}
+h5{font-size:14px;margin:20px 0 2px;font-weight:700;color:var(--ink2)}
+h6{font-size:12px;margin:0 0 6px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+p{margin:10px 0}
+.lead{font-size:17px;line-height:1.78;color:var(--ink2);max-width:74ch}
+.sec-no{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--ink3);
+  text-transform:uppercase;margin-bottom:8px}
+.sec-head{border-bottom:2px solid var(--ink);padding-bottom:14px;margin:0 0 26px}
+.sec-head p{margin:8px 0 0;color:var(--ink3);font-size:14px;max-width:80ch}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.9em}
+.center{text-align:center}
+.nowrap{white-space:nowrap}
+
+/* ============================================================
+   3. 封面
+   ============================================================ */
+.cover{
+  background:var(--chrome);color:#EAF7F1;border-radius:26px;padding:44px 46px 40px;
+  margin-bottom:52px;position:relative;overflow:hidden;
+  box-shadow:0 22px 60px rgba(15,26,22,.28);
+}
+.cover:before{
+  content:"";position:absolute;inset:-40% -10% auto auto;width:520px;height:520px;
+  background:radial-gradient(circle,rgba(93,223,180,.30),transparent 62%);pointer-events:none;
+}
+.cover:after{
+  content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--grad);
+}
+.cover .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#6FE3BC;
+  text-transform:uppercase;margin-bottom:16px}
+.cover h1{color:#FFF;max-width:20ch}
+.cover .sub{color:#A9C6BA;font-size:16px;max-width:56ch;margin:16px 0 0;line-height:1.75}
+.cover .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px;position:relative}
+.cover .meta div{
+  background:#182A23;border:1px solid #24382F;border-radius:12px;padding:10px 14px;
+  font-size:12px;color:#8FAAA0;line-height:1.5
+}
+.cover .meta div b{display:block;color:#E6F5EE;font-family:var(--mono);font-size:15px;letter-spacing:-.01em}
+.cover .gradbar{height:8px;border-radius:6px;background:var(--grad);margin-top:30px;width:180px}
+
+/* ============================================================
+   4. 通用块
+   ============================================================ */
+.note,.warn,.danger,.ok{
+  border-radius:14px;padding:15px 18px;margin:18px 0;font-size:14px;line-height:1.72;
+  border:1px solid var(--outline);background:var(--tint);color:var(--onMint);
+}
+.note b,.warn b,.danger b,.ok b{display:block;margin-bottom:4px;font-size:12.5px;
+  letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.warn{background:#FDF6E7;border-color:#F2E2BE;color:#7A5310}
+.danger{background:var(--danger-l);border-color:#EBC0B7;color:var(--danger-d)}
+.ok{background:#E7F7EF;border-color:#BFE7D4;color:#0E5C43}
+.note p:first-of-type{margin-top:0}
+.note p:last-child,.warn p:last-child,.danger p:last-child,.ok p:last-child{margin-bottom:0}
+.note ul,.warn ul,.danger ul,.ok ul{margin:6px 0 0;padding-left:20px}
+
+ul,ol{padding-left:22px;margin:10px 0}
+li{margin:5px 0}
+ul.tight li,ol.tight li{margin:2px 0}
+ul.plain{list-style:none;padding-left:0}
+ul.plain li{position:relative;padding-left:18px}
+ul.plain li:before{content:"";position:absolute;left:2px;top:.72em;width:5px;height:5px;
+  border-radius:2px;background:var(--ai)}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media(max-width:900px){.grid3,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.grid2,.grid3,.grid4{grid-template-columns:minmax(0,1fr)}}
+
+.card{background:#fff;border:1px solid var(--hair);border-radius:16px;padding:20px 22px}
+.card h6{margin-bottom:8px}
+.card p:last-child{margin-bottom:0}
+
+.badge{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;
+  padding:2px 8px;border-radius:999px;border:1px solid currentColor;text-transform:uppercase;
+  vertical-align:middle;line-height:1.6}
+.b-s{color:var(--learn-d);background:var(--learn-l)}
+.b-r{color:var(--reading-d);background:var(--reading-l)}
+.b-a{color:var(--ai-d);background:var(--ai-l)}
+.b-m{color:var(--settings-d);background:var(--settings-l)}
+.b-n{color:var(--ink3);background:var(--tint2)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.chip{font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--tint2);
+  color:var(--onMint);border:1px solid var(--outline);line-height:1.6;white-space:nowrap}
+.chip.e{background:#fff;color:var(--ink2)}
+
+/* ============================================================
+   5. 表格
+   ============================================================ */
+.tw{overflow-x:auto;margin:16px 0;border-radius:14px;border:1px solid var(--hair);background:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.62}
+table.spec{min-width:660px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair);vertical-align:top}
+thead th{
+  background:var(--tint);color:var(--onMint);font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;font-weight:700;white-space:nowrap;
+  position:sticky;top:0;z-index:2;
+}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:nth-child(even) td{background:#FCFDFC}
+td code{white-space:nowrap}
+td.num{font-family:var(--mono);white-space:nowrap;font-size:12.5px}
+table.tok td:first-child{font-family:var(--mono);font-size:12.5px;white-space:nowrap;font-weight:600}
+table.tok td:nth-child(2){font-family:var(--mono);font-size:12px;color:var(--ink2);white-space:nowrap}
+caption{caption-side:bottom;text-align:left;font-size:12px;color:var(--ink3);padding:8px 2px}
+
+/* 色板 */
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px;margin:16px 0}
+.sw figure{margin:0;border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:#fff}
+.sw .chip3{display:flex;height:56px}
+.sw .chip3 i{flex:1}
+.sw figcaption{padding:8px 10px 10px;font-size:11.5px;line-height:1.5}
+.sw figcaption b{display:block;font-size:12.5px;color:var(--ink)}
+.sw figcaption span{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink3);letter-spacing:.02em}
+
+/* 排印样例 */
+.typerow{display:flex;align-items:baseline;gap:16px;padding:12px 0;border-bottom:1px solid var(--hair)}
+.typerow:last-child{border-bottom:0}
+.typerow .tname{flex:0 0 118px;font-family:var(--mono);font-size:11.5px;color:var(--ink3);letter-spacing:.04em}
+.typerow .tdemo{flex:1;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.typerow .tspec{flex:0 0 132px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink3)}
+
+/* 形状样例 */
+.shapes{display:flex;flex-wrap:wrap;gap:18px;margin:16px 0}
+.shapes div{text-align:center;font-size:11.5px;color:var(--ink3);font-family:var(--mono)}
+.shapes div i{display:block;margin:0 auto 8px;background:var(--tint2);border:1px solid var(--outline)}
+
+/* ============================================================
+   6. 版式带（每屏的结构示意图）
+   ============================================================ */
+.stack{
+  background:#fff;border:1px solid var(--hair);border-radius:14px;padding:12px;
+  display:flex;flex-direction:column;gap:5px;font-size:12px;
+}
+.strip{
+  display:flex;align-items:center;gap:9px;padding:6px 10px 6px 12px;
+  border-radius:9px;background:var(--tint);position:relative;line-height:1.5;
+  border:1px solid transparent;
+}
+.strip:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:9px 0 0 9px;background:var(--ink3)}
+.strip.strong{background:var(--tint2);border-color:var(--outline)}
+.strip.strong:before{background:var(--onMint)}
+.strip.soft{background:#F3F8F5}
+.strip.soft:before{background:var(--outline)}
+.strip.bare{background:#fff}
+.strip.bare:before{background:#DCE7E2}
+.strip.dom-s:before{background:var(--learn)}
+.strip.dom-r:before{background:var(--reading)}
+.strip.dom-a:before{background:var(--ai)}
+.strip.dom-m:before{background:var(--settings)}
+.strip.dom-l:before{background:var(--library)}
+.strip.dom-v:before{background:var(--review)}
+.strip.dom-d:before{background:var(--danger)}
+.strip em{font-style:normal;color:var(--ink);font-weight:600;flex:0 0 auto}
+.strip span{color:var(--ink3);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+.strip b{
+  flex:0 0 auto;font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--ink3);
+  letter-spacing:.03em;background:#fff;border-radius:5px;padding:0 5px;border:1px solid var(--hair)
+}
+.strip.gap{background:transparent;border:1px dashed var(--outline);justify-content:center;color:var(--ink3);font-size:10.5px;padding:2px}
+.strip.gap:before{display:none}
+
+/* ============================================================
+   7. 手机画框
+   ============================================================ */
+.phones{display:flex;flex-wrap:wrap;gap:26px;margin:22px 0;align-items:flex-start}
+.phone-wrap{width:296px}
+.phone-wrap > h6{margin:0 0 10px;text-align:center;letter-spacing:.06em}
+.phone{
+  width:296px;height:632px;border-radius:40px;background:var(--bg);
+  border:9px solid #16231E;position:relative;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 20px 44px rgba(18,33,28,.20),0 2px 0 rgba(255,255,255,.6) inset;
+  font-size:11px;line-height:1.5;color:var(--text1);
+}
+.phone.dark{background:var(--dbg);color:var(--dtext1);border-color:#0A1210}
+.phone .ibar{height:24px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;font-family:var(--mono);font-size:9px;color:var(--text3);flex:0 0 auto}
+.phone.dark .ibar{color:#7E968C}
+.phone .scr{flex:1 1 auto;overflow:hidden;padding:2px 12px 0;display:flex;flex-direction:column;gap:8px}
+.phone .bbar{
+  flex:0 0 auto;height:52px;display:flex;align-items:center;justify-content:space-around;
+  border-top:1px solid var(--outline);background:var(--surface);
+}
+.phone.dark .bbar{background:var(--dsurface);border-top-color:var(--doutline)}
+.phone .bbar i{width:20px;height:20px;border-radius:6px;background:var(--tint3)}
+.phone.dark .bbar i{background:var(--dtint3)}
+.phone .bbar i.on{background:var(--grad)}
+
+/* 画框内的原子件 */
+.p-h1{font-size:15.5px;font-weight:750;letter-spacing:-.01em;margin:0}
+.p-h2{font-size:9px;color:var(--text3);margin:0}
+.p-card{background:var(--tint2);border-radius:16px;padding:11px 12px;display:flex;flex-direction:column;gap:7px}
+.p-card.soft{background:var(--tint);border-radius:16px;padding:0;overflow:hidden}
+.p-card.white{background:var(--surface);border:1px solid var(--outline)}
+.p-row{display:flex;align-items:center;gap:8px}
+.p-row .ic{width:22px;height:22px;border-radius:7px;background:#fff;flex:0 0 auto}
+.p-t{font-size:11px;font-weight:650;line-height:1.4}
+.p-s{font-size:9px;color:var(--text2);line-height:1.45}
+.p-num{font-family:var(--mono);font-size:11px;color:var(--text2);flex:0 0 auto}
+.p-pill{height:28px;border-radius:999px;background:var(--grad);display:flex;align-items:center;
+  justify-content:center;font-size:10.5px;font-weight:700;color:var(--onBrand);letter-spacing:.02em}
+.p-pill.ghost{background:transparent;border:1px solid var(--outline);color:var(--onMint);font-weight:600}
+.p-track{height:6px;border-radius:99px;overflow:hidden}
+.p-track i{display:block;height:100%;border-radius:99px}
+.p-sep{height:1px;background:var(--outline);margin:0 12px}
+.p-label{font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);font-weight:700}
+.p-badge{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;font-family:var(--mono)}
+.ring{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;flex:0 0 auto}
+.annot{font-family:var(--mono);font-size:10px;color:var(--danger-d);background:var(--danger-l);
+  border:1px solid #EBC0B7;border-radius:6px;padding:1px 6px;display:inline-block}
+.annot.ok{color:#0E5C43;background:#E7F7EF;border-color:#BFE7D4}
+
+/* ============================================================
+   8. 屏卡
+   ============================================================ */
+.screen{border:1px solid var(--hair);border-radius:18px;background:#fff;margin:22px 0;
+  overflow:hidden;scroll-margin-top:20px}
+.screen > header{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+  padding:13px 20px;background:linear-gradient(180deg,#F7FBF8,#F2F8F4);
+  border-bottom:1px solid var(--hair);
+}
+.screen > header h4{margin:0;font-size:15.5px}
+.screen > header .file{font-family:var(--mono);font-size:11px;color:var(--ink3);
+  background:#fff;border:1px solid var(--hair);border-radius:6px;padding:1px 7px}
+.screen > header .skel{margin-left:auto;font-family:var(--mono);font-size:10.5px;
+  color:var(--onMint);background:var(--tint);border:1px solid var(--outline);
+  border-radius:999px;padding:2px 9px;letter-spacing:.05em}
+.screen .sbody{padding:16px 20px 20px;display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:22px}
+@media(max-width:900px){.screen .sbody{grid-template-columns:minmax(0,1fr)}}
+.screen .sright{min-width:0}
+.screen h5{margin:16px 0 4px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.screen h5:first-child{margin-top:0}
+.delta{background:#FFFDF6;border:1px solid #F0E6CC;border-radius:12px;padding:12px 15px;font-size:13.5px}
+.delta ul{margin:4px 0 0;padding-left:18px}
+.delta li{margin:3px 0}
+.delta b{color:#6E4A0C}
+
+/* 缺陷专章 */
+.defect{border:1px solid #EBC0B7;border-radius:18px;overflow:hidden;margin:26px 0;background:#fff}
+.defect > header{background:var(--danger-l);padding:14px 20px;border-bottom:1px solid #EBC0B7}
+.defect > header h4{margin:0;color:#6B1B14;font-size:16px}
+.defect > header span{font-family:var(--mono);font-size:11px;color:#A2544A}
+.defect .inner{padding:18px 20px 22px}
+.defect h5{color:#6B1B14;border-top:1px solid #F2DAD4;padding-top:14px;margin-top:20px}
+.defect h5:first-child{border-top:0;margin-top:0;padding-top:0}
+pre.snip{
+  background:#16231E;color:#CFE9DC;border-radius:12px;padding:14px 16px;overflow:auto;
+  font-family:var(--mono);font-size:11.5px;line-height:1.7;margin:12px 0;
+}
+pre.snip .c{color:#6E8B7E}
+pre.snip .bad{color:#FF9E8E}
+pre.snip .good{color:#7FE6C0}
+pre.snip .k{color:#9FD2FF}
+
+/* 浮层面板样例 */
+.dlg{display:grid;grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:22px;
+  border:1px solid var(--hair);border-radius:18px;background:#fff;padding:16px 20px 20px;margin:18px 0}
+.dlg .stage{background:var(--chrome);border-radius:16px;padding:20px 16px;display:flex;
+  align-items:center;justify-content:center;min-height:196px}
+.dlg .panel{background:var(--surface);border-radius:24px;width:100%;max-width:242px;
+  padding:16px 16px 12px;display:flex;flex-direction:column;gap:9px;
+  box-shadow:0 14px 34px rgba(0,0,0,.38)}
+.dlg .panel.dark{background:var(--dsurface)}
+.dlg .ptitle{font-size:12.5px;font-weight:750;color:var(--text1);margin:0;line-height:1.45}
+.dlg .panel.dark .ptitle{color:var(--dtext1)}
+.dlg .ptext{font-size:10px;line-height:1.6;color:var(--text2);margin:0}
+.dlg .panel.dark .ptext{color:var(--dtext2)}
+.dlg .pbtns{display:flex;gap:8px;margin-top:5px}
+.dlg .pbtn{flex:1;height:26px;border-radius:999px;display:flex;align-items:center;
+  justify-content:center;font-size:9.5px;font-weight:700;letter-spacing:.02em}
+.dlg .pbtn.ghost{background:transparent;border:1px solid var(--outline);color:var(--text2)}
+.dlg .pbtn.danger{background:var(--danger-d);color:#fff}
+.dlg .pbtn.go{background:var(--grad);color:var(--onBrand)}
+.dlg .pfield{height:26px;border-radius:9px;background:var(--tint);display:flex;
+  align-items:center;padding:0 9px;font-size:9.5px;color:var(--text3)}
+.dlg .meta{min-width:0}
+
+/* 目录/索引大表 */
+.idx{font-size:12.5px}
+.idx td:first-child{font-family:var(--mono);font-size:11px;color:var(--ink3);white-space:nowrap}
+
+/* 打印 */
+@media print{
+  nav.toc{display:none}
+  .layout{grid-template-columns:1fr}
+  main{padding:0;max-width:none}
+  body{background:#fff;font-size:10.5pt}
+  .cover{box-shadow:none;border-radius:0;padding:24px 0 18px;background:#fff;color:#000}
+  .cover h1,.cover .sub,.cover .kicker{color:#000}
+  .cover .meta div{border-color:#ccc;background:#fff;color:#333}
+  .phone{break-inside:avoid;box-shadow:none}
+  .screen,.defect,.card,.tw,pre.snip,.stack{break-inside:avoid}
+  h2,h3,h4{break-after:avoid}
+  thead th{position:static}
+  .tw{overflow:visible}
+  a{color:#000;border:0}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc" id="toc">
+  <div class="toc-brand">
+    <b>全应用 UI 重做<br>参考稿</b>
+    <span>2026-11-03 · v1</span>
+  </div>
+  <div class="toc-l">导言</div>
+  <ol>
+    <li><a href="#read-me">0 · 怎么读这份稿</a></li>
+    <li><a href="#inventory">0.1 · 覆盖面清单</a></li>
+  </ol>
+  <div class="toc-l">基座</div>
+  <ol>
+    <li><a href="#tokens">1 · 设计基座</a></li>
+    <li class="toc-l2"><a href="#t-color">1.1 七域色板</a></li>
+    <li class="toc-l2"><a href="#t-neutral">1.2 中性两套</a></li>
+    <li class="toc-l2"><a href="#t-type">1.3 排印六档</a></li>
+    <li class="toc-l2"><a href="#t-shape">1.4 形状与高度</a></li>
+    <li class="toc-l2"><a href="#t-container">1.5 容器三档</a></li>
+    <li class="toc-l2"><a href="#t-icon">1.6 图标双轨</a></li>
+    <li class="toc-l2"><a href="#t-grid">1.7 间距栅格</a></li>
+    <li class="toc-l2"><a href="#t-brand">1.8 品牌渐变</a></li>
+  </ol>
+  <div class="toc-l">版式语法</div>
+  <ol>
+    <li><a href="#skeleton">2 · 骨架 A–F</a></li>
+    <li><a href="#nav">2.1 底导与页头契约</a></li>
+  </ol>
+  <div class="toc-l">逐屏</div>
+  <ol>
+    <li><a href="#lane-learn">3.1 学习链路 · 15 屏</a></li>
+    <li><a href="#lane-read">3.2 阅读链路 · 5 屏</a></li>
+    <li><a href="#lane-ai">3.3 AI 助学 · 7 屏</a></li>
+    <li><a href="#lane-me">3.4 我的与系统 · 10 屏</a></li>
+    <li><a href="#lane-host">3.5 宿主壳 AppScreen</a></li>
+  </ol>
+  <div class="toc-l">浮层与收口</div>
+  <ol>
+    <li><a href="#dialogs">4 · 弹窗与浮层 · 12 项</a></li>
+    <li class="toc-l2"><a href="#dlg-map">4.0 站点 → 条目映射</a></li>
+    <li class="toc-l2"><a href="#d-confirm">D1 破坏性确认</a></li>
+    <li class="toc-l2"><a href="#d-outbound">D2 外发确认</a></li>
+    <li class="toc-l2"><a href="#d-bookexport">D3 词书导出选择</a></li>
+    <li class="toc-l2"><a href="#d-migrate">D4 换机迁移确认</a></li>
+    <li class="toc-l2"><a href="#d-notes">D5 个人笔记</a></li>
+    <li class="toc-l2"><a href="#d-coverage">D6 覆盖范围抽屉</a></li>
+    <li class="toc-l2"><a href="#d-image">D7 生图确认</a></li>
+    <li class="toc-l2"><a href="#d-cascade">D8 级联计数槽</a></li>
+    <li class="toc-l2"><a href="#d-time">D9 提醒时间</a></li>
+    <li class="toc-l2"><a href="#d-rules">D10 入场与遮罩</a></li>
+    <li class="toc-l2"><a href="#d-inset">D11 键盘与无障碍</a></li>
+    <li class="toc-l2"><a href="#d-copy">D12 文案模板</a></li>
+    <li><a href="#defects">5 · 四处点名缺陷</a></li>
+    <li><a href="#defect-1">5.1 进度条与圆环过深</a></li>
+    <li><a href="#defect-2">5.2 词库版式不统一</a></li>
+    <li><a href="#defect-3">5.3 两处搜索框不连贯</a></li>
+    <li><a href="#defect-4">5.4 播放药片上下错开</a></li>
+    <li><a href="#mapping">6 · 屏 → 组件 → 验收</a></li>
+    <li><a href="#appendix">附录 · 数值速查</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ============================================================
+     封面
+     ============================================================ -->
+<section class="cover">
+  <div class="kicker">UI Reference · Not Runnable</div>
+  <h1>全应用 UI 重做参考稿</h1>
+  <p class="sub">
+    37 个屏级界面 + 宿主壳 + 12 项弹窗浮层，逐屏给出「版式带 · 规格表 · 状态清单 · 与今天比改什么」。
+    这是一份<b>视觉与布局的权威参照</b>，不是可运行代码：所有数值都能直接落到 Compose 的
+    <code>AppColors</code> / <code>AppType</code> / <code>AppShape</code> / <code>Containers.kt</code> 上。
+  </p>
+  <div class="meta">
+    <div><b>37 + 1</b>屏级界面</div>
+    <div><b>12</b>项弹窗浮层</div>
+    <div><b>7</b>域色板</div>
+    <div><b>6</b>档骨架</div>
+    <div><b>4</b>处点名缺陷</div>
+  </div>
+  <div class="gradbar"></div>
+</section>
+
+<!-- ============================================================
+     §0 怎么读
+     ============================================================ -->
+<section id="read-me">
+  <div class="sec-head">
+    <div class="sec-no">Section 00</div>
+    <h2>怎么读这份稿</h2>
+    <p>给实现方：先说清这份文档的效力边界、标注约定，以及每一屏的四件套分别对应 Compose 里的哪一层。</p>
+  </div>
+
+  <h3>效力边界</h3>
+  <div class="grid2">
+    <div class="card">
+      <h6>这份稿管什么</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>每一屏<b>从上到下的版式顺序</b>（哪个容器、什么档、几 dp 间距）</li>
+        <li>颜色、字号、圆角、触控尺寸的<b>具体数值</b></li>
+        <li>空态 / 加载 / 失败 / 未配置 / 大字号下的<b>呈现规则</b></li>
+        <li>「与今天比改什么」——差分清单，<b>改完这条即视为达标</b></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>这份稿不管什么</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>业务逻辑、状态机、网络与数据库（沿用现有 ViewModel）</li>
+        <li>文案终稿（<b>逐字保留现有中文</b>，稿中引用的都是源码原文）</li>
+        <li>动效时长曲线（沿用主题默认，仅在必要处标注）</li>
+        <li>已叫停的功能项（见下）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="warn">
+    <b>已叫停、本轮不要碰</b>
+    <ul class="tight">
+      <li>AI 入口 <code>AppIcon.Spark</code> 去重 —— 归另一个 AI。</li>
+      <li>aora-bot 吉祥物（Emotion Ball，32 表情、纯 SVG+JS）与 <code>emotionId</code> 绑定 —— 归另一个 AI。</li>
+      <li>拍照翻译原位覆盖 —— 依赖 OCR bbox，另案。</li>
+      <li>遗留 6 项提醒权限夹具。</li>
+    </ul>
+  </div>
+
+  <h3>标注约定</h3>
+  <div class="tw">
+    <table class="spec">
+      <thead><tr><th>记号</th><th>含义</th><th>落到 Compose 的哪里</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-s">学习</span> <span class="badge b-r">阅读</span> <span class="badge b-a">AI</span> <span class="badge b-m">系统</span></td><td>该屏所属链路，同时决定默认域色</td><td><code>AppDomain.Learn / Reading / AiSpeech / Settings</code></td></tr>
+        <tr><td><b>骨架 A–F</b></td><td>版式家族，见 §2</td><td>屏幕最外层容器的组合方式</td></tr>
+        <tr><td><code>Strong</code> <code>Soft</code> <code>Bare</code></td><td>版式带左侧色条的三种容器档</td><td><code>StrongCard</code> / <code>SoftCard</code> / <code>BareRow</code></td></tr>
+        <tr><td><code>16/12</code></td><td>水平 / 垂直内边距，单位 dp</td><td><code>contentPadding</code> 或 <code>padding()</code></td></tr>
+        <tr><td><code>gap 10</code></td><td>相邻带之间的间距，单位 dp</td><td><code>Arrangement.spacedBy</code></td></tr>
+        <tr><td class="mono">testTag</td><td>图中出现的标识符均为<b>源码已存在</b>的 tag，可直接用于测试</td><td><code>Modifier.testTag(...)</code></td></tr>
+        <tr><td><span class="annot">改</span></td><td>与今天不同的地方，必须动</td><td>——</td></tr>
+        <tr><td><span class="annot ok">留</span></td><td>今天已经对了，别动</td><td>——</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>每一屏的四件套</h3>
+  <div class="grid4">
+    <div class="card"><h6>① 版式带</h6><p class="small muted">屏幕从上到下的带序列。左边色条 = 容器档，右边数字 = 该带的水平/垂直内边距。</p></div>
+    <div class="card"><h6>② 规格表</h6><p class="small muted">每个元素用什么组件、什么字号档、什么颜色、多高多宽。可逐行实现。</p></div>
+    <div class="card"><h6>③ 状态清单</h6><p class="small muted">空态、加载、失败、未配置、大字号 2.0 下的呈现要求。</p></div>
+    <div class="card"><h6>④ 差分</h6><p class="small muted">「与今天比改什么」——只列要动的，没列的就别动。</p></div>
+  </div>
+
+  <h3 id="inventory">0.1 · 覆盖面清单</h3>
+  <p class="lead">下面这张表就是本合同。<b>一格都不能少</b>：源码里 <code>ui/</code> 下所有屏级 <code>@Composable</code> 都在列。</p>
+  <div class="tw">
+    <table class="spec idx">
+      <thead><tr><th>#</th><th>界面</th><th>Composable / 文件</th><th>骨架</th><th>域</th></tr></thead>
+      <tbody>
+        <tr><td>L1</td><td>今日学习</td><td><code>TodayPlanScreen</code></td><td>B</td><td>Learn</td></tr>
+        <tr><td>L2</td><td>学习卡（新学 / 复习）</td><td><code>WordCardScreen</code></td><td>C</td><td>Learn</td></tr>
+        <tr><td>L3</td><td>词库</td><td><code>WordBankScreen</code></td><td>D</td><td>Library</td></tr>
+        <tr><td>L4</td><td>词书词表</td><td><code>WordBookWordsScreen</code></td><td>F</td><td>Library</td></tr>
+        <tr><td>L5</td><td>我的词（收藏 / 生词本 / 错词）</td><td><code>MyWordsScreen</code></td><td>F</td><td>Library</td></tr>
+        <tr><td>L6</td><td>查词</td><td><code>GlobalVocabularySearchScreen</code></td><td>A</td><td>Library</td></tr>
+        <tr><td>L7</td><td>词义详情</td><td><code>CardDetailScreen</code></td><td>E</td><td>Library</td></tr>
+        <tr><td>L8</td><td>重新学习</td><td><code>VocabularyRelearnScreen</code></td><td>C</td><td>Review</td></tr>
+        <tr><td>L9</td><td>学习打卡</td><td><code>CheckInScreen</code></td><td>E</td><td>Review</td></tr>
+        <tr><td>L10</td><td>学习记录</td><td><code>LearningRecordsScreen</code></td><td>F</td><td>Learn</td></tr>
+        <tr><td>L11</td><td>生成默写纸</td><td><code>WorksheetSettingsScreen</code></td><td>D</td><td>Learn</td></tr>
+        <tr><td>L12</td><td>预览默写纸</td><td><code>WorksheetPreviewScreen</code></td><td>E</td><td>Learn</td></tr>
+        <tr><td>L13</td><td>选词书引导</td><td><code>LearningSetupScreen</code></td><td>D</td><td>Learn</td></tr>
+        <tr><td>L14</td><td>建档</td><td><code>ProfileCreationScreen</code></td><td>A</td><td>Learn</td></tr>
+        <tr><td>L15</td><td>恢复</td><td><code>RecoveryScreen</code></td><td>A</td><td>Danger</td></tr>
+        <tr><td>R1</td><td>每日阅读</td><td><code>ReadingAccessScreen</code></td><td>D</td><td>Reading</td></tr>
+        <tr><td>R2</td><td>外刊选读</td><td><code>ReadingFeedScreen</code></td><td>F</td><td>Reading</td></tr>
+        <tr><td>R3</td><td>读文章</td><td><code>ArticleReadingScreen</code></td><td>E</td><td>Reading</td></tr>
+        <tr><td>R4</td><td>粘贴导入</td><td><code>ArticleImportScreen</code></td><td>D</td><td>Reading</td></tr>
+        <tr><td>R5</td><td>阅读历史</td><td><code>ReadingHistoryScreen</code></td><td>F</td><td>Reading</td></tr>
+        <tr><td>A1</td><td>AI 助学</td><td><code>AiLearningScreen</code></td><td>D</td><td>AiSpeech</td></tr>
+        <tr><td>A2</td><td>AI 功能页（7 功能共用）</td><td><code>AiFeatureScreen</code></td><td>D</td><td>AiSpeech</td></tr>
+        <tr><td>A3</td><td>AI 服务与密钥</td><td><code>AiProfileSettingsScreen</code></td><td>F + 编辑态</td><td>AiSpeech</td></tr>
+        <tr><td>A4</td><td>AI 问词</td><td><code>WordAiQaScreen</code></td><td>E</td><td>AiSpeech</td></tr>
+        <tr><td>A5</td><td>长难句分析</td><td><code>SentenceAnalysisScreen</code></td><td>E</td><td>AiSpeech</td></tr>
+        <tr><td>A6</td><td>拍照翻译</td><td><code>PhotoTranslationScreen</code></td><td>E</td><td>AiSpeech</td></tr>
+        <tr><td>A7</td><td>AI 生图</td><td><code>ImageStudioScreen</code></td><td>E</td><td>AiSpeech</td></tr>
+        <tr><td>M1</td><td>我的</td><td><code>ProfileScreen</code></td><td>E</td><td>Settings</td></tr>
+        <tr><td>M2</td><td>设置</td><td><code>SettingsScreen</code></td><td>F</td><td>Settings</td></tr>
+        <tr><td>M3</td><td>语音合成</td><td><code>SpeechSettingsScreen</code></td><td>D</td><td>Settings</td></tr>
+        <tr><td>M4</td><td>学习提醒</td><td><code>ReminderSettingsScreen</code></td><td>D</td><td>Settings</td></tr>
+        <tr><td>M5</td><td>备份与恢复</td><td><code>BackupHubScreen</code></td><td>D</td><td>Settings</td></tr>
+        <tr><td>M6</td><td>导出备份</td><td><code>BackupExportScreen</code></td><td>D</td><td>Settings</td></tr>
+        <tr><td>M7</td><td>认证导出</td><td><code>BackupPairingExportScreen</code></td><td>D</td><td>Settings</td></tr>
+        <tr><td>M8</td><td>从旧设备恢复</td><td><code>BackupRestoreScreen</code></td><td>D</td><td>Settings</td></tr>
+        <tr><td>M9</td><td>开源许可与隐私说明</td><td><code>LicensesScreen</code></td><td>F</td><td>Settings</td></tr>
+        <tr><td>M10</td><td>错误页</td><td><code>ErrorScreen</code></td><td>A</td><td>Danger</td></tr>
+        <tr><td>H</td><td>宿主壳（底导 + 页面容器）</td><td><code>AppScreen</code></td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     §1 设计基座
+     ============================================================ -->
+<section id="tokens">
+  <div class="sec-head">
+    <div class="sec-no">Section 01</div>
+    <h2>设计基座</h2>
+    <p>所有屏共用的一套令牌。数值与源码权威档逐字一致——<code>theme/AppColors.kt</code>、<code>AppType.kt</code>、
+      <code>AppShape.kt</code>、<code>components/Containers.kt</code>。<b>不要引入第七种颜色、第七档字号、第四种容器。</b></p>
+  </div>
+
+  <h3 id="t-color">1.1 · 七域色板</h3>
+  <p>每个域有三枚：<code>base</code>（正身）、<code>light</code>（浅底）、<code>deep</code>（墨）。
+    <b>域色的唯一职责是「告诉用户这是哪一类事」</b>，不承担装饰。</p>
+
+  <div class="sw">
+    <figure><div class="chip3"><i style="background:#7BB4E6"></i><i style="background:#CDE6F7"></i><i style="background:#175A93"></i></div>
+      <figcaption><b>Learn 学习</b><span>#7BB4E6 · #CDE6F7 · #175A93</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#B7A0D9"></i><i style="background:#E4DAF2"></i><i style="background:#65478A"></i></div>
+      <figcaption><b>Library 词库</b><span>#B7A0D9 · #E4DAF2 · #65478A</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#EBC68B"></i><i style="background:#F7E7CB"></i><i style="background:#8A5712"></i></div>
+      <figcaption><b>Review 复习</b><span>#EBC68B · #F7E7CB · #8A5712</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#A6B0AC"></i><i style="background:#DCE4E0"></i><i style="background:#4A5551"></i></div>
+      <figcaption><b>Settings 设置</b><span>#A6B0AC · #DCE4E0 · #4A5551</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#6CCBAB"></i><i style="background:#CFEDE2"></i><i style="background:#1A7A63"></i></div>
+      <figcaption><b>AiSpeech AI 语音</b><span>#6CCBAB · #CFEDE2 · #1A7A63</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#E297A4"></i><i style="background:#F6DCE0"></i><i style="background:#9C3B4F"></i></div>
+      <figcaption><b>Reading 阅读</b><span>#E297A4 · #F6DCE0 · #9C3B4F</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#DD8B81"></i><i style="background:#F7DCD6"></i><i style="background:#9E2B24"></i></div>
+      <figcaption><b>Danger 危险</b><span>#DD8B81 · #F7DCD6 · #9E2B24</span></figcaption></figure>
+  </div>
+
+  <div class="warn">
+    <b>域色的三条硬规则</b>
+    <ul class="tight">
+      <li><b>数据形状</b>（进度条、圆环、占比条）一律 <code>base → deep</code> 双色渐变，<b>绝不用 <code>LocalContentColor</code></b>。
+        这是缺陷 ① 的根因，见 <a href="#defect-1">§5.1</a>。</li>
+      <li><b>浅底</b>只用来铺「整块的小面积」：徽标 backdrop、徽章、内联提示，且透明度另有规定（见 1.6）。</li>
+      <li><b>同一屏最多出现两个域色</b>。第三个别进来之前，先问「这屏到底属于谁」。</li>
+    </ul>
+  </div>
+
+  <div class="tw">
+    <table class="tok">
+      <thead><tr><th>令牌</th><th>浅套取值</th><th>用在</th></tr></thead>
+      <tbody>
+        <tr><td>AppDomain.Learn</td><td>#7BB4E6 / #CDE6F7 / #175A93</td><td>今日学习、学习卡、学习记录、默写纸</td></tr>
+        <tr><td>AppDomain.Library</td><td>#B7A0D9 / #E4DAF2 / #65478A</td><td>词库、词书、我的词、查词、词义详情</td></tr>
+        <tr><td>AppDomain.Review</td><td>#EBC68B / #F7E7CB / #8A5712</td><td>重新学习、打卡、复习相关计数</td></tr>
+        <tr><td>AppDomain.Settings</td><td>#A6B0AC / #DCE4E0 / #4A5551</td><td>我的、设置、语音、提醒、备份、许可</td></tr>
+        <tr><td>AppDomain.AiSpeech</td><td>#6CCBAB / #CFEDE2 / #1A7A63</td><td>AI 助学全域、AI 服务、四个 AI 工作台</td></tr>
+        <tr><td>AppDomain.Reading</td><td>#E297A4 / #F6DCE0 / #9C3B4F</td><td>每日阅读、外刊、读文章、导入、阅读历史</td></tr>
+        <tr><td>AppDomain.Danger</td><td>#DD8B81 / #F7DCD6 / #9E2B24</td><td>删除、清空、恢复、错误页</td></tr>
+      </tbody>
+      <caption>深套同位置换 base/light/deep 的深套取法，色相不变、明度整体下压；实现走 <code>appColors()</code>，不要在这里另抄一份。</caption>
+    </table>
+  </div>
+
+  <h3 id="t-neutral">1.2 · 中性两套</h3>
+  <p>底色、卡面、发丝线、三级墨。<b>浅套是主套</b>（默认启动），深套与之逐槽对位。</p>
+
+  <h4>浅套（默认）</h4>
+  <div class="sw">
+    <figure><div class="chip3"><i style="background:#F6F9F6"></i><i style="background:#FFFFFF"></i><i style="background:#E9F4EE"></i></div>
+      <figcaption><b>三层底</b><span>bg / surface / tint</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#E4EFE9"></i><i style="background:#DEEAE4"></i><i style="background:#D3E7DC"></i></div>
+      <figcaption><b>卡与线</b><span>tint2 / tint3 / outline</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#1F2B26"></i><i style="background:#566B62"></i><i style="background:#7C9188"></i></div>
+      <figcaption><b>三级墨</b><span>text1 / text2 / text3</span></figcaption></figure>
+    <figure><div class="chip3"><i style="background:#174C44"></i><i style="background:#04241C"></i><i style="background:#1F4739"></i></div>
+      <figcaption><b>墨面</b><span>onMint / onBrand / strongSurface</span></figcaption></figure>
+  </div>
+
+  <div class="tw">
+    <table class="tok">
+      <thead><tr><th>槽位</th><th>浅套</th><th>深套</th><th>职责与禁令</th></tr></thead>
+      <tbody>
+        <tr><td>background</td><td>#F6F9F6</td><td>#111A16</td><td>屏幕最底。不发白、不纯灰，永远带一点绿。</td></tr>
+        <tr><td>surface</td><td>#FFFFFF</td><td>#17201C</td><td>浮起面：底导、弹窗面板、输入框。<b>不用于大块卡片</b>。</td></tr>
+        <tr><td>tint</td><td>#E9F4EE</td><td>#1B2A25</td><td>第一层凹陷：内联提示、假搜索框、选中行。</td></tr>
+        <tr><td>tint2</td><td>#E4EFE9</td><td>#22332C</td><td><code>StrongCard</code> 浅套卡面。一屏至多一层。</td></tr>
+        <tr><td>tint3</td><td>#DEEAE4</td><td>#27392F</td><td>再深一档：图表轨道底、分段控件底槽。</td></tr>
+        <tr><td>outline</td><td>#D3E7DC</td><td>#2E4038</td><td>发丝线、输入框边。<b>1dp，永远 1dp</b>。</td></tr>
+        <tr><td>text1</td><td>#1F2B26</td><td>#E9F2EC</td><td>Display / Headline / Title / Body 的墨。</td></tr>
+        <tr><td>text2</td><td>#566B62</td><td>#9FB6AC</td><td>Footnote / Label 的墨、副标题、次级图标。</td></tr>
+        <tr><td>text3</td><td>#7C9188</td><td>#7E968C</td><td>仅三处：时间戳、占位符、空态说明。<b>正文别用它</b>。</td></tr>
+        <tr><td>onMint</td><td>#174C44</td><td>—</td><td>浅底上的深薄荷墨：次级按钮字、注释正文。</td></tr>
+        <tr><td>onBrand</td><td>#04241C</td><td>—</td><td>品牌渐变上的墨色（CTA 药片字）。</td></tr>
+        <tr><td>strongSurface</td><td>#1F4739</td><td>#22332C</td><td>深套的强档卡面；也是浅套反白块的底。</td></tr>
+        <tr><td>onStrong</td><td>#E9F2EC</td><td>#E9F2EC</td><td>strongSurface 上的墨。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="t-type">1.3 · 排印六档</h3>
+  <p>系统 sans，不引字体文件。层级<b>只靠字号 / 字重 / 字距</b>，六档之上不许再派生第七档。</p>
+
+  <div class="card" style="margin:18px 0">
+    <div class="typerow"><span class="tname">Display</span><span class="tdemo" style="font-size:38px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums">24/32</span><span class="tspec">44sp · Bold · -0.5</span></div>
+    <div class="typerow"><span class="tname">Headline</span><span class="tdemo" style="font-size:26px;font-weight:700;letter-spacing:.2px">今日学习</span><span class="tspec">28sp · Bold · +0.2</span></div>
+    <div class="typerow"><span class="tname">Title</span><span class="tdemo" style="font-size:17px;font-weight:600">新概念英语 第一册</span><span class="tspec">17sp · SemiBold</span></div>
+    <div class="typerow"><span class="tname">Body</span><span class="tdemo" style="font-size:15px">新学 8/12 · 复习 14/20</span><span class="tspec">15sp · Normal</span></div>
+    <div class="typerow"><span class="tname">Footnote</span><span class="tdemo" style="font-size:13px;color:var(--text2)">今日已完成 · 连续 7 天</span><span class="tspec">13sp · Normal</span></div>
+    <div class="typerow"><span class="tname">Label</span><span class="tdemo" style="font-size:12px;font-weight:500;letter-spacing:.3px;color:var(--text2);text-transform:uppercase">新学 · 复习 · 错词</span><span class="tspec">12sp · Medium · +0.3</span></div>
+  </div>
+
+  <div class="tw">
+    <table class="tok">
+      <thead><tr><th>档</th><th>钉值</th><th>自带墨</th><th>M3 角色对位</th></tr></thead>
+      <tbody>
+        <tr><td>Display</td><td>44sp / Bold / -0.5sp / tnum</td><td>text1</td><td>displayLarge·Medium·Small</td></tr>
+        <tr><td>Headline</td><td>28sp / Bold / +0.2sp</td><td>text1</td><td>headlineLarge·Medium·Small、titleLarge</td></tr>
+        <tr><td>Title</td><td>17sp / SemiBold</td><td>text1</td><td>titleMedium</td></tr>
+        <tr><td>Body</td><td>15sp / Normal</td><td>text1</td><td>titleSmall、bodyLarge、bodyMedium</td></tr>
+        <tr><td>Footnote</td><td>13sp / Normal</td><td>text2</td><td>bodySmall</td></tr>
+        <tr><td>Label</td><td>12sp / Medium / +0.3sp</td><td>text2</td><td>labelLarge·Medium·Small</td></tr>
+      </tbody>
+      <caption>六档不写 <code>lineHeight</code>；行高回落字体度量。要「读得松」请用间距解决，不要加行高令牌。</caption>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>用档纪律</b>
+    <ul class="tight">
+      <li><b>一屏只有一个 Display</b>。它不是「大字」，是「这屏唯一的那个数」。</li>
+      <li>标题（页头、区块标题）走 Headline；列表主行标题走 Title；说明与正文走 Body/Footnote。</li>
+      <li>计数与标签走 Label，<b>不要用 Body 缩小字号</b>来实现「小字」。</li>
+      <li>大字号 2.0 节流：Title/Body 允许折行，<b>Label 与计数恒为一行</b>——放不下就改容器，不许压扁。</li>
+    </ul>
+  </div>
+
+  <h3 id="t-shape">1.4 · 形状与高度</h3>
+  <div class="shapes">
+    <div><i style="width:96px;height:64px;border-radius:24px"></i>Dialog 24</div>
+    <div><i style="width:96px;height:64px;border-radius:20px"></i>Card 20</div>
+    <div><i style="width:96px;height:40px;border-radius:14px"></i>Button 14</div>
+    <div><i style="width:96px;height:34px;border-radius:999px"></i>Pill 50%</div>
+    <div><i style="width:44px;height:44px;border-radius:12px"></i>Icon 12</div>
+    <div><i style="width:30px;height:30px;border-radius:9px"></i>Inline 9</div>
+    <div><i style="width:96px;height:64px;border-radius:28px"></i>StrongCard 28</div>
+  </div>
+
+  <div class="tw">
+    <table class="spec">
+      <thead><tr><th>档</th><th>圆角</th><th>适用</th><th>可点高度下限</th></tr></thead>
+      <tbody>
+        <tr><td>Dialog</td><td>24dp</td><td>确认框、笔记框、选择框的面板</td><td>按钮 48dp</td></tr>
+        <tr><td>Card</td><td>20dp</td><td><code>SoftCard</code>、内联提示、白卡</td><td>—</td></tr>
+        <tr><td>Button</td><td>14dp</td><td>假搜索框、输入框、分段控件</td><td>48dp</td></tr>
+        <tr><td>Pill</td><td>50%</td><td><code>PillButton</code>、发音药片、筛选 chip</td><td>48dp（视觉可 36dp）</td></tr>
+        <tr><td>Icon</td><td>12dp</td><td>≥40dp 入口徽标（<code>EntryIconBadge</code>）</td><td>48dp 外框</td></tr>
+        <tr><td>Inline</td><td>9dp</td><td>30dp 行内徽标（<code>InlineIconBadge</code>）</td><td>随行 52dp</td></tr>
+        <tr><td>StrongCard</td><td>28dp</td><td>每屏唯一的主容器</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="t-container">1.5 · 容器三档</h3>
+  <p>整个 App 只有三种「块」。<b>每一个版式带都必须是这三档之一或裸内容</b>——这是保证 37 屏长得像同一套东西的根本。</p>
+
+  <div class="grid3">
+    <div class="card" style="border-color:#CFE3D8">
+      <h6>StrongCard</h6>
+      <div style="background:var(--tint2);border-radius:18px;padding:16px;margin:10px 0">
+        <div style="font-weight:700;font-size:13px">新概念英语 第一册</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">新学 8/12 · 复习 14/20</div>
+        <div style="font-family:var(--mono);font-size:22px;font-weight:700;margin-top:8px">22/32 <span style="font-size:10px;font-weight:400;color:var(--text2)">项已完成</span></div>
+        <div style="height:28px;border-radius:999px;background:var(--grad);margin-top:8px"></div>
+      </div>
+      <p class="small muted"><b>一屏至多一枚。</b>圆角 28dp，内边距 18dp，带间 10dp。浅套 <code>tint2</code> 底 + <code>text1</code> 墨；深套 <code>strongSurface</code> + <code>onStrong</code>。只用来装「今天最重要的那件事」。</p>
+    </div>
+    <div class="card" style="border-color:#CFE3D8">
+      <h6>SoftCard</h6>
+      <div style="background:var(--tint);border-radius:14px;padding:12px;margin:10px 0">
+        <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px">
+          <span style="width:22px;height:22px;border-radius:7px;background:var(--reading-l)"></span>
+          <span style="font-size:12px;font-weight:600;flex:1">今日文章 · 可阅读</span>
+          <span style="color:var(--text3);font-size:11px">›</span>
+        </div>
+        <div style="height:1px;background:var(--outline);margin-left:30px"></div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:6px">
+          <span style="width:22px;height:22px;border-radius:7px;background:var(--library-l)"></span>
+          <span style="font-size:12px;font-weight:600;flex:1">词书 · 生词 · 错词 · 收藏</span>
+          <span style="color:var(--text3);font-size:11px">›</span>
+        </div>
+      </div>
+      <p class="small muted">圆角 20dp，内边距 16dp（<b>装裸行时传 <code>PaddingValues(0.dp)</code></b>），带间 8dp。<b>不描边</b>，只靠明度差分。
+        次要分组用它。</p>
+    </div>
+    <div class="card" style="border-color:#CFE3D8">
+      <h6>BareRow</h6>
+      <div style="margin:10px 0">
+        <div style="display:flex;align-items:center;gap:12px;padding:13px 15px">
+          <span style="width:22px;height:22px;border-radius:7px;background:var(--tint3)"></span>
+          <span style="flex:1"><span style="display:block;font-size:12px;font-weight:600">学习提醒</span>
+          <span style="display:block;font-size:10px;color:var(--text2)">每天最多一次，系统可能稍有延迟</span></span>
+          <span style="color:var(--text3);font-size:11px">›</span>
+        </div>
+        <div style="height:1px;background:var(--outline);margin-left:52px"></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:13px 15px">
+          <span style="width:22px;height:22px;border-radius:7px;background:var(--tint3)"></span>
+          <span style="flex:1"><span style="display:block;font-size:12px;font-weight:600">语音合成</span>
+          <span style="display:block;font-size:10px;color:var(--text2)">当前供应商：系统 TTS</span></span>
+          <span style="color:var(--text3);font-size:11px">›</span>
+        </div>
+      </div>
+      <p class="small muted">最小高 52dp，内边距 15/13，图标—文字间距 12dp。分隔线<b>左缩进 52dp</b>（= 40dp 徽标 + 12dp 间距），
+        从文字起点起笔。<b>线画在 padding 外侧</b>，不吃高度。</p>
+    </div>
+  </div>
+
+  <div class="danger">
+    <b>三档的红线</b>
+    <ul class="tight">
+      <li><b>不许套娃</b>：<code>StrongCard</code> 里不许再放 <code>SoftCard</code>；<code>SoftCard</code> 里放裸行时内边距归零。</li>
+      <li><b>不许自造第四档</b>：遇到「需要一点底色」的场景，先找 <code>tint</code> / <code>InlineNotice</code>，而不是再包一层圆角矩形。</li>
+      <li><b>一屏一个强档卡</b>。第二枚出现时，正解是把其中一枚降为 SoftCard 或裸行。</li>
+    </ul>
+  </div>
+
+  <h3 id="t-icon">1.6 · 图标双轨</h3>
+  <p>两套图标并存，<b>职责按尺寸分</b>，不按心情挑。</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h6>轨 A · 位图插画（28 枚）</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li><code>res/drawable-xhdpi/app_icon_*.png</code>，256×256 RGBA。</li>
+        <li>经 <code>AppIllustrations.kt</code> 映射，走 <code>EntryIconBadge(illustrated = true)</code> 分支。</li>
+        <li>用于<b>入口级</b>：功能入口行、词书封面、AI 功能卡、空态插图。</li>
+        <li>尺寸档：40dp 行首徽标 / 56dp 卡内插图 / 96dp 空态。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>轨 B · 三层矢量（33 枚）</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>三层：底色渐变层 → 图形层 → 强调层，<code>GRADIENT_START_FRACTION = 0.18</code>。</li>
+        <li>其中 5 枚 <b>StrokeOnly</b>：<code>Back</code> / <code>ChevronRight</code> / <code>ChevronDown</code> / <code>Close</code> / <code>Check</code>——
+          这五枚<b>永远只描边、不填色</b>，尺寸 16/22dp。</li>
+        <li>用于<b>控件级</b>：底导 glyph（<code>Book</code>/<code>Newspaper</code>/<code>Spark</code>/<code>Person</code>）、行尾箭头、关闭、勾选。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="tw">
+    <table class="spec">
+      <thead><tr><th>容器</th><th>尺寸</th><th>圆角</th><th>backdrop 规则</th><th>强调层墨</th></tr></thead>
+      <tbody>
+        <tr><td><code>EntryIconBadge</code></td><td>40dp</td><td>Icon 12dp</td><td>位图自带底，不再叠色</td><td>矢量分支：浅套 = 域 <code>deep</code> 压暗 22%；深套 = <code>onBrand</code></td></tr>
+        <tr><td><code>InlineIconBadge</code></td><td>30dp</td><td>Inline 9dp</td><td><code>backdrop = selected</code> 时有底，否则透明</td><td>同上</td></tr>
+        <tr><td><code>AppGlyph</code>（StrokeOnly）</td><td>16 / 18 / 22dp</td><td>—</td><td>无底</td><td><code>text2</code>，仅当前态可用 <code>onMint</code></td></tr>
+        <tr><td>底导 <code>TabSlot</code></td><td>30dp 徽标 + Label</td><td>Inline 9dp</td><td>两档<b>都</b>带 backdrop，选中态变化在 backdrop 与 alpha 上</td><td>未选中 <code>alpha(0.5f)</code>，选中 1.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>禁止事项</b>
+    <p>不要把 <code>StrokeOnly</code> 的五枚做成实心；不要给位图插画再叠一层圆角遮罩；不要用 Emoji 当图标；
+      不要让同一个概念在两张屏上用两种轨（例如「阅读」一处是位图报纸、一处是矢量报纸）。</p>
+  </div>
+
+  <h3 id="t-grid">1.7 · 间距栅格</h3>
+  <p>4dp 基数。这次重做<b>统一到下面这一套</b>，此前各屏的 12 / 14 / 15 / 18 混用收口到此表。</p>
+
+  <div class="tw">
+    <table class="tok">
+      <thead><tr><th>用途</th><th>值</th><th>与今天比</th></tr></thead>
+      <tbody>
+        <tr><td>屏内容水平内边距</td><td>16dp</td><td>统一 16（现为 15/16/18 混用）</td></tr>
+        <tr><td>页头 → 第一带</td><td>12dp</td><td>收紧，页头不再自带大留白</td></tr>
+        <tr><td>同卡内相邻要素</td><td>10dp（Strong）/ 8dp（Soft）</td><td>沿用</td></tr>
+        <tr><td>带与带之间</td><td>10dp</td><td>沿用</td></tr>
+        <tr><td>区块与区块之间（SectionHeading 上下）</td><td>22dp 上 / 10dp 下</td><td><span class="annot">改</span> 统一</td></tr>
+        <tr><td>卡内左右内边距</td><td>18dp（Strong）/ 16dp（Soft）/ 15dp（BareRow）</td><td>沿用</td></tr>
+        <tr><td>图标与文字</td><td>12dp（BareRow）/ 10dp（行内）</td><td>沿用</td></tr>
+        <tr><td>药片之间</td><td>8dp</td><td>沿用</td></tr>
+        <tr><td>屏底安全区（无底导）</td><td>24dp + 系统 inset</td><td>沿用</td></tr>
+        <tr><td>屏底安全区（有底导）</td><td>底导高 64dp + 系统 inset，内容再留 16dp</td><td><span class="annot">改</span> 现多处只有 8dp，会蹭底导</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="t-brand">1.8 · 品牌渐变</h3>
+  <div style="height:56px;border-radius:14px;background:linear-gradient(135deg,#A8F3C8 0%,#5DDFB4 52%,#35B9B5 100%);margin:16px 0;
+    display:flex;align-items:center;justify-content:center;color:#04241C;font-weight:700;letter-spacing:.02em">
+    #A8F3C8 → #5DDFB4 → #35B9B5
+  </div>
+  <div class="tw">
+    <table class="tok">
+      <thead><tr><th>令牌</th><th>值</th><th>允许出现的位置</th></tr></thead>
+      <tbody>
+        <tr><td>BrandGradient</td><td>135° #A8F3C8 → #5DDFB4 → #35B9B5</td><td>主 CTA 药片底、选中指示、启动面、品牌条</td></tr>
+        <tr><td>MintLight</td><td>#D9FFF0</td><td>渐变上的高光层、极浅强调底</td></tr>
+        <tr><td>AppleMintPillEnd</td><td>#65D3B9</td><td>药片渐变末端（避免与背景撞色）</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="warn">
+    <b>渐变只走三处</b>
+    <p>主 CTA、底导选中徽标、启动面。<b>不许</b>给卡片描边、给正文上渐变、给图标底无理由上渐变。
+      品牌渐变是「一次点击」的信号，一屏出现两次就已经失效。</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     §2 骨架
+     ============================================================ -->
+<section id="skeleton">
+  <div class="sec-head">
+    <div class="sec-no">Section 02</div>
+    <h2>骨架 A–F</h2>
+    <p>37 屏不是 37 种版式，是 6 种骨架的复用。先认骨架，再看逐屏——你会看到大量的「同一段代码换个内容」。</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h6>A · 单列居中（无页头）</h6>
+      <div class="stack" style="margin:10px 0">
+        <div class="strip gap">上下留白吸收剩余高度</div>
+        <div class="strip soft dom-a"><em>主内容</em><span>插图 / 输入 / 说明</span><b>居中</b></div>
+        <div class="strip strong dom-a"><em>主操作</em><span>单枚 PillButton 满宽</span><b>16/48</b></div>
+        <div class="strip gap">上下留白</div>
+      </div>
+      <p class="small muted">用于<b>还没有内容可看</b>的屏：建档、查词首屏、恢复、错误页、启动。特征：没有返回箭头、没有底导、一屏只说一件事。</p>
+    </div>
+    <div class="card">
+      <h6>B · 强档开屏</h6>
+      <div class="stack" style="margin:10px 0">
+        <div class="strip bare dom-s"><em>页头</em><span>今日学习 · 无返回</span><b>16</b></div>
+        <div class="strip soft dom-l"><em>假搜索框</em><span>查一个词</span><b>16/48</b></div>
+        <div class="strip strong dom-s"><em>StrongCard</em><span>进度 + 圆环 + CTA</span><b>18</b></div>
+        <div class="strip soft dom-r"><em>接下来</em><span>两枚 BareRow</span><b>0</b></div>
+      </div>
+      <p class="small muted">只有<b>今日学习</b>一屏。特征：页头 + 强档卡 + 一条软档分组的「接下来」。整屏只有一个视觉重心。</p>
+    </div>
+    <div class="card">
+      <h6>C · 焦点单卡（学习流）</h6>
+      <div class="stack" style="margin:10px 0">
+        <div class="strip bare dom-s"><em>页头</em><span>进度 3/12 · 返回</span><b>16</b></div>
+        <div class="strip bare"><em>细进度</em><span>6dp 轨，域色渐变</span><b>16</b></div>
+        <div class="strip strong dom-s"><em>词卡</em><span>词形 / 音标 / 发音 / 释义</span><b>18</b></div>
+        <div class="strip soft"><em>操作区</em><span>认识 / 不认识 两枚等宽药片</span><b>16</b></div>
+        <div class="strip gap">底部粘页脚 1dp 发丝线</div>
+      </div>
+      <p class="small muted">学习卡、重新学习。特征：<b>一屏一卡一决策</b>，操作区永远粘在底部、不滚走。</p>
+    </div>
+    <div class="card">
+      <h6>D · 入口页（4–8 个入口行）</h6>
+      <div class="stack" style="margin:10px 0">
+        <div class="strip bare"><em>页头</em><span>标题 + 副标题 + 返回</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>状态块</em><span>配置了没有 / 今天做了多少（可选）</span><b>18</b></div>
+        <div class="strip soft dom-a"><em>入口组</em><span>4–8 枚 BareRow</span><b>0</b></div>
+        <div class="strip soft dom-m"><em>说明组</em><span>「如何起作用？」一类折叠说明</span><b>0</b></div>
+      </div>
+      <p class="small muted">词库、每日阅读、AI 助学、设置分屏、语音、提醒、备份四屏、默写纸设置。App 里最多的一族。</p>
+    </div>
+    <div class="card">
+      <h6>E · 长滚动内容</h6>
+      <div class="stack" style="margin:10px 0">
+        <div class="strip bare"><em>页头</em><span>标题 + 返回</span><b>16</b></div>
+        <div class="strip strong dom-l"><em>Hero</em><span>词头 / 文章标题 / 数据总览</span><b>18</b></div>
+        <div class="strip soft"><em>内容分组 ×N</em><span>每组一枚 SoftCard</span><b>16</b></div>
+        <div class="strip bare"><em>粘底操作条</em><span>主 CTA + 1dp 发丝线</span><b>16</b></div>
+      </div>
+      <p class="small muted">词义详情、读文章、打卡、我的、AI 四个工作台、默写纸预览。特征：内容会超一屏，必须有粘底操作。</p>
+    </div>
+    <div class="card">
+      <h6>F · 长列表（筛选 + 行表）</h6>
+      <div class="stack" style="margin:10px 0">
+        <div class="strip bare"><em>页头</em><span>计数在副标题</span><b>16</b></div>
+        <div class="strip bare"><em>筛选条</em><span>chip 组，横向可滚</span><b>16</b></div>
+        <div class="strip bare"><em>索引栏</em><span>A–Z 竖排（仅词书词表）</span><b>右贴边</b></div>
+        <div class="strip soft"><em>行表</em><span>同一种 WordRow，零间距</span><b>0</b></div>
+      </div>
+      <p class="small muted">词书词表、我的词、外刊、阅读历史、学习记录、设置、AI 服务、许可。<b>这一族的版式纪律只有一条：所有列表用同一个行组件。</b></p>
+    </div>
+  </div>
+
+  <h3 id="nav">2.1 · 底导与页头契约</h3>
+  <div class="grid2">
+    <div class="card">
+      <h6>底导 AppBottomBar</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>四格：<b>今天 / 阅读 / AI 助学 / 我的</b>（<code>AppTab.AI</code> 标签已定名「AI 助学」）。</li>
+        <li>glyph：<code>Book</code> / <code>Newspaper</code> / <code>Spark</code> / <code>Person</code>，一律 <code>InlineIconBadge</code>。</li>
+        <li>两档<b>都</b>带 backdrop；未选中 <code>alpha(0.5f)</code>，选中 1.0。</li>
+        <li>高 64dp（+ 系统 inset）。列表页要把内容底部抬到 <code>64 + inset + 16</code>。</li>
+      </ul>
+      <div style="display:flex;gap:8px;margin-top:12px;background:var(--surface);border:1px solid var(--outline);border-radius:12px;padding:8px">
+        <span style="flex:1;text-align:center;font-size:9px;color:var(--onMint)"><i style="display:block;width:20px;height:20px;border-radius:6px;background:var(--grad);margin:0 auto 3px"></i>今天</span>
+        <span style="flex:1;text-align:center;font-size:9px;color:var(--text3);opacity:.5"><i style="display:block;width:20px;height:20px;border-radius:6px;background:var(--tint3);margin:0 auto 3px"></i>阅读</span>
+        <span style="flex:1;text-align:center;font-size:9px;color:var(--text3);opacity:.5"><i style="display:block;width:20px;height:20px;border-radius:6px;background:var(--tint3);margin:0 auto 3px"></i>AI 助学</span>
+        <span style="flex:1;text-align:center;font-size:9px;color:var(--text3);opacity:.5"><i style="display:block;width:20px;height:20px;border-radius:6px;background:var(--tint3);margin:0 auto 3px"></i>我的</span>
+      </div>
+    </div>
+    <div class="card">
+      <h6>页头 AppScreenHeader</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li><code>title</code> Headline；<code>subtitle</code> 可选，走 Footnote + <code>text2</code>。</li>
+        <li>返回：<b>40dp 视觉 + 48dp 可点区</b>，<code>app_screen_header</code> tag，<code>contentDescription = "返回"</code>。</li>
+        <li>无返回时不占位（骨架 A 的屏不带返回）。</li>
+        <li><b>subtitle 没有独立标签槽</b>：不要往副标题里塞 chip、计数徽章或按钮。</li>
+        <li>页头下方 12dp 到第一带；页头自身不叠背景，随屏滚走。</li>
+      </ul>
+      <div style="margin-top:12px;padding:10px 12px;border:1px solid var(--outline);border-radius:12px;background:#fff">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:14px">‹</span>
+          <span><span style="display:block;font-size:14px;font-weight:700">词义详情</span>
+          <span style="display:block;font-size:10px;color:var(--text2)">副标题位置：只放一句话</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     §3.1 学习链路
+     ============================================================ -->
+<section id="lane-learn">
+  <div class="sec-head">
+    <div class="sec-no">Section 03.1</div>
+    <h2>学习链路 · 15 屏</h2>
+    <p>用户每天真正花时间的 15 屏。主色 <code>Learn #7BB4E6</code> 与 <code>Library #B7A0D9</code>，
+      复习相关的计数用 <code>Review #EBC68B</code> 点缀。<b>这一族的核心矛盾是「今天还差多少」必须一眼可读</b>——缺陷 ① 就出在这里。</p>
+  </div>
+
+  <article class="screen" id="s-l1">
+    <header>
+      <span class="badge b-s">学习</span><h4>L1 · 今日学习</h4>
+      <code class="file">TodayPlanScreen.kt</code><span class="skel">骨架 B · 强档开屏</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>今日学习 · 无返回 · 无副标题</span><b>16</b></div>
+        <div class="strip soft dom-l"><em>查词条</em><span>「查一个词」假框 → 与 R6 同源</span><b>16/48</b></div>
+        <div class="strip strong dom-s"><em>StrongCard</em><span>词书名 + 新学/复习 + Display 大数 + 78dp 圆环</span><b>18</b></div>
+        <div class="strip soft dom-s"><em>└ 新学进度</em><span>6dp 轨 · Learn 渐变</span><b>10</b></div>
+        <div class="strip soft dom-v"><em>└ 复习进度</em><span>6dp 轨 · Review 渐变</span><b>10</b></div>
+        <div class="strip soft"><em>└ 一行脚注</em><span>解锁状态 / 连续天数 / 今日已完成</span><b>10</b></div>
+        <div class="strip strong dom-s"><em>└ CTA</em><span>PillButton 满宽 · 品牌渐变</span><b>18</b></div>
+        <div class="strip bare"><em>区块标题</em><span>「接下来」SectionHeading</span><b>22/10</b></div>
+        <div class="strip soft dom-r"><em>SoftCard</em><span>BareRow 今日文章</span><b>0</b></div>
+        <div class="strip soft dom-l"><em>└ 第二行</em><span>BareRow 词书 · 生词 · 错词 · 收藏</span><b>0</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>强档卡</td><td><code>StrongCard</code></td><td>圆角 28 · 内 18 · 带间 10</td><td>—</td><td>tint2 底 / text1 墨</td></tr>
+            <tr><td>词书名</td><td>Text</td><td>—</td><td>Title</td><td>text1</td></tr>
+            <tr><td>任务行</td><td><code>today_plan_task_total</code></td><td>—</td><td>Footnote</td><td>text1 @72%</td></tr>
+            <tr><td>大数</td><td><code>today_plan_total_progress</code></td><td>与「项已完成」同基线</td><td><b>Display</b> + Footnote</td><td>text1</td></tr>
+            <tr><td>圆环</td><td><code>ProgressRing</code></td><td>直径 78 · 线宽 8</td><td>环心 Body</td><td><span class="annot">改</span> base→deep 渐变；轨道 base@12%</td></tr>
+            <tr><td>两条细进度</td><td><code>ThinProgress</code></td><td>轨高 6 · 标签宽 ≥28</td><td>Label</td><td><span class="annot">改</span> 新学=Learn 渐变 / 复习=Review 渐变</td></tr>
+            <tr><td>CTA</td><td><code>today_plan_start_learning</code></td><td>满宽 · 高 48</td><td>Title/16</td><td>品牌渐变 + onBrand</td></tr>
+            <tr><td>两枚入口行</td><td><code>today_plan_reading_status</code> / <code>today_plan_open_word_bank</code></td><td><code>BareRow</code> 15/13 · 最小 52</td><td>Title + Footnote</td><td>徽标 Reading / Library</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">未解锁（圆环 0% + 解锁原因脚注）</span>
+          <span class="chip e">今日无待办 <code>today_plan_empty</code></span>
+          <span class="chip e">全部完成 <code>today_plan_plan_footnote</code></span>
+          <span class="chip e">连续 N 天</span>
+          <span class="chip e">词书进度已读</span>
+          <span class="chip e">大字号 2.0（圆环不缩、标签不折）</span>
+          <span class="chip e">深套</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>进度条与圆环改用域色渐变</b>：<code>ink</code> 不再传 <code>LocalContentColor.current</code>，改传 <code>AppDomain.Learn.base→deep</code>（复习轨用 <code>Review</code>）；
+            <b>轨道压到 12%</b>。这是缺陷 ①，完整处方见 <a href="#defect-1">§5.1</a>。</li>
+          <li><b>圆环从 78dp 保持</b>，但环内百分比从 Body 降到 <b>Label</b>——78dp 环里 Body 太吵，且与旁边 Display 抢层级。</li>
+          <li><b>查词条换成共享组件</b>，与查词页同一个 <code>SearchEntry</code>（见 <a href="#defect-3">§5.3</a>）。</li>
+          <li>「接下来」区块上下间距收到 <b>22/10</b>，与其它屏的 SectionHeading 一致。</li>
+          <li>屏底内容再留 <b>16dp</b>，不许压在底导上。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l2">
+    <header>
+      <span class="badge b-s">学习</span><h4>L2 · 学习卡（新学 / 复习）</h4>
+      <code class="file">WordCardScreen.kt</code><span class="skel">骨架 C · 焦点单卡</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>进度「3 / 12」+ 返回</span><b>16</b></div>
+        <div class="strip bare dom-s"><em>细进度</em><span>6dp 轨 · 本组整体进度</span><b>16</b></div>
+        <div class="strip strong dom-s"><em>词卡</em><span>词形 Headline · 音标 Body · 发音药片</span><b>18</b></div>
+        <div class="strip soft dom-l"><em>└ 释义</em><span>词性 + 中文释义 + 例句</span><b>12</b></div>
+        <div class="strip soft dom-l"><em>└ 配图</em><span>56dp 插图（若有）</span><b>12</b></div>
+        <div class="strip bare"><em>说明</em><span>「认识 / 不认识」会怎样的一句话</span><b>16</b></div>
+        <div class="strip gap">粘底：1dp 发丝线 + 两枚等宽药片</div>
+        <div class="strip strong dom-s"><em>不认识</em><span>PillStyle.Secondary</span><b>16/48</b></div>
+        <div class="strip strong dom-s"><em>认识</em><span>PillStyle.Primary 品牌渐变</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>词形</td><td>Text</td><td>可折行至 2 行</td><td>Headline 28</td><td>text1</td></tr>
+            <tr><td>音标</td><td>Text</td><td>紧贴词形下 4dp</td><td>Body</td><td>text2</td></tr>
+            <tr><td>发音药片</td><td><code>SpeakerButton</code></td><td>48 高 · 间距 8 · <b>IPA 独占一行</b></td><td>Body/14</td><td>美 / 英 尾缀</td></tr>
+            <tr><td>决策区</td><td>两枚 <code>PillButton</code></td><td>等分 <code>weight(1f)</code> · 高 48 · 间距 12</td><td>Title</td><td>Secondary / Primary</td></tr>
+            <tr><td>粘底条</td><td>Box + <code>hairlineTop</code></td><td>上边 1dp · 内 16/12 · 底 inset</td><td>—</td><td>outline</td></tr>
+            <tr><td>进度</td><td>页头 subtitle</td><td>—</td><td>Footnote</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">新学</span><span class="chip e">复习</span>
+          <span class="chip e">播放中 / 暂停（SpeakerButton 三态）</span>
+          <span class="chip e">全部完成 <code>AllDone</code></span>
+          <span class="chip e">这轮复习完成 <code>ReviewCompleted</code></span>
+          <span class="chip e">无配图</span>
+          <span class="chip e">大字号 2.0：音标可折，决策区不变形</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>发音药片行改成「IPA 一行 + 药片一行等分两列」</b>，与 L7 同一处方（<a href="#defect-4">§5.4</a>）。</li>
+          <li>细进度改域色渐变（与 ① 同源规则）。</li>
+          <li>决策区两枚药片保证 <b>等宽</b>，不再按内容自然宽度排布——这是「学习流看起来很稳」的关键。</li>
+          <li>粘底条上沿固定 1dp 发丝线，滚动时线始终可见（<code>StickyFooterHairlineGuardTest</code> 已钉）。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l3">
+    <header>
+      <span class="badge b-s">学习</span><h4>L3 · 词库（壳）</h4>
+      <code class="file">WordBankScreen.kt</code><span class="skel">骨架 D → F</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>词库 · 副标题 = 词书名</span><b>16</b></div>
+        <div class="strip soft dom-l"><em>分段控件</em><span>词书 / 生词本 / 错词 / 收藏 · 四格 ≥48</span><b>16</b></div>
+        <div class="strip bare dom-l"><em>列表头槽</em><span>四段共用（筛选 chip / 空）</span><b>16</b></div>
+        <div class="strip soft dom-l"><em>行表</em><span>同一种 <code>WordRow</code>，零间距</span><b>0</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>分段控件</td><td>Row + 四枚 Text</td><td>槽 <span class="annot">改</span>圆角 14 · 内 3 · 格圆角 11 · 格高 ≥48</td><td>Body（选中 SemiBold）</td><td>槽 tint2 / 选中 surface / 未选 text2</td></tr>
+            <tr><td>语义</td><td><code>Role.Tab</code></td><td>4 格各自 <code>testTag</code></td><td>—</td><td>选中须给 <code>stateDescription="已选中"</code></td></tr>
+            <tr><td>页内边距</td><td>—</td><td><span class="annot">改</span>20 → <b>16</b></td><td>—</td><td>—</td></tr>
+            <tr><td>四段内容</td><td>槽内 <code>bookPane/newPane/wrongPane/favoritePane</code></td><td>零额外内边距</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">词书段</span><span class="chip e">生词本段</span><span class="chip e">错词段</span><span class="chip e">收藏段</span>
+          <span class="chip e">各段空 / 载入 / 读不出来</span><span class="chip e">深套</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>这一屏的问题不在壳，在四个 pane 各长一套</b>——词书段用卡片行 + A–Z 条 + M3 FilterChip，
+            另三段用 <code>WordRow</code> 铺平。处方见 <a href="#defect-2">§5.2</a>。</li>
+          <li>壳里新增一个<b>「列表头槽」</b>（可为空、不占高度），四段都从这里出口，取代「只有词书段自己长了一个 FilterBar」。</li>
+          <li>分段槽圆角从 <b>13 → 14</b>，与 <code>AppShape.Button</code> 对齐（13dp 是体系外的第七个圆角值）。</li>
+          <li>页内边距 20 → 16。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l4">
+    <header>
+      <span class="badge b-s">学习</span><h4>L4 · 词书词表</h4>
+      <code class="file">WordBookWordsScreen.kt</code><span class="skel">骨架 F · 长列表</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>（可选页头）</em><span>showHeader = true 时「← 返回 / 词书单词」</span><b>16</b></div>
+        <div class="strip bare dom-l"><em>筛选条</em><span>全部 / 新词 / 学习中 / 已掌握 + 计数</span><b>16</b></div>
+        <div class="strip bare dom-l"><em>字母条</em><span>26 枚 48dp 芯片 · 横向可滚</span><b>16/6</b></div>
+        <div class="strip soft dom-l"><em>字母组头</em><span>sticky · A / B / C…</span><b>0</b></div>
+        <div class="strip soft dom-l"><em>词行 ×N</em><span>WordRow：词形 + 释义 + 状态</span><b>16/12</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>筛选 chip</td><td><span class="annot">改</span><code>PillButton(Secondary)</code></td><td>高 36 视觉 / 48 命中 · 间距 8</td><td>Label</td><td>tint2 底 / onMint 字</td></tr>
+            <tr><td>字母芯片</td><td>Box + 48dp 命中</td><td>26 枚 · 间距 2 · 当前字母居中</td><td>Body</td><td>可用 text1 / 不可用 text3@50% / 当前 onMint</td></tr>
+            <tr><td>字母组头</td><td>stickyHeader</td><td><span class="annot">改</span>高 32 · 通栏 tint3 底</td><td>Label +0.3</td><td>onMint</td></tr>
+            <tr><td>词行</td><td><code>WordRow</code> 裸铺</td><td><span class="annot">改</span>左右各 16 · 上下 12 · 行间 1dp 发丝线</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>列表内边距</td><td>LazyColumn <code>contentPadding</code></td><td><span class="annot">改</span>start 20/end 36 → <b>两侧 16 对称</b></td><td>—</td><td>—</td></tr>
+            <tr><td>禁用行</td><td>行内原因串</td><td>走 <code>gloss</code> 槽（可 2 行、无 120dp 上限）</td><td>Footnote</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">载入中 <code>wordbook_words_loading</code></span>
+          <span class="chip e">读不出来 <code>wordbook_words_unavailable</code> + 重试</span>
+          <span class="chip e">空 <code>wordbook_words_empty</code></span>
+          <span class="chip e">筛到 0 条</span>
+          <span class="chip e">行不可开详情（词已不在词书）</span>
+          <span class="chip e">26 个字母里只有 12 个有词</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>去掉行卡外壳</b>：现在是 M3 <code>Card</code> + 1dp 描边 + 卡内 16dp，铺在已缩进 20 的列表里，
+            等于词形左边 36dp、右边 36+16=52dp 的「双缩进」，和「我的词」差一整档。<b>改裸铺</b>（<a href="#defect-2">§5.2</a>）。</li>
+          <li><b>列表内边距改对称</b>：现 <code>start = 20 / end = 36</code>，36 是当年给右侧竖排字母槽让的位；槽已搬到顶部，36 没跟着改回。
+            这是「单词左右不对称」的直接来源。</li>
+          <li>筛选 chip 从 M3 <code>FilterChip</code> 换成共享 <code>PillButton(Secondary)</code>，和「我的词」的「取消收藏」同一套几何。</li>
+          <li>字母条加「当前字母自动居中」+ 两端 12dp 渐隐遮罩（提示还能滚），<b>不动 48dp 命中</b>（AC-R-04）。</li>
+          <li>字母组头从 16sp Bold 裸文字收口到 Label 档 + tint3 底条，缩进与行文字对齐。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l5">
+    <header>
+      <span class="badge b-s">学习</span><h4>L5 · 我的词（收藏 / 生词本 / 错词）</h4>
+      <code class="file">MyWordsScreen.kt</code><span class="skel">骨架 F · 三段同屏</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>我的词 · 副标题「三处攒下来的词都在这一页」</span><b>16</b></div>
+        <div class="strip soft dom-l"><em>收藏段</em><span>段标题 + 计数 · 空/载入/读不出来</span><b>16</b></div>
+        <div class="strip soft dom-l"><em>└ 取消收藏药片</em><span>PillButton(Secondary)，行内右对齐</span><b>—</b></div>
+        <div class="strip soft dom-v"><em>生词本段</em><span>「开始重新学习」PillButton + 行表</span><b>16</b></div>
+        <div class="strip soft dom-d"><em>错词段</em><span>行表 + 行内动作</span><b>16</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>页容器</td><td>Column + verticalScroll</td><td><span class="annot">改</span>内边距 20/24 → 16/16 · 段间 14</td><td>—</td><td>background</td></tr>
+            <tr><td>段卡</td><td><code>MyWordsSectionCard</code></td><td>SoftCard 20 圆角 · 内 16</td><td>段标题 Title</td><td>tint</td></tr>
+            <tr><td>词行</td><td><code>WordRow</code></td><td>与 L4 <b>完全同一版式</b></td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>行内动作</td><td><code>PillButton(Secondary)</code></td><td>48 高 · 右挂</td><td>Label</td><td>tint2 / onMint</td></tr>
+            <tr><td>段空态</td><td><code>SectionEmpty</code></td><td>垂直 16 · 左对齐</td><td>Footnote</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">三段全空</span><span class="chip e">只有收藏有词</span>
+          <span class="chip e">某段载入 / 读不出来 + 重试</span>
+          <span class="chip e">标记已掌握二次确认</span>
+          <span class="chip e">掌握结果反馈框</span>
+          <span class="chip e">被裁成单段（词库页 pane 用法，不落位）</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>这一屏是「行版式」的标杆</b>，L4 要向它看齐，而不是反过来。</li>
+          <li>页内边距 20 → 16，段间 14 → 10（与全局带间距一致）。</li>
+          <li>「开始重新学习」提到段首、满宽，不要挤在行表上方左侧。</li>
+          <li>三段标题右侧统一挂 <b>Label 档计数</b>（「收藏 12」），不要只在有值时出现。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l6">
+    <header>
+      <span class="badge b-s">学习</span><h4>L6 · 查词</h4>
+      <code class="file">GlobalVocabularySearchScreen.kt</code><span class="skel">骨架 A → F</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>查词 + 返回</span><b>16</b></div>
+        <div class="strip strong dom-l"><em>搜索框</em><span>真输入 · 自动聚焦 · 带清除</span><b>16/48</b></div>
+        <div class="strip bare dom-l"><em>历史区</em><span>历史词 chip 组 + 「清空」</span><b>16</b></div>
+        <div class="strip bare dom-l"><em>结果区</em><span>结果行表 / 进度 / 失败 / 空</span><b>16</b></div>
+        <div class="strip gap">键盘弹起：结果区让位，不遮输入框</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>搜索框</td><td><span class="annot">改</span>共享 <code>SearchEntry</code>（真输入态）</td><td>高 48 · 圆角 14 · 内 14/12</td><td>Body</td><td>tint 底 / text1 字 / 占位 text2</td></tr>
+            <tr><td>放大镜</td><td><code>AppGlyph(Search)</code> StrokeOnly</td><td><b>18dp</b>（与主页假框同尺寸）</td><td>—</td><td>text2</td></tr>
+            <tr><td>清除按钮</td><td><code>AppGlyph(Close)</code></td><td>48dp 命中 · 视觉 18</td><td>—</td><td>text2</td></tr>
+            <tr><td>历史 chip</td><td><code>PillButton(Secondary)</code></td><td>高 36 / 命中 48 · 间距 8 · 可折行</td><td>Label</td><td>tint2 / onMint</td></tr>
+            <tr><td>结果行</td><td>行表（同 WordRow 家族）</td><td>左右 16 · 上下 12</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">首次进入提示 <code>GlobalSearchHint</code></span>
+          <span class="chip e">搜索中 <code>GlobalSearchProgress</code></span>
+          <span class="chip e">失败 + 重试 <code>GlobalSearchFailure</code></span>
+          <span class="chip e">空结果 <code>GlobalSearchEmpty</code></span>
+          <span class="chip e">打开词卡失败 <code>GlobalSearchOpenFailed</code></span>
+          <span class="chip e">有历史 / 无历史</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>搜索框换成共享组件</b>：现在是 M3 <code>TextField</code>（<code>surface</code> 底 + M3 默认描边），
+            主页那枚是自绘 <code>tint</code> 假框，两者<b>不是一套</b>，从主页点进来会像换了个 App。处方见 <a href="#defect-3">§5.3</a>。</li>
+          <li>放大镜统一 18dp、位置固定在最左，<b>与主页假框同一坐标</b>（左右 14dp、垂直居中）。</li>
+          <li>历史区给出「清空」这一枚 <code>PillButton(Text)</code>，位置固定在区标题右侧。</li>
+          <li>结果行与 L4/L5 同一行版式；不要在这里另长一种「搜索结果卡」。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l7">
+    <header>
+      <span class="badge b-s">学习</span><h4>L7 · 词义详情</h4>
+      <code class="file">CardDetailScreen.kt</code><span class="skel">骨架 E · 长滚动</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>词义详情 + 返回 + 星标</span><b>16</b></div>
+        <div class="strip strong dom-l"><em>Hero 词卡</em><span>词形 Headline + 配图 56dp</span><b>18</b></div>
+        <div class="strip soft dom-l"><em>└ IPA</em><span>音标 <b>独占一行</b></span><b>10</b></div>
+        <div class="strip soft dom-l"><em>└ 发音双列</em><span>美 / 英 两枚药片等分并排</span><b>10</b></div>
+        <div class="strip soft dom-l"><em>└ 释义</em><span>词性 · 中文释义（SenseRow）</span><b>10</b></div>
+        <div class="strip soft"><em>└ 播控组</em><span>Playing / Paused 三态</span><b>10</b></div>
+        <div class="strip strong dom-l"><em>动作九宫</em><span>收藏 / 笔记 / AI 问词 …</span><b>18</b></div>
+        <div class="strip soft"><em>例句</em><span>DetailSection</span><b>16</b></div>
+        <div class="strip soft"><em>我的笔记</em><span>DetailSection + 编辑入口</span><b>16</b></div>
+        <div class="strip soft"><em>派生词 / 关联短语 / 近义词 / 词形变化</em><span>四个 DetailSection</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>词形</td><td>Text <code>card_detail_lemma</code></td><td>可 2 行</td><td>Headline</td><td>text1</td></tr>
+            <tr><td>音标</td><td><code>card_detail_ipa</code></td><td><b>独占一行</b>，下留 8dp</td><td>Body</td><td>text2</td></tr>
+            <tr><td>发音药片</td><td><code>card_detail_speak</code> / <code>..._british</code></td><td><span class="annot">改</span>Row 两列各 <code>weight(1f)</code> · 高 48 · 间距 8</td><td>Body/14</td><td>tint2 / onMint</td></tr>
+            <tr><td>配图</td><td><code>card_detail_illustration</code></td><td>56dp 缩略 · 圆角 12</td><td>—</td><td>—</td></tr>
+            <tr><td>动作格</td><td><code>WordActionPillGrid</code></td><td>4 列 / 2 行 · 间距 8</td><td>Label</td><td>tint / onMint</td></tr>
+            <tr><td>分区</td><td><code>DetailSection</code></td><td>SoftCard · 内 16 · 区标题 22/10</td><td>Title 区标题 / Body 正文</td><td>text1 / text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">有配图 / 无配图</span>
+          <span class="chip e">配图读不出来 <code>card_detail_image_unreadable</code>（不占图位）</span>
+          <span class="chip e">有英音 / 只有美音</span>
+          <span class="chip e">无笔记</span>
+          <span class="chip e">四个关联区全空</span>
+          <span class="chip e">纯浏览（收藏浮层 / 搜索卡详情：无播控组）</span>
+          <span class="chip e">大字号 2.0</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>IPA 与两枚发音药片拆成两行</b>：现用 <code>FlowRow</code> 把三者塞进一条可折行流，
+            IPA 一长、字号一大，两枚药片就被挤掉行、上下错开。处方见 <a href="#defect-4">§5.4</a>。</li>
+          <li>两枚药片<b>等分并排</b>，右侧对齐到卡右边缘，不再各自按内容长宽。</li>
+          <li>配图读不出来时<b>不占位</b>（现行为已对，保持），只留一行 Footnote。</li>
+          <li>六个 <code>DetailSection</code> 之间从「8dp 裸堆」改为 <b>SoftCard 分组 + 22/10 区块间距</b>，长页才有节奏。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l8">
+    <header>
+      <span class="badge b-s">学习</span><h4>L8 · 重新学习</h4>
+      <code class="file">VocabularyRelearnScreen.kt</code><span class="skel">骨架 C</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>重新学习 + 返回 · 副标题 = 位置 x/total</span><b>16</b></div>
+        <div class="strip bare dom-v"><em>细进度</em><span>Review 域渐变</span><b>16</b></div>
+        <div class="strip strong"><em>词卡</em><span>词形 + 音标 + 释义 + 发音</span><b>18</b></div>
+        <div class="strip soft"><em>提示行</em><span>message（提交反馈，可空）</span><b>16</b></div>
+        <div class="strip gap">粘底：单枚满宽药片</div>
+        <div class="strip strong dom-v"><em>记住了</em><span>PillButton Primary，submitting 时禁用</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>进度</td><td>页头 subtitle</td><td>—</td><td>Footnote</td><td>text2</td></tr>
+            <tr><td>进度轨</td><td>ThinProgress 同款</td><td>高 6 · 满宽</td><td>—</td><td>Review 渐变</td></tr>
+            <tr><td>词卡</td><td><code>StrongCard</code></td><td>与 L2 同一版式</td><td>Headline / Body</td><td>tint2 / text1</td></tr>
+            <tr><td>提交反馈</td><td><code>InlineNotice</code></td><td>软底 · 内 14/12</td><td>Footnote</td><td>tint / onMint</td></tr>
+            <tr><td>完成态</td><td><code>Done(total)</code></td><td>居中 · 无底导</td><td>Headline + Body</td><td>text1 / text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">提交中（按钮禁用 + 进度）</span>
+          <span class="chip e">提交成功提示</span>
+          <span class="chip e">完成 Done</span>
+          <span class="chip e">生词本为空（入口不可达）</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>与 L2 共用「词卡 + 粘底操作」两段，<b>视觉上必须像同一屏的两种模式</b>，只在域色与按钮数量上不同。</li>
+          <li>完成态改用骨架 A：居中插图 + Headline「这一轮走完了」+ 一行 Footnote，<b>不再留一枚空按钮</b>。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l9">
+    <header>
+      <span class="badge b-s">学习</span><h4>L9 · 学习打卡</h4>
+      <code class="file">CheckInScreen.kt</code><span class="skel">骨架 E</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>学习打卡 + 返回</span><b>16</b></div>
+        <div class="strip strong dom-v"><em>总览</em><span>连续天数 Display + 本月完成 Footnote</span><b>18</b></div>
+        <div class="strip soft dom-v"><em>月历</em><span>MonthCalendar · 7 列格</span><b>16</b></div>
+        <div class="strip bare"><em>图例</em><span>已打卡 / 今天 / 未打卡</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>连续天数</td><td>Text（本屏唯一 Display）</td><td>—</td><td>Display 44</td><td>text1</td></tr>
+            <tr><td>日历格</td><td>7 列 Grid</td><td>格 ≥40dp · 间距 4</td><td>Label</td><td>已打卡 = Review base / 今天 = ring outline / 空 = tint</td></tr>
+            <tr><td>月标题</td><td>SectionHeading</td><td>22/10</td><td>Title</td><td>text1</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">本月无记录</span><span class="chip e">今天已打卡</span><span class="chip e">跨月（上月末几天灰）</span><span class="chip e">深套</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>日历格填色从「域色纯填」改为 <b>base→deep 渐变的小方角块</b>，与进度条同一套「数据形状」语言。</li>
+          <li>「今天」用 2dp <code>onMint</code> 描边而不是填色，避免同一天既算「已打卡」又算「今天」时两色打架。</li>
+          <li>补一条图例，否则用户读不出灰块是「没打卡」还是「还没到」。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l10">
+    <header>
+      <span class="badge b-s">学习</span><h4>L10 · 学习记录</h4>
+      <code class="file">LearningRecordsScreen.kt</code><span class="skel">骨架 F</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>学习记录 + 返回 · 副标题 = 总条数</span><b>16</b></div>
+        <div class="strip bare dom-s"><em>筛选条</em><span>时段 / 类型（可空）</span><b>16</b></div>
+        <div class="strip soft"><em>日期组头</em><span>sticky · 今天 / 昨天 / 10月28日</span><b>0</b></div>
+        <div class="strip soft dom-s"><em>记录行 ×N</em><span>事件 + 时间 + 结果</span><b>16/12</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>组头</td><td>stickyHeader</td><td>高 32 · 通栏 tint3 底</td><td>Label +0.3</td><td>onMint</td></tr>
+            <tr><td>记录行</td><td><code>BareRow</code> 家族</td><td>15/13 · 最小 52 · 分隔线缩进 52</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>结果标记</td><td>徽章</td><td>右侧 · 圆角 9</td><td>Label</td><td>认识 = Learn light / 不认识 = Danger light</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">无记录</span><span class="chip e">只有今天</span><span class="chip e">载入中</span><span class="chip e">读不出来 + 重试</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>记录行收口到 <code>BareRow</code> 家族（今天多处是自制 Row），保证与设置、备份等列表同一个水线。</li>
+          <li>日期组头补 sticky，长列表滚动时不丢「这是哪天」。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l11">
+    <header>
+      <span class="badge b-s">学习</span><h4>L11 · 生成默写纸</h4>
+      <code class="file">WorksheetSettingsScreen.kt</code><span class="skel">骨架 D</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>生成默写纸 + 返回</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>方向</em><span>中译英 / 英译中 · 二选一</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>范围</em><span>词书 / 我的词 · 条数</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>使用四线三格</em><span>开关行</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>附带答案页</em><span>开关行</span><b>16</b></div>
+        <div class="strip gap">粘底：主 CTA</div>
+        <div class="strip strong dom-s"><em>生成预览</em><span>PillButton Primary 满宽</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>方向二选一</td><td>分段控件（同 L3 语言）</td><td>槽 tint2 · 格 ≥48 · 内 3</td><td>Body</td><td>选中 surface</td></tr>
+            <tr><td>开关行</td><td><code>BareRow</code> + Switch</td><td>15/13 · 最小 52</td><td>Title + Footnote</td><td>轨道色见 <code>SwitchTrackColorGuardTest</code></td></tr>
+            <tr><td>CTA</td><td><code>PillButton</code></td><td>满宽 · 48</td><td>Title</td><td>品牌渐变</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">可选项不足（词太少）</span><span class="chip e">生成中</span><span class="chip e">生成失败 + 重试</span><span class="chip e">大字号 2.0（开关行不折成三行）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>方向二选一从「两枚独立按钮」改为<b>分段控件</b>，与词库同一语言。</li>
+          <li>两个开关行收进一枚 SoftCard，行间 1dp 发丝线（现在是散落的两行）。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l12">
+    <header>
+      <span class="badge b-s">学习</span><h4>L12 · 预览默写纸</h4>
+      <code class="file">WorksheetPreviewScreen.kt</code><span class="skel">骨架 E</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>预览默写纸 + 返回</span><b>16</b></div>
+        <div class="strip strong"><em>纸张</em><span>白底 · 四线三格 / 普通横线</span><b>0</b></div>
+        <div class="strip gap">粘底：导出 PDF</div>
+        <div class="strip strong dom-s"><em>导出可打印 PDF</em><span>PillButton Primary 满宽</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>纸面</td><td>Card 20 圆角 · 白</td><td>内 20 · 行距 32</td><td>Body / Label 序号</td><td>surface / text1</td></tr>
+            <tr><td>四线三格</td><td>自绘 Canvas 线</td><td>每行 3 条淡线 + 1 条基线</td><td>—</td><td>outline @60%</td></tr>
+            <tr><td>答案页</td><td>同纸面 + 分页</td><td>另起一页</td><td>Body</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">含答案页 / 不含</span><span class="chip e">导出中</span><span class="chip e">导出失败</span><span class="chip e">词数很多（多页）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>纸面用 <b>surface 白</b>，不要用 tint 底——它在模拟一张纸，是唯一允许纯白的大面积。</li>
+          <li>导出中把 CTA 换成进度态（同 <code>PillButton</code> 禁用 + 文案「正在导出…」），不再另起一条进度。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l13">
+    <header>
+      <span class="badge b-s">学习</span><h4>L13 · 选词书引导</h4>
+      <code class="file">AppScreen.kt · LearningSetupScreen</code><span class="skel">骨架 D</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>选好词书，开始今天的积累 + 副标题</span><b>16</b></div>
+        <div class="strip soft dom-l"><em>词书选择</em><span>WordBookPicker · 2 列 tile</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>每日目标</em><span>DailyTargetSection · 步进</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>细节开关</em><span>DetailToggleRow ×N</span><b>16</b></div>
+        <div class="strip gap">粘底：开始学习</div>
+        <div class="strip strong dom-s"><em>开始</em><span>PillButton Primary 满宽</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>词书 tile</td><td><code>WordBookTile</code></td><td>2 列 · 间距 12 · 圆角 20 · 高 ≥96</td><td>Title + Footnote</td><td>surface / 选中 2dp onMint</td></tr>
+            <tr><td>骨架态</td><td><code>WordBookTileSkeleton</code></td><td>同 tile 尺寸</td><td>—</td><td>tint3</td></tr>
+            <tr><td>目标步进</td><td><code>DailyTargetSection</code></td><td>−/＋ 各 48 命中 · 中间 Display 小号</td><td>Display(小) + Label</td><td>tint2 / onMint</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">词书载入中（tile 骨架）</span><span class="chip e">无可用词书</span><span class="chip e">未选词书（CTA 禁用）</span><span class="chip e">大字号 2.0（tile 变 1 列）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>tile 选中态从「换底色」改为 <b>2dp <code>onMint</code> 描边 + 右上角勾选徽标</b>，颜色单通道不可靠。</li>
+          <li>骨架 tile 与真实 tile <b>同尺寸</b>，载入完成时列表不跳。</li>
+          <li>大字号 2.0 时 2 列自动降为 1 列，不许把词书名压成省略号。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l14">
+    <header>
+      <span class="badge b-s">学习</span><h4>L14 · 建档</h4>
+      <code class="file">AppScreen.kt · ProfileCreationScreen</code><span class="skel">骨架 A</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip gap">上留白吸收</div>
+        <div class="strip soft dom-a"><em>品牌面</em><span>mint 渐变窄条 / 插图</span><b>居中</b></div>
+        <div class="strip bare"><em>标题</em><span>先认识一下你</span><b>16</b></div>
+        <div class="strip bare"><em>说明</em><span>学习记录只保存在这台设备上。</span><b>16</b></div>
+        <div class="strip soft"><em>输入框</em><span>称呼 · 单行 · 自动聚焦</span><b>16/48</b></div>
+        <div class="strip strong dom-a"><em>主操作</em><span>开始使用（空输入时禁用）</span><b>16/48</b></div>
+        <div class="strip gap">下留白</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>标题</td><td>Text</td><td>—</td><td>Headline 28</td><td>text1</td></tr>
+            <tr><td>说明</td><td>Text</td><td>距标题 8</td><td>Footnote</td><td>text2</td></tr>
+            <tr><td>输入框</td><td>共享 <code>SearchEntry</code> 的输入态</td><td>高 48 · 圆角 14 · 内 14/12</td><td>Body</td><td>tint / text1</td></tr>
+            <tr><td>CTA</td><td><code>PillButton</code></td><td>满宽 · 48 · 距输入框 20</td><td>Title</td><td>品牌渐变 / 禁用 40%</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">空输入（CTA 禁用）</span><span class="chip e">仅空白字符</span><span class="chip e">键盘弹起</span><span class="chip e">建立中</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>输入框与 L6 查词、L1 查词条<b>共用同一枚组件</b>，三处必须长得一样。</li>
+          <li>CTA 禁用态从「变灰」改为 <b>渐变降饱和 40% + 字色 text2</b>，保留形状。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-l15">
+    <header>
+      <span class="badge b-s">学习</span><h4>L15 · 恢复</h4>
+      <code class="file">RecoveryScreen.kt</code><span class="skel">骨架 A</span>
+    </header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip gap">上留白</div>
+        <div class="strip soft dom-d"><em>插图</em><span>96dp · 域色浅底圆</span><b>居中</b></div>
+        <div class="strip bare"><em>标题</em><span>需要恢复</span><b>16</b></div>
+        <div class="strip bare"><em>说明</em><span>原因串（来自宿主）</span><b>16</b></div>
+        <div class="strip soft"><em>详情</em><span>可折叠的技术细节</span><b>16</b></div>
+        <div class="strip strong dom-d"><em>主操作</em><span>PillButton Primary</span><b>16/48</b></div>
+        <div class="strip strong"><em>次操作</em><span>PillButton Text「稍后处理」</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>插图</td><td>矢量 96dp</td><td>浅底圆 128dp</td><td>—</td><td>Danger light</td></tr>
+            <tr><td>原因串</td><td>Text</td><td>可多行 · 居中</td><td>Body</td><td>text2</td></tr>
+            <tr><td>技术细节</td><td>GlassDialog 同源面板</td><td>折叠默认收起</td><td>Footnote</td><td>text3</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">可恢复</span><span class="chip e">不可恢复</span><span class="chip e">详情展开 / 收起</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>三种「坏了」的屏（L15 恢复、M10 错误页、AI 未配置）统一为<b>同一套三段式</b>：插图 → 一句人话 → 一枚主操作。
+            共用组件建议命名 <code>ProblemScaffold</code>。</li>
+          <li>技术细节默认收起，展开用内联提示块，不再弹窗。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!--PART4-->
+<!-- ============================================================
+     §3.2 阅读链路
+     ============================================================ -->
+<section id="lane-read">
+  <div class="sec-head">
+    <div class="sec-no">Section 03.2</div>
+    <h2>阅读链路 · 5 屏</h2>
+    <p>主色 <code>Reading #E297A4</code>。<b>这一族的特殊约束：生成型内容要外发</b>，所以每一屏都可能长出「出站确认」，
+      而正文永远是屏上最高优先级的东西。</p>
+  </div>
+
+  <article class="screen" id="s-r1">
+    <header><span class="badge b-r">阅读</span><h4>R1 · 每日阅读</h4><code class="file">ReadingAccessScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>每日阅读 + 返回</span><b>16</b></div>
+        <div class="strip strong dom-r"><em>今日文章</em><span>标题 + 状态（可读 / 未解锁）+ 主 CTA</span><b>18</b></div>
+        <div class="strip soft dom-a"><em>AI 生成入口</em><span>未配置时降级为 NotConfiguredCard</span><b>16</b></div>
+        <div class="strip soft dom-r"><em>外刊选读</em><span>入口行 · 副标题「从已核验的来源挑一篇」</span><b>0</b></div>
+        <div class="strip soft dom-r"><em>粘贴导入</em><span>入口行 · 副标题「用你自己的文章学」</span><b>0</b></div>
+        <div class="strip soft dom-r"><em>阅读历史</em><span>入口行 · 副标题「共 N 篇」</span><b>0</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>今日卡</td><td><code>StrongCard</code></td><td>18 · 内 CTA 高 48</td><td>Title + Footnote</td><td>tint2 / text1</td></tr>
+            <tr><td>三枚入口</td><td><code>BareRow</code></td><td>15/13 · 最小 52 · 分隔缩进 52</td><td>Title + Footnote</td><td>徽标 Reading deep</td></tr>
+            <tr><td>未配置</td><td><code>NotConfiguredCard</code></td><td>软底 · 内 16 · 带「去配置」出口</td><td>Body</td><td>tint / onMint</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e"><code>Locked(reason)</code> 未解锁</span>
+          <span class="chip e"><code>Ready</code></span>
+          <span class="chip e">今日已换过一篇（换一篇确认框）</span>
+          <span class="chip e">生成中</span>
+          <span class="chip e">生成失败 + 重试</span>
+          <span class="chip e">AI 未配置</span>
+          <span class="chip e">历史 0 篇</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>「未解锁」的原因串现在是<一处裸文案>，改为<b>今日卡内的 Footnote + 禁用态 CTA</b>，不要让整屏看起来像坏了。</li>
+          <li>三枚入口收进<b>一枚 SoftCard 零间距</b>，中间两条发丝线，与主页「接下来」同一结构。</li>
+          <li>「换一篇今天的文章？」确认框统一走共享破坏性/确认框（见 <a href="#d-confirm">D1</a>），文案逐字保留。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-r2">
+    <header><span class="badge b-r">阅读</span><h4>R2 · 外刊选读</h4><code class="file">ReadingFeedScreen.kt</code><span class="skel">骨架 F</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>外刊选读 + 返回 · 副标题 = 来源名</span><b>16</b></div>
+        <div class="strip bare dom-r"><em>刷新态</em><span>拉取中 / 拉取失败 + 重试</span><b>16</b></div>
+        <div class="strip soft dom-r"><em>文章行 ×N</em><span>标题 + 摘要 2 行 + 来源 / 日期</span><b>16/12</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>行</td><td>行表家族</td><td>左右 16 · 上下 12 · 分隔线 1dp</td><td>Title 标题 / Footnote 摘要</td><td>text1 / text2</td></tr>
+            <tr><td>来源标记</td><td>徽章</td><td>圆角 9 · 右挂</td><td>Label</td><td>Reading light</td></tr>
+            <tr><td>摘要</td><td>Text</td><td><b>2 行上限</b> + 省略号</td><td>Footnote</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">载入中</span><span class="chip e">拉取失败 <code>FetchFailed</code> + 重试</span><span class="chip e">空源</span><span class="chip e">已读 / 未读</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>摘要固定 2 行——现在是自然长，长摘要会把行高拉到 6 行，列表失去节奏。</li>
+          <li>「已读」靠行尾徽章表达，不要靠降低整行透明度（会让文字不可读）。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-r3">
+    <header><span class="badge b-r">阅读</span><h4>R3 · 读文章</h4><code class="file">ArticleReadingScreen.kt</code><span class="skel">骨架 E</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>返回 + 标题（滚动后收成小标题）</span><b>16</b></div>
+        <div class="strip strong dom-r"><em>标题与朗读</em><span>Headline + 播放药片</span><b>18</b></div>
+        <div class="strip soft dom-r"><em>来源块</em><span>来源 · 日期 · 版本</span><b>16</b></div>
+        <div class="strip bare"><em>模式行</em><span>原文 / 对照 / 中文 · ModeChip</span><b>16</b></div>
+        <div class="strip bare"><em>标记行</em><span>高亮 / 生词 / 收藏</span><b>16</b></div>
+        <div class="strip bare"><em>正文</em><span>正文 17sp · 行距松 · 生词高亮</span><b>16</b></div>
+        <div class="strip gap">底部面板（从下沿升起，可下滑收起）</div>
+        <div class="strip soft dom-r"><em>覆盖词面板</em><span>ModalBottomSheet · skipPartiallyExpanded</span><b>16</b></div>
+        <div class="strip strong dom-r"><em>完成条</em><span>粘底「标记为已读」</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>文章标题</td><td>Text</td><td>可 3 行</td><td>Headline 28</td><td>text1</td></tr>
+            <tr><td>正文</td><td><code>HighlightedEnglish</code></td><td>段距 14 · 行距 1.7</td><td><b>Title 17</b>（比全站 Body 大一档，长文更好读）</td><td>text1</td></tr>
+            <tr><td>模式 chip</td><td><code>ModeChip</code></td><td>高 36 / 命中 48 · 间距 8</td><td>Label</td><td>选中 onMint 底</td></tr>
+            <tr><td>覆盖词面板</td><td><code>ModalBottomSheet</code></td><td>圆角顶 24 · 拖拽把手 32×4</td><td>Title + Body</td><td>surface</td></tr>
+            <tr><td>完成条</td><td><code>ArticleCompleteBar</code></td><td>粘底 · 1dp 发丝线 · 内 16/12</td><td>Title</td><td>品牌渐变</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">首次进文（覆盖词面板）</span><span class="chip e">三种阅读模式</span>
+          <span class="chip e">有生词高亮 / 无</span><span class="chip e">已读</span>
+          <span class="chip e">朗读中 / 暂停</span><span class="chip e">版本切换</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>覆盖词提示已经从居中弹窗改成底部面板</b>（源码注释里写明这是为了不挡正文），这条保留，别退回去。</li>
+          <li>正文用 <b>17sp</b>（Title 档）而非 15sp。长文阅读是唯一允许「跳档放大」的场景，但要写进规格，不许每处自己调。</li>
+          <li>模式行与标记行合并成<b>一条</b>可横滚的工具条，省出 40dp 给正文。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-r4">
+    <header><span class="badge b-r">阅读</span><h4>R4 · 粘贴导入</h4><code class="file">ArticleImportScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>粘贴导入 + 返回</span><b>16</b></div>
+        <div class="strip soft dom-r"><em>标题输入</em><span>单行 · 预填可改</span><b>16/48</b></div>
+        <div class="strip soft dom-r"><em>正文输入</em><span>多行 · 最小 8 行高 · 可滚</span><b>16</b></div>
+        <div class="strip bare"><em>校验提示</em><span>拒绝原因（ImportRejection.message）</span><b>16</b></div>
+        <div class="strip gap">粘底：导入</div>
+        <div class="strip strong dom-r"><em>导入</em><span>PillButton Primary 满宽</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>标题框</td><td>共享输入组件</td><td>高 48 · 圆角 14</td><td>Body</td><td>tint / text1</td></tr>
+            <tr><td>正文框</td><td>共享输入组件（多行）</td><td>最小 168 高 · 内 14/12 · 可内部滚</td><td>Body</td><td>tint / text1</td></tr>
+            <tr><td>拒绝提示</td><td><code>InlineNotice</code></td><td>紧贴输入框下 8dp</td><td>Footnote</td><td>Danger light / danger deep</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">空</span><span class="chip e">太长（超字数）</span><span class="chip e">正文为空</span>
+          <span class="chip e">包含不支持字符</span><span class="chip e">导入中</span><span class="chip e">键盘弹起（正文框让位）</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>两个输入框都用<b>共享输入组件</b>，不要各自写一份 <code>TextFieldDefaults.colors()</code>。</li>
+          <li>拒绝原因从「顶部一条红字」改为<b>紧贴触发它的那个框</b>，用户才知道改哪。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-r5">
+    <header><span class="badge b-r">阅读</span><h4>R5 · 阅读历史</h4><code class="file">ReadingHistoryScreen.kt</code><span class="skel">骨架 F</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>阅读历史 + 返回 · 副标题 = 共 N 篇</span><b>16</b></div>
+        <div class="strip soft dom-r"><em>文章组头</em><span>标题 · 共 N 个版本 · 点按展开</span><b>16</b></div>
+        <div class="strip soft dom-r"><em>版本行 ×N</em><span>第 N 版 · 日期 · 已读标记</span><b>16/12</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>组头</td><td><code>BareRow</code>（可展开）</td><td>15/13 · 最小 52 · 右侧 ChevronDown 旋转</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>版本行</td><td>缩进行</td><td>左缩进 52（与组头文字起点对齐）</td><td>Body + Label</td><td>text1 / text3</td></tr>
+            <tr><td>删除版本</td><td>行尾图标按钮</td><td>48 命中</td><td>—</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">空</span><span class="chip e">单版本（不可展开）</span><span class="chip e">多版本展开 / 收起</span><span class="chip e">删除版本确认框</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>版本行<b>左缩进 52dp</b>，与组头文字起点对齐——这是「从属关系」唯一可靠的画法。</li>
+          <li>组头副标题逐字沿用「共 N 个版本 · 点按收起/展开」，不要改写成图标。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================================
+     §3.3 AI 助学
+     ============================================================ -->
+<section id="lane-ai">
+  <div class="sec-head">
+    <div class="sec-no">Section 03.3</div>
+    <h2>AI 助学 · 7 屏</h2>
+    <p>主色 <code>AiSpeech #6CCBAB</code>。<b>这一族共同的四种失败态</b>必须在七屏上长得一模一样：
+      未配置 / 外发确认 / 调用失败 / 结果空。任何一屏自己发明第五种，都算没做完。</p>
+  </div>
+
+  <article class="screen" id="s-a1">
+    <header><span class="badge b-a">AI</span><h4>A1 · AI 助学（Tab 3）</h4><code class="file">AiLearningScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>AI 助学 · 无返回（顶格 Tab）</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>AiHeaderCard</em><span>配置状态 + 今天的词数（可空）</span><b>18</b></div>
+        <div class="strip soft dom-a"><em>七个功能行</em><span>词文串学 / 短文填词 / 随身听 / 串讲 / 长难句 / 拍照翻译 / 生图</span><b>0</b></div>
+        <div class="strip soft dom-m"><em>未上线功能（N 个）</em><span>折叠组 · 点开逐条看进度</span><b>0</b></div>
+        <div class="strip soft dom-s"><em>查看词表</em><span>入口行 · 副标题为今日词数</span><b>0</b></div>
+        <div class="strip soft"><em>AI 助学如何起作用？</em><span>ExplainerLine · 数据用在哪、发往哪里</span><b>16</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>头部卡</td><td><code>StrongCard</code></td><td>18 · 内 CTA 高 48</td><td>Title + Footnote</td><td>tint2 / text1</td></tr>
+            <tr><td>功能行</td><td><code>AiFeatureRow</code>（BareRow 家族）</td><td>15/13 · 最小 52 · <code>topDivider</code> 从第二行起</td><td>Title + Footnote</td><td>徽标 AiSpeech</td></tr>
+            <tr><td>状态徽章</td><td><code>featureStatusBadge</code></td><td>行尾 · 圆角 9</td><td>Label</td><td>「现在能用」= AiSpeech light /「未上线」= tint2 + text3</td></tr>
+            <tr><td>说明行</td><td><code>ExplainerLine</code></td><td>标题 Title · 正文 Footnote · 内 16</td><td>—</td><td>text1 / text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">AI 已配置</span><span class="chip e">AI 未配置（头部卡改成引导）</span>
+          <span class="chip e">今天有词 / 没有词</span><span class="chip e">N 个未上线功能 = 0</span>
+          <span class="chip e">折叠展开</span><span class="chip e">深套</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>七个功能行<b>必须同一行高、同一徽标尺寸、同一副标题行数</b>（各 1 行）。今天有功能项副标题两行，把那一行顶高了。</li>
+          <li>「未上线功能」这一组用<b>同一枚 SoftCard</b> 包住，不要和可用功能混在一个列表里——可用与不可用之间要有一条视觉断层。</li>
+          <li>入口图标去重（<code>AppIcon.Spark</code> 重复）已叫停，本轮不碰。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-a2">
+    <header><span class="badge b-a">AI</span><h4>A2 · AI 功能页（7 功能共用）</h4><code class="file">AiFeatureScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>功能名 + 返回 · 副标题 = 一句价值</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>状态条</em><span>StatusPill「现在能用 / 未上线」</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>主内容</em><span>输入区 / 结果区（按功能不同）</span><b>18</b></div>
+        <div class="strip soft dom-d"><em>未配置</em><span><code>NotConfiguredCard</code> + 去配置</span><b>16</b></div>
+        <div class="strip bare"><em>边界说明</em><span>「数据发往哪里」一行 Footnote</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>七个功能的差异化只允许发生在「主内容」这一带</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>功能</th><th>主内容形态</th><th>主操作</th></tr></thead>
+          <tbody>
+            <tr><td>词文串学</td><td>词表 + 生成的短文</td><td>生成短文</td></tr>
+            <tr><td>AI 短文填词</td><td>短文 + 空格输入</td><td>判分</td></tr>
+            <tr><td>单词随身听</td><td>播放列表 + 当前词</td><td>播放 / 暂停</td></tr>
+            <tr><td>单词串讲</td><td>词群 → 讲解正文</td><td>开始串讲</td></tr>
+            <tr><td>长难句分析</td><td>句子输入 + 分段解析</td><td>分析</td></tr>
+            <tr><td>拍照翻译</td><td>图 + OCR 文本 + 译文</td><td>翻译</td></tr>
+            <tr><td>AI 生图</td><td>提示词 + 结果图</td><td>生成图片</td></tr>
+          </tbody>
+          <caption>页头、状态条、未配置卡、边界说明<b>四带共用</b>；七屏的差异被压在中间一带里。</caption>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">未上线</span><span class="chip e">未配置</span><span class="chip e">待确认</span><span class="chip e">调用中</span><span class="chip e">失败</span><span class="chip e">结果空</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>把「页头 / 状态条 / 未配置 / 边界说明」抽成<b>共享壳</b>，七个功能只填中间带——否则七屏会各自漂移。</li>
+          <li>「未上线」时中间带换成 <b>NotConfiguredCard 的同族说明卡</b>，不要留一个点了没反应的按钮。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-a3">
+    <header><span class="badge b-a">AI</span><h4>A3 · AI 服务与密钥</h4><code class="file">AiProfileSettingsScreen.kt</code><span class="skel">骨架 F + 全屏编辑态</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>列表态页头</em><span>AI 服务 + 副标题（密钥说明）</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>说明卡</em><span>「可以配置多套 OpenAI 兼容服务…」</span><b>18</b></div>
+        <div class="strip soft dom-a"><em>配置行 ×N</em><span>名称 + 「模型 · 主机」+ 状态</span><b>0</b></div>
+        <div class="strip soft dom-a"><em>新增配置</em><span>行尾 ＋ ／ 底部主 CTA</span><b>16</b></div>
+        <div class="strip gap">── 进入编辑态（同屏替换，不是弹窗）──</div>
+        <div class="strip bare"><em>编辑态页头</em><span>新建 / 编辑配置 + 取消 + 保存</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>EditorField ×N</em><span>名称 / 网站地址 / Endpoint / 模型</span><b>16/48</b></div>
+        <div class="strip soft dom-a"><em>密钥</em><span>密文输入 + 「已保存」态 + 清除</span><b>16/48</b></div>
+        <div class="strip soft dom-a"><em>CapabilityToggle ×N</em><span>文本 / 图片 / 语音 能力勾选</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>VoiceOverlayOption ×N</em><span>语音叠加选项</span><b>16</b></div>
+        <div class="strip soft"><em>高级参数</em><span>折叠 · 温度 / 最大 token 等</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>配置行主行</td><td><code>AiProfileRow</code></td><td>15/13 · 最小 52</td><td>Title</td><td>text1</td></tr>
+            <tr><td>配置行副行</td><td>subtitle</td><td>「{model} · {host}」</td><td>Footnote</td><td>text2</td></tr>
+            <tr><td>字段</td><td><code>EditorField</code></td><td>标签 Label + 输入高 48 · 圆角 14 · 字段间 14</td><td>Label / Body</td><td>text2 / text1</td></tr>
+            <tr><td>密钥字段</td><td>EditorField（password）</td><td>右侧「清除」文字按钮</td><td>—</td><td>已保存 = AiSpeech deep 徽章</td></tr>
+            <tr><td>能力开关</td><td><code>CapabilityToggle</code></td><td>行高 ≥48 · 图标 22 + 文案 + Switch</td><td>Body</td><td>tint / onMint</td></tr>
+            <tr><td>校验错误</td><td><code>AiProfileFieldError</code></td><td>紧贴字段下 4dp</td><td>Footnote</td><td>danger deep</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">无配置（空态 + 主 CTA）</span>
+          <span class="chip e">多套配置</span>
+          <span class="chip e">密钥已保存 / 未保存</span>
+          <span class="chip e">字段校验失败（Endpoint 非法 / 名称为空）</span>
+          <span class="chip e">高级参数非法</span>
+          <span class="chip e">保存中</span>
+          <span class="chip e">删除配置确认</span>
+          <span class="chip e">清除密钥确认</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>编辑态明确「是全屏替换、不是弹窗」</b>——它有 8 个以上字段，塞进 Dialog 必然滚动嵌套。这条要在实现时写死，避免后人改回弹窗。</li>
+          <li>字段分组顺序固定：<b>身份（名称）→ 连接（网站 / Endpoint / 模型）→ 凭据（密钥）→ 能力 → 高级</b>。
+            现在的能力勾选夹在连接与凭据之间，用户填到一半要跳来跳去。</li>
+          <li>密钥字段的三种态（未填 / 已保存 / 清除中）用<b>同一行的尾注徽章</b>表达，不要另起一行说明。</li>
+          <li>两个确认框（删配置、清密钥）走共享 <a href="#d-confirm">D1</a>，文案逐字保留源码原文。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-a4">
+    <header><span class="badge b-a">AI</span><h4>A4 · AI 问词</h4><code class="file">WordAiQaScreen.kt</code><span class="skel">骨架 E</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>AI 问词 + 返回</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>词头</em><span>当前词 + 释义（上下文锚）</span><b>18</b></div>
+        <div class="strip soft"><em>问题输入</em><span>多行 · 2–3 行高</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>回答卡</em><span>Answered · 正文 + 复制</span><b>16</b></div>
+        <div class="strip soft dom-d"><em>四态</em><span>未配置 / 待确认 / 失败 / 空</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>提问</em><span>粘底主 CTA</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>词头</td><td>StrongCard</td><td>18 · 词形 Title·释义 Footnote</td><td>Title / Footnote</td><td>tint2 / text1</td></tr>
+            <tr><td>回答正文</td><td>Text</td><td>段距 12 · 可选中</td><td>Body 15</td><td>text1</td></tr>
+            <tr><td>外发确认</td><td><code>OutboundConfirmDialog</code></td><td>见 <a href="#d-outbound">D2</a></td><td>—</td><td>onMint 确认按钮</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">提问前</span><span class="chip e">待确认外发</span><span class="chip e">调用中</span><span class="chip e">失败 + 重试</span><span class="chip e">未配置</span><span class="chip e">回答超长（可滚）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>四态<b>共用同一块位置</b>（输入框与 CTA 之间），不要有的浮在上面有的挤在下面。</li>
+          <li>回答卡加「复制」次要操作，位置固定在卡右上。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-a5">
+    <header><span class="badge b-a">AI</span><h4>A5 · 长难句分析</h4><code class="file">SentenceAnalysisScreen.kt</code><span class="skel">骨架 E</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>长难句分析 + 返回 · 副标题 = 一句价值</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>句子输入</em><span>多行 · 最小 3 行</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>分段结果</em><span>SentenceSegment ×N：原句片段 + 成分标签 + 中文</span><b>16</b></div>
+        <div class="strip soft dom-d"><em>四态</em><span>未配置 / 待确认 / 失败 / 空</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>分析</em><span>粘底主 CTA</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>成分标签</td><td>徽章（主句 / 从句 / 短语）</td><td>圆角 9 · 高 20</td><td>Label 12</td><td>主句 = Learn light / 从句 = Library light / 短语 = Review light</td></tr>
+            <tr><td>原句片段</td><td>Text</td><td>段间 10</td><td>Title 17</td><td>text1</td></tr>
+            <tr><td>中文解释</td><td>Text</td><td>紧贴片段下 2</td><td>Footnote</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">输入为空（CTA 禁用）</span><span class="chip e">待确认外发</span><span class="chip e">调用中</span><span class="chip e">失败</span><span class="chip e">未配置</span><span class="chip e">句子过长</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>三个成分色<b>是语义色不是装饰色</b>：主句/从句/短语固定三色，全应用统一，不要再按屏变化。</li>
+          <li>分段结果用左色条（2dp）连成一条竖线，读者才能看出「这几段是同一句」。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-a6">
+    <header><span class="badge b-a">AI</span><h4>A6 · 拍照翻译</h4><code class="file">PhotoTranslationScreen.kt</code><span class="skel">骨架 E</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>拍照翻译 + 返回 · 副标题（图片不上传）</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>取图</em><span>拍照 / 从相册选 · 两枚大按钮</span><b>18</b></div>
+        <div class="strip soft dom-a"><em>OCR 结果</em><span>可编辑文本（校对后再翻译）</span><b>16</b></div>
+        <div class="strip soft dom-d"><em>OCR 不可用 / 识别失败</em><span>两档不同措辞，别混</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>译文</em><span>中文译文 + 复制</span><b>16</b></div>
+        <div class="strip soft"><em>已保存的翻译</em><span>历史行表 · 长按删除</span><b>16</b></div>
+        <div class="strip soft dom-m"><em>离线备用识别模型</em><span>下载 / 已就绪</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>取图按钮</td><td><code>PillButton</code> ×2</td><td>等分 · 高 56 · 间距 12</td><td>Title</td><td>Primary / Secondary</td></tr>
+            <tr><td>OCR 文本</td><td>共享输入组件</td><td>最小 120 高</td><td>Body</td><td>tint / text1</td></tr>
+            <tr><td>失败两档</td><td><code>NotConfiguredCard</code> 同族</td><td>内 16 · 各有独立标题</td><td>Title + Body</td><td>danger light</td></tr>
+            <tr><td>历史行</td><td>行表家族</td><td>左右 16 · 上下 12</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">空</span><span class="chip e">OCR 不可用</span><span class="chip e">识别失败</span>
+          <span class="chip e">识别成功待校对</span><span class="chip e">已翻译</span><span class="chip e">翻译失败</span>
+          <span class="chip e">无历史 / 有历史</span><span class="chip e">离线模型未下载 / 下载中 / 就绪</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>「OCR 不可用」和「识别失败」必须是两张不同的卡</b>（源码已是两档，视觉上也要分开：一个是「设备不支持」，一个是「这张图不行」）。</li>
+          <li>「图片不会上传」这句必须留在页头副标题，<b>不许移到折叠说明里</b>——它是这一屏最关键的信任信息。</li>
+          <li>原位覆盖翻译已叫停，本轮不做 bbox 叠加。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-a7">
+    <header><span class="badge b-a">AI</span><h4>A7 · AI 生图</h4><code class="file">ImageStudioScreen.kt</code><span class="skel">骨架 E</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>AI 生图 + 返回</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>提示词</em><span>PromptEditor · 多行 + 生成按钮</span><b>16</b></div>
+        <div class="strip strong dom-a"><em>结果图</em><span>ResultImage · 方形 · 可保存</span><b>18</b></div>
+        <div class="strip soft dom-d"><em>失败 / 未配置</em><span>FailureCard + guidance()</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>动作</em><span>ActionPill：重新生成 / 保存 / 复制</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>提示词框</td><td>共享输入组件（多行）</td><td>最小 96 高</td><td>Body</td><td>tint / text1</td></tr>
+            <tr><td>结果图</td><td>Image 1:1</td><td>满宽 · 圆角 20</td><td>—</td><td>surface 白底</td></tr>
+            <tr><td>动作药片</td><td><code>ActionPill</code></td><td>横排 · 间距 8 · 高 48</td><td>Label</td><td>Secondary</td></tr>
+            <tr><td>确认框</td><td><code>GlassDialog</code></td><td>见 <a href="#d-image">D7</a></td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">PromptReady</span><span class="chip e">AwaitingConfirmation（两段 stage）</span><span class="chip e">生成中</span><span class="chip e">ImageReady</span><span class="chip e">NotConfigured（多种 reason）</span><span class="chip e">Failed</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>结果图占位框与出图<b>同尺寸</b>，出图时不跳版。</li>
+          <li>失败卡必须带 <code>guidance()</code> 那句「下一步怎么办」，不能只有错误码。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!--PART5-->
+<!-- ============================================================
+     §3.4 我的与系统
+     ============================================================ -->
+<section id="lane-me">
+  <div class="sec-head">
+    <div class="sec-no">Section 03.4</div>
+    <h2>我的与系统 · 10 屏</h2>
+    <p>主色 <code>Settings #A6B0AC</code>（一个几乎不抢戏的灰绿）。<b>这一族的目标是「可预期」</b>：
+      每个开关、每枚删除按钮的位置都一样，用户第二次进来不需要重新找。</p>
+  </div>
+
+  <article class="screen" id="s-m1">
+    <header><span class="badge b-m">系统</span><h4>M1 · 我的（Tab 4）</h4><code class="file">ProfileScreen.kt</code><span class="skel">骨架 E</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>我的 · 无返回 · 副标题「连续 N 天 · API Key 只保存在本机加密区」</span><b>16</b></div>
+        <div class="strip strong dom-m"><em>档案卡</em><span>称呼 + 头像/徽标 + 连续天数</span><b>18</b></div>
+        <div class="strip soft dom-s"><em>数据卡</em><span>已学词数 / 今日完成 / 总天数</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>学习记录</em><span>入口行 · 副标题「今日已学与历史」</span><b>0</b></div>
+        <div class="strip soft dom-m"><em>设置</em><span>入口行 · 副标题带称呼</span><b>0</b></div>
+        <div class="strip gap">底导 64dp</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>档案卡</td><td><code>StrongCard</code></td><td>18 · 内边距 20 上 18 下</td><td>Headline 称呼 / Footnote 连续天数</td><td>tint2 / text1</td></tr>
+            <tr><td>数据卡</td><td><code>SoftCard</code></td><td>16 · 三列等分 · 列间距 8</td><td>Display(小 24) 数 / Label 名</td><td>tint / text1 + text2</td></tr>
+            <tr><td>入口行</td><td><code>BareRow</code></td><td>15/13 · 最小 52</td><td>Title + Footnote</td><td>徽标 Settings</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">无连续天数（不显示「连续 0 天」）</span><span class="chip e">今日 0 完成</span><span class="chip e">深套</span><span class="chip e">大字号 2.0（三列降为一行一列）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>数据卡里的三个数用 <b>Display 缩小版（24sp）</b>，不要用 Headline——Headline 是「页级标题」，这里不是。</li>
+          <li>没有连续天数时<b>整格消失</b>而不是显示 0（源码已这么判断，视觉规格要跟上）。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m2">
+    <header><span class="badge b-m">系统</span><h4>M2 · 设置</h4><code class="file">SettingsScreen.kt</code><span class="skel">骨架 F · 四组</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>设置 · 副标题「称呼 · API Key 只保存在本机加密区」</span><b>16</b></div>
+        <div class="strip bare dom-s"><em>组：学习</em><span>学习提醒 / 默写纸</span><b>0</b></div>
+        <div class="strip bare dom-a"><em>组：AI 与语音</em><span>AI 服务 / 语音合成（当前供应商）</span><b>0</b></div>
+        <div class="strip bare dom-m"><em>组：外观与关于</em><span>外观 / 开源许可与隐私</span><b>0</b></div>
+        <div class="strip bare dom-d"><em>组：数据与安全</em><span>导入词书 / 导出词书 / 备份与恢复</span><b>0</b></div>
+        <div class="strip gap">四组之间 22dp；组内零间距 + 发丝线</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>组标题</td><td><code>SectionHeading</code></td><td>上 22 / 下 10 · 左对齐</td><td>Title</td><td>text1</td></tr>
+            <tr><td>组容器</td><td><code>SoftCard(contentPadding = 0)</code></td><td>圆角 20 · 行间 1dp 发丝线（缩进 52）</td><td>—</td><td>tint</td></tr>
+            <tr><td>入口行</td><td><code>BareRow</code></td><td>15/13 · 最小 52 · ChevronRight 16 描边</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>危险行</td><td><code>BareRow</code>（危险着色）</td><td>同上，仅墨色变化</td><td>Title</td><td>danger deep</td></tr>
+            <tr><td>副标题</td><td>行内 Footnote</td><td>「当前供应商：系统 TTS」这类状态串</td><td>Footnote</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips">
+          <span class="chip e">四组常驻</span><span class="chip e">语音未选择引擎</span>
+          <span class="chip e">提醒开着 / 关着</span><span class="chip e">深套</span><span class="chip e">大字号 2.0</span>
+        </div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>组内行必须同高</b>：现在有副标题的行比没副标题的行高 16dp，四组放在一起像两种列表。
+            处方：无副标题的行也给一个空 Footnote 槽（或统一两行版式）。</li>
+          <li>「数据与安全」组里<b>不许</b>出现删除动作——删除全部学习数据的入口在 M5 备份中心，设置里只放导航。今天两处都有，重复了。</li>
+          <li>每组之间 22dp，组内零间距；不要给每组再套一层外边距。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m3">
+    <header><span class="badge b-m">系统</span><h4>M3 · 语音合成</h4><code class="file">SpeechSettingsScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>语音合成 + 返回 · 副标题「密钥仅保存在系统安全区」</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>引擎选择</em><span>SpeechProfileCandidate ×N · 单选</span><b>16</b></div>
+        <div class="strip soft dom-a"><em>试听</em><span>输入文本 + 播放药片</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>语速</em><span>滑杆 + 当前值</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>口音</em><span>美 / 英 · 二选一</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>引擎行</td><td><code>BareRow</code> + 单选标记</td><td>15/13 · 最小 52 · 选中 = 2dp onMint 描边</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>试听输入</td><td>共享输入组件</td><td>高 48</td><td>Body</td><td>tint / text1</td></tr>
+            <tr><td>语速</td><td>Slider + 数值</td><td>轨高 4 · 拇指 20 · 右挂 Label 值</td><td>Label</td><td>AiSpeech base</td></tr>
+            <tr><td>播放药片</td><td><code>SpeakerButton</code></td><td>高 48</td><td>Body</td><td>tint2 / onMint</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">系统 TTS</span><span class="chip e">第三方引擎未配置密钥</span><span class="chip e">试听播放中 / 暂停</span><span class="chip e">试听失败</span><span class="chip e">大字号 2.0（语速滑杆不与数值抢位）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>四个设置项收进<b>一枚 SoftCard 的四个区块</b>，区块之间 1dp 发丝线；现在是四张散卡。</li>
+          <li>语速数值固定在滑杆右侧同一行，<b>不随字号换行</b>。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m4">
+    <header><span class="badge b-m">系统</span><h4>M4 · 学习提醒</h4><code class="file">ReminderSettingsScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>学习提醒 + 返回 · 副标题「每天最多一次，系统可能稍有延迟」</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>开关</em><span>BareRow + Switch</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>时间</em><span>行 → 弹出时间选择对话框</span><b>16</b></div>
+        <div class="strip soft"><em>权限说明</em><span>未授权时的一行解释 + 去设置</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>开关行</td><td><code>BareRow</code> + Switch</td><td>15/13 · 最小 52</td><td>Title + Footnote</td><td>轨道色走 <code>SwitchTrackColorGuardTest</code></td></tr>
+            <tr><td>时间行</td><td><code>BareRow</code></td><td>右侧显示「08:30」mono</td><td>Title / Label 时间</td><td>text1 / text2</td></tr>
+            <tr><td>时间选择</td><td><code>AlertDialog</code> + TimePicker</td><td>面板 24 圆角 · 内 20</td><td>Headline 标题</td><td>surface</td></tr>
+            <tr><td>权限提示</td><td><code>InlineNotice</code></td><td>内 14/12</td><td>Footnote</td><td>Review light / review deep</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">关</span><span class="chip e">开 + 已选时间</span><span class="chip e">权限未授予</span><span class="chip e">时间选择框打开</span><span class="chip e">大字号 2.0（时间选择框不溢出）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li><b>时间选择框是这一族唯一的浮层</b>，统一到 <a href="#d-time">D9</a> 的面板规格（24 圆角 + 20 内边距），
+            现在它用的是 M3 默认 <code>AlertDialog</code>，与全站面板不同源。</li>
+          <li>权限未授予时的说明用 <b>Review 域浅底</b>（提醒属于复习节奏），不要用 Danger。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m5">
+    <header><span class="badge b-m">系统</span><h4>M5 · 备份与恢复</h4><code class="file">BackupHubScreen.kt</code><span class="skel">骨架 D · 三节</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>备份与恢复 + 返回 · 副标题「API Key 与系统 TTS 数据不在任何备份里」</span><b>16</b></div>
+        <div class="strip bare dom-s"><em>组：导出</em><span>SectionHeading</span><b>22/10</b></div>
+        <div class="strip soft dom-s"><em>导出学习数据留档</em><span>「不含密钥，不能用于换机恢复」</span><b>0</b></div>
+        <div class="strip soft dom-s"><em>认证导出</em><span>「旧设备系统认证后生成配对码」</span><b>0</b></div>
+        <div class="strip bare dom-r"><em>组：恢复</em><span>SectionHeading</span><b>22/10</b></div>
+        <div class="strip soft dom-r"><em>从旧设备恢复</em><span>「扫描旧设备配对码并替换本机数据」</span><b>0</b></div>
+        <div class="strip bare dom-d"><em>组：危险操作</em><span>SectionHeading</span><b>22/10</b></div>
+        <div class="strip soft dom-d"><em>删除全部学习数据</em><span>「文章与收藏保留」· 墨色 danger</span><b>0</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>节标题</td><td><code>BackupHubSection</code></td><td>22/10 · 带 <code>backup_hub_section_*</code> tag</td><td>Title</td><td>text1</td></tr>
+            <tr><td>入口行</td><td><code>BareRow</code></td><td>15/13 · 最小 52 · 副标题可 2 行</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>危险行</td><td><code>BareRow</code> 危险着色</td><td>同上</td><td>Title</td><td><b>danger deep</b>（只有这一行）</td></tr>
+            <tr><td>页头副标题</td><td>Header subtitle</td><td>可 2 行</td><td>Footnote</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">全部入口可达</span><span class="chip e">删除确认框（含级联计数）</span><span class="chip e">深套</span><span class="chip e">大字号 2.0（副标题 2 行）</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>三节的分组差<b>只允许通过副标题文案 + 危险行墨色</b>表达；不要给三节各配一种底色（现在是三种浅底）。</li>
+          <li>页头副标题那句「API Key 与系统 TTS 数据不在任何备份里」是<b>信任文案，必须常驻</b>，不要折叠。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m6">
+    <header><span class="badge b-m">系统</span><h4>M6 · 导出备份</h4><code class="file">BackupExportScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>导出备份 + 返回 · 副标题「App 自己不留副本」</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>范围行 ×N</em><span>ExportScopeRow：标题 + 说明 + 勾选</span><b>16</b></div>
+        <div class="strip bare"><em>进度</em><span>ExportProgressLine</span><b>16</b></div>
+        <div class="strip gap">粘底：选择目录并导出</div>
+        <div class="strip strong dom-s"><em>导出</em><span>PillButton Primary 满宽</span><b>16/48</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>范围行</td><td><code>ExportScopeRow</code></td><td>15/13 · 最小 52 · 右侧 48dp 勾选</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>勾选</td><td><code>AppGlyph(Check)</code> StrokeOnly</td><td>22dp</td><td>—</td><td>onMint / 未选 outline</td></tr>
+            <tr><td>进度行</td><td>Text + 细进度</td><td>高 6 轨 · 域色渐变</td><td>Footnote</td><td>Learn 渐变</td></tr>
+            <tr><td>不可用态</td><td><code>UnavailableContent</code></td><td>居中 · 三件套</td><td>Headline + Body</td><td>text1 / text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">范围全选 / 部分选</span><span class="chip e">导出中（进度）</span><span class="chip e">导出完成</span><span class="chip e">导出失败</span><span class="chip e">目录未选</span><span class="chip e">本功能不可用</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>导出中把「导出」CTA 换成<b>禁用 + 进度文字</b>，与 M7/M8 的进行态一致。</li>
+          <li><code>UnavailableContent</code> 三屏（M6/M7/M8）共用一套：插图 → 一句人话 → 一枚返回。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m7">
+    <header><span class="badge b-m">系统</span><h4>M7 · 认证导出</h4><code class="file">BackupPairingExportScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>认证导出 + 返回 · 副标题「配对码 30 分钟内有效、只能用一次」</span><b>16</b></div>
+        <div class="strip strong dom-m"><em>二维码</em><span>QrCodeDisplay · 白底方块</span><b>18</b></div>
+        <div class="strip bare"><em>倒计时</em><span>剩余有效期 · mono 数字</span><b>16</b></div>
+        <div class="strip soft"><em>配对码文本</em><span>长串 + 复制</span><b>16</b></div>
+        <div class="strip soft dom-s"><em>步骤说明</em><span>1 2 3 三步（在旧设备做什么）</span><b>16</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>二维码</td><td><code>QrCodeDisplay</code></td><td>220dp 见方 · 圆角 20 · 白底</td><td>—</td><td><b>surface 白</b>（扫码必需，深套也是白）</td></tr>
+            <tr><td>倒计时</td><td>Text mono</td><td>—</td><td>Body（tnum）</td><td>text1；&lt;5 分钟转 danger deep</td></tr>
+            <tr><td>配对码</td><td>Text mono + 复制</td><td>可折行 · 字距 +0.5</td><td>Footnote</td><td>text2</td></tr>
+            <tr><td>认证</td><td>系统生物识别</td><td>系统面板，不自定义</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">生成中</span><span class="chip e">已出码</span><span class="chip e">倒计时 &lt;5 分钟</span><span class="chip e">已过期</span><span class="chip e">认证失败</span><span class="chip e">本功能不可用</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>二维码区域<b>永远白底</b>，深套下也不许换色——扫码成功率优先于配色一致性。这条要写进规格，避免被「深套收口」时误改。</li>
+          <li>倒计时最后一分钟给一次视觉提示（数字转 danger deep + 一行 Footnote），不要弹窗。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m8">
+    <header><span class="badge b-m">系统</span><h4>M8 · 从旧设备恢复</h4><code class="file">BackupRestoreScreen.kt</code><span class="skel">骨架 D</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>从旧设备恢复 + 返回 · 副标题「整机替换，不合并」</span><b>16</b></div>
+        <div class="strip strong dom-m"><em>扫描框</em><span>QrScanBox · 方形取景</span><b>18</b></div>
+        <div class="strip soft"><em>待恢复摘要</em><span>记录 N 条 / 音频 N 个 / 解压后体量</span><b>16</b></div>
+        <div class="strip soft"><em>重启提示</em><span>RestartNoticeCard</span><b>16</b></div>
+        <div class="strip gap">恢复中：全屏遮罩</div>
+        <div class="strip strong dom-m"><em>RestoringCard</em><span>进度 + 禁止返回</span><b>18</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>取景框</td><td><code>QrScanBox</code></td><td>260dp 见方 · 四角 3dp 描边 · 中间扫掠线</td><td>—</td><td>onMint 角标 / 其余透明</td></tr>
+            <tr><td>摘要行</td><td><code>BareRow(showChevron = false)</code></td><td>15/13 · 最小 52</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>恢复中</td><td><code>RestoringCard</code></td><td>居中 · 无操作</td><td>Headline + Body</td><td>tint2 / text1</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">等待扫码</span><span class="chip e">码无效</span><span class="chip e">摘要已就绪</span><span class="chip e">恢复中（不可返回）</span><span class="chip e">恢复完成需重启</span><span class="chip e">失败</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>「整机替换：新设备上的数据会被备份内容覆盖，不会合并」<b>必须在取景框上方、不在下方</b>——用户扫码前必须看见它。</li>
+          <li>恢复中禁用返回手势（源码也应如此），并给一个明确的「不要关掉 App」文案。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m9">
+    <header><span class="badge b-m">系统</span><h4>M9 · 开源许可与隐私说明</h4><code class="file">LicensesScreen.kt</code><span class="skel">骨架 F</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip bare"><em>页头</em><span>开源许可与隐私说明 + 返回 · 副标题「与仓库台账同一份」</span><b>16</b></div>
+        <div class="strip soft dom-m"><em>隐私说明</em><span>PrivacyStatement · 长文</span><b>16</b></div>
+        <div class="strip bare"><em>许可列表</em><span>组件名 + 「许可证 · v版本」</span><b>16</b></div>
+        <div class="strip soft"><em>许可行 ×N</em><span>可展开看全文</span><b>16/12</b></div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>隐私正文</td><td>Text</td><td>段距 12 · 行距 1.7</td><td>Body</td><td>text1</td></tr>
+            <tr><td>许可行</td><td><code>BareRow</code>（可展开）</td><td>15/13 · 最小 52</td><td>Title + Footnote</td><td>text1 / text2</td></tr>
+            <tr><td>不可用</td><td><code>UnavailableLedger</code></td><td>居中 · 带重试</td><td>Body</td><td>text2</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">台账载入中</span><span class="chip e">台账不可用 + 重试</span><span class="chip e">展开全文</span><span class="chip e">深套</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>隐私说明放<b>最上面</b>（用户更常看这个），许可列表在下。<b>顺序不要反过来。</b></li>
+          <li>许可全文展开用行内展开，不弹窗、不跳页。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="screen" id="s-m10">
+    <header><span class="badge b-d" style="color:var(--danger-d);background:var(--danger-l)">系统</span><h4>M10 · 错误页</h4><code class="file">AppScreen.kt · ErrorScreen</code><span class="skel">骨架 A</span></header>
+    <div class="sbody">
+      <div class="stack">
+        <div class="strip gap">上留白</div>
+        <div class="strip soft dom-d"><em>插图</em><span>96dp 矢量 · 浅底圆</span><b>居中</b></div>
+        <div class="strip bare"><em>标题</em><span>一句人话（不是异常名）</span><b>16</b></div>
+        <div class="strip bare"><em>说明</em><span>能做什么 / 不会丢什么</span><b>16</b></div>
+        <div class="strip soft"><em>技术细节</em><span>折叠 · 默认收起</span><b>16</b></div>
+        <div class="strip strong dom-d"><em>重试</em><span>PillButton Primary 满宽</span><b>16/48</b></div>
+        <div class="strip gap">下留白</div>
+      </div>
+      <div class="sright">
+        <h5>规格</h5>
+        <div class="tw"><table class="spec">
+          <thead><tr><th>元素</th><th>组件</th><th>尺寸 / 间距</th><th>排印</th><th>颜色</th></tr></thead>
+          <tbody>
+            <tr><td>插图</td><td>矢量 96dp</td><td>浅底圆 128dp</td><td>—</td><td>Danger light</td></tr>
+            <tr><td>标题</td><td>Text</td><td>居中 · 最多 2 行</td><td>Headline</td><td>text1</td></tr>
+            <tr><td>说明</td><td>Text</td><td>居中 · 距标题 8</td><td>Body</td><td>text2</td></tr>
+            <tr><td>技术细节</td><td>折叠块</td><td>内 16 · 等宽字体</td><td>Footnote mono</td><td>text3</td></tr>
+          </tbody>
+        </table></div>
+        <h5>状态</h5>
+        <div class="chips"><span class="chip e">可重试</span><span class="chip e">不可重试（只能退出）</span><span class="chip e">细节展开</span></div>
+        <h5>与今天比改什么</h5>
+        <div class="delta"><ul>
+          <li>与 L15 恢复页、AI 未配置共用 <code>ProblemScaffold</code>（见 <a href="#s-l15">L15</a>）。</li>
+          <li>错误页<b>永远不要用 Danger 当主色铺满</b>：主 CTA 仍是品牌渐变，Danger 只用在插图和标题上。</li>
+        </ul></div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================================================
+     §3.5 宿主壳
+     ============================================================ -->
+<section id="lane-host">
+  <div class="sec-head">
+    <div class="sec-no">Section 03.5</div>
+    <h2>宿主壳 AppScreen</h2>
+    <p>37 屏之外的那一个：它不管内容，只管<b>路由、底导、启动面与十二个浮层的托管</b>。改它等于改全部屏的外框，所以单独一节。</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h6>五段职责</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li><b>启动面</b> <code>BrandLaunchSurface</code>：品牌渐变条 + 标识，仅冷启动 1 帧。</li>
+        <li><b>状态分派</b>：Loading / NeedsProfile / Ready / Error / NeedsRecovery 五种整屏。</li>
+        <li><b>底导</b>：四个顶层 Tab 才有；进入二级页一律隐藏。</li>
+        <li><b>浮层托管</b>：十二个弹窗全部挂在这一层（见 §4），屏内只发「请求」。</li>
+        <li><b>系统 inset</b>：状态栏 / 导航栏 / 键盘，统一在这里吃掉。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>硬约束</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li><b>屏不发弹窗</b>：屏只回传「我请求删除 X」，由宿主弹共享确认框。<b>这条是现有架构的正确做法，必须保持。</b></li>
+        <li><b>破坏性确认不可绕过</b>：<code>ConfirmDestructiveDialog</code> 的两步确认是红线（先请求、再确认）。</li>
+        <li><b>底导只在四个顶层出现</b>，二级页（词义详情、读文章、AI 服务等）一律无底导。</li>
+        <li><b>内容底边距</b> = 64dp 底导 + 系统 inset + 16dp；漏了就会蹭底导。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>底导四格已定名</b>
+    <p>第三格从占位名收口为 <b>「AI 助学」</b>（<code>AppTab.AI("AI 助学", "AI 助学")</code>），标签与朗读描述同一串。
+      四格 glyph 固定为 <code>Book</code> / <code>Newspaper</code> / <code>Spark</code> / <code>Person</code>，不再换。</p>
+  </div>
+</section>
+
+<!--PART6-->
+<!-- ============================================================
+     §4 弹窗与浮层
+     ============================================================ -->
+<section id="dialogs">
+  <div class="sec-head">
+    <div class="sec-no">Section 04</div>
+    <h2>弹窗与浮层 · 12 项</h2>
+    <p>十二项 = <b>九个面板规格（D1–D9）+ 三项通用规矩（D10–D12）</b>。
+      十二处代码站点全部落在下面这张映射表里，没有一处漏掉；其中 <b>7 处站点共用 D1 这一个面板</b>——
+      这正是本节最想让主力开发 AI 守住的东西：<b>删除类确认只有一个长相</b>。</p>
+  </div>
+
+  <h3 id="dlg-map">4.0 站点 → 条目映射</h3>
+  <div class="tw"><table class="idx spec">
+    <thead><tr><th>#</th><th>站点（文件 · 行）</th><th>触发文案</th><th>面板</th><th>形态</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>AppScreen.kt · 450</code></td><td>删除全部学习数据？</td><td><a href="#d-confirm">D1</a></td><td>居中对话框</td></tr>
+      <tr><td>2</td><td><code>AppScreen.kt · 738</code></td><td>清空搜索历史？</td><td><a href="#d-confirm">D1</a></td><td>居中对话框</td></tr>
+      <tr><td>3</td><td><code>AppScreen.kt · 1260</code></td><td>删除这套 AI 配置？</td><td><a href="#d-confirm">D1</a></td><td>居中对话框</td></tr>
+      <tr><td>4</td><td><code>AppScreen.kt · 1280</code></td><td>清除已保存的密钥？</td><td><a href="#d-confirm">D1</a></td><td>居中对话框（含「需重新填写」正文）</td></tr>
+      <tr><td>5</td><td><code>AppScreen.kt · 1485</code></td><td>删除这条翻译记录？</td><td><a href="#d-confirm">D1</a></td><td>居中对话框</td></tr>
+      <tr><td>6</td><td><code>AppScreen.kt · 1554</code></td><td>删除这一版？</td><td><a href="#d-confirm">D1</a></td><td>居中对话框</td></tr>
+      <tr><td>7</td><td><code>AppScreen.kt · 2156</code></td><td>删除《词书名》？</td><td><a href="#d-confirm">D1</a> + <a href="#d-cascade">D8</a> 计数槽</td><td>居中对话框（带级联数字）</td></tr>
+      <tr><td>8</td><td><code>AppScreen.kt · 1851</code></td><td>词书导出选择</td><td><a href="#d-bookexport">D3</a></td><td>玻璃面板 · 列表多选</td></tr>
+      <tr><td>9</td><td><code>AppScreen.kt · 2186</code></td><td>换机数据迁移确认</td><td><a href="#d-migrate">D4</a></td><td>玻璃面板 · 长正文</td></tr>
+      <tr><td>10</td><td><code>CardDetailScreen.kt · 541/548</code></td><td>个人笔记</td><td><a href="#d-notes">D5</a></td><td>居中对话框 · 多行输入</td></tr>
+      <tr><td>11</td><td><code>ArticleReadingScreen.kt · 599</code></td><td>覆盖范围说明</td><td><a href="#d-coverage">D6</a></td><td>底部抽屉</td></tr>
+      <tr><td>12</td><td><code>ImageStudioScreen.kt · 278</code></td><td>生图前确认</td><td><a href="#d-image">D7</a></td><td>玻璃面板</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">另有 <a href="#d-outbound">D2</a> 外发确认（挂在 AI 各能力入口，不是独立屏幕站点）与
+    <a href="#d-time">D9</a> 提醒时间选择（挂在设置 M4），两者按同一套面板几何出。</p>
+
+  <div class="warn">
+    <b>一条总规矩先说：面板只有两种圆角</b>
+    <p><b>居中对话框 24dp / 底部抽屉上圆角 24dp / 全站再无第三种。</b>
+      现在偏偏有第四种：玻璃面板用的是 28dp、M3 默认 <code>AlertDialog</code> 又是另一套 28dp。
+      统一到 24 之后，D1–D9 的外框可以只写一份。</p>
+  </div>
+
+  <h3 id="d-confirm">D1 · 破坏性确认（共享面板）</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel">
+        <p class="ptitle">删除全部学习数据？</p>
+        <p class="ptext">会清空 128 个词的学习进度与复习记录。文章和收藏会保留。这一步不能用撤销恢复。</p>
+        <div class="pbtns"><span class="pbtn ghost">取消</span><span class="pbtn danger">删除</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>面板</td><td>宽 = min(视宽 − 64dp, 320dp) · 圆角 <b>24</b> · 内边距 22 / 22 / 16 / 18</td></tr>
+          <tr><td>遮罩</td><td><code>text1</code> @ 32%（深套 <code>#000</code> @ 48%）· 无模糊</td></tr>
+          <tr><td>标题</td><td>Title 17 SemiBold · 一行问句 · 句末问号</td></tr>
+          <tr><td>正文</td><td>Body 15 · <code>text2</code> · 说清「丢什么 / 留什么 / 能不能撤回」三件事</td></tr>
+          <tr><td>按钮组</td><td>两枚等分 · 高 48 · 间距 10 · 取消在左（Text/Secondary）· 执行在右（Danger 实底）</td></tr>
+          <tr><td>危险主键</td><td>底色 <code>danger-d #9E2B24</code> · 字 <code>#FFF</code> · <b>不是品牌渐变</b></td></tr>
+          <tr><td>返回键</td><td>= 取消（不是「无响应」）</td></tr>
+          <tr><td>tag</td><td><code>confirm_destructive_dialog</code> / 按钮 <code>..._confirm</code> · <code>..._cancel</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips">
+        <span class="chip e">7 处站点</span><span class="chip e">执行中禁用双键 + 进度</span>
+        <span class="chip e">执行失败：留在面板 + 一行错误</span><span class="chip e">深套</span><span class="chip e">大字号 2.0（正文可滚，按钮不滚）</span>
+      </div>
+      <div class="delta"><ul>
+        <li><b>动词写具体</b>：按钮文案 = 标题里的动词（删除 / 清空 / 清除），<b>不许写「确定」</b>。</li>
+        <li>「清除已保存的密钥」这类<b>可恢复动作不得用 Danger 实底</b>，改用 Secondary——它丢的东西用户能重新填。
+          7 处站点里只有「删除全部学习数据」「删除《词书名》」是真的不可逆。</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <h3 id="d-outbound">D2 · 外发确认（AI 内容出门）</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel">
+        <p class="ptitle">把这段文字发送到第三方？</p>
+        <p class="ptext">翻译会把选中的 42 个字符发送到 Groq 的服务器。发送内容不包含你的学习记录。</p>
+        <div class="pbtns"><span class="pbtn ghost">取消</span><span class="pbtn go">发送</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <p class="small">与 D1 同一几何，<b>只换主键颜色与语气</b>：外发不是破坏性动作，主键用品牌渐变。
+        正文必须出现三件事：<b>哪家服务商</b> → <b>发出去的是什么</b>（字数/范围）→ <b>不包含什么</b>。</p>
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>面板</td><td>同 D1（24 / 22-22-16-18）</td></tr>
+          <tr><td>主键</td><td>品牌渐变 · 字 <code>onBrand</code> · 文案 =「发送」</td></tr>
+          <tr><td>服务商名</td><td>正文内联 <code>text1</code> 加粗，<b>不截断</b></td></tr>
+          <tr><td>一次性</td><td>同内容同会话只问一次；换内容要重问</td></tr>
+          <tr><td>tag</td><td><code>outbound_confirm_dialog</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips"><span class="chip e">本地引擎（无需外发）→ 不弹</span><span class="chip e">无密钥 → 转 AI 未配置态</span></div>
+    </div>
+  </div>
+
+  <h3 id="d-bookexport">D3 · 词书导出选择（玻璃面板）</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel">
+        <p class="ptitle">导出哪些词书</p>
+        <div class="pfield">□  四级核心词 · 1280 词</div>
+        <div class="pfield">☑  考研高频 · 860 词</div>
+        <div class="pfield">☑  我的生词 · 214 词</div>
+        <div class="pbtns"><span class="pbtn ghost">取消</span><span class="pbtn go">导出 2 本</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>面板</td><td><code>GlassDialog</code> · 圆角 <b>24</b>（原 28 → 改） · 内 20/16/16/18</td></tr>
+          <tr><td>选项行</td><td>高 48 · 圆角 12 · <code>tint</code> 底 · 左勾选框 22 · 右计数 Footnote</td></tr>
+          <tr><td>主键</td><td>文案带数量「导出 2 本」· 0 选时禁用</td></tr>
+          <tr><td>滚动</td><td>列表区最大高 = 视高 40%，内部滚</td></tr>
+          <tr><td>tag</td><td><code>book_export_dialog</code> · <code>book_export_option_*</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips"><span class="chip e">全不选（主键禁用）</span><span class="chip e">20 本（列表滚）</span><span class="chip e">深套</span></div>
+    </div>
+  </div>
+
+  <h3 id="d-migrate">D4 · 换机迁移确认（玻璃面板 · 长正文）</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel">
+        <p class="ptitle">用旧设备的数据替换本机？</p>
+        <p class="ptext">本机现有的 3 本词书、310 条学习记录会被旧设备的备份整体覆盖，不会合并。覆盖后无法找回。</p>
+        <div class="pbtns"><span class="pbtn ghost">取消</span><span class="pbtn danger">替换</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <p class="small">与 M8 恢复流程配套。<b>正文里必须出现具体数字</b>（本机将丢多少 + 旧机带来多少），
+        只写「将替换数据」不算合格文案——用户在换机场景下最怕的是不知道自己在丢什么。</p>
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>面板</td><td><code>GlassDialog</code> · 24 圆角 · 正文区可滚（限 3 行高）</td></tr>
+          <tr><td>主键</td><td><b>Danger 实底</b> · 文案「替换」（<code>onMint</code> 确认在玻璃上是错的，玻璃底不吃品牌绿）</td></tr>
+          <tr><td>前后对照</td><td>正文内两行：<code>现在：…</code> / <code>之后：…</code>，各一行 Footnote</td></tr>
+          <tr><td>tag</td><td><code>migration_confirm_dialog</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips"><span class="chip e">本机为空（正文改为「本机还没有数据」）</span><span class="chip e">深套</span></div>
+    </div>
+  </div>
+
+  <h3 id="d-notes">D5 · 个人笔记编辑</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel">
+        <p class="ptitle">个人笔记</p>
+        <div class="pfield" style="height:64px;align-items:flex-start;padding:8px 9px">联想：词根 memor- 记得…</div>
+        <div class="pbtns"><span class="pbtn ghost">取消</span><span class="pbtn go">保存</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>面板</td><td>居中对话框 · 24 圆角 · 内 22</td></tr>
+          <tr><td>输入框</td><td>最小高 96 · 可长到视高 40% 后内滚 · 圆角 12 · <code>tint</code> 底</td></tr>
+          <tr><td>字数</td><td>右下 Footnote 计数（如 <code>36 / 500</code>）</td></tr>
+          <tr><td>主键</td><td>「保存」· 空内容时改为「删除」且用 Text 样式</td></tr>
+          <tr><td>键盘</td><td>面板上移贴键盘，输入框不被遮</td></tr>
+          <tr><td>tag</td><td><code>personal_notes_dialog</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips"><span class="chip e">已有笔记</span><span class="chip e">空笔记</span><span class="chip e">键盘弹起</span><span class="chip e">深套</span></div>
+      <div class="delta"><ul><li>这是全站<b>唯一需要键盘的对话框</b>，它必须单独处理 inset；其余浮层一律吃掉键盘。</li></ul></div>
+    </div>
+  </div>
+
+  <h3 id="d-coverage">D6 · 覆盖范围说明（底部抽屉）</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel" style="border-radius:24px 24px 0 0;align-self:flex-end">
+        <div style="width:34px;height:4px;border-radius:99px;background:var(--outline);margin:0 auto 4px"></div>
+        <p class="ptitle">「coverage」在这里的意思</p>
+        <p class="ptext">按你已学的 128 词，这篇文章有 87% 的词你能读懂。剩下的 13% 会在正文里标出来。</p>
+        <div class="pbtns"><span class="pbtn go">知道了</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>形态</td><td><code>ModalBottomSheet</code> · <code>skipPartiallyExpanded = true</code>（保持现状）</td></tr>
+          <tr><td>圆角</td><td>上 24 / 下 0 · 抓柄 34×4 居中 · 距顶 10</td></tr>
+          <tr><td>内容</td><td>一句解释 + 一个百分比大数 + 一段正文 · 内边距 20</td></tr>
+          <tr><td>关闭</td><td>下滑 / 点遮罩 / 「知道了」三路等价</td></tr>
+          <tr><td>tag</td><td><code>coverage_sheet</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips"><span class="chip e">覆盖率 100%</span><span class="chip e">覆盖率 0%（尚未学词）</span><span class="chip e">深套</span></div>
+      <div class="delta"><ul><li>抽屉内容<b>不超过视高 50%</b>，因为它只是解释，不是工作面板。</li></ul></div>
+    </div>
+  </div>
+
+  <h3 id="d-image">D7 · 生图前确认（玻璃面板）</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel">
+        <p class="ptitle">生成这张配图？</p>
+        <p class="ptext">提示词会发送到图像服务。生成一次消耗 1 次额度，剩余 4 次。</p>
+        <div class="pbtns"><span class="pbtn ghost">取消</span><span class="pbtn go">生成</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>面板</td><td><code>ConfirmationDialog</code>(<code>GlassDialog</code>) · 24 圆角 · 内 20</td></tr>
+          <tr><td>提示词回显</td><td>正文下方一枚 <code>tint</code> 圆角块 · 最多 2 行省略</td></tr>
+          <tr><td>额度</td><td>「剩余 N 次」<code>text2</code>；N=0 时主键禁用 + 「额度用完」</td></tr>
+          <tr><td>主键</td><td>「生成」· 品牌渐变</td></tr>
+          <tr><td>tag</td><td><code>image_generate_confirm_dialog</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips"><span class="chip e">额度 0</span><span class="chip e">生成中（面板关，转卡片进度）</span><span class="chip e">深套</span></div>
+      <div class="delta"><ul><li>确认后<b>面板立即关闭</b>，进度画在结果位上，不要「面板内转圈」——生图耗时长，卡在浮层里会让人以为 App 挂了。</li></ul></div>
+    </div>
+  </div>
+
+  <h3 id="d-cascade">D8 · 级联计数槽（D1 的加装件）</h3>
+  <div class="meta">
+    <p class="small">删除整本词书时，正文下方多一块<b>计数区</b>：三行「词条 860 · 学习记录 412 · 收藏 12」，等分两列或三列，数字用 Display 缩小版 24、标签 Label。
+      它只在「删除整本词书」这一类站点出现，几何完全复用 D1，<b>不许另做一套面板</b>。</p>
+    <div class="tw"><table class="spec">
+      <thead><tr><th>部位</th><th>规格</th></tr></thead>
+      <tbody>
+        <tr><td>容器</td><td>圆角 12 · <code>tint</code> 底 · 内 12/10</td></tr>
+        <tr><td>数字</td><td>24 mono tnum · <code>text1</code></td></tr>
+        <tr><td>标签</td><td>Label 12 · <code>text2</code> · 数字下方 2dp</td></tr>
+        <tr><td>何时出现</td><td>计数 &gt; 0 的项才出现；全 0 则整块不显示</td></tr>
+        <tr><td>tag</td><td><code>confirm_cascade_counts</code></td></tr>
+      </tbody>
+    </table></div>
+    <div class="chips"><span class="chip e">全 0（不显示）</span><span class="chip e">大字号 2.0（降为单列）</span></div>
+  </div>
+
+  <h3 id="d-time">D9 · 提醒时间选择</h3>
+  <div class="dlg">
+    <div class="stage">
+      <div class="panel">
+        <p class="ptitle">每天几点提醒</p>
+        <div class="pfield" style="justify-content:center;font-family:var(--mono);font-size:18px;color:var(--text1)">08 : 30</div>
+        <div class="pbtns"><span class="pbtn ghost">取消</span><span class="pbtn go">就这个时间</span></div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>规格</th></tr></thead>
+        <tbody>
+          <tr><td>面板</td><td>居中对话框 · 24 圆角 · <b>与 D1 同一份外框</b>（现在用的是 M3 默认 <code>AlertDialog</code>，要换掉）</td></tr>
+          <tr><td>选择器</td><td>M3 <code>TimePicker</code> 本体保留 · 外框由我们出 · 时钟/输入双模</td></tr>
+          <tr><td>字号</td><td>数字用 mono tnum，避免宽度跳动</td></tr>
+          <tr><td>主键</td><td>「就这个时间」· Secondary 即可（不是危险动作）</td></tr>
+          <tr><td>tag</td><td><code>reminder_time_dialog</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chips"><span class="chip e">键盘输入模式</span><span class="chip e">大字号 2.0（时间不折行）</span><span class="chip e">深套</span></div>
+    </div>
+  </div>
+
+  <h3 id="d-rules">D10 · 通用规矩：入场与遮罩</h3>
+  <div class="grid2">
+    <div class="card">
+      <h6>动效</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li><b>居中对话框</b>：遮罩淡入 120ms + 面板 0.96→1.0 缩放 160ms（<code>FastOutSlowIn</code>）。</li>
+        <li><b>底部抽屉</b>：位移上滑 220ms，遮罩同时淡入。</li>
+        <li><b>关闭</b>：一律 120ms 淡出，<b>不做反向缩放</b>（会显得拖）。</li>
+        <li>系统「减少动画」开启时，全部降为纯淡入淡出。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>遮罩与层级</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>遮罩：<code>text1</code> @32%（浅套）/ <code>#000</code> @48%（深套）· <b>不用模糊</b>（模糊会让长正文读不清）。</li>
+        <li>遮罩点击 = 取消；<b>破坏性面板（D1 不可逆态）遮罩点击无效</b>，必须显式点。</li>
+        <li>同一时刻<b>只有一层浮层</b>。第二个浮层不得叠上来——需要串行就关一个再开一个。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 id="d-inset">D11 · 通用规矩：键盘、返回键与无障碍</h3>
+  <div class="grid2">
+    <div class="card">
+      <h6>键盘与 inset</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>只有 D5（笔记）与 D9（输入模式）吃键盘；其余浮层在键盘弹起时<b>先收键盘</b>。</li>
+        <li>面板底部内边距要加导航栏 inset，否则三键导航下按钮贴边。</li>
+        <li>底部抽屉的高度上限要扣掉键盘高度，<b>不要盖住输入框</b>。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>返回与朗读</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li><b>返回键 = 取消</b>，一律如此（含破坏性面板）——把用户关在弹窗里是错的。</li>
+        <li>浮层打开时焦点锁在面板内，TalkBack 焦点<b>先落标题再落按钮</b>。</li>
+        <li>朗读顺序：标题 → 正文 → 主键 → 次键。危险主键的朗读文本要带动作名（「删除全部学习数据」），不能只读「删除」。</li>
+        <li>面板打开时给一次 <code>semantics { paneTitle = 标题 }</code>。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 id="d-copy">D12 · 通用规矩：文案模板</h3>
+  <div class="tw"><table class="spec">
+    <thead><tr><th>部位</th><th>要求</th><th>反例（现在就有的）</th></tr></thead>
+    <tbody>
+      <tr><td>标题</td><td><b>一行问句</b>，动词 + 对象 + 问号</td><td>「提示」</td></tr>
+      <tr><td>正文第 1 句</td><td>会发生什么（含具体数字）</td><td>「确定要删除吗？」</td></tr>
+      <tr><td>正文第 2 句</td><td>什么会保留</td><td>（缺）</td></tr>
+      <tr><td>正文第 3 句</td><td>能不能撤回</td><td>（缺）</td></tr>
+      <tr><td>主键</td><td>= 标题动词，唯一例外「知道了」</td><td>「确定」/「OK」</td></tr>
+      <tr><td>次键</td><td>「取消」，不写「关闭」「返回」</td><td>「关闭」</td></tr>
+      <tr><td>禁用词</td><td>「确定」「取消操作？」「操作成功」「发生错误」</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <b>为什么这一节要写三条规矩</b>
+    <p>因为十二处站点里只有九个是真的「面板设计」，剩下三件是<b>每次新加弹窗都会踩的坑</b>：
+      圆角随手写 28、遮罩随手加模糊、按钮随手写「确定」。规矩写进参考稿，主力开发 AI 才有依据一次性做对。</p>
+  </div>
+</section>
+
+<!--PART7-->
+<!-- ============================================================
+     §5 四处点名缺陷
+     ============================================================ -->
+<section id="defects">
+  <div class="sec-head">
+    <div class="sec-no">Section 05</div>
+    <h2>四处点名缺陷 · 根因与处方</h2>
+    <p>这四处是你亲口点出来的。下面每一处都按同一格式写：<b>现象 → 根因（精确到行）→ 处方（精确到 dp）→ 验收</b>。
+      处方都是<b>设计层决定</b>，主力开发 AI 照着改即可，不需要再猜。</p>
+  </div>
+
+  <!-- ---------------- 缺陷 1 ---------------- -->
+  <article class="defect" id="defect-1">
+    <header>
+      <h4>① 新学 / 复习进度条与总进度圆环过深</h4>
+      <span>TodayPlanScreen.kt · 236 / 255 / 263 · ProgressRing + ThinProgress</span>
+    </header>
+    <div class="inner">
+      <h5>现象</h5>
+      <p>今日计划强卡里，三处进度（总进度圆环、新学细条、复习细条）都是<b>近黑色</b>。
+        强卡浅色底（<code>tint2 #E4EFE9</code>）上压一条 <code>#1F2B26</code> 的实心条，
+        像「深色进度条」而不是「学习进度」——跟全站的薄荷渐变语言完全脱节，也和页面上其它三张卡不成一家人。</p>
+
+      <h5>根因（一行代码）</h5>
+      <pre class="snip"><span class="c">// TodayPlanScreen.kt:236 / 255 / 263 —— 三处都传了同一个「继承来的墨色」</span>
+ProgressRing(
+    progress = ...,
+    ink = <span class="bad">LocalContentColor.current</span>,   <span class="c">// ← 强卡浅底 → 继承 text1 #1F2B26</span>
+    ...
+)
+ThinProgress(..., tag = "today_plan_new_progress",    ink = <span class="bad">LocalContentColor.current</span>)
+ThinProgress(..., tag = "today_plan_review_progress", ink = <span class="bad">LocalContentColor.current</span>)</pre>
+      <p><code>StrongCard</code> 在浅套下 <code>fill = tint2</code> 且 <code>ink = text1</code>，
+        <code>LocalContentColor</code> 因此是 <code>#1F2B26</code>。
+        <b>进度组件的「墨」被当成了文字色用</b>，这是语义错位：它继承的是「这里的字有多黑」，不是「这里的进度该是什么色」。</p>
+
+      <h5>处方（设计层定值）</h5>
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>改成</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>圆环（总进度）</td><td>域色渐变 <code>Learn.base → Learn.deep</code>（扫角 135°）· 轨 = <code>Learn.base @ 12%</code></td><td>渐变起点 <code>GRADIENT_START_FRACTION = 0.18</code> 的同一套规则</td></tr>
+          <tr><td>新学细条</td><td><code>Learn.base</code> 实心 · 轨 <code>Learn.base @ 12%</code></td><td>6dp 高 / 圆头</td></tr>
+          <tr><td>复习细条</td><td><code>Review.base</code> 实心 · 轨 <code>Review.base @ 12%</code></td><td>与新学用两个域区分，<b>不要同色</b></td></tr>
+          <tr><td>标签与计数</td><td><code>text2</code>（<code>ink.copy(alpha=.72f)</code> 那层保留，但 ink 不再传 text1）</td><td>Label 12 · tnum</td></tr>
+          <tr><td>深套</td><td>同一渐变提亮一档（<code>Learn.light → Learn.base</code>）</td><td>深底上不能让条比底暗</td></tr>
+        </tbody>
+      </table></div>
+      <pre class="snip"><span class="c">// 处方（示意，非最终代码）：把「墨」换成「域」</span>
+ThinProgress(
+    label = "新学", done = newDone, target = newTarget,
+    tag = "today_plan_new_progress",
+    track = <span class="good">AppDomain.Learn.base.copy(alpha = 0.12f)</span>,
+    ink   = <span class="good">AppDomain.Learn.base</span>,          <span class="c">// ← 不再继承 LocalContentColor</span>
+)</pre>
+      <div class="ok">
+        <b>验收</b>
+        <p>强卡内三处进度肉眼可见为<b>彩条</b>而非黑条；
+          <code>SwitchTrackColorGuardTest</code> 的同族断言扩一条「进度 ink 不得等于 <code>LocalContentColor</code> / <code>text1</code>」；
+          深套下条比底亮。</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ---------------- 缺陷 2 ---------------- -->
+  <article class="defect" id="defect-2">
+    <header>
+      <h4>② 词库三段的版式不统一</h4>
+      <span>WordBankScreen.kt（壳）+ WordBookWordsScreen.kt:175/243-244/267 + MyWordsScreen.kt</span>
+    </header>
+    <div class="inner">
+      <h5>现象</h5>
+      <p>词库页三段列表（词书内词表 / 我的生词 / 搜索结果）三种长相：</p>
+      <ul>
+        <li><b>词书内词表</b>：每词一枚 M3 <code>Card</code>，1dp <code>MintOutline</code> 描边、卡内 16dp，逐颗漂在页面上；</li>
+        <li><b>我的生词</b>：<code>WordRow</code> 裸铺，无描边无卡；</li>
+        <li><b>左右边距</b>：列表 <code>start = 20 / end = 36</code> <b>不对称</b>，右边多出 16dp。</li>
+      </ul>
+
+      <h5>根因</h5>
+      <pre class="snip"><span class="c">// WordBookWordsScreen.kt:175 —— 右侧比左侧多半格</span>
+contentPadding = PaddingValues(<span class="bad">start = 20.dp, end = 36.dp</span>, top = 6.dp, bottom = 24.dp)
+
+<span class="c">// :243-244 —— 行本身又是「一枚描边卡」</span>
+colors = CardDefaults.cardColors(containerColor = if (enabled) MintSurface else MintTint.copy(alpha = .55f))
+border = BorderStroke(<span class="bad">1.dp</span>, if (enabled) MintOutline else MintOutline.copy(alpha = .65f))
+
+<span class="c">// :267 —— 卡内再 16 的水平内边距，字实际落在 20+16=36 起</span>
+modifier = Modifier.padding(horizontal = <span class="bad">16.dp</span>, vertical = 12.dp)</pre>
+      <p>那个 <code>end = 36</code> 是当年为了<b>给右侧字母索引槽让位</b>留下的（36 = 20 + 16）。
+        字母槽后来改成浮在列表上方，这 16dp 就成了纯粹的「右边比左边宽」。
+        而 <code>WordBankScreen</code> 只是个壳，它把三种不同来源的列表直接塞进同一个 <code>bookPane</code>，
+        <b>壳里没有「列表头槽」这个概念，所以三个子屏只能各写各的边距</b>。</p>
+
+      <h5>处方（设计层定值）</h5>
+      <div class="tw"><table class="spec">
+        <thead><tr><th>部位</th><th>改成</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>行形态</td><td><b>裸铺 + 发丝线</b>，弃用 M3 <code>Card</code> 行卡</td><td>与设置、备份中心、许可证共用 <code>BareRow</code>，全站只留一种行</td></tr>
+          <tr><td>页边距</td><td><code>start = end = 16</code></td><td><b>对称</b>；右侧字母槽改为浮层，不再吃版面</td></tr>
+          <tr><td>分行线</td><td>1dp <code>outline</code> @ 起点缩进 <code>52dp</code>（<code>BareRowDividerIndent</code>）</td><td>与全站缩进一致，不用 <code>hairlineTop</code> 之外的画法</td></tr>
+          <tr><td>筛选药片</td><td>共享 <code>PillButton(PillStyle.Secondary)</code> 替换 <code>FilterChip</code></td><td>现在 <code>FilterChip</code> 的圆角/高度与药片不同源</td></tr>
+          <tr><td>列表头槽</td><td>壳里新增 <code>listHead</code> 槽：筛选行 + 计数 + 排序统一落在这里</td><td>三段共用一处，子屏不再各写一行</td></tr>
+          <tr><td>禁用行</td><td>墨整体降为 <code>text3</code>，<b>不换底色</b></td><td>现在用 <code>MintTint@55%</code> 换底，深套下会翻色</td></tr>
+        </tbody>
+      </table></div>
+
+      <h5>验收</h5>
+      <ul class="tight">
+        <li>三段列表截图像同一屏的三次滚动——<b>把三张图叠起来看，行高、缩进、分行线必须重合</b>。</li>
+        <li>左右边距各 16dp，用一条垂直参考线量。</li>
+        <li>字母索引仍在（浮层形态），滑到 <code>Z</code> 能正确落位。</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- ---------------- 缺陷 3 ---------------- -->
+  <article class="defect" id="defect-3">
+    <header>
+      <h4>③ 搜索框两套形状，点下去会「变身」</h4>
+      <span>TodayPlanScreen.kt:345-360（假框）· GlobalVocabularySearchScreen.kt:118（真框）</span>
+    </header>
+    <div class="inner">
+      <h5>现象</h5>
+      <p>主页那枚「查一个词」是个 <b>48dp 高的假框</b>：<code>tint</code> 底、圆角 14、14/12 内边距、18dp 描边放大镜、字 <code>text2</code>。
+        点进去以后真正的输入框是 M3 <code>TextField</code>，<b>高度、圆角、底色、图标大小、文字色全都变了一档</b>。
+        用户的感受不是「搜索开了」，而是「换了一个 App」。</p>
+
+      <h5>根因</h5>
+      <pre class="snip"><span class="c">// TodayPlanScreen.kt:345-360 —— 假框：手搓几何</span>
+Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+    .clip(RoundedCornerShape(<span class="bad">14.dp</span>))
+    .background(colors.tint)
+    .padding(horizontal = <span class="bad">14.dp</span>, vertical = 12.dp)) {
+  AppGlyph(AppIcon.Search, colors.text2, <span class="bad">18.dp</span>, StrokeOnly)
+  Text("查一个词", AppType.Body, colors.text2)
+}
+
+<span class="c">// GlobalVocabularySearchScreen.kt:118 —— 真框：M3 TextField 的默认几何</span>
+SoftCard { TextField(value = query, ... placeholder = "输入英文单词或短语") }</pre>
+      <p>两处<b>没有任何共享件</b>。假框是一段手写 <code>Row</code>，真框是 M3 组件，
+        两边的默认值天生不同——所以这不是「忘了对齐」，而是<b>缺少一个组件</b>。</p>
+
+      <h5>处方：一枚 <code>SearchEntry</code>，两种态</h5>
+      <div class="tw"><table class="spec">
+        <thead><tr><th>态</th><th>行为</th><th>几何（两态完全相同）</th></tr></thead>
+        <tbody>
+          <tr><td><b>Entry（假框）</b></td><td>不可输入，点击 → 导航</td><td rowspan="2">高 <b>48</b> · 圆角 <b>14</b> · 内 <b>14/12</b> · 放大镜 <b>18</b> 描边 · 字 Body 15<br>底色 <code>tint</code>（浅套）/ <code>dtint</code>（深套）· 占位字 <code>text2</code></td></tr>
+          <tr><td><b>Input（真框）</b></td><td>可输入，右侧「清除」</td></tr>
+          <tr><td>差异只允许</td><td colspan="2">Entry 有「点不动」的语义（<code>role = Button</code> + 朗读「搜索单词或短语」）；Input 有光标与清除。<b>除此之外几何、色彩、字号必须逐值相等。</b></td></tr>
+          <tr><td>接入点</td><td colspan="2">主页 <code>today_plan_search_entry</code> · 全局搜索 <code>global_search_input</code> · 词库筛选 · 我的生词筛选</td></tr>
+        </tbody>
+      </table></div>
+      <div class="delta"><ul>
+        <li>真框<b>不再包 <code>SoftCard</code></b>——它自己就是那枚圆角块，外面再套一层会让圆角套圆角。</li>
+        <li>放大镜不许放大：18dp 是「行内图标」档，M3 <code>leadingIcon</code> 默认给的是 24dp。</li>
+      </ul></div>
+      <div class="ok">
+        <b>验收</b>
+        <p>截图叠图法：从主页点进搜索页，<b>只有光标和「清除」出现，框体不得位移 1px</b>。
+          新增 <code>SearchEntryContractTest</code>：断言两态的高度/圆角/内边距/图标尺寸常量同源。</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ---------------- 缺陷 4 ---------------- -->
+  <article class="defect" id="defect-4">
+    <header>
+      <h4>④ 音标与两枚发音药片错开着</h4>
+      <span>CardDetailScreen.kt:304 · FlowRow</span>
+    </header>
+    <div class="inner">
+      <h5>现象</h5>
+      <p>词义详情里，「音标 + 美音药片 + 英音药片」被塞进同一条流式布局：
+        放得下就三个并排，放不下就零散折行——<b>一行里三件东西，谁都不占主导</b>。
+        大字号下变成「音标一行、美音一行、英音一行」，看起来像三条不同等级的信息。</p>
+
+      <h5>根因</h5>
+      <pre class="snip"><span class="c">// CardDetailScreen.kt:304 —— 三件东西一枚 FlowRow</span>
+FlowRow(
+    horizontalArrangement = Arrangement.spacedBy(<span class="bad">8.dp</span>),
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+    itemVerticalAlignment = Alignment.CenterVertically,
+) {
+    Text(card.ipa, ...)                    <span class="c">// ① 音标（文本）</span>
+    SpeakerButton("美音", ...)             <span class="c">// ② 药片</span>
+    SpeakerButton("英音", ...)             <span class="c">// ③ 药片</span>
+}</pre>
+      <div class="warn">
+        <b>这段 <code>FlowRow</code> 本身修的是一个真问题，不许退回 <code>Row</code></b>
+        <p>源码注释记了真机取证：1080×2340 上「音标 + 两枚药片」的自然宽度超出卡内可用宽约 27dp，
+          原来的 <code>Row</code> 按顺序扣空间，把英音药片压到只剩字宽、「播放发音」竖排成乱码。
+          <code>FlowRow</code> 保证了<b>「只换行、不压扁、不裁字」</b>——这个性质必须留。</p>
+      </div>
+
+      <h5>处方：换结构，不换性质</h5>
+      <div class="tw"><table class="spec">
+        <thead><tr><th>行</th><th>内容</th><th>几何</th></tr></thead>
+        <tbody>
+          <tr><td>第 1 行</td><td><b>IPA 独占一行</b></td><td>Body 15 · <code>text2</code> · 左对齐 · 同行右侧可挂小喇叭 32dp</td></tr>
+          <tr><td>第 2 行</td><td><b>美音 / 英音 等分两列</b></td><td>两枚药片各 <code>weight(1f)</code> · 高 48 · 间距 10 · 无英音时美音<b>满宽</b></td></tr>
+          <tr><td>大字号 2.0</td><td>两列降为两行，各满宽</td><td>不压扁、不裁字（保留原保证）</td></tr>
+          <tr><td>音标缺失</td><td>第 1 行整行消失，药片行上移</td><td>不留空行</td></tr>
+          <tr><td>竖排告警保留</td><td>药片内文字 <code>maxLines = 1</code> + <code>softWrap = false</code></td><td>宁可整枚换行，也不逐字竖排</td></tr>
+        </tbody>
+      </table></div>
+      <pre class="snip"><span class="c">// 处方（示意）：两行结构，等分不抢宽</span>
+Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Text(card.ipa, style = AppType.Body, color = colors.text2)   <span class="c">// 独占一行</span>
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SpeakerButton("美音", modifier = Modifier.<span class="good">weight(1f)</span>)
+        if (hasUk) SpeakerButton("英音", modifier = Modifier.<span class="good">weight(1f)</span>)
+    }
+}</pre>
+      <div class="ok">
+        <b>验收</b>
+        <p>在 1080×2340 与最大字号下截图：<b>按列宽永远两枚等宽，「播放发音」永不成竖排</b>；
+          原真机取证的不裁字断言（<code>CardDetailLayoutContractTest</code> 一族）继续通过；
+          与学习卡 L2 的发音区遵循同一处方。</p>
+      </div>
+    </div>
+  </article>
+
+  <div class="note">
+    <b>四处的共同点</b>
+    <p>四处都不是「审美分歧」，而是<b>同一个组件缺失或语义错位</b>：
+      ① 进度组件的「墨」被当文字色；②③④ 则是「同一个东西写了三遍」。
+      所以处方全部指向<b>收敛到共享件</b>（<code>SearchEntry</code>、<code>BareRow</code>、<code>SpeakerRow</code>、域色进度），而不是逐屏调像素。</p>
+  </div>
+</section>
+
+<!--PART8-->
+<!-- ============================================================
+     §6 屏 → 组件 → 验收
+     ============================================================ -->
+<section id="mapping">
+  <div class="sec-head">
+    <div class="sec-no">Section 06</div>
+    <h2>屏 → 组件 → 验收</h2>
+    <p>这张表是给主力开发 AI 的<b>执行索引</b>：一行一屏，左边是「要长成什么样」，右边是「改完拿什么证明改对了」。
+      验收列优先引用仓库里<b>已有的测试类</b>；没有的，写明要新增哪一个。</p>
+  </div>
+
+  <div class="tw"><table class="idx spec">
+    <thead><tr>
+      <th>屏</th><th>骨架</th><th>必须复用的共享件</th><th>不许再出现</th><th>验收</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>L1 今日学习</td><td>A</td><td><code>StrongCard</code> · 域色进度 · <code>SearchEntry</code>(Entry)</td><td>手搓搜索 Row · <code>LocalContentColor</code> 当进度墨</td><td><a href="#defect-1">①</a> <a href="#defect-3">③</a> + <code>TodayPlanLayoutContractTest</code></td></tr>
+      <tr><td>L2 学习卡</td><td>B</td><td><code>SpeakerRow</code>（与 L7 同构）· 等分药片</td><td>三件一枚 <code>FlowRow</code></td><td><a href="#defect-4">④</a> + 最大字号竖排断言</td></tr>
+      <tr><td>L3 学习卡（大字号）</td><td>B</td><td>降列策略</td><td>压扁/裁字</td><td>字号 2.0 截图</td></tr>
+      <tr><td>L4 默写</td><td>C</td><td>共享输入 · 键盘 inset</td><td>自造输入框</td><td><code>DictationLayoutContractTest</code></td></tr>
+      <tr><td>L5 默写结果</td><td>C</td><td>状态行 + 计数槽（同 <a href="#d-cascade">D8</a>）</td><td>自造计数块</td><td>同族契约测试</td></tr>
+      <tr><td>L6 学习记录</td><td>D</td><td><code>BareRow</code> + 发丝线 52</td><td>卡行</td><td>行高/缩进叠图</td></tr>
+      <tr><td>L7 词义详情</td><td>B</td><td><code>SpeakerRow</code> · <code>PersonalNotesDialog</code>(<a href="#d-notes">D5</a>)</td><td>三件 <code>FlowRow</code> · M3 默认 <code>AlertDialog</code></td><td><a href="#defect-4">④</a> + <code>CardDetailLayoutContractTest</code></td></tr>
+      <tr><td>L8 词库</td><td>F</td><td>壳内 <code>listHead</code> 槽 · <code>PillButton(Secondary)</code></td><td><code>FilterChip</code> · 各子屏自写边距</td><td><a href="#defect-2">②</a></td></tr>
+      <tr><td>L9 词书内词表</td><td>D</td><td><code>BareRow</code> · 对称 16 · 字母浮层</td><td>M3 <code>Card</code> 行卡 · <code>end = 36</code></td><td><a href="#defect-2">②</a> + <code>WordListAlignmentTest</code>（新增）</td></tr>
+      <tr><td>L10 我的生词</td><td>D</td><td>同上 + 分组</td><td>另一种行样式</td><td><a href="#defect-2">②</a></td></tr>
+      <tr><td>L11 全局搜索</td><td>D</td><td><code>SearchEntry</code>(Input) · 历史清空走 <a href="#d-confirm">D1</a></td><td>框外再包 <code>SoftCard</code></td><td><a href="#defect-3">③</a> + <code>SearchEntryContractTest</code>（新增）</td></tr>
+      <tr><td>L12 添加词书</td><td>F</td><td><code>BareRow</code> · 进度行</td><td>自造列表</td><td>同族契约测试</td></tr>
+      <tr><td>L13 导入词书</td><td>D</td><td><code>UnavailableContent</code></td><td>裸 Text 报错</td><td>不可用态截图</td></tr>
+      <tr><td>L14 打卡</td><td>E</td><td>域色 + <code>StrongCard</code></td><td>进度深色</td><td><a href="#defect-1">①</a></td></tr>
+      <tr><td>L15 恢复/问题页</td><td>A</td><td><code>ProblemScaffold</code></td><td>Danger 铺满</td><td>与 M10 同源断言</td></tr>
+      <tr><td>R1 文章列表</td><td>D</td><td><code>BareRow</code> · 覆盖率药片</td><td>卡行</td><td><code>ArticleListLayoutContractTest</code></td></tr>
+      <tr><td>R2 阅读正文</td><td>B</td><td><code>HighlightedEnglish</code> · <code>CoverageSheet</code>(<a href="#d-coverage">D6</a>)</td><td>自造抽屉</td><td>行距与高亮叠图</td></tr>
+      <tr><td>R3 文章完成</td><td>C</td><td><code>ArticleCompleteBar</code></td><td>—</td><td>粘底不遮正文</td></tr>
+      <tr><td>R4 阅读设置</td><td>D</td><td><code>BareRow</code> + Switch</td><td>—</td><td><code>SwitchTrackColorGuardTest</code></td></tr>
+      <tr><td>R5 生词速览</td><td>D</td><td><code>BareRow</code></td><td>卡行</td><td>同族契约测试</td></tr>
+      <tr><td>A1 AI 助学首页</td><td>F</td><td>能力卡 · <code>featureStatusBadge</code></td><td>五种徽标色</td><td><code>AiProfileLayoutContractTest</code></td></tr>
+      <tr><td>A2 AI 服务</td><td>F</td><td><code>AiProfileRow</code> · <a href="#d-confirm">D1</a>（删除配置）</td><td>自造确认框</td><td>同上</td></tr>
+      <tr><td>A3 服务商编辑</td><td>D</td><td><code>EditorField</code> · <code>CapabilityToggle</code></td><td>自造开关</td><td>同上</td></tr>
+      <tr><td>A4 密钥</td><td>D</td><td><a href="#d-confirm">D1</a>（清除密钥 · 可恢复 → Secondary）</td><td>Danger 实底</td><td><a href="#d-confirm">D1</a> 断言</td></tr>
+      <tr><td>A5 语音</td><td>D</td><td><code>VoiceOverlayOption</code></td><td>—</td><td><code>GlassPanelInkPairingContractTest</code></td></tr>
+      <tr><td>A6 翻译</td><td>C</td><td><a href="#d-outbound">D2</a> 外发确认</td><td>静默外发</td><td>无密钥 → 未配置态</td></tr>
+      <tr><td>A7 生图</td><td>C</td><td><a href="#d-image">D7</a> · <code>ResultImage</code> · <code>FailureCard</code></td><td>面板内转圈</td><td>额度 0 禁用</td></tr>
+      <tr><td>M1 我的</td><td>E</td><td><code>StrongCard</code> + <code>SoftCard</code></td><td>字号 0 显示「连续 0 天」</td><td>空态截图</td></tr>
+      <tr><td>M2 设置</td><td>F</td><td><code>SectionHeading</code> · 组内同高 <code>BareRow</code></td><td>四组各异底色 · 组内删除动作</td><td>行高叠图</td></tr>
+      <tr><td>M3 语音合成</td><td>D</td><td>单卡四区块</td><td>四张散卡</td><td>滑杆不换行</td></tr>
+      <tr><td>M4 学习提醒</td><td>D</td><td><a href="#d-time">D9</a> · <code>InlineNotice</code>(Review)</td><td>M3 默认 <code>AlertDialog</code></td><td>大字号不溢出</td></tr>
+      <tr><td>M5 备份与恢复</td><td>D</td><td>三节 <code>SectionHeading</code> · <a href="#d-confirm">D1</a></td><td>三节三种底色</td><td>信任文案常驻</td></tr>
+      <tr><td>M6 导出备份</td><td>D</td><td><code>ExportScopeRow</code> · <code>UnavailableContent</code></td><td>三屏各写一套空态</td><td>导出中 CTA 禁用</td></tr>
+      <tr><td>M7 认证导出</td><td>D</td><td><code>QrCodeDisplay</code>（<b>恒白底</b>）</td><td>深套改二维码底色</td><td>深套截图仍为白</td></tr>
+      <tr><td>M8 从旧设备恢复</td><td>D</td><td><code>QrScanBox</code> · <code>RestoringCard</code> · <a href="#d-migrate">D4</a></td><td>警告放在取景框下方</td><td>恢复中禁返回</td></tr>
+      <tr><td>M9 许可与隐私</td><td>F</td><td><code>BareRow</code> 行内展开</td><td>许可弹窗</td><td>不可用 + 重试</td></tr>
+      <tr><td>M10 错误页</td><td>A</td><td><code>ProblemScaffold</code></td><td>Danger 当主色</td><td>与 L15 同源</td></tr>
+      <tr><td>H 宿主壳</td><td>—</td><td>底导 · 十二浮层托管 · inset</td><td>屏内自弹窗</td><td><code>ConfirmDestructiveDialog</code> 两步不可绕过</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <b>怎么用这张表</b>
+    <p>三个共用的「新件」必须先落，否则后面 37 屏会各自长一遍：</p>
+    <ul class="tight">
+      <li><b>第 1 件</b> <code>SearchEntry</code>（Entry / Input 双态） → 解锁 <a href="#defect-3">③</a>，影响 L1 L8 L11。</li>
+      <li><b>第 2 件</b> <code>BareRow</code> 全线铺开 + 对称 16 → 解锁 <a href="#defect-2">②</a>，影响 L8 L9 L10 及全部 M 屏。</li>
+      <li><b>第 3 件</b> 域色进度（圆环 + 细条） → 解锁 <a href="#defect-1">①</a>，影响 L1 L14 与所有带进度的卡。</li>
+    </ul>
+    <p><b>建议顺序：3 → 2 → 1 → ④</b>。理由：进度是纯视觉替换、风险最低；<code>BareRow</code> 改动面最大所以排第二（留足回归时间）；
+      <code>SearchEntry</code> 要动导航语义排第三；④ 只需重排一个 <code>FlowRow</code>，最后收。<b>四处做完再动任何单屏的细节。</b></p>
+  </div>
+</section>
+
+<!-- ============================================================
+     附录
+     ============================================================ -->
+<section id="appendix">
+  <div class="sec-head">
+    <div class="sec-no">Appendix</div>
+    <h2>附录 · 数值速查</h2>
+    <p>下面全是<b>可以直接抄进代码的常量</b>。写实现时不必回翻前文。</p>
+  </div>
+
+  <h3 id="ap-color">A.1 颜色</h3>
+  <div class="tw"><table class="spec">
+    <thead><tr><th>角色</th><th>浅套</th><th>深套</th><th>用在哪</th></tr></thead>
+    <tbody>
+      <tr><td>页面底</td><td><code>#F6F9F6</code></td><td><code>#111A16</code></td><td>屏背景</td></tr>
+      <tr><td>卡面</td><td><code>#FFFFFF</code></td><td><code>#17201C</code></td><td>白卡 / 抽屉 / 面板</td></tr>
+      <tr><td>弱底</td><td><code>#E9F4EE</code></td><td><code>#1B2A25</code></td><td><code>SoftCard</code> / 输入块</td></tr>
+      <tr><td>强卡底</td><td><code>#E4EFE9</code></td><td><code>#22332C</code></td><td><code>StrongCard</code></td></tr>
+      <tr><td>更弱底</td><td><code>#DEEAE4</code></td><td><code>#27392F</code></td><td>分段槽 / 占位</td></tr>
+      <tr><td>描边</td><td><code>#D3E7DC</code></td><td><code>#2E4038</code></td><td>发丝线 / 勾选框</td></tr>
+      <tr><td>主字</td><td><code>#1F2B26</code></td><td><code>#E9F2EC</code></td><td>标题 / 正文</td></tr>
+      <tr><td>次字</td><td><code>#566B62</code></td><td><code>#9FB6AC</code></td><td>副标题 / 说明</td></tr>
+      <tr><td>三字</td><td><code>#7C9188</code></td><td><code>#7E968C</code></td><td>禁用 / 计量</td></tr>
+      <tr><td>薄荷墨</td><td><code>#174C44</code></td><td><code>#174C44</code></td><td>浅底上的强调字</td></tr>
+      <tr><td>品牌墨</td><td colspan="2"><code>#04241C</code></td><td>渐变按钮上的字</td></tr>
+      <tr><td>危险实底</td><td colspan="2"><code>#9E2B24</code></td><td><a href="#d-confirm">D1</a> / <a href="#d-migrate">D4</a> 主键</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">品牌渐变固定为 <code>135° #A8F3C8 → #5DDFB4(52%) → #35B9B5</code>；<b>只有主 CTA 与底导选中格用它</b>，进度条用域色渐变，不用品牌渐变。</p>
+
+  <h3 id="ap-type">A.2 排印六档</h3>
+  <div class="tw"><table class="spec">
+    <thead><tr><th>档</th><th>字号</th><th>字重</th><th>字距</th><th>墨</th><th>用在哪</th></tr></thead>
+    <tbody>
+      <tr><td>Display</td><td>44sp</td><td>Bold</td><td>−0.5sp · tnum</td><td>text1</td><td>仅封面级大数（今日完成 / 打卡天数）</td></tr>
+      <tr><td>Headline</td><td>28sp</td><td>Bold</td><td>+0.2sp</td><td>text1</td><td>页内主标题 / 空态标题</td></tr>
+      <tr><td>Title</td><td>17sp</td><td>SemiBold</td><td>0</td><td>text1</td><td>行标题 / 弹窗标题 / 页头</td></tr>
+      <tr><td>Body</td><td>15sp</td><td>Regular</td><td>0</td><td>text1</td><td>正文 / 输入 / 按钮字</td></tr>
+      <tr><td>Footnote</td><td>13sp</td><td>Regular</td><td>0</td><td>text2</td><td>副标题 / 说明</td></tr>
+      <tr><td>Label</td><td>12sp</td><td>Medium</td><td>+0.3sp</td><td>text2</td><td>计量 / 标签 / 徽标</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">六档<b>都不写 <code>lineHeight</code></b>（走系统行距）；数字一律 <code>tnum</code>；M3 映射见 §1。</p>
+
+  <h3 id="ap-shape">A.3 圆角</h3>
+  <div class="shapes">
+    <div><i style="width:56px;height:40px;border-radius:24px"></i>Dialog 24</div>
+    <div><i style="width:56px;height:40px;border-radius:20px"></i>Card 20</div>
+    <div><i style="width:56px;height:40px;border-radius:14px"></i>Button 14</div>
+    <div><i style="width:56px;height:40px;border-radius:999px"></i>Pill 50%</div>
+    <div><i style="width:40px;height:40px;border-radius:12px"></i>Icon/块 12</div>
+    <div><i style="width:56px;height:40px;border-radius:9px"></i>Inline 9</div>
+  </div>
+  <p class="small muted"><b>强卡 28</b> 是既有实现（<code>StrongCard</code> 圆角 28dp），保留；
+    玻璃面板与 M3 默认 <code>AlertDialog</code> 的 28 必须收到 <b>24</b>——这一条是 §4 的总规矩。</p>
+
+  <h3 id="ap-space">A.4 间距节奏</h3>
+  <div class="tw"><table class="spec">
+    <thead><tr><th>值</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td>2</td><td>行内 Column 的标题/副标题间距</td></tr>
+      <tr><td>8</td><td>卡内元素间距 / 药片间距</td></tr>
+      <tr><td>10</td><td>强卡内区块间距 / 弹窗双键间距</td></tr>
+      <tr><td>12</td><td>页级元素间距 / 卡内水平内边距</td></tr>
+      <tr><td>16</td><td><b>页边距（对称）</b> / 卡内边距 / 区块上下</td></tr>
+      <tr><td>18</td><td><code>StrongCard</code> 内边距</td></tr>
+      <tr><td>22</td><td>分组之间的间距 / 弹窗内边距</td></tr>
+      <tr><td>52</td><td>分行线缩进（<code>BareRowDividerIndent</code>）</td></tr>
+      <tr><td>64</td><td>底导高度（内容底边距要加上）</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="ap-touch">A.5 触控与命中</h3>
+  <div class="grid2">
+    <div class="card">
+      <h6>尺寸下限</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>行：<code>BareRow</code> <b>52dp</b> 起（<code>EntryRow</code> 56dp）</li>
+        <li>按钮：药片高 <b>48dp</b> · 双键各 48</li>
+        <li>图标按钮：视觉 40dp，命中 <b>48dp</b>（页头返回即此档）</li>
+        <li>勾选：视觉 22dp，命中 48dp</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h6>硬规矩</h6>
+      <ul class="tight" style="margin-top:8px">
+        <li>不许出现「只有符号没有可见文案」的交互控件。</li>
+        <li>可点区域不得互相重叠（含药片行与分行线）。</li>
+        <li>粘底 CTA 上方必须留 <b>16dp</b>，且内容区底部再加「CTA 高 + 16」的 padding。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 id="ap-check">A.6 交付前自检</h3>
+  <div class="tw"><table class="spec">
+    <thead><tr><th>#</th><th>检查</th><th>判据</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>覆盖面</td><td>§0.1 表里 37 屏 + 宿主壳 + 12 处浮层，逐条在正文能找到对应小节</td></tr>
+      <tr><td>2</td><td>锚点</td><td>目录每一条都能跳；交叉引用（①–④、D1–D12、L/R/A/M 各屏）不断链</td></tr>
+      <tr><td>3</td><td>浅/深双套</td><td>每个面板样例都要能推出深套长什么样（深套不得「比底更暗」或「二维码变色」）</td></tr>
+      <tr><td>4</td><td>大字号</td><td>字号 2.0 下：不压扁、不裁字、不竖排、不溢出（弹窗正文可滚、按钮不滚）</td></tr>
+      <tr><td>5</td><td>390 / 1440</td><td>窄屏单列、宽屏双列；表格可横滚，正文不横向溢出</td></tr>
+      <tr><td>6</td><td>打印</td><td>表格不断行、屏卡不断开、颜色强制还原</td></tr>
+      <tr><td>7</td><td>数值可抄</td><td>附录 A.1–A.5 的所有值都是可直接落代码的常量，无「约」「左右」</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="ok">
+    <b>交付说明</b>
+    <p>这份稿子只定「长什么样、为什么这样、怎么验收」，<b>不含功能代码</b>。
+      主力开发 AI 拿到后按 §6 的顺序落三个共享件，再逐屏替换；
+      每落一处，用 §5 的验收条款和 §6 的验收列自查。<b>四处点名缺陷全部闭环之后，才允许做纯审美微调。</b></p>
+  </div>
+</section>
+
+</main>
+</div>
+</body>
+</html>

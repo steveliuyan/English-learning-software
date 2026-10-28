@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>图标视觉母版 · calm 分色档 · 全 28 枚同版</title>
+<style>
+  :root {
+    --bg: #F6F9F6;
+    --surface: #FFFFFF;
+    --tint: #E9F4EE;
+    --outline: #D3E7DC;
+    --text1: #1F2B26;
+    --text2: #566B62;
+    --text3: #7C9188;
+    --ink: #174C44;
+    --warn-tint: #FBF0DC;
+    --warn-line: #E9D3AC;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text1);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 32px 96px; }
+  header { border-bottom: 1px solid var(--outline); padding-bottom: 28px; margin-bottom: 40px; }
+  .eyebrow {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink); margin: 0 0 12px;
+  }
+  h1 { font-size: 32px; line-height: 1.3; margin: 0 0 12px; font-weight: 650; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 60px 0 10px; font-weight: 650; letter-spacing: -0.005em; }
+  h3 { font-size: 16px; margin: 28px 0 6px; font-weight: 650; }
+  h2:first-of-type { margin-top: 0; }
+  p { margin: 0 0 14px; color: var(--text2); max-width: 76ch; }
+  .lead { font-size: 17px; color: var(--text2); margin: 0; }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--tint); color: var(--ink);
+    border-radius: 999px; padding: 4px 12px;
+    font-size: 13px; font-weight: 500;
+  }
+  .note {
+    background: var(--surface); border: 1px solid var(--outline);
+    border-radius: var(--radius); padding: 18px 20px; margin: 24px 0;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note strong { color: var(--text1); }
+  .note.warn { background: var(--warn-tint); border-color: var(--warn-line); }
+  .note ul { margin: 8px 0 0; padding-left: 20px; color: var(--text2); }
+  .note li { margin-bottom: 6px; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+  .cell {
+    background: var(--surface); border: 1px solid var(--outline);
+    border-radius: var(--radius); padding: 12px 12px 10px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .cell img { width: 100%; height: auto; aspect-ratio: 1 / 1; display: block; border-radius: 10px; background: var(--bg); }
+  .cell .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .cell .no { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--text3); }
+  .cell .name { font-weight: 600; font-size: 15px; }
+  .cell .enum { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--text2); }
+  .swatches { display: flex; align-items: center; gap: 5px; }
+  .sw { width: 13px; height: 13px; border-radius: 4px; border: 1px solid rgba(31,43,38,.12); }
+  .domain { font-size: 12px; color: var(--text3); margin-left: auto; }
+  .batch {
+    font-size: 11px; padding: 1px 7px; border-radius: 999px;
+    background: var(--tint); color: var(--ink); font-weight: 500;
+  }
+  .batch.fix { background: #E7F1FA; color: #175A93; }
+  .batch.redo { background: #F2ECFA; color: #65478A; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .verdict { font-size: 11px; padding: 1px 7px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+  .vpass { background: #E4F2EC; color: #1A7A63; }
+  .vfail { background: #FBE7E3; color: #9E2B24; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--outline); vertical-align: middle; }
+  th { font-size: 12.5px; color: var(--text3); font-weight: 600; }
+  td.mono, th.mono { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+  tbody tr:last-child td { border-bottom: none; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; border: 1px solid rgba(31,43,38,.14); }
+  .delta { color: var(--text3); font-size: 12px; }
+  .ok { color: #1A7A63; }
+
+  .ab { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 20px; }
+  .ab figure { margin: 0; background: var(--surface); border: 1px solid var(--outline); border-radius: var(--radius); padding: 14px; }
+  .ab img { width: 100%; aspect-ratio: 1 / 1; display: block; border-radius: 10px; background: var(--bg); }
+  .ab figcaption { font-size: 13.5px; color: var(--text2); margin-top: 10px; }
+  .ab b { color: var(--text1); }
+
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--outline); color: var(--text3); font-size: 14px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 640px) {
+    .wrap { padding: 32px 18px 64px; }
+    .grid, .ab { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    h1 { font-size: 26px; }
+  }
+  @media print { body { background: #fff; } .cell { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">EnglishLearning · icon master set · v3</p>
+    <h1>图标视觉母版 · calm 分色档 · 全 28 枚同版</h1>
+    <p class="lead">这一版把 28 枚一次性拉回同一版风格：形态、光照、描边、内高光的画法全部对齐 01–12 那批你已经认可的样子，颜色各走自己功能域，并且每一项都用基准实测分布标定过量。</p>
+    <div class="meta">
+      <span class="pill">28 / 33 枚</span>
+      <span class="pill">1024 × 1024 PNG</span>
+      <span class="pill">七域分色</span>
+      <span class="pill">底 #F6F9F6</span>
+      <span class="pill">统一性审计 28 / 28 通过</span>
+    </div>
+  </header>
+
+  <div class="note">
+    <p><strong>上一版为什么会「失忆」。</strong>13–28 那 16 枚生成时，风格合同被压缩成了一句话、而且只写在临时命令里没存盘，颜色位也只剩 2 个（主面 + 深笔），缺了亮面 —— 所以那批偏平、边缘硬、和 01–12 不像同一套。这一版把合同冻成文件再逐枚套用，并且每枚都带一张<strong>同域基准图</strong>作参考，才不会再漂。</p>
+    <p><strong>怎么看这一组。</strong>每枚图标的「主面 / 亮面 / 深笔」就是它落点所属功能域的 <span class="mono">base</span> / <span class="mono">light</span> / <span class="mono">deep</span>。落到代码时颜色会 1:1 复现，不会出现「设计稿有 12 种颜色、实机只有 1 种」的落差。</p>
+    <p><strong>没出母版的 5 枚：</strong><span class="mono">Back</span> / <span class="mono">ChevronRight</span> / <span class="mono">ChevronDown</span> / <span class="mono">Close</span> / <span class="mono">Check</span> 是纯描边导航符号，工程契约里走 <span class="mono">StrokeOnlyIcons</span>，不需要母版。</p>
+  </div>
+
+  <div class="note warn">
+    <p><strong>量色时揪出 4 枚错色，现已全部修完。</strong>把 28 张 PNG 逐枚采样、和七域色板对齐后发现：<span class="mono">07 spark</span> 是金色（应为语音薄荷）、<span class="mono">08 chart</span> 是紫色（应为学习蓝）、<span class="mono">10 shield</span> 是偏冷的蓝灰（应为设置中性灰）—— 这三枚是<strong>基准批里就存在的错色</strong>，色相对不上任何域，已在原文件位置重出（旧图存进 <span class="mono">archive-drift/</span>）。第 4 枚 <span class="mono">11 upload</span> 是薄荷绿（和 05 / 12 / 18 / 26 / 27 / 28 撞色），已按裁决结果定稿，见下面「11 upload 定稿」。</p>
+    <p><strong>另有 3 枚二次重出：</strong><span class="mono">08 chart</span> 亮面太小、<span class="mono">16 star</span> 描边偏细、<span class="mono">25 trash</span> 亮面缺失，第一轮审计没过。重写了这三枚的 <span class="mono">ICON SUBJECT</span> 段（明确要求「clearly visible」的亮面与「not a hairline」的描边）后重出，现已落回基准区间，旧图存进 <span class="mono">archive-drift/*.prev.png</span>。</p>
+  </div>
+
+  <div class="note">
+    <p><strong>怎么判「同版」，这件事本身也做了一遍校准。</strong>审计把合同里的定性描述换成 9 项可量判据，逐枚量 28 张 PNG。第一版判据是凭直觉写的，拿基准 8 枚（<span class="mono">01 02 03 04 05 06 09 12</span>，即你已认可、一个像素没动的那批原图）回测，反而把基准自己判死 —— 那不是基准不合格，是判据取错了。于是全部改成<strong>用基准实测分布反推放行区间</strong>：</p>
+    <ul>
+      <li><strong>四角必须是 <span class="mono">#F6F9F6</span> ±3</strong> → 按欧氏距离会把基准判死 7 / 8 枚。<span class="mono">#F3F6F3</span> 每通道只差 3，欧氏距离却是 5.2。改为<strong>按通道差 ≤8</strong>（基准实测 1–4）。</li>
+      <li><strong>主体占画布 66–72%</strong> → 基准实测长边从 27.3%（麦克风）到 74.6%（书堆），竖长件和横宽件本来就不同形。改为<strong>长边 24–78%</strong>。</li>
+      <li><strong>亮面恰好 1 处连通区域</strong> → 基准实测 10–114 处，抗锯齿过渡像素被切成碎块，这条量的是像素噪声不是造型。改为<strong>「抬亮带」像素占主体的 ≥2.5% 且最大连通块 ≥2%</strong>，只判断「有没有亮面」，不规定大小 —— 合同原文就是 subtle，基准自身从 5% 跨到 53%。</li>
+    </ul>
+    <p>标定后 28 枚全部重跑：<strong>28 枚全部通过</strong>。唯一曾经不通过的 <span class="mono">11 upload</span>（薄荷绿，离 Review 琥珀 Δ337、离 Library 紫也远）在定稿 Library 词库后复测，9 项判据全部落回基准区间。明细在 <span class="mono">icon-master/audit/</span>，按 <span class="mono">audit-full.ps1 → audit-lift.ps1 → verdict.ps1</span> 顺序即可复跑。</p>
+  </div>
+
+  <h2>全部 28 枚</h2>
+  <div class="grid" id="grid"></div>
+
+  <h2>逐枚量色</h2>
+  <p>表里的「实测」是从 PNG 里采样出来的真实颜色（每 4 像素取一点，先剔除背景 <span class="mono">#F6F9F6</span>），Δ 是与该域目标色板的 RGB 距离。Δ 在 40 以内属正常范围：生成模型对描边、抗锯齿边缘会有轻微混色，深笔尤其偏亮一点。</p>
+  <table>
+    <thead>
+      <tr>
+        <th class="mono">#</th><th>图标</th><th>功能域</th>
+        <th>主面 base</th><th>亮面 light</th><th>深笔 deep</th><th>亮面抬亮带</th><th>放行判定</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <h2>11 upload 定稿：词库域 Library 紫</h2>
+  <p>这一枚曾经的域归属两处不一致：<span class="mono">README</span> 记复习（Review 琥珀），代码里传的却是词库紫。裁决结果：<strong>定稿 Library 词库紫</strong>。依据是主语义 —— 它有 3 个调用点，其中设置页两个导入入口（导入词库包 / 导入 <span class="mono">.wbpack</span>）传 <span class="mono">AppDomain.Library</span>，备份中心的「从旧设备恢复」传 <span class="mono">AppDomain.Settings</span>；母版定的是<strong>主语义域</strong>，运行态 tint 仍由各调用点自己决定（<span class="mono">Download</span> 也是这种多域用法）。下面是定稿与弃用对照：</p>
+  <div class="ab">
+    <figure>
+      <img src="icon-master/icon-color-calm__11-upload.png" alt="upload 词库域 紫色定稿" />
+      <figcaption><b>✓ 定稿 · 词库域 Library 紫</b> <span class="mono">#B7A0D9 / #E4DAF2 / #65478A</span><br />依据：主语义是把词库导进来 —— <span class="mono">SettingsScreen.kt:147</span> 与 <span class="mono">:392</span> 两个导入入口都传 <span class="mono">AppDomain.Library</span>。实测主面 <span class="mono">#BDA3E2</span>（Δ 11.2）、暗色簇 35.1%、域外色仅 9.0%，9 项判据全过。</figcaption>
+    </figure>
+    <figure>
+      <img src="icon-master/archive-drift/icon-color-calm__11-upload.review-rejected.png" alt="upload 复习域 琥珀候选（已弃用）" />
+      <figcaption><b>× 弃用 · 复习域 Review 琥珀</b> <span class="mono">#EBC68B / #F7E7CB / #8A5712</span><br />否掉的原因：代码里这一枚没有任何 Review 调用点，Review 只是旧 README 的登记。旧薄荷绿原图也一并存进 <span class="mono">archive-drift/</span>。</figcaption>
+    </figure>
+  </div>
+
+  <h2>12 download 裁决：保留基准原图</h2>
+  <p>这一枚是 v3 收口时留下的唯一待裁决项：登记为 <span class="mono">AiSpeech</span>，但代码里没有任何语音调用点 —— 只有 <span class="mono">SettingsScreen.kt:407</span>（导出词库，染 <span class="mono">Library</span>）与 <span class="mono">BackupHubScreen.kt:75</span>（导出学习数据包，染 <span class="mono">Settings</span>），语义上也与语音无关。裁决结果：<strong>沿用现有这张</strong>，不重出、不改主语义域。核实过用户给的附件与工程内文件字节完全相同（SHA256 <span class="mono">5B39B0BC…42E94243D</span>，678129 字节），所以正式目录一个字节没动。</p>
+  <div class="ab">
+    <figure>
+      <img src="icon-master/icon-color-calm__12-download.png" alt="download 语音域 薄荷绿（保留原图）" />
+      <figcaption><b>✓ 定稿 · 沿用基准原图</b> <span class="mono">#6CCBAB / #CFEDE2 / #1A7A63</span><br />实测主面 <span class="mono">#8FCCBF</span>（Δ 40，阈值 42，是 28 枚里最高）、暗色簇 42%（区间 8–46%），两项都在边缘但均通过。深笔面积大导致采样混色，属基准图既有特征，不作修图理由。</figcaption>
+    </figure>
+    <figure>
+      <figcaption><b>与 11 upload 的区别</b><br />11 是<strong>登记错域</strong>（旧 README 记 Review，代码无 Review 调用点），故按主语义重出；12 是<strong>图已被认可、只是找不出语音调用点</strong>，运行态 tint 本来就由调用点各自决定，母版无需跟每个调用点同域。<br /><br />口径：母版「功能域」列 = 主语义域；运行态 tint = 调用点传入的域；两者不一致是常态，不是缺陷。</figcaption>
+    </figure>
+  </div>
+
+  <h2>这一版的风格合同</h2>
+  <p>合同已从“记住”变成“存档”，下次补图标或改图标直接引用，不会再走样：</p>
+  <table>
+    <thead><tr><th>项</th><th>冻结的口径</th></tr></thead>
+    <tbody>
+      <tr><td>构图</td><td>2–3 块重叠实色面 + 恰好一处内高光斜面；描边只作辅助细线，绝不整幅只用描边</td></tr>
+      <tr><td>色</td><td>每枚三色位全部取自本域 <span class="mono">base / light / deep</span>；深笔是同色族的更深一档，不共用统一墨色</td></tr>
+      <tr><td>光</td><td>左上柔和单光源，高光只有一处，无投影、无外发光</td></tr>
+      <tr><td>禁</td><td>文字、字母、数字、外框、圆角底板、渐变网格、3D 渲染、照片感</td></tr>
+      <tr><td>框内比例</td><td>主体包围盒长边 24–78%，四边最小留白 ≥10%，四角必须是背景 <span class="mono">#F6F9F6</span>（每通道差 ≤8）</td></tr>
+      <tr><td>可辨识</td><td>缩到 17dp 仍能凭色族 + 轮廓认出来；5 枚纯描边导航符号不在此列</td></tr>
+    </tbody>
+  </table>
+  <p>合同全文（含 9 项判据的基准实测区间）与 20 份逐枚提示词：<span class="mono">docs/design/icon-master/STYLE-CONTRACT.md</span> · <span class="mono">docs/design/icon-master/prompts/</span> · 审计脚本与结果：<span class="mono">docs/design/icon-master/audit/</span></p>
+
+  <h2>从母版到代码</h2>
+  <p>母版是位图，不能直接进工程 —— 工程里的图标是 24×24 的 <span class="mono">ImageVector</span>，要跟着域色 tint、缩到 17dp 仍清楚、浅深两套自动切换。所以母版的作用是「确定语言」，落地要按层重绘：</p>
+  <table>
+    <thead><tr><th>母版元素</th><th class="mono">AppIconSpec</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>主面 / 亮面</td><td class="mono">fillPaths</td><td>半透明底幅，浅套 0.42 / 深套 0.30</td></tr>
+      <tr><td>深色块面、局部实心</td><td class="mono">accentPaths</td><td>不透明强调层，已接进渲染器</td></tr>
+      <tr><td>深色细描边</td><td class="mono">strokePaths</td><td>2px 骨架，浅套提亮、深套压深</td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    <p>文件：<span class="mono">docs/design/icon-master/</span> · 清单：<span class="mono">docs/design/icon-master/README.md</span> · 合同：<span class="mono">docs/design/icon-master/STYLE-CONTRACT.md</span> · 本页：<span class="mono">docs/design/2026-10-28-icon-master-sheet.html</span></p>
+    <p>本轮只产出评审母版，未改动任何 Compose 代码与 <span class="mono">AppIcons.kt</span> 路径数据。</p>
+  </footer>
+</div>
+<script>
+  var ZH = {
+    1:'学习', 2:'词库', 3:'复习', 4:'设置', 5:'语音', 6:'阅读', 7:'语音', 8:'学习',
+    9:'查词', 10:'设置', 11:'词库', 12:'语音', 13:'查词', 14:'词库', 15:'阅读', 16:'复习',
+    17:'学习', 18:'语音', 19:'阅读', 20:'设置', 21:'设置', 22:'设置', 23:'复习', 24:'危险',
+    25:'危险', 26:'语音', 27:'语音', 28:'语音'
+  };
+
+  // no, slug, AppIcon, 域, base, light, deep, 批次,
+  // 实测base, Δbase, %base, 实测light, Δlight, %light, 实测deep, Δdeep, %deep,
+  // 放行判定, 亮面抬亮带占比%
+  var CALM = [
+    [1, 'book', 'Book', 'Learn', '#7BB4E6', '#CDE6F7', '#175A93', 'base', '#76AEE4', 8.1, 67.7, '#C6DFF0', 12.4, 8.8, '#2369A6', 27.1, 20.3, 'pass', 9.1],
+    [2, 'books', 'BookOpen', 'Library', '#B7A0D9', '#E4DAF2', '#65478A', 'base', '#BA9DD7', 4.4, 51, '#E7D8F1', 3.5, 26.9, '#7557A3', 33.3, 12, 'pass', 29.2],
+    [3, 'clock', 'Clock', 'Review', '#EBC68B', '#F7E7CB', '#8A5712', 'base', '#E7BF7E', 15.1, 34.2, '#F5E1BF', 13.5, 37.8, '#8B520F', 5.6, 12.7, 'pass', 37.8],
+    [4, 'document', 'Document', 'Settings', '#A6B0AC', '#DCE4E0', '#4A5551', 'base', '#A3AFAA', 3.5, 73.9, '#CEDAD3', 21.1, 5, '#485751', 2.4, 20.7, 'pass', 8],
+    [5, 'microphone', 'Mic', 'AiSpeech', '#6CCBAB', '#CFEDE2', '#1A7A63', 'base', '#6DC0A5', 12.9, 64.3, '#C7E5DA', 14.4, 9.3, '#22836B', 14.9, 20.5, 'pass', 11],
+    [6, 'speaker', 'Speaker', 'Reading', '#E297A4', '#F6DCE0', '#9C3B4F', 'base', '#DF93A4', 5, 44.6, '#F2D5DA', 9.8, 4.2, '#A24258', 12.6, 20.3, 'pass', 5.1],
+    [7, 'spark', 'Spark', 'AiSpeech', '#6CCBAB', '#CFEDE2', '#1A7A63', 'fix', '#73C1A7', 12.5, 69.2, '#D0EAE1', 3.3, 9.6, '#228068', 11.5, 20.3, 'pass', 10.1],
+    [8, 'chart', 'Chart', 'Learn', '#7BB4E6', '#CDE6F7', '#175A93', 'fix', '#77AEE2', 8.1, 66.8, '#C2DDF1', 15, 3.3, '#1D65A3', 20.5, 28.9, 'pass', 3.3],
+    [9, 'camera', 'Camera', 'Danger', '#DD8B81', '#F7DCD6', '#9E2B24', 'base', '#E08274', 16.3, 63.3, '#F4C2B4', 42.7, 6.5, '#933728', 16.5, 17.4, 'pass', 7.7],
+    [10, 'shield', 'Shield', 'Settings', '#A6B0AC', '#DCE4E0', '#4A5551', 'fix', '#A2B0A9', 4.4, 70.8, '#CBD6CF', 27.6, 4.5, '#45554E', 5.5, 24.4, 'pass', 4.5],
+    [11, 'upload', 'Upload', 'Library', '#B7A0D9', '#E4DAF2', '#65478A', 'final', '#BDA3E2', 11.2, 52.2, '#E1D4F2', 7, 3.6, '#7052A3', 29.5, 35.1, 'pass', 4],
+    [12, 'download', 'Download', 'AiSpeech', '#6CCBAB', '#CFEDE2', '#1A7A63', 'keep', '#8FCCBF', 40, 50.1, '#C5E2DB', 16.6, 5.3, '#176C60', 14.7, 42, 'pass', 53.3],
+    [13, 'search', 'Search', 'Danger', '#DD8B81', '#F7DCD6', '#9E2B24', 'redo', '#DD8174', 16.9, 52.6, '#F1CDC7', 22.1, 32.1, '#9C3527', 10.7, 14.6, 'pass', 32.6],
+    [14, 'list', 'List', 'Library', '#B7A0D9', '#E4DAF2', '#65478A', 'redo', '#BAA2DA', 3.7, 52.9, '#E5DBF5', 3.4, 24.2, '#71519A', 22.6, 22, 'pass', 24.8],
+    [15, 'bookmark', 'Bookmark', 'Reading', '#E297A4', '#F6DCE0', '#9C3B4F', 'redo', '#E08FA2', 8.2, 73.6, '#F5D7DE', 5.3, 5.9, '#A54058', 13.7, 20.4, 'pass', 7],
+    [16, 'star', 'Star', 'Review', '#EBC68B', '#F7E7CB', '#8A5712', 'redo', '#EBC283', 9.4, 69, '#F5E3C4', 8.1, 6.9, '#8D5611', 3.5, 23.3, 'pass', 6.9],
+    [17, 'translate', 'Translate', 'Learn', '#7BB4E6', '#CDE6F7', '#175A93', 'redo', '#82B5E4', 7.5, 67.5, '#B4D6F2', 29.8, 6.7, '#1C629F', 15.6, 25, 'pass', 30.8],
+    [18, 'image', 'Image', 'AiSpeech', '#6CCBAB', '#CFEDE2', '#1A7A63', 'redo', '#71C0A5', 13.8, 35.2, '#D5EBE1', 6.3, 23, '#26856D', 19.2, 39.9, 'pass', 23.5],
+    [19, 'newspaper', 'Newspaper', 'Reading', '#E297A4', '#F6DCE0', '#9C3B4F', 'redo', '#E094A5', 4.1, 61.6, '#F3D0D7', 15.6, 4.9, '#A4435B', 16.3, 32.8, 'pass', 5.1],
+    [20, 'gear', 'Gear', 'Settings', '#A6B0AC', '#DCE4E0', '#4A5551', 'redo', '#A3B0A9', 4.3, 62.8, '#CBD7CF', 27.1, 7.2, '#4D5C55', 8.6, 28.6, 'pass', 7.3],
+    [21, 'person', 'Person', 'Settings', '#A6B0AC', '#DCE4E0', '#4A5551', 'redo', '#A2AEA8', 5.6, 69.2, '#CAD7CF', 27.7, 9.8, '#44544E', 6.4, 20.4, 'pass', 10.1],
+    [22, 'info', 'Info', 'Settings', '#A6B0AC', '#DCE4E0', '#4A5551', 'redo', '#A7B3AC', 3, 76.4, '#CDD8D1', 24.4, 5.6, '#495650', 1.7, 17.3, 'pass', 5.8],
+    [23, 'bell', 'Bell', 'Review', '#EBC68B', '#F7E7CB', '#8A5712', 'redo', '#EDC27D', 14.4, 77, '#F7E3C4', 8.1, 3.9, '#8C5511', 2.9, 13.1, 'pass', 3.9],
+    [24, 'warning', 'Warning', 'Danger', '#DD8B81', '#F7DCD6', '#9E2B24', 'redo', '#E28274', 16.8, 82, '#F4CCC3', 25.5, 7.2, '#A03427', 10, 10.6, 'pass', 7.4],
+    [25, 'trash', 'Trash', 'Danger', '#DD8B81', '#F7DCD6', '#9E2B24', 'redo', '#E58173', 18.5, 74.9, '#EED8D4', 9.7, 0.2, '#B83B30', 32.6, 20.9, 'pass', 3.6],
+    [26, 'play', 'Play', 'AiSpeech', '#6CCBAB', '#CFEDE2', '#1A7A63', 'redo', '#6DBFA3', 14.1, 42.3, '#CAE6DC', 10.3, 26.1, '#23826A', 13.8, 31.1, 'pass', 26.2],
+    [27, 'pause', 'Pause', 'AiSpeech', '#6CCBAB', '#CFEDE2', '#1A7A63', 'redo', '#75C2A9', 12.7, 72.1, '#C7E4D9', 14.7, 4.3, '#198069', 8.3, 21.6, 'pass', 4.4],
+    [28, 'stop', 'Stop', 'AiSpeech', '#6CCBAB', '#CFEDE2', '#1A7A63', 'redo', '#79C6AF', 14.8, 83.2, '#D5EDE5', 6.7, 5.7, '#1E836C', 13.7, 10.8, 'pass', 5.9]
+  ];
+
+  var BATCH = {
+    base:    ['基准（未改动）', ''],
+    fix:     ['修色重出', 'fix'],
+    redo:    ['复刻 13–28', 'redo'],
+    final:   ['裁决定稿', 'fix'],
+    keep:    ['裁决定稿（保留原图）', 'fix']
+  };
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  var grid = document.getElementById('grid');
+  var tbody = document.getElementById('tbody');
+
+  CALM.forEach(function (it) {
+    var no = it[0], slug = it[1], en = it[2], dom = it[3];
+    var base = it[4], light = it[5], deep = it[6], batch = it[7];
+    var verdict = it[17], lift = it[18];
+    var zh = ZH[no];
+
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+
+    var img = document.createElement('img');
+    img.src = 'icon-master/icon-color-calm__' + pad(no) + '-' + slug + '.png';
+    img.alt = en + ' 图标母版（' + zh + '域）';
+    img.loading = 'lazy';
+    cell.appendChild(img);
+
+    var row = document.createElement('div');
+    row.className = 'row';
+    var left = document.createElement('div');
+    var nameEl = document.createElement('div');
+    nameEl.className = 'name';
+    nameEl.textContent = zh + ' · ' + en;
+    var enumEl = document.createElement('div');
+    enumEl.className = 'enum';
+    enumEl.textContent = 'AppIcon.' + en;
+    left.appendChild(nameEl);
+    left.appendChild(enumEl);
+    var noEl = document.createElement('div');
+    noEl.className = 'no';
+    noEl.textContent = pad(no);
+    row.appendChild(left);
+    row.appendChild(noEl);
+    cell.appendChild(row);
+
+    var sw = document.createElement('div');
+    sw.className = 'swatches';
+    [base, light, deep].forEach(function (c) {
+      var s = document.createElement('span');
+      s.className = 'sw';
+      s.style.background = c;
+      s.title = c;
+      sw.appendChild(s);
+    });
+    var domEl = document.createElement('span');
+    domEl.className = 'domain';
+    domEl.textContent = dom;
+    sw.appendChild(domEl);
+    cell.appendChild(sw);
+
+    var tags = document.createElement('div');
+    tags.className = 'tags';
+    var b = BATCH[batch];
+    var bEl = document.createElement('span');
+    bEl.className = 'batch ' + b[1];
+    bEl.textContent = b[0];
+    tags.appendChild(bEl);
+    var vEl = document.createElement('span');
+    vEl.className = 'verdict ' + (verdict === 'pass' ? 'vpass' : 'vfail');
+    vEl.textContent = verdict === 'pass' ? '通过' : '不通过';
+    vEl.title = verdict === 'pass' ? '9 项判据全部落在基准实测区间内' : '色族对不上所属域，等域归属裁决';
+    tags.appendChild(vEl);
+    cell.appendChild(tags);
+
+    grid.appendChild(cell);
+
+    var tr = document.createElement('tr');
+    function td(content, cls) {
+      var el = document.createElement('td');
+      if (cls) el.className = cls;
+      if (content && typeof content === 'object') el.appendChild(content); else el.textContent = content;
+      return el;
+    }
+    tr.appendChild(td(pad(no), 'mono'));
+    tr.appendChild(td(zh + ' · ' + en));
+    tr.appendChild(td(dom));
+
+    function colorCell(targetHex, measuredHex, delta, pct) {
+      var wrap = document.createElement('div');
+      wrap.className = 'chip';
+      var d = document.createElement('span');
+      d.className = 'dot';
+      d.style.background = targetHex;
+      wrap.appendChild(d);
+      var txt = document.createElement('span');
+      txt.className = 'mono';
+      txt.textContent = (measuredHex || '—') + ' / ' + targetHex;
+      wrap.appendChild(txt);
+      if (delta !== null && delta !== undefined) {
+        var t2 = document.createElement('span');
+        t2.className = 'delta';
+        t2.textContent = ' Δ' + delta.toFixed(1) + ' · ' + pct.toFixed(1) + '%';
+        wrap.appendChild(t2);
+      }
+      return wrap;
+    }
+    tr.appendChild(td(colorCell(base, it[8], it[9], it[10])));
+    tr.appendChild(td(colorCell(light, it[11], it[12], it[13])));
+    tr.appendChild(td(colorCell(deep, it[14], it[15], it[16])));
+
+    var liftEl = document.createElement('span');
+    liftEl.className = 'mono delta';
+    liftEl.textContent = lift.toFixed(1) + '%';
+    tr.appendChild(td(liftEl));
+
+    var vTag = document.createElement('span');
+    vTag.className = 'verdict ' + (verdict === 'pass' ? 'vpass' : 'vfail');
+    vTag.textContent = verdict === 'pass' ? '通过' : '不通过';
+    tr.appendChild(td(vTag, 'delta'));
+
+    tbody.appendChild(tr);
+  });
+
+</script>
+</body>
+</html>

@@ -1837,3 +1837,27 @@ Task 4 只改学习页，却把 §3.2 的五枚入口锚从 `TodayPlanScreen` �
   （根装配 1 + `Containers.kt` 的 `StrongCard` 1），新增第三处即红。
 - `SharedComponentGeometryContractTest` 的发丝线取值/顺序锚仍读 `EntryRow.kt`，而 `hairlineTop` 已迁到
   `Containers.kt`。改读新家，并在 `EntryRow.kt` 补一条零计数反向锚（旧家不许留第二份画线实现）。
+
+---
+
+## 执行状态（2026-10-27 实跑记录）
+
+本小节的目的是让「计划 checkbox 全空」不再有歧义：**Task 1–8 的 Step 1–4 已执行完毕、Step 5（提交）
+全部未执行**（原因：本机没有可用的 `git`，见工作报告第 5 节）。逐格勾选会与「提交是否落盘」混为一谈，
+故保留 checkbox 原样，用本表 + `docs/handoff/2026-10-27-layout-redesign-batch-1-report.md` 作为权威账。
+
+| Task | Step 1 RED | Step 2 实跑红 | Step 3 GREEN | Step 4 转绿 | Step 5 提交 |
+|---|---|---|---|---|---|
+| 1 类型换档 + strong token | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 2 三档容器 `Containers.kt` | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 3 底栏四格 + `Person` | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 4 学习页重排 | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 5 词库页分段落壳 | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 6 我的页 + 设置抽离 | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 7 阅读主页页头 | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 8 学习记录/打卡裸行 | 已执行 | 已执行 | 已执行 | 已执行 | 未执行（无 git） |
+| 9 全量门禁 | 已执行（1831 tests / 0 failures） | — | — | — | — |
+| 9 模拟器 connected | `OK (68 tests)` | — | — | — | — |
+| 9 真机目视 8 项 | 6 项通过、第 6 项部分、第 8 项 3/4（AI 页旧版式） | — | — | — | — |
+| 9 报告 | `docs/handoff/2026-10-27-layout-redesign-batch-1-report.md` | — | — | — | 未执行（无 git） |
+| 9 请示 | 待用户答复（是否推送、是否进批 2） | — | — | — | — |

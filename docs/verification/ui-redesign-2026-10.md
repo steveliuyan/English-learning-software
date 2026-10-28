@@ -30,6 +30,10 @@ git diff --name-only main..HEAD | grep -c lockfile   # 期望 0：依赖锁零�
 `suites=231 tests=1708 skipped=0 failures=0 errors=0`，结果 XML 文件数与 suite 数同为 231（无孤儿文件，五元组不虚高）。
 **批 2 关账基线：231 类 / 1708 用例 / 0 失败 / 0 错误 / 0 跳过，只准增不准减。**
 **批 3 关账基线（2026-10-24，Task 26 Step 5 实跑，见下方 Step 5 节）：241 类 / 1788 用例 / 0 失败 / 0 错误 / 0 跳过。**
+**D7 轻松档改色关账基线（2026-10-27）：248 类 / 1819 用例 / 0 失败 / 0 错误 / 0 跳过，只准增不准减。**
+证据见 `docs/verification/2026-10-27-relaxed-palette-d7.md`；改色决策见
+`docs/decisions/2026-10-27-relaxed-palette-rulings.md`。本文正文的 2026-10-20 及更早快照数字是**历史留档，不回改**——
+它们记录的是当时的取值，读它们要配 `AppColors.kt` 现值一起看。
 **用例数只增不减**（批 2 实跑演进：14B `225/1666` → 14A-i/ii `226/1673` → 15 `227/1681` → 16 `228/1690` → 17A `230/1702` → 17B `231/1708`；批 1 历史值 223/1654），差值就是当轮新增的
 JVM 用例数——本行是**运行日志**不是规范值，别把它当分母去核对文档里的其它数字。
 
@@ -297,6 +301,8 @@ ls -la /tmp/ui-icons                        # 六张字节数均非 0
 - **返回位交接**：屏侧 `check_in_back` 那枚文字返回节点删除，返回位由组件的 48dp 图标位承载
   （组件返回位**无 testTag**，只有 `contentDescription = "返回"`）。判据侧因此把
   `CheckInScreenTest.back_invokes_callback` 与 `AppScreenTest.checkInEntryOpensOverlayAndBackReturnsToTodayPlan`
+  （2026-10-25 版式重做后签到入口搬到「我的」页，该用例随之更名为
+  `checkInEntryOpensOverlayAndBackReturnsToTheProfilePage`，返回落点从今日计划页改为「我的」页）
   的选取器从 `onNodeWithTag("check_in_back")` 换成 `onNodeWithContentDescription("返回")`——语义不变
   （点返回位、回调恰一次），未放宽。48dp 与可读描述改由
   `AppScreenHeaderTest.header_back_is_a_48dp_target_with_a_readable_description` 承重，护栏 KDoc 里点名了这次交接。
@@ -1270,3 +1276,39 @@ adb -s emulator-5574 shell dumpsys user | grep 'State:'      # 期望 RUNNING_UN
 - **对用户的实际影响（必须知道再决定推进顺序）**：**开系统深色的用户在批 2 收完核心屏之前会看到半深色的界面**，
   浅色档无此问题。合 main 与对外分发前，要么先完成批 2，要么把「全站静态容器读点一次性改读 `appColors()`」提到批 2 最前面做（控制者建议后者，见交接报告 §5）。
 - 截图证据按红线**不入库**（含真实词书与进度数据），留在本机忽略区；本节的判定以「现象 + 定义行 + 重算命令」为准，不依赖截图。
+
+## 轻松档配色落地后的真机全量复验（2026-10-27，`bf353dda` + `emulator-5574`）
+
+配色改到「轻松、低压力」档（裁决见 `docs/decisions/2026-10-27-relaxed-palette-rulings.md`）后，把 `ui` 包整包在两台设备上重跑：
+
+```bash
+adb -s <serial> install -r -t app/build/outputs/apk/debug/app-debug.apk
+adb -s <serial> install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb -s <serial> shell am instrument -w -e package com.example.englishlearning.ui \
+  com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+- **结果**：真机 475 用例、模拟器 475 用例，各**只剩 1 条红**——两处都红在同一条
+  `AppScreenOverlayContainerTest.hostedWordBookDeletePanelStaysFullyReadableAndTappableAtDoubleFontScale`，
+  原因是该条自带 `assertScaleTookEffect` 护栏（`AppScreenOverlayContainerTest.kt:573`）：设备 `font_scale` 不是 2.0 时它**判定自己空转**、
+  故意报红，不是布局缺陷。按护栏要求先 `adb shell settings put system font_scale 2.0` 再单跑该条：真机 `OK (1 test)`、模拟器同；
+  该类的 6 条在 2.0 档下整类跑也是 `OK (6 tests)`，跑完一律恢复 `font_scale 1.0`。故口径是**两设备各 475/475**（1 条需换字号档跑）。
+- **本轮由真机暴露、模拟器测不到的缺陷**（根因值得留档）：`captureToImage()` 在真机上返回的是**与父面板合成后**的位图，
+  不是子节点自身图层（API 30 模拟器返回纯自身图层）。于是「取标题笔画众数当墨色」在真机上量到的是玻璃容器色
+  `#F1FDFDFD`（差 222），墨色断言全线误红。修法是把容器色作为基准传进采样：`modeOfTitleInkPixels(backdrop: Int)`、
+  `modeOfSampledPixels(bitmap, awayFrom: Int?)` 排除贴容器族，并立两枚常量
+  `INK_MIN_DELTA_FROM_BACKDROP = 64`、`INK_MIN_FAMILY_COUNT = 25`（凑不足 25 个同族像素即判红，防「挑一个远点像素就当墨」）。
+  另有一条同族教训：`GlassDialogThemeInkTest` 自检③原把 `background` 也算进「最近相邻填充」，轻松档下它与 `surfaceGlass`
+  只差 6 个通道值、恰等容差 6，恒红——改为只比 `tint/tint2/tint3/outlineSoft`（透出页底已由 alpha 腿挡死）。
+- **与配色无关的红（陈旧锚点，10 条）**：2026-10-25 版式重做把签到、学习记录、可选设置、问答药片、今日计划 CTA 的落点全换了，
+  判据仍按旧锚取，属**换面未换判据**。逐条换锚后改名（旧名在库内不再存在，检索旧名即为陈旧引用）：
+  `checkInEntryOpensOverlayAndBackReturnsToTodayPlan` → `…ReturnsToTheProfilePage`、
+  `readyPlanEntryReopensSetupAndSavingReturnsToTodayPlan` → `…SavingReloadsTheTodayPlan`、
+  `optionalSetupCanBeCancelledBackToTodayPlanWithoutReloading` → `…BackToTheProfilePageWithoutReloading`；
+  「学习记录」内容描述 → `app_tab_settings` + `profile_open_learning_records`；问答药片按 `WordQaKind.entries` 里去掉 `Personal` 后的集合逐枚点名
+  （个人笔记走 `word_qa_personal_note`，不是固定问答药片）；今日计划主 CTA 按 tag `today_plan_start_learning` 取而不按文案取。
+- **一条用例自身的前提被本轮改准**：`systemBackClosingAReadingWordDetailClearsTheSharedDetailPronunciationState` 需要「文章已解锁」与
+  「学习入口仍可点」同时成立，而严格档下这俩**互斥**——`UnlockPolicy` 要求新词与复习都完成才解锁文章，
+  主 CTA 又只在「没全完成」时才走 `onStartLearning`。改用宽松档 `v1-relaxed` 的计划夹具
+  （`planUnlockedWithPendingReview()`：`apple-id` 已学 → 文章解锁；复习位留一枚没做过的 → CTA 落「开始复习」，仍走同一条 `onStartLearning`）。
+- **同轮**：`:app:testDebugUnitTest` 1819 用例 0 失败（`app/build/test-results/testDebugUnitTest` 248 个 XML 现算）、`:app:assembleDebug` 成功。

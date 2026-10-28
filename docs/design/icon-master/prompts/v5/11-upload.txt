@@ -1,0 +1,17 @@
+﻿STYLE CONTRACT v5 - CHUNKY STICKER (identical across the whole set, derived from the supplied reference sheet):
+Chunky die-cut sticker illustration of a single friendly object, slightly dimensional like a soft moulded clay toy flattened onto the page. Rounded simplified geometry. Every form is a SOLID opaque colour mass filled with ONE perfectly flat tone - zero shading and zero gradient inside a mass - with crisp clean edges. No translucency, no mesh gradient, no texture, no raster noise.
+
+DEPTH RULE: each icon has exactly ONE mid-tone main mass, exactly ONE darker same-hue mass that reads as a side wall, an underside or a recessed inner area, and ONE bold DARKEST same-hue contour that runs around the whole silhouette and around every opening. The contour is thick and confident, about 4 to 5 percent of the icon width, uniform in weight, with rounded joins and rounded ends - a structural outline, not a thin accent line. Any interior detail line uses the same thick contour weight.
+
+HIGHLIGHT RULE: exactly ONE glossy near-white highlight patch, placed on the upper left of the largest mass, shaped like a short comma, crescent or oval, following the curve of that mass. It sits fully inside the mass and never touches the contour. No other white anywhere in the icon.
+
+COLOUR RULE: all solids of an icon belong to ONE hue family: mid tone, darker shade, darkest contour. Gentle slightly desaturated pastel colours, bright enough to stay legible at 17 px. No neon, no pure black.
+
+FRAMING: a single icon, centered, occupying about 70 percent of the frame, on a plain very light neutral off-white background (#F6F9F6), generous even padding.
+
+NO text, NO letters, NO numbers, NO labels, NO logos, NO watermark, NO outer border, NO rounded-square tile behind the icon, NO cast shadow on the background, NO gradient shading, NO photorealism - the icon floats directly on the flat background.
+
+ICON SUBJECT:
+A thick upward arrow rising out of an open tray. The tray front wall is the mid-tone main mass; the arrow and the inner back lip of the tray are the darker mass; the darkest contour runs around the arrow and the tray; one glossy near-white comma highlight sits on the left side of the arrow shaft.
+
+THIS ICON'S COLOUR FAMILY: mid-tone main mass #B7A0D9 , darker mass and thick contour #65478A , single glossy highlight near-white #F4FBF7 .

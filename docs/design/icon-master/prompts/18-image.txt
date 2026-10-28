@@ -1,0 +1,13 @@
+STYLE CONTRACT (identical across the whole set):
+Soft flat illustration, calm low-stress learning-app aesthetic. Rounded friendly geometry. Each icon is built from two or three overlapping SOLID color masses plus exactly one subtle inner highlight facet, with a thin rounded stroke used only as a secondary accent line - never as the entire icon.
+
+COLOR RULE (the point of this batch): every icon in the set uses a DIFFERENT hue family, so the twelve read as twelve clearly distinct entries instead of one uniform mint family. All colours stay desaturated, gentle and low-stress - no neon, no pure black, no gradient mesh. The accent stroke and the darkest mass of each icon are a DARKER SHADE OF THAT ICON'S OWN hue (never a shared teal ink), so the hue identity survives when the icon is shrunk to 17 px. Soft even lighting from the top left. Crisp vector-clean edges. No photorealism, no 3D render, no glow, no drop shadow of the icon onto the background.
+
+FRAMING: a single icon, centered, occupying about 70% of the frame, on a plain very light neutral off-white background (#F6F9F6), generous even padding.
+
+NO text, NO letters, NO numbers, NO labels, NO logos, NO watermark, NO border, NO rounded-square tile behind the icon - the icon floats directly on the flat background.
+
+ICON SUBJECT:
+A picture frame with a mountain silhouette and a small sun disc.
+
+THIS ICON'S COLOUR FAMILY: main mass #6CCBAB , lighter inner facet #CFEDE2 , deepest accent and stroke #1A7A63 . Both the facet and the darkest mass belong to this same hue family.
