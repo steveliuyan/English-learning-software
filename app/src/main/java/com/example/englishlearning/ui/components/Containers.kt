@@ -22,11 +22,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.appColors
 
 /**
@@ -42,14 +44,22 @@ import com.example.englishlearning.ui.theme.appColors
 val BareRowDividerIndent: Dp = 52.dp
 
 /**
- * 强档卡：深墨实底 + 圆角 28 + 内边距 18（spec §4.1）。
+ * 强档卡：圆角 28 + 内边距 18，**底与墨两套分取**（spec §4.1；2026-10-31 用户评审 ②③ 改浅套落点）。
  *
- * 底色取 [com.example.englishlearning.ui.theme.AppColorSet.strongSurface]——明暗两套都是深底，
- * 所以卡内文字一律取 [com.example.englishlearning.ui.theme.AppColorSet.onStrong]（两套同值 `#E9F2EC`，
- * 压两套 strongSurface 均 ≥4.5:1）。这里额外把 `LocalContentColor` 一并提供成 `onStrong`：
- * [AppType] 的六档 getter 会自带墨色，但未显式着色的 `Text`（例如图标旁边的计数）仍会落到
- * 容器内容色上——不提供就会在浅套里落下近黑的 `text1`，深底深字等于不可读。
- * `LocalContentColor` 拦不住 `AppType` 自带的墨，所以卡内正文仍须显式写 `color = colors.onStrong`。
+ * 浅套底取 [com.example.englishlearning.ui.theme.AppColorSet.tint2]（浅薄荷一档）、墨取
+ * [com.example.englishlearning.ui.theme.AppColorSet.text1]；深套底仍是
+ * [com.example.englishlearning.ui.theme.AppColorSet.strongSurface]、墨仍是
+ * [com.example.englishlearning.ui.theme.AppColorSet.onStrong]（`#E9F2EC`）。
+ *
+ * 为什么分套而不是把 `strongSurface` 这个 token 改浅：它同时被主按钮、开关轨道、阅读页提交键消费，
+ * 改 token 会把那些「实心深色操作面」一起洗淡——要降的是**卡片**的层次，不是操作面。
+ * 深套不动：那套 `strongSurface` 与页面背景只差一档明度，深底浅字本来就是对的层次。
+ *
+ * `LocalContentColor` 必须提供分套后的那枚墨：卡内未显式着色的 `Text`（图标旁的计数一类）会落到
+ * 容器内容色上。但 `LocalContentColor` 拦不住 [AppType] 六档 getter 自带的墨，所以卡内正文仍须
+ * 显式写 `color = LocalContentColor.current`——**不要**在卡内写死 `onStrong`，那会在浅套里
+ * 落到一枚浅薄荷底上的近白字（实测不可读，`ProfilePageContractTest` / `TodayPlanNumberAuthorityTest`
+ * 各有一条把「卡内写死 onStrong」判红的用例）。
  */
 @Composable
 fun StrongCard(
@@ -58,12 +68,15 @@ fun StrongCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = appColors()
-    CompositionLocalProvider(LocalContentColor provides colors.onStrong) {
+    val isDark = LocalIsDark.current
+    val fill = if (isDark) colors.strongSurface else colors.tint2
+    val ink = if (isDark) colors.onStrong else colors.text1
+    CompositionLocalProvider(LocalContentColor provides ink) {
         Column(
             modifier = modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(colors.strongSurface)
+                .background(fill)
                 .padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content,
@@ -105,6 +118,14 @@ fun SoftCard(
  *
  * 只给 `onClick != null` 的行挂 `clickable`：`onClick == null` 的纯信息行（统计、只读摘要）
  * 不是「假入口」，也不该进 TalkBack 的可点序列。
+ *
+ * [titleMaxLines] 是批 3 Task 1 为外刊标题加的第二档：索引页的标题是「内容本身」（长标题截成半句
+ * 就读不出是什么），而入口行的标题是「去哪」（单行更省、也更好扫）。默认 1 行，即既有各屏的几何
+ * 与观感一字不动；两行只由需要它的调用方显式传。副标题仍是 2 行上限，不与这一档联动。
+ *
+ * [trailingTag] 是批 3 Task 5 加的第二档（同 [titleMaxLines] 的加法，只增不改）：尾部值由本组件渲染，
+ * 而查词页的历史行要把「N 次」单独当成一枚节点来读（关闭次数显示时 connected 断言它不存在）。
+ * 默认 `null` = 不打标签，既有调用点的标签面与树形一字不动。
  */
 @Composable
 fun BareRow(
@@ -115,6 +136,8 @@ fun BareRow(
     leading: @Composable (() -> Unit)? = null,
     showChevron: Boolean = true,
     topDivider: Boolean = false,
+    titleMaxLines: Int = 1,
+    trailingTag: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = appColors()
@@ -134,7 +157,7 @@ fun BareRow(
                 text = title,
                 style = AppType.Body,
                 color = colors.text1,
-                maxLines = 1,
+                maxLines = titleMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
             if (!subtitle.isNullOrBlank()) {
@@ -153,6 +176,7 @@ fun BareRow(
                 style = AppType.Footnote,
                 color = colors.text2,
                 maxLines = 1,
+                modifier = if (trailingTag == null) Modifier else Modifier.testTag(trailingTag),
             )
         }
         if (showChevron && onClick != null) {

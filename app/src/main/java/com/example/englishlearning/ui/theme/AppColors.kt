@@ -11,6 +11,13 @@ import androidx.compose.ui.graphics.Color
  *
  * 取值来自 spec §2.1（`docs/superpowers/specs/2026-10-17-ui-redesign-design.md`）与决策
  * 2026-10-18 裁决 1–3（`docs/decisions/2026-10-18-ui-redesign-contrast-and-icon-layer-rulings.md`）。
+ *
+ * **2026-10-27 轻松档改色**（决策 `docs/decisions/2026-10-27-relaxed-palette-rulings.md`）：
+ * 中性 18 枚与七域域色整体降到「低压力」色阶——背景去黄绿偏中性、`tint` 系去饱和、
+ * 七域 base 由 iOS 高饱和亮色改为柔化色（AiSpeech `/2EC99C`→`/6CCBAB`、Learn `0A84FF`→`7BB4E6` 等），
+ * 域 deep 同时压深以保证「浅底文字 ≥4.5、白字形压容器 ≥3:1」仍成立。
+ * 品牌渐变 `AppleMint*` 四枚**未动**（spec §2.1「品牌渐变保持现状不动」）。
+ * 改色依据与逐对实测见设计稿 §4.4（`docs/design/2026-10-25-icon-system-design-sheet.html`）。
  * 本文件是这些 hex 的权威源（`AppPalette.kt` 为浅套静态兼容源，取值由 DesignTokenContractTest
  * 同步钉住）。配对合法性（WCAG 正文 ≥4.5、图形 ≥3.0）不在这里抄录——契约测试从这些字面量
  * 当场按相对亮度复算；在此写「对比合格」类注释只会随取值漂移。
@@ -44,38 +51,38 @@ data class AppColorSet(
     val onStrong: Color,
 )
 
-/** 浅套中性 token（spec §2.1 浅色行）。 */
+/** 浅套中性 token（spec §2.1 浅色行；2026-10-27 轻松档取值）。 */
 val AppColorLight = AppColorSet(
-    background = Color(0xFFF1FBF5),
+    background = Color(0xFFF6F9F6),
     surface = Color(0xFFFFFFFF),
     surfaceGlass = Color(0xEFFFFFFF),
-    tint = Color(0xFFDDF7E8),
-    tint2 = Color(0xFFDCEAE1),
-    tint3 = Color(0xFFCDEDD9),
-    outline = Color(0xFFADE7D2),
-    outlineSoft = Color(0xFFE4EFE9),
-    text1 = Color(0xFF1C1C1E),
-    text2 = Color(0xFF4E756A),
-    text3 = Color(0xFF7A9088),
+    tint = Color(0xFFE9F4EE),
+    tint2 = Color(0xFFE4EFE9),
+    tint3 = Color(0xFFDEEAE4),
+    outline = Color(0xFFD3E7DC),
+    outlineSoft = Color(0xFFEBF1ED),
+    text1 = Color(0xFF1F2B26),
+    text2 = Color(0xFF566B62),
+    text3 = Color(0xFF7C9188),
     onMint = Color(0xFF174C44),
     onBrand = Color(0xFF04241C),
     error = Color(0xFFB30000),
     errorFill = Color(0xFFFF3B30),
     success = Color(0xFF1B5E20),
-    strongSurface = Color(0xFF0C2A22),
+    strongSurface = Color(0xFF1F4739),
     onStrong = Color(0xFFE9F2EC),
 )
 
-/** 深套中性 token（spec §2.1 深色行；`onBrand` 见文件头说明）。 */
+/** 深套中性 token（spec §2.1 深色行；`onBrand` 见文件头说明；2026-10-27 轻松档取值）。 */
 val AppColorDark = AppColorSet(
-    background = Color(0xFF0E1512),
+    background = Color(0xFF111A16),
     surface = Color(0xFF17201C),
     surfaceGlass = Color(0xE617201C),
-    tint = Color(0xFF1C2C26),
-    tint2 = Color(0xFF22322B),
-    tint3 = Color(0xFF27392F),
-    outline = Color(0xFF2E4238),
-    outlineSoft = Color(0xFF233029),
+    tint = Color(0xFF1B2A25),
+    tint2 = Color(0xFF20302A),
+    tint3 = Color(0xFF25352E),
+    outline = Color(0xFF2B3A33),
+    outlineSoft = Color(0xFF202C26),
     text1 = Color(0xFFE9F2EC),
     text2 = Color(0xFF9FB3AA),
     text3 = Color(0xFF7F938A),
@@ -84,7 +91,7 @@ val AppColorDark = AppColorSet(
     error = Color(0xFFFF8177),
     errorFill = Color(0xFFFF6B61),
     success = Color(0xFF6BD98A),
-    strongSurface = Color(0xFF1E2B25),
+    strongSurface = Color(0xFF22332C),
     onStrong = Color(0xFFE9F2EC),
 )
 
@@ -99,24 +106,24 @@ data class DomainPalette(val base: Color, val deep: Color)
 
 /** 浅套域色：与 `DomainColors` 逐值相同（契约测试双钉：改本表或改 DomainColors 都会红）。 */
 val DomainLight: Map<AppDomain, DomainPalette> = mapOf(
-    AppDomain.AiSpeech to DomainPalette(base = Color(0xFF2EC99C), deep = Color(0xFF188F76)),
-    AppDomain.Learn to DomainPalette(base = Color(0xFF0A84FF), deep = Color(0xFF075EB4)),
-    AppDomain.Review to DomainPalette(base = Color(0xFFFF9F0A), deep = Color(0xFFAB5700)),
-    AppDomain.Library to DomainPalette(base = Color(0xFFBF5AF2), deep = Color(0xFF8E34B8)),
-    AppDomain.Reading to DomainPalette(base = Color(0xFFFF375F), deep = Color(0xFFC81E46)),
-    AppDomain.Danger to DomainPalette(base = Color(0xFFFF3B30), deep = Color(0xFFB30000)),
-    AppDomain.Settings to DomainPalette(base = Color(0xFF8E8E93), deep = Color(0xFF48484A)),
+    AppDomain.AiSpeech to DomainPalette(base = Color(0xFF6CCBAB), deep = Color(0xFF1A7A63)),
+    AppDomain.Learn to DomainPalette(base = Color(0xFF7BB4E6), deep = Color(0xFF175A93)),
+    AppDomain.Review to DomainPalette(base = Color(0xFFEBC68B), deep = Color(0xFF8A5712)),
+    AppDomain.Library to DomainPalette(base = Color(0xFFB7A0D9), deep = Color(0xFF65478A)),
+    AppDomain.Reading to DomainPalette(base = Color(0xFFE297A4), deep = Color(0xFF9C3B4F)),
+    AppDomain.Danger to DomainPalette(base = Color(0xFFDD8B81), deep = Color(0xFF9E2B24)),
+    AppDomain.Settings to DomainPalette(base = Color(0xFFA6B0AC), deep = Color(0xFF4A5551)),
 )
 
 /** 深套域色：deep = base（spec §2.1「深色下域色与 base 合一，避免暗底深字」）。 */
 val DomainDark: Map<AppDomain, DomainPalette> = mapOf(
-    AppDomain.AiSpeech to DomainPalette(base = Color(0xFF35E0AC), deep = Color(0xFF35E0AC)),
-    AppDomain.Learn to DomainPalette(base = Color(0xFF5AC0FF), deep = Color(0xFF5AC0FF)),
-    AppDomain.Review to DomainPalette(base = Color(0xFFFFB340), deep = Color(0xFFFFB340)),
-    AppDomain.Library to DomainPalette(base = Color(0xFFDA8CFF), deep = Color(0xFFDA8CFF)),
-    AppDomain.Reading to DomainPalette(base = Color(0xFFFF7A93), deep = Color(0xFFFF7A93)),
-    AppDomain.Danger to DomainPalette(base = Color(0xFFFF6B61), deep = Color(0xFFFF6B61)),
-    AppDomain.Settings to DomainPalette(base = Color(0xFFB0B0B5), deep = Color(0xFFB0B0B5)),
+    AppDomain.AiSpeech to DomainPalette(base = Color(0xFF6FD9B6), deep = Color(0xFF6FD9B6)),
+    AppDomain.Learn to DomainPalette(base = Color(0xFF84C4EE), deep = Color(0xFF84C4EE)),
+    AppDomain.Review to DomainPalette(base = Color(0xFFEFCB92), deep = Color(0xFFEFCB92)),
+    AppDomain.Library to DomainPalette(base = Color(0xFFC6A9E4), deep = Color(0xFFC6A9E4)),
+    AppDomain.Reading to DomainPalette(base = Color(0xFFEDA8B4), deep = Color(0xFFEDA8B4)),
+    AppDomain.Danger to DomainPalette(base = Color(0xFFE39086), deep = Color(0xFFE39086)),
+    AppDomain.Settings to DomainPalette(base = Color(0xFFB4BEBA), deep = Color(0xFFB4BEBA)),
 )
 
 /**

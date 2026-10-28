@@ -68,8 +68,13 @@ private val BrandMintGradientStops: List<Color> = listOf(
  * Secondary / Text 档的域色墨（R-14.1 ② + R-14.4 第二条）。
  *
  * 深套 `base == deep`，所以「浅 `deep` / 深 `base`」的分叉塌成一条统一取 `palette.deep`；唯一例外是
- * **浅套 AiSpeech**（它的 `deep` 压白只有 4.016，不达标）取 `set.onMint`。这条例外不是纸面边界：
+ * **浅套 AiSpeech** 取 `set.onMint`。这条例外不是纸面边界：
  * 默认形参即 AiSpeech，消费面有 3 处默认 + 5 处显式真的走这两档（取证见 Task 14A-i 报告）。
+ *
+ * 2026-10-27 轻松档注记：当年立例的读数「deep 压白只有 4.016」随换色作废（#1A7A63 压白 5.24，
+ * 那笔「批前既有债」也一并还清，见 `AiBadgeContrastFixTest` 同名用例）。例外**不撤**：
+ * R-14.4 要的是全房一致——浅套 AiSpeech 的文本墨一律 `onMint`（9.75，余量 5.25 对比 deep 的 0.74），
+ * 药丸、底导标签、EntryRow 三处不能各取一枚。
  */
 private fun domainInkOnLightSurface(
     set: AppColorSet,

@@ -28,9 +28,9 @@ import androidx.compose.ui.graphics.Color
  *
  * ## 命名陷阱：`MintOutline` 读 `outlineSoft`，不是 `outline`
  *
- * `MintOutline` 名字像 spec §2.1 的 `outline #ADE7D2`，实际承载的是**分隔线**
+ * `MintOutline` 名字像 spec §2.1 的 `outline`（轻松档 = `#D3E7DC`），实际承载的是**分隔线**
  * （改值前是 `AppPalette.Separator`），故映射到 `outlineSoft`。若按字面映射到 `outline`，
- * 全站每一条细分隔线会突然变成粗薄荷线。spec 的 `outline #ADE7D2` **不建 `Mint` 别名**：
+ * 全站每一条细分隔线会突然变成粗薄荷线。spec 的 `outline`（`#D3E7DC`）**不建 `Mint` 别名**：
  * 它只由新组件（`IconBadge` 描边、卡片主描边）直接读 `appColors().outline`。
  */
 

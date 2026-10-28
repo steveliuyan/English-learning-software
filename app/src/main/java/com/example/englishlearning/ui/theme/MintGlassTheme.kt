@@ -75,8 +75,11 @@ fun MintGlassTheme(
  * `MaterialThemeAssemblyContractTest`，按 WCAG 相对亮度当场算）。域色不进 `ColorScheme`：
  * 各功能域一律走 [appDomain] 直读，避免 M3 角色表和域色表长出第二套真值。
  *
- * `onErrorContainer` 是唯一按模式分叉的取值：`errorFill` 在浅套是深红、在深套是浅红，字形极性
- * 相反，所以浅套取 `text1`、深套取 `background`。M3 的 `outline` 槽是**控件边界**（OutlinedButton
+ * `onErrorContainer` 是唯一按模式分叉的取值：`errorFill` 在浅套是饱和红、在深套是浅红，字形极性
+ * 相反，所以浅套取 `onBrand`（#04241C，压 #FF3B30 实测 4.65）、深套取 `background`（#111A16，
+ * 压 #FF6B61 实测 6.36）。浅套 2026-10-27 从 `text1` 换成 `onBrand`：轻松档 `text1` 抬到 #1F2B26
+ * 后压浅套 `errorFill` 只有 4.13，掉到 AA 正文下限以下；`onBrand` 本来就是「彩色实底上的墨」，
+ * 语义对得上，也是本套里唯一能过闸的那枚墨。M3 的 `outline` 槽是**控件边界**（OutlinedButton
  * 描边、Switch 未选中态描边…），受 WCAG 1.4.11 非文本 3:1 约束，故取 `text2`——它在浅套压
  * `surface` / `background` / 三种 tint 容器全部 ≥4.10、深套全部 ≥5.55，取值由契约的 `boundaryRoles`
  * 用例按 WCAG 相对亮度压**生产装配实参**当场复算；`AppColorSet.outline` 是装饰性细线，压各自套的
@@ -141,7 +144,7 @@ fun appColorScheme(dark: Boolean): ColorScheme {
             error = set.error,
             onError = set.surface,
             errorContainer = set.errorFill,
-            onErrorContainer = set.text1,
+            onErrorContainer = set.onBrand,
             background = set.background,
             onBackground = set.text1,
             surface = set.surface,

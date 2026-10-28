@@ -106,7 +106,7 @@ internal val InlineNoticeKind.glyph: AppIcon
     }
 
 /**
- * 层开关按两层豁免表（`StrokeOnlyIcons`）走：`Info` / `Warning` 是两层枚，用默认 [AppGlyphLayer.Duotone]；
+ * 层开关按三层结构豁免表（`StrokeOnlyIcons`）走：`Info` / `Warning` 是三层枚，用默认 [AppGlyphLayer.Duotone]；
  * `Check` 在豁免表里（开放折线、没有可闭合的内部区域），必须显式 [AppGlyphLayer.StrokeOnly]。
  */
 internal val InlineNoticeKind.glyphLayer: AppGlyphLayer

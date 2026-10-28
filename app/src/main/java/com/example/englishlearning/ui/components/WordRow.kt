@@ -140,7 +140,9 @@ fun WordRow(
     /**
      * 批 1 Task 8：裸行列表里「行与行之间一条发丝线」（spec §4.1）。由调用方按行号给
      * （`topDivider = index > 0`）：首行不画线，否则线会贴在列表/分组的上沿。
-     * 缩进 15dp 与行的横向让位同档，线从文字/图标起点起笔。
+     * 缩进取 0：线的起笔点就是本行的左沿，而调用方已用 `padding(horizontal = …)` 把行推进页面留白，
+     * 所以线与正文左端对齐。曾在 Task 8 取 15dp「让线从文字起点起笔」，真机目视证明那是错的——
+     * 行的横向让位已经由调用方给过，再缩 15dp 会让线比正文多缩进一截、看着像悬空（批 1 Task 9 真机取证后改回 0）。
      */
     topDivider: Boolean = false,
     actions: @Composable (RowScope.() -> Unit)? = null,
@@ -160,7 +162,7 @@ fun WordRow(
             .then(touchModifier)
             // 线画在 padding 外侧：`hairlineTop` 自带 `padding(top = 1.dp)` 让出那条缝，
             // 于是 48dp 的最小内容高不被 1dp 线吃掉（与 BareRow 同口径）。
-            .then(if (topDivider) hairlineTop(inks.meta, startIndent = 15.dp) else Modifier)
+            .then(if (topDivider) hairlineTop(inks.meta) else Modifier)
             .heightIn(min = 48.dp)
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

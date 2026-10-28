@@ -18,9 +18,17 @@ import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.LocalIsDark
 
 /**
- * Task 6 冻结路径数据的**运行时组装层**：把 `AppIcon.spec` 的两层路径数据 + 当前主题的颜色，
+ * Task 6 冻结路径数据的**运行时组装层**：把 `AppIcon.spec` 的三层路径数据 + 当前主题的颜色，
  * 组装成一枚可以交给 `Image` 画的 `ImageVector`。本文件不含任何几何：坐标只来自 `AppIcons.kt`，
  * 这里只做「解析、给画笔、按主题给不透明度」三件事。
+ *
+ * **三层着色（2026-10-28，裁决 D1）**：底幅（`fillPaths`，主题档 α）→ 强调层（`accentPaths`，
+ * 不透明 [accent]）→ 骨架（`strokePaths`，不透明 [tint]）。此前 `accentPaths` 虽在 `AppIcons.kt`
+ * 里逐枚写好，却从未进过画布——字形实际只剩「半透明底幅 + 白描边」两层，这正是「单调线框」的根因：
+ * 强调层是「书脊、页内文字、镜头高光、柱状块」这些让字形有体积的笔画，缺了它，24dp 画布上
+ * 所有字形都退化成同一档线条。强调层取色由调用方给（入口容器见 `IconBadge.kt` 的
+ * `accentInkForGradient`），默认沿用 [tint]——同色不透明叠加在半透明底幅上即产生第三档明度，
+ * 不必为每个调用点再引入一枚新色。
  *
  * 为什么是运行时组装而不是直接内嵌静态 `ImageVector`（与计划 Task 3 同一理由）：颜色必须来自
  * `LocalAppColors` / 域色映射 / `LocalIsDark`，而静态 `val` 在类初始化时就把颜色钉死，
@@ -75,16 +83,27 @@ fun appImageVector(
     tint: Color,
     strokeScale: Float = 1f,
     layer: AppGlyphLayer = AppGlyphLayer.Duotone,
+    accent: Color = tint,
 ): ImageVector {
     val isDark = LocalIsDark.current
-    return remember(icon, tint, strokeScale, layer, isDark) {
-        buildAppImageVector(icon = icon, tint = tint, strokeScale = strokeScale, layer = layer, isDark = isDark)
+    return remember(icon, tint, strokeScale, layer, isDark, accent) {
+        buildAppImageVector(
+            icon = icon,
+            tint = tint,
+            strokeScale = strokeScale,
+            layer = layer,
+            isDark = isDark,
+            accent = accent,
+        )
     }
 }
 
 /**
  * 一枚图标的渲染出口：装饰性字形（`contentDescription = null`），语义由调用方承载
  * ——入口徽标旁边就有文案，读屏不需要念路径名，念了反而是噪声。
+ *
+ * [accent] 只影响 [AppGlyphLayer.Duotone]（强调层）；默认与 [tint] 同色，即不透明覆盖在
+ * 半透明底幅上得到的第三档明度，调用点不必为此多传一个色。
  */
 @Composable
 fun AppGlyph(
@@ -94,20 +113,30 @@ fun AppGlyph(
     modifier: Modifier = Modifier,
     layer: AppGlyphLayer = AppGlyphLayer.Duotone,
     strokeScale: Float = 1f,
+    accent: Color = tint,
 ) {
     Image(
-        imageVector = appImageVector(icon, tint, strokeScale, layer),
+        imageVector = appImageVector(icon, tint, strokeScale, layer, accent),
         contentDescription = null,
         modifier = modifier.size(size),
     )
 }
 
+/**
+ * 三层组装：底幅 → 强调层 → 骨架。
+ *
+ * 强调层只在 [AppGlyphLayer.Duotone] 且 [accentPaths][AppIconSpec.accentPaths] 非空时出现，
+ * 恒为**不透明**：它承担「比底幅深一档」的转折（书脊、页内文字、镜头高光），一旦也按主题稀释，
+ * 与底幅的明度差会被压到看不出，等于白画一层。取色由调用方保证与底幅够分辨
+ * （入口容器见 `accentInkForGradient`，契约要求 ≥3:1）。
+ */
 internal fun buildAppImageVector(
     icon: AppIcon,
     tint: Color,
     strokeScale: Float,
     layer: AppGlyphLayer,
     isDark: Boolean,
+    accent: Color = tint,
 ): ImageVector {
     val spec = icon.spec
     val fillAlpha = DuotoneFillAlpha.forTheme(isDark)
@@ -121,6 +150,9 @@ internal fun buildAppImageVector(
         if (layer == AppGlyphLayer.Duotone) {
             spec.fillPaths.forEach { data ->
                 addPath(pathData = pathNodesOf(data), fill = SolidColor(tint.copy(alpha = fillAlpha)))
+            }
+            spec.accentPaths.forEach { data ->
+                addPath(pathData = pathNodesOf(data), fill = SolidColor(accent))
             }
         }
         spec.strokePaths.forEach { data ->

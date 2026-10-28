@@ -37,7 +37,7 @@ import com.example.englishlearning.ui.theme.appColors
  * 内层 40dp 容器按稿上色（surface 底 + 1dp outlineSoft 描边 + Icon 圆角档），字形取稿 `.back` 容器
  * （`mockups.html:119-122`）+ 同族 `.ic svg` 的 22dp 度量；22dp 是 `mockups.html:528` 定稿散文的
  * **直写值**（「40dp 容器 + 22dp 字形，触控区仍 ≥48dp（外扩 padding）」），不是「稿未单独给尺寸、
- * 仅沿 `.ic` 口径」的推定。`AppIcon.Back` 属两层豁免表，这里显式传 `AppGlyphLayer.StrokeOnly`
+ * 仅沿 `.ic` 口径」的推定。`AppIcon.Back` 属三层结构豁免表，这里显式传 `AppGlyphLayer.StrokeOnly`
  * （只靠 `AppIcons` 里 `Back` 的 `fillPaths = emptyList()` 兜住属「靠数据凑对」，同族写法见
  * `InlineIconBadge`）。豁免表禁令的执行点是 `EntryIconBadge` 开头的 `require`，管的是**域渐变入口容器**
  * 那一族；页头 `.back` 是稿子里另一种容器（surface 底 + 1dp outlineSoft + `text1` 描边字形），
@@ -62,6 +62,19 @@ import com.example.englishlearning.ui.theme.appColors
  *
  * 组件内不写底部外边距：稿子的 `margin-bottom:6px` 归各屏的列节奏（`verticalArrangement`），
  * 写进组件会与列间隙叠成幽灵间距（F5-03 移交账点过名）。
+ *
+ * ## 两档字级（2026-10-30 版式重做）
+ *
+ * `hero = false`（默认，二级页）标题取 `AppType.Title` 17sp——返回位 + 17sp 标题是「进到里面去了」的口径，
+ * 与全站 `.page-sub` 那套紧凑页头一致，也是 `AppScreenHeaderTest` 大字号两条判据的现行参照。
+ *
+ * `hero = true`（一级页 / tab 根页）标题取 `AppType.Headline` 28sp，`eyebrow` 是标题上沿的一行
+ * `Label` 小字（日期 / 计数这类「此刻在哪」的定位信息），`badge` 是标题右侧一枚 40dp 入口容器
+ * （`EntryIconBadge`，域色只出现在那枚位图里）。一级页没有返回位，靠「大标题 + 徽标 + 眉标」把
+ * 层级讲清楚；二级页不传 `hero`，几何一字不动，因此大字号判据不受影响。
+ *
+ * `badge` 与 `action` 都在尾部，且**不加 clickable**：本组件只摆内容，可点与否交给调用方
+ * （一级页的首页用例按「可点节点闭合集合」逐枚数可点目标，页头擅自包一层 clickable 会当场数多）。
  */
 @Composable
 fun AppScreenHeader(
@@ -70,6 +83,9 @@ fun AppScreenHeader(
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     action: @Composable (() -> Unit)? = null,
+    hero: Boolean = false,
+    eyebrow: String? = null,
+    badge: @Composable (() -> Unit)? = null,
 ) {
     val colors = appColors()
     Row(
@@ -102,9 +118,19 @@ fun AppScreenHeader(
             }
         }
         Column(modifier = Modifier.weight(1f)) {
+            if (eyebrow != null) {
+                Text(
+                    text = eyebrow,
+                    style = AppType.Label,
+                    color = colors.text2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+            }
             Text(
                 text = title,
-                style = AppType.Title,
+                style = if (hero) AppType.Headline else AppType.Title,
                 color = colors.text1,
                 maxLines = 2,
                 overflow = TextOverflow.Clip,
@@ -117,6 +143,9 @@ fun AppScreenHeader(
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+        }
+        if (badge != null) {
+            badge()
         }
         if (action != null) {
             action()

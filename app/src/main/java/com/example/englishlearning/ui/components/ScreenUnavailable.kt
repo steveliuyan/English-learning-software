@@ -39,9 +39,9 @@ import com.example.englishlearning.ui.theme.appColors
  * 动作只有**一个**：复用批 1 唯一按钮 [PillButton] 的 Secondary 档并打
  * `screen_unavailable_action` 标签——再造「不可用态专用按钮」会撞上组件份数棘轮（计划 Task 12）。
  * 这枚动作的具体后果要说全（评审 I-4 放行前置①）：`PillButton` 的 Secondary 档容器/文字/描边读的是
- * **静态浅套值**（`AppPalette.Surface`、`accent.deep` = `#188F76`、`AppPalette.Separator`），
- * **不随主题翻色** → 深色模式会在 `#17201C` 的卡底上浮出一枚白药片（`#188F76` 压白 4.02:1、
- * 压深套 surface 4.15:1）。这不是纯视觉档位差异，是计划 Task 8 台账里「组件层静态读点」那一族债务，
+ * **静态浅套值**（`AppPalette.Surface`、`accent.deep` = `#1A7A63`、`AppPalette.Separator`），
+ * **不随主题翻色** → 深色模式会在 `#17201C` 的卡底上浮出一枚白药片（`#1A7A63` 压白 5.24:1、
+ * 压深套 surface 3.18:1）。这不是纯视觉档位差异，是计划 Task 8 台账里「组件层静态读点」那一族债务，
  * 修点归批 2 Task 14 的按钮族裁决（本轮不动 `PillButton`），本组件只登记不预判。
  */
 @Composable
