@@ -134,10 +134,10 @@ class AiFeatureScreenTest {
     }
 
     /**
-     * 深色档取证（Task 23 修复轮 R-23.13）：按钮容器 `MintPrimary` 两档都是亮薄荷
-     * （容器主题化归 Task 26/27），前景必须按 `LocalIsDark` 分档——深色取 `onBrand`（#04241C 压 #35E0AC ≈9.74:1，
-     * 与 `AiBadgeContrastFixTest` 的活 token 亮度腿同一把尺）。
-     * 上一席把前景单迁成裸 `colors.onMint`，深色档渲出亮套 `onMint`（#DFF6EC）压亮薄荷（1.49:1），
+     * 深色档取证（Task 23 修复轮 R-23.13，2026-10-29 原型 token 迁移后收成单墨 R-23.13′）：
+     * 按钮容器 `MintPrimary` 两档都是亮薄荷（容器主题化归 Task 26/27），前景取**主题无关**的
+     * `onBrand`（#04241C 压深套 #6FD9B6 ≈9.63:1，与 `AiBadgeContrastFixTest` 的活 token 亮度腿同一把尺）。
+     * 上一席把前景单迁成裸 `colors.onMint`，深色档渲出亮套 `onMint` 压亮薄荷（1.49:1），
      * 本例的前置腿（容器亮薄荷在场）判绿、墨色腿当场判红——正是 B1 回归的设备侧镜像。
      *
      * 深色档走显式 `MintGlassTheme(themeMode = ThemeMode.Dark)` 包装（先例
@@ -192,7 +192,7 @@ class AiFeatureScreenTest {
         )
         val ink = AppColorDark.onBrand.toArgb()
         assertTrue(
-            "the pill's dark-tier ink must be on-brand, split by theme like the button",
+            "the pill's dark-tier ink must be on-brand (theme-invariant ink on a theme-invariant bright pill)",
             pixels.minOf { colorDistance(it, ink) } <= 18.0,
         )
     }

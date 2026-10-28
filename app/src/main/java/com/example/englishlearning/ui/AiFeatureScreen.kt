@@ -34,7 +34,6 @@ import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
-import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
 
@@ -104,7 +103,8 @@ fun AiFeatureScreen(
 
         // 主操作：全屏唯一一枚实底按钮，容器取域色（与徽章「现在能用」档同族）。
         // 容器 `appDomain(AppDomain.AiSpeech).base` 两套主题皆亮（深套 DomainDark base/deep 合一），
-        // 前景因此按 R-23.13 分档：浅套 onMint、深套 onBrand（裸 onMint 在深套是亮墨压亮底 ≈1.49:1）。
+        // 前景取主题无关的 `onBrand`（2026-10-29 原型 token 迁移后 R-23.13 的唯一合格墨：
+        // 亮底不变 ⇒ 墨也不分档；onMint 现在是 brandDeep 别名，浅套 1A7A63 压 6CCBAB 只有 2.69:1）。
         Button(
             onClick = onOpenSettings,
             modifier = Modifier
@@ -115,7 +115,7 @@ fun AiFeatureScreen(
             shape = AppShape.Button,
             colors = ButtonDefaults.buttonColors(
                 containerColor = appDomain(AppDomain.AiSpeech).base,
-                contentColor = if (!LocalIsDark.current) colors.onMint else colors.onBrand,
+                contentColor = colors.onBrand,
             ),
         ) {
             // 前景显式补色（`ContainerInkPairingContractTest` 在「同段已迁中性容器」的段里要求每处
@@ -123,7 +123,7 @@ fun AiFeatureScreen(
             Text(
                 text = "去配置 AI 服务",
                 style = AppType.Label,
-                color = if (!LocalIsDark.current) colors.onMint else colors.onBrand,
+                color = colors.onBrand,
             )
         }
 
@@ -196,11 +196,11 @@ private fun StatusPill(implemented: Boolean) {
         Text(
             text = label,
             style = AppType.Label,
-            // 「现在能用」档底是实底域色——深色档同族仍是**亮底**，所以前景按 R-23.13 再分一层档：
-            // 浅档 onMint、深档 onBrand（单迁裸 onMint = 亮墨压亮底 ≈1.49:1，正是 B1 的形状；
-            // 写法取 `AiProfileSettingsScreen.kt:524` 的门控链式同形）。
+            // 「现在能用」档底是实底域色——深色档同族仍是**亮底**，所以前景与主按钮同一枚主题无关墨
+            // `onBrand`：底不随主题变，墨就不该随主题分档（2026-10-29 原型 token 迁移后 onMint 是
+            // brandDeep 别名，两套压这枚亮底都不达 4.5，旧的分档形在这里两种主题下都会红）。
             // 「未上线」档底是中性 `tint` + `text1` 深字；两档底色按裁决保持不变。
-            color = if (implemented && !LocalIsDark.current) colors.onMint else if (implemented) colors.onBrand else colors.text1,
+            color = if (implemented) colors.onBrand else colors.text1,
         )
     }
 }

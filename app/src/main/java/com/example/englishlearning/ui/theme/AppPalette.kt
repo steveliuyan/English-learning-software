@@ -4,42 +4,41 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * 中性语义色：全局底色/表面/文字。批 1 起全 app 生效。
- * 本 object 是浅套静态源（spec §2.1 浅值 + 决策 2026-10-18 裁决校准）；
+ * 本 object 是浅套静态源（2026-10-29 原型对齐批 0 取值，见
+ * `docs/decisions/2026-10-29-ui-prototype-token-alignment.md`）；
  * 深色取值由 AppColorDark/LocalAppColors 在装配点提供，新组件一律走 appColors()。
  */
 object AppPalette {
-    val Background = Color(0xFFF6F9F6)
+    val Background = Color(0xFFF1F4EF)
     val Surface = Color(0xFFFFFFFF)
-    val TextPrimary = Color(0xFF1F2B26)
-    val TextSecondary = Color(0xFF566B62)
-    val Separator = Color(0xFFEBF1ED)
+    val TextPrimary = Color(0xFF15211C)
+    val TextSecondary = Color(0xFF55665D)
+    val Separator = Color(0xFFEEF2ED)
     val Scrim = Color(0x66000000)
 
-    /** 浅薄荷主色容器上的文字色：压 `MintTint` 8.65:1（AA 正文），替代「白字压浅底」。 */
-    val OnMintPrimary = Color(0xFF174C44)
+    /** 浅薄荷主色容器上的文字色：与运行时 `brandDeep` 同值，压 `MintTint` 达标。 */
+    val OnMintPrimary = Color(0xFF1A7A63)
 
-    /** 错误状态文字（白底 7.20:1），替代裸 `Color.Red`（≈3.7:1 且不可主题化）。 */
-    val ErrorText = Color(0xFFB30000)
+    /** 错误状态文字（压白底 7.15:1），替代裸 `Color.Red`（≈3.7:1 且不可主题化）。 */
+    val ErrorText = Color(0xFFA5291F)
     /** 成功/提示状态文字（深绿，白底 7.87:1）。 */
     val SuccessText = Color(0xFF1B5E20)
 
-    /** 玻璃面板填充与高光描边。 */
-    val GlassFill = Color(0xEFFFFFFF)
+    /** 玻璃面板填充与高光描边（原型导航药片取 surface 88%）。 */
+    val GlassFill = Color(0xE0FFFFFF)
     val GlassHighlight = Color(0x59FFFFFF)
 
     /**
      * 浅套静态源（深色由 AppColorDark/LocalAppColors 提供）。
-     * TextTertiary 按 2026-10-18 裁决 1（该裁决已于批 1 终审 Seat A I-2 收窄底限定）只可用于
-     * `surface`/`background` 底上的 ≥24sp 大数字/装饰与纯图标描边（实测 3.35/3.16，过装饰档 3.1）；
-     * **不得作任何正文或标签前景**，亦不得作图标描边压 `tint`/`tint-2`/`tint-3`（实测 2.98/2.85/2.71，
-     * 后两枚连非文本 3:1 都不过，`tint` 只差 0.12 才到 3.1——2026-10-27 轻松档把余量收到临界，别再加亮）。
+     * `TextTertiary` 原型值为 #65756C：压 `surface` 4.87、压 `background` 4.39，
+     * 只用于 11–13sp 辅助文字/装饰，不作正文；不得压 `tint` 以下的更暗容器补正文。
      */
-    val Tint = Color(0xFFE9F4EE)
-    val Tint2 = Color(0xFFE4EFE9)
-    val Tint3 = Color(0xFFDEEAE4)
-    val Outline = Color(0xFFD3E7DC)
-    val OutlineSoft = Color(0xFFEBF1ED)
-    val TextTertiary = Color(0xFF7C9188)
+    val Tint = Color(0xFFE8F2EA)
+    val Tint2 = Color(0xFFDCEBE1)
+    val Tint3 = Color(0xFFE4F4EC)
+    val Outline = Color(0xFFDDE5DD)
+    val OutlineSoft = Color(0xFFEEF2ED)
+    val TextTertiary = Color(0xFF65756C)
     val OnBrand = Color(0xFF04241C)
     val ErrorFill = Color(0xFFFF3B30)
 }

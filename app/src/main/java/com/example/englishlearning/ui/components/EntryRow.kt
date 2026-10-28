@@ -45,10 +45,12 @@ data class EntryRowInk(
  * 两套主题 → 五枚槽位墨色的纯函数（无 `@Composable`，[set] 就是浅套或深套那两套之一）。
  *
  * 槽位分配（R-10.4，稿 `.en`/`.ed`/`.val`/`.chev`/`.entry + .entry`）：标题 `text1`、副标题与尾部值
- * `text2`、行间发丝线 `outlineSoft`。**chevron 取 `text2`、不取稿写的 `text-3`**：`text3` 压浅套 `tint`
- * 恰好落在非文本 3:1 线上（边界上的合格不算合格），批 1 Task 1 的裁决 #1 又禁止 `text-3` 作前景；
- * 这条偏离连同「不得回到 text3」由 `EntryRowInkTest.chevron_is_pinned_to_text2_and_explicitly_not_to_text3`
- * 双向守着。比值与等值都不写在注释里（抄了会随 token 取值漂移），算式在测试端复算。
+ * `text2`、行间发丝线 `outlineSoft`。**chevron 取 `text2`、不取稿写的 `text-3`**：2026-10-29 原型 token
+ * 迁移后 `text3`（#65756C）压浅套 `tint` 已过装饰档（3:1+余量），旧的「不合格」算术依据作废——
+ * 本 pin 现在靠设计一致性（chevron 与尾部值同档）承重，偏离连同「不得回到 text3」由
+ * `EntryRowInkTest.chevron_is_pinned_to_text2_and_explicitly_not_to_text3` 双向守着。
+ * 若批次 1 按原型改回 `text-3`，须同批撤 pin 并重议（原型优先）。
+ * 比值与等值都不写在注释里（抄了会随 token 取值漂移），算式在测试端复算。
  * 「不取 text3」这一面如今不止本行单点防守：批 1 终审 Seat A I-2 把裁决 #1 的授权底收窄成
  * `surface`/`background`，并由 `DesignTokenContractTest` 的三条图形禁配（text3 压 tint / tint-2 / tint-3）
  * 兜住整个 token 族，chevron 这类图标描边再也拿不到浅薄荷底。
