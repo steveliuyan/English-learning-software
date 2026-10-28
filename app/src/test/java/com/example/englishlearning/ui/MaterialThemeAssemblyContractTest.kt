@@ -45,18 +45,30 @@ class MaterialThemeAssemblyContractTest {
      * 改由 `AppType six tiers take their ink from the current theme set` 逐档钉「取哪一枚主题墨」。
      */
     private val appTypeSpecSegments: Map<String, String> = linkedMapOf(
-        "Display" to "private val DisplaySpec = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold, " +
-            "letterSpacing = (-0.5).sp, fontFeatureSettings = \"tnum\")",
-        "Headline" to "private val HeadlineSpec = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, " +
-            "letterSpacing = 0.2.sp)",
-        "Title" to "private val TitleSpec = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)",
-        "Body" to "private val BodySpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)",
-        "Footnote" to "private val FootnoteSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal)",
-        "Label" to "private val LabelSpec = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, " +
-            "letterSpacing = 0.3.sp)",
+        "Display" to "private val DisplaySpec = TextStyle(fontSize = 46.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-1.15).sp, lineHeight = 48.sp, fontFeatureSettings = \"tnum\")",
+        "Headline" to "private val HeadlineSpec = TextStyle(fontSize = 24.sp, fontWeight = FontWeight(650), letterSpacing = (-0.24).sp, lineHeight = 30.sp)",
+        "Title" to "private val TitleSpec = TextStyle(fontSize = 17.sp, fontWeight = FontWeight(650), letterSpacing = (-0.17).sp, lineHeight = 27.sp)",
+        "Body" to "private val BodySpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, lineHeight = 24.sp)",
+        "Footnote" to "private val FootnoteSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 21.sp)",
+        "Label" to "private val LabelSpec = TextStyle(fontSize = 12.sp, fontWeight = FontWeight(600), letterSpacing = 0.24.sp, lineHeight = 16.sp)",
+        "Eyebrow" to "private val EyebrowSpec = TextStyle(fontSize = 11.sp, fontWeight = FontWeight(600), letterSpacing = 1.54.sp, lineHeight = 14.sp, fontFeatureSettings = \"tnum\")",
+        "Caption" to "private val CaptionSpec = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal, lineHeight = 19.sp)",
+        "Meta" to "private val MetaSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 20.sp)",
+        "BodyLg" to "private val BodyLgSpec = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal, lineHeight = 26.sp)",
+        "Lemma" to "private val LemmaSpec = TextStyle(fontSize = 46.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-1.15).sp, lineHeight = 48.sp, fontFeatureSettings = \"tnum\")",
+        "StatNum" to "private val StatNumSpec = TextStyle(fontSize = 26.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.52).sp, lineHeight = 29.sp, fontFeatureSettings = \"tnum\")",
+        "PlanNum" to "private val PlanNumSpec = TextStyle(fontSize = 32.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.64).sp, lineHeight = 32.sp, fontFeatureSettings = \"tnum\")",
+        "Prose" to "private val ProseSpec = TextStyle(fontSize = 17.5.sp, fontWeight = FontWeight.Normal, fontFamily = AppFont.Serif, lineHeight = 30.sp)",
+        "ProseZh" to "private val ProseZhSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, lineHeight = 23.sp)",
+        "NavLabel" to "private val NavLabelSpec = TextStyle(fontSize = 11.sp, fontWeight = FontWeight(600), letterSpacing = 0.11.sp, lineHeight = 11.sp)",
+        "StrongTitle" to "private val StrongTitleSpec = TextStyle(fontSize = 27.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.27).sp, lineHeight = 32.sp)",
+        "ArticleTitle" to "private val ArticleTitleSpec = TextStyle(fontSize = 30.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.6).sp, lineHeight = 35.sp)",
     )
 
-    /** `<Tier>Spec` → 该档应取的主题墨字段名（浅套取值的对位沿用批 1：正文族 text1、辅助族 text2）。 */
+    /**
+     * `<Tier>Spec` → 该档应取的主题墨字段名（原型层级：主文 `text1`、辅助 `text2`、三级/小字 `text3`）。
+     * 2026-10-29 原型对齐把六档扩到十八档，逐档墨对位由本条与 `PrototypeTokenContractTest` 双钉。
+     */
     private val appTypeInkTiers: Map<String, String> = linkedMapOf(
         "Display" to "text1",
         "Headline" to "text1",
@@ -64,6 +76,18 @@ class MaterialThemeAssemblyContractTest {
         "Body" to "text1",
         "Footnote" to "text2",
         "Label" to "text2",
+        "Eyebrow" to "text3",
+        "Caption" to "text3",
+        "Meta" to "text2",
+        "BodyLg" to "text1",
+        "Lemma" to "text1",
+        "StatNum" to "text1",
+        "PlanNum" to "text1",
+        "Prose" to "text1",
+        "ProseZh" to "text2",
+        "NavLabel" to "text3",
+        "StrongTitle" to "text1",
+        "ArticleTitle" to "text1",
     )
 
     /**
@@ -97,61 +121,51 @@ class MaterialThemeAssemblyContractTest {
     private fun neutralTierStyle(tier: String): String = "AppType.$tier.neutralForTheme()"
 
     /**
-     * `appColorScheme(dark)` 两个分支共享的角色取值表（除 `onErrorContainer`）：全部取
-     * `AppColorSet` 字段，无裸 hex。分支各自与这张表逐字比对，再加「两分支只差一项」的对位断言，
-     * 浅/深两套装配不可能漂移成两份不同的真值。
+     * `appColorScheme(dark)` 的角色取值表：2026-10-29 原型对齐后浅深两分支**逐项相同**（共享
+     * `base.copy(...)`），不再有 `onErrorContainer` 分叉。全部取 `AppColorSet` 字段，无裸 hex。
      */
     private val colorSchemeSharedExpressions: Map<String, String> = linkedMapOf(
-        "primary" to "set.onMint",
-        "onPrimary" to "set.background",
-        "primaryContainer" to "set.tint",
-        "onPrimaryContainer" to "set.onMint",
-        "secondary" to "set.onMint",
-        "onSecondary" to "set.background",
-        "secondaryContainer" to "set.tint3",
-        "onSecondaryContainer" to "set.text1",
-        "tertiary" to "set.text2",
+        "primary" to "set.brandDeep",
+        "onPrimary" to "set.surface",
+        "primaryContainer" to "set.brandTint",
+        "onPrimaryContainer" to "set.brandDeep",
+        "secondary" to "set.text2",
+        "onSecondary" to "set.surface",
+        "secondaryContainer" to "set.brandTint",
+        "onSecondaryContainer" to "set.brandDeep",
+        "tertiary" to "set.text1",
         "onTertiary" to "set.surface",
         "tertiaryContainer" to "set.tint2",
         "onTertiaryContainer" to "set.text1",
         "error" to "set.error",
         "onError" to "set.surface",
-        "errorContainer" to "set.errorFill",
+        "errorContainer" to "set.dangerTint",
+        "onErrorContainer" to "set.error",
         "background" to "set.background",
         "onBackground" to "set.text1",
         "surface" to "set.surface",
         "onSurface" to "set.text1",
-        "surfaceVariant" to "set.tint2",
-        "onSurfaceVariant" to "set.text1",
-        "surfaceTint" to "set.onMint",
-        "inverseSurface" to "set.text1",
-        "inverseOnSurface" to "set.surface",
-        "inversePrimary" to "set.tint",
-        // I-1 裁决：M3 的 outline 槽是控件边界（OutlinedButton 描边、Switch 未选中态描边…），
-        // 受 WCAG 1.4.11 非文本 3:1 约束，取 text2；装饰性细线 set.outline 只由新组件直读，不进 M3 槽
-        // （下限复算见 boundaryRoles 用例，压生产装配实参，非仅本表）。
-        "outline" to "set.text2",
-        "outlineVariant" to "set.outlineSoft",
+        "surfaceVariant" to "set.tint",
+        "onSurfaceVariant" to "set.text2",
+        "surfaceTint" to "set.brand",
+        "inverseSurface" to "set.strongSurface",
+        "inverseOnSurface" to "set.onStrong",
+        "inversePrimary" to "set.brand",
+        // M3 的 outline 槽是控件边界（OutlinedButton 描边、Switch 未选中态描边…），受 WCAG 1.4.11
+        // 非文本 3:1 约束，取 text3（浅套压 surface 4.87）；装饰性细线 set.outline 只由新组件直读。
+        "outline" to "set.text3",
+        "outlineVariant" to "set.outline",
         "surfaceContainerLowest" to "set.surface",
         "surfaceContainerLow" to "set.surface",
         "surfaceContainer" to "set.surface",
-        "surfaceContainerHigh" to "set.tint2",
+        "surfaceContainerHigh" to "set.surface2",
         "surfaceContainerHighest" to "set.tint2",
         "surfaceBright" to "set.surface",
-        "surfaceDim" to "set.tint2",
+        "surfaceDim" to "set.surface2",
     )
 
-    /**
-     * 唯一按模式分叉的取值：`errorFill` 浅套是饱和红、深套是浅红，字形极性相反，
-     * 所以浅套取 `onBrand`、深套取 `background`（顺序即 light to dark）。
-     * 浅套 2026-10-27 从 `text1` 换成 `onBrand`：轻松档 `text1` 抬到 #1F2B26 后压 #FF3B30 只剩 4.13，
-     * `onBrand`（#04241C）压同一底 4.65 才过 4.5；两枚都是深墨，换的是 token 名不是极性。
-     */
-    private val onErrorContainerInk: Pair<String, String> = "set.onBrand" to "set.background"
-
     /** 某一主题下「角色 → 取色表达式」的完整表（35 项，与 material3 1.4.0 的 builder 必传子集对齐）。 */
-    private fun colorSchemeExpressions(dark: Boolean): Map<String, String> = colorSchemeSharedExpressions +
-        ("onErrorContainer" to if (dark) onErrorContainerInk.second else onErrorContainerInk.first)
+    private fun colorSchemeExpressions(): Map<String, String> = colorSchemeSharedExpressions
 
     /**
      * 装配点引入的字形对容器配对，全部按正文族下限 4.5:1 复算（左列字形压右列容器；
@@ -320,6 +334,7 @@ class MaterialThemeAssemblyContractTest {
     private fun fieldOf(set: AppColorSet, name: String): Color = when (name) {
         "background" -> set.background
         "surface" -> set.surface
+        "surface2" -> set.surface2
         "surfaceGlass" -> set.surfaceGlass
         "tint" -> set.tint
         "tint2" -> set.tint2
@@ -329,13 +344,22 @@ class MaterialThemeAssemblyContractTest {
         "text1" -> set.text1
         "text2" -> set.text2
         "text3" -> set.text3
+        "brand" -> set.brand
+        "brandDeep" -> set.brandDeep
+        "brandTint" -> set.brandTint
         "onMint" -> set.onMint
         "onBrand" -> set.onBrand
         "error" -> set.error
         "errorFill" -> set.errorFill
+        "dangerTint" -> set.dangerTint
         "success" -> set.success
+        "feedbackAgain" -> set.feedbackAgain
+        "feedbackFuzzy" -> set.feedbackFuzzy
+        "feedbackKnown" -> set.feedbackKnown
         "strongSurface" -> set.strongSurface
+        "strongSurfaceHigh" -> set.strongSurfaceHigh
         "onStrong" -> set.onStrong
+        "onStrongMuted" -> set.onStrongMuted
         else -> error("AppColorSet 没有字段：$name")
     }
 
@@ -508,19 +532,21 @@ class MaterialThemeAssemblyContractTest {
         appTypeSpecSegments.forEach { (tier, specSegment) ->
             assertTrue(
                 text.contains(specSegment),
-                "AppType.$tier 偏离 **spec §2.2 钉值段**（只钉 fontSize/fontWeight/letterSpacing 与 M3 角色对位，" +
+                "AppType.$tier 偏离 **spec §2.2 钉值段**（只钉 fontSize/fontWeight/fontFamily/letterSpacing/lineHeight，" +
                     "spec 从未钉 color）：期望 $specSegment"
             )
         }
         assertEquals(
-            6,
-            Regex("""private val (Display|Headline|Title|Body|Footnote|Label)Spec = TextStyle\(""").findAll(text).count(),
-            "AppType 必须恰好六个语义档的度量表：多出任何一档就是引入新字号（R3 禁止）",
+            18,
+            Regex("""private val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle)Spec = TextStyle\(""")
+                .findAll(text).count(),
+            "AppType 必须有恰好十八个语义档的度量表（原型字号表全量）：多出任何一档就是引入新字号（R3 禁止）",
         )
         assertEquals(
-            6,
-            Regex("""val (Display|Headline|Title|Body|Footnote|Label): TextStyle\r?\n""").findAll(text).count(),
-            "六个语义档必须各自有一枚 `val <Tier>: TextStyle` 组合期 getter：少一枚就是某档的直读点失去主题墨",
+            18,
+            Regex("""val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle): TextStyle\r?\n""")
+                .findAll(text).count(),
+            "十八个语义档必须各自有一枚 `val <Tier>: TextStyle` 组合期 getter：少一枚就是某档的直读点失去主题墨",
         )
     }
 
@@ -537,9 +563,9 @@ class MaterialThemeAssemblyContractTest {
         val text = appTypeText()
         assertEquals(
             appTypeInkTiers.keys,
-            Regex("""val (Display|Headline|Title|Body|Footnote|Label): TextStyle""")
+            Regex("""val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle): TextStyle""")
                 .findAll(text).map { it.groupValues[1] }.toSet(),
-            "六档 getter 的集合与墨对位表不一致（少一档 = 那张档的直读点没有主题墨）",
+            "十八档 getter 的集合与墨对位表不一致（少一档 = 那张档的直读点没有主题墨）",
         )
         appTypeInkTiers.forEach { (tier, ink) ->
             val getter = Regex(
@@ -554,7 +580,7 @@ class MaterialThemeAssemblyContractTest {
         assertEquals(
             0,
             countMatches(text, Regex("""AppPalette\.""")),
-            "AppType.kt 不得再读 AppPalette 静态浅套墨（六档是深色档「当场不可读」的主因）",
+            "AppType.kt 不得再读 AppPalette 静态浅套墨（各档是深色档「当场不可读」的主因）",
         )
         // 反空转：同一形状换错档位必须判红 —— 否则「逐档对位」只是「六档都取了某个主题墨」的恒真断言。
         val wrongTier = "val Display: TextStyle\n    @Composable\n    @ReadOnlyComposable\n" +
@@ -651,42 +677,36 @@ class MaterialThemeAssemblyContractTest {
     @Test
     fun `appColorScheme takes every named role from the AppColorSet`() {
         val body = functionText(mintGlassThemeText(), "appColorScheme")
-        val light = namedArgs(parenBlock(body, lightSchemeCall))
-        val dark = namedArgs(parenBlock(body, darkSchemeCall))
-        assertEquals(colorSchemeExpressions(false), light, "lightColorScheme 分支的角色取值偏离钉值表")
-        assertEquals(colorSchemeExpressions(true), dark, "darkColorScheme 分支的角色取值偏离钉值表")
-        // 分支对位：两分支只允许在 onErrorContainer 上分叉，其余取值必须逐字相同。
-        assertEquals(
-            light - "onErrorContainer",
-            dark - "onErrorContainer",
-            "深浅两分支除 onErrorContainer 外出现取值分叉：装配点长出了第二套真值",
-        )
-        listOf("light 分支" to light, "dark 分支" to dark).forEach { (branchName, args) ->
-            args.forEach { (role, expr) ->
-                assertEquals(
-                    1,
-                    fieldsOf(expr).size,
-                    "$branchName 的 $role 取色表达式应恰好引用一个 AppColorSet 字段：$expr",
-                )
-            }
+        // 2026-10-29 原型对齐后是单一 `base.copy(...)`：原型两套 token 各自完整，不再需要按模式分叉。
+        val args = namedArgs(parenBlock(body, copyCall))
+        assertEquals(colorSchemeExpressions(), args, "appColorScheme 的角色取值偏离钉值表")
+        assertEquals(35, args.size, "ColorScheme 装配的角色数应为 35（material3 1.4.0 builder 必传子集）")
+        args.forEach { (role, expr) ->
+            assertEquals(
+                1,
+                fieldsOf(expr).size,
+                "$role 取色表达式应恰好引用一个 AppColorSet 字段：$expr",
+            )
         }
         assertTrue(
             Regex("""val set = if \(dark\) AppColorDark else AppColorLight""").containsMatchIn(body),
             "appColorScheme 必须由 dark 在两套 AppColorSet 之间选择（深套不是第二套 hex）"
         )
         assertTrue(
+            Regex("""val base = if \(dark\) darkColorScheme\(\) else lightColorScheme\(\)""").containsMatchIn(body),
+            "深/浅底色必须由同一个 base 分支取库内默认：两处各写一遍就是把分支漂移留给下一个人",
+        )
+        assertTrue(
             !Regex("""AppPalette\.""").containsMatchIn(body),
             "appColorScheme 引用了 AppPalette 静态浅套：深色下会把浅墨带回组件"
         )
-        // 两个 builder 形状的正/负片段：`[\s{]lightColorScheme(` 不得被 `darkColorScheme(` 满足，
-        // 反之亦然——否则「两分支各自比对」会退化成「同一分支比两次」。
-        assertTrue(lightSchemeCall.containsMatchIn("    return if (dark) x else lightColorScheme(\n        primary = set.onMint,\n    )"))
-        assertTrue(!lightSchemeCall.containsMatchIn("darkColorScheme(\n    primary = set.onMint,\n)"))
-        assertTrue(darkSchemeCall.containsMatchIn("if (dark) {\n        darkColorScheme(\n            primary = set.onMint,\n        )"))
-        assertTrue(!darkSchemeCall.containsMatchIn("lightColorScheme(\n    primary = set.onMint,\n)"))
-        // 装配点只准这两个 builder，各一次：第三处调用能让子树里的角色表偏离钉值表而不被发现。
-        assertEquals(1, countMatches(body, lightSchemeCall), "lightColorScheme 调用应恰好一处")
-        assertEquals(1, countMatches(body, darkSchemeCall), "darkColorScheme 调用应恰好一处")
+        // 两个 builder 各只允许出现一次（空实参 + copy 覆写）；第三处调用能让子树里的角色表偏离钉值表而不被发现。
+        assertEquals(1, countMatches(body, Regex("""[\s{]lightColorScheme\(\)""")), "lightColorScheme() 调用应恰好一处")
+        assertEquals(1, countMatches(body, Regex("""[\s{]darkColorScheme\(\)""")), "darkColorScheme() 调用应恰好一处")
+        assertEquals(1, countMatches(body, copyCall), "base.copy(…) 应恰好一处（两处 copy 就是两套真值）")
+        // 合成负例：漏一个角色 / 多一个角色都必须判红，而不是被部分比对放行。
+        val missing = args - "outlineVariant"
+        assertNotEquals(colorSchemeExpressions(), missing, "合成负例被放行：少一个角色的表也算合格")
     }
 
     @Test
@@ -698,7 +718,7 @@ class MaterialThemeAssemblyContractTest {
         val body = functionText(mintGlassThemeText(), "appColorScheme")
         listOf(false to AppColorLight, true to AppColorDark).forEach { (dark, set) ->
             val schemeName = if (dark) "深套" else "浅套"
-            val args = namedArgs(parenBlock(body, if (dark) darkSchemeCall else lightSchemeCall))
+            val args = namedArgs(parenBlock(body, copyCall))
             textPairRoles.forEach { (inkRole, containerRole) ->
                 val inkExpr = args[inkRole] ?: error("$schemeName 装配缺 $inkRole 实参")
                 val containerExpr = args[containerRole] ?: error("$schemeName 装配缺 $containerRole 实参")
@@ -710,20 +730,14 @@ class MaterialThemeAssemblyContractTest {
                 )
             }
         }
-        // 反空转：故意让 onErrorContainer 取 text1（深套的 text-1 就是 onSurface，浅墨压浅红填充），
-        // 必须判它不合格——否则说明亮度公式或 4.5 阈值本身失效。
-        val r = ratio(AppColorDark.text1, AppColorDark.errorFill)
-        assertTrue(r < 4.5, "合成负例失效：深套浅墨压 error-fill 实测 %.2f:1 竟已过正文阈值（公式或阈值错了）".format(r))
-        // 第二枚诱饵钉浅套那次换墨的理由：`text1` 压浅套 errorFill 必须仍不合格，
-        // 否则「浅套 onErrorContainer 取 onBrand」就成了没有理由的偏好（改回 text1 也测不出）。
-        val lightText1 = ratio(AppColorLight.text1, AppColorLight.errorFill)
+        // 反空转：onBrand 压品牌深绿只有 3.15（浅套）——证明渐变上的墨必须取 onBrand 到浅品牌底，
+        // 而不是把 onBrand 塞进任何深绿容器；若这条已合格，说明亮度公式或 4.5 阈值本身失效。
+        val r = ratio(AppColorLight.onBrand, AppColorLight.brandDeep)
+        assertTrue(r < 4.5, "合成负例失效：浅套 onBrand 压 brandDeep 实测 %.2f:1 竟已过正文阈值（公式或阈值错了）".format(r))
+        // 第二枚诱饵钉品牌深绿选作 primary 的理由：它压两套 surface 都必须过 4.5。
         assertTrue(
-            lightText1 < 4.5,
-            "裁决依据失效：浅套 text1 压 errorFill 实测 %.2f:1 已过 4.5，onErrorContainer 可以从 onBrand 改回 text1".format(lightText1),
-        )
-        assertTrue(
-            ratio(AppColorLight.onBrand, AppColorLight.errorFill) >= 4.5,
-            "浅套 onBrand 压 errorFill 不足 4.5：装配点换墨后仍不达 AA 正文下限",
+            ratio(AppColorLight.brandDeep, AppColorLight.surface) >= 4.5,
+            "浅套 brandDeep 压 surface 不足 4.5：primary 作字色（TextButton）在浅套不达 AA",
         )
     }
 
@@ -732,7 +746,7 @@ class MaterialThemeAssemblyContractTest {
         val body = functionText(mintGlassThemeText(), "appColorScheme")
         listOf(false to "浅套", true to "深套").forEach { (dark, schemeName) ->
             val set = if (dark) AppColorDark else AppColorLight
-            val args = namedArgs(parenBlock(body, if (dark) darkSchemeCall else lightSchemeCall))
+            val args = namedArgs(parenBlock(body, copyCall))
             boundaryRoles.forEach { (boundaryRole, containerRole) ->
                 val boundaryExpr = args[boundaryRole] ?: error("$schemeName 装配缺 $boundaryRole 实参")
                 val containerExpr = args[containerRole] ?: error("$schemeName 装配缺 $containerRole 实参")
@@ -749,9 +763,9 @@ class MaterialThemeAssemblyContractTest {
         val decorative = ratio(AppColorLight.outline, AppColorLight.surface)
         assertTrue(
             decorative < 3.0,
-            "合成负例失效：装饰性细线 AppColorSet.outline（浅 #ADE7D2）压 surface 实测 %.2f:1 竟过了 3.0 下限" +
+            "合成负例失效：装饰性细线 AppColorSet.outline（浅 #DDE5DD）压 surface 实测 %.2f:1 竟过了 3.0 下限" +
                 "（亮度公式或阈值错了）。本用例存在的理由：装饰性细线 AppColorSet.outline 不得进 " +
-                "colorScheme.outline——M3 把它用作控件边界，OutlinedButton 会掉到 1.39:1".format(decorative)
+                "colorScheme.outline——M3 把它用作控件边界，OutlinedButton 会掉到 1.29:1".format(decorative)
         )
     }
 
@@ -887,26 +901,24 @@ class MaterialThemeAssemblyContractTest {
     fun `AppShapes maps the five M3 shape slots to the corner tiers`() {
         val text = mintGlassThemeText()
         val expected = mapOf(
-            "extraSmall" to "RoundedCornerShape(12.dp)",
+            "extraSmall" to "AppShape.Small",
             "small" to "AppShape.Button",
-            "medium" to "MediumCorner",
+            "medium" to "AppShape.Card",
             "large" to "AppShape.Dialog",
             "extraLarge" to "AppShape.Dialog",
         )
-        assertEquals(expected, namedArgs(parenBlock(text, appShapesCall)), "AppShapes 槽位偏离 spec §2.3")
+        assertEquals(expected, namedArgs(parenBlock(text, appShapesCall)), "AppShapes 槽位偏离原型圆角档")
+        // 原型圆角只有 10/14/20/26 四档：装配点不得另立 `RoundedCornerShape(…dp)`，
+        // 否则 `AppShape` 与 M3 槽会长出第二套圆角真值（2026-10-29 起 MediumCorner 校准值作废）。
         assertTrue(
-            Regex("""private val MediumCorner = RoundedCornerShape\(18\.dp\)""").containsMatchIn(text),
-            "卡片圆角校准值必须以 private val MediumCorner = RoundedCornerShape(18.dp) 落地（spec §2.3 卡 18dp）"
+            !Regex("""RoundedCornerShape\(""").containsMatchIn(text),
+            "AppShapes 装配点出现裸 RoundedCornerShape(…)：圆角只能取 AppShape 的具名档",
         )
-        assertTrue(
-            !Regex("""AppShape\.Card""").containsMatchIn(text),
-            "AppShapes 不得复用 AppShape.Card：那是 20dp 旧值，spec §2.3 要卡 18dp"
-        )
-        // 合成负例：medium 退回 20dp 旧值必须判红——证明上面的表真的在校准值上把关。
+        // 合成负例：medium 退回 18dp 私有校准值必须判红——证明上面的表真的在校准值上把关。
         val reverted = "val AppShapes: Shapes = Shapes(\n" +
-            "    extraSmall = RoundedCornerShape(12.dp),\n" +
+            "    extraSmall = AppShape.Small,\n" +
             "    small = AppShape.Button,\n" +
-            "    medium = AppShape.Card,\n" +
+            "    medium = RoundedCornerShape(18.dp),\n" +
             "    large = AppShape.Dialog,\n" +
             "    extraLarge = AppShape.Dialog,\n)"
         assertFailsWith<AssertionError> { assertEquals(expected, namedArgs(parenBlock(reverted, appShapesCall))) }
@@ -955,10 +967,8 @@ class MaterialThemeAssemblyContractTest {
 
     private val typographyCall = Regex("""[\s{]Typography\(""")
 
-    /** 两个带库内默认值的 builder：前置 `[\s{]` 让 `light` 与 `dark` 分支互不救活。 */
-    private val lightSchemeCall = Regex("""[\s{]lightColorScheme\(""")
-
-    private val darkSchemeCall = Regex("""[\s{]darkColorScheme\(""")
+    /** 角色覆写块：2026-10-29 起是 `base.copy(…)` 单点（builder 只负责给库内默认值）。 */
+    private val copyCall = Regex("""[\s{]base\.copy\(""")
 
     private val appShapesCall = Regex("""Shapes\(""")
 

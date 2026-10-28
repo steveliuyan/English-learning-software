@@ -39,14 +39,16 @@ import kotlin.test.assertTrue
  * 站点侧「前景到底取了哪枚墨」零防线——这正是 B1（三处前景单迁、深色档 1.49–2.21:1）能穿过
  *  全部门与 connected 的洞。修复轮补三族腿：
  *  ① **亮度腿（两套都要有）**：`the mint primary ink pair clears the AA floor on both theme sets`
- *    钉 R-23.13 分档成立的前提（浅 `onMint`×浅 AiSpeech 底、`onBrand`×浅底、深 `onBrand`×深底均 ≥4.5），
- *    并反向钉「深套 `onMint` 压深套 AiSpeech 亮底」**不达** 4.5——分档唯一理由的 decoy 腿，
- *    哪天调色板真把它修达标，本腿先红、逼裁决与站点形状同批改；
- *  ② **站点形状腿 + 现算**：`the mint primary sites split their foreground ink by theme set`
+ *    钉 R-23.13′ 成立的前提（`onBrand` 压浅/深两套 AiSpeech 亮底均 ≥4.5），并反向钉「`onMint` 压两套亮底
+ *    **都不达** 4.5」——「亮底只认 onBrand」的 decoy 腿，哪天调色板真把它修达标，本腿先红、逼裁决与站点形状同批改；
+ *  ② **站点形状腿 + 现算**：`the mint primary sites print on brand ink on both theme sets`
  *    从源码里把「容器 `MintPrimary`（两套皆亮）之上那两枚前景表达式」抠出来（按钮 `contentColor` 与
- *    `StatusPill` 的「现在能用」档），要求必须是 `if (!LocalIsDark.current) colors.onMint else colors.onBrand`
- *    一族分档形状，并把取到的墨 token 的**两套活值**当场压两套 AiSpeech 底复算 ≥4.5。
+ *    `StatusPill` 的「现在能用」档），要求取的是**主题无关的 `colors.onBrand`**（底不随主题变，墨就不分档），
+ *    并把取到的墨 token 的**两套活值**当场压两套 AiSpeech 底复算 ≥4.5。
  *    批 3 的裸 `contentColor = colors.onMint` 走这条腿时深档读数 ≈1.49:1，当场红——B1 的直接防线；
+ *    **2026-10-29 原型 token 迁移**：`onMint` 改成 `brandDeep` 别名（浅 1A7A63 / 深 7FE3C1），旧分档形的
+ *    浅档腿降到 2.69:1 也红了——分档本身失去存在理由（两套底同亮），判据随之收成「单墨 `onBrand`」，
+ *    旧分档形从「合规本体」降级成反事实（见 counterfactual 用例）。
  *  ③ **容器不随主题 ⇒ 前景不许单迁**：`the theme invariant white pill keeps its registered static foregrounds`
  *    钉白胶囊（`Color.White.copy(alpha = 0.85f)`，R-23.11 未授权主题化，归 Task 26/27）的两枚前景
  *    保持登记静态（R-23.14 回退），并对两枚静态墨当场压白复算——未配置档 ≥4.5，已配置档按
@@ -310,7 +312,7 @@ class AiBadgeContrastFixTest {
         // 迁移的目标形状必须在真正没回退的那一侧成立，而不是「把静态读点删了、颜色也不给了」。
         assertTrue(
             uiScreenSource("AiFeatureScreen.kt").contains("appColors()"),
-            "AiFeatureScreen.kt 迁移后必须经 appColors() 取墨（徽标前景、按钮与徽章的分档前景三处）",
+            "AiFeatureScreen.kt 迁移后必须经 appColors() 取墨（徽标前景、按钮与徽章的主题无关亮底墨三处）",
         )
     }
 
@@ -361,11 +363,12 @@ class AiBadgeContrastFixTest {
 
     /**
      * 把「亮底容器上的前景表达式」解成（浅档墨, 深档墨）。认得的形状：
-     *  - R-23.13 分档（裸 / `implemented` 门控前置）：`if (!LocalIsDark.current) A else B`、
-     *    `if (implemented && !LocalIsDark.current) A else if (implemented) B else C`；
-     *  - 单迁旧形（B1 形状，用于判红而不是放行）：裸 token、`if (implemented) A else B`——
-     *    浅深两档都按**同一枚 themed token 的两套活值**求（组合期真实行为：`colors.onMint` 在深套
-     *    就是深套 `onMint`），这正是「前景单迁、容器未迁」在深档塌掉的读数来源。
+     *  - `implemented` 门控链：`if (implemented) A else if (implemented) B else C`、
+     *    `if (implemented) A else B`——门控真时两套主题同取 A（底是亮底，墨不分档），
+     *    所以两档都记 A；C / B 是**未上线档**（中性 `tint` 底）的墨，不在本判据的亮底上；
+     *  - 裸 token：两档同值；
+     *  - 旧 R-23.13 分档形（`if (!LocalIsDark.current) A else B` 一族）：**只为反事实取样**——
+     *    2026-10-29 原型 token 迁移后它两种主题都不过线，判据必须判红，不许放行。
      */
     private fun resolveMintPrimaryInks(expression: String): Pair<String, String>? {
         Regex("""^if \(implemented && !LocalIsDark\.current\) ([\w.]+) else if \(implemented\) ([\w.]+) else ([\w.]+)$""")
@@ -397,50 +400,59 @@ class AiBadgeContrastFixTest {
                 "深套 AiSpeech 底仍是亮底（DomainDark 的 base/deep 合一），亮墨压亮底正是 B1 的深色档回归形状"
         }
         if (
-            !expression.contains("LocalIsDark") ||
-            inks.first != "colors.onMint" ||
+            expression.contains("LocalIsDark") ||
+            inks.first != "colors.onBrand" ||
             inks.second != "colors.onBrand"
         ) {
-            offenders += "$label：站点侧形状未按 R-23.13 分档 `if (!LocalIsDark.current) colors.onMint else colors.onBrand`" +
-                "（先例 AppBottomBar.kt:95、AiProfileSettingsScreen.kt:402/:524、GlassButton.kt:78 同族写法）：$expression"
+            offenders += "$label：站点侧形状未按 R-23.13′ 取主题无关的 `colors.onBrand`" +
+                "（底两套皆亮 ⇒ 墨不分档；`onMint` 是 brandDeep 别名，浅 2.69:1 / 深 1.11:1 都不过线）：$expression"
         }
         return offenders
     }
 
     /**
-     * 亮度腿的前提面（M3①）：分档取的两枚墨压两套 AiSpeech 底**各自**过 AA，外加一枚 decoy——
-     * 深套 `onMint` 压深套 AiSpeech 亮底必须**不达** 4.5，这是「为什么必须分档」的唯一理由。
-     * 调色板哪天把 decoy 那对修达标了，本用例先红，逼着人回头撤 R-23.13 的两处守卫而不是让它变成死条款。
+     * 亮度腿的前提面（M3①）：`onBrand` 压两套 AiSpeech 亮底**各自**过 AA，外加两枚 decoy——
+     * `onMint`（brandDeep 别名）压浅/深两套亮底都必须**不达** 4.5，这是「亮底只认 onBrand、
+     * 不再按主题分档」的全部理由。调色板哪天把 decoy 那对修达标了，本用例先红，逼着人回头
+     * 复核站点形状而不是让它变成死条款。
      */
     @Test
     fun `the mint primary ink pair clears the AA floor on both theme sets`() {
         listOf(
-            "浅档 onMint 压浅套 AiSpeech 底" to ratio(AppColorLight.onMint.toArgb(), mintPrimaryLightBase),
-            "onBrand 压浅套 AiSpeech 底（同值收口预案档）" to ratio(AppColorLight.onBrand.toArgb(), mintPrimaryLightBase),
-            "深档 onBrand 压深套 AiSpeech 底" to ratio(AppColorDark.onBrand.toArgb(), mintPrimaryDarkBase),
+            "onBrand 压浅套 AiSpeech 亮底" to ratio(AppColorLight.onBrand.toArgb(), mintPrimaryLightBase),
+            "onBrand 压深套 AiSpeech 亮底" to ratio(AppColorDark.onBrand.toArgb(), mintPrimaryDarkBase),
         ).forEach { (label, value) ->
             assertTrue(
                 value >= 4.5,
-                "$label 只有 ${"%.2f".format(value)}:1（AA 正文下限 4.5:1）——R-23.13 的分档前提破了，" +
+                "$label 只有 ${"%.2f".format(value)}:1（AA 正文下限 4.5:1）——R-23.13′ 的前提破了，" +
                     "先修订裁决与站点形状腿，再谈取值",
             )
         }
-        val splitRationale = ratio(AppColorDark.onMint.toArgb(), mintPrimaryDarkBase)
-        assertTrue(
-            splitRationale < 4.5,
-            "深套 onMint 压深套 AiSpeech 底已达 ${"%.2f".format(splitRationale)}:1——「必须分档」的唯一理由消失：" +
-                "届时先撤 R-23.13 两站的 LocalIsDark 守卫与本腿，再收台账（不允许静默改判据方向）",
-        )
+        listOf(
+            "浅套 onMint（brandDeep 别名）压浅套 AiSpeech 亮底" to
+                ratio(AppColorLight.onMint.toArgb(), mintPrimaryLightBase),
+            "深套 onMint 压深套 AiSpeech 亮底" to
+                ratio(AppColorDark.onMint.toArgb(), mintPrimaryDarkBase),
+        ).forEach { (label, value) ->
+            assertTrue(
+                value < 4.5,
+                "$label 已达 ${"%.2f".format(value)}:1——「亮底只认 onBrand」的唯一理由消失：" +
+                    "届时先复核 onMint 是否重新成为及格的亮底墨、再同步撤站点形状腿（不允许静默改判据方向）",
+            )
+        }
     }
 
     /**
      * B1 的直接防线（M3②）：两枚「亮底容器 + 前景」站点（`AiFeatureScreen` 的主按钮 + `StatusPill`
-     * 现在能用档）的前景必须是分档形状，且取到的墨按两套活值当场压两套 AiSpeech 底复算 ≥4.5。
-     * **修复轮 RED 读数**：改生产前现盘两站点都是裸 `colors.onMint` 一族单迁形，深档复算 ≈1.49:1，
-     * 本用例红（`t23-fix1-RED-jvm.log`）；R-23.13 落地后绿。
+     * 现在能用档）的前景必须取主题无关的 `colors.onBrand`，且这枚墨按两套活值当场压两套 AiSpeech 底
+     * 复算 ≥4.5。
+     * **修复轮 RED 读数**：批 3 两站点都是裸 `colors.onMint` 单迁形，深档复算 ≈1.49:1，本用例红
+     * （`t23-fix1-RED-jvm.log`）；R-23.13 落地后绿。
+     * **2026-10-29 原型 token 迁移**：`onMint` 改成 brandDeep 别名后，旧分档形的浅档腿也塌到 2.69:1——
+     * 分档失去存在理由（容器两套同亮），站点随之收成单墨 `onBrand`，本腿跟着换成单墨形状。
      */
     @Test
-    fun `the mint primary sites split their foreground ink by theme set`() {
+    fun `the mint primary sites print on brand ink on both theme sets`() {
         val featureSource = uiScreenSource("AiFeatureScreen.kt")
         val offenders = mutableListOf<String>()
 
@@ -462,20 +474,23 @@ class AiBadgeContrastFixTest {
 
         assertTrue(
             offenders.isEmpty(),
-            "MintPrimary（两套皆亮的 AiSpeech 实底）上的前景没按 R-23.13 分档，或分档的墨压不住底：\n" +
+            "MintPrimary（两套皆亮的 AiSpeech 实底）上的前景没取主题无关的 `colors.onBrand`，或这枚墨压不住底：\n" +
                 offenders.joinToString("\n"),
         )
     }
 
     /**
      * 合成反事实（现在就要绿，不依赖生产码）：判据对裸 `colors.onMint` 单迁形必须判红，
-     * 对 R-23.13 的两种分档写法必须放行，对 resolver 不认识的墨必须响亮判红而不是恒绿。
+     * 对 R-23.13′ 的单墨写法必须放行，对 resolver 不认识的墨必须响亮判红而不是恒绿。
+     *
+     * 2026-10-29 原型 token 迁移把**旧分档形**从「合规本体」翻成反事实：`onMint` 现在是 brandDeep
+     * 别名，浅档腿压亮底只有 2.69:1——判据若还放行它，equal 于让 2.69:1 的浅色文字上线。
      */
     @Test
     fun `the mint primary ink rule catches the bare on mint ink counterfactual`() {
         assertTrue(
             mintPrimaryInkOffenders("反事实·裸前景", "colors.onMint").isNotEmpty(),
-            "反事实失控：裸 contentColor = colors.onMint（B1 形状，深档亮墨压亮底 ≈1.49:1）被判成合规——本腿空转",
+            "反事实失控：裸 contentColor = colors.onMint（B1 形状，两套亮底都 ≈1–2.7:1）被判成合规——本腿空转",
         )
         assertTrue(
             mintPrimaryInkOffenders("反事实·裸分档前景", "if (implemented) colors.onMint else MintPrimaryDark").isNotEmpty(),
@@ -486,19 +501,24 @@ class AiBadgeContrastFixTest {
             "反事实失控：分档分错墨（深档 text1 亮墨压亮底）被判成合规",
         )
         assertTrue(
+            mintPrimaryInkOffenders("反事实·旧 R-23.13 分档形", "if (!LocalIsDark.current) colors.onMint else colors.onBrand").isNotEmpty(),
+            "反事实失控：旧 R-23.13 分档形在原型 token 下的浅档只有 2.69:1，竟被判成合规——" +
+                "判据没跟着调色板走，等于给浅色文字放行",
+        )
+        assertTrue(
             mintPrimaryInkOffenders("反事实·未登记墨", "colors.success").isNotEmpty(),
             "反事实失控：resolver 不认识的墨被静默放行（恒绿判据）",
         )
         assertTrue(
-            mintPrimaryInkOffenders("反事实·R-23.13 裸分档", "if (!LocalIsDark.current) colors.onMint else colors.onBrand").isEmpty(),
-            "R-23.13 的按钮写法被判红——判据把修复本体当违规，方向反了",
+            mintPrimaryInkOffenders("反事实·R-23.13′ 单墨", "colors.onBrand").isEmpty(),
+            "R-23.13′ 的按钮写法被判红——判据把修复本体当违规，方向反了",
         )
         assertTrue(
             mintPrimaryInkOffenders(
-                "反事实·R-23.13 门控分档",
-                "if (implemented && !LocalIsDark.current) colors.onMint else if (implemented) colors.onBrand else MintPrimaryDark",
+                "反事实·R-23.13′ 门控单墨",
+                "if (implemented) colors.onBrand else colors.text1",
             ).isEmpty(),
-            "R-23.13 的 StatusPill 写法（:524 先例同形）被判红——判据把修复本体当违规，方向反了",
+            "R-23.13′ 的 StatusPill 写法被判红——判据把修复本体当违规，方向反了",
         )
     }
 

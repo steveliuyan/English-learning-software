@@ -62,17 +62,21 @@ class EntryRowInkTest {
     /**
      * R-10.4 的裁决落点：chevron 取 `text2`，**不是**稿 `.entry .chev` 写的 `text-3`。
      *
-     * `text3` 压浅套 `tint` 恰好卡在非文本 3:1 线上（复算即断言消息里那个数，注释不抄值），
-     * 边界上的合格不算合格；批 1 Task 1 的裁决 #1 又禁止 `text-3` 作前景。
+     * **2026-10-29 原型 token 迁移改写本腿的依据面**：浅套 `text3` 从旧值换到原型 `#65756C` 后，
+     * 压浅套 `tint` 是 4.25:1——已过装饰档 3:1+余量（≥3.1），旧口径「被拒候选当场不合格」的
+     * 算术依据**作废**（比值现算，不抄进注释）。也就是说 `text3` 现在正好落在「装饰档合格、
+     * 正文档不合格（<4.5）」这一带：拿它当 chevron 在图形档确实能看，本 pin 仍取 `text2`
+     * 的理由转为**设计一致性**（chevron 与尾部值同档）、不再是「text3 不合格」。
+     * 若批次 1 按原型改回 `text-3`，须同批撤此 pin 并重议（原型优先）。
      *
      * **3.1 的含义**（R-10.6，Task 1 裁决 #1 同口径的算术写法）：装饰墨按 3:1 **加余量**判——
      * 卡在边界上的合格不算合格，所以本套阈值从 `>= 3.0` 收紧成 `>= 3.1`。
      * 评审轮删掉了 `assertTrue(inks.chevron != set.text3)`：两枚 token 取值本不相同，
      * 等值 `assertEquals(set.text2, inks.chevron)` 成立即不等式必然成立，它永远不单独红（重言）。
-     * 裁决的**依据**改用可判红的复算承重：被拒候选 `text3` 压浅套 `tint` 当场不合格（`< 3.1`，
-     * 与 `outline` 诱饵、`InlineNoticeKindTest` 的 R-10.1b `mockActionRatio < 4.5` 同族）。
-     * **浅套是这条裁决的现场**；深套的被拒候选取值达标，所以本条只按浅套断言——
-     * 若哪天浅/深套取值漂移让 `text3` 压 `tint` 达到 3.1，这条会红，提示裁决重议。
+     * 反向承重改成「被拒候选仍落在装饰档带内」：`text3` 压 `tint` 必须 ∈ [3.1, 4.5)——跌出下界
+     * 说明它连装饰档都不合格（旧理由复活，须重写本腿），升过上界说明它成了正文档墨（tier 语义漂移，
+     * 得先重议 pin 再动代码）。两个方向都会红。
+     * **浅套是这条裁决的现场**；深套的被拒候选取值达标，所以本条只按浅套断言。
      */
     @Test
     fun chevron_is_pinned_to_text2_and_explicitly_not_to_text3() {
@@ -87,12 +91,14 @@ class EntryRowInkTest {
                 )
             )
         }
-        // 被拒候选当场不合格（R-10.6 的可判红裁决依据）：浅套 text3 压 tint 卡在 3:1 线上零余量。
+        // 被拒候选的现状：text3 落在装饰档带内（≥3.1 且 <4.5）——它不再「当场不合格」，
+        // 但也没资格当正文墨；本 pin 的等值断言承重，这条把「依据已过期」变成可判红的事实。
         val rejectedRatio = ratioOf(AppColorLight.text3, AppColorLight.tint)
         assertTrue(
-            rejectedRatio < 3.1,
-            "裁决依据失效：被拒候选 text3 压浅套 tint 已升到 %.2f:1（≥3.1），「chevron 不得回 text3」需重议"
-                .format(rejectedRatio)
+            rejectedRatio >= 3.1 && rejectedRatio < 4.5,
+            "被拒候选 text3 压浅套 tint 现在是 %.2f:1，已跌出装饰档带 [3.1, 4.5)——" +
+                "要么它连图形档都不合格（旧口径的「不合格」理由复活，须重写本腿）、" +
+                "要么它升成了正文档墨（text3 的从属档身份漂移，先重议 chevron pin）".format(rejectedRatio)
         )
         // 反空转：本用例的 ≥3.1 口径必须判得出「装饰性细线压 tint 不合格」，
         // 否则换成 outline/outlineSoft 当 chevron 也算过——那就是取错字段却测不出。

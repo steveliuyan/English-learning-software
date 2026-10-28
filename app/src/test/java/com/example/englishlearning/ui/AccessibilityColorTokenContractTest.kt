@@ -125,7 +125,7 @@ class AccessibilityColorTokenContractTest {
             "禁令3 的修复目标 AppPalette.kt 应恰好一个，实际 ${paletteFiles.size} 个（扫描错位？）"
         )
         val paletteSource = paletteFiles.single().readText()
-        listOf("ErrorText" to "0xFFB30000", "SuccessText" to "0xFF1B5E20").forEach { (token, hex) ->
+        listOf("ErrorText" to "0xFFA5291F", "SuccessText" to "0xFF1B5E20").forEach { (token, hex) ->
             val declared = Regex("""val\s+$token\s*=\s*Color\(\s*$hex\s*\)""", RegexOption.IGNORE_CASE)
             assertTrue(
                 declared.containsMatchIn(paletteSource),

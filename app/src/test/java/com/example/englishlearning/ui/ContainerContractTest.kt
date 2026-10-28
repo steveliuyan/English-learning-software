@@ -162,19 +162,27 @@ class ContainerContractTest {
     fun `the soft card carries no border`() {
         val body = bodyOf(containers, "fun SoftCard(")
         assertTrue(body.isNotEmpty(), "取不到 SoftCard 本体，判据会空转")
-        assertTrue("border" !in body, "软档卡禁止描边：层次由 surface 与 strongSurface 的明度差表达")
-        assertTrue("RoundedCornerShape(20.dp)" in body, "软档卡圆角 20dp（§4.1）")
+        assertTrue("border" !in body, "软档卡禁止描边（原型 .card-soft 的 border 是 transparent）：层次由 tint 与 surface 的明度差表达")
+        assertTrue("AppShape.Card" in body, "软档卡圆角 20dp 走共享 AppShape.Card（原型 --r-lg = 20）")
     }
 
+    /**
+     * 裸行几何（原型对齐批 0，2026-10-29）：从「52dp 行高 + 15/13 内距 + 52dp 缩进线」改为原型 `.row`
+     * 的「48dp 触控下限 + 上下 12 + 无横向内距 + 全宽 line-soft 顶线」。
+     *
+     * 横向留白归宿主卡片：原型 `.row` 就是 `padding: var(--s3) 0`，卡片自己有 16dp 内距；再给行加
+     * 15dp 横向内距会让卡内文字缩进 31dp，与原型对不上。缩进常量 `BareRowDividerIndent` 随之退役。
+     */
     @Test
-    fun `the bare row keeps a 52dp divider indent and a 48dp touch floor`() {
+    fun `the bare row keeps a 48dp touch floor and a full width hairline`() {
         val body = bodyOf(containers, "fun BareRow(")
         assertTrue(body.isNotEmpty(), "取不到 BareRow 本体，判据会空转")
-        assertTrue("heightIn(min = 52.dp)" in body, "裸行最小高度 52dp（§4.3 三档行高）")
-        assertTrue("padding(horizontal = 15.dp, vertical = 13.dp)" in body, "裸行内边距 15/13（§4.3）")
+        assertTrue("heightIn(min = 48.dp)" in body, "裸行触控下限 48dp（F5-03；原型自然高由行高决定）")
+        assertTrue("padding(vertical = 12.dp)" in body, "裸行上下 12dp（原型 .row padding: var(--s3) 0）")
+        assertTrue("horizontal = 15.dp" !in body, "横向内距归宿主卡片，行内不得再写 15dp（原型 .row 无横向内距）")
+        assertTrue("startIndent = 0.dp" in body, "顶线全宽（原型 .row border-top 无缩进）")
         assertTrue("hairlineTop(" in body, "裸行靠 hairlineTop 画同组分隔线")
-        assertTrue("BareRowDividerIndent" in body, "分隔线必须用具名缩进常量，不许散写 52.dp")
-        assertTrue("val BareRowDividerIndent: Dp = 52.dp" in containers, "缩进常量必须是 52dp：与 40dp 图标 + 12dp 间距对齐")
+        assertTrue("BareRowDividerIndent" !in containers, "52dp 缩进常量随原型口径退役，不得留第二份真值")
     }
 
     @Test

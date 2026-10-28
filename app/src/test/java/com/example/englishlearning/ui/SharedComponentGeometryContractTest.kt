@@ -293,22 +293,31 @@ class SharedComponentGeometryContractTest {
 
     // ---------- InlineNotice.kt ----------
 
-    /** 提示条 padding（稿 `.banner` 14×12dp）。变异自证 ⑦ 的红点。 */
-    private val noticePadding14x12 = Regex("""padding\(horizontal = 14\.dp, vertical = 12\.dp\)""")
+    /**
+     * 提示条内距（原型 `.notice` = `padding: var(--s3) var(--s4)` → 上下 12 / 左右 16）。
+     *
+     * 2026-10-29 原型对齐批 0 改口径：旧值 14×12 来自上一版稿 `.banner`，原型 `.notice` 的左右
+     * 内距是 16（`--s4`）。几何取值仍只有源码契约能挡——connected 只钉下限。
+     */
+    private val noticePadding16x12 = Regex("""padding\(horizontal = 16\.dp, vertical = 12\.dp\)""")
 
-    /** 提示条间隙（稿 `.banner` 10dp）。 */
-    private val noticeGap10 = Regex("""Arrangement\.spacedBy\(10\.dp\)""")
+    /** 提示条间隙（原型 `.notice` `gap: var(--s3)` = 12dp）。 */
+    private val noticeGap12 = Regex("""Arrangement\.spacedBy\(12\.dp\)""")
 
-    /** 1dp 描边（稿 `.banner` border）。 */
+    /**
+     * 1dp 描边 —— 原型 `.notice` **没有** border，所以这一项从「恰一处」改成「0 处」。
+     * 提示条与页面底的层次由 `tint` / `danger-tint` 的明度差表达，加边就多一道原型没有的线。
+     */
     private val noticeBorder1dp = Regex("""border\(1\.dp,""")
 
-    /** 18dp 状态字形（稿 `.banner .ic`）。 */
-    private val noticeGlyph18 = Regex("""size = 18\.dp""")
+    /** 17dp 状态字形（原型 `icon(ic, 17)`）。 */
+    private val noticeGlyph17 = Regex("""size = 17\.dp""")
 
-    /** 48dp 触控下限——只派给动作槽（R-10.1 口径：无动作本体 ~42dp 是合规内容高）。 */
+    /** 48dp 触控下限——只派给动作槽（R-10.1 口径：无动作本体是合规内容高）。 */
     private val actionFloor48 = Regex("""heightIn\(min = 48\.dp\)""")
 
-    /** 圆角取装配档 18dp（`MintGlassTheme.kt:173` = 稿 `--r-card`）。 */
+    /** 提示条圆角 = 原型 `--r-md` 14dp，走共享 `AppShape.Button`（旧 `MaterialTheme.shapes.medium` 档已退役）。 */
+    private val noticeShapeButton = Regex("""AppShape\.Button""")
     private val shapesMedium = Regex("""MaterialTheme\.shapes\.medium""")
 
     /** 禁止形状：新组件读 20dp 旧档。 */
@@ -320,25 +329,25 @@ class SharedComponentGeometryContractTest {
     @Test
     fun inline_notice_geometry_literals_are_pinned_in_source() {
         val source = uiComponentSource(INLINE_NOTICE)
-        assertEquals(1, countMatches(source, noticePadding14x12), "提示条 padding 必须恰一处 14×12dp（变异自证 ⑦：vertical 改 14 即此条红）")
-        assertEquals(1, countMatches(source, noticeGap10), "提示条间隙必须恰一处 10dp")
-        assertEquals(1, countMatches(source, noticeBorder1dp), "提示条描边必须恰一处 border(1.dp,")
-        assertEquals(1, countMatches(source, noticeGlyph18), "提示条状态字形必须恰一处 18dp")
+        assertEquals(1, countMatches(source, noticePadding16x12), "提示条内距必须恰一处 16×12dp（原型 .notice padding s3 s4）")
+        assertEquals(1, countMatches(source, noticeGap12), "提示条间隙必须恰一处 12dp（原型 gap s3）")
+        assertEquals(0, countMatches(source, noticeBorder1dp), "提示条不得有描边（原型 .notice 没有 border）")
+        assertEquals(1, countMatches(source, noticeGlyph17), "提示条状态字形必须恰一处 17dp（原型 icon(ic, 17)）")
         assertEquals(1, countMatches(source, actionFloor48), "48dp 下限必须恰一处且只落在动作槽（多一处 = 给本体也钉了水线）")
-        assertEquals(1, countMatches(source, shapesMedium), "圆角必须恰一处 MaterialTheme.shapes.medium（装配档 = 稿 --r-card 18dp）")
-        assertEquals(0, countMatches(source, appShapeCard), "新组件禁读 AppShape.Card（20dp 旧档）")
+        assertEquals(1, countMatches(source, noticeShapeButton), "提示条圆角必须恰一处走 AppShape.Button（原型 --r-md 14dp）")
+        assertEquals(0, countMatches(source, shapesMedium), "MaterialTheme.shapes.medium 档已退役：新组件不读装配档圆角")
+        assertEquals(0, countMatches(source, appShapeCard), "新组件禁读 AppShape.Card（20dp 卡档）")
         assertEquals(0, countMatches(source, anyMaxLines), "提示文案不得出现 maxLines（R-10.1 相反口径：这里裁掉 = 丢信息）")
 
-        // 合成正/负片段：padding 锚必须同时吃下两个分量——14×14（变异 ⑦ 的形状）与 12×12 都不得命中。
-        val goodPadding = "Modifier.padding(horizontal = 14.dp, vertical = 12.dp)"
-        assertEquals(1, countMatches(goodPadding, noticePadding14x12), "合成正片段漏判：14×12 padding 没被锚认出")
-        assertEquals(0, countMatches("Modifier.padding(horizontal = 14.dp, vertical = 14.dp)", noticePadding14x12), "合成负片段被放行：vertical 漂到 14dp 也算合规（变异 ⑦ 形状）")
-        assertEquals(0, countMatches("Modifier.padding(horizontal = 12.dp, vertical = 12.dp)", noticePadding14x12), "合成负片段被放行：horizontal 漂到 12dp 也算合规")
-        // 跨组件冒名：入口行的 12dp 串不得被提示条 10dp 锚命中；48dp 锚不吃入口行的 56dp 串。
-        assertEquals(0, countMatches("Row(horizontalArrangement = Arrangement.spacedBy(12.dp))", noticeGap10), "合成负片段被放行：入口行 12dp 串被提示条 10dp 锚冒名命中")
+        // 合成正/负片段：内距锚必须同时吃下两个分量——16×14 与 14×12 都不得命中。
+        val goodPadding = "Modifier.padding(horizontal = 16.dp, vertical = 12.dp)"
+        assertEquals(1, countMatches(goodPadding, noticePadding16x12), "合成正片段漏判：16×12 padding 没被锚认出")
+        assertEquals(0, countMatches("Modifier.padding(horizontal = 16.dp, vertical = 14.dp)", noticePadding16x12), "合成负片段被放行：vertical 漂到 14dp 也算合规")
+        assertEquals(0, countMatches("Modifier.padding(horizontal = 14.dp, vertical = 12.dp)", noticePadding16x12), "合成负片段被放行：旧稿 14dp 横向内距也算合规")
+        // 跨组件冒名：入口行的 12dp 串不得被提示条锚拒；48dp 锚不吃入口行的 56dp 串。
         assertEquals(0, countMatches("Row(Modifier.heightIn(min = 56.dp))", actionFloor48), "合成负片段被放行：入口行 56dp 串被动作槽 48dp 锚冒名命中")
         assertEquals(1, countMatches("Box(Modifier.heightIn(min = 48.dp))", actionFloor48), "合成正片段漏判：动作槽 48dp 下限没被锚认出")
-        assertEquals(1, countMatches("Column { Text(modifier = Modifier.padding(top = 1.dp)) }", Regex("""padding\(top = 1\.dp\)""")), "取样壳失控：1dp padding 串本身数不出来（顺序锚另见入口行用例）")
+        assertEquals(1, countMatches("Modifier.border(1.dp, ink.border, shape)", noticeBorder1dp), "禁形探针失控：描边串根本没被数出来（0 处断言会空转）")
         assertEquals(1, countMatches("Text(text = text, maxLines = 1)", anyMaxLines), "禁形探针失控：maxLines 串根本没被数出来")
     }
 

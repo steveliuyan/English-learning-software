@@ -573,8 +573,9 @@ class GlassPanelInkPairingContractTest {
      *  - 底取**该行的真实落底**：`surfaceGlass` 带 alpha，按 src-over 压在该套 `background` 上
      *    （浅套合成 `#FEFFFE`、深套合成 `#161F1B`），不是拿半透明 token 的字节直接算；
      *  - 两套 × 选中/未选中四对墨全部 ≥ 4.5；
-     *  - 反空转（评审红线「不许为过判据放宽阈值」）：喂两枚**落在装饰档**的诱饵墨——浅套 `text-3 #7C9188`
-     *    （现算 3.35:1）与一枚 3.6 档硬编码诱饵 `#1E987C`（现算 3.59:1）——进同一条 4.5 闸，两枚都必须不合格；
+     *  - 反空转（评审红线「不许为过判据放宽阈值」）：喂两枚**落在装饰档**的诱饵墨——浅套
+     *    `feedbackFuzzy #A8792A`（2026-10-29 迁移后压浅玻璃 3.82:1；旧诱饵 `text3` 已升到 4.81 过闸而作废）
+     *    与一枚 3.6 档硬编码诱饵 `#1E987C`（现算 3.59:1）——进同一条 4.5 闸，两枚都必须不合格；
      *    它们若被判 ≥4.5，说明本条把阈值写宽了；它们若被判 <3.1，说明这行压根该按装饰档走，两种情况都会红。
      *
      * **2026-10-27 轻松档的连带变化**：旧诱饵「修复前那枚浅套域色墨 `AiSpeech.deep`」已不再合格——
@@ -621,7 +622,11 @@ class GlassPanelInkPairingContractTest {
         }
 
         listOf(
-            "浅套 text-3 墨 #7C9188（装饰档诱饵）" to rgbOf(AppColorLight.text3),
+            // 2026-10-29 原型 token 迁移：浅套 `text3` 换到 #65756C 后压浅玻璃升到 4.81，
+            // 已过正文闸、不再能当诱饵；改取原型反馈色 `feedbackFuzzy`（#A8792A，压浅玻璃 3.82）——
+            // 它与本仓 `DesignTokenContractTest` 钉住的原型偏差（压白 3.87 <4.5）同源，仍落在
+            // 「装饰过、正文不过」这一带，两向断言照旧承重。
+            "浅套 feedbackFuzzy 墨（装饰档诱饵）" to rgbOf(AppColorLight.feedbackFuzzy),
             "3.6 档诱饵墨 #1E987C" to (0xFF1E987C.toInt() and 0xFFFFFF),
         ).forEach { (label, ink) ->
             val measured = ratio(ink, lightGlass)

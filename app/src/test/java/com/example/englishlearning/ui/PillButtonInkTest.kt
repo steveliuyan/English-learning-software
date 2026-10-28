@@ -259,7 +259,8 @@ class PillButtonInkTest {
      * 三条都是「若达标即红」的裁决依据承重：令牌一旦漂移让这些候选翻身，本条红并提示裁决重议，
      * 而不是让决策表悄悄失去理由。2026-10-27 轻松档把七域 `deep` 全部修进 4.5 以上，
      * 于是「文字墨不得用域色 deep」这条不再有数字支撑——第 2 条改成钉**浅端 base**（永远过不了闸的那一端）
-     * 外加「例外分支取的是两枚里更富余的一枚」。
+     * 外加「例外分支取的是两枚里不更差的一枚」（2026-10-29 原型 token 迁移后 onMint 与浅套 deep
+     * 同值，严格优势收成 `>=`，见断言旁注）。
      */
     @Test
     fun rejected_candidates_are_pinned_and_turn_red_if_tokens_drift() {
@@ -274,9 +275,13 @@ class PillButtonInkTest {
         // 并把被拒候选换成域色的**浅端**（base 端在任何套里都不会被选作文字墨）。
         val aiSpeechDeepOnSurface = ratioOf(DomainLight.getValue(AppDomain.AiSpeech).deep, AppColorLight.surface)
         val aiSpeechOnMintOnSurface = ratioOf(AppColorLight.onMint, AppColorLight.surface)
+        // 2026-10-29 原型 token 迁移：`onMint` 改成 `brandDeep` 别名，浅套两枚在现盘**同值**
+        // （都是 #1A7A63），「取更富余的一枚」的严格优势消失——口径随之从 `>` 收成 `>=`：
+        // 只要分叉后 onMint 不比域 deep 差，R-14.4 的「全房同一枚浅套 AiSpeech 墨」就仍成立；
+        // 若哪天 onMint 反被调低到 deep 之下，本腿红并提示撤例外分支。
         assertTrue(
-            aiSpeechOnMintOnSurface > aiSpeechDeepOnSurface,
-            "例外分支失去优势：浅套 onMint 压 surface（%.2f）不再优于 AiSpeech deep（%.2f），onMint 例外可撤"
+            aiSpeechOnMintOnSurface >= aiSpeechDeepOnSurface,
+            "例外分支失去优势：浅套 onMint 压 surface（%.2f）低于 AiSpeech deep（%.2f），onMint 例外可撤"
                 .format(aiSpeechOnMintOnSurface, aiSpeechDeepOnSurface)
         )
         val aiSpeechBaseOnSurface = ratioOf(DomainLight.getValue(AppDomain.AiSpeech).base, AppColorLight.surface)

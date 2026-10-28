@@ -300,10 +300,14 @@ class WordRowSpeakerContractTest {
                     }
                 }
         }
-        val rejected = ratioOf(AppColorLight.text3, AppColorLight.surface)
+        // 被拒候选的现行依据（2026-10-29 原型 token 迁移后换底）：`text3` 换到原型 #65756C 后
+        // 压浅套 `surface` 已升到 4.87（≥4.5），旧依据作废；本用例上方本来就要求每个槽位在
+        // `surface` 与 `background` **两底**上都过线，词行也真的会铺在页底上——改按较弱的那枚底
+        // （页底 `background`，4.39）钉，仍然证明 `text3` 不是合格的词行次要墨，且两向可判红。
+        val rejected = ratioOf(AppColorLight.text3, AppColorLight.background)
         assertTrue(
             rejected < 4.5,
-            "被拒候选 text3 压浅套 surface 已达 %.2f:1（≥4.5）——裁决依据失效，需重议词行次要档墨".format(rejected),
+            "被拒候选 text3 压浅套 background 已达 %.2f:1（≥4.5）——裁决依据失效，需重议词行次要档墨".format(rejected),
         )
     }
 

@@ -109,8 +109,9 @@ class AiFeatureLayoutContractTest {
             "主操作必须是实底域色容器（全屏唯一的主操作）：$primary",
         )
         assertTrue(
-            "contentColor = if (!LocalIsDark.current) colors.onMint else colors.onBrand" in primary,
-            "实底域色容器两套主题皆亮，前景必须按 R-23.13 分档（裸 `colors.onMint` 在深套是亮墨压亮底 ≈1.49:1）：$primary",
+            "contentColor = colors.onBrand" in primary,
+            "实底域色容器两套主题皆亮，前景必须取主题无关的 onBrand（2026-10-29 原型 token 迁移后 " +
+                "`onMint` 是 brandDeep 别名：浅套 1A7A63 压 6CCBAB 只有 2.69:1、深套 7FE3C1 压 6FD9B6 只有 1.11:1，两套都不达标）：$primary",
         )
         val secondary = callSpanContaining("Button(", """testTag("ai_feature_open_learning")""")
         assertTrue(secondary.isNotEmpty(), "取不到次操作那枚 `Button(`（本条会空转）")
@@ -212,9 +213,10 @@ class AiFeatureLayoutContractTest {
     // ---------- 6. 许可链（徽章单一出处 + 分档墨）不许顺手改坏 ----------
 
     /**
-     * `StatusPill` 是**亮底容器**（实底域色，两套主题皆亮）上的一枚墨：前景按 R-23.13 分三档，
-     * 浅套 `onMint`、深套 `onBrand`、未上线档 `text1`。改前改后这条链一字不动——它由
-     * `AiBadgeContrastFixTest` 按两套活值当场复算，`AiFeatureScreenTest` 在设备侧取色复核。
+     * `StatusPill` 是**亮底容器**（实底域色，两套主题皆亮）上的一枚墨：2026-10-29 原型 token 迁移后
+     * 前景为「能用档主题无关 `onBrand`、未上线档 `text1`」——底不随主题变，墨就不分档
+     * （旧的分档形在迁移后的两套 palette 下都不达 4.5）。它由 `AiBadgeContrastFixTest` 按两套活值
+     * 当场复算，`AiFeatureScreenTest` 在设备侧取色复核。
      * 徽章面文案只有一个出处（R-23.9）：`featureStatusBadge(implemented)`，屏侧不得自带词。
      */
     @Test
@@ -234,8 +236,9 @@ class AiFeatureLayoutContractTest {
             "`StatusPill` 必须还在（`AiFeatureScreenTest` 按 `ai_feature_status_pill` 取色）",
         )
         assertTrue(
-            "color = if (implemented && !LocalIsDark.current) colors.onMint else if (implemented) colors.onBrand else colors.text1," in source,
-            "「现在能用」档的分档墨链必须逐字保留：浅套 onMint / 深套 onBrand / 未上线档 text1",
+            "color = if (implemented) colors.onBrand else colors.text1," in source,
+            "「现在能用」档的墨链必须逐字保留：能用档主题无关 onBrand / 未上线档 text1" +
+                "（浅深两套底同为亮薄荷，墨不分档）",
         )
         assertTrue(
             "background(if (implemented) appDomain(AppDomain.AiSpeech).base else colors.tint, AppShape.Pill)" in source,

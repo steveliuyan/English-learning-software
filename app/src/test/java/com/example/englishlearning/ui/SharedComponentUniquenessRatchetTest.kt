@@ -339,6 +339,16 @@ class SharedComponentUniquenessRatchetTest {
         "ScreenUnavailable.kt",
         "SpeakerButton.kt",
         "WordRow.kt",
+        // 原型对齐批 0（2026-10-29）：七枚新共享组件 + 贴纸徽标。组件清单按「点名文件必须存在」写，
+        // 不按总数写（R-12.3），所以后续批次继续往这里加行即可。
+        "StickerBadge.kt",
+        "SegmentedControl.kt",
+        "AppChip.kt",
+        "AppSwitch.kt",
+        "PickRow.kt",
+        "AppField.kt",
+        "EmptyState.kt",
+        "PlanBar.kt",
     )
 
     /** 组件名 → 承载它的文件（`IconBadge.kt` 与 `InlineNotice.kt` 各承载两枚公开组件）。 */
@@ -347,7 +357,9 @@ class SharedComponentUniquenessRatchetTest {
         "AppScreenHeader" to "AppScreenHeader.kt",
         "ConfirmDestructiveDialog" to "ConfirmDestructiveDialog.kt",
         "StrongCard" to "Containers.kt",
+        "AppCard" to "Containers.kt",
         "SoftCard" to "Containers.kt",
+        "QuietCard" to "Containers.kt",
         "BareRow" to "Containers.kt",
         "EntryRow" to "EntryRow.kt",
         "EntryIconBadge" to "IconBadge.kt",
@@ -359,6 +371,15 @@ class SharedComponentUniquenessRatchetTest {
         "ScreenUnavailable" to "ScreenUnavailable.kt",
         "SpeakerButton" to "SpeakerButton.kt",
         "WordRow" to "WordRow.kt",
+        // 批 0 新组件
+        "StickerBadge" to "StickerBadge.kt",
+        "SegmentedControl" to "SegmentedControl.kt",
+        "AppChip" to "AppChip.kt",
+        "AppSwitch" to "AppSwitch.kt",
+        "PickRow" to "PickRow.kt",
+        "AppField" to "AppField.kt",
+        "EmptyState" to "EmptyState.kt",
+        "PlanProgressBar" to "PlanBar.kt",
     )
 
     /**

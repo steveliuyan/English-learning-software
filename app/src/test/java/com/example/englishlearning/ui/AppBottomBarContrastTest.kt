@@ -28,8 +28,9 @@ import kotlin.test.assertTrue
  *     位图本身的自带墨色对比不归本契约：母版是 PNG，颜色不在这两套 token 里，由
  *     `AppIllustrationContractTest`（在盘/尺寸/映射）与真机走查承担。
  *  3. **选中档标签文字腿**：铺在同一枚容器 `surface` 上，是正文档 → 判 ≥4.5。
- *     浅套按 R-14.4 的 AiSpeech 例外取 `appColors().onMint`（轻松档实测 9.751），
- *     深套沿用 `appDomain(AiSpeech).deep`（深套 deep 与 base 合一，轻松档实测 9.745）。
+ *     浅套按 R-14.4 的 AiSpeech 例外取 `appColors().onMint`（**2026-10-29 原型 token 迁移后 onMint
+ *     是 brandDeep 别名 #1A7A63，压 surface 5.24**；迁移前旧值压白 9.75，那组数只是历史留痕），
+ *     深套沿用 `appDomain(AiSpeech).deep`（深套 deep 与 base 合一）。
  *     旧契约让浅套 `deep` 走这条腿（当时实测 4.016，够不上 4.5）却按图形 3.0 放行 ⇒ 档位用错。
  *     注意：2026-10-27 轻松档把浅套 `AiSpeech.deep` 压到 #1A7A63 后，同一对已升到 **5.240**，
  *     那枚 4.016 诱饵随之失效——现在改用同域色的 `base` 端（#6CCBAB，压 `surface` 只有 1.950）
@@ -87,7 +88,10 @@ class AppBottomBarContrastTest {
             fgName = "浅套 text2", fg = rgb(AppColorLight.text2),
             bgName = "浅套 surface 底", bg = rgb(AppColorLight.surface),
             floor = 4.5,
-            decoy = "浅套装饰线 text3" to rgb(AppColorLight.text3),
+            // 2026-10-29 原型 token 迁移：浅套 text3 从旧值换到 #65756C 后压白升到 4.87，
+            // 不再能当「同式不合格」的诱饵（它现在本身就是合格的三级墨）。诱饵改成装饰线
+            // `outline`（压白 1.29）——与深套腿同一枚，证明 4.5 闸在这条底上确实判得动。
+            decoy = "浅套装饰线 outline" to rgb(AppColorLight.outline),
         )
     }
 
