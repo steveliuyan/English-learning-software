@@ -16,6 +16,7 @@ import com.example.englishlearning.ui.theme.ThemeMode
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -55,7 +56,7 @@ class AiLearningScreenTest {
         composeRule.onNodeWithTag("ai_learning_screen").assertExists()
         composeRule.onNodeWithTag("ai_learning_header").assertExists()
         composeRule.onNodeWithTag("ai_learning_status_badge").assertExists()
-        composeRule.onNodeWithText("AI 学").assertExists()
+        composeRule.onNodeWithText("AI 助学").assertExists()
     }
 
     /** AI 网关还没接通，页面必须如实说「尚未接通」，不能让人以为已经能用。 */
@@ -71,29 +72,41 @@ class AiLearningScreenTest {
         composeRule.onNodeWithText("AI 尚未接通").assertDoesNotExist()
     }
 
-    @Test fun unconfigured_badge_is_neutral_while_ai_action_stays_mint() {
+    /**
+     * 批 4 Task 1：品牌渐变的取样面从「词表入口那枚 `PillButton`」换到头卡
+     * （`ai_learning_header`）——spec §3.5 的头卡是本屏唯一强卡，也是全屏唯一铺品牌渐变的地方；
+     * 词表入口已收成一枚裸行（`ai_learning_nav_row`），不再有渐变底。
+     */
+    @Test fun unconfigured_badge_is_neutral_while_the_hero_keeps_the_brand_gradient() {
         setScreen(aiConfigured = false)
         val badge = composeRule.onNodeWithTag("ai_learning_status_badge").captureToImage().asAndroidBitmap()
         val neutral = AppPalette.TextSecondary.toArgb()
         assertTrue("unconfigured badge should use neutral text", (0 until badge.width).any { x ->
             (0 until badge.height).any { y -> badge.getPixel(x, y) == neutral }
         })
-        val action = composeRule.onNodeWithTag("ai_learning_nav_detail").performScrollTo().captureToImage().asAndroidBitmap()
+        val hero = composeRule.onNodeWithTag("ai_learning_header").captureToImage().asAndroidBitmap()
         val mint = AppleMintStart.toArgb()
-        assertTrue("AI action should preserve mint gradient", (0 until action.width).any { x ->
-            (0 until action.height).any { y -> colorDistance(action.getPixel(x, y), mint) <= 18.0 }
+        assertTrue("the hero should keep the brand gradient", (0 until hero.width).any { x ->
+            (0 until hero.height).any { y -> colorDistance(hero.getPixel(x, y), mint) <= 18.0 }
         })
     }
 
-    @Test fun ai_detail_action_uses_brand_gradient_and_dark_text() {
+    /**
+     * 头卡三件事同屏取证：渐变起点 / 软化终点各在场，且状态胶囊的前景仍是登记的静态深墨
+     * （`DomainColors.AiSpeech.deep`）——骨架换新不许把这三枚同批换掉。
+     */
+    @Test fun the_hero_keeps_the_brand_gradient_and_the_registered_pill_ink() {
         setScreen(aiConfigured = true)
-        val action = composeRule.onNodeWithTag("ai_learning_nav_detail").performScrollTo().captureToImage().asAndroidBitmap()
-        val pixels = (0 until action.width).flatMap { x ->
-            (0 until action.height).map { y -> action.getPixel(x, y) }
+        val hero = composeRule.onNodeWithTag("ai_learning_header").captureToImage().asAndroidBitmap()
+        val pixels = (0 until hero.width).flatMap { x ->
+            (0 until hero.height).map { y -> hero.getPixel(x, y) }
         }
-        assertTrue("AI detail action should render mint gradient start", pixels.minOf { colorDistance(it, AppleMintStart.toArgb()) } <= 18.0)
-        assertTrue("AI detail action should render softened mint end", pixels.minOf { colorDistance(it, 0xFF65D3B9.toInt()) } <= 18.0)
-        assertTrue("AI detail action should use readable teal text", pixels.minOf { colorDistance(it, 0xFF174C44.toInt()) } <= 18.0)
+        assertTrue("the hero should render mint gradient start", pixels.minOf { colorDistance(it, AppleMintStart.toArgb()) } <= 18.0)
+        assertTrue("the hero should render softened mint end", pixels.minOf { colorDistance(it, 0xFF65D3B9.toInt()) } <= 18.0)
+        assertTrue(
+            "the status pill should keep the registered static deep ink",
+            pixels.minOf { colorDistance(it, DomainColors.AiSpeech.deep.toArgb()) } <= 18.0,
+        )
     }
 
     /**
@@ -301,23 +314,28 @@ class AiLearningScreenTest {
         assertEquals(AiFeature.entries.toList(), received)
     }
 
-    @Test fun navigation_card_shows_the_real_word_counts() {
+    /**
+     * 批 4 Task 1：词表入口收成一枚裸行（`ai_learning_nav_row`），计数不再是单独一枚 tag 上的数字，
+     * 而是这一行的副标题正文——所以这里改成对**同一行节点**的文本点名，顺带证明两枚计数真的露在屏上。
+     */
+    @Test fun the_word_list_row_shows_the_real_word_counts() {
         setScreen(todayWordCount = 12, dueWordCount = 5)
-        composeRule.onNodeWithTag("ai_learning_nav_card").assertExists()
-        composeRule.onNodeWithTag("ai_learning_word_list_count").performScrollTo().assertExists()
+        val row = composeRule.onNodeWithTag("ai_learning_nav_row").performScrollTo()
+        row.assertExists()
+        row.assertTextContains("今日新词 12 个 · 待复习 5 个", substring = true)
     }
 
     /** 今日计划不可读时必须说不可读，不能拿 0 冒充。 */
-    @Test fun navigation_card_does_not_fake_zero_when_the_plan_is_unavailable() {
+    @Test fun the_word_list_row_does_not_fake_zero_when_the_plan_is_unavailable() {
         setScreen(todayWordCount = null, dueWordCount = null)
-        composeRule.onNodeWithTag("ai_learning_nav_card").assertExists().performScrollTo()
+        composeRule.onNodeWithTag("ai_learning_nav_row").assertExists().performScrollTo()
         composeRule.onNodeWithText("今日计划还没读出来，稍后重试。").assertExists()
     }
 
-    @Test fun detail_button_opens_the_word_list() {
+    @Test fun the_word_list_row_opens_the_word_list() {
         var opened = 0
         setScreen(onOpenWordList = { opened++ })
-        composeRule.onNodeWithTag("ai_learning_nav_detail").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_learning_nav_row").performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals(1, opened)
     }
@@ -326,7 +344,7 @@ class AiLearningScreenTest {
         setScreen()
         val toggle = composeRule.onNodeWithTag("ai_learning_explainer_toggle")
         toggle.performScrollTo().assertExists()
-        composeRule.onNodeWithContentDescription("AI 学如何起作用说明").assertExists()
+        composeRule.onNodeWithContentDescription("AI 助学如何起作用说明").assertExists()
         composeRule.onNodeWithText("会用到的数据").assertDoesNotExist()
         toggle.performClick()
         composeRule.waitForIdle()

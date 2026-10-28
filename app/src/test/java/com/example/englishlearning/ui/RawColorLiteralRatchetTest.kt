@@ -88,7 +88,7 @@ internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
  * 与本轮验收一起裁决。
  */
 internal val RawColorSeedSiteLines: List<String> = listOf(
-    "AiMascot.kt: private val EyeColor: Color = Color(0xFF188F76)",
+    "AiMascot.kt: private val EyeColor: Color = Color(0xFF1A7A63)",
 )
 
 /**

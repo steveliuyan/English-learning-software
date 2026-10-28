@@ -102,10 +102,13 @@ class InlineNoticeKindTest {
      * 底 = `tint` **token 直取**（稿 `.banner` 本体就是 `background: var(--tint)`，没有混色），
      * 前景 = `onMint`，描边 = `outline`。
      *
-     * 最后那条反空转断言把 R-10.1b 的理由钉进测试：稿 `.act` 写的是 `var(--d-ai)`（浅套 = AiSpeech
-     * 的 deep），它压浅套 tint 底不足正文 4.5，会被批 1 Task 1 的低对比禁令契约当场挡下，所以
-     * `action` 一律改取 `text1`。若哪天有人把 action 改回稿值，这条会说明它本来就不合格；
-     * 若有人把 `tint` 或 AiSpeech 的 deep 改成别的值导致稿值也达标了，这条同样会红，提示裁决要重议。
+     * 最后那条反空转断言把 R-10.1b 的理由钉进测试：稿 `.act` 写的是域色（浅套 = AiSpeech 那枚色），
+     * 而域色的浅端（`base`）压浅套 tint 底不足正文 4.5，会被批 1 Task 1 的低对比禁令契约当场挡下，
+     * 所以 `action` 一律改取 `text1`。若哪天有人把 action 改回稿值，这条会说明它本来就不合格；
+     * 若有人把 `tint` 或 AiSpeech 的浅端改成别的值导致稿值也达标了，这条同样会红，提示裁决要重议。
+     *
+     * 2026-10-27 轻松档注记：`deep` 端（#1A7A63）压浅套 tint 升到 4.651 已达标，
+     * 所以诱饵从 `deep` 换成**浅端 base**（1.731）——裁决不变，承重的那一端换了。
      */
     @Test
     fun info_notice_pins_tint_backdrop_and_on_mint_foreground() {
@@ -127,12 +130,12 @@ class InlineNoticeKindTest {
                 "Info 动作墨压 tint 只有 %.2f:1，不足正文 AA 4.5（set=$set）".format(action)
             )
         }
-        // R-10.1b 的裁决依据必须承重：稿的 `.act` 墨色压浅套 tint 底不达正文 4.5。
-        val mockAction = DomainLight.getValue(AppDomain.AiSpeech).deep
+        // R-10.1b 的裁决依据必须承重：稿的 `.act` 域色（此处取域色浅端 base）压浅套 tint 底不达正文 4.5。
+        val mockAction = DomainLight.getValue(AppDomain.AiSpeech).base
         val mockActionRatio = ratioOf(mockAction, AppColorLight.tint)
         assertTrue(
             mockActionRatio < 4.5,
-            "稿 `.act`（浅套 AiSpeech deep）压浅套 tint 已升到 %.2f:1：R-10.1b 的「动作墨必须偏离稿值」依据失效，需重议".format(
+            "稿 `.act`（浅套 AiSpeech base）压浅套 tint 已升到 %.2f:1：R-10.1b 的「动作墨必须偏离稿值」依据失效，需重议".format(
                 mockActionRatio
             )
         )

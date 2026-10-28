@@ -314,7 +314,7 @@ class SettingsScreenTest {
 
         composeRule.onNodeWithTag("settings_import_word_book").performScrollTo().assertIsDisplayed().assertHasClickAction()
         composeRule.onNodeWithTag("settings_export_word_book").performScrollTo().assertIsDisplayed().assertHasClickAction()
-        composeRule.onNodeWithText("已导入 2 册，导出为 `.wbpack` 分享给别的设备").assertExists()
+        composeRule.onNodeWithText("已导入 2 册，导出为 .wbpack 分享给别的设备").assertExists()
     }
 
     /**

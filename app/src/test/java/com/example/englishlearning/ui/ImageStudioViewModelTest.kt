@@ -320,6 +320,63 @@ class ImageStudioViewModelTest {
         assertEquals(ImageStudioUiState.Failed(AiFailure.NetworkUnavailable), f.viewModel.uiState.value)
     }
 
+    /**
+     * 批 4 Task 6（计划对账 6）：画面描述改成可编辑之后，**出站的是用户改过的那一句**。
+     *
+     * 这一条钉的是本批唯一越出「只动呈现层」的改动——[ImageStudioViewModel.generateImage] 收
+     * `promptOverride`。屏内能改而送出去的还是模型原句，等于用户改了白改：不但白花一次文本调用的钱，
+     * 界面还当着他的面说谎。所以判据落在**真请求体**上，不落在状态字段上。
+     */
+    @Test
+    fun theEditedPromptIsWhatActuallyGoesOut() = runTest {
+        val f = fixture()
+
+        f.viewModel.generatePrompt("苹果")
+        advanceUntilIdle()
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+        f.viewModel.generateImage("a hand edited watercolor apple")
+        advanceUntilIdle()
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+
+        assertEquals(1, f.imageTransport.requests.size)
+        val body = f.imageTransport.requests.single().body
+        assertTrue(
+            body.contains("a hand edited watercolor apple"),
+            "生图请求体里必须是用户改过的那一句（实际请求体：$body）",
+        )
+        assertTrue(
+            !body.contains("\"a watercolor apple\""),
+            "模型原句不得冒充用户改过的描述（实际请求体：$body）",
+        )
+    }
+
+    /**
+     * 改空了就退回模型原稿：屏侧把「生成图片」按空白禁用，这一层是第二道防线——
+     * 空描述出站等于拿一次按张计费的请求换一张随机图。
+     */
+    @Test
+    fun aBlankEditFallsBackToTheModelDraft() = runTest {
+        val f = fixture()
+
+        f.viewModel.generatePrompt("苹果")
+        advanceUntilIdle()
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+        f.viewModel.generateImage("   ")
+        advanceUntilIdle()
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+
+        assertEquals(1, f.imageTransport.requests.size)
+        val body = f.imageTransport.requests.single().body
+        assertTrue(
+            body.contains("\"a watercolor apple\""),
+            "改空之后必须退回模型原稿，而不是把空白送出去（实际请求体：$body）",
+        )
+    }
+
     @Test
     fun resetReturnsToIdleAndForgetsTheConfirmedHost() = runTest {
         val f = fixture()

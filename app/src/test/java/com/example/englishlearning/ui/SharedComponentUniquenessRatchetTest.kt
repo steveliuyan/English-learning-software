@@ -10,11 +10,25 @@ import kotlin.test.assertTrue
  * 页头族在批 3 Task 26 Step 3 的**保留理由**（计划 Step 3 明许「归零或写明保留理由」的后者）。
  *
  * 本族判定面只锚「文件里出现 `MaterialTheme.typography.headline`」这一半（见 `isHeaderOffender` 的 KDoc），
- * 所以 16 枚命中里有一部分根本不是页头：
- *  - `AiFeatureScreen.kt`：`feature.title` 是能力**卡片标题**，不在页头行；
- *  - `ArticleReadingScreen.kt`：`article_title` 是文章正文标题（connected 用例按这个 tag 取），不是屏头；
- *  - `GlobalVocabularySearchScreen.kt` 第二处、`LicensesScreen.kt` 第一处：`›` / `‹` 是**方向字形**，
- *    用 headline 档借字号，换 `AppScreenHeader` 会改变字形语义。
+ * 所以命中里有一部分根本不是页头：
+ *  - `LicensesScreen.kt` 第一处：`‹` 是**方向字形**，用 headline 档借字号，换 `AppScreenHeader`
+ *    会改变字形语义。**批 5 Task 3 已摘行**：那枚 `‹` 与标题行一起换成共享页头（返回位由页头承担），
+ *    本文件 `MaterialTheme.typography` 读点归零，页头族台账到此为空集。
+ *
+ * `AiFeatureScreen.kt` 原先以「`feature.title` 是能力卡片标题、不在页头行」留档——批 4 Task 2 已把
+ * 标题与副标题交给共享 `AppScreenHeader`（44dp 渐变徽标走 `badge` 槽），本文件 `MaterialTheme.typography`
+ * 读点归零，与页头族 seed 行同批摘除（`AiFeatureLayoutContractTest` 第 1/5 条同批钉住 0 读点）。
+ *
+ * `ArticleReadingScreen.kt` 原先也在这条留档里（`article_title` 是文章正文标题、不是屏头）——
+ * 批 3 Task 3 已把它接线并摘行：标题仍由 `article_title` 留在正文侧（`AppType.Headline`），
+ * 页头只承载**返回与发音**，本文件 headline 读点归零。
+ *
+ * `GlobalVocabularySearchScreen.kt` 原先也在这条留档里，理由正是「本文件第二处 headline 是 `›` / `‹`
+ * 方向字形」——批 3 Task 5 把那两枚字形换成 `AppGlyph(AppIcon.ChevronRight)`（裸行自带、结果行显式传），
+ * 方向字形不再借 headline 档凑字号，`MaterialTheme.typography` 读点归零，故与页头族 seed 行同批摘除
+ * （`GlobalSearchLayoutContractTest` 第 1/4 条同批钉住 0 读点与「`border(` 必须为 0」）。
+ * 词行族 seed 里它**仍在册**：那一条的理由是 R-20C.1（结果行五枚信息塞不进 `WordRow` 四槽），
+ * 与本族的页头读点无关。
  *
  * 剩余真正的屏头也没有在批 3 授权迁移，且有一条硬阻塞：共享 `AppScreenHeader` 的返回位把
  * `contentDescription` 固定写成「返回」、测试标识固定为 `app_screen_header`；而这批屏的返回位承载
@@ -24,8 +38,18 @@ import kotlin.test.assertTrue
  * 那是独立的一轮工作，计划未排给 Task 26；本轮按 Step 3 的许可**留档**，不硬迁、也不给残余读点补锚。
  */
 internal val headerSeedRetentionReason: String =
-    "含非页头读点（卡片标题 / 正文标题 / 方向字形）与「返回位带目的地语义」的屏头；" +
-        "共享 AppScreenHeader 的返回位固定为「返回」+ app_screen_header，迁移需先扩组件 API 并逐屏复跑 connected。"
+    "本理由自批 5 Task 3 起**不再覆盖任何文件**：页头族台账已清零（最后一枚 `LicensesScreen.kt` 在那一轮" +
+        "换成共享 `AppScreenHeader`，`MaterialTheme.typography` 读点归零）。" +
+        "历史口径留档：含非页头读点（卡片标题 / 方向字形）与「返回位带目的地语义」的屏头；" +
+        "共享 AppScreenHeader 的返回位固定为「返回」+ app_screen_header，迁移需先扩组件 API 并逐屏复跑 connected。" +
+        "批 3 Task 5 起「方向字形」这条不再覆盖 GlobalVocabularySearchScreen.kt：那两枚 ›/‹ 已换 AppIcon.ChevronRight，" +
+        "headline 读点归零。" +
+        "批 4 Task 1 起本理由也不再覆盖 AiLearningScreen.kt：头卡标题换 `AppType.Headline`，headline 读点归零，" +
+        "该屏从页头族台账摘行。" +
+        "批 4 Task 2 起同理摘掉 AiFeatureScreen.kt：标题/副标题进共享 `AppScreenHeader`，读点归零。" +
+        "批 4 Task 6 起同理摘掉 ImageStudioScreen.kt：标题进共享 `AppScreenHeader`，headline 读点归零；" +
+        "画面描述是可编辑草稿，走输入框而不是页头 subtitle，故本屏对页头族的债务到此清零。" +
+        "批 5 Task 3 起同理摘掉 LicensesScreen.kt：页名进共享页头，`‹` 字形与 `horizontalScroll` 一同下线。"
 
 /**
  * 共享组件唯一性棘轮（批 1 Task 12 Step 3，承接 Task 8 Step 4「顺延到 Task 12」那一棒）。
@@ -210,20 +234,81 @@ class SharedComponentUniquenessRatchetTest {
             // 私有页头随屏消失（摘行门 removing_a_file_from_the_header_seed_requires_its_headline_reads_to_be_cleared
             // 的覆盖面只判「仍在树上且调用 AppScreenHeader(」的根屏，屏不在树上时本门对其无账可核）。
             // Task 26 Step 3 的收法是「留档写理由」，逐条理由见 [headerSeedRetentionReason]（计划 Step 3 明许）。
-            "AiFeatureScreen.kt",
-            "AiLearningScreen.kt",
-            "ArticleImportScreen.kt",
-            "ArticleReadingScreen.kt",
-            "GlobalVocabularySearchScreen.kt",
-            "ImageStudioScreen.kt",
-            "LicensesScreen.kt",
-            "PhotoTranslationScreen.kt",
-            "ReadingHistoryScreen.kt",
-            "SentenceAnalysisScreen.kt",
-            "WordAiQaScreen.kt",
-            "WordCardScreen.kt",
-            "WorksheetPreviewScreen.kt",
-            "WorksheetSettingsScreen.kt",
+            // 批 4 Task 2：`"AiFeatureScreen.kt"` 已摘——标题/副标题交给共享 `AppScreenHeader`（渐变徽标走
+            // `badge` 槽），本文件 `MaterialTheme.typography` 读点归零（`AiFeatureLayoutContractTest` 第 1/5 条
+            // 同批钉住 0 读点，并正向钉 `AppType` 读点与 `AppScreenHeader(` 恰一处）。
+            // 旧锚 `ai_feature_title` / `ai_feature_back` 一并退役：页头返回位固定 testTag `app_screen_header` +
+            // 可及名「返回」，`AiFeatureScreenTest` / `AppScreenTest` 同批改按内容描述与 `app_screen_header` 点。
+            // 批 4 Task 1：`"AiLearningScreen.kt"` 已摘——自写 `headlineSmall` 头卡标题换成六档
+            // `AppType.Headline`，本文件 `MaterialTheme.typography` 读点归零（`AiLearningLayoutContractTest`
+            // 第 5 条同批钉住 0 读点并正向钉 `AppType` 读点）。
+            // 该屏的 hero 是品牌渐变头卡（spec §3.5），**不**调共享 `AppScreenHeader(hero = true)`：
+            // 页头与头卡两枚 28sp 标题会撞进同一屏，connected 侧 `onNodeWithText("AI 学")` 也会变多节点。
+            // 批 3 Task 4：`"ArticleImportScreen.kt"` 已摘——自写 `TextButton("← 返回上一层")` +
+            // `headlineSmall` 标题换成共享 `AppScreenHeader("粘贴导入", onBack)`，本文件
+            // `MaterialTheme.typography` 与 `contentDescription = ` 两个读点族同时归零
+            // （`ArticleImportLayoutContractTest` 第 1 条同批钉住，并正向钉「← 返回上一层」必须为 0）。
+            // 旧锚 `import_back` 一并退役：页头的返回位固定 testTag `app_screen_header` + 可及名「返回」，
+            // `ArticleImportScreenTest` 同批改按内容描述点。
+            // 批 3 Task 3：`"ArticleReadingScreen.kt"` 已摘——自写「返回」+「发音」两枚实底
+            // `Button` 与 `headlineSmall` 标题换成共享 `AppScreenHeader(文章标题, onBack, action = 发音位)`，
+            // 本文件 `MaterialTheme.typography` 读点归零（`ArticleReadingLayoutContractTest`
+            // 第 1 条同批钉住 0 读点与「`Text("返回")` 必须为 0」）。正文标题仍由 `article_title`
+            // 留在正文侧（`AppType.Headline`）：页头两行 `Clip` 承担「滚动后我还知道在读哪篇」，
+            // 长标题的完整呈现归正文那枚。
+            // 批 3 Task 5：`"GlobalVocabularySearchScreen.kt"` 已摘——自写「← 返回上一层」可点文字 +
+            // `headlineSmall` 标题与两枚 `›` 方向字形（借 headline 档凑字号）一并换成共享
+            // `AppScreenHeader("查词", onBack)` + `AppIcon.ChevronRight`，本文件 `MaterialTheme.typography`
+            // 与 `contentDescription = ` 两个读点族同时归零（`GlobalSearchLayoutContractTest` 第 1 条同批钉住，
+            // 并正向钉「← 返回上一层」必须为 0）。旧锚 `global_search_back` 一并退役：
+            // 页头的返回位固定 testTag `app_screen_header` + 可及名「返回」，
+            // `GlobalVocabularySearchScreenTest` 同批改按内容描述点。
+            // 词行族 seed 里本文件仍在册（R-20C.1：结果行五枚信息塞不进 WordRow 四槽），与本行无关。
+            // 批 5 Task 3：`"LicensesScreen.kt"` 已摘——`‹` 方向字形借 `headlineSmall` 凑字号的裸页头
+            // （外加一层 `horizontalScroll`）换成共享 `AppScreenHeader("开源许可与隐私说明", onBack)`，
+            // 本文件 `MaterialTheme.typography` 读点归零（`LicensesLayoutContractTest` 第 1/2 条同批钉住
+            // 页头恰一处、页名逐字、`licenses_back` / 「关于与开源许可」/ `horizontalScroll(` 均为 0）。
+            // 旧锚 `licenses_back` 一并退役：页头返回位固定 testTag `app_screen_header` + 可及名「返回」，
+            // `LicensesScreenTest` 同批改按该锚与内容描述点。
+            // **这是页头族的最后一枚**：本族 seed 到此为空集（空集口径见
+            // `seed_table_covers_every_family_and_never_lists_a_canonical_component` 的注释）。
+            // 批 4 Task 6：`"ImageStudioScreen.kt"` 已摘——自写「← 返回 AI 学」TextButton 药片 +
+            // `MaterialTheme.typography.headlineSmall` 标题换成共享 `AppScreenHeader(AI 生图, onBack)`，
+            // 本文件 `MaterialTheme.typography` 读点归零（`ImageStudioLayoutContractTest` 第 1 条同批钉住
+            // 页头恰一处、`← 返回` / `image_studio_back` / `headlineSmall` 均为 0）。
+            // 旧锚 `image_studio_back` 一并退役：页头返回位固定 testTag `app_screen_header` + 可及名「返回」，
+            // `ImageStudioScreenTest` / `AppScreenTest` 同批改按内容描述点（宿主用例限定祖先
+            // `image_studio_screen`，避免与同树另一枚页头撞名）。
+            // 模型写出来的画面描述没有塞进页头 `subtitle`：那一句是**可编辑**草稿，必须落在输入框里
+            // （`ImageStudioLayoutContractTest` 第 2 条钉住 `value = editedPrompt` + `onValueChange`），
+            // 塞进纯 `String` 的 subtitle 等于把 spec §5「可编辑后再生成」还回去。
+            // 批 4 Task 4：`"PhotoTranslationScreen.kt"` 已摘——自写「← 返回 AI 学」TextButton 药片 +
+            // `MaterialTheme.typography.headlineSmall` 标题换成共享 `AppScreenHeader(拍照翻译, onBack)`，
+            // 本文件 `MaterialTheme.typography` 读点归零（`PhotoTranslationLayoutContractTest` 第 1 条同批钉住
+            // 页头恰一处、`← 返回` 与 `TextButton(` 均为 0）。旧锚 `photo_translation_back` 一并退役：
+            // 页头返回位固定 testTag `app_screen_header` + 可及名「返回」。
+            // 批 4 Task 5：`"SentenceAnalysisScreen.kt"` 已摘——自写「← 返回 AI 学」TextButton 药片 +
+            // `MaterialTheme.typography.headlineSmall` 标题换成共享 `AppScreenHeader(长难句分析, onBack, subtitle)`,
+            // 本文件 `MaterialTheme.typography` 读点归零（`SentenceAnalysisLayoutContractTest` 第 1 条同批钉住
+            // 页头恰一处、`← 返回` / `sentence_analysis_back` / `headlineSmall` 均为 0）。
+            // 旧锚 `sentence_analysis_back` 一并退役：页头返回位固定 testTag `app_screen_header` + 可及名「返回」，
+            // `SentenceAnalysisScreenTest` / `AppScreenTest` 同批改按内容描述点。
+            // 批 4 Task 7：`"WordAiQaScreen.kt"` 已摘——自写 `Button` 形态返回（「← 返回上一层」）+
+            // `MaterialTheme.typography.headlineSmall` 标题换成共享 `AppScreenHeader(AI 问词, onBack)`，
+            // 本文件 `MaterialTheme.typography` 读点归零（`WordQaLayoutContractTest` 第 1 条同批钉住
+            // 页头恰一处、`← 返回` / `word_qa_back` / `headlineSmall` 均为 0）。
+            // 旧锚 `word_qa_back` 一并退役：页头返回位固定 testTag `app_screen_header` + 可及名「返回」，
+            // `WordAiQaScreenTest` / `AppScreenTest` 同批改按内容描述点。
+            // 单词没有塞进页头 `subtitle`：共享页头的 `subtitle` 没有标签槽，塞进去就要丢掉 `word_qa_lemma`
+            // 这个锚。故页头只带标题，单词由紧随其后的一行说明承载（`WordQaLayoutContractTest` 第 7 条
+            // 钉住该 tag 恰 1 处）。
+            // 批 2 Task 1：`"WordCardScreen.kt"` 已摘——词卡页头随版式重做换成顶部 × + 计数 + 进度条，
+            // 本文件 headline 读点归零（`WordCardLayoutContractTest` 同批钉住 0 读点）。
+            // 批 2 Task 4：`"WorksheetSettingsScreen.kt"` 已摘——「← 返回设置」文字按钮 + headline 标题
+            // 换成共享 `AppScreenHeader(生成默写纸, onBack)`，headline 读点归零
+            // （`WorksheetLayoutContractTest` 同批钉住 `MaterialTheme.typography` 为 0 与页头恰一处调用）。
+            // 批 2 Task 5：`"WorksheetPreviewScreen.kt"` 已摘——自写 `headlineSmall` 标题换成共享
+            // `AppScreenHeader(预览默写纸, onBack)`，返回位由页头承担。
         ),
         "错误提示条（应调 InlineNotice）" to emptySet(),
         "未配置卡（应调 NotConfiguredCard）" to emptySet(),

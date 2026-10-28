@@ -108,6 +108,60 @@ class ReminderSettingsViewModelTest {
         assertEquals("无法读取提醒设置", vm.state.value.error)
         assertFalse(vm.state.value.loading)
     }
+
+    /**
+     * 批 5 Task 2：读失败后必须能重试，且重试**真的重跑读取**。
+     *
+     * 为什么单独钉这一条：`load()` 的落位守卫是 `loading == true`（防迟到读取冲掉用户刚改的值），
+     * 而读失败后 `loading` 已经是 `false`——UI 里直接接 `load()` 的「重试」按钮会静默无效。
+     * 本用例让仓储先失败一次、再成功，断言重试后错误清空且读到存储值。
+     */
+    @Test
+    fun `retry re-runs the read and clears the error`() = runTest(dispatcher) {
+        var failNext = true
+        val flaky = object : ReminderPreferenceRepository {
+            override suspend fun get(): Result<ReminderPreference> = if (failNext) {
+                Result.failure(IllegalStateException("boom"))
+            } else {
+                Result.success(ReminderPreference(enabled = true, time = LocalTime.of(21, 15)))
+            }
+
+            override suspend fun save(preference: ReminderPreference): Result<Unit> {
+                preferences.save(preference)
+                return Result.success(Unit)
+            }
+        }
+        val vm = ReminderSettingsViewModel(flaky, scheduler, FakePlans(), FakeEvents(), clock)
+        vm.load()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("无法读取提醒设置", vm.state.value.error)
+
+        failNext = false
+        vm.retry()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(null, vm.state.value.error)
+        assertTrue(vm.state.value.enabled)
+        assertEquals(LocalTime.of(21, 15), vm.state.value.time)
+        assertFalse(vm.state.value.loading)
+    }
+
+    /** 重试若再次失败，不能把 `loading` 卡在 true（否则 UI 会永远停在「正在读取」掩盖错误）。 */
+    @Test
+    fun `retry that fails again lands back on the error instead of a stuck spinner`() = runTest(dispatcher) {
+        val failing = object : ReminderPreferenceRepository by preferences {
+            override suspend fun get(): Result<ReminderPreference> = Result.failure(IllegalStateException("boom"))
+        }
+        val vm = ReminderSettingsViewModel(failing, scheduler, FakePlans(), FakeEvents(), clock)
+        vm.load()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.retry()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("无法读取提醒设置", vm.state.value.error)
+        assertFalse(vm.state.value.loading)
+    }
 }
 
 /** 测试用假仓储：域接口的最小内存实现（与 learning 模块 fake 风格一致）。 */

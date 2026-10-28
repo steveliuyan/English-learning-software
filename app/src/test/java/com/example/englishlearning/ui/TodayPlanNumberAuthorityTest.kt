@@ -57,8 +57,9 @@ import kotlin.test.fail
  *    缺锚 / 未闭合 / 形参表未闭合三条合成负控，钉住 #8/#9 的「响亮红而不是静默降级」。
  *
  * **批 1（2026-10-25 版式重做）改的是期望值，判据一条没松**：
- *  - 权威数字搬进深墨强档卡，前景墨从 `text1/text2` 换成 `onStrong`（[NeutralInk] 随之改口径——
- *    这不是放宽：强档卡上的中性墨**只有** `onStrong` 一枚，`text1` 压深底反而不可读）；
+ *  - 权威数字搬进强档卡，前景墨从 `text1/text2` 换成卡内分套墨（[NeutralInk] 随之改口径——
+ *    这不是放宽：强档卡上的中性墨只有「容器内容色 / 浅套 `text1` / 深套 `onStrong`」这一族，
+ *    2026-10-31 用户评审 ③ 起浅套卡底是 `tint2` 浅薄荷，`onStrong` 压浅底反而不可读）；
  *  - 入口组离场：本屏 `EntryRow` 恒 0、裸行恰 2，原「EntryRow ≥3」的下界换成「`BareRow` 恰 2」+「`EntryRow` 恒 0」；
  *  - 阅读文章从受解锁态约束的 M3 `Button` 降为裸行，`Button(` 计数从 1 归 0（阅读的解锁说明改由
  *    行标题与强档卡里的 `unlockReason` 承载，`today_plan_reading_status` 这枚锚不动）；
@@ -616,9 +617,11 @@ class TodayPlanNumberAuthorityTest {
         )
 
         // 谓词自检（旧有内容，保留）：缺 color 的那枚必须被中性墨谓词判红、补齐的那枚必须放过。
-        // 批 1 起本屏的中性墨是强档卡前景 `onStrong`，故合成正片段同步换墨（判据形状不变）。
+        // 2026-10-31 起本屏卡上墨有三枚合法点（容器内容色 / 浅套 text1 / 深套 onStrong），三形都要被认出。
         val uncolored = "Text(\"3/5\", style = AppType.Display, modifier = Modifier.testTag(\"probe_tag\"))"
         val colored = "Text(\"3/5\", style = AppType.Display, color = appColors().onStrong, modifier = Modifier.testTag(\"probe_tag\"))"
+        val containerInk = "Text(\"3/5\", style = AppType.Display, color = LocalContentColor.current, modifier = Modifier.testTag(\"probe_tag\"))"
+        val lightInk = "Text(\"3/5\", style = AppType.Display, color = colors.text1, modifier = Modifier.testTag(\"probe_tag\"))"
         assertEquals(1, Regex("""\bText\(""").findAll(uncolored).count(), "合成片段自检：窗口取样前提（Text 调用存在）不成立")
         assertTrue(
             !NeutralInk.containsMatchIn(uncolored.substring(3, uncolored.length - 1)),
@@ -627,6 +630,14 @@ class TodayPlanNumberAuthorityTest {
         assertTrue(
             NeutralInk.containsMatchIn(colored.substring(3, colored.length - 1)),
             "补色的合成片段不被认出 = 本类窗口谓词对正确写法也判红，判据过宽",
+        )
+        assertTrue(
+            NeutralInk.containsMatchIn(containerInk.substring(3, containerInk.length - 1)),
+            "容器内容色 `LocalContentColor.current` 不被认出 = 分套后的首选写法会被判红",
+        )
+        assertTrue(
+            NeutralInk.containsMatchIn(lightInk.substring(3, lightInk.length - 1)),
+            "浅套 `text1` 不被认出 = 浅薄荷底上的合法中性墨会被判红",
         )
         assertTrue(
             AccentInk.containsMatchIn("color = MintPrimaryDark"),
@@ -681,15 +692,43 @@ class TodayPlanNumberAuthorityTest {
         )
     }
 
+    /**
+     * 卡内墨一律归容器（2026-10-31 用户评审 ③：浅套强档卡不再是深墨实底）。
+     *
+     * 浅套卡底从 `strongSurface`（`#1F4739`）改成 `tint2`（`#E4EFE9`）之后，屏侧那十四枚写死的
+     * `colors.onStrong`（近白）压浅底等于不可读，所以**整族禁掉**，改为读 `StrongCard` 提供的
+     * `LocalContentColor`。判据形状是「旧形归零 + 新形在场」：只判后者会被「两套墨并存、实际生效的
+     * 仍是旧形」绕过；只判前者会被「墨全删了、Text 落到 M3 默认色」绕过（那在浅底上是近黑，
+     * 数值虽可读却脱离了 token 体系——同时会被上面 `the_screen_reads_only_dynamic_tokens…` 的
+     * `style =` 白名单与 [NeutralInk] 两条窗口判据判红）。
+     */
+    @Test
+    fun every_card_ink_comes_from_the_container() {
+        assertEquals(
+            0,
+            countMatches(source, Regex("""\b(?:colors|set)\.onStrong\b|appColors\(\)\.onStrong\b""")),
+            "本屏卡内墨不得再钉死 onStrong：浅套强档卡是 tint2 浅底，近白墨压它等于不可读（用户评审 ③）",
+        )
+        val containerInkReads = countMatches(source, Regex("""LocalContentColor\.current"""))
+        assertTrue(
+            containerInkReads > 0,
+            "本屏一处都没读容器内容色：强档卡的分套前景（浅 text1 / 深 onStrong）没被接上，判据会空转",
+        )
+    }
+
     private companion object {
         /**
-         * 显式中性墨读法（字面形与 `val colors = appColors()` 别名形都算）。
+         * 显式中性墨读法（字面形、`val colors = appColors()` 别名形、以及容器内容色三形都算）。
          *
-         * 批 1 起本屏的数字全部住在深墨强档卡里，卡上的中性墨**只有** `onStrong` 一枚
-         * （`text1`/`text2` 压 `strongSurface` 不可读，跨套都一样）。这是换口径，不是放宽：
-         * 同一处仍然只认「具名中性 token」，强调色由 [AccentInk] 反面钉住。
+         * 批 1 起本屏的数字全部住在强档卡里；2026-10-31 用户评审 ③ 起，浅套强档卡是 `tint2` 浅薄荷底
+         * （深套仍是 `strongSurface` 深底）。所以卡上的中性墨有两枚合法点：浅套 `text1`、深套 `onStrong`，
+         * 而屏侧的首选写法是从容器内容色取（`LocalContentColor.current`，`StrongCard` 已按主题分套提供）。
+         * 这是换口径，不是放宽：同一处仍然只认「具名中性 token / 容器内容色」，强调色由 [AccentInk] 反面钉住，
+         * 且下面 `every_card_ink_comes_from_the_container` 一条把「屏侧钉死 `onStrong`」这个旧形整族禁掉。
          */
-        val NeutralInk = Regex("""\bcolor\s*=\s*(?:appColors\(\)\.|colors\.|set\.)onStrong\b""")
+        val NeutralInk = Regex(
+            """\bcolor\s*=\s*(?:LocalContentColor\.current|(?:appColors\(\)\.|colors\.|set\.)(?:onStrong|text1))\b"""
+        )
 
         /** 任何强调色读法：`Mint*` 快捷名、静态/动态域色、以及状态色。 */
         val AccentInk = Regex("""\bcolor\s*=\s*(?:Mint\w+|AppPalette\.\w+|DomainColors\.\w+|appDomain\(|appColors\(\)\.(?:success|error|errorFill|onMint|tint\d*)|colors\.(?:success|error|errorFill|onMint))""")

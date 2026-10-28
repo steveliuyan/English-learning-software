@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  *  规则3 LearningRecordsScreen TabRow：role = Role.Tab；
  *  规则4 LicensesScreen.NoticeCard 与 ReadingHistoryScreen 组卡：
  *         stateDescription = if (expanded) "已展开" else "已收起"；
- *  规则5 AppScreen.DailyTargetCard Slider：contentDescription = "每日新词目标，当前 ${displayedTarget} 词"。
+ *  规则5 AppScreen.DailyTargetSection Slider：contentDescription = "每日新词目标，当前 ${displayedTarget} 词"。
  *  规则形状即 brief 的五个正则：它们不含任何通配段（只有 `\(`、`\{`、`\$` 转义的字面字符），
  *  故精确子串断言与正则形态等价，且更直白。
  *
@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
  *  2. 真实文件走 scanUiSources(dir)：目录缺失或零 .kt 文件立即失败——walkTopDown()
  *     对缺失路径返回空序列，禁止契约静默空扫（包名重构 / 工作目录变化防线）；
  *  3. 每个站点先断言锚点存在（fun WordBookCard( / TabSlot( / TabRow( / fun NoticeCard( /
- *     reading_history_group_ / fun DailyTargetCard(），再断言规则 offender 为空：组件被
+ *     reading_history_group_ / fun DailyTargetSection(），再断言规则 offender 为空：组件被
  *     改名或删除、semantics 块被整段搬走时，必须报「契约空转」而不是无声通过。
  *
  * 已知漏判/过判面（启发式局限，如实记录，不为未修复的面做假测试）：
@@ -82,7 +82,7 @@ class AccessibilityStateSemanticsContractTest {
     /** 规则5 纯函数：Slider 描述必须内嵌当前值模板（无值描述与写死数值都不放行）。 */
     private fun sliderValueOffenders(source: String): List<String> =
         if (stripComments(source).contains(sliderValueSemantics)) emptyList()
-        else listOf("DailyTargetCard Slider 缺 $sliderValueSemantics —— 焦点落在滑杆上念不出当前目标词数")
+        else listOf("DailyTargetSection Slider 缺 $sliderValueSemantics —— 焦点落在滑杆上念不出当前目标词数")
 
     /** 扫描范围守卫：目录与 .kt 文件必须真实存在，否则契约测试静默空扫。 */
     private fun scanUiSources(dir: File = uiDir): List<File> {
@@ -150,7 +150,7 @@ class AccessibilityStateSemanticsContractTest {
 
     @Test
     fun `wordbook card announces selected state`() {
-        assertSite("AppScreen.kt", listOf("fun WordBookCard("), ::wordBookSelectedStateOffenders)
+        assertSite("AppScreen.kt", listOf("fun WordBookTile("), ::wordBookSelectedStateOffenders)
     }
 
     @Test
@@ -183,7 +183,9 @@ class AccessibilityStateSemanticsContractTest {
 
     @Test
     fun `daily target slider description embeds current value`() {
-        assertSite("AppScreen.kt", listOf("fun DailyTargetCard(", "每日新词目标"), ::sliderValueOffenders)
+        // 批 2 Task 6：`DailyTargetCard` 撤卡壳后改名 `DailyTargetSection`，锚点随实现改，
+        // 判据本身不变——仍要求 Slider 的 contentDescription 内嵌当前词数。
+        assertSite("AppScreen.kt", listOf("fun DailyTargetSection(", "每日新词目标"), ::sliderValueOffenders)
     }
 
     @Test

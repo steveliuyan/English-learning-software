@@ -142,10 +142,12 @@ class MaterialThemeAssemblyContractTest {
     )
 
     /**
-     * 唯一按模式分叉的取值：`errorFill` 浅套是深红、深套是浅红，字形极性相反，
-     * 所以浅套取 `text1`、深套取 `background`（顺序即 light to dark）。
+     * 唯一按模式分叉的取值：`errorFill` 浅套是饱和红、深套是浅红，字形极性相反，
+     * 所以浅套取 `onBrand`、深套取 `background`（顺序即 light to dark）。
+     * 浅套 2026-10-27 从 `text1` 换成 `onBrand`：轻松档 `text1` 抬到 #1F2B26 后压 #FF3B30 只剩 4.13，
+     * `onBrand`（#04241C）压同一底 4.65 才过 4.5；两枚都是深墨，换的是 token 名不是极性。
      */
-    private val onErrorContainerInk: Pair<String, String> = "set.text1" to "set.background"
+    private val onErrorContainerInk: Pair<String, String> = "set.onBrand" to "set.background"
 
     /** 某一主题下「角色 → 取色表达式」的完整表（35 项，与 material3 1.4.0 的 builder 必传子集对齐）。 */
     private fun colorSchemeExpressions(dark: Boolean): Map<String, String> = colorSchemeSharedExpressions +
@@ -712,6 +714,17 @@ class MaterialThemeAssemblyContractTest {
         // 必须判它不合格——否则说明亮度公式或 4.5 阈值本身失效。
         val r = ratio(AppColorDark.text1, AppColorDark.errorFill)
         assertTrue(r < 4.5, "合成负例失效：深套浅墨压 error-fill 实测 %.2f:1 竟已过正文阈值（公式或阈值错了）".format(r))
+        // 第二枚诱饵钉浅套那次换墨的理由：`text1` 压浅套 errorFill 必须仍不合格，
+        // 否则「浅套 onErrorContainer 取 onBrand」就成了没有理由的偏好（改回 text1 也测不出）。
+        val lightText1 = ratio(AppColorLight.text1, AppColorLight.errorFill)
+        assertTrue(
+            lightText1 < 4.5,
+            "裁决依据失效：浅套 text1 压 errorFill 实测 %.2f:1 已过 4.5，onErrorContainer 可以从 onBrand 改回 text1".format(lightText1),
+        )
+        assertTrue(
+            ratio(AppColorLight.onBrand, AppColorLight.errorFill) >= 4.5,
+            "浅套 onBrand 压 errorFill 不足 4.5：装配点换墨后仍不达 AA 正文下限",
+        )
     }
 
     @Test

@@ -42,9 +42,10 @@ class AiProfileSettingsScreenTest {
         onDraftChange: (AiProfileDraft) -> Unit = {},
         onSave: () -> Unit = {},
         onCloseEditor: () -> Unit = {},
-        onDeleteProfile: (String) -> Unit = {},
-        onDeleteKey: (String) -> Unit = {},
+        onRequestDeleteProfile: (String) -> Unit = {},
+        onRequestDeleteKey: (String) -> Unit = {},
         onSetDefaultTextProfile: (String) -> Unit = {},
+        onSetDefaultImageProfile: (String) -> Unit = {},
         onBack: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -56,9 +57,10 @@ class AiProfileSettingsScreenTest {
                 onDraftChange = onDraftChange,
                 onSave = onSave,
                 onCloseEditor = onCloseEditor,
-                onDeleteProfile = onDeleteProfile,
-                onDeleteKey = onDeleteKey,
+                onRequestDeleteProfile = onRequestDeleteProfile,
+                onRequestDeleteKey = onRequestDeleteKey,
                 onSetDefaultTextProfile = onSetDefaultTextProfile,
+                onSetDefaultImageProfile = onSetDefaultImageProfile,
                 onBack = onBack,
             )
         }
@@ -167,20 +169,25 @@ class AiProfileSettingsScreenTest {
         var backs = 0
         setScreen(onBack = { backs++ })
 
-        composeRule.onNodeWithText("← 返回上一层").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("返回").assertHasClickAction().performClick()
         composeRule.waitForIdle()
 
         assertEquals(1, backs)
     }
 
     /**
-     * 这一层也能从「AI 学」功能页直达，那时底部选中的是 AI 学栏而不是设置栏，所以返回按钮不能
+     * 这一层也能从「AI 学」功能页直达，那时底部选中的是 AI 学栏而不是设置栏，所以返回位不能
      * 写死「返回设置」——那会让用户以为要回设置，实际回到了 AI 学。
+     *
+     * 批 4 Task 3：旧的「← 返回上一层」文字药片下线，返回位归共享 `AppScreenHeader`（`app_screen_header`
+     * 标签 + 可及名「返回」），两枚旧文案必须都不在树上。
      */
-    @Test fun back_label_does_not_claim_a_specific_tab() {
+    @Test fun back_goes_through_the_shared_header_without_claiming_a_tab() {
         setScreen()
 
-        composeRule.onNodeWithText("← 返回上一层").assertExists()
+        composeRule.onNodeWithTag("app_screen_header").assertExists()
+        composeRule.onNodeWithContentDescription("返回").assertExists()
+        composeRule.onNodeWithText("← 返回上一层").assertDoesNotExist()
         composeRule.onNodeWithText("← 返回设置").assertDoesNotExist()
     }
 
@@ -244,8 +251,8 @@ class AiProfileSettingsScreenTest {
                 },
                 onSave = {},
                 onCloseEditor = {},
-                onDeleteProfile = {},
-                onDeleteKey = {},
+                onRequestDeleteProfile = {},
+                onRequestDeleteKey = {},
                 onBack = {},
             )
         }
@@ -270,7 +277,8 @@ class AiProfileSettingsScreenTest {
         var saves = 0
         setScreen(editor = editorState(), onSave = { saves++ })
 
-        composeRule.onNodeWithTag("ai_profile_save").performScrollTo().performClick()
+        // 批 4 Task 3：保存条吸底，不再在滚动面里，所以不能再 `performScrollTo()`（没有可滚祖先）。
+        composeRule.onNodeWithTag("ai_profile_save").assertHasClickAction().performClick()
         composeRule.waitForIdle()
 
         assertEquals(1, saves)
@@ -281,6 +289,33 @@ class AiProfileSettingsScreenTest {
         setScreen(editor = editorState(profileId = "p1"))
 
         composeRule.onNodeWithTag("ai_profile_delete").performScrollTo().assertExists().assertHasClickAction()
+    }
+
+    /**
+     * 批 4 Task 3：清除密钥与删除配置都是不可逆动作，**屏内零对话框**——两枚按钮只把请求交给宿主
+     * `AppScreen`，由宿主的 `ConfirmDestructiveDialog` 统一确认（`AppScreenOverlayContainerContractTest`
+     * 的守卫站点与 `AiProfileLayoutContractTest` 同批钉住）。这里钉住「点了只发请求、自己不执行、
+     * 也不自己弹框」。
+     */
+    @Test fun destructive_actions_only_report_requests_and_never_open_a_dialog_in_screen() {
+        var deleted: String? = null
+        var cleared: String? = null
+        setScreen(
+            editor = editorState(profileId = "p1"),
+            onRequestDeleteProfile = { deleted = it },
+            onRequestDeleteKey = { cleared = it },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_key_clear").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals("p1", cleared)
+
+        composeRule.onNodeWithTag("ai_profile_delete").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals("p1", deleted)
+
+        composeRule.onNodeWithTag("confirm_destructive_confirm").assertDoesNotExist()
+        composeRule.onNodeWithTag("confirm_destructive_dismiss").assertDoesNotExist()
     }
 
     /** 新建时不该出现「删除这套配置」——还没有东西可删。 */
@@ -295,7 +330,7 @@ class AiProfileSettingsScreenTest {
         setScreen(editor = editorState().copy(saving = true))
 
         composeRule.onNodeWithText("保存中…").assertExists()
-        composeRule.onNodeWithTag("ai_profile_save").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithTag("ai_profile_save").assertIsNotEnabled()
     }
 
     /**

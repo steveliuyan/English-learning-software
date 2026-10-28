@@ -389,15 +389,21 @@ class SharedComponentGeometryContractTest {
      */
     @Test
     fun icon_badge_weak_tone_backdrop_recipe_is_pinned_to_source() {
-        val source = uiComponentSource(ICON_BADGE)
+        // **2026-10-31（用户评审 ①）取样范围收窄**：行内徽标加了 `backdrop` 开关后，同一枚配方在文件里
+        // 出现了两处（入口弱档 + 行内开关支）。本锚守的是**入口弱档**那一处（对比表复算的底就是它），
+        // 所以先把行内段切掉再数；行内那处的底由 `AppBottomBarContrastTest`（`background(appColors().tint)`
+        // 必须在 `InlineIconBadge` 体内）与 `AppIllustrationContractTest`（受 `backdrop` 真控制）各自钉住。
+        // 退役混色的禁形仍按**整份文件**数（禁形不因取样收窄而缩水）。
+        val file = uiComponentSource(ICON_BADGE)
+        val source = file.substringBefore("fun InlineIconBadge(")
         assertEquals(
             1,
             countMatches(source, weakToneRecipe),
-            "弱档底色必须恰一处 Modifier.background(appColors().tint)（裁决 22-2：共享 tint 令牌，域色只染字形）",
+            "入口弱档底色必须恰一处 Modifier.background(appColors().tint)（裁决 22-2：共享 tint 令牌，域色只染字形）",
         )
         assertEquals(
             0,
-            countMatches(source, weakToneRetiredMix),
+            countMatches(file, weakToneRetiredMix),
             "弱档仍在按域混色（裁决 22-2 已退役「surface 混 deep」：同屏九块彩色容器就是它）",
         )
 

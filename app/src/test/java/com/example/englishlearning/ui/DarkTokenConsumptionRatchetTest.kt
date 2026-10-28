@@ -76,7 +76,6 @@ internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
     // 蒙版族（GlassHighlight / Scrim）：压在图片或玻璃面板上，深浅两套同值都合法，
     // 逐文件理由见 [ThemeInvariantMaskReadLedger]。
     "components/glass/GlassOverlay.kt" to 2,
-    "AiProfileSettingsScreen.kt" to 1,
     "components/glass/GlassDialog.kt" to 1,
     "SpeechSettingsScreen.kt" to 1,
     "components/IconBadge.kt" to 1,
@@ -152,7 +151,6 @@ internal val GlassFillBackdropDebtLedger: Map<String, String> = emptyMap()
  */
 internal val ThemeInvariantMaskReadLedger: Map<String, Int> = mapOf(
     "components/glass/GlassOverlay.kt" to 2,
-    "AiProfileSettingsScreen.kt" to 1,
     "components/glass/GlassDialog.kt" to 1,
     "SpeechSettingsScreen.kt" to 1,
     "components/IconBadge.kt" to 1,

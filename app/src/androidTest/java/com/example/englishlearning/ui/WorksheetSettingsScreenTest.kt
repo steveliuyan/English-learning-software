@@ -4,10 +4,12 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.worksheet.WorksheetDirection
 import com.example.englishlearning.learning.worksheet.WorksheetSettings
 import com.example.englishlearning.learning.worksheet.WorksheetTemplate
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,11 +39,15 @@ class WorksheetSettingsScreenTest {
     }
 
     /**
-     * 入口从已删除的「学习工具」页搬到了「设置」栏，返回按钮的文案必须跟着走；留着旧文案
-     * 会让用户以为要回到一个不存在的页面。
+     * 返回位改由共享页头承载（批 2 Task 4 / spec §3 页头族）：页头的返回位自带
+     * `contentDescription = "返回"` 与 48dp 可点区，「回到设置栏」这条**去向**不再写在按钮文案里。
+     *
+     * 判据不降级：仍要求「页头上有一枚可点的返回键」，并且旧文案（含那张已删除的
+     * 「学习工具」页）一个都不许再出现——少了一半就红。
      */
     @Test
-    fun backEntryNamesTheSettingsTabItActuallyReturnsTo() {
+    fun backEntryIsTheSharedHeaderBackAffordance() {
+        var backs = 0
         composeRule.setContent {
             WorksheetSettingsScreen(
                 settings = WorksheetSettings(),
@@ -50,11 +56,14 @@ class WorksheetSettingsScreenTest {
                 onToggleGrid = {},
                 onToggleAnswers = {},
                 onPreview = {},
-                onBack = {},
+                onBack = { backs++ },
             )
         }
 
-        composeRule.onNodeWithContentDescription("返回设置").assertExists().assertHasClickAction()
+        composeRule.onNodeWithTag("app_screen_header").assertExists()
+        composeRule.onNodeWithContentDescription("返回").assertExists().assertHasClickAction().performClick()
+        assertEquals(1, backs)
+        composeRule.onNodeWithContentDescription("返回设置").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("返回学习工具").assertDoesNotExist()
     }
 

@@ -16,11 +16,11 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * 批 1 Task 6 契约：`AppIcons.kt` 里 B 案图标的两层结构与「零 AndroidX material-icons」。
+ * 批 1 Task 6 契约：`AppIcons.kt` 里 B 案图标的三层结构与「零 AndroidX material-icons」。
  *
  * 口径沿用 Task 2/3/4（`DesignTokenContractTest` / `MintTokenIsComposableContractTest` /
  * `MaterialThemeAssemblyContractTest`）：
- *  - 「源码文本即契约」：枚数与顺序、两层结构、豁免表、路径字符集都读 `src/main/java` 文本，
+ *  - 「源码文本即契约」：枚数与顺序、三层结构、豁免表、路径字符集都读 `src/main/java` 文本，
  *    本测试不在 JVM 侧渲染 Compose；
  *  - 唯一的例外是有意的缝（修复轮 I-1）：`every enum entry resolves to a spec…` 直接引用
  *    `AppIcon` / `AppIcons.all` 符号，钉的是「路径表键集 == 枚举全集」这条运行时真相——
@@ -50,7 +50,7 @@ class AppIconsStructureContractTest {
         "Bell", "Shield", "Warning", "Trash", "Upload", "Download",
     )
 
-    /** 两层豁免表：这五枚只有描边骨架，不得建填充层，也不得进入 `EntryIconBadge` 一族的域渐变入口容器（页头 `.back` 的 surface 容器除外）。 */
+    /** 三层结构豁免表：这五枚只有描边骨架，不得建填充层，也不得进入 `EntryIconBadge` 一族的域渐变入口容器（页头 `.back` 的 surface 容器除外）。 */
     private val expectedStrokeOnly = setOf("Back", "ChevronRight", "ChevronDown", "Close", "Check")
 
     // ---------- 规则形状 ----------
@@ -201,18 +201,18 @@ class AppIconsStructureContractTest {
         assertTrue(diffs.isEmpty(), "$label 与决策清单不符：$diffs（期望 ${expected.size} 项，实到 ${actual.size} 项）")
     }
 
-    /** 两层口径的纯函数：豁免枚必须零填充、其余必须至少一条填充；返回违规描述（空表 = 合规）。 */
+    /** 三层口径的纯函数：豁免枚必须零填充、其余必须至少一条填充；返回违规描述（空表 = 合规）。 */
     private fun layerViolations(specs: Map<String, String>, exempt: Set<String>): List<String> {
         val offenders = mutableListOf<String>()
         specs.forEach { (name, block) ->
             val stroke = fieldPaths(block, "strokePaths")
             val fill = fieldPaths(block, "fillPaths")
             if (stroke == null || stroke.isEmpty()) offenders += "$name 缺 strokePaths 或为空：描边骨架是 B 案的必要层"
-            if (fill == null) offenders += "$name 缺 fillPaths 字段：两层口径不能靠省略字段表达"
+            if (fill == null) offenders += "$name 缺 fillPaths 字段：三层口径不能靠省略字段表达"
             else if (name in exempt && fill.isNotEmpty()) {
-                offenders += "$name 在豁免表里却带 ${fill.size} 条填充层：「两层」口径变成含糊"
+                offenders += "$name 在豁免表里却带 ${fill.size} 条填充层：「三层」口径变成含糊"
             } else if (name !in exempt && fill.isEmpty()) {
-                offenders += "$name 不在豁免表里却没有填充层：B 案要求除豁免表外每枚两层"
+                offenders += "$name 不在豁免表里却没有填充层：B 案要求除豁免表外每枚三层"
             }
         }
         return offenders
@@ -301,13 +301,13 @@ class AppIconsStructureContractTest {
         return PathParser().parsePathString(expanded).toNodes().count { it !is PathNode.Close }
     }
 
-    /** 「逐枚清单」到「两层豁免表」之间的小节文本；任一锚点缺失返回 null。 */
+    /** 「逐枚清单」到「三层结构豁免表」之间的小节文本；任一锚点缺失返回 null。 */
     private fun iconListSection(raw: String): String? {
         if (!raw.contains(LIST_HEADING) || !raw.contains(EXEMPT_HEADING)) return null
         return raw.substringAfter(LIST_HEADING).substringBefore(EXEMPT_HEADING)
     }
 
-    /** 小节内的编号行 `序号. \`名字\` — 用途｜两层列`，按序号排序。 */
+    /** 小节内的编号行 `序号. \`名字\` — 用途｜三层列`，按序号排序。 */
     private fun iconListEntries(section: String): List<ListedGlyph> =
         iconListLine.findAll(section)
             .map { ListedGlyph(it.groupValues[1].toIntOrNull() ?: 0, it.groupValues[2], it.groupValues[3]) }
@@ -316,9 +316,9 @@ class AppIconsStructureContractTest {
 
     /**
      * 层列形状判据（批 1 终审 m1）：每枚编号行都必须带「｜<层列取值>」，取值只有两种合法词表——
-     * `两层`（精确相等）或以 `豁免` 起头（现状写作 `豁免（描边only）`）。
+     * `三层`（精确相等）或以 `豁免` 起头（现状写作 `豁免（描边only）`）。
      * 存在的理由：补一枚字形时忘写层列、或把层列写成第三种说法（单层 / 仅描边 / stroke-only…），
-     * 「两层豁免表」与 `StrokeOnlyIcons` 的同源比对是**之后**才发生的，那种漂移会让豁免口径先隐形一轮；
+     * 「三层结构豁免表」与 `StrokeOnlyIcons` 的同源比对是**之后**才发生的，那种漂移会让豁免口径先隐形一轮；
      * 本判据在形状层就把它挡住。返回违规行描述，空 = 全部合规。
      */
     private fun layerColumnViolations(listed: List<ListedGlyph>): List<String> = listed.mapNotNull { glyph ->
@@ -327,8 +327,8 @@ class AppIconsStructureContractTest {
         when {
             !tail.contains('｜') -> "${glyph.index}. `${glyph.name}`：整行没有「｜层列」（$tail）"
             value.isEmpty() -> "${glyph.index}. `${glyph.name}`：层列为空（$tail）"
-            value == "两层" || value.startsWith("豁免") -> null
-            else -> "${glyph.index}. `${glyph.name}`：层列取值「$value」不在词表（两层 / 豁免…）"
+            value == "三层" || value.startsWith("豁免") -> null
+            else -> "${glyph.index}. `${glyph.name}`：层列取值「$value」不在词表（三层 / 豁免…）"
         }
     }
 
@@ -436,7 +436,7 @@ class AppIconsStructureContractTest {
         assertEquals(null, enumEntries("val somethingElse = 1"), "没有枚举声明时解析必须给 null（否则断言空转）")
     }
 
-    // ---------- 用例：两层结构与豁免双向（brief Step 1 断言 2） ----------
+    // ---------- 用例：三层结构与豁免双向（brief Step 1 断言 2） ----------
 
     @Test
     fun `every glyph outside the exemption table carries a fill layer and every exemption stays bare`() {
@@ -452,13 +452,13 @@ class AppIconsStructureContractTest {
         assertEquals(
             emptyList(),
             layerViolations(specs, exempt ?: emptySet()),
-            "两层结构与豁免表对不上（逐条违规见上）",
+            "三层结构与豁免表对不上（逐条违规见上）",
         )
     }
 
     @Test
     fun `the two-layer rules are not vacuous`() {
-        // 合成正片段：豁免枚裸描边 + 非豁免枚两层，必须判合规。
+        // 合成正片段：豁免枚裸描边 + 非豁免枚三层，必须判合规。
         val good = """
             AppIconSpec(
                 name = "Back",
@@ -476,7 +476,7 @@ class AppIconsStructureContractTest {
         assertEquals(
             emptyList(),
             layerViolations(goodSpecs, setOf("Back")),
-            "合成正片段被误判：合规的「裸描边 + 两层」组合被判违规",
+            "合成正片段被误判：合规的「裸描边 + 三层」组合被判违规",
         )
 
         // 合成负例 1：豁免枚（Back）偷偷带上填充层。
@@ -488,7 +488,7 @@ class AppIconsStructureContractTest {
             )
         """.trimIndent()
         assertEquals(
-            listOf("Back 在豁免表里却带 1 条填充层：「两层」口径变成含糊"),
+            listOf("Back 在豁免表里却带 1 条填充层：「三层」口径变成含糊"),
             layerViolations(specBlocks(exemptWithFill), setOf("Back")),
             "合成负例被放行：豁免表内出现填充层没被抓住",
         )
@@ -502,7 +502,7 @@ class AppIconsStructureContractTest {
             )
         """.trimIndent()
         assertEquals(
-            listOf("Search 不在豁免表里却没有填充层：B 案要求除豁免表外每枚两层"),
+            listOf("Search 不在豁免表里却没有填充层：B 案要求除豁免表外每枚三层"),
             layerViolations(specBlocks(singleLayer), setOf("Back")),
             "合成负例被放行：非豁免枚单层没被抓住",
         )
@@ -713,25 +713,25 @@ class AppIconsStructureContractTest {
         // m1（批 1 终审 Seat D）：这里原来是一条 `listed.forEach { assertContains(raw, "`${it.name}`") }`
         // 的**恒真**子断言——`listed` 正是从这段 raw 解析出来的，枚名当然在 raw 里，生产怎么漂它都绿。
         // 换成有牙齿的形状判据：每枚都必须带「｜<层列取值>」，且取值只能落在两种词表里
-        // （`两层` / `豁免…`）。有人补一枚却忘写层列、或把层列写成第三种说法（单层 / 仅描边 / stroke-only…），
+        // （`三层` / `豁免…`）。有人补一枚却忘写层列、或把层列写成第三种说法（单层 / 仅描边 / stroke-only…），
         // 本条当场红；判据本体是纯函数 [layerColumnViolations]，由「parser is not vacuous」用例给合成正/负片段。
         assertEquals(
             emptyList(),
             layerColumnViolations(listed),
-            "逐枚清单里有行缺「｜两层列」或层列取值不在词表（两层 / 豁免…）内",
+            "逐枚清单里有行缺「｜三层列」或层列取值不在词表（三层 / 豁免…）内",
         )
 
-        // 「两层」列必须与代码里的豁免表同源：注释说豁免、代码带填充（或反之）都判红。
+        // 「三层」列必须与代码里的豁免表同源：注释说豁免、代码带填充（或反之）都判红。
         val claimedExempt = listed.filter { it.layerColumn.contains("豁免") }.map { it.name }.toSet()
         assertEquals(
             expectedStrokeOnly,
             claimedExempt,
-            "逐枚清单的「两层」列与决策文档豁免表不一致：注释自称的豁免枚是 $claimedExempt",
+            "逐枚清单的「三层」列与决策文档豁免表不一致：注释自称的豁免枚是 $claimedExempt",
         )
         assertEquals(
             claimedExempt,
             strokeOnlyLiterals(codeText()),
-            "逐枚清单的「两层」列与 StrokeOnlyIcons 不一致：豁免口径成了两处真值",
+            "逐枚清单的「三层」列与 StrokeOnlyIcons 不一致：豁免口径成了两处真值",
         )
     }
 
@@ -741,8 +741,8 @@ class AppIconsStructureContractTest {
               逐枚清单
               ---------
               1. `Back` — 返回键｜豁免（描边only）
-              2. `Search` — 查词入口｜两层
-              两层豁免表
+              2. `Search` — 查词入口｜三层
+              三层结构豁免表
         """.trimIndent()
         val section = iconListSection(good) ?: error("合成片段解析失败：小节定位不到")
         val parsed = iconListEntries(section)
@@ -750,12 +750,12 @@ class AppIconsStructureContractTest {
         assertEquals(
             setOf("Back"),
             parsed.filter { it.layerColumn.contains("豁免") }.map { it.name }.toSet(),
-            "合成正片段失效：「两层」列里的豁免标记没被读出来",
+            "合成正片段失效：「三层」列里的豁免标记没被读出来",
         )
 
         // 合成负例：清单少一枚（漏掉 Search）——同一条规则必须给出可比的差异。
         val incomplete = iconListEntries(
-            iconListSection("  逐枚清单\n  1. `Back` — 返回键｜豁免（描边only）\n  两层豁免表")
+            iconListSection("  逐枚清单\n  1. `Back` — 返回键｜豁免（描边only）\n  三层结构豁免表")
                 ?: error("合成片段解析失败：缺枚小节定位不到")
         )
         assertEquals(
@@ -769,7 +769,7 @@ class AppIconsStructureContractTest {
         assertEquals(
             emptyList(),
             layerColumnViolations(parsed),
-            "m1 合成正片段失效：合规的「｜两层」「｜豁免（描边only）」两种取值被判成违规",
+            "m1 合成正片段失效：合规的「｜三层」「｜豁免（描边only）」两种取值被判成违规",
         )
         val driftedSection = """
               逐枚清单
@@ -778,13 +778,13 @@ class AppIconsStructureContractTest {
               2. `Search` — 查词入口
               3. `Star` — 通用｜仅描边
               4. `Bell` — 提醒行｜
-              两层豁免表
+              三层结构豁免表
         """.trimIndent()
         val drifted = iconListEntries(iconListSection(driftedSection) ?: error("m1 合成负片段小节定位不到"))
         assertEquals(
             listOf(
                 "2. `Search`：整行没有「｜层列」（ — 查词入口）",
-                "3. `Star`：层列取值「仅描边」不在词表（两层 / 豁免…）",
+                "3. `Star`：层列取值「仅描边」不在词表（三层 / 豁免…）",
                 "4. `Bell`：层列为空（ — 提醒行｜）",
             ),
             layerColumnViolations(drifted),
@@ -926,12 +926,12 @@ class AppIconsStructureContractTest {
         const val APP_ICONS_NAME = "AppIcons.kt"
         const val ICONS_LOCATION_SEGMENT = "/ui/components/"
         const val LIST_HEADING = "逐枚清单"
-        const val EXEMPT_HEADING = "两层豁免表"
+        const val EXEMPT_HEADING = "三层结构豁免表"
 
-        /** 编号行：`序号. \`字形名\` — 用途（落点）｜两层列`。 */
+        /** 编号行：`序号. \`字形名\` — 用途（落点）｜三层列`。 */
         val iconListLine = Regex("""^\s*\**\s*(\d+)\.\s+`([A-Za-z]+)`(.*)$""", RegexOption.MULTILINE)
     }
 }
 
-/** 逐枚清单里的一行：序号、字形名、「两层」列文本。 */
+/** 逐枚清单里的一行：序号、字形名、「三层」列文本。 */
 private data class ListedGlyph(val index: Int, val name: String, val layerColumn: String)

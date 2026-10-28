@@ -100,8 +100,8 @@ class WordBookCardProgressContractTest {
     fun `word count comes from the book and never from progress`() {
         val source = sourceOf("AppScreen.kt")
         assertTrue(
-            stripComments(source).contains("fun WordBookCard("),
-            "AppScreen.kt 找不到锚点 \"fun WordBookCard(\"：契约空转（组件被改名/删除必须显式失败）",
+            stripComments(source).contains("fun WordBookTile("),
+            "AppScreen.kt 找不到锚点 \"fun WordBookTile(\"：契约空转（组件被改名/删除必须显式失败）",
         )
         val found = wordCountOffenders(source)
         assertTrue(found.isEmpty(), "AppScreen.kt:\n${found.joinToString("\n")}")

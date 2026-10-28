@@ -46,18 +46,28 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 批 2 终审修复席 B 的**配对像素**取证（task-18fix-b）：三块玻璃面板的容器与面板内前景必须同时来自
- * 当前那一套主题 token，且浅色侧逐值不变。
+ * 批 2 终审修复席 B 的**配对像素**取证（task-18fix-b）：面板的容器与面板内前景必须同时来自
+ * 当前那一套主题 token，且浅色侧逐值不变（② 的容器批 4 已换成不透明 `surface`，见下条说明）。
  *
  * 为什么必须上真机像素：JVM 侧 `GlassPanelInkPairingContractTest` 只能钉源码形状（容器恰一处
  * `appColors().surfaceGlass`、面板内每一枚排印点带显式主题墨），钉不出组合期真的取到了本套的色。
  * 「容器迁了、墨没迁」在深色档正是批 2 终审 B 席 C-1 那条「亮墨压白玻璃」（实测 ≈2.18:1）的形状。
  *
- * 三块面板 = `GlassFillBackdropDebtLedger` 里本席迁走的三行：
+ * 三块面板 = `GlassFillBackdropDebtLedger` 里本席迁走的三行（② 批 4 已不在玻璃台账内）：
  *  ① `GlassOverlay` 浮层面板（消费者：`AiProfileSettingsScreen` 音色浮层，选项行 `VoiceOverlayOption`）；
- *  ② `AiProfileSettingsScreen` 的 `SectionCard`（含台账点名的 `CapabilityToggle`）；
+ *  ② `AiProfileSettingsScreen` 的配置卡（**批 4 Task 3 起是不透明 `SoftCard`**，仍含台账点名的 `CapabilityToggle`）；
  *  ③ `SpeechSettingsScreen` 的 `PreviewCard`（试听卡）。
- * 每块浅/深各一例，另加 `CapabilityToggle` 一例与 C-1 那枚 `PillStyle.Text` 药片的**当场现算**一例。
+ * ①③ 各浅/深一例走玻璃合成口径，② 浅/深各一例走不透明 `surface` 口径，另加 `CapabilityToggle` 一例
+ * 与 C-1 那枚 `PillStyle.Text` 药片的**当场现算**一例。
+ *
+ * **批 4 Task 3 改动（② 换底，判据不收窄）**：`AiProfileSettingsScreen` 整屏重写，旧玻璃分节卡
+ * `SectionCard` 下线，编辑页改三枚**不透明** `SoftCard`（`appColors().surface`，不描边）。所以：
+ *  - JVM 侧该面板已从 `GlassPanelInkPairingContractTest.migratedPanels` 撤登记（那里只登记仍在用
+ *    玻璃容器的面板），玻璃填充债务台账也归零；
+ *  - 本类的 ② 三例保留，但期望容器从「`surfaceGlass` 压页底合成」改成**不透明 `surface` 本身**；
+ *    卡内取样带仍在左侧那 12–17dp 空白里，墨核、正文 AA 闸、反空转守卫一条都没放宽；
+ *  - `CapabilityToggle` 与 C-1 药片的「脚下那层」同步从玻璃换成 `surface`（药片底色是卡底，不是玻璃），
+ *    12% 域色选中档也改成压在不透明卡底上复查。
  *
  * 取样口径五条：
  *  - **整屏截图 + 语义节点 bounds 定位**：`onRoot().captureToImage()` 给的是**已合成**的屏幕像素，
@@ -69,11 +79,13 @@ import org.junit.runner.RunWith
  *    剩下的字身核心才是众数。取样前必须把节点 `performScrollTo()` 进视口：两块屏都是整列 `verticalScroll`，
  *    视口外节点的 `captureToImage` 区域宽/高为 0，`Bitmap.createBitmap` 直接抛。
  *  - **期望值走 alpha 合成**：`surfaceGlass` 浅 `0xEF` / 深 `0xE6` 都是半透明，直接比 token 原值必然差一整档；
- *    用例内先 src-over 把玻璃与它脚下的实底合成，再比（逐通道 sRGB，与绘制一致）。
+ *    用例内先 src-over 把玻璃与它脚下的实底合成，再比（逐通道 sRGB，与绘制一致）。不透明的 `surface`
+ *    合成后就是它自己，同一套比对口径照旧适用。
  *  - **反向判据**：本套墨还得离**另一套**那档墨足够远，否则「浅套常量写死」在深色档可能因两档近似而蒙过。
- *  - **浅色侧不变量**：浅档用例的期望值取**迁移前那两枚静态常量**（`AppPalette.GlassFill` /
+ *  - **浅色侧不变量**：浅档玻璃用例的期望值取**迁移前那两枚静态常量**（`AppPalette.GlassFill` /
  *    `DomainColors.AiSpeech.deep` / `AppPalette.TextPrimary` / `TextSecondary`），并在断言前先钉住
- *    「浅套 token 与之逐字相等」——浅档像素用例改完仍绿就是浅色侧零变化的硬证据。
+ *    「浅套 token 与之逐字相等」——浅档像素用例改完仍绿就是浅色侧零变化的硬证据。②（批 4 换底的
+ *    不透明卡）不在这一条里：它的浅档期望是套内 `surface`，浅色观感从 #FEFFFE 变成 #FFFFFF。
  *
  * 每个方法只调一次 `setContent`（同方法两次真机必崩，Task 9 实测）；浮层用例先点开下拉再取样
  * （`GlassOverlay` 在 `visible=false` 时不组合任何内容）。本类不碰 SAF、不做点击动作断言。
@@ -82,66 +94,82 @@ import org.junit.runner.RunWith
 class GlassPanelThemeInkTest {
     @get:Rule val composeRule = createComposeRule()
 
-    // ---------- ② AI 配置卡 SectionCard ----------
+    // ---------- ② AI 配置卡（批 4 Task 3：玻璃 SectionCard → 不透明 SoftCard） ----------
 
     @Test
-    fun the_light_section_card_still_paints_the_pre_migration_glass_and_ink() {
+    fun the_light_profile_card_paints_the_opaque_theme_surface_and_theme_ink() {
         assertLightTokensEqualThePreMigrationStatics()
         setEditor(ThemeMode.Light)
-        scrollToTag(SECTION_CARD_INK_TAG)
-        val glass = modeOf(bandLeftOfTag(SECTION_CARD_INK_TAG, CARD_BAND_INSET_DP, CARD_BAND_WIDTH_DP))
-        val ink = inkOfTag(SECTION_CARD_INK_TAG, glass)
-        assertGlassIs("SectionCard 容器（浅）", glass, AppPalette.GlassFill, AppColorLight.background)
+        scrollToTag(PROFILE_CARD_INK_TAG)
+        val card = modeOf(bandLeftOfTag(PROFILE_CARD_INK_TAG, CARD_BAND_INSET_DP, CARD_BAND_WIDTH_DP))
+        val ink = inkOfTag(PROFILE_CARD_INK_TAG, card)
+        // 批 4 Task 3：容器从「玻璃 `SectionCard`」换成共享不透明 `SoftCard`，期望值随之落回套内 `surface`。
+        // 浅套 `surface` = #FFFFFF（旧玻璃压页底的合成实底是 #FEFFFE，逐通道差 1 档，属观感上的白底不变）。
+        assertGlassIs("AI 配置软卡容器（浅，不透明 surface）", card, AppColorLight.surface, AppColorLight.background)
         // 批 2 终审修复席 C-1（控制者裁决）：密钥态那行 `style = AppType.Body` 是正文档，本腿由
         // 「装饰档 3.1 放行」归位到 [BODY_AA_RATIO]。生产行按 `AppBottomBar.kt:95` 的形状按套钉死后，
-        // 浅套这枚墨是 `AppColorLight.onMint`（#174C44，压本底 9.727:1，本席现算）；玻璃容器腿仍与迁移前逐值相同，
-        // 浅套侧观感变化只剩前景这一枚（薄荷绿墨→深墨），已列入 18-ii 用户目检。
-        assertInkIs("SectionCard 密钥态墨（浅，套内 onMint）", ink, AppColorLight.onMint)
-        assertInkIsFarFromTheOtherSet("SectionCard 密钥态墨（浅）", ink, DomainColors.AiSpeech.deep)
-        assertContrastAtLeast("浅套密钥态正文墨压浅玻璃（Body = 正文档，阈值 4.5）", ink, glass, BODY_AA_RATIO)
-        // 反空转：修复前那枚浅套域色墨（#188F76，现算 4.006:1）喂进同一条 4.5 闸必须不合格——
+        // 浅套这枚墨是 `AppColorLight.onMint`（#174C44，压白底 = 10.9:1，本席现算）；浅套侧观感变化
+        // 只剩前景这一枚（薄荷绿墨→深墨），已列入 18-ii 用户目检。
+        assertInkIs("AI 配置卡密钥态墨（浅，套内 onMint）", ink, AppColorLight.onMint)
+        assertInkIsFarFromTheOtherSet("AI 配置卡密钥态墨（浅）", ink, DomainColors.AiSpeech.deep)
+        assertContrastAtLeast("浅套密钥态正文墨压不透明卡底（Body = 正文档，阈值 4.5）", ink, card, BODY_AA_RATIO)
+        // 反空转：修复前那枚浅套域色墨（**历史字面量** #188F76，压白底现算 4.01:1）喂进同一条 4.5 闸必须不合格——
         // 它若 ≥4.5，说明本行的 4.5 闸没有对象或阈值被写宽，归位裁决须重议。
-        val preFixInk = DomainColors.AiSpeech.deep.toArgb()
-        val preFixRatio = contrastRatio(preFixInk, glass)
+        // 这枚墨必须写死成当年的字面量，**不能**改读 `DomainColors.AiSpeech.deep`：后者是活 token，
+        // 轻松档（2026-10-27 裁决 2）已把它抬到 #1A7A63，拿它当「修复前」等于用换色后的墨去证换色前的判决。
+        val preFixInk = PRE_FIX_AI_SPEECH_DEEP_INK
+        val preFixRatio = contrastRatio(preFixInk, card)
         assertTrue(
-            "反空转失控：修复前的浅套域色墨 ${preFixInk.hex()} 压本行浅玻璃 ${glass.hex()} 实测 ${preFixRatio.r2()}，" +
+            "反空转失控：修复前的浅套域色墨 ${preFixInk.hex()} 压本行卡底 ${card.hex()} 实测 ${preFixRatio.r2()}，" +
                 "已 ≥$BODY_AA_RATIO——那这条正文闸对这行没有对象，换墨与阈值归位的裁决都必须重议",
             preFixRatio < BODY_AA_RATIO,
         )
     }
 
     @Test
-    fun the_dark_section_card_pairs_dark_glass_with_the_dark_set_ink() {
+    fun the_dark_profile_card_pairs_the_dark_set_surface_with_the_dark_set_ink() {
         assertTrue(
-            "深浅两套玻璃必须真的不同值，否则本用例的换套判据没有对象",
-            AppColorLight.surfaceGlass.toArgb() != AppColorDark.surfaceGlass.toArgb(),
+            "深浅两套 surface 必须真的不同值，否则本用例的换套判据没有对象",
+            AppColorLight.surface.toArgb() != AppColorDark.surface.toArgb(),
         )
         setEditor(ThemeMode.Dark)
-        scrollToTag(SECTION_CARD_INK_TAG)
-        val glass = modeOf(bandLeftOfTag(SECTION_CARD_INK_TAG, CARD_BAND_INSET_DP, CARD_BAND_WIDTH_DP))
-        val ink = inkOfTag(SECTION_CARD_INK_TAG, glass)
-        assertGlassIs("SectionCard 容器（深）", glass, AppColorDark.surfaceGlass, AppColorDark.background)
-        assertInkIs("SectionCard 密钥态墨（深）", ink, DomainDark.getValue(AppDomain.AiSpeech).deep)
-        assertInkIsFarFromTheOtherSet("SectionCard 密钥态墨（深）", ink, DomainColors.AiSpeech.deep)
-        assertContrastAtLeast("深套域色墨压深玻璃", ink, glass, BODY_AA_RATIO)
+        scrollToTag(PROFILE_CARD_INK_TAG)
+        val card = modeOf(bandLeftOfTag(PROFILE_CARD_INK_TAG, CARD_BAND_INSET_DP, CARD_BAND_WIDTH_DP))
+        val ink = inkOfTag(PROFILE_CARD_INK_TAG, card)
+        assertGlassIs("AI 配置软卡容器（深，不透明 surface）", card, AppColorDark.surface, AppColorDark.background)
+        assertInkIs("AI 配置卡密钥态墨（深）", ink, DomainDark.getValue(AppDomain.AiSpeech).deep)
+        assertInkIsFarFromTheOtherSet("AI 配置卡密钥态墨（深）", ink, DomainColors.AiSpeech.deep)
+        assertContrastAtLeast("深套域色墨压不透明卡底", ink, card, BODY_AA_RATIO)
     }
 
     /**
      * 台账点名的 `CapabilityToggle`（Task 12.5 修复轮曾被单独回退成 `AppPalette.Surface` / `Separator`）：
-     * 深色档未选中档的底必须是**套内 surface**，选中档必须是**套内域色 base 的 12% alpha 压在这层玻璃上**。
+     * 深色档未选中档的底必须是**套内 surface**，选中档必须是**套内域色 base 的 12% alpha 压在卡底上**。
      * 取样取行内左端那段只有该行底色、没有字的带（行左内边距 12dp）。
+     *
+     * 批 4 Task 3：脚下那层从「玻璃 `SectionCard`」换成不透明 `SoftCard`，所以合成基准同步换成
+     * `AppColorDark.surface`——未选中档的「套内 surface」于是与卡底同值，可分辨性由行描边
+     * （`outlineSoft`）承担，选中档仍靠 12% 域色 tint 与本行下面那条 ≥3 档的判据区分。
      */
     @Test
     fun the_dark_capability_toggle_container_follows_the_theme_instead_of_the_static_surface() {
         setEditor(ThemeMode.Dark, capabilities = setOf(AiCapability.Text, AiCapability.Speech))
+        // 与同文件 ③ 的写法一致：2× 字号下这一族芯片会滚出视口，取样前先滚到它，避免把页底像素当成档底。
+        // 取样窗口（行左内边距 3dp..9dp）与四条断言逐字未改。
+        scrollToTag("ai_profile_capability_vision")
         val selectedFill = modeOf(bandInsideTag("ai_profile_capability_text", 3f, 6f))
         val unselectedFill = modeOf(bandInsideTag("ai_profile_capability_vision", 3f, 6f))
-        assertGlassIs("CapabilityToggle 未选中档底（深）", unselectedFill, AppColorDark.surface, AppColorDark.surfaceGlass)
         assertGlassIs(
-            "CapabilityToggle 选中档底（深，域色 base 12% 压深玻璃）",
+            "CapabilityToggle 未选中档底（深）",
+            unselectedFill,
+            AppColorDark.surface,
+            AppColorDark.surface,
+        )
+        assertGlassIs(
+            "CapabilityToggle 选中档底（深，域色 base 12% 压深卡底）",
             selectedFill,
             DomainDark.getValue(AppDomain.AiSpeech).base.copy(alpha = 0.12f),
-            AppColorDark.surfaceGlass,
+            AppColorDark.surface,
         )
         assertTrue(
             "选中档与未选中档必须可分辨（两档同值 = 这一族取值等于没迁）：选中 ${selectedFill.hex()}、未选中 ${unselectedFill.hex()}",
@@ -173,9 +201,11 @@ class GlassPanelThemeInkTest {
         assertInkIs("浮层选中选项墨（浅，套内 onMint）", selectedInk, AppColorLight.onMint)
         assertInkIsFarFromTheOtherSet("浮层选中选项墨（浅）", selectedInk, DomainDark.getValue(AppDomain.AiSpeech).deep)
         assertContrastAtLeast("浅套选中行正文墨压浅玻璃（Body = 正文档，阈值 4.5）", selectedInk, glass, BODY_AA_RATIO)
-        // 反空转：把修复前那枚浅套域色墨喂进同一条 4.5 闸，必须不合格——它若被判 ≥4.5，
-        // 说明这条正文闸对这行没有对象或阈值被写宽，本席的换墨与归位裁决都必须重议。
-        val preFixInk = DomainColors.AiSpeech.deep.toArgb()
+        // 反空转：把修复前那枚浅套域色墨（**历史字面量** #188F76）喂进同一条 4.5 闸，必须不合格——
+        // 它若被判 ≥4.5，说明这条正文闸对这行没有对象或阈值被写宽，本席的换墨与归位裁决都必须重议。
+        // 同 [the_light_section_card_still_paints_the_pre_migration_glass_and_ink]：这枚墨取字面量，
+        // 不取活 token，理由见 [PRE_FIX_AI_SPEECH_DEEP_INK]。
+        val preFixInk = PRE_FIX_AI_SPEECH_DEEP_INK
         val preFixRatio = contrastRatio(preFixInk, glass)
         assertTrue(
             "反空转失控：修复前的浅套域色墨 ${preFixInk.hex()} 压本行浅玻璃 ${glass.hex()} 实测 ${preFixRatio.r2()}，" +
@@ -241,42 +271,49 @@ class GlassPanelThemeInkTest {
     // ---------- C-1 那枚药片：迁完必须现算 ----------
 
     /**
-     * 批 2 终审 B 席 C-1 的当场现算：密钥卡里那枚 `PillStyle.Text` + `domain = Reading`
-     * 的「清除已保存的密钥」（`ai_profile_key_clear`）。Text 档容器透明 ⇒ 真实底就是它脚下那层**半透明**玻璃。
+     * 批 2 终审 B 席 C-1 的当场现算：密钥卡里那枚 `PillStyle.Text` + `domain = Danger`
+     * 的「清除已保存的密钥」（`ai_profile_key_clear`）。Text 档容器透明 ⇒ 真实底就是它脚下那一层。
+     * 批 4 Task 3 起那层是**不透明卡底** `appColors().surface`（旧版是半透明 `surfaceGlass`）。
      *
-     * 顺序不许反：① 从纯表 [pillButtonInk] 取当前档位（深套 / Reading / enabled / Text）的那枚前景
-     * （本用例不自己写死墨，纯表改了这里就跟着改）；② 把深套 `surfaceGlass` 与它脚下的深页底 src-over
-     * 合成成不透明实底；③ 按 WCAG 算 ①压② —— 正文档必须 ≥ [BODY_AA_RATIO]；
+     * 域是 `Danger` 而不是 `Reading`：`AiProfileSettingsScreen` 里这枚药片的装配点是
+     * `domain = AppDomain.Danger`（销毁性动作取危险域），本用例按生产装配点取纯表，不自己另选一域
+     * （真机/模拟器实测：按 `Reading` 取墨得 `#EDA8B4`、屏幕像素是 `#E39086`，差 46 档；换色前的
+     * 旧取值 `#FF7A93` 对 `#FF6B61` 同差 50 档，即本行早在这个用例写下时就与实际域不符）。
+     *
+     * 顺序不许反：① 从纯表 [pillButtonInk] 取当前档位（深套 / Danger / enabled / Text）的那枚前景
+     * （本用例不自己写死墨，纯表改了这里就跟着改）；② 取它脚下那层的实底——深套 `surface` 本身就是
+     * 不透明的（旧的玻璃腿要 src-over 压页底，现在这一层没有 alpha，`compositeSrcOver` 原样返回）；
+     * ③ 按 WCAG 算 ①压② —— 正文档必须 ≥ [BODY_AA_RATIO]；
      * ④ 再拿屏幕像素复核同一对（药片带里的墨核 / 容器众数），纸上与屏幕上必须同档。
      *
-     * 迁移前这枚是「深套 `#FF7A93` 压静态白玻璃」≈ 2.18:1，跌破正文 AA；迁完两侧都过 4.5 才算闭。
+     * 迁移前这枚是「深套 `#FF6B61`（当年 Danger 亮色）压静态白玻璃」≈ 2.79:1，跌破正文 AA；迁完两侧都过 4.5 才算闭。
      */
     @Test
-    fun the_c1_text_pill_on_the_migrated_dark_glass_clears_body_contrast_by_live_computation() {
+    fun the_c1_text_pill_on_the_migrated_dark_card_clears_body_contrast_by_live_computation() {
         setEditor(ThemeMode.Dark)
         val ink = pillButtonInk(
             style = PillStyle.Text,
-            domain = AppDomain.Reading,
+            domain = AppDomain.Danger,
             enabled = true,
             set = AppColorDark,
-            palette = DomainDark.getValue(AppDomain.Reading),
+            palette = DomainDark.getValue(AppDomain.Danger),
             isDark = true,
         ).foreground
-        val paperBackdrop = compositeSrcOver(AppColorDark.surfaceGlass.toArgb(), AppColorDark.background.toArgb())
+        val paperBackdrop = compositeSrcOver(AppColorDark.surface.toArgb(), AppColorDark.background.toArgb())
         val paperRatio = contrastRatio(ink.toArgb(), paperBackdrop)
-        log("C-1 纸面：纯表墨 ${ink.toArgb().hex()} 压合成底 ${paperBackdrop.hex()} = ${paperRatio.r2()}")
+        log("C-1 纸面：纯表墨 ${ink.toArgb().hex()} 压卡底 ${paperBackdrop.hex()} = ${paperRatio.r2()}")
 
         scrollToTag(PILL_TAG)
         val pillBounds = boundsOfTag(PILL_TAG)
-        val pillGlass = modeOf(pillBounds)
-        val pillInk = inkModeOf(pillBounds, pillGlass)
-        val pixelRatio = contrastRatio(pillInk, pillGlass)
-        log("C-1 像素：药片墨核 ${pillInk.hex()} 压面板底 ${pillGlass.hex()} = ${pixelRatio.r2()}")
+        val pillBackdrop = modeOf(pillBounds)
+        val pillInk = inkModeOf(pillBounds, pillBackdrop)
+        val pixelRatio = contrastRatio(pillInk, pillBackdrop)
+        log("C-1 像素：药片墨核 ${pillInk.hex()} 压卡底 ${pillBackdrop.hex()} = ${pixelRatio.r2()}")
 
         assertInkIs("C-1 药片墨（像素必须等于纯表那一档）", pillInk, ink)
-        assertGlassIs("C-1 药片真实底（它脚下那层玻璃）", pillGlass, AppColorDark.surfaceGlass, AppColorDark.background)
+        assertGlassIs("C-1 药片真实底（它脚下那层不透明卡底）", pillBackdrop, AppColorDark.surface, AppColorDark.background)
         assertContrastAtLeast("C-1 纸面现算", ink.toArgb(), paperBackdrop, BODY_AA_RATIO)
-        assertContrastAtLeast("C-1 像素现算", pillInk, pillGlass, BODY_AA_RATIO)
+        assertContrastAtLeast("C-1 像素现算", pillInk, pillBackdrop, BODY_AA_RATIO)
         assertTrue(
             "纸面与像素两条比值必须同档（差 ≤ $PAPER_PIXEL_RATIO_TOLERANCE）：纸上 ${paperRatio.r2()}、像素 ${pixelRatio.r2()}",
             abs(paperRatio - pixelRatio) <= PAPER_PIXEL_RATIO_TOLERANCE,
@@ -289,7 +326,7 @@ class GlassPanelThemeInkTest {
         composeRule.setContent {
             MintGlassTheme(themeMode = mode) {
                 AiProfileSettingsScreen(
-                    // 列表态与取证无关：editor 非空时整屏渲染的就是编辑态（含三块 SectionCard 与浮层）。
+                    // 列表态与取证无关：editor 非空时整屏渲染的就是编辑态（三枚 SoftCard + 吸底保存 + 浮层）。
                     listState = AiProfileListUiState.Ready(emptyList()),
                     editor = AiProfileEditorUiState(
                         profileId = "p1",
@@ -309,14 +346,19 @@ class GlassPanelThemeInkTest {
                     onDraftChange = {},
                     onSave = {},
                     onCloseEditor = {},
-                    onDeleteProfile = {},
-                    onDeleteKey = {},
+                    onRequestDeleteProfile = {},
+                    onRequestDeleteKey = {},
                     onBack = {},
                 )
             }
         }
     }
 
+    /**
+     * 批 5 Task 1 起试听区默认收成一行（`speech_preview_toggle`），**玻璃卡本体与其签名不动**
+     * （计划对账第 7 条：折叠的是外壳）。本夹具照旧走生产屏，所以展开一行再取证——取到的仍是
+     * 同一张 `PreviewCard` 的玻璃与墨，③ 的三条断言逐字未放宽。
+     */
     private fun setSpeechScreen(mode: ThemeMode) {
         composeRule.setContent {
             MintGlassTheme(themeMode = mode) {
@@ -333,6 +375,8 @@ class GlassPanelThemeInkTest {
                 )
             }
         }
+        composeRule.onNodeWithTag("speech_preview_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
     }
 
     private fun openVoiceOverlay() {
@@ -588,7 +632,7 @@ class GlassPanelThemeInkTest {
 }
 
 /** 密钥卡里那枚按套取墨的 `Text`（`ai_profile_key_state`：本席从静态 `DomainColors.AiSpeech.deep` 迁到 `appDomain(...)`）。 */
-private const val SECTION_CARD_INK_TAG = "ai_profile_key_state"
+private const val PROFILE_CARD_INK_TAG = "ai_profile_key_state"
 
 /** 取样带：面板内容左侧那段只有卡内 16dp 内边距、没有字的空白（全部由 bounds 现算）。 */
 private const val CARD_BAND_INSET_DP = 12f
@@ -609,6 +653,15 @@ private const val OVERLAY_UNSELECTED_TEXT = "alloy"
 private const val PREVIEW_INPUT_TAG = "speech_preview_input"
 private const val PREVIEW_FOOTNOTE_TEXT = "用当前选中的朗读服务播放这段文字。"
 private const val PILL_TAG = "ai_profile_key_clear"
+
+/**
+ * 批 2 终审修复席 C 动手**之前**浅套那枚域色墨的历史字面量（当年压浅玻璃 4.006:1，不足正文 AA 4.5，
+ * 才是「换成 `onMint`」这条裁决的对象）。反空转守卫拿它去喂 4.5 闸，必须不合格。
+ *
+ * 写成字面量而不是读 `DomainColors.AiSpeech.deep`：后者是活 token，轻松档（2026-10-27 裁决 2）已把它
+ * 抬到 `#1A7A63`（压同一行浅玻璃 5.227:1）。用换色后的墨去证换色前的判决，守卫会空转地红。
+ */
+private val PRE_FIX_AI_SPEECH_DEEP_INK: Int = 0xFF188F76.toInt()
 
 /** 「算不透明」下限：与席 A 同口径，必须低于两档玻璃的 alpha（浅 `0xEF` = 239 / 深 `0xE6` = 230）。 */
 private const val OPAQUE_ALPHA_FLOOR = 200

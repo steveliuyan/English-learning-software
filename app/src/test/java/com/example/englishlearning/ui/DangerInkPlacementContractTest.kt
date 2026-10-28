@@ -71,10 +71,16 @@ class DangerInkPlacementContractTest {
                 countMatches(source, learnDomainRule),
                 "$file 的出站确认按钮仍在用 Learn 绿：AI 请求属于 AiSpeech 域",
             )
+            // 计数取样收敛到**确认框区间**（从取消 tag 到确认 tag 两侧各一窗）：
+            // 批 4 Task 4 起 `PhotoTranslationScreen` 的入口行徽标也用 `AiSpeech` 域，全文件计数会被
+            // 行徽标顶到 4；判据本意一直是「出站确认框那两枚按钮的域色」，所以取样收敛到确认框本身。
+            // 判据没有放宽：区间内仍必须恰 2 处（多一处 = 冒第三枚按钮，少一处 = 某枚丢了域色），
+            // 区间外不承诺限制（那一侧的域色由 `EntryRowInkTest` / 各屏版式契约分别钉）。
+            val dialogSpan = outboundDialogSpan(source, tags)
             assertEquals(
                 tags.size,
-                countMatches(source, aiSpeechDomainRule),
-                "$file 的 AiSpeech 域色应恰 ${tags.size} 处（取消 + 确认）",
+                countMatches(dialogSpan, aiSpeechDomainRule),
+                "$file 的出站确认框内 AiSpeech 域色应恰 ${tags.size} 处（取消 + 确认），实际 ${countMatches(dialogSpan, aiSpeechDomainRule)}",
             )
             tags.forEach { tag ->
                 val window = tagWindow(source, tag)
@@ -145,6 +151,22 @@ class DangerInkPlacementContractTest {
         assertTrue(at >= 0, "源码里找不到 testTag \"$tag\"：锚点失效，本契约失去对象")
         val from = maxOf(0, at - RADIUS)
         val to = minOf(source.length, at + tag.length + RADIUS)
+        return source.substring(from, to)
+    }
+
+    /**
+     * 出站确认框的取样区间：从第一枚 tag（取消）到第二枚 tag（确认）两侧各留一个 [RADIUS]。
+     * 两枚 tag 与两处 `domain =` 长在同一个 `GlassDialog` 尾随 lambda 里，区间必然覆盖整对按钮；
+     * 找不到任一枚即响亮报错（区间切不出来时不许静默给空窗，那会让上面的计数恒等于 0 而假红/假绿）。
+     */
+    private fun outboundDialogSpan(source: String, tags: List<String>): String {
+        assertTrue(tags.size == 2, "出站确认框永远是「取消 + 确认」两枚，锚点表被改过：$tags")
+        val first = source.indexOf("\"${tags[0]}\"")
+        assertTrue(first >= 0, "源码里找不到出站取消按钮 tag \"${tags[0]}\"")
+        val second = source.indexOf("\"${tags[1]}\"")
+        assertTrue(second > first, "源码里确认按钮 tag \"${tags[1]}\" 不在取消之后（要求 $first < $second）：确认框区间切不出来")
+        val from = maxOf(0, first - RADIUS)
+        val to = minOf(source.length, second + tags[1].length + RADIUS)
         return source.substring(from, to)
     }
 

@@ -32,11 +32,16 @@ class AppTabTest {
         }
     }
 
-    /** 用户原话是「在应用底下也加个 ai 学」，这个标签就是那句需求的落点，改字会与需求不符。 */
+    /**
+     * 用户原话是「在应用底下也加个 ai 学」，这个标签就是那句需求的落点，改字会与需求不符。
+     *
+     * 2026-11-02 用户对「这一格到底叫什么」给出定名：**「AI 助学」**。所以下面钉的是定名，
+     * 不是最初那句口语需求——「AI 学」三字已退役，改回即与定名不符。
+     */
     @Test
     fun `the ai destination is labelled exactly as the user asked`() {
-        assertEquals("AI 学", AppTab.AI.label)
-        assertEquals("AI 学", AppTab.AI.contentDescription)
+        assertEquals("AI 助学", AppTab.AI.label)
+        assertEquals("AI 助学", AppTab.AI.contentDescription)
     }
 
     /**

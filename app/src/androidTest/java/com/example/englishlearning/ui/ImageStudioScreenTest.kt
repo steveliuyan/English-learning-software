@@ -1,13 +1,17 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.ai.AiFailure
@@ -42,7 +46,10 @@ class ImageStudioScreenTest {
         composeRule.onNodeWithTag("image_studio_subject_input").assertExists()
         composeRule.onNodeWithTag("image_studio_generate_prompt").assertIsNotEnabled()
         composeRule.onNodeWithTag("image_studio_cost_hint").assertExists()
-        composeRule.onNodeWithTag("image_studio_back").performClick()
+        // 批 4 Task 6：返回位归共享页头（旧 `image_studio_back` 药片退役），可及名固定「返回」。
+        composeRule.onNodeWithTag("image_studio_back").assertDoesNotExist()
+        composeRule.onNodeWithTag("app_screen_header").assertExists()
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitForIdle()
         assertEquals(1, backed)
     }
@@ -97,6 +104,33 @@ class ImageStudioScreenTest {
         composeRule.onNodeWithTag("image_studio_generate_image").performClick()
         composeRule.waitForIdle()
         assertEquals(1, generated)
+    }
+
+    /**
+     * 批 4 Task 6（spec §5「AI 生图 | 画面描述可编辑后再生成」）：模型稿先落进输入框，用户改字之后
+     * 点「生成图片」，报给宿主的是**改过的那一句**——可编辑却把原稿送出去，等于让界面当面说谎。
+     *
+     * 与 JVM 侧 `ImageStudioLayoutContractTest` 第 2 条互补：那条只证「tag 长在可编辑输入框上」，
+     * 这条证「改过的字真的从键上流出去」。
+     */
+    @Test
+    fun theDescriptionIsEditableAndTheEditedWordsAreWhatGoOut() {
+        var reported: String? = null
+        composeRule.setContent {
+            ImageStudioScreen(
+                state = ImageStudioUiState.PromptReady("a watercolor apple"),
+                onGeneratePrompt = {}, onGenerateImage = { reported = it }, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("image_studio_prompt").assertTextContains("a watercolor apple", substring = true)
+        // 吸底条不许压住输入：任何滚动内容都能被滚到完整可见（大字号 2.0 下同样成立，见计划 Task 8 Step 3 ④）。
+        composeRule.onNodeWithTag("image_studio_prompt").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("image_studio_generate_image").assertIsDisplayed()
+        composeRule.onNodeWithTag("image_studio_prompt").performTextReplacement("a hand edited watercolor apple")
+        composeRule.onNodeWithTag("image_studio_generate_image").performClick()
+        composeRule.waitForIdle()
+        assertEquals("a hand edited watercolor apple", reported)
     }
 
     @Test

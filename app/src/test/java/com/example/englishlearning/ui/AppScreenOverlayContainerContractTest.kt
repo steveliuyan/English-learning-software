@@ -323,27 +323,36 @@ class AppScreenOverlayContainerContractTest {
         assertEquals(1, count("Text(\"删除不可撤销。\", fontWeight = FontWeight.Bold)", "删除不可撤销。"), "反空转失控：旧措辞样片没被数出来")
     }
 
-    // ---------- 用例 2：逐位钉数 —— 路 A 恰 4 枚、路 B 恰 2 枚，且都长在生效宿主函数体内 ----------
+    // ---------- 用例 2：逐位钉数 —— 路 A 恰 7 枚、路 B 恰 2 枚，且都长在生效宿主函数体内 ----------
 
     @Test
-    fun `six overlays route to exactly four destructive confirmations and two glass pickers`() {
+    fun `nine overlays route to exactly seven destructive confirmations and two glass pickers`() {
         val source = appScreenSource()
-        assertEquals(4, count(source, destructiveCall), "ConfirmDestructiveDialog( 必须恰 4 枚（清空搜索历史 / 删除这一版 / 删除全部学习数据 / 删除词书），实际 ${count(source, destructiveCall)}")
+        assertEquals(
+            7,
+            count(source, destructiveCall),
+            "ConfirmDestructiveDialog( 必须恰 7 枚（清空搜索历史 / 删除这一版 / 删除全部学习数据 / 删除词书 / " +
+                "删除这套 AI 配置 / 清除已保存的密钥 / 删除一条拍照翻译记录），实际 ${count(source, destructiveCall)}",
+        )
         assertEquals(2, count(source, glassCall), "GlassDialog( 必须恰 2 枚（导出词书选择器 / 发现已学过的单词），实际 ${count(source, glassCall)}")
         val calls = overlayCalls(source)
-        assertEquals(6, calls.size, "浮层调用取样必须恰 6 枚（迁 3 留 3、或多迁一枚都会掉在这里）")
-        assertEquals(4, calls.count { it.kind == OverlayKind.Destructive }, "路 A 取样份数不对")
+        assertEquals(9, calls.size, "浮层调用取样必须恰 9 枚（迁 3 留 3、或多迁一枚都会掉在这里）")
+        assertEquals(7, calls.count { it.kind == OverlayKind.Destructive }, "路 A 取样份数不对")
         assertEquals(2, calls.count { it.kind == OverlayKind.Glass }, "路 B 取样份数不对")
 
-        // 体内/体外夹击：3+1 枚属于 AppScreen 宿主，1+1 枚属于 LearningSetupScreen 宿主，两体之外一枚都不许有。
+        // 体内/体外夹击：6+1 枚属于 AppScreen 宿主，1+1 枚属于 LearningSetupScreen 宿主，两体之外一枚都不许有。
         val appScreenBody = extractFunctionBody(source, appScreenSignature)
         val setupBody = extractFunctionBody(source, learningSetupSignature)
-        assertEquals(3, count(appScreenBody, destructiveCall), "AppScreen 函数体内应有 3 枚破坏性确认（清空搜索历史 / 删除这一版 / 删除全部学习数据）")
+        assertEquals(
+            6,
+            count(appScreenBody, destructiveCall),
+            "AppScreen 函数体内应有 6 枚破坏性确认（清空搜索历史 / 删除这一版 / 删除全部学习数据 / 删除 AI 配置 / 清除密钥 / 删除一条拍照翻译记录）",
+        )
         assertEquals(1, count(appScreenBody, glassCall), "AppScreen 函数体内应有 1 枚玻璃选择器（导出词书）")
         assertEquals(1, count(setupBody, destructiveCall), "LearningSetupScreen 函数体内应有 1 枚破坏性确认（删除词书）")
         assertEquals(1, count(setupBody, glassCall), "LearningSetupScreen 函数体内应有 1 枚玻璃选择器（发现已学过的单词）")
         assertEquals(
-            4,
+            7,
             count(appScreenBody, destructiveCall) + count(setupBody, destructiveCall),
             "路 A 有一枚不在两个宿主函数体内：幽灵函数或窗外死分支里的假调用不算生效渲染路径",
         )
@@ -363,8 +372,8 @@ class AppScreenOverlayContainerContractTest {
             "取窗器切歪：AppScreen 体吞进了 LearningSetupScreen 的定义（右括号配平错位）",
         )
         assertTrue(
-            setupBody.contains("WordBookList("),
-            "取窗器切歪：LearningSetupScreen 体没覆盖到词书列表调用",
+            setupBody.contains("WordBookPicker("),
+            "取窗器切歪：LearningSetupScreen 体没覆盖到词书选择器的调用",
         )
 
         // 反空转（M2 的击穿形状）：少迁一枚（4 变 3）必须被这套份数逻辑判出来。
@@ -383,7 +392,7 @@ class AppScreenOverlayContainerContractTest {
     fun `each destructive confirmation carries the full argument shape exactly once`() {
         val source = appScreenSource()
         val routeA = destructiveCallsIn(source)
-        assertEquals(4, routeA.size, "路 A 取样份数不对，形状判据无从谈起")
+        assertEquals(7, routeA.size, "路 A 取样份数不对，形状判据无从谈起")
         routeA.forEach { call ->
             destructiveArgShapes.forEach { shape ->
                 assertEquals(
@@ -395,11 +404,11 @@ class AppScreenOverlayContainerContractTest {
             assertEquals(0, count(call.region, alertDialogCall), "路 A 调用区间内不得残留 AlertDialog(")
             assertEquals(0, count(call.region, glassCall), "一枚路 A 调用区间内不得嵌 GlassDialog(（两路不混用）")
         }
-        // 体内恰一处 ⇒ 体外零处：全文件计数 == 4 == 四枚窗口之和。
+        // 体内恰一处 ⇒ 体外零处：全文件计数 == 7 == 七枚窗口之和。
         routeAOnlyShapes.forEach { shape ->
             val inWindows = routeA.sumOf { count(it.region, shape) }
-            assertEquals(4, count(source, shape), "「$shape」全文件计数不等于 4：窗外多出来的一份 = 死分支/幽灵调用塞的假形状")
-            assertEquals(4, inWindows, "「$shape」有命中落在四枚路 A 调用区间之外")
+            assertEquals(7, count(source, shape), "「$shape」全文件计数不等于 7：窗外多出来的一份 = 死分支/幽灵调用塞的假形状")
+            assertEquals(7, inWindows, "「$shape」有命中落在七枚路 A 调用区间之外")
         }
         // 反空转（修复轮 1，Important-3）：路 A 缺 keepLines 的那一枚必须被**真判据**打掉。旧版只验
         // 「计数器能数出 needle」（`assertEquals(0, count(missingKeep, "keepLines = "))` 由样片构造必真，
@@ -483,6 +492,45 @@ class AppScreenOverlayContainerContractTest {
             "onDismiss = viewModel::cancelDelete",
         ).forEach { literal ->
             assertEquals(1, count(wordBookDelete, literal), "「删除词书」一枚的级联/保留面/动作变了：$literal")
+        }
+
+        // 站点 4b（批 4 Task 3）删除这套 AI 配置：元数据与已保存的密钥一起走，保留面要说全。
+        val aiProfileDelete = destructiveRegionByTitle(source, "删除这套 AI 配置？")
+        listOf(
+            "将删除这台设备上这套配置的名称、网站地址、Endpoint、模型与高级参数，并清除已保存的密钥。",
+            "文章、收藏、学习记录与词库不受影响；其他 AI 配置也不受影响。",
+            "confirmLabel = \"确认删除\"",
+            "onConfirm = {",
+            "aiProfileViewModel?.deleteProfile(profileId)",
+            "onDismiss = { pendingAiProfileDelete = null }",
+        ).forEach { literal ->
+            assertEquals(1, count(aiProfileDelete, literal), "「删除这套 AI 配置」一枚的级联/保留面/动作变了：$literal")
+        }
+
+        // 站点 4c（批 4 Task 3）清除已保存的密钥：元数据全留，只丢密钥。
+        val aiProfileKeyClear = destructiveRegionByTitle(source, "清除已保存的密钥？")
+        listOf(
+            "清除后这套配置将无法调用服务，需要重新粘贴密钥才能再用。",
+            "名称、网站地址、Endpoint、模型与高级参数保留；文章、收藏与学习记录不受影响。",
+            "confirmLabel = \"确认清除\"",
+            "onConfirm = {",
+            "aiProfileViewModel?.deleteKey(profileId)",
+            "onDismiss = { pendingAiProfileKeyClear = null }",
+        ).forEach { literal ->
+            assertEquals(1, count(aiProfileKeyClear, literal), "「清除已保存的密钥」一枚的级联/保留面/动作变了：$literal")
+        }
+
+        // 站点 4d（批 4 Task 4）删除一条拍照翻译记录：原图与译文一起走，保留面要说全。
+        val photoTranslationDelete = destructiveRegionByTitle(source, "删除这条翻译记录？")
+        listOf(
+            "将删除这条已保存的原文、译文，以及随它保存的原图（图片文件同时从本机清除）。",
+            "其他历史记录、词库、文章与学习记录不受影响。",
+            "confirmLabel = \"确认删除\"",
+            "onConfirm = {",
+            "photoTranslationViewModel?.deleteSaved(state.profile.id, recordId)",
+            "onDismiss = { pendingPhotoTranslationDelete = null }",
+        ).forEach { literal ->
+            assertEquals(1, count(photoTranslationDelete, literal), "「删除这条翻译记录」一枚的级联/保留面/动作变了：$literal")
         }
 
         // 站点 5（迁移前 `:1608`）导出词书选择器（路 B）：列表项 tag 原地保留，取消动作逐字不变。
@@ -594,6 +642,9 @@ class AppScreenOverlayContainerContractTest {
             GuardSite("删除这一版？（路 A）", "pendingDelete?.let { pending ->", destructiveCall, "title = \"删除这一版？\""),
             GuardSite("删除全部学习数据？（路 A）", "if (pending != null) {", destructiveCall, "title = \"删除全部学习数据？\""),
             GuardSite("删除《词书名》？（路 A，LearningSetupScreen 体内）", "state.pendingDelete?.let { book ->", destructiveCall, "title = \"删除《\${book.displayName}》？\""),
+            GuardSite("删除这套 AI 配置？（路 A，批 4 Task 3）", "pendingAiProfileDelete?.let { profileId ->", destructiveCall, "title = \"删除这套 AI 配置？\""),
+            GuardSite("清除已保存的密钥？（路 A，批 4 Task 3）", "pendingAiProfileKeyClear?.let { profileId ->", destructiveCall, "title = \"清除已保存的密钥？\""),
+            GuardSite("删除一条拍照翻译记录？（路 A，批 4 Task 4）", "pendingPhotoTranslationDelete?.let { recordId ->", destructiveCall, "title = \"删除这条翻译记录？\""),
             GuardSite("选择要导出的词书（路 B）", "if (showWordBookExportPicker) {", glassCall, "text = \"选择要导出的词书\""),
             GuardSite("发现已学过的单词（路 B）", "state.pendingMigration?.let { preview ->", glassCall, "text = \"发现已学过的单词\""),
         ).forEach { site -> assertOverlayGuardedUnderLiveBranch(source, site) }

@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -130,6 +131,23 @@ class WordCardScreenTest {
             "word_card_speak 的触控目标应至少 48dp 宽，实际=$bounds",
             bounds.right - bounds.left >= 48.dp,
         )
+    }
+
+    @Test
+    fun feedback_actions_remain_reachable_at_large_font_scale() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                WordCardScreen(state = ready())
+            }
+        }
+
+        // 批 2 Task 1：三档反馈改成吸底条（不再是滚动正文的尾部），所以这里既不该也不能再
+        // `performScrollTo()`——整屏根 Column 已无滚动祖先，旧写法会直接报「no parent layout with a
+        // Scroll SemanticsAction」。判据换成更严的一条：2.0 字号下**不滚动就可见**（吸底条自己撑高、
+        // 内容区让位，不被裁切），这才是吸底布局该保证的事。
+        composeRule.onNodeWithTag("word_card_feedback_bar").assertIsDisplayed()
+        composeRule.onNodeWithTag("word_card_feedback_known").assertIsDisplayed()
     }
 
     @Test

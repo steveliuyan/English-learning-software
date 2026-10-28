@@ -246,31 +246,35 @@ class ContainerInkPairingContractTest {
     }
 
     @Test
-    fun `the pairing scan guards the real AiProfileRow segment, not a fabricated one`() {
-        // 真实文件锚（m-6 的处置）：本判据守的形状必须在**生产源码**里真实存在——
-        // AiProfileRow 那一段要同时含「已迁的中性容器读点」与「AppType 排印点」。
+    fun `the pairing scan guards the real AiProfileEditor segment, not a fabricated one`() {
+        // 真实文件锚（m-6 的处置；批 4 Task 3 换锚）：本判据守的形状必须在**生产源码**里真实存在——
+        // 该段要同时含「已迁的中性容器读点」与「AppType 排印点」。
         // 早先这一例是把真行拼进一段合成的 `Surface(color = appColors().surface)` 里再喂扫描器，
         // 于是「真文件里这两者到底同不同段」从没被证过：版面一旦改动（容器回退静态、或排印点挪出该段），
         // 第一条全量真文件用例照样绿，本例照样绿，判据却已经对着一个不存在的形状空转。
+        //
+        // 批 4 Task 3 把 `AiProfileRow` 从「描边 Surface 卡片」改成裸行（容器归共享 `BareRow`），该段不再
+        // 持有中性容器读点——锚点随之移到同屏仍画 `Surface(color = appColors().surface)` 的吸底条那段
+        // （`AiProfileEditor`），判据照旧对着生产源码里的真实形状，而不是退回合成片段。
         val source = uiScreenSource("AiProfileSettingsScreen.kt")
-        val rowSegment = topLevelSegments(source).firstOrNull {
-            it.contains("fun AiProfileRow") && hasMigratedNeutralContainer(it)
+        val editorSegment = topLevelSegments(source).firstOrNull {
+            it.contains("fun AiProfileEditor(") && hasMigratedNeutralContainer(it)
         }
         assertTrue(
-            rowSegment != null,
-            "生产源码里已不存在「AiProfileRow 段内含 appColors().surface 容器」这一形状：" +
-                "容器读点回退成静态 AppPalette.Surface、或该段被拆分重排。" +
+            editorSegment != null,
+            "生产源码里已不存在「AiProfileEditor 段内含 appColors().surface 容器」这一形状：" +
+                "吸底条容器读点回退成静态 AppPalette.Surface、或该段被拆分重排。" +
                 "本判据的锚点必须随之更新（连同类合成片段一起复核，见上一条用例）。",
         )
-        val segment = checkNotNull(rowSegment)
+        val segment = checkNotNull(editorSegment)
         assertTrue(
-            segment.contains("item.profile.displayName") && AppTypeStyleRead.containsMatchIn(segment),
-            "AiProfileRow 段里的 displayName 排印点不见了（版面重排把本判据盯的那处前景挪走了）：$segment",
+            segment.contains("ai_profile_save") && AppTypeStyleRead.containsMatchIn(segment),
+            "AiProfileEditor 段里的排印点不见了（版面重排把本判据盯的那处前景挪走了）：$segment",
         )
         assertEquals(
             emptyList(),
             pairingViolationsIn(source, "AiProfileSettingsScreen.kt"),
-            "真实文件里 AiProfileRow 仍画未补色的 AppType 前景 = 深色档浅套静态墨压换套深底（C-1 回归）",
+            "真实文件里仍有段画未补色的 AppType 前景 = 深色档浅套静态墨压换套深底（C-1 回归）",
         )
     }
 }

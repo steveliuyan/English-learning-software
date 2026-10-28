@@ -257,7 +257,9 @@ class PillButtonInkTest {
      * （不读 `AppPalette`/`DomainColors` 静态源：那两套漂移不代表本组件的取值漂移）。
      *
      * 三条都是「若达标即红」的裁决依据承重：令牌一旦漂移让这些候选翻身，本条红并提示裁决重议，
-     * 而不是让决策表悄悄失去理由。
+     * 而不是让决策表悄悄失去理由。2026-10-27 轻松档把七域 `deep` 全部修进 4.5 以上，
+     * 于是「文字墨不得用域色 deep」这条不再有数字支撑——第 2 条改成钉**浅端 base**（永远过不了闸的那一端）
+     * 外加「例外分支取的是两枚里更富余的一枚」。
      */
     @Test
     fun rejected_candidates_are_pinned_and_turn_red_if_tokens_drift() {
@@ -266,11 +268,22 @@ class PillButtonInkTest {
             whiteOnReviewBase < 4.5,
             "裁决依据失效：白字压浅套 Review base 已升到 %.2f:1（≥4.5），「容器不许含 base」需重议".format(whiteOnReviewBase)
         )
+        // 2026-10-27 轻松档：浅套 AiSpeech `deep` 换到 #1A7A63 后压 surface 升到 5.24，已经过 4.5——
+        // 「deep 不过闸」这条旧依据作废。例外分支（浅套 AiSpeech 取 set.onMint）**没有撤**：R-14.4 要的是
+        // 全房一致（底导、EntryRow、药丸同一枚浅套 AiSpeech 墨）。所以这条改成钉「二选一取更富余的一枚」，
+        // 并把被拒候选换成域色的**浅端**（base 端在任何套里都不会被选作文字墨）。
         val aiSpeechDeepOnSurface = ratioOf(DomainLight.getValue(AppDomain.AiSpeech).deep, AppColorLight.surface)
+        val aiSpeechOnMintOnSurface = ratioOf(AppColorLight.onMint, AppColorLight.surface)
         assertTrue(
-            aiSpeechDeepOnSurface < 4.5,
-            "裁决依据失效：浅套 AiSpeech deep 压 surface 已升到 %.2f:1（≥4.5），Secondary/Text 的 set.onMint 例外分支可撤"
-                .format(aiSpeechDeepOnSurface)
+            aiSpeechOnMintOnSurface > aiSpeechDeepOnSurface,
+            "例外分支失去优势：浅套 onMint 压 surface（%.2f）不再优于 AiSpeech deep（%.2f），onMint 例外可撤"
+                .format(aiSpeechOnMintOnSurface, aiSpeechDeepOnSurface)
+        )
+        val aiSpeechBaseOnSurface = ratioOf(DomainLight.getValue(AppDomain.AiSpeech).base, AppColorLight.surface)
+        assertTrue(
+            aiSpeechBaseOnSurface < 4.5,
+            "裁决依据失效：浅套 AiSpeech base 压 surface 已升到 %.2f:1（≥4.5），「容器/文字不得回稿面强调色浅端」需重议"
+                .format(aiSpeechBaseOnSurface)
         )
         // 诱饵（仿 EntryRowInkTest 的反空转写法）：七域里 base 端的最好成绩。它若翻身，说明整套 base 漂移，
         // 上面那条「代表候选」可能仍卡在线下——这条把整套一起看住。

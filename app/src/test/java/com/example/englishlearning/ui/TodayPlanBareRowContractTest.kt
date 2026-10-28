@@ -96,7 +96,12 @@ class TodayPlanBareRowContractTest {
     /**
      * 域色对位：今日文章 → `Reading`、词库 → `Library`，且**只此两枚**。
      *
-     * 同屏第三枚 `appDomain(...)` 读点就是「同一概念两套颜色」的入口（旧判据的立法目的），
+     * 域色不再由裸行自己写 `appDomain(...).deep` 给 24dp 裸字形，而是交给
+     * `InlineIconBadge(icon, domain)`——30dp tint 底 + 17dp `deep` 单层描边在 `IconBadge.kt` 里是
+     * **一枚**组合件，`domain` 实参就是语义归属。判据跟着换成计数具名实参，并显式禁止本屏
+     * Ready 体再出现手写 `AppGlyphLayer.StrokeOnly`：裸行退回「自己取色 + 自己画字形」会当场红。
+     *
+     * 同屏第三枚域色读点就是「同一概念两套颜色」的入口（旧判据的立法目的），
      * 主 CTA 的强调底由 `PillButton` 内部按 `AiSpeech` 取，不经过本屏的域色读点。
      *
      * 枚数按 **Ready 分支体**判而不是全文件：`Loading` 分支的转圈取 `AiSpeech.deep` 是加载件的
@@ -107,12 +112,31 @@ class TodayPlanBareRowContractTest {
      */
     @Test
     fun `the two bare rows carry their own domain ink and nothing else`() {
-        assertEquals(1, countMatches(screen, Regex("""appDomain\(AppDomain\.Reading\)""")), "今日文章裸行取 Reading 域色")
-        assertEquals(1, countMatches(screen, Regex("""appDomain\(AppDomain\.Library\)""")), "词库裸行取 Library 域色")
+        assertEquals(
+            1,
+            countMatches(
+                screen,
+                Regex("""InlineIconBadge\(icon = AppIcon\.Newspaper, domain = AppDomain\.Reading\)"""),
+            ),
+            "今日文章裸行的域徽标必须恰一处：InlineIconBadge(Newspaper, Reading)",
+        )
+        assertEquals(
+            1,
+            countMatches(
+                screen,
+                Regex("""InlineIconBadge\(icon = AppIcon\.Book, domain = AppDomain\.Library\)"""),
+            ),
+            "词库裸行的域徽标必须恰一处：InlineIconBadge(Book, Library)",
+        )
         assertEquals(
             2,
-            countMatches(readyBranchBody(), Regex("""appDomain\(AppDomain\.[A-Za-z]+\)""")),
-            "Ready 分支体里的域色读点只此两枚（文章 / 词库）：第三枚即同一概念两套颜色的入口",
+            countMatches(readyBranchBody(), Regex("""AppDomain\.[A-Za-z]+""")),
+            "Ready 分支体里的域实参只此两枚（文章 / 词库）：第三枚即同一概念两套颜色的入口",
+        )
+        assertEquals(
+            0,
+            countMatches(readyBranchBody(), Regex("""AppGlyphLayer\.StrokeOnly""")),
+            "两条裸行不得退回手写裸字形：域色只能经 InlineIconBadge 的 domain 实参给出",
         )
     }
 }

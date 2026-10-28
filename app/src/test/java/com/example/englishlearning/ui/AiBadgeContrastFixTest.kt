@@ -77,8 +77,37 @@ class AiBadgeContrastFixTest {
     /** 本批的取样切片：只有这两枚 AI 屏（R-23.7 的两屏范围）。 */
     private val aiSurfaces = listOf("AiFeatureScreen.kt", "AiLearningScreen.kt")
 
+    /**
+     * m2 腿的取样锚：共享字形出口那一次调用里必须出现的字形实参。
+     *
+     * 2026-11-02 图标去重换锚（只换钉哪一枚实参，**判据没放宽**）：本腿原先钉的是 `AppIcon.Spark`——
+     * 那时两屏的徽标（功能行 30dp 行内档、详情页头 44dp 渐变档）共用同一枚 AI 域锚点。用户评审把这枚
+     * 共用判成缺陷（「七行图标一样，扫不出哪行是拍照翻译」），字形改由目录 `AiFeature.icon` 逐功能给出，
+     * 两个站点随之都读 `feature.icon`；`AppIcon.Spark` 在本页只剩 `EntryRow(icon = AppIcon.Spark)`
+     * 那两枚折叠/说明行（属 `EntryRow`，不在 [sharedGlyphExitCall] 并集里，也不是功能字形）。
+     * 若仍按 Spark 取样就会判红——那不是「徽标被删了」，是锚点过期。
+     *
+     * 换锚后仍承重的三件事：取样单元仍是 [sharedGlyphExitCall] 的**单次调用**（「文件级两枚同现」照旧不算数）；
+     * 「字形必须出自目录而不是屏侧写死」另由 `AiFeatureIconContractTest` 反向钉住（0 处 `AppIcon.Spark`）；
+     * 「≥40dp 档不得显式 StrokeOnly」那条腿不受换锚影响。
+     */
+    private val sharedGlyphAnchor = "feature.icon"
+
     /** `AppGlyph` 单次调用（允许一层嵌套括号与跨行）——m2 把「同一枚调用」钉成取样单元。 */
     private val appGlyphCall = Regex("""AppGlyph\((?:[^()]|\([^()]*\))*\)""")
+
+    /**
+     * 共享字形出口的**并集**（批 4 Task 1 补的半边）：字形可以直接交给 `AppGlyph` 画，也可以交给
+     * 30dp 行内徽标 `InlineIconBadge` 或 40dp 入口容器 `EntryIconBadge`——这两枚内部同样经 `AppGlyph`
+     * 出图，只是屏侧不再自己写那枚调用。
+     *
+     * 批 4 的 AI 主页把功能行的徽标从「私有 38dp 盒子 + `AppGlyph(Spark)`」换成共享
+     * `InlineIconBadge`，若取样面仍只认 `AppGlyph(`，就会把「换掉了徽标」误判成「删掉了徽标」。
+     * 取样单元仍是**同一枚调用**（Spark 必须出现在实参里），「单字中文当图标」另由
+     * [textAsBadgeRule] 与 [glyphPropertyRead] 两族挡住，本并集不会放过它们。
+     */
+    private val sharedGlyphExitCall =
+        Regex("""(?:AppGlyph|InlineIconBadge|EntryIconBadge)\((?:[^()]|\([^()]*\))*\)""")
 
     /**
      * RED（修复轮判据红样，改生产之前现盘读数）：AI 面不得再有「文字当图标」。
@@ -91,7 +120,7 @@ class AiBadgeContrastFixTest {
             val source = uiScreenSource(name)
             assertFalse(
                 textAsBadgeRule.containsMatchIn(source),
-                "$name 仍在把单字中文当图标（spec §4.2）：应换 AppGlyph(icon = AppIcon.Spark, …)",
+                "$name 仍在把单字中文当图标（spec §4.2）：应换共享字形出口 AppGlyph(icon = feature.icon, …)",
             )
             assertFalse(
                 textAsChevronRule.containsMatchIn(source),
@@ -101,20 +130,21 @@ class AiBadgeContrastFixTest {
     }
 
     /**
-     * m2：共享字形出口必须**同一次调用**里成对出现——`AppGlyph(` 与 `AppIcon.Spark` 分踹两处
-     * （哪怕同文件）不算数，否则有人把 Spark 换成别的形状、文件里再留一枚裸 `AppIcon.Spark` 引用就蒙过去。
+     * m2：共享字形出口必须**同一次调用**里成对出现——`AppGlyph(` 与字形实参分踹两处
+     * （哪怕同文件）不算数，否则有人把字形换成别的形状、文件里再留一枚裸字形引用就蒙过去。
+     * 字形实参是 [sharedGlyphAnchor]（`feature.icon`，2026-11-02 图标去重后的唯一出处）。
      * `layer` 侧按裁决只钉一条：≥40dp 容器档不得显式传 `StrokeOnly`（真机「图标一半一半」的共同形状，
-     * 40dp 档两层都要出得来；Duotone 缺省的自动化半边由「同一枚调用含 Spark 且未显式换层」承重）。
+     * 40dp 档两层都要出得来；Duotone 缺省的自动化半边由「同一枚调用含字形实参且未显式换层」承重）。
      */
     @Test
-    fun `the AI surface draws the shared spark glyph instead of a letter`() {
+    fun `the AI surface draws its shared glyph instead of a letter`() {
         aiSurfaces.forEach { name ->
-            val calls = appGlyphCall.findAll(uiScreenSource(name)).map { it.value }.toList()
-            assertTrue(calls.isNotEmpty(), "$name 未调用共享字形 AppGlyph(：徽标被删掉了而不是换掉了")
-            val sparkCalls = calls.filter { it.contains("AppIcon.Spark") }
+            val calls = sharedGlyphExitCall.findAll(uiScreenSource(name)).map { it.value }.toList()
+            assertTrue(calls.isNotEmpty(), "$name 未调用共享字形出口 AppGlyph( / InlineIconBadge(：徽标被删掉了而不是换掉了")
+            val anchoredCalls = calls.filter { it.contains(sharedGlyphAnchor) }
             assertTrue(
-                sparkCalls.isNotEmpty(),
-                "$name 的 AppIcon.Spark 没有钉在任何一次 AppGlyph( 调用实参里（m2：文件级子串两枚同现 ≠ 同一调用）",
+                anchoredCalls.isNotEmpty(),
+                "$name 的字形实参 `$sharedGlyphAnchor` 没有钉在任何一次共享字形出口的实参里（m2：文件级子串两枚同现 ≠ 同一调用）",
             )
             calls.filter { it.contains("AppGlyphLayer.StrokeOnly") }.forEach { call ->
                 val size = Regex("""size\s*=\s*(\d+)\.dp""").find(call)?.groupValues?.get(1)?.toInt()
@@ -125,6 +155,11 @@ class AiBadgeContrastFixTest {
                 )
             }
         }
+        // 反空转：并集半边不得把「单字当图标」判成合规出口（否则把徽标换成字也会绿）。
+        assertFalse(
+            sharedGlyphExitCall.containsMatchIn("""Text(feature.glyph, fontWeight = FontWeight.Bold)"""),
+            "共享字形出口的并集把「单字当图标」判成了合规（采样面写宽了）",
+        )
     }
 
     /**
@@ -209,11 +244,11 @@ class AiBadgeContrastFixTest {
         assertEquals(
             2,
             Regex("""color\s*=\s*appColors\(\)\.onBrand\b""").findAll(headerScope).count(),
-            "头卡两行文案（「AI 学」与副标题）必须都走 on-brand 墨；少一枚=还有白字，多一枚=墨挪到了别处",
+            "头卡两行文案（「AI 助学」与副标题）必须都走 on-brand 墨；少一枚=还有白字，多一枚=墨挪到了别处",
         )
         // 反空转：规则要抓得到禁令本体，且不把白胶囊容器当墨。
         assertTrue(
-            whiteInk.containsMatchIn("""Text("AI 学", color = Color.White)"""),
+            whiteInk.containsMatchIn("""Text("AI 助学", color = Color.White)"""),
             "白字规则抓不到禁令本体（空转）",
         )
         assertFalse(
@@ -311,9 +346,17 @@ class AiBadgeContrastFixTest {
         "MintPrimaryDark" to (AppColorLight.text1 to AppColorDark.text1),
     )
 
-    /** 容器是 `MintPrimary` 的按钮调用里 `contentColor` 的实参表达式（`AiFeatureScreen`「去配置 AI 服务」那枚按钮的形状）。 */
+    /**
+     * 容器是**亮底 AiSpeech 实底**的按钮调用里 `contentColor` 的实参表达式（`AiFeatureScreen`「去配置 AI 服务」
+     * 那枚按钮的形状）。
+     *
+     * 容器表达式两种拼法都认：批 3 前的 `MintPrimary`（它就是
+     * `LocalDomainColors.current.getValue(AppDomain.AiSpeech).base` 的别名），以及批 4 Task 2 起把
+     * 「容器随主题」写在调用点上的 `appDomain(AppDomain.AiSpeech).base`——两者**同一个值**，
+     * 本腿只关心「亮底容器上的前景是否分档」，不关心容器用哪个别名。
+     */
     private val mintPrimaryButtonCall = Regex(
-        """buttonColors\(\s*containerColor = MintPrimary(?![A-Za-z]),\s*contentColor = ((?:[^(),\n]|\([^(),\n]*\))*)\)""",
+        """buttonColors\(\s*containerColor = (?:MintPrimary(?![A-Za-z])|appDomain\(AppDomain\.AiSpeech\)\.base),\s*contentColor = ((?:[^(),\n]|\([^(),\n]*\))*)\s*,?\s*\)""",
     )
 
     /**
@@ -403,7 +446,8 @@ class AiBadgeContrastFixTest {
 
         val button = mintPrimaryButtonCall.find(featureSource)
         if (button == null) {
-            offenders += "抓不到 containerColor = MintPrimary 的 buttonColors 调用（站点搬家或容器被换：本腿失去对象）"
+            offenders += "抓不到亮底 AiSpeech 实底容器（MintPrimary / appDomain(AppDomain.AiSpeech).base）的 " +
+                "buttonColors 调用（站点搬家或容器被换：本腿失去对象）"
         } else {
             offenders += mintPrimaryInkOffenders("AiFeatureScreen「去配置 AI 服务」按钮", button.groupValues[1])
         }
@@ -461,11 +505,12 @@ class AiBadgeContrastFixTest {
     /**
      * R-23.14（白胶囊 = 回退，不硬迁）：容器 `Color.White.copy(alpha = 0.85f)` 是主题不变面，
      * 前景必须保持登记的两枚静态墨；同时按 §一 复算口径压白复算两套同值的静态墨——
-     * 未配置档过正文 4.5 线；已配置档是**批前既有债**（`GlassButton.kt:70` 同口径原话），
-     * 钉「≥3.0 且 <4.5」两向：跌破装饰线要修，真修达正文线也要先撤台账再收本腿。
-     * **修复轮 RED 读数**：改生产前现盘前景是 `appDomain(...).deep` / `colors.text2` 单迁形
-     * （深档 deep 压白 ≈1.69:1、text2 压白 ≈2.21:1），
-     * 本用例红；回退后绿。容器主题化本身归 Task 26/27（R-23.11 未授权本席迁容器）。
+     * 未配置档过正文 4.5 线；已配置档原先是**批前既有债**（`GlassButton.kt:70` 同口径原话），
+     * 按「≥3.0 且 <4.5」两向钉住。
+     * **2026-10-27 轻松档把这个债还清了**：浅套 AiSpeech `deep` 从旧值换成 #1A7A63，压白升到 5.24，
+     * 已过 4.5。按本用例自己写的规矩（「真修达正文线也要先撤台账再收本腿」），这条腿翻成正向
+     * 正文 4.5 下限，`docs/verification` 的 Task 23 节与 `GlassButton.kt` 的债句同时作废。
+     * 容器主题化本身归 Task 26/27（R-23.11 未授权本席迁容器）。
      */
     @Test
     fun `the theme invariant white pill keeps its registered static foregrounds`() {
@@ -493,13 +538,9 @@ class AiBadgeContrastFixTest {
             "未配置档静态墨压白只有 ${"%.2f".format(neutralRatio)}:1（正文档下限 4.5:1）——这枚不是登记债，是真回归",
         )
         assertTrue(
-            configuredRatio >= 3.0,
-            "已配置档静态墨压白跌破 3.0（现 ${"%.2f".format(configuredRatio)}:1）：连装饰档线都守不住了",
-        )
-        assertTrue(
-            configuredRatio < 4.5,
-            "已配置档静态墨压白已达 ${"%.2f".format(configuredRatio)}:1——批前既有债（docs/verification 的 Task 23 节、" +
-                "GlassButton.kt:70）登记失实或取值被改：先撤台账债句与本注记，再翻这条腿的方向",
+            configuredRatio >= 4.5,
+            "已配置档静态墨压白只有 ${"%.2f".format(configuredRatio)}:1——原登记为「批前既有债（≥3.0 且 <4.5）」，" +
+                "2026-10-27 轻松档换墨后应按正文 4.5 下限判；掉回 4.5 以下说明债又回来了，先修墨再谈台账",
         )
     }
 
@@ -507,13 +548,17 @@ class AiBadgeContrastFixTest {
      * R-23.15 保留面 + 评审席 M3 的原始洞：有人把头部渐变徽标的 `tint = colors.onBrand` 顺手改成
      * 白字时，批 3 的三条判据全绿（:101 只算 token×端点、:66 只看文件级子串、:124 看静态读点）。
      * 本腿把「这枚 AppGlyph 调用的实参里有 onBrand、没有 Color.White」钉死（同 m2 的单调用取样单元）。
+     *
+     * 2026-11-02 换锚：取样单元里的字形实参从 `AppIcon.Spark` 换成 `feature.icon`（图标去重的连带改动，
+     * 见 [sharedGlyphAnchor]）。本条钉的仍是「那**一枚**头部渐变徽标调用」——数量仍恒为 1，
+     * 实参仍必须带 onBrand 且不得出现 `Color.White`，判据一字未放宽。
      */
     @Test
     fun `the brand gradient badge keeps its on brand tint`() {
         val source = uiScreenSource("AiFeatureScreen.kt")
-        val sparkCalls = appGlyphCall.findAll(source).map { it.value }.filter { it.contains("AppIcon.Spark") }.toList()
-        assertEquals(1, sparkCalls.size, "AiFeatureScreen 头部渐变徽标的 AppGlyph(Spark) 调用应恰一枚，实际 ${sparkCalls.size}：$sparkCalls")
-        val call = sparkCalls.single()
+        val badgeCalls = appGlyphCall.findAll(source).map { it.value }.filter { it.contains("feature.icon") }.toList()
+        assertEquals(1, badgeCalls.size, "AiFeatureScreen 头部渐变徽标的 AppGlyph(feature.icon) 调用应恰一枚，实际 ${badgeCalls.size}：$badgeCalls")
+        val call = badgeCalls.single()
         assertTrue(
             call.contains("onBrand"),
             "头部渐变徽标的 tint 离开了 on-brand（2026-10-18 裁决 #3；亮度由本类 on_brand… 用例按活 token 复算）：$call",

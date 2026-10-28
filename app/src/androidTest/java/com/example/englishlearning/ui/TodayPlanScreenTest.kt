@@ -2,20 +2,27 @@ package com.example.englishlearning.ui
 
 import android.graphics.Color as AndroidColor
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.WordBookProgress
+import com.example.englishlearning.ui.components.IllustratedIconTag
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -190,7 +197,13 @@ class TodayPlanScreenTest {
     @Test fun word_bank_row_hides_progress_when_it_is_unknown() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
         composeRule.onAllNodesWithText("已学", substring = true).assertCountEquals(0)
-        composeRule.onAllNodesWithText("小学").assertCountEquals(1)
+        // 改期望值（批 1 Task 4）：旧判据是「全屏『小学』恰 1 处」。四段式重排后词书名在
+        // **两处**合法出现——强档卡的词书标题 + 词库行的行标题（`TodayPlanScreen.kt` 的
+        // `today_plan_open_word_bank`），所以全屏计数会误红。判据强度没降：
+        // 「已学」零处这半条原样保留（假进度仍当场红），并改为**点名词库行节点**必须带出词书名。
+        composeRule.onNodeWithTag("today_plan_open_word_bank")
+            .performScrollTo()
+            .assertTextContains("小学")
     }
 
     /** 主 CTA 四态同锚点：新词学完但仍欠复习 →「开始复习」，仍走学习入口。 */
@@ -299,22 +312,51 @@ class TodayPlanScreenTest {
         composeRule.onNodeWithContentDescription("学习工具与设置").assertDoesNotExist()
     }
 
+    /**
+     * 阅读状态行排在主 CTA 之后（信息架构：先「学什么」，再「顺带读」）。
+     *
+     * 为什么用 `positionInRoot` + `size` 而不是 `boundsInRoot.bottom/top`：`boundsInRoot` 是**裁剪后**的矩形，
+     * 这个测试宿主的根窗口只有 `2250×946`px（≈818×344dp，真机像素密度的 946px 高），今日计划屏整卷比它高，
+     * 因此卡片里的 CTA 与它下面那行都落在视口外，两个 `boundsInRoot` 都被裁成 `Rect(0,0,0,0)`——
+     * 于是 `0 > 0` 恒假，判据测的成了窗口高度而不是文档顺序。`positionInRoot` 报的是布局位置（不裁剪），
+     * 用它算「前一块的下沿」与「后一块的上沿」才是这条判据本来要量的东西，且仍要求**严格**先后（`>`，不是 `>=`）。
+     */
     @Test fun reading_is_after_primary_learning_action() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        val primaryBottom = composeRule.onNodeWithTag("today_plan_start_learning").fetchSemanticsNode().boundsInRoot.bottom
-        val readingTop = composeRule.onNodeWithTag("today_plan_reading_status").fetchSemanticsNode().boundsInRoot.top
-        assertTrue("reading should follow the primary learning action", readingTop > primaryBottom)
+        val primary = composeRule.onNodeWithTag("today_plan_start_learning").fetchSemanticsNode()
+        val reading = composeRule.onNodeWithTag("today_plan_reading_status").fetchSemanticsNode()
+        val primaryBottom = primary.positionInRoot.y + primary.size.height
+        val readingTop = reading.positionInRoot.y
+        assertTrue(
+            "reading should follow the primary learning action（CTA 下沿=$primaryBottom，" +
+                "阅读行上沿=$readingTop）",
+            readingTop > primaryBottom,
+        )
     }
 
-    /** 强档卡：深墨实底 `strongSurface` + `onStrong` 墨的权威数字（浅套 `#0C2A22` / `#E9F2EC`）。 */
-    @Test fun ready_strong_card_paints_strong_surface_with_on_strong_ink() {
+    /**
+     * 强档卡的分套层次（2026-10-31 用户评审 ③：「四级词汇 · 开始学习」那块深墨实底太重、喧宾夺主）。
+     *
+     * 浅套底从 `strongSurface`（`#1F4739`）改成 `tint2`（`#E4EFE9`，浅薄荷一档），前景随之从 `onStrong`
+     * 换成 `text1`（`#1F2B26`）；深套一字不动（`#22332C` 压深背景只差一档明度，深底浅字本来就是对的）。
+     * 判据仍是三条合取、温度不变：底色在、前景色在、这一对过 4.5——外加一条反向对偶：
+     * 这张卡的**底**不许再是旧深墨 `#1F4739`（只判前三条会被「上下两块底色都画了」这种半迁移放过）。
+     *
+     * 反向对偶为什么**不能**用 [assertNoRenderedColor] 整卡扫：卡片里嵌着主 CTA（`today_plan_start_learning`），
+     * 它的墨是 `onBrand` `#04241C`（品牌渐变键的深墨），文字抗锯齿把 `#04241C` 与薄荷渐变混出 `#19483A` 一档，
+     * 这枚**合成色**与 `#1F4739` 的欧氏距离只有 6.2（阈值 18.0）——整卡禁色会把合法的 CTA 字形边缘
+     * 判成「旧底色回退」，量的是渲染伪影而不是版式。所以反向对偶改成 [assertCardFillBands]：
+     * 只在只由底色构成的三点上取色（见该函数 KDoc）。
+     */
+    @Test fun ready_strong_card_paints_the_light_tone_and_the_container_ink() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        assertRenderedColor("today_plan_summary", 0xFF0C2A22.toInt())
-        assertRenderedColor("today_plan_total_progress", 0xFFE9F2EC.toInt())
+        assertRenderedColor("today_plan_summary", 0xFFE4EFE9.toInt())
+        assertRenderedColor("today_plan_total_progress", 0xFF1F2B26.toInt())
         assertTrue(
-            "onStrong 压 strongSurface 必须过 4.5:1",
-            contrastRatio(0xFFE9F2EC.toInt(), 0xFF0C2A22.toInt()) >= 4.5,
+            "text1 压 tint2 必须过 4.5:1（浅套强档卡前景的分套墨）",
+            contrastRatio(0xFF1F2B26.toInt(), 0xFFE4EFE9.toInt()) >= 4.5,
         )
+        assertCardFillBands("today_plan_summary", 0xFFE4EFE9.toInt(), 0xFF1F4739.toInt())
     }
 
     /**
@@ -341,16 +383,22 @@ class TodayPlanScreenTest {
     }
 
     /**
-     * 两条裸行的字形各取自己那一域的 `deep`：今日文章走 `Reading`（`#C81E46`）、
-     * 词库走 `Library`（`#8E34B8`），容器仍是中性 `surface`（浅套白）。
+     * 两条裸行各自带一枚**插画**徽标，外卡仍是中性白（2026-10-30 位图档改判：判据随形改，不放宽）。
      *
-     * 这一条替代了被删的「工作量条分段与图例读同一组域色」——工作量条已下线，
-     * 「一屏之内域色只出现在字形上、不铺成色块」这条口径改由这两行承担。
+     * 旧断言取「行内徽标那层域 `deep` 矢量墨」（今日文章 = `Reading #9C3B4F`、词库 = `Library #65478A`）。
+     * 插画档上线后，行内徽标走 `InlineIconBadge` 的插画分支：颜色写在母版位图里（**母版定主域**，
+     * 例如词库那枚是蓝皮合书，不是 Library 的紫），域色只留给兜底的 5 枚豁免字形，旧断言必然判红
+     * （实测最近距离 49.6）。设备侧因此改判两件可执行的事：两行都必须真的挂着插画位图（证明插画分支
+     * 走通、没有静默退回 24×24 线框），且外层软卡仍是中性白（「域色只出现在字形上、不铺成色块」不变）。
      */
-    @Test fun the_two_bare_rows_use_their_own_domain_ink() {
+    @Test fun the_two_bare_rows_carry_illustrated_badges_on_a_neutral_card() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        assertRenderedColor("today_plan_reading_status", 0xFFC81E46.toInt())
-        assertRenderedColor("today_plan_open_word_bank", 0xFF8E34B8.toInt())
+        listOf("today_plan_reading_status", "today_plan_open_word_bank").forEach { tag ->
+            composeRule.onNode(
+                hasTestTag(tag) and hasAnyDescendant(hasTestTag(IllustratedIconTag)),
+                useUnmergedTree = true,
+            ).assertExists()
+        }
         assertRenderedColor("today_plan_secondary_card", 0xFFFFFFFF.toInt())
     }
 
@@ -359,7 +407,7 @@ class TodayPlanScreenTest {
      *
      * 「今天完成了几项」那一格用 `AppType.Display`（44sp），其余数字（小标题、明细注脚）只能是它的注脚。
      * compose-ui 1.10 的语义节点里**没有** FontSize 属性（`SemanticsProperties.FontSize` 在这个 BOM 上不存在），
-     * 所以这里按「渲染高度」复算尺寸；两档的行高与字号成正比（同一字体），所以比值可直接用字号比推算：
+     * 所以改从 `SemanticsActions.GetTextLayoutResult` 取**解析后的字号**（`TextLayoutResult.layoutInput.style.fontSize`）复算：
      *  | 档 | sp | 对 Display（44sp）的字号比 | 本用例采样 |
      *  |---|---|---|---|
      *  | `Display`（今日完成数） | 44 | 1.000 | 参照 |
@@ -373,6 +421,15 @@ class TodayPlanScreenTest {
      * 都会当场红，`Body`（0.341）也落在判红侧（本屏的注脚只许 `Footnote`/`Label`）。
      * 覆盖声明：本条兜住 ≥ `Title`（17sp）的所有升档；`AppType.Display` 全屏恰一枚、`Title` 只给词书名
      * 由 `TodayPlanNumberAuthorityTest` 的源码读数负责（本条只采样固定标签，新标签天然不在名单里）。
+     *
+     * ## 为什么不再按「渲染高度」算（2026-10-26 真机回归）
+     *
+     * 旧版用 `boundsInRoot.height` 当字号比的代理，前提是「两档行高与字号成正比（同一字体）」。
+     * 这个前提在真机上不成立：参照文本是 `2/5`（Roboto 数字，垂直度量约 1.17×字号），
+     * 被采样的注脚是「新学 1/3 · 复习 1/2」（CJK 混排，约 1.43×字号），两者字体族不同。
+     * 小米 M2102J2SC / Android 13 上一条**确实是 13sp Footnote** 的文本量出 51/142 = 0.359 被判红，
+     * 同一用例在 API 30 模拟器上通过——说明失败来自设备字体度量差异，不是排版升档。
+     * 改为直接读解析字号后，比值回到 0.295（= 13/44），判据比原来更严（不再有字体度量抖动余量可吃）。
      */
     @Test fun ready_presents_todays_numbers_with_one_display_authority() {
         composeRule.setContent {
@@ -384,18 +441,17 @@ class TodayPlanScreenTest {
                 ),
             )
         }
-        val display = composeRule.onNodeWithTag("today_plan_total_progress")
-        display.performScrollTo().assertTextEquals("2/5")
-        val displayHeight = display.fetchSemanticsNode().boundsInRoot.height
-        assertTrue("权威数字自身高度为 $displayHeight px，判据失去参照（本用例空转）", displayHeight > 0f)
+        composeRule.onNodeWithTag("today_plan_total_progress").performScrollTo().assertTextEquals("2/5")
+        val displaySize = resolvedFontSizeSp("today_plan_total_progress")
+        assertTrue("权威数字解析字号为 ${displaySize}sp，判据失去参照（本用例空转）", displaySize > 0f)
         listOf(
             "today_plan_task_total",
             "today_plan_progress",
         ).forEach { tag ->
-            val node = composeRule.onNodeWithTag(tag).performScrollTo().fetchSemanticsNode()
-            val ratio = node.boundsInRoot.height / displayHeight
+            val size = resolvedFontSizeSp(tag)
+            val ratio = size / displaySize
             assertTrue(
-                "$tag 的渲染高度 ${node.boundsInRoot.height}px 对权威数字 ${displayHeight}px 的比值=$ratio，" +
+                "$tag 的解析字号 ${size}sp 对权威数字 ${displaySize}sp 的比值=$ratio，" +
                     "超过注脚上限阈值 $MaxFootnoteToDisplayRatio——它没降到注脚档" +
                     "（字号比：Footnote 13/44=0.295、Body 15/44=0.341、Title 17/44=0.386）",
                 ratio <= MaxFootnoteToDisplayRatio,
@@ -463,9 +519,29 @@ class TodayPlanScreenTest {
         )
     }
 
+    /**
+     * 读某个文本节点**解析后**的字号（单位 sp），不依赖渲染边界高度。
+     *
+     * 走 `SemanticsActions.GetTextLayoutResult`（compose-ui 1.10 的语义树里没有 FontSize 属性，
+     * 但每个 `Text` 都会挂这条 action）。用它而不是 `boundsInRoot.height` 的原因见
+     * [ready_presents_todays_numbers_with_one_display_authority] 的「为什么不再按渲染高度算」：
+     * 不同字体族（Roboto 数字 vs CJK 混排）的垂直度量不同，渲染高度比不能当字号比用。
+     */
+    private fun resolvedFontSizeSp(tag: String): Float {
+        val node = composeRule.onNodeWithTag(tag).performScrollTo()
+        val results = mutableListOf<TextLayoutResult>()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        assertEquals(
+            "$tag 的 GetTextLayoutResult 产出 ${results.size} 份布局（期望恰 1 份），取不到解析字号",
+            1,
+            results.size,
+        )
+        return results.single().layoutInput.style.fontSize.value
+    }
+
     private companion object {
         /**
-         * 注脚行高对权威数字（`AppType.Display` 44sp）的上限阈值。
+         * 注脚**解析字号**对权威数字（`AppType.Display` 44sp）的上限阈值。
          *
          * 字号比：Footnote 13/44=0.295、Label 12/44=0.273（放行）、Body 15/44=0.341、
          * Title 17/44=0.386（判红）。0.34 处在 Footnote 与 Title 之间，两侧各留约 0.045。
@@ -512,6 +588,45 @@ class TodayPlanScreenTest {
                 "（最近距离=$nearest，阈值 18.0）",
             nearest > 18.0,
         )
+    }
+
+    /**
+     * 强档卡「底」的三点取样判据：三点都必须是 [expectedFill]，且都不许接近 [forbiddenFill]。
+     *
+     * 三个点位都刻意落在**只由底色构成**的地方，避开一切文字、进度条、主 CTA 及其抗锯齿：
+     *  - 上沿居中、距顶 5dp（在 20dp 圆角之内、18dp 内边距之内）；
+     *  - 左内边带、垂直居中、距左 5dp；
+     *  - 右内边带、垂直居中、距右 5dp。
+     *
+     * 阈值沿用全局 18.0 欧氏距离，与 [assertRenderedColor] 同温；报的是点位坐标与实际色，
+     * 改色时一眼能看出哪条边带先漏。为什么要「取样点」而不是整卡扫，见
+     * [ready_strong_card_paints_the_light_tone_and_the_container_ink] 的 KDoc。
+     */
+    private fun assertCardFillBands(tag: String, expectedFill: Int, forbiddenFill: Int) {
+        val bitmap = composeRule.onNodeWithTag(tag).performScrollTo().captureToImage().asAndroidBitmap()
+        val insetPx = with(composeRule.density) { 5.dp.roundToPx() }
+        val midY = bitmap.height / 2
+        val probes = listOf(
+            "上沿居中" to (bitmap.width / 2 to insetPx),
+            "左内边带" to (insetPx to midY),
+            "右内边带" to (bitmap.width - 1 - insetPx to midY),
+        )
+        probes.forEach { (label, point) ->
+            val pixel = bitmap.getPixel(point.first, point.second)
+            val actual = "(${AndroidColor.red(pixel)},${AndroidColor.green(pixel)},${AndroidColor.blue(pixel)})"
+            assertTrue(
+                "$tag 的$label x=${point.first} y=${point.second} 应是底色" +
+                    "(${AndroidColor.red(expectedFill)},${AndroidColor.green(expectedFill)},${AndroidColor.blue(expectedFill)})，" +
+                    "实际 $actual（距离=${colorDistance(pixel, expectedFill)}，阈值 18.0）",
+                colorDistance(pixel, expectedFill) <= 18.0,
+            )
+            assertTrue(
+                "$tag 的$label 不许是旧深墨底" +
+                    "(${AndroidColor.red(forbiddenFill)},${AndroidColor.green(forbiddenFill)},${AndroidColor.blue(forbiddenFill)})，" +
+                    "实际 $actual（距离=${colorDistance(pixel, forbiddenFill)}，阈值 18.0）",
+                colorDistance(pixel, forbiddenFill) > 18.0,
+            )
+        }
     }
 
     private fun colorDistance(actual: Int, expected: Int): Double {

@@ -169,13 +169,19 @@ class ThemeModeSwitchTest {
      * 本用例就是把那枚缺陷钉成像素判据：容器底必须是**当前主题的 surface**，而不是永远 `#FFFFFFFF`。
      *
      * **判据对象在批 1 Task 4 换过一次**，换的理由留在原处而不是悄悄改锚：原先取的是「今日学习进度」卡
-     * （`today_plan_progress_summary`）；版式重做后那张卡升格为强档卡，容器画 `strongSurface`
-     * （浅套 #0C2A22 / 深套 #1E2B25，前景 `onStrong`），它与深套 `tint`（#1C2C26）只差 2 个通道，
+     * （`today_plan_progress_summary`）；版式重做后那张卡升格为强档卡，深套容器画 `strongSurface`
+     * （前景 `onStrong`），它与深套相邻填充（`tint` / `background`）只差个位数通道，
      * 本用例的「容差 2 / 相邻档门槛 4」在强档卡上会当场失守，而放大容差就是放「漏画容器」过去。
      * 于是对象换成**仍然画 `surface` 的那块业务容器**——两条裸行同住的软档卡：缺陷形状不变
      * （容器读点跟不跟主题）、期望 token 不变、三条自检的实测数值也不变（它们本来就是按 `surface`
-     * 与相邻三档的间距算的）。强档卡自己的配对（`strongSurface` 底 + `onStrong` 墨）由 connected 的
-     * `TodayPlanScreenTest.ready_strong_card_paints_strong_surface_with_on_strong_ink` 承担。
+     * 与相邻三档的间距算的）。
+     *
+     * 注意这条换锚只跟**深套**有关：浅套的强档卡在 2026-10-31 用户评审 ③ 之后不再用 `strongSurface`
+     * （浅底「深墨实底太重、喧宾夺主」），改画 `tint2` 底 + `text1` 墨；深套一字未动，仍是
+     * `strongSurface` 底 + `onStrong` 墨，所以上面「深套相邻档只差个位数通道」的理由继续成立。
+     * 强档卡自己的配对由 connected 的
+     * `TodayPlanScreenTest.ready_strong_card_paints_the_light_tone_and_the_container_ink` 承担
+     * （浅套 `tint2` 底 + `text1` 墨，并反向钉住旧深墨底不许回流）。
      *
      * 三条取样口径，都不是随手写的：
      *  - **偏好显式写 `ThemeMode.Dark`，不再走「与平台相反」那一档**：本类前两已经把「prefs 压过平台」与
@@ -278,28 +284,36 @@ class ThemeModeSwitchTest {
     }
 
     /**
-     * AI 服务列表行（修复轮 C-1 那一处）的**配对像素**：容器必须画深套 `surface`，
-     * 且同一行里离容器对比度最远的那枚像素（墨核）压容器必须到正文 AA 4.5:1。
+     * AI 服务列表行（修复轮 C-1 那一处，批 4 Task 3 改成裸行）的**配对像素**：行底不再有卡片填充，
+     * 透出的就是页底（`appColors().background`）——同一行里离底色对比度最远的那枚像素（墨核）
+     * 压这枚底色必须到正文 AA 4.5:1。
      *
      * 为什么还要这条，静态判据（`ContainerInkPairingContractTest`）不够吗：
      * 静态判据只证「源码里那一行写了显式 `color =`」，证不到**组合期取到的那枚色真的是本套墨**。
-     * 浅套写死的 `AppType.*` 静态墨（#1C1C1E）压深套 `surface`（#17201C）实测 ≈1.05:1，
+     * 浅套写死的 `AppType.*` 静态墨（#1C1C1E）压深套页底（#111A16）实测 ≈1.05:1，
      * 也就是批 1 终审 F4 / AC-R-11 说的那一侧：容器迁了、墨没迁，字当场消失。
      * 本例把这枚缺陷钉成像素判据，且判据取「最远像素」而不是「最暗像素」——
-     * 深套正文墨是**浅**色（text1 #E9F2EC），按最暗取会取到容器本身，比值恒等于 1，用例恒红。
+     * 深套正文墨是**浅**色（text1 #E9F2EC），按最暗取会取到页面底色，比值恒等于 1，用例恒红。
+     *
+     * 批 4 Task 3 改动（旧期望值失效，按新容器重算）：
+     *  - 列表行从「描边 `Surface` 卡」改成共享 `BareRow`（spec §4.3：同组靠发丝线 + 52dp 缩进表达），
+     *    行自身**不再画** `surface`，取样众数因此是页底 `background`。旧期望值 `AppColorDark.surface`
+     *    (#17201C) 与页底 (#111A16) 只差 11 档，两个断言都还过得去，但会把「行底漏画卡片」这件事
+     *    从「判红」变成「判绿」——所以期望值必须跟着容器改，且下面补一条反向自检钉住「行底不是 surface」。
+     *  - 行标题仍取未合并树的叶子节点；副标题（`text2`）不进来，判据仍只量标题那一段字。
      *
      * 取样口径两条：
-     *  - **容器底色取整行像素直方图的众数**，不取固定坐标：这一行右侧还要排密钥状态徽标与两个默认位图标，
-     *    任取一列都可能量到图标。填充是面积最大的一档，字身/描边/图标都是少数派，众数即容器。
+     *  - **行底色取整行像素直方图的众数**，不取固定坐标：这一行右侧还要排密钥状态尾部与能力标签，
+     *    任取一列都可能量到图标或色块。填充/透底是面积最大的一档，字身/描边/图标都是少数派，众数即行底。
      *  - **墨核取标题那个 `Text` 节点的边界内**：节点边界就是这几行字的排版区，
-     *    边界里除字就是容器底，所以「离众数最远的像素」就是墨核（抗锯齿边缘只是次远，不影响比值下限）。
+     *    边界里除字就是行底，所以「离众数最远的像素」就是墨核（抗锯齿边缘只是次远，不影响比值下限）。
      *
      * 阈值 4.5 沿用本仓正文 AA 口径（`EntryRowInkTest`、`InlineNoticeKindTest` 同一档），
      * 亮度/比值公式与 JVM 侧 `SourceRatchet.luminance/ratio` 同式：那份在 `src/test`，
      * `androidTest` 编译期看不见，只能按同一公式在此复刻一份，注释互相点名以免两条口径漂移。
      */
     @Test
-    fun the_ai_profile_row_paints_theme_ink_on_the_migrated_container_in_dark_mode() {
+    fun the_ai_profile_bare_row_paints_theme_ink_over_the_page_background_in_dark_mode() {
         AppThemePreferences.write(appContext, ThemeMode.Dark)
         composeRule.setContent {
             MintGlassTheme(themeMode = rememberAppThemeMode()) {
@@ -313,8 +327,8 @@ class ThemeModeSwitchTest {
                     onDraftChange = {},
                     onSave = {},
                     onCloseEditor = {},
-                    onDeleteProfile = {},
-                    onDeleteKey = {},
+                    onRequestDeleteProfile = {},
+                    onRequestDeleteKey = {},
                     onBack = {},
                 )
             }
@@ -323,26 +337,34 @@ class ThemeModeSwitchTest {
         composeRule.onNodeWithTag(rowTag).performScrollTo()
 
         val container = dominantRgb(rowTag)
-        val darkSurface = surfaceRgb(AppColorDark)
+        val darkBackground = backgroundRgb(AppColorDark)
         assertEquals(
-            "AI 服务行容器必须画深套 surface（修复轮把这里从静态 AppPalette.Surface 迁成 appColors().surface，" +
-                "迁移读点没接到组合期套色时这里是白底）：期望 $darkSurface ±$SURFACE_CHANNEL_TOLERANCE，实际 $container",
+            "AI 服务裸行的行底必须是深套页底 background（写静态 AppPalette.Surface 时这里是白底，" +
+                "即真机实勘那处「白底 + 主题浅墨」）：期望 $darkBackground ±$SURFACE_CHANNEL_TOLERANCE，实际 $container",
             0,
-            maxChannelDelta(container, surfaceRgb(AppColorDark))
+            maxChannelDelta(container, darkBackground)
                 .let { if (it <= SURFACE_CHANNEL_TOLERANCE) 0 else it },
+        )
+        // 反向自检（批 4 Task 3 新增，替代旧「容器必须是 surface」那条的判别力）：裸行**不该**再画卡片填充。
+        // 若有人把行底重新包成 `surface` 卡，本行当场判红——「行底是 background」这条断言因此不会与
+        // 「画了 surface 也算过」的宽判据混为一谈（两档在深套只差 11 档，容差 2 分得开）。
+        assertTrue(
+            "AI 服务裸行不该再有自己的卡片填充（spec §4.3 裸行靠发丝线分组）：实测行底 $container，" +
+                "离深套 surface ${surfaceRgb(AppColorDark)} 只有 ${maxChannelDelta(container, surfaceRgb(AppColorDark))} 档",
+            SURFACE_CHANNEL_TOLERANCE < maxChannelDelta(container, surfaceRgb(AppColorDark)),
         )
 
         val inkCore = extremeContrastRgb(AI_PROFILE_TITLE_TEXT, container)
         val contrast = contrastRatio(inkCore, container)
         assertTrue(
-            "行标题墨压该行容器必须达正文 AA $NORMAL_TEXT_AA_RATIO:1（浅套写死的 AppType 静态墨压深套 surface " +
-                "只有约 1.05:1，即「容器迁了墨没迁」那一侧）：墨核 $inkCore，容器 $container，实测 $contrast",
+            "行标题墨压该行底色必须达正文 AA $NORMAL_TEXT_AA_RATIO:1（浅套写死的 AppType 静态墨压深套页底 " +
+                "只有约 1.05:1，即「容器迁了墨没迁」那一侧）：墨核 $inkCore，行底 $container，实测 $contrast",
             NORMAL_TEXT_AA_RATIO <= contrast,
         )
-        // 自检：墨核不能就是容器本身。若取样区里根本没字（文案改了、节点空了），
-        // 上面那条对比断言会退化成「容器压容器 = 1:1」而判红——这条把失配原因先说清，避免误读成配色回归。
+        // 自检：墨核不能就是行底本身。若取样区里根本没字（文案改了、节点空了），
+        // 上面那条对比断言会退化成「底色压底色 = 1:1」而判红——这条把失配原因先说清，避免误读成配色回归。
         assertTrue(
-            "墨核必须与容器底不同像素，否则本用例量到的可能是空白区而不是字身：墨核 $inkCore，容器 $container",
+            "墨核必须与行底不同像素，否则本用例量到的可能是空白区而不是字身：墨核 $inkCore，行底 $container",
             inkCore != container,
         )
     }

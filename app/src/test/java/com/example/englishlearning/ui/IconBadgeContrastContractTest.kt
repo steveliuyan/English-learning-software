@@ -9,10 +9,12 @@ import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.graphics.vector.VectorGroup
 import androidx.compose.ui.graphics.vector.VectorPath
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.components.AccentlessIcons
 import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.DuotoneFillAlpha
 import com.example.englishlearning.ui.components.StrokeOnlyIcons
+import com.example.englishlearning.ui.components.accentInkForGradient
 import com.example.englishlearning.ui.components.allowsInEntryContainer
 import com.example.englishlearning.ui.components.buildAppImageVector
 import com.example.englishlearning.ui.components.circleFillPathData
@@ -99,6 +101,49 @@ class IconBadgeContrastContractTest {
     /** 计划原文的混色入口：只要 RGB 三字节（白字形比值不关心 alpha）。 */
     private fun mixHex(from: Int, to: Int, fraction: Double): Int = mixArgb(from, to, fraction) and 0xFFFFFF
 
+    /**
+     * 逐通道乘 `(1 - fraction)`（强调层压暗规则的测试端独立实现，与生产 `IconBadge.darkenArgb` 零共享）。
+     * alpha 恒置满：强调层必须不透明，这条在 [accent_ink_stays_opaque_whatever_the_domain_color_is] 里单独钉。
+     */
+    private fun darkenArgb(from: Int, fraction: Double): Int {
+        fun channel(shift: Int): Int {
+            val v = (from shr shift) and 0xFF
+            return (v * (1 - fraction)).roundToInt().coerceIn(0, 255)
+        }
+        return (0xFF shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+    }
+
+    /**
+     * 半透明前景压不透明底：`fg` 权重 `alpha`、`bg` 权重 `1 - alpha`，字节域四舍五入，返回 RGB。
+     * 底幅是「不透明墨按主题 α 稀释后压在容器底上」，屏幕看到的正是这一层合成色，
+     * 强调层与底幅的比值必须按合成后的颜色算——拿未经稀释的墨去比会高估一倍。
+     */
+    private fun overArgb(fg: Int, alpha: Double, bg: Int): Int {
+        fun channel(shift: Int): Int {
+            val f = (fg shr shift) and 0xFF
+            val b = (bg shr shift) and 0xFF
+            return (f * alpha + b * (1 - alpha)).roundToInt().coerceIn(0, 255)
+        }
+        return (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+    }
+
+    /**
+     * 强调层的压暗比重，必须与生产 `IconBadge.kt` 的 `ACCENT_DARKEN_FRACTION` 同值。
+     * 与 [gradientStartFraction] 同一口径：本类**有意**走第二份实现，一侧漂移由
+     * [accent_ink_is_produced_by_the_darken_rule_channel_by_channel] 判红，两侧一起改由
+     * [accent_darken_fraction_is_pinned_to_the_three_to_one_solved_value] 按源码字面量判红。
+     */
+    private val accentDarkenFraction = 0.22
+
+    /**
+     * 入口容器亮端的混比，必须与生产 `IconBadge.kt` 的 `GRADIENT_START_FRACTION` 同值：
+     * 本类**有意**走第二份混色实现（[mixArgb]），所以这里再抄一个分数不算「两面同源」——
+     * 一侧漂移会让 [gradient_start_endpoints_match_the_independent_mix_channel_by_channel] 当场红，
+     * 两侧一起改则由 [gradient_start_fraction_is_pinned_to_the_relaxed_palette_value] 按源码字面量钉红。
+     * 2026-10-27 轻松档：0.35 → 0.18，容器从「一块彩色渐变」变成「近乎纯色」。
+     */
+    private val gradientStartFraction = 0.18
+
     // ---------- 读取与守卫 ----------
 
     /**
@@ -150,7 +195,7 @@ class IconBadgeContrastContractTest {
     /** 禁止形状：入口族之外的旧 24dp 锚点串残留（字形度量必须只有 22dp 一档，Task 10 R-10.3）。 */
     private val legacyEntryGlyphSize = Regex("""size\s*=\s*24\.dp""")
 
-    /** 禁止形状：入口实底档调用段里显式写 `layer =`——两层口径靠默认值承载，写死即改口径。 */
+    /** 禁止形状：入口实底档调用段里显式写 `layer =`——三层口径靠默认值承载，写死即改口径。 */
     private val explicitLayerArgument = Regex("""layer\s*=""")
 
     /** 豁免表强制：入口容器开头必须由纯函数判定挡住豁免枚。 */
@@ -200,6 +245,12 @@ class IconBadgeContrastContractTest {
     /** 填充层不透明度是主题取值，只能问 `DuotoneFillAlpha.forTheme`，不得把档位抄进渲染码。 */
     private val themedFillAlphaRead = Regex("""DuotoneFillAlpha\.forTheme\(""")
 
+    /** 强调层压暗比重（裁决 D1）：0.22 是「压暗后过 3:1」反推出来的最小整数档，按源码字面量钉死。 */
+    private val accentDarkenRule = Regex("""private const val ACCENT_DARKEN_FRACTION = 0\.22\b""")
+
+    /** 入口实底档必须把强调墨真正传给字形：参数接进去却没用画笔画，等于第三层不存在。 */
+    private val entrySolidAccentArgument = Regex("""accent\s*=\s*accentInk""")
+
     /** 组装结果必须按输入缓存：图标、色、描边倍率任一变化都要重建，否则换色不换形。 */
     private val cacheKeyedOnInputs = Regex("""remember\(\s*icon\s*,\s*tint\s*,\s*strokeScale""")
 
@@ -239,7 +290,7 @@ class IconBadgeContrastContractTest {
     fun white_glyph_on_every_domain_gradient_start_clears_3_to_1() {
         val white = 0xFFFFFF
         DomainLight.forEach { (domain, p) ->
-            val start = mixHex(argbOf(p.deep), argbOf(p.base), 0.35)
+            val start = mixHex(argbOf(p.deep), argbOf(p.base), gradientStartFraction)
             val r = ratio(white, start)
             assertTrue(r >= 3.0, "$domain 容器亮端 #%06X 上白字形 %.2f:1 不足 3:1".format(start and 0xFFFFFF, r))
         }
@@ -352,24 +403,25 @@ class IconBadgeContrastContractTest {
     @Test
     fun gradient_start_endpoints_match_the_independent_mix_channel_by_channel() {
         DomainLight.forEach { (domain, p) ->
-            val expected = mixArgb(argbOf(p.deep), argbOf(p.base), 0.35)
+            val expected = mixArgb(argbOf(p.deep), argbOf(p.base), gradientStartFraction)
             val actual = argbOf(gradientStartForDomain(p.deep, p.base))
             assertEquals((expected shr 16) and 0xFF, (actual shr 16) and 0xFF, "$domain 红通道偏离测试端独立复算")
             assertEquals((expected shr 8) and 0xFF, (actual shr 8) and 0xFF, "$domain 绿通道偏离测试端独立复算")
             assertEquals(expected and 0xFF, actual and 0xFF, "$domain 蓝通道偏离测试端独立复算")
             assertEquals((expected shr 24) and 0xFF, (actual shr 24) and 0xFF, "$domain alpha 通道偏离测试端独立复算")
-            // 反空转：分数换成 0.5 的端点必须与 0.35 的端点不同，否则逐通道比对没有把关对象。
+            // 反空转：分数换成 0.5 的端点必须与生产分数（[gradientStartFraction]）的端点不同，
+            // 否则逐通道比对没有把关对象。
             assertNotEquals(
                 expected,
                 mixArgb(argbOf(p.deep), argbOf(p.base), 0.5),
-                "合成负例失效：$domain 在 0.35 与 0.5 两档混出同一点（fraction 写错也测不出）"
+                "合成负例失效：$domain 在 $gradientStartFraction 与 0.5 两档混出同一点（fraction 写错也测不出）"
             )
         }
         // 反空转：参数写反（拿 base 当主色）必须被同一条口径抓住，且生产函数必须辨得出顺序。
         val ai = DomainLight.getValue(AppDomain.AiSpeech)
         assertNotEquals(
-            mixArgb(argbOf(ai.deep), argbOf(ai.base), 0.35),
-            mixArgb(argbOf(ai.base), argbOf(ai.deep), 0.35),
+            mixArgb(argbOf(ai.deep), argbOf(ai.base), gradientStartFraction),
+            mixArgb(argbOf(ai.base), argbOf(ai.deep), gradientStartFraction),
             "合成负例失效：deep/base 顺序颠倒仍算同一点",
         )
         assertNotEquals(
@@ -381,15 +433,33 @@ class IconBadgeContrastContractTest {
 
     @Test
     fun gradient_start_mixes_alpha_and_keeps_opaque_endpoints_opaque() {
-        val deep = Color(0x80188F76)
-        val base = Color(0xFF2EC99C)
+        val deep = Color(0x801A7A63)
+        val base = Color(0xFF6CCBAB)
         assertEquals(
-            mixArgb(argbOf(deep), argbOf(base), 0.35),
+            mixArgb(argbOf(deep), argbOf(base), gradientStartFraction),
             argbOf(gradientStartForDomain(deep, base)),
             "半透明端点的混色必须连 alpha 一起插值（alpha 被丢掉或被写死都会在这里爆）",
         )
-        val opaque = argbOf(gradientStartForDomain(Color(0xFF188F76), Color(0xFF2EC99C)))
+        val opaque = argbOf(gradientStartForDomain(Color(0xFF1A7A63), Color(0xFF6CCBAB)))
         assertEquals(0xFF, (opaque shr 24) and 0xFF, "两套域色都是不透明端点，混出的亮端也必须完全不透明")
+    }
+
+    /**
+     * 生产那枚分数按源码字面量钉住。
+     *
+     * 上面几条「两端算出同一点」的用例只发现得了**一侧**漂移；把本类常量与生产常量同时改成别的值
+     * 它会全绿——但那是设计裁决变更，必须让一条字面量钉红一次，逼改动者先改决策文档与设计稿。
+     * 断言用「恰一处」而非「出现过」：多出一处同名常量（第二套容器口径）同样要红。
+     */
+    @Test
+    fun gradient_start_fraction_is_pinned_to_the_relaxed_palette_value() {
+        val badge = uiComponentSource(BADGE_SOURCE_NAME)
+        assertEquals(
+            1,
+            countMatches(badge, Regex("""private const val GRADIENT_START_FRACTION = 0\.18\b""")),
+            "入口容器渐变亮端混比必须恰为 0.18（2026-10-27 轻松档裁决：0.35 的容器读成「一块彩色渐变」，" +
+                "与「低压力、近乎纯色」方向相反）；改这枚数等于改设计裁决，先改决策文档与本钉值。",
+        )
     }
 
     // ---------- 用例：组装契约（修复轮 I-1：`CircleFill` 解释与两种层必须被真断言守住） ----------
@@ -409,19 +479,45 @@ class IconBadgeContrastContractTest {
         }
     }
 
-    /** 填充层：组装时只给 `fill`，不带 stroke；骨架层反之。层身份由画笔存在性区分，与书写顺序无关。 */
-    private fun fillLayers(vector: ImageVector): List<VectorPath> = pathsOf(vector).filter { it.stroke == null }
+    /**
+     * 三层判定（2026-10-28，裁决 D1 把强调层接进组装之后）：填充 / 强调 / 骨架各自的画笔指纹。
+     *
+     * 三层的区别不只是「有没有 stroke」——底幅与强调层都是纯填充，只有 alpha 能把它们分开：
+     * 底幅按主题稀释（`DuotoneFillAlpha.forTheme`），强调层恒不透明。所以：
+     *  - [fillLayers] = 只给 `fill`、且 alpha **小于**不透明；
+     *  - [accentLayers] = 只给 `fill`、且 alpha **恰为** 255；
+     *  - [strokeLayers] = 带 `stroke`。
+     * 这三条合起来覆盖全部画笔组合，任何一条路径都躲不进「既不算填充也不算强调」的缝里
+     * （[every_path_in_the_vector_is_one_of_the_three_layers] 钉这条）。
+     */
+    private fun fillLayers(vector: ImageVector): List<VectorPath> =
+        pathsOf(vector).filter { it.stroke == null && alphaByteOf(it) < 255 }
+
+    private fun accentLayers(vector: ImageVector): List<VectorPath> =
+        pathsOf(vector).filter { it.stroke == null && alphaByteOf(it) == 255 }
 
     private fun strokeLayers(vector: ImageVector): List<VectorPath> = pathsOf(vector).filter { it.stroke != null }
+
+    /** 纯填充路径的 alpha 字节；拿不到 `SolidColor` 就当场炸（渐变画笔在字形里没有合法用例）。 */
+    private fun alphaByteOf(path: VectorPath): Int {
+        val brush = path.fill as? SolidColor
+            ?: fail("填充层画笔不是 SolidColor，层身份无从判定：${path.fill}")
+        return (brush.value.toArgb() shr 24) and 0xFF
+    }
+
+    /** 纯填充路径的颜色字节（RGB），强调层取色契约按它比对。 */
+    private fun rgbByteOf(path: VectorPath): Int {
+        val brush = path.fill as? SolidColor
+            ?: fail("填充层画笔不是 SolidColor，取色无从判定：${path.fill}")
+        return brush.value.toArgb() and 0xFFFFFF
+    }
 
     /**
      * 填充不透明度落在 `SolidColor` 的颜色 alpha 上（Compose 的 `Color` 是 8-bit 量化的），
      * 所以主题档比对按字节做，容得下 1/255 的量化差；档位抄错（0.42 写成 0.30 一类）差 30 个字节，照样判红。
      */
     private fun alphaMatchesTheme(path: VectorPath, isDark: Boolean): Boolean {
-        val brush = path.fill as? SolidColor
-            ?: fail("填充层画笔不是 SolidColor，主题档无从复算：${path.fill}")
-        val actual = (brush.value.toArgb() shr 24) and 0xFF
+        val actual = alphaByteOf(path)
         val expected = (DuotoneFillAlpha.forTheme(isDark) * 255f).roundToInt()
         return abs(actual - expected) <= 1
     }
@@ -544,7 +640,13 @@ class IconBadgeContrastContractTest {
         }
     }
 
-    /** 层开关是组装期的真分支：Duotone 两层都在、StrokeOnly 只剩骨架。 */
+    /**
+     * 层开关是组装期的真分支：Duotone 三层都在（底幅 + 强调 + 骨架），StrokeOnly 只剩骨架。
+     *
+     * 强调层的存在是 2026-10-28 裁决 D1 的落点：`AppIcons.kt` 里逐枚写好的 `accentPaths` 此前从未进过画布，
+     * 字形实际只有「半透明底幅 + 白描边」两层——24dp 画布上所有字形退化成同一档线框，
+     * 这正是「单调、没有绘画感」的直接根因。本用例按 Search 的冻结数据复算三层枚数。
+     */
     @Test
     fun assembled_vector_keeps_both_layers_for_duotone_and_only_the_skeleton_for_stroke_only() {
         val duotone = buildAppImageVector(AppIcon.Search, Color.White, 1f, AppGlyphLayer.Duotone, false)
@@ -556,23 +658,76 @@ class IconBadgeContrastContractTest {
             strokeLayers(duotone).isNotEmpty() && strokeLayers(duotone).all { it.pathData.isNotEmpty() },
             "Duotone 的骨架层没有可画节点：字形不会画出来",
         )
+        assertEquals(
+            AppIcon.Search.spec.accentPaths.size,
+            accentLayers(duotone).size,
+            "Duotone 的强调层枚数不等于冻结数据：`accentPaths` 没进组装（裁决 D1 回归锁）",
+        )
+        assertTrue(
+            accentLayers(duotone).all { it.pathData.isNotEmpty() && alphaByteOf(it) == 255 },
+            "强调层必须是可画且**不透明**的路径：稀释后与底幅的明度差会被吃掉，等于白画一层",
+        )
 
         val strokeOnly = buildAppImageVector(AppIcon.Search, Color.White, 1f, AppGlyphLayer.StrokeOnly, false)
         assertTrue(fillLayers(strokeOnly).isEmpty(), "StrokeOnly 仍长出填充层：30dp 行内的单层口径失效")
+        assertTrue(accentLayers(strokeOnly).isEmpty(), "StrokeOnly 仍长出强调层：行内只画骨架这一条口径失效")
         assertTrue(strokeLayers(strokeOnly).all { it.pathData.isNotEmpty() }, "StrokeOnly 的骨架为空：行内字形不会画出来")
 
-        // 反空转（合成反例）：一条 pathData 为空的填充路径必须让同一个 all{} 判据变红，否则 all{} 是空转。
+        // 反空转（合成反例）：一条 pathData 为空的**底幅**填充路径必须让同一个 all{} 判据变红，否则 all{} 是空转。
         val emptyFill = ImageVector.Builder(
             name = "SyntheticEmptyFill",
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
             viewportWidth = 24f,
             viewportHeight = 24f,
-        ).addPath(pathData = emptyList(), fill = SolidColor(Color.White)).build()
-        assertEquals(1, fillLayers(emptyFill).size, "合成反例失控：空 pathData 的填充路径没被识别成填充层")
+        ).addPath(
+            pathData = emptyList(),
+            fill = SolidColor(Color.White.copy(alpha = DuotoneFillAlpha.forTheme(false))),
+        ).build()
+        assertEquals(1, fillLayers(emptyFill).size, "合成反例失控：空 pathData 的底幅填充没被识别成填充层")
         assertFalse(fillLayers(emptyFill).all { it.pathData.isNotEmpty() }, "合成反例失控：零节点填充被判为合格")
         // 反空转：把 layer 实参写错成 Duotone 的调用形状（行内误用两层）必须由填充层断言抓住。
         assertEquals(1, fillLayers(duotone).size, "Search 的填充层数量与冻结数据不符（两条填充层就是两套口径）")
+        // 反空转（层身份的真判据是 alpha 而不是「有没有 stroke」）：不透明填充必须落进强调层、不进底幅层，
+        // 否则本用例的 accentLayers 恒空、「强调层到底画没画」根本无从判定。
+        val syntheticAccent = ImageVector.Builder(
+            name = "SyntheticAccent",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).addPath(pathData = nodesOf("M4 4h8v8H4z"), fill = SolidColor(Color.Red)).build()
+        assertEquals(0, fillLayers(syntheticAccent).size, "合成反例失控：不透明填充被算进底幅层，两层判据混成一档")
+        assertEquals(1, accentLayers(syntheticAccent).size, "合成反例失控：不透明填充没被识别成强调层")
+    }
+
+    /** 每一条路径都必须落进三层之一：有画笔组合能躲过三个筛选，「三层」就是句空话。 */
+    @Test
+    fun every_path_in_the_vector_is_one_of_the_three_layers() {
+        AppIcon.entries.forEach { icon ->
+            listOf(false, true).forEach { isDark ->
+                val vector = buildAppImageVector(icon, Color.White, 1f, AppGlyphLayer.Duotone, isDark)
+                val layered = fillLayers(vector).size + accentLayers(vector).size + strokeLayers(vector).size
+                assertEquals(
+                    pathsOf(vector).size,
+                    layered,
+                    "$icon（isDark=$isDark）有路径既不算底幅、也不算强调、也不算骨架：三层筛选漏了一档画笔组合",
+                )
+                // 三层顺序也得对：底幅在下、强调居中、骨架在上——强调层被骨架压住才不会糊掉轮廓。
+                val rank = pathsOf(vector).map { path ->
+                    when {
+                        path.stroke != null -> 2
+                        alphaByteOf(path) == 255 -> 1
+                        else -> 0
+                    }
+                }
+                assertEquals(
+                    rank.sorted(),
+                    rank,
+                    "$icon（isDark=$isDark）三层顺序乱了（应为 底幅 → 强调 → 骨架），实际：$rank",
+                )
+            }
+        }
     }
 
     /** 33 枚全遍历：删掉标记解释、改描边重量、改主题档，都会在这里变红。 */
@@ -596,7 +751,7 @@ class IconBadgeContrastContractTest {
                     }
                     val fills = fillLayers(duotone)
                     if (icon in StrokeOnlyIcons) {
-                        assertTrue(fills.isEmpty(), "$icon 属两层豁免表，却在 Duotone 档长出填充层")
+                        assertTrue(fills.isEmpty(), "$icon 属三层结构豁免表，却在 Duotone 档长出填充层")
                     } else {
                         assertTrue(
                             fills.isNotEmpty() && fills.all { it.pathData.isNotEmpty() },
@@ -610,12 +765,33 @@ class IconBadgeContrastContractTest {
                         }
                     }
 
+                    // 强调层（裁决 D1）：`AccentlessIcons` 之外必须逐条落进画布且不透明；表内一枚都不许有。
+                    val accents = accentLayers(duotone)
+                    if (icon in AccentlessIcons) {
+                        assertTrue(
+                            accents.isEmpty(),
+                            "$icon 在强调层豁免表里，却在 Duotone 档长出强调层：实心感已由底幅承担，再叠一层是重复",
+                        )
+                    } else {
+                        assertEquals(
+                            icon.spec.accentPaths.size,
+                            accents.size,
+                            "$icon 的强调层枚数与冻结数据不符（strokeScale=$strokeScale / isDark=$isDark）：" +
+                                "`accentPaths` 没进组装就是「单调线框」复发",
+                        )
+                        assertTrue(
+                            accents.all { it.pathData.isNotEmpty() && alphaByteOf(it) == 255 },
+                            "$icon 的强调层必须可画且不透明：稀释或空路径都等于没画第三层",
+                        )
+                    }
+
                     val strokeOnly = buildAppImageVector(icon, Color.White, strokeScale, AppGlyphLayer.StrokeOnly, isDark)
                     assertTrue(
                         strokeLayers(strokeOnly).all { it.pathData.isNotEmpty() },
                         "$icon 的 StrokeOnly 档骨架为空（strokeScale=$strokeScale / isDark=$isDark）",
                     )
                     assertTrue(fillLayers(strokeOnly).isEmpty(), "$icon 的 StrokeOnly 档仍带填充层")
+                    assertTrue(accentLayers(strokeOnly).isEmpty(), "$icon 的 StrokeOnly 档仍带强调层")
                 }
             }
         }
@@ -633,7 +809,7 @@ class IconBadgeContrastContractTest {
     @Test
     fun entry_badge_rejects_stroke_only_glyphs() {
         StrokeOnlyIcons.forEach { icon ->
-            assertFalse(allowsInEntryContainer(icon), "$icon 属两层豁免表，只作行内/尾部指示，不得进入 ≥40dp 入口容器")
+            assertFalse(allowsInEntryContainer(icon), "$icon 属三层结构豁免表，只作行内/尾部指示，不得进入 ≥40dp 入口容器")
         }
         AppIcon.entries.filterNot { it in StrokeOnlyIcons }.forEach { icon ->
             assertTrue(allowsInEntryContainer(icon), "$icon 不在豁免表里，入口容器没有理由拒它")
@@ -647,7 +823,7 @@ class IconBadgeContrastContractTest {
         )
     }
 
-    /** 豁免枚的路径数据本身必须是裸描边：入口判定函数与两层口径不能各说各话。 */
+    /** 豁免枚的路径数据本身必须是裸描边：入口判定函数与三层口径不能各说各话。 */
     @Test
     fun exempt_glyphs_really_have_no_fill_layer_to_hide() {
         StrokeOnlyIcons.forEach { icon ->
@@ -730,7 +906,7 @@ class IconBadgeContrastContractTest {
             assertEquals(
                 0,
                 countMatches(call, explicitLayerArgument),
-                "入口实底档把 layer 实参写死了：默认两层口径被改成显式口径（追加 modifier 一类合法实参不在禁止范围）",
+                "入口实底档把 layer 实参写死了：默认三层口径被改成显式口径（追加 modifier 一类合法实参不在禁止范围）",
             )
         }
         assertEquals(0, countMatches(badge, legacyEntryGlyphSize), "入口族字形度量已统一到 22dp：残留 size = 24.dp 就是第二套度量")
@@ -796,7 +972,7 @@ class IconBadgeContrastContractTest {
             val solidInk = if (isDark) rgbOf(set.onBrand) else 0xFFFFFF
             table.forEach { (domain, p) ->
                 val deep = rgbOf(p.deep)
-                val solidBackdrop = mixHex(argbOf(p.deep), argbOf(p.base), 0.35)
+                val solidBackdrop = mixHex(argbOf(p.deep), argbOf(p.base), gradientStartFraction)
                 val solidRatio = ratio(solidInk, solidBackdrop)
                 assertTrue(
                     solidRatio >= 3.0,
@@ -832,6 +1008,148 @@ class IconBadgeContrastContractTest {
         )
     }
 
+    // ---------- 用例：强调层（2026-10-28 裁决 D1） ----------
+
+    /**
+     * 强调层取色的独立复算：生产 `accentInkForGradient` 必须等于「域 deep 逐通道压暗 22%」。
+     * 两侧各写一份实现是本类一贯的口径（同 [mixArgb]）：共用一份就退化成「函数返回它自己」。
+     */
+    @Test
+    fun accent_ink_is_produced_by_the_darken_rule_channel_by_channel() {
+        DomainLight.forEach { (domain, p) ->
+            val expected = darkenArgb(argbOf(p.deep), accentDarkenFraction)
+            val actual = argbOf(accentInkForGradient(p.deep))
+            assertEquals((expected shr 16) and 0xFF, (actual shr 16) and 0xFF, "$domain 强调层红通道偏离测试端独立复算")
+            assertEquals((expected shr 8) and 0xFF, (actual shr 8) and 0xFF, "$domain 强调层绿通道偏离测试端独立复算")
+            assertEquals(expected and 0xFF, actual and 0xFF, "$domain 强调层蓝通道偏离测试端独立复算")
+            // 反空转：压暗比重换成 0（= 原样返回 deep）必须与生产结果不同，否则「压暗」这件事测不出来。
+            assertNotEquals(
+                actual,
+                darkenArgb(argbOf(p.deep), 0.0),
+                "合成负例失效：$domain 压暗 22% 与不压暗算出了同一个颜色（规则形同虚设）",
+            )
+            // 反空转：强化必须真的变深——压暗后的亮度不得高于原 deep，否则规则方向反了。
+            assertTrue(
+                luminance(actual) < luminance(rgbOf(p.deep)),
+                "$domain 强调层没有比域 deep 更深：压暗规则方向反了",
+            )
+        }
+    }
+
+    /** 强调层必须恒不透明：alpha 随域色漂移（半透明域色一类输入也不许带出去）会让「深一档」被底幅稀释掉。 */
+    @Test
+    fun accent_ink_stays_opaque_whatever_the_domain_color_is() {
+        (listOf(0x801A7A63, 0xFF1A7A63, 0x00FFFFFF).map { Color(it.toInt()) }).forEach { deep ->
+            val argb = argbOf(accentInkForGradient(deep))
+            assertEquals(0xFF, (argb shr 24) and 0xFF, "强调层取色没把 alpha 置满：输入 $deep → #%08X".format(argb))
+        }
+    }
+
+    /**
+     * 裁决 D1 的对比面：强调层压在**底幅合成色**上必须 ≥3:1（非文本口径），7 域 × 2 主题共 14 对。
+     *
+     * 取样的底幅不是一枚：入口容器的底是渐变（亮端 = deep 混 18% base，暗端 = deep），
+     * 底幅在两端透出的合成色不同，故两端各算一次、取**最差**的那一端——只按亮端算会漏掉 Deep 端那 0.3 的差。
+     * 浅套强调层 = [accentInkForGradient]（域 deep 压暗 22%），深套 = `onBrand`（深套域色本身就是浅底，
+     * 再压暗没有意义，最深的中性墨就是这一枚）。
+     */
+    @Test
+    fun accent_layer_clears_3_to_1_against_the_duotone_fill_in_both_theme_sets() {
+        listOf(false to DomainLight, true to DomainDark).forEach { (isDark, table) ->
+            val set = if (isDark) AppColorDark else AppColorLight
+            val ink = rgbOf(if (isDark) set.onBrand else Color.White)
+            val fillAlpha = DuotoneFillAlpha.forTheme(isDark).toDouble()
+            table.forEach { (domain, p) ->
+                val accent = rgbOf(if (isDark) set.onBrand else accentInkForGradient(p.deep))
+                // 底幅合成色：亮端与暗端各一枚（深套 deep == base，混色不改变端点，两端同值）。
+                val ends = listOf(
+                    mixHex(argbOf(p.deep), argbOf(p.base), gradientStartFraction),
+                    rgbOf(p.deep),
+                ).map { overArgb(ink, fillAlpha, it) }
+                val worst = ends.minOf { ratio(accent, it) }
+                assertTrue(
+                    worst >= 3.0,
+                    "$domain（isDark=$isDark）强调层 #%06X 压底幅 %s 最差只有 %.2f:1，不足非文本 3:1——" +
+                        "第三层与底幅分不开就等于没画".format(
+                            accent,
+                            ends.joinToString("/") { "#%06X".format(it) },
+                            worst,
+                        )
+                )
+            }
+        }
+        // 反证（旧裁决被证伪）：强调层按原计划取域 `base` 时，压在底幅合成色上只有 1.0–1.5:1，
+        // 与「同一家族的浅色叠浅色」完全一致——这条断言就是决策文档第 4 条必须改钉的证据。
+        val fillAlpha = DuotoneFillAlpha.forTheme(false).toDouble()
+        DomainLight.forEach { (domain, p) ->
+            val fill = overArgb(0xFFFFFF, fillAlpha, rgbOf(p.deep))
+            val baseAsAccent = ratio(rgbOf(p.base), fill)
+            assertTrue(
+                baseAsAccent < 3.0,
+                "$domain 用 base 当强调层竟也过 3:1（%.2f:1）：裁决 D1 的改钉理由不再成立，需重议".format(baseAsAccent),
+            )
+        }
+    }
+
+    /**
+     * 强调层取色规则按源码字面量钉住，并把入口实底档的接线一起钉住：
+     *
+     *  - `ACCENT_DARKEN_FRACTION = 0.22` 恰一处——22% 是「域 deep 压暗后过 3:1」反推出来的最小整数档
+     *    （18% 时最差的 `AiSpeech` 只有 2.93），不是审美偏好；改这枚数等于改裁决，先改决策文档与本钉值；
+     *  - 入口实底档必须把 `accentInk` 传进字形：少了这处接线，`accentPaths` 又会回到「写了但从不渲染」的旧状态。
+     */
+    @Test
+    fun accent_darken_fraction_is_pinned_to_the_three_to_one_solved_value() {
+        val badge = uiComponentSource(BADGE_SOURCE_NAME)
+        assertEquals(
+            1,
+            countMatches(badge, accentDarkenRule),
+            "强调层压暗比重必须恰为 0.22（18% 时最差域只有 2.93:1，过不了 3:1 线）；改它先改裁决",
+        )
+        assertEquals(
+            1,
+            countMatches(badge, entrySolidAccentArgument),
+            "入口实底档没有把 accentInk 传给字形：强调层会退化成与 tint 同色（深套尚可，浅套等于没画）",
+        )
+        // 合成正片段 / 负片段：正则必须认得出接线、也必须认得出「忘了传」。
+        assertEquals(1, countMatches("AppGlyph(icon = icon, tint = ink, size = 22.dp, accent = accentInk)", entrySolidAccentArgument))
+        assertEquals(0, countMatches("AppGlyph(icon = icon, tint = ink, size = 22.dp)", entrySolidAccentArgument))
+        assertEquals(
+            1,
+            countMatches("private const val ACCENT_DARKEN_FRACTION = 0.22", accentDarkenRule),
+            "合成正片段漏判：压暗常量没被认出",
+        )
+        assertEquals(
+            0,
+            countMatches("private const val ACCENT_DARKEN_FRACTION = 0.18", accentDarkenRule),
+            "合成负片段被放行：改回 18%（2.93:1，过不了 3:1）仍算合格",
+        )
+    }
+
+    /**
+     * 组装层必须真的用调用方给的强调色：传一枚与 tint 明显不同的色，强调层就得是那一枚。
+     * 这条守的是「accent 参数接进去了却没被画出来」这类假接线（参数收下、画笔仍用 tint）。
+     */
+    @Test
+    fun accent_layer_paints_the_color_it_was_given() {
+        val accent = Color(0xFF123456)
+        val vector = buildAppImageVector(AppIcon.Book, Color.White, 1f, AppGlyphLayer.Duotone, false, accent)
+        val accents = accentLayers(vector)
+        assertEquals(AppIcon.Book.spec.accentPaths.size, accents.size, "Book 的强调层没进画布：accent 参数被吞掉了")
+        accents.forEach { path ->
+            assertEquals(0x123456, rgbByteOf(path), "强调层画出来的不是调用方给的颜色（画笔仍取 tint）")
+        }
+        // 默认实参沿用 tint：不传 accent 的调用点（今日计划、提示条一类）拿到的是「同色不透明」，仍是第三档明度。
+        val defaultAccent = accentLayers(buildAppImageVector(AppIcon.Book, Color.White, 1f, AppGlyphLayer.Duotone, false))
+        defaultAccent.forEach { path ->
+            assertEquals(0xFFFFFF, rgbByteOf(path), "accent 默认值不再是 tint：未传强调色的调用点会拿到意外颜色")
+        }
+        // 反空转：底幅层不得被顺手染成强调色（三层画成一层就是这次的失败形状）。
+        fillLayers(vector).forEach { path ->
+            assertEquals(0xFFFFFF, rgbByteOf(path), "强调色漏进了底幅层：三层被压成同一层")
+        }
+    }
+
     /**
      * 裁决 22-2 的源码面：入口弱档的底必须与行内共用 `appColors().tint`，
      * 旧的 `lerp(colors.surface, palette.deep, 0.16f)` 必须整条消失（不是改个分数继续混）。
@@ -841,7 +1159,13 @@ class IconBadgeContrastContractTest {
      */
     @Test
     fun entry_tint_tone_uses_the_shared_tint_token_not_a_per_domain_mix() {
-        val badge = uiComponentSource(BADGE_SOURCE_NAME)
+        // **2026-10-31（用户评审 ①）取样范围收窄**：行内徽标加了 `backdrop` 开关后，同一枚配方在文件里
+        // 出现两处（入口弱档 + 行内开关支）。本锚守的是**入口弱档**那一处（对比表复算的底就是它），
+        // 故先把行内段切掉再数；行内那处由本类
+        // `badge_containers_use_the_ruled_geometry_and_glass_border` 的「两档合计 2 处
+        // `background(appColors().tint)`」钉住，不是放宽。退役混色的禁形仍按**整份文件**数。
+        val file = uiComponentSource(BADGE_SOURCE_NAME)
+        val badge = file.substringBefore("fun InlineIconBadge(")
         val tintBranch = Regex("""Modifier\.background\(appColors\(\)\.tint\)""")
         assertEquals(
             1,
@@ -850,7 +1174,7 @@ class IconBadgeContrastContractTest {
         )
         assertEquals(
             0,
-            countMatches(badge, retiredEntryTintMix),
+            countMatches(file, retiredEntryTintMix),
             "入口弱档仍在按域混色（lerp(colors.surface, palette.deep, …)）：裁决 22-2 要求域名只染字形",
         )
 
@@ -886,7 +1210,7 @@ class IconBadgeContrastContractTest {
                     .border(1.dp, AppPalette.GlassHighlight, AppShape.Icon),
             )
             Box(modifier = Modifier.size(30.dp).clip(AppShape.Inline).background(appColors().tint))
-            require(allowsInEntryContainer(icon)) { "X 属两层豁免表，只作行内/尾部指示，不得进入 ≥40dp 入口容器" }
+            require(allowsInEntryContainer(icon)) { "X 属三层结构豁免表，只作行内/尾部指示，不得进入 ≥40dp 入口容器" }
         """.trimIndent()
         assertEquals(1, countMatches(good, entryContainerSize), "合成正片段漏判：40dp 容器")
         assertEquals(1, countMatches(good, inlineContainerSize), "合成正片段漏判：30dp 容器")

@@ -4,10 +4,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -34,6 +38,12 @@ class SpeechSettingsScreenTest {
         // v32 语速 Row 把本页抬高，折叠按钮会落在视口外：performClick 前必须 performScrollTo，
         // 否则点击命中别处、展开态不变（与 AppScreenTest 本页族同一写法、同一理由）。
         composeRule.onNodeWithTag("speech_toggle_candidates").performScrollTo().performClick()
+        composeRule.waitForIdle()
+    }
+
+    /** 批 5 Task 1：试听卡收进一枚裸行的折叠体，用例要看得见卡内控件，必须先把那行点开。 */
+    private fun expandPreview() {
+        composeRule.onNodeWithTag("speech_preview_toggle").performScrollTo().performClick()
         composeRule.waitForIdle()
     }
 
@@ -58,7 +68,11 @@ class SpeechSettingsScreenTest {
 
         composeRule.onNodeWithContentDescription("选择 系统 TTS").assertHasClickAction()
         composeRule.onNodeWithText("当前供应商").assertExists()
-        // 试听卡常驻页首：输入、按钮、默认文案齐备。
+        // 批 5 Task 1（spec §5「试听卡降为一行」）：卡默认收起，屏上只有一枚裸行；
+        // 展开后输入、按钮、默认文案齐备——两张状态都钉，避免「折叠成死路」被当成重排合格。
+        composeRule.onNodeWithTag("speech_preview_toggle").assertExists().assertHasClickAction()
+        composeRule.onNodeWithTag("speech_preview_input").assertDoesNotExist()
+        expandPreview()
         composeRule.onNodeWithTag("speech_preview_input").assertExists()
         composeRule.onNodeWithTag("speech_preview_button").assertHasClickAction()
         composeRule.onNodeWithText("Hello! 你好，世界！").assertExists()
@@ -287,57 +301,79 @@ class SpeechSettingsScreenTest {
             )
         }
 
+        composeRule.onNodeWithTag("speech_preview_toggle").performScrollTo().performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("speech_preview_input").performTextReplacement("ability")
         composeRule.onNodeWithTag("speech_preview_button").performClick()
         assertEquals("ability", previewed)
         composeRule.onNodeWithTag("speech_preview_message").assertTextEquals("试听已播放。")
     }
 
-    /** D1：自动发音开关行显示当前状态，点击把相反值发给回调。 */
-    @Test fun autoSpeakToggleShowsStateAndForwardsTheInvertedValue() {
+    /**
+     * D1：自动发音改成一枚 Material `Switch`（批 5 Task 1，spec §5「开关统一 Switch」）。
+     *
+     * 旧形态是「整行 clickable + 行尾一枚「开/关」文字」：读屏念得到字、念不出开关状态，
+     * 且文字既不可点也不参与语义。新版三件事一起钉：
+     *  ① 开关节点本身带开关语义（`assertIsOn` / `assertIsOff`）；
+     *  ② 可及名仍是「学习时自动发音」（`AccessibilitySwitchLabelContractTest` 的同一条口径）；
+     *  ③ 点开关把相反值发给既有回调 `onToggleAutoSpeakOnCardReady`——状态由外部（VM）回写。
+     * 外加反向钉住旧文字锚 `speech_auto_speak_state` 不再存在，防止「文字 + Switch 双写」回潮。
+     */
+    @Test fun autoSpeakSwitchCarriesItsLabelAndForwardsTheInvertedValue() {
         var toggled: Boolean? = null
         composeRule.setContent {
+            var on by remember { mutableStateOf(true) }
             SpeechSettingsScreen(
-                state = SpeechSettingsUiState(autoSpeakOnCardReady = true),
+                state = SpeechSettingsUiState(autoSpeakOnCardReady = on),
                 onSelect = { _, _ -> },
                 onOpenAiProfiles = {},
                 onAddMiMoPreset = {},
                 onPreview = {},
-                onToggleAutoSpeakOnCardReady = { toggled = it },
+                onToggleAutoSpeakOnCardReady = { next ->
+                    toggled = next
+                    on = next
+                },
                 onBack = {},
             )
         }
 
-        // 状态文本在可点击 Row 内被语义合并，必须查未合并树。
-        composeRule.onNodeWithTag("speech_auto_speak_state", useUnmergedTree = true).assertTextEquals("开")
+        composeRule.onNodeWithContentDescription("学习时自动发音").assertExists()
+        composeRule.onNodeWithTag("speech_auto_speak_state", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("speech_auto_speak_toggle").performScrollTo().assertIsOn()
         composeRule.onNodeWithTag("speech_auto_speak_toggle").performClick()
+        composeRule.waitForIdle()
         assertEquals(false, toggled)
+        composeRule.onNodeWithTag("speech_auto_speak_toggle").assertIsOff()
     }
 
     /**
-     * I-A1（终审 A §2）：语速行**自身**的无障碍描述必须携带当前档位值。
+     * I-A1（终审 A §2）：语速行的无障碍描述必须携带当前档位值——批 5 Task 1 把承载控件从
+     * 「点按循环的行」换成 Material `Slider` 后，这条口径**不变**：滑杆默认播报的是百分比，
+     * 用户滑完仍不知道这是「倍速」。所以 `contentDescription` 与 `stateDescription` 继续自带档位。
      *
-     * 该行是 `clickable` 合并节点，`contentDescription` 会盖掉子节点文字；档位文字
-     * （`1x`→`1.25x`…）只在兄弟 `Text` 里、且本行不在任何 liveRegion 常驻容器内。
-     * 描述若是静态「发音语速」，读屏用户点完一次就不知道当前倍率——正是决策 §4 给
-     * Slider 立下的「描述动态带上当前值」口径（`AppScreen` 的「每日新词目标，当前 N 词」）
-     * 在本轮新增循环按钮上的漏配。这里钉两件事：切换前后描述都含当前档位、`stateDescription` 等于档位。
+     * 交互口径随之从「点一下进一档」变成「设置进度」：用例直接打滑杆的 `SetProgress` 语义动作，
+     * 与拖动手势走同一条 `onValueChange`，断言三件事——
+     *  ① 下发的是档位表里的值（`SpeechRateSteps[index]`，1.25x 而不是 raw 2f 这类刻度值）；
+     *  ② 行尾读数跟着变；
+     *  ③ 描述与状态在每次变化后都带新值。
      */
     @Test
-    fun speechRateRowAnnouncesTheCurrentRateThroughItsOwnSemantics() {
-        val steps = listOf(0.75f, 1f, 1.25f, 1.5f)
-        var cycled = 0
+    fun speechRateSliderAnnouncesTheCurrentRateThroughItsOwnSemantics() {
+        val requested = mutableListOf<Float>()
         composeRule.setContent {
             // 档位必须存进 Compose 状态：本页是无状态屏幕，state 由外部驱动，
             // 裸 var 不触发重组（本页 autoSpeak/profileSelection 用例同写法）。
-            var index by remember { mutableStateOf(1) }
+            var rate by remember { mutableStateOf(1f) }
             SpeechSettingsScreen(
-                state = SpeechSettingsUiState(speechRate = steps[index]),
+                state = SpeechSettingsUiState(speechRate = rate),
                 onSelect = { _, _ -> },
                 onOpenAiProfiles = {},
                 onAddMiMoPreset = {},
                 onPreview = {},
-                onCycleSpeechRate = { index = (index + 1) % steps.size; cycled++ },
+                onSetSpeechRate = { next ->
+                    requested += next
+                    rate = next
+                },
                 onBack = {},
             )
         }
@@ -346,16 +382,20 @@ class SpeechSettingsScreenTest {
         assertEquals(listOf("发音语速，当前 1x"), contentDescriptionsOfRateRow())
         assertEquals("1x", stateDescriptionOfRateRow())
 
-        composeRule.onNodeWithTag("speech_rate_toggle").performClick()
+        // 滑到第 3 档（刻度 index 2 = 1.25x）。
+        composeRule.onNodeWithTag("speech_rate_toggle")
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(2f) }
         composeRule.waitForIdle()
-        assertEquals(1, cycled)
-        // 点击后档位文字在兄弟 Text 里，读屏拿不到——描述与状态必须自己把它带出来。
+        assertEquals(listOf(1.25f), requested)
+        // 档位文字在兄弟 Text 里，读屏拿不到——描述与状态必须自己把它带出来。
         composeRule.onNodeWithTag("speech_rate_value", useUnmergedTree = true).assertTextEquals("1.25x")
         assertEquals(listOf("发音语速，当前 1.25x"), contentDescriptionsOfRateRow())
         assertEquals("1.25x", stateDescriptionOfRateRow())
 
-        composeRule.onNodeWithTag("speech_rate_toggle").performClick()
+        composeRule.onNodeWithTag("speech_rate_toggle")
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(3f) }
         composeRule.waitForIdle()
+        assertEquals(listOf(1.25f, 1.5f), requested)
         assertEquals(listOf("发音语速，当前 1.5x"), contentDescriptionsOfRateRow())
         assertEquals("1.5x", stateDescriptionOfRateRow())
     }

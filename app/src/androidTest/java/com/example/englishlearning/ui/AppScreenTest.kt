@@ -2,13 +2,18 @@ package com.example.englishlearning.ui
 
 import android.view.KeyEvent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -18,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
@@ -68,6 +74,15 @@ import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.language.SpeechPreferenceRepository
+import com.example.englishlearning.language.domain.EnglishOcrModelAssets
+import com.example.englishlearning.language.domain.OcrEngineKind
+import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
+import com.example.englishlearning.language.domain.OcrModelAssetStatus
+import com.example.englishlearning.language.domain.OcrProviderChain
+import com.example.englishlearning.language.domain.TemporaryImageWorkspace
+import com.example.englishlearning.phototranslation.PhotoTranslationHistoryRepository
+import com.example.englishlearning.phototranslation.PhotoTranslationUseCase
+import com.example.englishlearning.phototranslation.SavedPhotoTranslation
 import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationEngine
 import com.example.englishlearning.language.domain.PronunciationProvider
@@ -138,6 +153,33 @@ class AppScreenTest {
     }
 
     @Test
+    fun recoveryScreenOffersTheArchiveExportAndReachesTheExportScreen() {
+        // 批 5 Task 8（对账 1）：恢复态的「导出本机留档」必须真能出去。
+        // 旧宿主在 NeedsRecovery 分支只接 `onRetry`，本屏文案却写着「先确认留档」——
+        // 承诺了却没有入口。现在恢复态自己也能把导出屏顶上来。
+        val repository = InMemoryLocalProfileRepository()
+        val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
+        val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestFailingDatabaseStartupProbe)
+        composeRule.setContent {
+            AppScreen(
+                viewModel = vm,
+                learningSetupViewModel = setupViewModel(),
+                todayPlanViewModel = todayPlanViewModel(),
+                wordCardViewModel = wordCardFixtureViewModel(),
+            )
+        }
+
+        composeRule.onNodeWithText("数据暂时打不开").assertExists()
+        composeRule.onNodeWithTag("recovery_export_archive").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("backup_export_screen").assertExists()
+        // 返回键把恢复态还回来（导出只是覆盖层，不掉状态机）。
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("recovery_export_archive").assertExists()
+    }
+
+    @Test
     fun blankNameDisablesCreateAndDoesNotReloadTodayPlan() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
@@ -176,8 +218,8 @@ class AppScreenTest {
     }
 
     /**
-     * 用户要求「在应用底下加个 AI 学」。这里断言四栏都真的出现在应用外壳里，而不只是
-     * 组件级测试通过——底导没被接进 AppScreen 是很容易发生的回归。
+     * 用户要求「在应用底下加个 AI 学」，2026-11-02 定名为「AI 助学」。这里断言四栏都真的出现在
+     * 应用外壳里，而不只是组件级测试通过——底导没被接进 AppScreen 是很容易发生的回归。
      */
     @Test
     fun readyPlanShowsTheFourSlotBottomNavigation() {
@@ -186,7 +228,7 @@ class AppScreenTest {
         AppTab.entries.forEach { tab ->
             composeRule.onNodeWithTag("app_tab_${tab.name.lowercase()}").assertExists()
         }
-        composeRule.onNodeWithContentDescription("AI 学").assertExists()
+        composeRule.onNodeWithContentDescription("AI 助学").assertExists()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
     }
 
@@ -321,7 +363,13 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("my_words_wordbook_row_0").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("my_words_wordbook_row_0").performScrollTo().performClick()
+        // 大字号 2.0 下尾部「标记为已掌握」药片会涨到行心左侧，`performClick()`（点节点正中心）
+        // 就落到药片上、弹出掌握确认框而不是打开详情。判据没变（仍是「点这一行 → 开详情」），
+        // 只是把落点收进行首文字区——那是这行真正意义上的「行本体」。
+        composeRule.onNodeWithTag("my_words_wordbook_row_0").performScrollTo()
+        composeRule.onNodeWithTag("my_words_wordbook_row_0").performTouchInput {
+            click(Offset((width * 0.2f).coerceAtLeast(1f), centerY))
+        }
         composeRule.onNodeWithTag("card_detail_screen").assertExists()
 
         pressSystemBack()
@@ -463,10 +511,16 @@ class AppScreenTest {
     }
 
     @Test
-    fun checkInEntryOpensOverlayAndBackReturnsToTodayPlan() {
+    fun checkInEntryOpensOverlayAndBackReturnsToTheProfilePage() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
-        composeRule.onNodeWithTag("today_plan_open_check_in")
+        // 打卡入口随 2026-10-25 版式重做搬到「我的」页（`TodayPlanScreen` 头注释：五枚入口锚
+        // `_check_in` 等随功能一起离场，判决由 `TodayPlanBareRowContractTest` 双向钉住）：
+        // 现行为「我的」页强档卡里的「连续天数」那一格（`profile_stat_streak` → `onOpenCheckIn`）。
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("profile_stat_streak")
             .performScrollTo()
             .performClick()
         composeRule.waitForIdle()
@@ -475,7 +529,8 @@ class AppScreenTest {
         // contentDescription "返回"），故这里由 tag 选取换成描述选取——语义仍是「点返回位、回调把叠层关掉」，未放宽。
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        // 返回位落在入口所在页（「我的」），不再是学习页——这是版式重做的结果，不是判据放宽。
+        composeRule.onNodeWithTag("profile_screen").assertExists()
         composeRule.onNodeWithTag("check_in_screen").assertDoesNotExist()
         AppTab.entries.forEach { tab ->
             composeRule.onNodeWithTag("app_tab_${tab.name.lowercase()}").assertExists()
@@ -532,22 +587,22 @@ class AppScreenTest {
     }
 
     /**
-     * M6（Task 9 必须项）：语音设置页的语速行**不是静默失效**。
+     * M6（Task 9 必须项）改写（批 5 Task 1）：语音设置页的语速滑杆**不是静默失效**。
      *
      * 为什么断在 AppScreen 这一层而不是只断 `SpeechSettingsScreen`：
-     * `SpeechSettingsScreen` 与 `AppScreen` 两侧的 `onCycleSpeechRate` 都带默认空 lambda
-     * （`AppScreen.kt` 里那一行 `onCycleSpeechRate = { speechSettingsViewModel?.cycleSpeechRate() }`
-     * 被整条删掉，屏级用例照旧全绿，用户点语速却永远不变）。本用例走真实宿主，
-     * 断言因此落在这条接线上：删掉它本用例必须红（Task 9 报告的删行探针即以此取证）。
+     * `SpeechSettingsScreen` 与 `AppScreen` 两侧的回调都带默认空 lambda
+     * （`AppScreen.kt` 里那一行 `onSetSpeechRate = { rate -> speechSettingsViewModel?.setSpeechRate(rate) }`
+     * 被整条删掉，屏级用例照旧全绿，用户拖滑杆却永远不变）。本用例走真实宿主，
+     * 断言因此落在这条接线上：删掉它本用例必须红。
      *
-     * 「恰好一次点按前进一档」钉的是宿主接线：`AppScreen` 把 `onCycleSpeechRate` 接到
-     * `viewModel::cycleSpeechRate`，且每次一点只前进一步（持久化本身由
-     * `SpeechSettingsViewModelTest` 覆盖——本 fixture 的偏好仓储 `save` 是空实现，不能在这里
-     * 声称「值来自持久化偏好」）。若宿主或屏幕重复派发，会直接跳到 1.5x。
-     * 四档循环口径 {0.75x, 1.0x, 1.25x, 1.5x} 见决策 2026-10-15 §2。
+     * 承载控件从批 5 Task 1 起是 Material `Slider`（spec §5「语速改 slider + 数值」），
+     * 判据不变——**宿主接线下发的是档位表里的值**：把滑杆推到刻度 2（第三档），
+     * 行尾读数必须从 `1x` 变成 `1.25x`。吸附到四档由 `SpeechSettingsViewModel.setSpeechRate` 做，
+     * 档位表是 `SpeechRateSteps`（{0.75x, 1.0x, 1.25x, 1.5x}，决策 2026-10-15 §2）。
+     * 持久化本身由 `SpeechSettingsViewModelTest` 覆盖——本 fixture 的偏好仓储 `save` 是空实现。
      */
     @Test
-    fun speechRateRowOnTheHostedSpeechPageCyclesOneStepPerPress() {
+    fun speechRateSliderOnTheHostedSpeechPageReachesTheViewModel() {
         val fixture = speechFixture()
         composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
         createProfile()
@@ -555,11 +610,11 @@ class AppScreenTest {
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
 
-        // 未合并树：当前倍速文本在可点击 Row 内会被语义合并（与 speech_auto_speak_state 同一口径）。
-        // 滚动只作用在可点击 Row 上（未合并子节点不带滚动语义）。
+        // 未合并树：读数在滑杆旁的兄弟 Text 里（与 speech_auto_speak_switch 同一口径）。
         composeRule.onNodeWithTag("speech_rate_toggle").performScrollTo()
         composeRule.onNodeWithTag("speech_rate_value", useUnmergedTree = true).assertTextEquals("1x")
-        composeRule.onNodeWithTag("speech_rate_toggle").performClick()
+        composeRule.onNodeWithTag("speech_rate_toggle")
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(2f) }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("speech_rate_value", useUnmergedTree = true).assertTextEquals("1.25x")
     }
@@ -580,7 +635,9 @@ class AppScreenTest {
         composeRule.onNodeWithTag("speech_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys += "mimo"
-        composeRule.onNodeWithContentDescription("返回上一层").performClick()
+        // 批 4 Task 3：AI 服务页换成共享 `AppScreenHeader`，返回位就是页头那枚图标按钮
+        // （contentDescription 固定「返回」，屏内自写的「返回上一层」已随整屏重写下线）。
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
         composeRule.onNodeWithTag("speech_toggle_candidates").performScrollTo().performClick()
         composeRule.onNodeWithTag("speech_profile_mimo").performScrollTo()
@@ -662,7 +719,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("ai_feature_cloze").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("ai_feature_screen").assertExists()
-        composeRule.onNodeWithTag("ai_feature_title").assertExists()
+        composeRule.onNodeWithTag("app_screen_header").assertExists()
         composeRule.onNodeWithTag("app_tab_ai").assertDoesNotExist()
 
         pressSystemBack()
@@ -810,7 +867,11 @@ class AppScreenTest {
         }
         createProfile()
 
-        composeRule.onNodeWithContentDescription("学习记录").performScrollTo().performClick()
+        // 「学习记录」入口随 2026-10-25 版式重做搬到「我的」页（`ProfileScreen` 里那条 BareRow，
+        // 锚 `profile_open_learning_records`）：旧锚是内容描述「学习记录」，本屏已不渲染该入口。
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_open_learning_records").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("learning_record_row_ability").fetchSemanticsNodes().isNotEmpty()
         }
@@ -978,10 +1039,14 @@ class AppScreenTest {
             composeRule.onAllNodesWithTag("reading_open_today").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // 轮 1：屏内「返回」按钮退出。
+        // 轮 1：页头返回位（图标）退出。
         openTodayArticle()
         speakArticleAndAwaitControls()
-        composeRule.onNodeWithText("返回").performClick()
+        // 批 3 Task 3：自写 `Button("返回")` 换成共享 `AppScreenHeader` 的图标返回位，
+        // 文字「返回」在文章页必须归零（标题走页头 `title`，不再是「返回」二字），
+        // 离开动作改按内容描述定位——判据从「文字」收紧到「无障碍名 + 旧文案为 0」。
+        composeRule.onNodeWithText("返回").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
         }
@@ -1039,7 +1104,9 @@ class AppScreenTest {
 
     /** 点「发音」朗读整篇（挂起 provider 钉住 Playing），直到瞬时消息节点出现。 */
     private fun speakArticleAndAwaitControls() {
-        composeRule.onNodeWithTag("article_pronunciation").performScrollTo().performClick()
+        // 批 3 Task 3：发音位搬进页头 `action` 槽，不在滚动面里了——`performScrollTo()` 会找
+        // 滚动容器祖先，页头行没有，必须去掉（留着会以「找不到可滚动祖先」失败）。
+        composeRule.onNodeWithTag("article_pronunciation").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("article_pronunciation_message").fetchSemanticsNodes().isNotEmpty()
         }
@@ -1095,7 +1162,10 @@ class AppScreenTest {
                 pronunciationProvider = provider,
                 readingAccessViewModel = reading.access,
                 articleReadingViewModel = reading.article,
-                todayPlanViewModel = reading.todayPlan,
+                // 本用例要「阅读入口」与「学习入口」同时可达，见 `planUnlockedWithPendingReview()`：
+                // `readingFixture()` 自带的计划（严格档、当日新词已学完）只有前者，主 CTA 会落到
+                // 「去读今日文章／复习生词本」，点了不进学习流。
+                todayPlanViewModel = planUnlockedWithPendingReview(),
             )
         }
         openReadingWordDetail()
@@ -1112,7 +1182,11 @@ class AppScreenTest {
         // 退文章 → 今日计划 → 进学习流，提交一张卡打开「下一处详情」（学习流宿主）。
         pressSystemBack()
         composeRule.onNodeWithTag("app_tab_learning").performClick()
-        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        // 主 CTA 按 tag 取，不按内容描述取：`TodayPlanScreen` 头注释写明「四态同锚点
+        // `today_plan_start_learning`，文案随状态换」（未学完→开始学习／欠复习→开始复习／
+        // 未读文章→去读今日文章／读完→复习生词本）。本用例喂的是 `planUnlockedWithPendingReview()`，
+        // 文案是「开始复习」，按描述取恒红。
+        composeRule.onNodeWithTag("today_plan_start_learning").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("word_card_feedback_fuzzy").fetchSemanticsNodes().isNotEmpty()
         }
@@ -1252,7 +1326,10 @@ class AppScreenTest {
             )
         }
         createProfile()
-        composeRule.onNodeWithContentDescription("学习记录").performScrollTo().performClick()
+        // 同上：学习记录入口现居「我的」页（`profile_open_learning_records`）。
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_open_learning_records").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("learning_record_row_ability").fetchSemanticsNodes().isNotEmpty()
         }
@@ -1296,7 +1373,13 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("word_qa_not_configured").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("word_qa_back").performClick()
+        // 批 4 Task 7：旧 `word_qa_back` 药片随版式重做退役，返回位改点页头固定可及名「返回」。
+        // 这里必须**限定在问词覆盖层内**点：底层词义详情也是共享页头，同一棵树上会有两枚「返回」，
+        // 不限定的 `onNodeWithContentDescription("返回")` 会因「找到 2 枚」而红（判据没放宽：
+        // 仍必须恰点中覆盖层里那一枚）。
+        composeRule.onNode(
+            hasContentDescription("返回") and hasAnyAncestor(hasTestTag("word_qa_screen")),
+        ).performClick()
         composeRule.onNodeWithTag("card_detail_screen").assertExists()
         assert(composeRule.onAllNodesWithTag("word_qa_screen").fetchSemanticsNodes().isEmpty())
     }
@@ -1427,7 +1510,9 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("sentence_analysis_not_configured").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("sentence_analysis_back").performClick()
+        // 批 4 Task 5：本屏返回位改由共享 `AppScreenHeader` 承担（contentDescription 固定「返回」），
+        // 旧 `sentence_analysis_back` tag 随「← 返回 AI 学」药片一起下线。
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.onNodeWithTag("ai_learning_screen").assertExists()
         composeRule.onAllNodesWithTag("sentence_analysis_screen").fetchSemanticsNodes().isEmpty()
     }
@@ -1470,10 +1555,143 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("image_studio_not_configured").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("image_studio_back").performClick()
+        // 批 4 Task 6：返回位归共享页头（旧 `image_studio_back` 药片退役）。同树可能还有别的页头，
+        // 所以限定「生图屏内那一枚」，判据比裸可及名更紧。
+        composeRule.onNode(
+            hasContentDescription("返回") and hasAnyAncestor(hasTestTag("image_studio_screen")),
+        ).performClick()
         composeRule.onNodeWithTag("ai_learning_screen").assertExists()
         composeRule.onAllNodesWithTag("image_studio_screen").fetchSemanticsNodes().isEmpty()
     }
+
+    /**
+     * 批 4 Task 4：拍照翻译历史删除的**确认门**在宿主 `AppScreen` 这一层真的拦得住。
+     *
+     * 屏侧（`PhotoTranslationScreenTest`）只证到「点了删除只发请求」；JVM 侧
+     * `AppScreenOverlayContainerContractTest` 只证到「守卫站点与逐字要素在源码里」。两处都证不到
+     * 「真机上点下去确实弹出宿主那枚确认框、取消真的零写入、确认才真的调仓库」——这一条走**真实宿主 +
+     * 真实 `PhotoTranslationViewModel` + 真实历史仓库假件**补齐，不在用例里复刻任何生产分支。
+     */
+    @Test
+    fun photoTranslationHistoryDeleteGoesThroughTheHostDestructiveDoor() {
+        val history = RecordingPhotoTranslationHistory(listOf(savedPhotoTranslation("r1")))
+        composeRule.setContent {
+            readyAppScreen(photoTranslationViewModel = photoTranslationViewModelWith(history))
+        }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_ai").performClick()
+        composeRule.waitForIdle()
+        // 拍照翻译是已上线行，默认可见（未上线折叠行不用展开）。
+        composeRule.onNodeWithTag("ai_feature_photo-translation").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("photo_translation_screen").assertExists()
+
+        composeRule.onNodeWithTag("photo_translation_history_entry").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("photo_translation_history_delete_r1").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 第一次：弹框 → 取消 → 零写入，记录原地还在（红线：取消绝不落库）。
+        composeRule.onNodeWithTag("photo_translation_history_delete_r1").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("删除这条翻译记录？").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("confirm_destructive_dismiss").performClick()
+        composeRule.waitForIdle()
+        assertEquals("取消后不许写库", 0, history.deleteCalls.size)
+        composeRule.onAllNodesWithText("删除这条翻译记录？").fetchSemanticsNodes().let {
+            assertEquals("取消后确认框必须收起", 0, it.size)
+        }
+        composeRule.onNodeWithTag("photo_translation_history_r1").assertExists()
+
+        // 第二次：弹框 → 确认 → 真调仓库、记录从列表消失。
+        composeRule.onNodeWithTag("photo_translation_history_delete_r1").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("confirm_destructive_confirm").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("confirm_destructive_confirm").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("photo_translation_history_r1").fetchSemanticsNodes().isEmpty()
+        }
+        assertEquals("确认后必须恰好删掉那一条", listOf("r1"), history.deleteCalls.map { it.second })
+    }
+
+    /** 拍照翻译 ViewModel 夹具：OCR 链路空载（本用例不走识别）、历史仓库是记录件、网络通道一律禁调。 */
+    private fun photoTranslationViewModelWith(history: PhotoTranslationHistoryRepository): PhotoTranslationViewModel {
+        val transport = object : AiHttpTransport {
+            override suspend fun send(request: AiHttpRequest) =
+                error("photo translation wiring test must not perform network requests")
+        }
+        val secrets = AiProfileSecretUseCase(object : SecretStore {
+            override fun save(reference: SecretReference, secret: CharArray) = Result.success(Unit)
+            override fun read(reference: SecretReference) = Result.success(charArrayOf('k'))
+            override fun delete(reference: SecretReference) = Result.success(Unit)
+            override fun has(reference: SecretReference) = Result.success(true)
+        })
+        val workspace = TemporaryImageWorkspace(
+            java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "photo-translation-wiring").also { it.mkdirs() },
+        )
+        return PhotoTranslationViewModel(
+            ocr = OcrProviderChain(emptyList()),
+            workspace = workspace,
+            translate = PhotoTranslationUseCase(DefaultTextProfileResolver { DefaultTextProfileResult.NoSelection }, secrets, transport),
+            modelAssets = object : EnglishOcrModelAssets {
+                override suspend fun status(): OcrModelAssetStatus = OcrModelAssetStatus.NotInstalled
+
+                override suspend fun install(
+                    onProgress: (Float) -> Unit,
+                ): OcrModelAssetInstallOutcome = OcrModelAssetInstallOutcome.DownloadFailed("wiring test")
+
+                override suspend fun uninstall() = Unit
+            },
+            history = history,
+            recordIds = WordNoteIdFactory { "record-1" },
+            clock = FixedClockProvider(java.time.Instant.ofEpochMilli(1_700_000_000_000L), java.time.ZoneOffset.UTC),
+        )
+    }
+
+    /**
+     * 只记不真写的历史仓库：删除调用逐条留痕。
+     *
+     * `listRecent` **不按 profile 过滤**：本用例的资料 id 由 `createProfile()` 现场生成（不是固定字面量），
+     * 生产侧的「跨 profile 不可见」由 `RoomPhotoTranslationHistoryRepositoryTest` 与
+     * `PhotoTranslationViewModelTest.refreshHistoryListsRecordsAndDeleteRemovesOne` 承担，
+     * 这里要证的是宿主确认门，不该为了造 profileId 把断言绕到别处去。
+     */
+    private class RecordingPhotoTranslationHistory(
+        private val records: List<SavedPhotoTranslation>,
+    ) : PhotoTranslationHistoryRepository {
+        val deleteCalls = mutableListOf<Pair<String, String>>()
+        private val current = records.toMutableList()
+
+        override suspend fun save(record: SavedPhotoTranslation): Result<Unit> {
+            current += record
+            return Result.success(Unit)
+        }
+
+        override suspend fun listRecent(profileId: String): Result<List<SavedPhotoTranslation>> =
+            Result.success(current.sortedByDescending { it.createdAtEpochMillis })
+
+        override suspend fun delete(profileId: String, recordId: String): Result<Unit> {
+            deleteCalls += profileId to recordId
+            current.removeAll { it.recordId == recordId }
+            return Result.success(Unit)
+        }
+
+        override suspend fun storeImage(bytes: ByteArray): Result<String> = Result.success("asset-1")
+
+        override suspend fun removeImage(assetId: String): Result<Unit> = Result.success(Unit)
+    }
+
+    private fun savedPhotoTranslation(id: String) = SavedPhotoTranslation(
+        recordId = id,
+        profileId = "default",
+        sourceText = "A page of English prose.",
+        translatedText = "一页英文散文。",
+        engine = OcrEngineKind.MlKit,
+        imageAssetId = null,
+        createdAtEpochMillis = 1_700_000_000_000L,
+    )
 
     /** 生图 ViewModel 夹具：两个出站通道一旦被调用就失败——确认前零字节的证明。 */
     private fun imageStudioViewModelWith(selection: DefaultTextProfileResult): ImageStudioViewModel {
@@ -1509,6 +1727,48 @@ class AppScreenTest {
     private data class ReadingFixture(        val access: ReadingAccessViewModel,
         val article: ArticleReadingViewModel,
         val todayPlan: TodayPlanViewModel,
+    )
+
+    /**
+     * 「今日文章已解锁、学习入口照旧可点」的今日计划夹具——`systemBackClosingAReadingWordDetail…`
+     * 一条用例要两个入口同时可达，而**开箱条件下的解锁与主 CTA 是互斥的**：
+     *
+     *  - `UnlockPolicy.isUnlocked` 在严格档（`v1`）要求新词与复习**都**完成，阅读页才拿得到
+     *    `isUnlocked = true`（`AppScreen` 把 `todayReady.isUnlocked` 透给 `ReadingAccessViewModel.load`）；
+     *  - `TodayPlanScreen` 的主 CTA 只在「没全完成」时才走 `onStartLearning`，全完成就换成
+     *    「去读今日文章」/「复习生词本」。
+     *
+     * 唯一让两者并存的杠杆是宽松档（`v1-relaxed`，只要求新词完成）：把 `apple-id` 记作已学 →
+     * `newDone == newTarget` → 解锁；复习位再留一枚没做过的 `due-orange-id` → `allDone == false`
+     * 且 `newDone` 已满 → CTA 落「开始复习」，`ctaAction` 仍是 `onStartLearning`（同一枚
+     * `today_plan_start_learning` 锚点），点了照常进学习流。
+     *
+     * 计划身份与 [readingFixture] 逐字对齐（`planId` / `profileId = "default"` / 本地日
+     * `1970-01-01` / `cet4`）：阅读侧的仓储 fake 按真实检索键校验，键一错今日文章就变空。
+     */
+    private fun planUnlockedWithPendingReview(): TodayPlanViewModel = TodayPlanViewModel(
+        {
+            TodayPlanResult.Ready(
+                TodayPlan(
+                    planId = "plan-1",
+                    profileId = "default",
+                    localDate = java.time.LocalDate.of(1970, 1, 1),
+                    zoneId = "Asia/Shanghai",
+                    activeWordBookId = "cet4",
+                    newTarget = 1,
+                    dueTarget = 1,
+                    newCardIds = listOf("apple-id"),
+                    dueCardIds = listOf("due-orange-id"),
+                    ruleVersion = "v1-relaxed",
+                    generatedAt = java.time.Instant.EPOCH,
+                ),
+            )
+        },
+        FakeLearningProfileRepository(),
+        object : LearningEventRepository by NoopLearningEventRepository() {
+            override suspend fun completedCardIds(planId: String) =
+                RepositoryResult.Success(if (planId == "plan-1") listOf("apple-id") else emptyList())
+        },
     )
 
     private fun readingFixture(unlocked: Boolean = true): ReadingFixture {
@@ -1908,6 +2168,7 @@ class AppScreenTest {
         wordQaViewModel: WordAiQaViewModel? = null,
         sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
         imageStudioViewModel: ImageStudioViewModel? = null,
+        photoTranslationViewModel: PhotoTranslationViewModel? = null,
         learningRecordsViewModel: LearningRecordsViewModel? = null,
         wordBookWordsViewModel: WordBookWordsViewModel? = null,
         vocabularyViewModel: VocabularyViewModel? = null,
@@ -1932,6 +2193,7 @@ class AppScreenTest {
             wordQaViewModel = wordQaViewModel,
             sentenceAnalysisViewModel = sentenceAnalysisViewModel,
             imageStudioViewModel = imageStudioViewModel,
+            photoTranslationViewModel = photoTranslationViewModel,
             learningRecordsViewModel = learningRecordsViewModel,
             wordBookWordsViewModel = wordBookWordsViewModel,
             vocabularyViewModel = vocabularyViewModel,
@@ -1950,7 +2212,7 @@ class AppScreenTest {
     private fun todayPlanViewModel(): TodayPlanViewModel = TodayPlanViewModel({ TodayPlanResult.MissingLearningSetup }, FakeLearningProfileRepository())
 
     @Test
-    fun readyPlanEntryReopensSetupAndSavingReturnsToTodayPlan() {
+    fun readyPlanEntryReopensSetupAndSavingReloadsTheTodayPlan() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
         val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
@@ -1962,11 +2224,20 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
 
-        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performScrollTo().performClick()
+        // 设置入口随 2026-10-25 版式重做搬到「我的」页的「学习」组（`SettingsScreen` 里 `settings_open_setup`，
+        // 副标题「换词书与目标」）：旧锚是内容描述「调整词书与目标」，本屏已不渲染该入口。
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_open_setup").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
 
         composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performScrollTo().performClick()
+        composeRule.waitForIdle()
+        // 存完落回入口所在页（「我的」），再回学习页看计划是否重算——原用例「回今日计划 + 重算一次」
+        // 的判据原样保留，只把「回哪一页」按新版式改准。
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_learning").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
         }
@@ -1975,7 +2246,7 @@ class AppScreenTest {
     }
 
     @Test
-    fun optionalSetupCanBeCancelledBackToTodayPlanWithoutReloading() {
+    fun optionalSetupCanBeCancelledBackToTheProfilePageWithoutReloading() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
         val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
@@ -1985,12 +2256,23 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("调整词书与目标").assertExists().performScrollTo().performClick()
+        // 同上：可选设置入口现居「我的」页。
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_open_setup").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
 
-        composeRule.onNodeWithContentDescription("返回上一层").assertExists().performClick()
+        // 批 2 Task 6：旧版另有一枚 `← 返回上一层` 文字按钮（朗读文案「返回上一层」）；现在返回位
+        // 只剩共享页头一处，朗读文案随之变成页头固定的「返回」。判据仍是「点得到、点完回到「我的」」。
+        composeRule.onNodeWithContentDescription("返回").assertExists().performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+        // 取消不得触发重算：回学习页复用已算好的计划。
+        composeRule.onNodeWithTag("app_tab_learning").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
         assertEquals(1, invocations)
     }
@@ -2005,7 +2287,10 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
-        composeRule.onNodeWithContentDescription("返回上一层").assertDoesNotExist()
+        // 强制首设路径 `onCancel == null`：共享页头在 `onBack == null` 时整段不渲染（R-9.2），
+        // 所以这里断言的是「页头返回位不存在」。批 2 Task 6 起返回位只有页头这一处，
+        // 原来的「返回上一层」文字按钮已删，判据跟着换到新的唯一入口上，不放宽。
+        composeRule.onNodeWithContentDescription("返回").assertDoesNotExist()
     }
 
     @Test

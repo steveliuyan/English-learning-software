@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -96,6 +97,13 @@ class ArticleReadingScreenTest {
         }
 
         composeRule.onNodeWithTag("article_translation").assertExists()
+        // 批 3 Task 3：旧偏好里的 `FULL_TRANSLATION` 起手不再有第三枚 chip，而是折叠成
+        // 「双语 chip 选中 + 译文已展开」的呈现等价（VM 侧 `setMode` 语义零改动）。
+        // 上面那条 `article_translation` 断言逐字保留，这里只加严：第三档标识必须为 0，
+        // 双语 chip 必须在场，且文案已变成「收起译文」（= 已展开）。
+        composeRule.onNodeWithTag("article_mode_full_translation").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_mode_bilingual").assertExists()
+        composeRule.onNodeWithTag("article_translation_toggle").assertTextContains("收起译文", substring = true)
     }
 
     @Test
@@ -262,9 +270,20 @@ class ArticleReadingScreenTest {
             ArticleReadingScreen(state(article()), onBack = {}, onOpenCard = {}, onModeChange = { changed = it }, onToggleTranslation = {}, onOpenDictionaryPlaceholder = {}, onOpenPronunciationPlaceholder = {})
         }
 
-        composeRule.onNodeWithTag("article_mode_full_translation").performClick()
+        // 批 3 Task 3：模式行只剩两枚 chip + 同一行的一枚译文开关（原「全文对照」第三枚已折进
+        // 「双语 + 译文展开」）。原用例点的是第三枚并期望 `FULL_TRANSLATION`——那正是被撤掉的那档，
+        // 现在改成「两枚 chip 都能发回调 + 第三枚标识必须为 0」，档位覆盖不减（ENGLISH_FIRST 原来没被
+        // 覆盖，这里顺带补上）。
+        composeRule.onNodeWithTag("article_mode_full_translation").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_mode_english_first").assertExists()
+        composeRule.onNodeWithTag("article_mode_bilingual").assertExists()
+        composeRule.onNodeWithTag("article_translation_toggle").assertExists()
 
-        org.junit.Assert.assertEquals(ArticleDisplayMode.FULL_TRANSLATION, changed)
+        composeRule.onNodeWithTag("article_mode_bilingual").performClick()
+        org.junit.Assert.assertEquals(ArticleDisplayMode.BILINGUAL, changed)
+
+        composeRule.onNodeWithTag("article_mode_english_first").performClick()
+        org.junit.Assert.assertEquals(ArticleDisplayMode.ENGLISH_FIRST, changed)
     }
 
     @Test
@@ -379,6 +398,12 @@ class ArticleReadingScreenTest {
         composeRule.onNodeWithTag("coverage_popup_count").assertTextContains("2", substring = true)
         composeRule.onNodeWithTag("coverage_chip_apple").assertExists()
         composeRule.onNodeWithTag("coverage_chip_banana").assertExists()
+        // 批 3 Task 3：载体从居中 `GlassDialog` 换成底部面板（`ModalBottomSheet`，一次升到展开位）。
+        // 四枚 tag 全部保留，另加一条加严判据：正文**仍然在场且可见**——这是这次换载体的全部目的
+        // （原来的对话框进文第一帧把正文整块挡住，用户得先点「我知道了」才看得到文章）。
+        // 只断言可见性、不 performClick：面板下方的遮罩仍会吃掉触摸，能看见才是这一条要的结论。
+        composeRule.onNodeWithTag("article_english").assertExists()
+        composeRule.onNodeWithTag("article_english").assertIsDisplayed()
     }
 
     @Test

@@ -141,23 +141,23 @@ class DesignTokenContractTest {
     // ---------- 钉值表（逐字来自 spec §2.1 与 brief；Long 位形含 alpha） ----------
 
     private val lightHex: Map<String, Long> = linkedMapOf(
-        "background" to 0xFFF1FBF5L,
+        "background" to 0xFFF6F9F6L,
         "surface" to 0xFFFFFFFFL,
         "surfaceGlass" to 0xEFFFFFFFL,
-        "tint" to 0xFFDDF7E8L,
-        "tint2" to 0xFFDCEAE1L,
-        "tint3" to 0xFFCDEDD9L,
-        "outline" to 0xFFADE7D2L,
-        "outlineSoft" to 0xFFE4EFE9L,
-        "text1" to 0xFF1C1C1EL,
-        "text2" to 0xFF4E756AL,
-        "text3" to 0xFF7A9088L,
+        "tint" to 0xFFE9F4EEL,
+        "tint2" to 0xFFE4EFE9L,
+        "tint3" to 0xFFDEEAE4L,
+        "outline" to 0xFFD3E7DCL,
+        "outlineSoft" to 0xFFEBF1EDL,
+        "text1" to 0xFF1F2B26L,
+        "text2" to 0xFF566B62L,
+        "text3" to 0xFF7C9188L,
         "onMint" to 0xFF174C44L,
         "onBrand" to 0xFF04241CL,
         "error" to 0xFFB30000L,
         "errorFill" to 0xFFFF3B30L,
         "success" to 0xFF1B5E20L,
-        "strongSurface" to 0xFF0C2A22L,
+        "strongSurface" to 0xFF1F4739L,
         "onStrong" to 0xFFE9F2ECL,
     )
 
@@ -168,14 +168,14 @@ class DesignTokenContractTest {
      * 该调和已记入 task-2 报告「计划缺陷」。
      */
     private val darkHex: Map<String, Long> = linkedMapOf(
-        "background" to 0xFF0E1512L,
+        "background" to 0xFF111A16L,
         "surface" to 0xFF17201CL,
         "surfaceGlass" to 0xE617201CL,
-        "tint" to 0xFF1C2C26L,
-        "tint2" to 0xFF22322BL,
-        "tint3" to 0xFF27392FL,
-        "outline" to 0xFF2E4238L,
-        "outlineSoft" to 0xFF233029L,
+        "tint" to 0xFF1B2A25L,
+        "tint2" to 0xFF20302AL,
+        "tint3" to 0xFF25352EL,
+        "outline" to 0xFF2B3A33L,
+        "outlineSoft" to 0xFF202C26L,
         "text1" to 0xFFE9F2ECL,
         "text2" to 0xFF9FB3AAL,
         "text3" to 0xFF7F938AL,
@@ -184,7 +184,7 @@ class DesignTokenContractTest {
         "error" to 0xFFFF8177L,
         "errorFill" to 0xFFFF6B61L,
         "success" to 0xFF6BD98AL,
-        "strongSurface" to 0xFF1E2B25L,
+        "strongSurface" to 0xFF22332CL,
         "onStrong" to 0xFFE9F2ECL,
     )
 
@@ -198,52 +198,53 @@ class DesignTokenContractTest {
      * 所以它是**有据可依的主题无关值**，不是无人认领的死 token。深色下玻璃面板上的前景最终核验归 AC-R-11 真机实测。
      *
      * `onStrong`：2026-10-25 规范 §4.1 的强档卡配对。容器 `strongSurface` 两套都是**深底**
-     * （浅 #0C2A22 / 深 #1E2B25），前景必须与套无关，故两套同取 #E9F2EC；复算 13.4:1 / 12.9:1。
+     * （浅 #1F4739 / 深 #22332C），前景必须与套无关，故两套同取 #E9F2EC；复算 9.10:1 / 11.65:1。
      */
     private val crossSetIdenticalNeutralTokenExemptions: Set<String> = setOf("onBrand", "onStrong")
 
     /** 域浅套：spec §2.1 域色表 / 既有 DomainColors 逐值（base, deep）。hex 串同时供正则拼接，避免 Long 十进制插值。 */
     private val domainLightHex: Map<String, Pair<String, String>> = linkedMapOf(
-        "AiSpeech" to ("0xFF2EC99C" to "0xFF188F76"),
-        "Learn" to ("0xFF0A84FF" to "0xFF075EB4"),
-        "Review" to ("0xFFFF9F0A" to "0xFFAB5700"),
-        "Library" to ("0xFFBF5AF2" to "0xFF8E34B8"),
-        "Reading" to ("0xFFFF375F" to "0xFFC81E46"),
-        "Danger" to ("0xFFFF3B30" to "0xFFB30000"),
-        "Settings" to ("0xFF8E8E93" to "0xFF48484A"),
+        "AiSpeech" to ("0xFF6CCBAB" to "0xFF1A7A63"),
+        "Learn" to ("0xFF7BB4E6" to "0xFF175A93"),
+        "Review" to ("0xFFEBC68B" to "0xFF8A5712"),
+        "Library" to ("0xFFB7A0D9" to "0xFF65478A"),
+        "Reading" to ("0xFFE297A4" to "0xFF9C3B4F"),
+        "Danger" to ("0xFFDD8B81" to "0xFF9E2B24"),
+        "Settings" to ("0xFFA6B0AC" to "0xFF4A5551"),
     )
 
     /** 域深套：deep = base（spec §2.1「深色下域色与 base 合一」）。 */
     private val domainDarkHex: Map<String, String> = linkedMapOf(
-        "AiSpeech" to "0xFF35E0AC",
-        "Learn" to "0xFF5AC0FF",
-        "Review" to "0xFFFFB340",
-        "Library" to "0xFFDA8CFF",
-        "Reading" to "0xFFFF7A93",
-        "Danger" to "0xFFFF6B61",
-        "Settings" to "0xFFB0B0B5",
+        "AiSpeech" to "0xFF6FD9B6",
+        "Learn" to "0xFF84C4EE",
+        "Review" to "0xFFEFCB92",
+        "Library" to "0xFFC6A9E4",
+        "Reading" to "0xFFEDA8B4",
+        "Danger" to "0xFFE39086",
+        "Settings" to "0xFFB4BEBA",
     )
 
     private val appPaletteCalibrated: Map<String, Long> = linkedMapOf(
-        // Step 4 改值四项
-        "Background" to 0xFFF1FBF5L,
-        "TextSecondary" to 0xFF4E756AL,
-        "Separator" to 0xFFE4EFE9L,
+        // Step 4 改值四项（2026-10-27 轻松档再次校准；GlassFill 的 AARRGGBB 未动）
+        "Background" to 0xFFF6F9F6L,
+        "TextPrimary" to 0xFF1F2B26L,
+        "TextSecondary" to 0xFF566B62L,
+        "Separator" to 0xFFEBF1EDL,
         "GlassFill" to 0xEFFFFFFFL,
         // Step 4 新增八项（浅套静态源）
-        "Tint" to 0xFFDDF7E8L,
-        "Tint2" to 0xFFDCEAE1L,
-        "Tint3" to 0xFFCDEDD9L,
-        "Outline" to 0xFFADE7D2L,
-        "OutlineSoft" to 0xFFE4EFE9L,
-        "TextTertiary" to 0xFF7A9088L,
+        "Tint" to 0xFFE9F4EEL,
+        "Tint2" to 0xFFE4EFE9L,
+        "Tint3" to 0xFFDEEAE4L,
+        "Outline" to 0xFFD3E7DCL,
+        "OutlineSoft" to 0xFFEBF1EDL,
+        "TextTertiary" to 0xFF7C9188L,
         "OnBrand" to 0xFF04241CL,
         "ErrorFill" to 0xFFFF3B30L,
     )
 
+    /** 轻松档未动的四项：`Surface` 保持纯白（卡片实底）、`Scrim`/`GlassHighlight` 是遮罩与高光。 */
     private val appPaletteUnchanged: Map<String, Long> = linkedMapOf(
         "Surface" to 0xFFFFFFFFL,
-        "TextPrimary" to 0xFF1C1C1EL,
         "Scrim" to 0x66000000L,
         "GlassHighlight" to 0x59FFFFFFL,
     )
@@ -346,12 +347,12 @@ class DesignTokenContractTest {
         val dark = section(text, "val AppColorDark")
         val lightBg = hexOf(light, "background", "AppColorLight")
         val darkBg = hexOf(dark, "background", "AppColorDark")
-        assertEquals(0xFFF1FBF5L, unsigned(lightBg), "浅套 background 偏离 spec §2.1")
-        assertEquals(0xFF0E1512L, unsigned(darkBg), "深套 background 偏离 spec §2.1")
+        assertEquals(0xFFF6F9F6L, unsigned(lightBg), "浅套 background 偏离 spec §2.1")
+        assertEquals(0xFF111A16L, unsigned(darkBg), "深套 background 偏离 spec §2.1")
         // 显式「不等于对侧值」：若未来有人把两块合并/复制，此处先于取值表爆掉。
         assertTrue(darkBg != lightBg, "深套 background 与浅套同值：分节已坍缩")
-        assertTrue(unsigned(darkBg) != 0xFFF1FBF5L, "深套 background 查到了浅套值：全文件搜索冒充分节")
-        assertTrue(unsigned(lightBg) != 0xFF0E1512L, "浅套 background 查到了深套值：全文件搜索冒充分节")
+        assertTrue(unsigned(darkBg) != 0xFFF6F9F6L, "深套 background 查到了浅套值：全文件搜索冒充分节")
+        assertTrue(unsigned(lightBg) != 0xFF111A16L, "浅套 background 查到了深套值：全文件搜索冒充分节")
 
         // 合成负例：浅套块缺 background、深套块有——分节查找必须失败而非被深套救活。
         val synthetic = stripComments(
@@ -586,53 +587,53 @@ class DesignTokenContractTest {
         fun d(token: String) = hexOf(dark, token, "AppColorDark")
 
         // 正文族 ≥4.5
-        assertAtLeast("text1/bg-light", l("text1"), l("background"), 4.5)   // 16.09
-        assertAtLeast("text1/tint", l("text1"), l("tint"), 4.5)             // 15.02
-        assertAtLeast("text2/surface", l("text2"), l("surface"), 4.5)       // 5.15
-        assertAtLeast("text2/bg", l("text2"), l("background"), 4.5)         // 4.87
-        assertAtLeast("text2/tint", l("text2"), l("tint"), 4.5)             // 4.55
+        assertAtLeast("text1/bg-light", l("text1"), l("background"), 4.5)   // 13.83
+        assertAtLeast("text1/tint", l("text1"), l("tint"), 4.5)             // 13.02
+        assertAtLeast("text2/surface", l("text2"), l("surface"), 4.5)       // 5.71
+        assertAtLeast("text2/bg", l("text2"), l("background"), 4.5)         // 5.39
+        assertAtLeast("text2/tint", l("text2"), l("tint"), 4.5)             // 5.07
         assertAtLeast("error/surface", l("error"), l("surface"), 4.5)       // 7.20
         assertAtLeast("success/surface", l("success"), l("surface"), 4.5)   // 7.87
-        assertAtLeast("onMint/tint", l("onMint"), l("tint"), 4.5)           // 8.61（ADR 复算值）
+        assertAtLeast("onMint/tint", l("onMint"), l("tint"), 4.5)           // 8.65
         // 品牌渐变末端段不是 AppColorSet 字段（MintPalette.AppleMintEnd，取值在下方既有钉值用例），
         // 故操作数取 brief 钉值字面量（.toInt()：十六进制字面量默认 Long，Int 形参需显式截位）。
         assertAtLeast("onBrand/gradientEnd", l("onBrand"), 0xFF35B9B5.toInt(), 4.5) // 6.87
         // 深套
-        assertAtLeast("dark text1/bg", d("text1"), d("background"), 4.5)    // 16.20
+        assertAtLeast("dark text1/bg", d("text1"), d("background"), 4.5)    // 15.53
         assertAtLeast("dark text2/surface", d("text2"), d("surface"), 4.5)  // 7.54（本测试复算）
         assertAtLeast("dark error/surface", d("error"), d("surface"), 4.5)  // 6.87（本测试复算）
-        assertAtLeast("dark onMint/tint", d("onMint"), d("tint"), 4.5)      // 12.89
+        assertAtLeast("dark onMint/tint", d("onMint"), d("tint"), 4.5)      // 13.19
         // 强档卡（2026-10-25 §4.1）：明暗两套都是浅墨压深底。
-        assertAtLeast("onStrong/strongSurface-light", l("onStrong"), l("strongSurface"), 4.5) // 13.4
-        assertAtLeast("dark onStrong/strongSurface", d("onStrong"), d("strongSurface"), 4.5)  // 12.9
+        assertAtLeast("onStrong/strongSurface-light", l("onStrong"), l("strongSurface"), 4.5) // 9.10
+        assertAtLeast("dark onStrong/strongSurface", d("onStrong"), d("strongSurface"), 4.5)  // 11.65
     }
 
     /** brief「必须出现的配对断言」字面量原文：钉住比值表本身（文档事实层；.toInt() 见上方说明）。 */
     @Test
     fun `pinned ratio table holds as documented WCAG facts`() {
         // 正文族 ≥4.5
-        assertAtLeast("text1/bg-light", 0xFF1C1C1E.toInt(), 0xFFF1FBF5.toInt(), 4.5)   // 16.09
-        assertAtLeast("text1/tint", 0xFF1C1C1E.toInt(), 0xFFDDF7E8.toInt(), 4.5)       // 15.02
-        assertAtLeast("text2/surface", 0xFF4E756A.toInt(), 0xFFFFFFFF.toInt(), 4.5)    // 5.15
-        assertAtLeast("text2/bg", 0xFF4E756A.toInt(), 0xFFF1FBF5.toInt(), 4.5)         // 4.87
-        assertAtLeast("text2/tint", 0xFF4E756A.toInt(), 0xFFDDF7E8.toInt(), 4.5)       // 4.55
+        assertAtLeast("text1/bg-light", 0xFF1F2B26.toInt(), 0xFFF6F9F6.toInt(), 4.5)   // 13.83
+        assertAtLeast("text1/tint", 0xFF1F2B26.toInt(), 0xFFE9F4EE.toInt(), 4.5)       // 13.02
+        assertAtLeast("text2/surface", 0xFF566B62.toInt(), 0xFFFFFFFF.toInt(), 4.5)    // 5.71
+        assertAtLeast("text2/bg", 0xFF566B62.toInt(), 0xFFF6F9F6.toInt(), 4.5)         // 5.39
+        assertAtLeast("text2/tint", 0xFF566B62.toInt(), 0xFFE9F4EE.toInt(), 4.5)       // 5.07
         assertAtLeast("error/surface", 0xFFB30000.toInt(), 0xFFFFFFFF.toInt(), 4.5)    // 7.20
         assertAtLeast("success/surface", 0xFF1B5E20.toInt(), 0xFFFFFFFF.toInt(), 4.5)  // 7.87
-        assertAtLeast("onMint/tint", 0xFF174C44.toInt(), 0xFFDDF7E8.toInt(), 4.5)      // 8.61
+        assertAtLeast("onMint/tint", 0xFF174C44.toInt(), 0xFFE9F4EE.toInt(), 4.5)      // 8.65
         assertAtLeast("onBrand/gradientEnd", 0xFF04241C.toInt(), 0xFF35B9B5.toInt(), 4.5) // 6.87
         // 深套
-        assertAtLeast("dark text1/bg", 0xFFE9F2EC.toInt(), 0xFF0E1512.toInt(), 4.5)    // 16.20
+        assertAtLeast("dark text1/bg", 0xFFE9F2EC.toInt(), 0xFF111A16.toInt(), 4.5)    // 15.53
         assertAtLeast("dark text2/surface", 0xFF9FB3AA.toInt(), 0xFF17201C.toInt(), 4.5)  // 7.54
         assertAtLeast("dark error/surface", 0xFFFF8177.toInt(), 0xFF17201C.toInt(), 4.5)  // 6.87
-        assertAtLeast("dark onMint/tint", 0xFFDFF6EC.toInt(), 0xFF1C2C26.toInt(), 4.5) // 12.89
+        assertAtLeast("dark onMint/tint", 0xFFDFF6EC.toInt(), 0xFF1B2A25.toInt(), 4.5) // 13.19
         // 强档卡（2026-10-25 §4.1）
-        assertAtLeast("onStrong/strongSurface", 0xFFE9F2EC.toInt(), 0xFF0C2A22.toInt(), 4.5)      // 13.4
-        assertAtLeast("dark onStrong/strongSurface", 0xFFE9F2EC.toInt(), 0xFF1E2B25.toInt(), 4.5) // 12.9
+        assertAtLeast("onStrong/strongSurface", 0xFFE9F2EC.toInt(), 0xFF1F4739.toInt(), 4.5)      // 9.10
+        assertAtLeast("dark onStrong/strongSurface", 0xFFE9F2EC.toInt(), 0xFF22332C.toInt(), 4.5) // 11.65
 
-        // 禁配（本禁配由 Task 1 裁决 #1/#2/#3 立；字面量层与源码层双钉，见下一用例）
-        assertTrue(ratio(0xFF7A9088.toInt(), 0xFFFFFFFF.toInt()) < 4.5, "text-3 若已合格，裁决 #1 需重议")   // 3.40
-        assertTrue(ratio(0xFF7A9088.toInt(), 0xFFDDF7E8.toInt()) < 4.5)                                     // 3.00
-        assertTrue(ratio(0xFF4E756A.toInt(), 0xFFDCEAE1.toInt()) < 4.5, "text-2 压 tint-2 若已合格，裁决 #2 需重议") // 4.15
+        // 禁配（本禁配由 Task 1 裁决 #1/#3 立；字面量层与源码层双钉，见下一用例）
+        assertTrue(ratio(0xFF7C9188.toInt(), 0xFFFFFFFF.toInt()) < 4.5, "text-3 若已合格，裁决 #1 需重议")   // 3.35
+        assertTrue(ratio(0xFF7C9188.toInt(), 0xFFE9F4EE.toInt()) < 4.5)                                     // 2.98
+        assertTrue(ratio(0xFF7C9188.toInt(), 0xFFE4EFE9.toInt()) < 4.5)                                     // 2.85
         assertTrue(ratio(0xFF174C44.toInt(), 0xFF35B9B5.toInt()) < 4.5, "on-mint 压渐变末端若已合格，裁决 #3 需重议") // 4.07
     }
 
@@ -651,29 +652,28 @@ class DesignTokenContractTest {
         )
         assertTrue(
             ratio(l("text3"), l("background")) < 4.5,
-            "text-3 压 bg 若已合格，裁决 #1 需重议（ADR 钉 3.22，实测 %.2f:1）".format(ratio(l("text3"), l("background"))),
+            "text-3 压 bg 若已合格，裁决 #1 需重议（实测 %.2f:1）".format(ratio(l("text3"), l("background"))),
         )
-        assertTrue(
-            ratio(l("text2"), l("tint2")) < 4.5,
-            "text-2 压 tint-2 若已合格，裁决 #2 需重议（实测 %.2f:1）".format(ratio(l("text2"), l("tint2"))),
-        )
-        assertTrue(
-            ratio(l("text2"), l("tint3")) < 4.5,
-            "text-2 压 tint-3 若已合格，裁决 #2 需重议（ADR 钉 4.10，实测 %.2f:1）".format(ratio(l("text2"), l("tint3"))),
-        )
+        // 裁决 #2（text-2 禁压 tint-2/tint-3）**已被 2026-10-27 轻松档解除**：tint 系去饱和后
+        // text-2 压 tint-2/tint-3 分别升到 4.85/4.62，已过正文 4.5 —— 这是「只增不减」的方向，
+        // 故旧的反向钉（要求 <4.5）翻成正向钉。凡有人把 tint 系再调暗到 <4.5，这里当场红。
+        assertAtLeast("text2/tint2(轻松档解除裁决#2 禁配)", l("text2"), l("tint2"), 4.5) // 4.85
+        assertAtLeast("text2/tint3(轻松档解除裁决#2 禁配)", l("text2"), l("tint3"), 4.5) // 4.62
         assertTrue(
             ratio(l("onMint"), 0xFF35B9B5.toInt()) < 4.5,
             "on-mint 压渐变末端若已合格，裁决 #3 需重议（实测 %.2f:1）".format(ratio(l("onMint"), 0xFF35B9B5.toInt())),
         )
-        // 裁决 #2 的替代配对同口径钉住：text-1 压 tint-2/tint-3 必须合格（ADR 钉 13.69/13.54）。
-        assertAtLeast("text1/tint2(裁决#2 替代配对)", l("text1"), l("tint2"), 4.5) // 13.69
-        assertAtLeast("text1/tint3(裁决#2 替代配对)", l("text1"), l("tint3"), 4.5) // 13.54
+        // 裁决 #2 的替代配对同口径钉住：text-1 压 tint-2/tint-3 必须合格（实测 12.45/11.87）。
+        assertAtLeast("text1/tint2(裁决#2 替代配对)", l("text1"), l("tint2"), 4.5) // 12.45
+        assertAtLeast("text1/tint3(裁决#2 替代配对)", l("text1"), l("tint3"), 4.5) // 11.87
 
         // ---------- F5（批 1 终审 Seat A I-2）：text-3 的**图形/非文本**下限方向 ----------
         // 上面三条只按正文 4.5 判「text-3 不合格」，从未按图形下限判过：裁决 1 允许 text-3 用于
         // 「纯图标描边」，而描边是非文本图形（Global Constraints #7：≥3:1），Task 10 又把装饰档局部收紧到
-        // ≥3.1（「边界上的合格不算合格」）。text-3 压 tint 恰好卡在 3.0 线上、压 tint-2/tint-3 连 3:1 都不过，
+        // ≥3.1（「边界上的合格不算合格」）。text-3 压 tint 实测 2.98（轻松档前是 3.00，本轮跌破 3.0 线）、
+        // 压 tint-2/tint-3 是 2.85/2.71 连 3:1 都不过，
         // 所以批 2 任何一枚照裁决 1 字面用 text-3 描边的图标都能穿过全部批 1 门禁 —— 这三条钉的就是那个缺口。
+        // 注意余量：tint 那条只差 0.12 到装饰档下限，`tint` 再亮一档就会翻（翻=这里红，不是静默放行）。
         assertTrue(
             ratio(l("text3"), l("tint")) < 3.1,
             "text-3 压 tint 已达 %.2f:1（≥3.1 装饰档下限）——裁决 1 的「图标描边可用底」需按 F5 重议，" +

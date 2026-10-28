@@ -173,6 +173,67 @@ class SpeechSettingsViewModelTest {
     }
 
     /**
+     * 批 5 Task 1：语速从「点按循环」改成滑杆后，滑杆给的是**连续**值，落盘前必须吸附到四档表
+     * （[SpeechRateSteps]）里最近的一档——否则存储里会出现 1.1x 这种档位表外的值，
+     * 播放侧与「四档」的产品口径当场分叉。
+     */
+    @Test fun setSpeechRateSnapsToTheNearestLegalStepAndPersists() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.setSpeechRate(1.3f)
+        advanceUntilIdle()
+
+        assertEquals(1.25f, viewModel.state.value.speechRate)
+        assertEquals(1.25f, preferences.saved.single().speechRate)
+
+        viewModel.setSpeechRate(0.7f)
+        advanceUntilIdle()
+        assertEquals(0.75f, viewModel.state.value.speechRate)
+        assertEquals(0.75f, preferences.saved.last().speechRate)
+
+        viewModel.setSpeechRate(1.9f)
+        advanceUntilIdle()
+        assertEquals(1.5f, viewModel.state.value.speechRate)
+        assertEquals(1.5f, preferences.saved.last().speechRate)
+    }
+
+    /** 滑杆拖到当前档位不需要写盘（等值是幂等操作），但状态里的报告必须收干净。 */
+    @Test fun setSpeechRateAtTheCurrentStepDoesNotRewriteStorage() = runTest(dispatcher) {
+        val preferences = FakePreferences(SpeechPreference(speechRate = 1.25f))
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.setSpeechRate(1.25f)
+        advanceUntilIdle()
+
+        assertEquals(1.25f, viewModel.state.value.speechRate)
+        assertTrue(preferences.saved.isEmpty(), "同一档位不写盘（现 ${preferences.saved.size} 次）")
+    }
+
+    /** 存储失败：状态与档位不变，只报存储错误——与 [cycleSpeechRate] 同一口径。 */
+    @Test fun failedSpeechRateSetKeepsStateAndReportsStorageError() = runTest(dispatcher) {
+        val preferences = FakePreferences(failSave = true)
+        val viewModel = viewModel(preferences = preferences)
+        viewModel.load()
+        advanceUntilIdle()
+
+        viewModel.setSpeechRate(0.75f)
+        advanceUntilIdle()
+
+        assertEquals(1.0f, viewModel.state.value.speechRate)
+        assertTrue(viewModel.state.value.message != null)
+    }
+
+    /** 四档表本身就是 UI 刻度表：滑杆的刻度数、吸附目标、循环步进三者必须同一份。 */
+    @Test fun speechRateStepsStayTheFourProductSteps() {
+        assertEquals(listOf(0.75f, 1.0f, 1.25f, 1.5f), SpeechRateSteps)
+    }
+
+    /**
      * 决策 §2 读改写口径（`:78` 历史坑同款防线）：select 用当前 UI 状态手工构造偏好，
      * 必须显式带上已存的 speechRate——存过 1.25x 之后换引擎不得把它复位。
      */

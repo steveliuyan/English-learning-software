@@ -168,7 +168,7 @@ class AppScreenOverlayContainerTest {
         }
         composeRule.onNodeWithText("删除《我的词书》？").assertDoesNotExist()
         assertEquals("取消不得落库：deleteWordBook 调用数必须不变", deleteCallsAtOpen, repository.deleteCalls.size)
-        composeRule.onNodeWithTag("wordbook_swipe_my-pack").assertExists()
+        composeRule.onNodeWithTag("wordbook_tile_my-pack").assertExists()
     }
 
     /**
@@ -484,7 +484,7 @@ class AppScreenOverlayContainerTest {
     private fun createProfileAndOpenSetup() {
         createProfile()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("wordbook_swipe_my-pack").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("wordbook_tile_my-pack").fetchSemanticsNodes().isNotEmpty()
         }
     }
 

@@ -19,20 +19,25 @@ import kotlin.test.assertTrue
  * 于是既绑错了底、又用错了档位。本席逐腿分开：
  *
  *  1. **未选中档**：字形与标签共用同一枚 `text2`，铺在底导容器 `background(MintSurface)`
- *     （= 当前主题 `surface`）上。标签是正文档 → 判 ≥4.5。本轮实测：浅 5.151、深 7.543。
- *  2. **选中档字形腿**：走 `InlineIconBadge`，字形实际铺在该组件的 `background(appColors().tint)`
- *     药片底上（不是 `surface`），是非文本图形档 → 判 ≥3.1（修复轮 2 / 裁决 D：与房内
- *     `EntryRowInkTest`、`NotConfiguredCardContractTest`、`WordRowSpeakerContractTest` 的 R-10.6 口径统一，
- *     按 3:1 **加余量**、卡在边界不算合格；原 `floor = 3.0` 废止）。本轮实测：浅 3.546、深 8.632。
- *     旧契约按 `surface` 复算这一腿，而字形从不落在那个底上 ⇒ 真实腿零断言。
+ *     （= 当前主题 `surface`）上。标签是正文档 → 判 ≥4.5。轻松档实测：浅 5.714、深 7.543。
+ *  2. **选中档字形腿**：走 `InlineIconBadge`。**2026-10-31 起**两档都画同一枚插画位图（用户评审 ①），
+ *     所以这条腿复算的已不是「屏幕上那枚字形」，而是徽标内部**无母版时的矢量兜底**（`deep` 单层描边
+ *     压 `appColors().tint` 药片底）——那枚兜底仍真实存在于源码与 5 枚豁免字形上，于是这条腿由
+ *     「选中态字形腿」转为「徽标兜底腿」：判据温度不变（非文本图形档 ≥3.1、同底诱饵负例），
+ *     只是它守的东西从「当选字形」变成「徽标退化路径」，不再是零断言。轻松档实测：浅 4.651、深 8.741。
+ *     位图本身的自带墨色对比不归本契约：母版是 PNG，颜色不在这两套 token 里，由
+ *     `AppIllustrationContractTest`（在盘/尺寸/映射）与真机走查承担。
  *  3. **选中档标签文字腿**：铺在同一枚容器 `surface` 上，是正文档 → 判 ≥4.5。
- *     浅套按 R-14.4 的 AiSpeech 例外取 `appColors().onMint`（本轮实测 9.751），
- *     深套沿用 `appDomain(AiSpeech).deep`（深套 deep 与 base 合一，本轮实测 9.850）。
- *     旧契约让浅套 `deep` 走这条腿（实测 4.016，够不上 4.5）却按图形 3.0 放行 ⇒ 档位用错；
- *     那枚 4.016 现在留在本契约里作**诱饵负例**，证明这条腿确实被 4.5 线判过。
+ *     浅套按 R-14.4 的 AiSpeech 例外取 `appColors().onMint`（轻松档实测 9.751），
+ *     深套沿用 `appDomain(AiSpeech).deep`（深套 deep 与 base 合一，轻松档实测 9.745）。
+ *     旧契约让浅套 `deep` 走这条腿（当时实测 4.016，够不上 4.5）却按图形 3.0 放行 ⇒ 档位用错。
+ *     注意：2026-10-27 轻松档把浅套 `AiSpeech.deep` 压到 #1A7A63 后，同一对已升到 **5.240**，
+ *     那枚 4.016 诱饵随之失效——现在改用同域色的 `base` 端（#6CCBAB，压 `surface` 只有 1.950）
+ *     当诱饵，仍然证明这条腿确实被 4.5 线判过（不是「怎么填都过」）。
  *
  * 上面那些实测数字只是本轮取证留痕，**判据一律是档位线本身**（4.5 / 3.1）加同底诱饵负例，
- * 不把实测值钉进判据（14A 零余量禁令）。本轮余量：浅文字 +5.25、深文字 +5.35、浅图形 +0.45、深图形 +5.53。
+ * 不把实测值钉进判据（14A 零余量禁令）。轻松档余量：浅文字 +5.251、深文字 +5.245、
+ * 浅图形 +1.551、深图形 +5.641。
  *
  * 契约不只算数：最后一例把这三条复算的腿逐一绑回生效渲染路径——底导容器底 `background(MintSurface)`、
  * 未选中墨 `appColors().text2`、选中字形入口 `InlineIconBadge(icon, domain = AppDomain.AiSpeech)`
@@ -123,8 +128,9 @@ class AppBottomBarContrastTest {
             fgName = "浅套 onMint 标签墨", fg = rgb(AppColorLight.onMint),
             bgName = "浅套 surface 底", bg = rgb(AppColorLight.surface),
             floor = 4.5,
-            // 被拒候选：旧契约放在这条腿上的那枚 deep（实测 4.016，正文档不达标）。
-            decoy = "浅套 AiSpeech deep（旧选中标签墨）" to aiSpeechLightDeep,
+            // 被拒候选：同域色的 `base` 浅端压同一底（1.950）——轻松档把 `deep` 修到达标之后，
+            // 就只剩这一端还站在 4.5 线外，诱饵负例改由它承担。
+            decoy = "浅套 AiSpeech base（域色浅端）" to rgb(DomainLight.getValue(AppDomain.AiSpeech).base),
         )
     }
 
@@ -170,10 +176,16 @@ class AppBottomBarContrastTest {
             bar.contains("else appColors().text2"),
             "未选中墨必须走 appColors().text2（活 token），否则 text2 对比复算对不上生效路径",
         )
-        // 选中字形腿：必须经行内徽标，且徽标底是主题 tint、字形墨是域 deep。
+        // 选中字形腿：必须经行内徽标，且徽标底是主题 tint、字形兜底墨是域 deep。
+        // 2026-10-31 起两档都经同一枚徽标（`backdrop = selected` 只决定带不带药片底、alpha 决定淡出），
+        // 故锚点取调用前缀 + 两枚状态实参：旧形「选中才套徽标」被 `backdrop = selected` 判出来。
         assertTrue(
-            bar.contains("InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech)"),
+            bar.contains("InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech"),
             "选中字形不再走 InlineIconBadge(AiSpeech)：本契约的 deep-on-tint 图形腿与生效路径脱钩",
+        )
+        assertTrue(
+            bar.contains("backdrop = selected"),
+            "徽标必须两档共用、只由 backdrop 决定带不带药片底：deep-on-tint 这条腿复算的底就在那枚药片上",
         )
         assertTrue(
             badge.contains("background(appColors().tint)"),

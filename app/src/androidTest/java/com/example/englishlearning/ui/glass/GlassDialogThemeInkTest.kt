@@ -51,8 +51,13 @@ import org.junit.runner.RunWith
  *    `AppScreenOverlayContainerTest` 的 dozen-books 那一例）。
  *
  * 取样口径四条，都不是随手写的：
- *  - **容器底与墨核都取节点位图的不透明像素众数**（`captureToImage()` 只截该节点自身图层，界外是透明区）：
- *    面积最大的一档必定是容器填充／字身核心，圆角与抗锯齿边缘是少数派；众数不依赖版面细节。
+ *  - **容器底取节点位图的不透明像素众数**（`captureToImage()` 只截该节点自身图层，界外是透明区）：
+ *    面积最大的一档必定是容器填充，圆角与抗锯齿边缘是少数派；众数不依赖版面细节。
+ *  - **墨核取「离容器众数足够远」的那一族里的众数**，不是全局众数：上面那条「只截自身图层」的前提在
+ *    API 30 模拟器成立、**在真机（MIUI / Android 13 / 440dpi）不成立**——标题位图拿到的是与面板合成后的
+ *    内容，全局众数落在玻璃填充 `#F1FDFDFD`（正是下面记的「浅套投影渗色」那一档），「墨核」被量成容器
+ *    而与期望差 222 档。排除贴容器族（[INK_MIN_DELTA_FROM_BACKDROP]）+ 成族下限（[INK_MIN_FAMILY_COUNT]）
+ *    之后，两种设备行为归一：剩下的像素里面积最大的一档就是字身核心，凑不出族就当场判红。
  *  - **alpha 参与取样键**：`surfaceGlass` 是**半透明**填充（浅 `0xEF`／深 `0xE6`），本包先例
  *    `ThemeModeSwitchTest.OPAQUE_ALPHA_FLOOR = 250` 会把玻璃填充整个排掉（239 < 250），所以此处按
  *    [GLASS_ALPHA_FLOOR] 取样，并把 alpha 纳入判据——深套 `surface`（`#FF17201C`）与深套
@@ -91,9 +96,9 @@ class GlassDialogThemeInkTest {
         composeRule.setContent {
             MintGlassTheme(themeMode = ThemeMode.Light) { PanelProbe() }
         }
-        assertPanelPaints(AppPalette.GlassFill.toArgb(), AppPalette.TextPrimary.toArgb())
+        val ink = assertPanelPaints(AppPalette.GlassFill.toArgb(), AppPalette.TextPrimary.toArgb())
         // 反向：深套那档墨（#E9F2EC）不许出现在浅色面板的字身上（前景被写成深套常量就在这里红）。
-        assertInkIsNotTheOtherSet(AppColorDark.text1.toArgb())
+        assertInkIsNotTheOtherSet(ink, AppColorDark.text1.toArgb())
     }
 
     /**
@@ -110,10 +115,10 @@ class GlassDialogThemeInkTest {
         composeRule.setContent {
             MintGlassTheme(themeMode = ThemeMode.Dark) { PanelProbe() }
         }
-        assertPanelPaints(AppColorDark.surfaceGlass.toArgb(), AppColorDark.text1.toArgb())
+        val ink = assertPanelPaints(AppColorDark.surfaceGlass.toArgb(), AppColorDark.text1.toArgb())
         // 反向：迁移前写死的浅套前景（#1C1C1E）不许出现在深色面板的字身上——
         // 它压深玻璃只有约 1.05:1，正是批 1 终审 F4 说的那一侧。
-        assertInkIsNotTheOtherSet(AppPalette.TextPrimary.toArgb())
+        assertInkIsNotTheOtherSet(ink, AppPalette.TextPrimary.toArgb())
     }
 
     /**
@@ -180,7 +185,7 @@ class GlassDialogThemeInkTest {
      * 于是 alpha 腿取「≥ 期望值且离期望值 ≤ 容差」，RGB 腿按容差判——
      * 渗色方向不可能把「画成不透明实底」这种缺陷往下拉，alpha 腿照样判红（详见下面自检②）。
      */
-    private fun assertPanelPaints(expectedGlass: Int, expectedInk: Int) {
+    private fun assertPanelPaints(expectedGlass: Int, expectedInk: Int): Int {
         val container = modeOfPanelPixels()
         assertRgbWithinTolerance("面板容器底（玻璃填充）", container, expectedGlass, GLASS_CHANNEL_TOLERANCE)
         val actualAlpha = (container ushr 24) and 0xFF
@@ -192,7 +197,7 @@ class GlassDialogThemeInkTest {
                 "期望 ≥${expectedAlpha}（${expectedGlass.hex()}）、≤${expectedAlpha + GLASS_ALPHA_TOLERANCE}，实际 $actualAlpha（${container.hex()}）",
             expectedAlpha <= actualAlpha && actualAlpha <= expectedAlpha + GLASS_ALPHA_TOLERANCE,
         )
-        val ink = modeOfTitleInkPixels()
+        val ink = modeOfTitleInkPixels(container)
         assertWithinChannelTolerance("标题墨核（面板前景）", ink, expectedInk, INK_CHANNEL_TOLERANCE)
         // 自检（取样点判别力）：墨核与容器必须是不同像素。面板里根本没画出字时，
         // 下面那条对比断言会退化成「容器压容器 = 1:1」，这条把失配原因先说清。
@@ -222,17 +227,26 @@ class GlassDialogThemeInkTest {
             "alpha 容差必须小于玻璃与不透明实底的 alpha 间距（最近一档只有 $nearestOpaqueAlphaGap 档）：容差 $GLASS_ALPHA_TOLERANCE",
             GLASS_ALPHA_TOLERANCE < nearestOpaqueAlphaGap,
         )
-        // 自检③（相邻填充判别力）：容差必须小于深套玻璃与该套 background / tint / outlineSoft 的最近间距，
-        // 否则「容器漏画、透出页底」会在本用例蒙过（渗色实测 ≤3 档，容差 6 仍容不下 11 档的最近相邻档）。
+        // 自检③（相邻填充判别力）：容差必须小于深套玻璃与该套**不透明**相邻填充的最近间距，
+        // 否则「容器漏画、透出别的填色」会在本用例蒙过（渗色实测 ≤3 档，容差 6 仍容不下这些档的最近一档）。
+        //
+        // 这里刻意**不含 `background`**：轻松档（2026-10-27 裁决 1）把深套页底从 #0E1512 抬到 #111A16，
+        // 它与 surface #17201C 的逐通道间距只余 6 档，正好等于本容差 —— 按旧口径这条自检恒红（真机与
+        // API 30 模拟器实测同红，与设备无关）。但「容器漏画、透出页底」这条失败模式已被上面那条 alpha 腿
+        // 挡死：`background` 是不透明 0xFF、玻璃是 0xE6，只要它透上来 alpha 就跳出 [E6, E6+8]，比 RGB
+        // 判据更早红。于是 RGB 容差只需要区分「同为半透明」的相邻档（本套没有第二枚半透明填充），
+        // 余下四枚不透明档与玻璃的间距是 tint 10 / tint2 16 / tint3 21 / outlineSoft 12，容差 6 仍有余量。
         val nearestAdjacentFill = minOf(
-            rgbChannelDelta(AppColorDark.surfaceGlass.toArgb(), AppColorDark.background.toArgb()),
             rgbChannelDelta(AppColorDark.surfaceGlass.toArgb(), AppColorDark.tint.toArgb()),
+            rgbChannelDelta(AppColorDark.surfaceGlass.toArgb(), AppColorDark.tint2.toArgb()),
+            rgbChannelDelta(AppColorDark.surfaceGlass.toArgb(), AppColorDark.tint3.toArgb()),
             rgbChannelDelta(AppColorDark.surfaceGlass.toArgb(), AppColorDark.outlineSoft.toArgb()),
         )
         assertTrue(
-            "容器 RGB 容差必须小于深套玻璃到相邻填充档的最近间距（实测 $nearestAdjacentFill 档）：容差 $GLASS_CHANNEL_TOLERANCE",
+            "容器 RGB 容差必须小于深套玻璃到相邻不透明填充档的最近间距（实测 $nearestAdjacentFill 档）：容差 $GLASS_CHANNEL_TOLERANCE",
             GLASS_CHANNEL_TOLERANCE < nearestAdjacentFill,
         )
+        return ink
     }
 
     /** 容器 RGB 腿：丢掉 alpha 后逐通道比较（理由见 [assertPanelPaints] 的分腿说明）。 */
@@ -251,8 +265,7 @@ class GlassDialogThemeInkTest {
      * 只断「等于本套墨」时，若另一套墨恰好也落在容差内（深玻璃 RGB 与浅套墨 #1C1C1E 只差 5/4/2 档，
      * 这类「容器与旧墨近似」正是本仓踩过的坑），写死常量的缺陷就可能蒙过；这条把距离当场钉住。
      */
-    private fun assertInkIsNotTheOtherSet(otherSetInk: Int) {
-        val ink = modeOfTitleInkPixels()
+    private fun assertInkIsNotTheOtherSet(ink: Int, otherSetInk: Int) {
         val delta = rgbChannelDelta(ink, otherSetInk)
         assertTrue(
             "面板前景不得取另一套的墨（写死常量或漏一处主题读点就会命中）：" +
@@ -275,29 +288,56 @@ class GlassDialogThemeInkTest {
         modeOfSampledPixels(composeRule.onNodeWithTag(PANEL_TAG).captureToImage().asAndroidBitmap())
 
     /**
-     * 标题节点的墨核众数。`useUnmergedTree = true` 是正确性而不是风格：父级带点击语义时会合并子节点，
+     * 标题节点的墨核众数。
+     *
+     * `useUnmergedTree = true` 是正确性而不是风格：父级带点击语义时会合并子节点，
      * 合并树取到的是整块面板，位图里混进容器填充，众数就变成容器（口径同 `ThemeModeSwitchTest`）。
+     *
+     * **取样必须排除贴近容器的那一族**（[INK_MIN_DELTA_FROM_BACKDROP]），不能直接取全局众数：
+     * 本类原口径默认「`captureToImage()` 只截节点自身图层，界外是透明区」，于是标题位图里唯一起眼的
+     * 就是字身。该前提在 API 30 模拟器成立，但**在真机（MIUI / Android 13 / 440dpi）不成立**：
+     * 标题节点位图拿到的是与面板合成后的内容，众数落在玻璃填充 #F1FDFDFD（正好是 KDoc 里记的
+     * 「浅套投影渗色」那一档），于是「墨核」被量成容器、与期望的 #1F2B26 差 222 档而误红。
+     * 排除贴容器族后两种情形都退化成同一件事：剩下的像素里面积最大的那一档就是字身核心
+     * （抗锯齿过渡像素介于容器与墨之间且每枚值都不同，靠 [INK_MIN_FAMILY_COUNT] 再滤一遍）。
      */
-    private fun modeOfTitleInkPixels(): Int =
+    private fun modeOfTitleInkPixels(backdrop: Int): Int =
         modeOfSampledPixels(
             composeRule.onNodeWithTag(TITLE_TAG, useUnmergedTree = true)
                 .captureToImage()
                 .asAndroidBitmap(),
+            awayFrom = backdrop,
         )
 
-    /** 逐像素遍历 alpha ≥ [GLASS_ALPHA_FLOOR] 的像素取直方图众数（保留玻璃 alpha，理由见类注释）。 */
-    private fun modeOfSampledPixels(bitmap: Bitmap): Int {
+    /**
+     * 逐像素遍历 alpha ≥ [GLASS_ALPHA_FLOOR] 的像素取直方图众数（保留玻璃 alpha，理由见类注释）。
+     *
+     * [awayFrom] 非空时只统计与它逐通道相差 ≥ [INK_MIN_DELTA_FROM_BACKDROP] 的像素，即「离容器足够远」那一族；
+     * 该族若凑不出 [INK_MIN_FAMILY_COUNT] 像素，说明这张位图里根本没有字身（漏画字 / 取错节点），当场判红，
+     * 不让众数退化回容器。
+     */
+    private fun modeOfSampledPixels(bitmap: Bitmap, awayFrom: Int? = null): Int {
         val counts = HashMap<Int, Int>()
         for (y in 0 until bitmap.height) {
             for (x in 0 until bitmap.width) {
                 val argb = bitmap.getPixel(x, y)
-                if (((argb ushr 24) and 0xFF) >= GLASS_ALPHA_FLOOR) counts[argb] = (counts[argb] ?: 0) + 1
+                if (((argb ushr 24) and 0xFF) < GLASS_ALPHA_FLOOR) continue
+                if (awayFrom != null && rgbChannelDelta(argb, awayFrom) < INK_MIN_DELTA_FROM_BACKDROP) continue
+                counts[argb] = (counts[argb] ?: 0) + 1
             }
         }
         val winner = counts.maxByOrNull { it.value }
-        return checkNotNull(winner) {
+        checkNotNull(winner) {
             "节点位图里没有 alpha ≥ $GLASS_ALPHA_FLOOR 的像素（尺寸 ${bitmap.width}x${bitmap.height}），取样对象根本没渲染？"
-        }.key
+        }
+        if (awayFrom != null) {
+            assertTrue(
+                "墨核成族下限：离容器 ${awayFrom.hex()} 足够远的像素只有 ${winner.value} 枚，不足 $INK_MIN_FAMILY_COUNT" +
+                    "（尺寸 ${bitmap.width}x${bitmap.height}）——这张位图里没有字身，取样对象不是标题节点或缺字",
+                winner.value >= INK_MIN_FAMILY_COUNT,
+            )
+        }
+        return winner.key
     }
 
     /** 四个通道（含 alpha）的最大绝对差。 */
@@ -360,6 +400,17 @@ private const val GLASS_ALPHA_TOLERANCE = 8
 
 /** 墨核容差：字身核心像素应逐值等于墨，留 12 档只抗不同字号/字重下的覆盖不足。 */
 private const val INK_CHANNEL_TOLERANCE = 12
+
+/**
+ * 墨核取样门槛：标题位图里离容器至少差这么多才算字身。
+ *
+ * 真机（MIUI / Android 13）的 `captureToImage()` 会把标题节点按「与面板合成后」返回，全局众数于是落在
+ * 玻璃填充上（实测 `#F1FDFDFD`）；排除贴近容器的那一族后，两种设备行为才归一到同一件事。
+ */
+private const val INK_MIN_DELTA_FROM_BACKDROP = 64
+
+/** 墨核成族下限：单发杂点不算字身（一行标题的字身核心有几百像素）。 */
+private const val INK_MIN_FAMILY_COUNT = 25
 
 /** 反向判据门槛：墨核离另一套墨必须远到这一点（两套墨实测间距 205/214/208 档）。 */
 private const val WRONG_SET_INK_MIN_CHANNEL_DELTA = 32

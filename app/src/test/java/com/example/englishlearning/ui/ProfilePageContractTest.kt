@@ -31,6 +31,28 @@ class ProfilePageContractTest {
         assertTrue("AppType.Display" !in profile, "我的页不出现 Display：全屏只学习页与打卡页各一枚")
     }
 
+    /**
+     * 统计格的墨归容器，屏侧不再钉死 `onStrong`（2026-10-31 用户评审 ②）。
+     *
+     * 浅套强档卡底色从 `strongSurface`（深墨实底）改成 `tint2`（浅薄荷）之后，卡上那枚
+     * `onStrong`（`#E9F2EC`，近白）压浅底等于不可读——墨必须跟着容器的分套走。`StrongCard`
+     * 已经把分套后的前景提供成 `LocalContentColor`，屏侧读它即可，不必（也不许）自己再判主题。
+     * 值 + 标签两格都要读，所以计数钉 2：只改一格会留下另一格压浅底。
+     */
+    @Test
+    fun `the three stat cells take their ink from the container, not a pinned on_strong`() {
+        assertEquals(
+            0,
+            countMatches(profile, Regex("""\bcolors\.onStrong\b""")),
+            "我的页统计格不得再钉死 onStrong：浅套强档卡是 tint2 浅底，近白墨压它等于不可读",
+        )
+        assertEquals(
+            2,
+            countMatches(profile, Regex("""LocalContentColor\.current""")),
+            "统计数值与统计标签两格都必须从容器内容色取墨（StrongCard 已按主题分套提供）",
+        )
+    }
+
     @Test
     fun `the settings ledger is reused not duplicated`() {
         assertEquals(1, countMatches(profile, Regex("""\bsettingsContent\(\)""")), "我的页必须调用宿主注入的设置内容槽")

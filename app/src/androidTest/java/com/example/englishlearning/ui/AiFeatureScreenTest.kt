@@ -60,7 +60,7 @@ class AiFeatureScreenTest {
             current.value = feature
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("ai_feature_screen").assertExists()
-            composeRule.onNodeWithTag("ai_feature_title").assertExists()
+            composeRule.onNodeWithTag("app_screen_header").assertExists()
             composeRule.onNodeWithText(feature.title).assertExists()
             composeRule.onNodeWithTag("ai_feature_status_card").assertExists()
             composeRule.onNodeWithTag("ai_feature_status").assertExists()
@@ -114,10 +114,13 @@ class AiFeatureScreenTest {
         assertEquals(1, toLearning)
     }
 
-    /** 这些按钮同时要有 testTag（测试用）与 contentDescription（无障碍 + adb 走查用）。 */
+    /**
+     * 这些按钮同时要有 testTag（测试用）与 contentDescription（无障碍 + adb 走查用）。
+     * 返回位自批 4 Task 2 起归共享 `AppScreenHeader`，它的语义固定是「返回」（组件内 48dp 可点盒）。
+     */
     @Test fun every_action_is_reachable_by_its_content_description() {
         setScreen()
-        composeRule.onNodeWithContentDescription("返回 AI 学").assertExists()
+        composeRule.onNodeWithContentDescription("返回").assertExists()
         composeRule.onNodeWithContentDescription("去配置 AI 服务").performScrollTo().assertExists()
         composeRule.onNodeWithContentDescription("回到今日学习").performScrollTo().assertExists()
     }
@@ -125,7 +128,7 @@ class AiFeatureScreenTest {
     @Test fun back_button_reports_its_callback() {
         var backed = 0
         setScreen(onBack = { backed++ })
-        composeRule.onNodeWithTag("ai_feature_back").assertHasClickAction().performClick()
+        composeRule.onNodeWithContentDescription("返回").assertHasClickAction().performClick()
         composeRule.waitForIdle()
         assertEquals(1, backed)
     }

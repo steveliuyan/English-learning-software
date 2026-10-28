@@ -54,13 +54,18 @@ import kotlin.test.fail
  * （席 B 扩展沿用同一批夹具，不再抄第四份）。
  *
  * **批 2 全分支终审修复席 B（task-18fix-b）的扩面**：判据 ⑤–⑦ 把同一条「容器与面板内前景同源」契约
- * 推到余下三块玻璃面板——`components/glass/GlassOverlay.kt` 的浮层面板、`AiProfileSettingsScreen.kt` 的
- * `SectionCard`、`SpeechSettingsScreen.kt` 的 `PreviewCard`。三块各自钉：容器 `appColors().surfaceGlass`
+ * 推到余下两块玻璃面板——`components/glass/GlassOverlay.kt` 的浮层面板与 `SpeechSettingsScreen.kt` 的
+ * `PreviewCard`。两块各自钉：容器 `appColors().surfaceGlass`
  * 体内恰一处（体外零处、`.copy` 间接换形不算）、`AppPalette.GlassFill` 归零、主题无关蒙版描边恰一处、
  * 公开签名与几何逐字不动；面板内容（消费者尾随 lambda 窗口 + 面板专属私有排印点函数体，如
- * `VoiceOverlayOption` / `CapabilityToggle` / `EditorField`）逐枚按套取墨，禁止静态墨、裸 hex、
+ * `VoiceOverlayOption`）逐枚按套取墨，禁止静态墨、裸 hex、
  * 命名色常量与「把墨提读成变量再点用」。曾被单独回退成静态浅套墨的那几行，另用
  * [MigratedPanel.pinnedInkLiterals] 逐字钉死取值形状。取样窗口同样绑生效调用点、未闭合即响亮 fail。
+ *
+ * **批 4 Task 3 摘项**：`AiProfileSettingsScreen.kt` 的 `SectionCard` 已整屏重写为不透明 `SoftCard` 三组，
+ * 容器不再读 `appColors().surfaceGlass`（玻璃填充债务归零，见 `DarkTokenConsumptionRatchetTest` 台账），
+ * 该面板因此从 [migratedPanels] 撤登记——这里只登记**仍在用玻璃容器**的面板，撤项不等于放宽判据：
+ * 新屏的不透明卡片由 `ContainerContractTest` / `AiProfileLayoutContractTest` 接管。
  */
 class GlassPanelInkPairingContractTest {
 
@@ -96,7 +101,14 @@ class GlassPanelInkPairingContractTest {
     private val expectedPanels = listOf(
         Panel("AppScreen.kt", "选择要导出的词书"),
         Panel("AppScreen.kt", "发现已学过的单词"),
-        Panel("ArticleReadingScreen.kt", "本文覆盖你已背的"),
+        // 批 3 Task 3：`ArticleReadingScreen.kt` 从玻璃面板族摘一行——覆盖词的居中 `GlassDialog`
+        // 换成底部面板 `ModalBottomSheet(containerColor = appColors().surface)`，本族的取样锚
+        // 就是字面 `GlassDialog(`，留着这一行会让锚对着「一枚已经不存在的面板」空转。
+        // 「容器与前景同源取墨」这条口径**没有放宽**，只是换了执行点：容器锚从 `surfaceGlass`
+        // 换成 `colors.surface`、取样窗口从 `GlassDialog(` 换成 `ModalBottomSheet(`，
+        // 由 `ArticleReadingLayoutContractTest` 第 3 条接管（断言面板窗口内逐枚前景显式给
+        // `appColors()` 档，且窗口内零静态墨）。重算：
+        // `grep -rn 'GlassDialog(' app/src/main/java/com/example/englishlearning/ui/ArticleReadingScreen.kt`（应为零命中）。
         Panel("ImageStudioScreen.kt", "确认发送请求"),
         Panel("PhotoTranslationScreen.kt", "确认发送请求"),
         // Task 24（裁决⑤ 第二件）：`ReadingAccessScreen.kt` 的私有玻璃对话框退役、改调共享
@@ -467,7 +479,7 @@ class GlassPanelInkPairingContractTest {
         assertEquals(1, windowsOf("ClosedScreen.kt", closed).size, "闭合样片取不到窗口：配平夹具本身坏了，上面的响亮报错也无从谈起")
     }
 
-    // ---------- 判据 ⑤–⑦：批 2 终审修复席 B 的三块玻璃面板 ----------
+    // ---------- 判据 ⑤–⑦：批 2 终审修复席 B 的玻璃面板（批 4 Task 3 后余两块） ----------
 
     /**
      * 席 B 面板契约描述。字段口径：
@@ -477,7 +489,7 @@ class GlassPanelInkPairingContractTest {
      *    （`null` = 内容内联在容器体内，如 `PreviewCard`）；
      *  - [helperSignatures] 是「内容被拆进同文件私有 Composable」的那几枚（`VoiceOverlayOption` 等），
      *    它们的体必须折进面板窗口，否则契约只看得到调用点、看不见真正画字的行（席 A 的八枚面板没有这一族，
-     *    本席三块面板全有）；
+     *    本席现存两块里 `GlassOverlay` 浮层有这一族）；
      *  - [pinnedInkLiterals] 逐字钉曾被 Task 12.5 单独回退的那几行取墨形状（条件式墨无法用「字面 = appColors().textX」
      *    一条覆盖，故按整行字面钉，改动即红并说明要同步本契约）。
      */
@@ -528,28 +540,6 @@ class GlassPanelInkPairingContractTest {
             ),
         ),
         MigratedPanel(
-            label = "AI 配置卡 SectionCard",
-            file = "AiProfileSettingsScreen.kt",
-            dirFragment = null,
-            containerSignature = "private fun SectionCard(",
-            frozenParameters = listOf("content: @Composable ColumnScope.() -> Unit"),
-            frozenAnchors = listOf(
-                Regex("""shape = AppShape\.Card""") to 1,
-                Regex("""Modifier\.fillMaxWidth\(\)""") to 1,
-                Regex("""Modifier\.padding\(16\.dp\)""") to 1,
-                Regex("""verticalArrangement = Arrangement\.spacedBy\(10\.dp\)""") to 1,
-            ),
-            callAnchor = "SectionCard",
-            consumerFile = "AiProfileSettingsScreen.kt",
-            consumerIdentities = listOf("名称", "能力", "语音角色", "高级参数", "密钥"),
-            helperSignatures = listOf("private fun CapabilityToggle(", "private fun EditorField("),
-            pinnedInkLiterals = listOf(
-                "color = if (!LocalIsDark.current) appColors().onMint else appDomain(AppDomain.AiSpeech).deep",
-                "val background = if (selected) appDomain(AppDomain.AiSpeech).base.copy(alpha = 0.12f) else appColors().surface",
-                "val border = if (selected) appDomain(AppDomain.AiSpeech).base else appColors().outlineSoft",
-            ),
-        ),
-        MigratedPanel(
             label = "语音试听卡 PreviewCard",
             file = "SpeechSettingsScreen.kt",
             dirFragment = null,
@@ -577,16 +567,20 @@ class GlassPanelInkPairingContractTest {
     /**
      * 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：`AiProfileSettingsScreen.kt` 的
      * 音色浮层选中行（`VoiceOverlayOption`，`style = AppType.Body`）选中档前景改取 `appColors().onMint`
-     * （取值形状照 `AppBottomBar.kt:95` 按套钉死：浅套 `#174C44` 压浅玻璃、深套 `deep` `#35E0AC` 压深玻璃），未选中档两套同 `text1`。
-     * 本用例把**正文档 ≥4.5** 这条线当场算给它看：
+     * （取值形状照 `AppBottomBar.kt:95` 按套钉死：浅套 `onMint #174C44` 压浅玻璃 9.73:1、
+     * 深套 `deep` 压深玻璃 9.85:1），未选中档两套同 `text1`（14.63 / 14.75）。本用例把**正文档 ≥4.5** 算给它看：
      *
      *  - 底取**该行的真实落底**：`surfaceGlass` 带 alpha，按 src-over 压在该套 `background` 上
-     *    （浅套合成 ≈ `#FEFFFE`、深套合成 ≈ `#161F1B`），不是拿半透明 token 的字节直接算；
+     *    （浅套合成 `#FEFFFE`、深套合成 `#161F1B`），不是拿半透明 token 的字节直接算；
      *  - 两套 × 选中/未选中四对墨全部 ≥ 4.5；
-     *  - 反空转（评审红线「不许为过判据放宽阈值」）：把**修复前那枚域色墨**（本席现算 4.006:1）与
-     *    一枚 3.6 档诱饵墨 `#1E987C`（本席现算 3.589:1）喂进同一条 4.5 闸，两枚都必须不合格——
-     *    它们若被判 ≥4.5，说明本条把阈值写宽了；它们若被判 <3.1，说明本行压根该按装饰档走，
-     *    两种情况这条用例都会红，逼下一次改动来复评裁决本身。
+     *  - 反空转（评审红线「不许为过判据放宽阈值」）：喂两枚**落在装饰档**的诱饵墨——浅套 `text-3 #7C9188`
+     *    （现算 3.35:1）与一枚 3.6 档硬编码诱饵 `#1E987C`（现算 3.59:1）——进同一条 4.5 闸，两枚都必须不合格；
+     *    它们若被判 ≥4.5，说明本条把阈值写宽了；它们若被判 <3.1，说明这行压根该按装饰档走，两种情况都会红。
+     *
+     * **2026-10-27 轻松档的连带变化**：旧诱饵「修复前那枚浅套域色墨 `AiSpeech.deep`」已不再合格——
+     * 域 deep 从 `#188F76` 压深到 `#1A7A63`，压浅玻璃从 4.006:1 升到 5.23:1，它能过 4.5 了。
+     * 也就是说那处旧缺陷被改色**顺手补上了**，但生产形状（浅套取 `onMint`、深套取 `deep`）不动：
+     * `onMint` 的余量更大，且这条钉的是「按套取墨」的结构，不是某枚值刚好过线。
      */
     @Test
     fun the_selected_voice_row_ink_clears_the_body_aa_gate_on_both_sets() {
@@ -627,7 +621,7 @@ class GlassPanelInkPairingContractTest {
         }
 
         listOf(
-            "修复前那枚浅套域色墨（AiSpeech.deep）" to rgbOf(DomainColors.AiSpeech.deep),
+            "浅套 text-3 墨 #7C9188（装饰档诱饵）" to rgbOf(AppColorLight.text3),
             "3.6 档诱饵墨 #1E987C" to (0xFF1E987C.toInt() and 0xFFFFFF),
         ).forEach { (label, ink) ->
             val measured = ratio(ink, lightGlass)
@@ -847,7 +841,7 @@ class GlassPanelInkPairingContractTest {
             .map { "$panel.label：登记在册的取墨行丢失或改写：\"$it\"（本席把它逐字钉死，改动必须同步本契约与理由）" }
 
     @Test
-    fun `the three migrated glass panel containers take their fill from the theme set`() {
+    fun `the migrated glass panel containers take their fill from the theme set`() {
         migratedPanels.forEach { panel ->
             val source = migratedPanelSource(panel)
             assertTrue(source.isNotBlank(), "${panel.file} 剥注释后为空：契约不许对空文件判绿")
@@ -857,13 +851,19 @@ class GlassPanelInkPairingContractTest {
     }
 
     @Test
-    fun `every foreground inside the three migrated glass panels is bound to a theme ink`() {
+    fun `every foreground inside the migrated glass panels is bound to a theme ink`() {
         val inkTable = appTypeInkTable()
-        val sources = migratedPanels.map { it.file }.distinct().associateWith { file ->
-            migratedPanels.first { it.file == file }.let { panel ->
-                if (panel.dirFragment == null) uiScreenSource(file) else uiComponentSource(file, panel.dirFragment)
-            }.also { assertTrue(it.isNotBlank(), "$file 剥注释后为空：契约不许对空文件判绿") }
-        }
+        // 消费者文件未必也是容器文件（批 4 Task 3 摘掉 `AiProfileSettingsScreen.kt` 的容器条目后，
+        // 它只以消费者身份出现），故取样表按「容器文件 ∪ 消费者文件」建键，容器口径由登记项的
+        // `dirFragment` 决定，消费者一律按 `*Screen.kt` 取。
+        val sources = (migratedPanels.map { it.file } + migratedPanels.mapNotNull { it.consumerFile })
+            .distinct()
+            .associateWith { file ->
+                val dirFragment = migratedPanels.firstOrNull { it.file == file }?.dirFragment
+                if (dirFragment == null) uiScreenSource(file) else uiComponentSource(file, dirFragment)
+            }.mapValues { (file, source) ->
+                source.also { assertTrue(it.isNotBlank(), "$file 剥注释后为空：契约不许对空文件判绿") }
+            }
         migratedPanels.forEach { panel ->
             val containerSource = sources.getValue(panel.file)
             val consumerSource = panel.consumerFile?.let { sources.getValue(it) }

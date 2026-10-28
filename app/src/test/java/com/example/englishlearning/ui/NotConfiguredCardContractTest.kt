@@ -52,9 +52,12 @@ class NotConfiguredCardContractTest {
     /**
      * 四枚槽位各归各的 token，并压本套面板底（`surface`）达标。
      *
-     * 出口墨取 `text1` + 组件侧 `FontWeight.Bold`，**不取域色 deep**：与 R-10.1b 同一条裁决——
-     * 稿 `.act` 那类「链接用强调色」的写法压浅套底不足正文 4.5（AiSpeech deep 压 surface 也在 4.5 之下），
-     * 批 1 Task 1 的低对比禁令会当场挡下；`text1` 两套都富余，链接读感由字重承担。
+     * 出口墨取 `text1` + 组件侧 `FontWeight.Bold`，**不取域色**：与 R-10.1b 同一条裁决。
+     * 原依据（「稿 `.act` 那类强调色压浅套底不足 4.5」）在 2026-10-27 轻松档里对 `deep` 端已不成立
+     * （AiSpeech `deep` #1A7A63 压 surface 5.24 已达标），裁决本身仍成立，依据改成**域色浅端**：
+     * 同一族 `base` 端（#6CCBAB）压 surface 只有 1.95，浅套里「链接用域色」一落到浅端就崩；
+     * 加一条真正不会随调色板漂的理由——出口墨与现状句同为 `text1`，靠字重而非色相分层，
+     * 一张卡里不出现第二套色相语言。`text1` 两套都富余。
      * chevron 取 `text2`（`EntryRow` 同槽位同 token），装饰档按 ≥3.1 判。
      */
     @Test
@@ -63,7 +66,7 @@ class NotConfiguredCardContractTest {
             val inks = notConfiguredCardInks(set)
             assertEquals(set.text1, inks.title, "现状句必须取 text1（它是这张卡的主信息）")
             assertEquals(set.text2, inks.detail, "补充说明必须取 text2（次要信息，与入口行副标题同档）")
-            assertEquals(set.text1, inks.exit, "出口墨必须取 text1 + 组件侧 Bold（R-10.1b 同族裁决，不用域色 deep）")
+            assertEquals(set.text1, inks.exit, "出口墨必须取 text1 + 组件侧 Bold（R-10.1b 同族裁决，不用域色）")
             assertEquals(set.text2, inks.chevron, "尾部「›」必须取 text2（与 EntryRow 的 chevron 同槽位同 token）")
 
             val title = ratioOf(inks.title, set.surface)
@@ -78,12 +81,13 @@ class NotConfiguredCardContractTest {
                 "chevron 压面板 surface 只有 %.2f:1，装饰档按 3:1+余量（≥3.1）判（set=$set）".format(chevron)
             )
         }
-        // 被拒候选当场不合格（house 口径的可判红裁决依据）：稿 `.act` 那类域色 deep（浅套 AiSpeech）
-        // 压浅套面板 surface 不足正文 4.5——这才是「出口墨取 text1、不取强调色」的依据本身在承重。
-        val rejected = ratioOf(DomainLight.getValue(AppDomain.AiSpeech).deep, AppColorLight.surface)
+        // 被拒候选当场不合格（house 口径的可判红裁决依据）：域色的**浅端**（浅套 AiSpeech `base`）
+        // 压同一张面板 `surface` 不足正文 4.5——「出口墨取 text1、不取强调色」的依据在此承重。
+        // 2026-10-27 轻松档把 `deep` 端修到达标后，诱饵从 `deep` 换成 `base`（域色浅端才是永远过不了闸的那一端）。
+        val rejected = ratioOf(DomainLight.getValue(AppDomain.AiSpeech).base, AppColorLight.surface)
         assertTrue(
             rejected < 4.5,
-            "裁决依据失效：浅套 AiSpeech deep 压 surface 已升到 %.2f:1（≥4.5），「出口墨不得回稿面强调色」需重议".format(rejected)
+            "裁决依据失效：浅套 AiSpeech base 压 surface 已升到 %.2f:1（≥4.5），「出口墨不得回稿面强调色」需重议".format(rejected)
         )
     }
 

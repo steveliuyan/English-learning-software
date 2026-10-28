@@ -172,9 +172,13 @@ class GlobalVocabularySearchScreenTest {
      *
      * 旧实现把按钮 `enabled` 绑在「输入非空」上，于是用户清空输入后回不到最近搜索，
      * 只能退出页面从主页入口重进——文案承诺的能力在界面上够不着。
+     *
+     * 批 3 Task 5 起文案不再随输入切换（原先空输入读作「查看最近搜索」）：那一套把一枚按钮
+     * 当成两个动作，用户读完按钮上的字再点、字已经变了。现在恒称「搜索」，能力不变——
+     * 「空输入落回最近搜索」由宿主的 `onSubmit` 判定，按钮只负责提交。
      */
     @Test
-    fun blank_query_keeps_the_submit_action_available_and_says_recent_searches() {
+    fun blank_query_keeps_the_submit_action_available_and_the_label_never_changes() {
         var submits = 0
         composeRule.setContent {
             GlobalVocabularySearchScreen(
@@ -191,14 +195,15 @@ class GlobalVocabularySearchScreenTest {
         }
 
         composeRule.onNodeWithTag("global_search_submit").assertIsEnabled()
-        composeRule.onNodeWithText("查看最近搜索").assertExists()
+        composeRule.onNodeWithText("搜索").assertExists()
         composeRule.onNodeWithTag("global_search_submit").performClick()
 
         assertEquals(1, submits)
     }
 
+    /** 非空输入不再是另一枚按钮：同一句「搜索」，空与非空都点得到同一个动作。 */
     @Test
-    fun non_blank_query_labels_the_submit_as_full_search() {
+    fun non_blank_query_keeps_the_same_submit_label() {
         composeRule.setContent {
             GlobalVocabularySearchScreen(
                 state = GlobalVocabularySearchUiState.Idle,
@@ -213,16 +218,18 @@ class GlobalVocabularySearchScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("全量搜索").assertExists()
+        composeRule.onNodeWithText("搜索").assertExists()
     }
 
     /**
-     * 「非空输入时不再出现最近搜索文案」单独成一条：和上一条写在同一个用例里时，
-     * 前一条断言失败会先行中断，这条哨兵根本不会执行——看着有断言，实际从没跑过
-     * （2026-10-05 变异验证实证）。哨兵用 substring 匹配，防「新文案后面又拼一句旧的」。
+     * 旧的两套按钮文案一条不留：删旧文案必须配「旧文案必须为 0」的正向断言，
+     * 否则「新文案后面又拼一句旧的」这种形状会静默通过。
+     *
+     * 单独成一条：和上一条写在同一个用例里时，前一条断言失败会先行中断，这条哨兵根本不会执行
+     * （2026-10-05 变异验证实证）。substring 匹配防「新文案后面拼旧文案」。
      */
     @Test
-    fun non_blank_query_never_says_recent_searches() {
+    fun the_old_two_state_submit_labels_are_gone() {
         composeRule.setContent {
             GlobalVocabularySearchScreen(
                 state = GlobalVocabularySearchUiState.Idle,
@@ -238,6 +245,7 @@ class GlobalVocabularySearchScreenTest {
         }
 
         composeRule.onNodeWithText("查看最近搜索", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("全量搜索", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -323,11 +331,16 @@ class GlobalVocabularySearchScreenTest {
     }
 
     /**
-     * 这个页面有两个入口：主页查词、阅读页点未知词。从阅读页进来时，返回要回到**文章**，
-     * 所以按钮必须说「返回上一层」——说「返回首页」就是在指错方向。
+     * 这个页面有两个入口：主页查词、阅读页点未知词。返回位必须真有得点（`BackHandler` 之外还留一枚
+     * 可点节点，否则平板/鼠标用户只能靠手势），且走的是全 App 统一的共享页头。
+     *
+     * 批 3 Task 5 起返回位不再是自写 `TextButton("← 返回上一层")`：共享页头的返回位固定
+     * testTag `app_screen_header` + 可及名「返回」（`AppScreenHeader` 无参数化返回文案），
+     * 所以这里按内容描述点，不再按「返回上一层」。
      */
     @Test
-    fun backPointerSaysUpOneLevel() {
+    fun backSlotIsTheSharedHeaderAndStillWorks() {
+        var backs = 0
         composeRule.setContent {
             GlobalVocabularySearchScreen(
                 state = GlobalVocabularySearchUiState.Idle,
@@ -338,15 +351,20 @@ class GlobalVocabularySearchScreenTest {
                 onClearHistory = {},
                 onOpenHistory = {},
                 onSelect = {},
-                onBack = {},
+                onBack = { backs++ },
             )
         }
 
-        composeRule.onNodeWithText("← 返回上一层").assertExists()
-        composeRule.onNodeWithContentDescription("返回上一层").assertExists()
+        composeRule.onNodeWithTag("app_screen_header").assertExists()
+        composeRule.onNodeWithContentDescription("返回").performClick()
+
+        assertEquals(1, backs)
     }
 
     /**
+     * 旧返回文案一条不留：「← 返回上一层」这行字与它的可及名都随自写返回按钮退役；
+     * 指错方向的「返回首页」一并留在这个哨兵里。
+     *
      * 「旧文案不再出现」单独成一条，**不和上面那条放在一起**：
      * 变异验证（2026-10-05）实证过，把两条放进同一个测试时，前一条断言会先中断用例，
      * 后面这条哨兵根本不会执行——看着有断言，实际从没跑过。
@@ -354,7 +372,7 @@ class GlobalVocabularySearchScreenTest {
      * 用 substring 匹配：全等断言对「在新文案后面又拼一句旧的」恰好免疫。
      */
     @Test
-    fun backPointerNeverPointsAtTheAppHome() {
+    fun theOldBackCopyIsGone() {
         composeRule.setContent {
             GlobalVocabularySearchScreen(
                 state = GlobalVocabularySearchUiState.Idle,
@@ -369,6 +387,8 @@ class GlobalVocabularySearchScreenTest {
             )
         }
 
+        composeRule.onNodeWithText("← 返回上一层", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("返回上一层").assertDoesNotExist()
         composeRule.onNodeWithText("返回首页", substring = true).assertDoesNotExist()
         composeRule.onNodeWithContentDescription("返回首页").assertDoesNotExist()
     }

@@ -17,6 +17,9 @@ import kotlin.test.fail
  * 修复轮 1（评审 I-2）：两枚字形锚从「只钉调用字面」升格为**实参级**逐字形状（字形来源、墨、度量、图层一起钉），
  * 并加「体内字形调用恰一处 + 显式 StrokeOnly 层恰一处」这一对，把评审 M2 的两条偷换路径
  * （`StrokeOnly`→`Duotone`、省略 `layer` 塌回默认 `Duotone`）都逼到当场见红；反空转探针逐形状钉住。
+ * **2026-10-31（用户评审 ①）**：未选中档不再退回裸矢量字形，两档都走同一枚插画徽标 ⇒
+ * 「22dp 裸字形 + StrokeOnly 层」两枚锚退役，换成「徽标前缀 + `backdrop = selected` + 半透明锚」
+ * 三枚合取锚，并把 `AppGlyph(` / `AppGlyphLayer` 在本文件整族归零（见 [tabBadgeAnchor] 的说明）。
  *
  * 修复轮 2（复评 A）：标签墨的「定义 + 消费」配对（`val labelInk = if (selected && !LocalIsDark.current)` /
  * `color = labelInk`）进同一具「体内恰一处 + 体外零处」计数器——复评席的击穿形状
@@ -100,16 +103,25 @@ class AppBottomBarContractTest {
         "if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text2"
 
     /**
-     * 实参级锚（修复轮 1 / 评审 I-2）：旧形状只钉 `InlineIconBadge(` / `AppGlyph(` 两枚字面，
-     * 于是把未选中档的 `layer = AppGlyphLayer.StrokeOnly` 偷换成 `Duotone`（spec §4.3 的行内层口径反过来改）
-     * 46 例全绿存活——与 14A I-1「只钉转调声明、不钉实参消费点」同族。故这里钉**整条实参形状**：
-     * 字形来自 `tab.glyph`、墨来自那枚主题化 `tint`、度量 22dp、层必须显式 `StrokeOnly`。
+     * 实参级锚（2026-10-31 用户评审 ①：选中/未选中的图标必须是同一枚插画）。
+     *
+     * 旧形状是「选中套徽标（`InlineIconBadge`）、未选中退回 22dp 裸矢量字形（`StrokeOnly` 描边）」——
+     * 两档画的是两种东西（彩色位图 vs 线框），第一眼就读成不一致。现在两档都经 `InlineIconBadge`
+     * 画同一枚插画，差别只留两处：`backdrop = selected`（只有选中档带 tint 药片底）与
+     * `Modifier.alpha(TabGlyphIdleAlpha)`（未选中压到半透明）。
+     *
+     * 三枚锚必须**合取**才关得住旧形：前缀锚 `InlineIconBadge(icon = tab.glyph, domain = …` 单独一条
+     * 会被旧形满足（旧形的选中分支就是这么写的），所以 `backdrop = selected` 与半透明锚各钉一处，
+     * 并在反空转里把旧形整段喂进去验证「前缀锚命中、另两枚判 0」。
+     * 修复轮 1 留下的「22dp 裸字形 + 显式 `StrokeOnly` 层」两枚锚随之退役：`AppGlyph(` 与
+     * `AppGlyphLayer` 在本文件整族归零——底导不再自己选字形、也不再自己选层。
      */
-    private val selectedBadgeAnchor = "InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech)"
-    private val unselectedGlyphAnchor =
-        "AppGlyph(icon = tab.glyph, tint = tint, size = 22.dp, layer = AppGlyphLayer.StrokeOnly)"
-    private val strokeOnlyLayerAnchor = "AppGlyphLayer.StrokeOnly"
-    private val glyphCallAnchor = "AppGlyph("
+    private val tabBadgeAnchor = "InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech"
+    private val tabBackdropAnchor = "backdrop = selected"
+    private val tabIdleAlphaAnchor = "Modifier.alpha(TabGlyphIdleAlpha)"
+    private val tabIdleAlphaPin = "private const val TabGlyphIdleAlpha = 0.5f"
+    private val bareGlyphAnchor = "AppGlyph("
+    private val glyphLayerAnchor = "AppGlyphLayer"
 
     /**
      * 标签墨夹击锚（修复轮 2 / 复评 A）：`AppBottomBarContrastTest` 的文件级 `contains` 只问「形状在不在文本里」，
@@ -123,7 +135,7 @@ class AppBottomBarContractTest {
     private val labelInkDefinitionAnchor = "val labelInk = if (selected && !LocalIsDark.current)"
     private val labelInkConsumptionAnchor = "color = labelInk"
 
-    /** 三件齐 + 墨线 + 两枚实参级字形锚 + 标签墨定义/消费配对：这些形状钉在 TabSlot 体内「恰一处」，且同一形状在体外「零处」。 */
+    /** 三件齐 + 墨线 + 两档同一枚插画徽标的三枚合取锚 + 标签墨定义/消费配对：这些形状钉在 TabSlot 体内「恰一处」，且同一形状在体外「零处」。 */
     private val inBodyExactlyOne = listOf(
         testTagAnchor,
         contentDescriptionAnchor,
@@ -131,8 +143,9 @@ class AppBottomBarContractTest {
         stateAnchor,
         slotMinHeightAnchor,
         themedInkAnchor,
-        selectedBadgeAnchor,
-        unselectedGlyphAnchor,
+        tabBadgeAnchor,
+        tabBackdropAnchor,
+        tabIdleAlphaAnchor,
         labelInkDefinitionAnchor,
         labelInkConsumptionAnchor,
     )
@@ -143,8 +156,9 @@ class AppBottomBarContractTest {
         contentDescriptionAnchor,
         roleAnchor,
         stateAnchor,
-        selectedBadgeAnchor,
-        unselectedGlyphAnchor,
+        tabBadgeAnchor,
+        tabBackdropAnchor,
+        tabIdleAlphaAnchor,
         labelInkConsumptionAnchor,
     )
 
@@ -193,29 +207,39 @@ class AppBottomBarContractTest {
         val constantState = """stateDescription = "已选中""""
         assertEquals(0, count(constantState, stateAnchor), "反空转失控：常量 stateDescription 竟满足双值锚点")
 
-        // ---------- 字形层的实参级牙齿（修复轮 1 / 评审 I-2）----------
-        // 一枚共享字形调用 + 一枚显式 StrokeOnly 层，两条同时恰一处：
-        // 「省略 layer 实参」会塌回 AppGlyph 的默认 Duotone，调用计数照旧为 1，但层计数掉到 0 ⇒ 红。
-        assertEquals(1, count(body, glyphCallAnchor), "TabSlot 体内的共享字形调用必须恰一处（多一处即长出第二份渲染路径）")
+        // ---------- 两档同一枚插画（2026-10-31 用户评审 ①）----------
+        // 底导不再自己选字形，也不再自己选层：裸 `AppGlyph(` 调用与 `AppGlyphLayer` 整族归零，
+        // 两档的差别只剩「带不带药片底」与「压不压半透明」，都由 TabSlot 体内的三枚锚钉住。
         assertEquals(
-            1, count(body, strokeOnlyLayerAnchor),
-            "未选中档必须显式只要描边层（AppGlyphLayer.StrokeOnly）：省略 layer 会静默取默认的 Duotone",
+            1,
+            count(bar, tabIdleAlphaPin),
+            "未选中档的半透明度必须具名成 `private const val TabGlyphIdleAlpha = 0.5f`：散写 0.5f 会与别的 alpha 混成一团，也没法在设备侧复算",
         )
         assertEquals(
-            0, count(bar, "AppGlyphLayer.Duotone"),
-            "底导不得显式请求 Duotone 层：选中档走 InlineIconBadge（内部即单层描边），未选档按 spec §4.3 只显描边",
+            0,
+            count(bar, bareGlyphAnchor),
+            "底导不得再有裸矢量字形调用：选中/未选中都必须经 InlineIconBadge 画同一枚插画（用户评审 ①）",
         )
-        // 反空转（评审 M2 那发变异的两条形状）：换成 Duotone、或整段省略 layer，都必须让实参级锚归零，
-        // 否则上面那批断言只是「字面在不在文件里」的摆设。
-        val duotoneSwap = unselectedGlyphAnchor.replace("AppGlyphLayer.StrokeOnly", "AppGlyphLayer.Duotone")
-        assertEquals(0, count(duotoneSwap, unselectedGlyphAnchor), "反空转失控：StrokeOnly→Duotone 的偷换形状仍满足实参级锚")
-        assertEquals(0, count(duotoneSwap, strokeOnlyLayerAnchor), "反空转失控：偷换成 Duotone 后层锚竟还有命中")
-        val layerOmitted = "AppGlyph(icon = tab.glyph, tint = tint, size = 22.dp)"
-        assertEquals(0, count(layerOmitted, unselectedGlyphAnchor), "反空转失控：省略 layer（默认 Duotone）竟满足实参级锚")
-        assertEquals(0, count(layerOmitted, strokeOnlyLayerAnchor), "反空转失控：省略 layer 后层锚竟还有命中")
-        val reordered = "AppGlyph(icon = tab.glyph, tint = tint, layer = AppGlyphLayer.StrokeOnly, size = 22.dp)"
-        assertEquals(0, count(reordered, unselectedGlyphAnchor), "反空转失控：实参换序的形状竟满足逐字锚（锚点没钉到实参段）")
-        assertEquals(1, count(unselectedGlyphAnchor, unselectedGlyphAnchor), "反空转失控：正向形状不满足自身锚点，锚点写歪了")
+        assertEquals(
+            0,
+            count(bar, glyphLayerAnchor),
+            "图层开关整族退出底导：字形层由徽标内部按「有无母版」决定，底导不再自己传 layer",
+        )
+        // 反空转（用户评审 ① 的原形）：选中才套徽标、未选中退回 22dp 裸字形，这套合取锚必须判它不过。
+        val legacyShape = "if (selected) {\n" +
+            "    InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech)\n" +
+            "} else {\n" +
+            "    AppGlyph(icon = tab.glyph, tint = tint, size = 22.dp, layer = AppGlyphLayer.StrokeOnly)\n" +
+            "}\n"
+        assertEquals(
+            1,
+            count(legacyShape, tabBadgeAnchor),
+            "反空转受控：旧形本来就满足前缀锚——这正是三枚锚必须合取的原因（单钉前缀锚等于没钉）",
+        )
+        assertEquals(0, count(legacyShape, tabBackdropAnchor), "反空转失控：旧形竟满足 backdrop 锚，两档统一这条路没被关住")
+        assertEquals(0, count(legacyShape, tabIdleAlphaAnchor), "反空转失控：旧形竟满足半透明锚，未选中档的淡出没被关住")
+        assertEquals(1, count(legacyShape, bareGlyphAnchor), "反空转失控：裸字形计数失灵，上面那条归零断言是恒真")
+        assertEquals(1, count(legacyShape, glyphLayerAnchor), "反空转失控：图层计数失灵，上面那条归零断言是恒真")
 
         // ---------- 标签墨夹击的近 miss 探针（修复轮 2 / 复评 A）----------
         // 复评席给的击穿形状本身：生效定义换成另一枚活 token、体内死分支只留原取色表达式的改名副本。

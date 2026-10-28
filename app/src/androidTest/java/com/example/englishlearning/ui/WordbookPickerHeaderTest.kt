@@ -1,9 +1,13 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -41,7 +45,13 @@ class WordbookPickerHeaderTest {
 
     /**
      * ①页头由 `AppScreenHeader` 承载：testTag 存在、标题与副标题文案逐字命中、
-     * 返回入口仍是既有的 `← 返回上一层`（`contentDescription` 原样，不被页头的「返回」替换）。
+     * 返回入口落在页头的返回位上。
+     *
+     * 批 2 Task 6 改期望值（不是放宽）：旧版本屏另有一枚 `← 返回上一层` 的 `TextButton` 排在页头**之前**，
+     * 页头自己又传 `onBack = null`——「标题下面还有一枚返回」是两个并排的返回入口。现在删掉那枚
+     * 文字按钮、把 `onCancel` 接到页头 `onBack`，朗读文案随之变成页头固定的「返回」。判据因此拆成
+     * 一正一反：正 = 页头返回位在；反 = 旧文案「返回上一层」必须不存在（返回位只剩一处）。
+     * 比原来只断言「有一枚返回」更严：谁再把第二枚返回加回来，本条就红。
      */
     @Test
     fun wordbook_picker_header_is_carried_by_the_shared_app_screen_header() {
@@ -58,26 +68,28 @@ class WordbookPickerHeaderTest {
         composeRule.onNodeWithTag("app_screen_header").assertExists()
         composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
         composeRule.onNodeWithText("每天一点点，学习会自然变成习惯。").assertExists()
-        // 返回位保留现有 TextButton：中性表述「返回上一层」是既有决策，不得被页头写死的「返回」覆盖。
-        composeRule.onNodeWithContentDescription("返回上一层").assertExists()
+        composeRule.onNodeWithContentDescription("返回").assertExists().assertHasClickAction()
+        composeRule.onNodeWithContentDescription("返回上一层").assertDoesNotExist()
     }
 
     /**
-     * ②首帧骨架：`wordbook_placeholder_0..<WORD_BOOK_PLACEHOLDER_ROWS>` 行齐全，每行实测高度
-     * ≥ 生产的 `WordBookCardMinHeight`。
+     * ②首帧骨架：`wordbook_tile_skeleton_0..<WORD_BOOK_PLACEHOLDER_ROWS × WORD_BOOK_TILE_COLUMNS>`
+     * 逐格齐全，每格实测高度 ≥ 生产的 `WordBookTileMinHeight`，且同一行的两格**并排**（等高、左块右缘
+     * 与右块左缘之间正好是 `WordBookTileGap`）。
      *
-     * 行数与下限高度都读**生产真值**（R-13.1 / m-4）：测试里另抄一份 `3` / `72f` 的话，
-     * 生产把行数改成 4、或把最小行高改成 80dp 时本例照样绿，判据与被测对象只剩巧合对齐。
+     * 行数、列数与下限高度都读**生产真值**（R-13.1 / m-4）：测试里另抄一份 `3` / `2` / `132f` 的话，
+     * 生产把行数改成 4、列数改成 1、或把最小高度改掉时本例照样绿，判据与被测对象只剩巧合对齐。
      *
-     * 刻意不判「骨架与真实卡逐像素同高」：真卡带进度条约 130dp、骨架按最小行高约 74dp，
-     * 是 `AppScreen.kt` 里写明并刻意保留的取舍（首帧要「立刻有东西」，不是复刻终版面）。
+     * 批 5 Task 9 改判留因（对账 4）：旧版是「三行单列骨架 + 册间分隔线」，两列色块下分隔线不存在，
+     * 骨架也随之变 3 行 × 2 列 6 格；判据从「逐行高度」换成「逐格高度 + 同行并排」，强度不降。
      */
     @Test
-    fun first_frame_reserves_placeholder_rows_at_the_card_minimum_height() {
-        val minHeightPx = WordBookCardMinHeight.value * composeRule.density.density
+    fun first_frame_reserves_two_column_placeholder_tiles_at_the_tile_minimum_height() {
+        val minHeightPx = WordBookTileMinHeight.value * composeRule.density.density
+        val gapPx = WordBookTileGap.value * composeRule.density.density
         composeRule.setContent {
             MintGlassTheme(themeMode = ThemeMode.Light) {
-                WordBookList(
+                WordBookPicker(
                     wordBooks = emptyList(),
                     loading = true,
                     selectedId = null,
@@ -89,89 +101,102 @@ class WordbookPickerHeaderTest {
                 )
             }
         }
-        for (row in 0 until WORD_BOOK_PLACEHOLDER_ROWS) {
-            val node = composeRule.onNodeWithTag("wordbook_placeholder_$row")
+        val tileCount = WORD_BOOK_PLACEHOLDER_ROWS * WORD_BOOK_TILE_COLUMNS
+        assertTrue("首帧骨架格数必须 > 0，否则下面的循环会空转", tileCount > 0)
+        val bounds = (0 until tileCount).map { index ->
+            val node = composeRule.onNodeWithTag("wordbook_tile_skeleton_$index")
             node.assertExists()
-            val heightPx = node.fetchSemanticsNode().boundsInRoot.height
+            val b = node.fetchSemanticsNode().boundsInRoot
             assertTrue(
-                "骨架第 $row 行高度不足 ${WordBookCardMinHeight.value} dp（实测 ${heightPx / composeRule.density.density}dp）",
-                heightPx >= minHeightPx - 1f,
+                "骨架第 $index 格高度不足 ${WordBookTileMinHeight.value} dp（实测 ${b.height / composeRule.density.density}dp）",
+                b.height >= minHeightPx - 1f,
             )
+            b
+        }
+        // 同一行两格并排：等高、顶边对齐、缝宽 = WordBookTileGap。
+        for (row in 0 until WORD_BOOK_PLACEHOLDER_ROWS) {
+            val left = bounds[row * WORD_BOOK_TILE_COLUMNS]
+            val right = bounds[row * WORD_BOOK_TILE_COLUMNS + 1]
+            assertTrue("第 $row 行两格顶边必须对齐（左 ${left.top} / 右 ${right.top}）", abs(left.top - right.top) <= 1f)
+            assertTrue("第 $row 行两格必须等高（左 ${left.height} / 右 ${right.height}）", abs(left.height - right.height) <= 1f)
+            assertTrue("第 $row 行两格必须等宽（左 ${left.width} / 右 ${right.width}）", abs(left.width - right.width) <= 1f)
+            assertTrue(
+                "第 $row 行两格之间的缝必须正好是 ${WordBookTileGap.value}dp（实测 ${(right.left - left.right) / composeRule.density.density}dp）",
+                abs((right.left - left.right) - gapPx) <= 1f,
+            )
+            assertTrue("第 $row 行右格必须落在左格右侧（否则不是两列）", right.left > left.right)
         }
     }
 
     /**
-     * ③册与册之间必须是真实分隔线，而不是 `spacedBy` 空白：取相邻两卡之间那条缝的中点像素，
-     * 断言它等于 `appColors().outlineSoft`（此处锁浅套档）。
+     * ③选词书是**两列色块**：两册同排等宽并排，第三册（行内只剩一格）保持半宽而不被撑成通栏。
      *
-     * 变异证据：把 `WordBookListDivider` 里那条画线调用删掉，本条必须变红——缝会退回纯透明，
-     * 取不到任何不透明像素（界外透明像素不筛就会把 0x000000 当成命中的颜色，所以按 alpha ≥ 250 过滤）。
+     * 变异证据：把 `Row` 里的 `Spacer(Modifier.weight(1f))` 删掉，第三册会独占整行、宽度翻倍，本条变红；
+     * 把 `chunked(WORD_BOOK_TILE_COLUMNS)` 换成 `forEach`（每册一行），同排断言立刻不成立。
+     *
+     * 缝里必须是页底而不是分隔线：色块间的留白是 grid 的格缝（`AppColorLight.background` 透出来），
+     * 旧版那条 `outlineSoft` 册间分隔线随单列一起退役。取样窗只覆盖缝本身——色块自带 1dp `outlineSoft`
+     * 描边，取样点离描边至少 6dp，不会把描边误当分隔线。
      */
     @Test
-    fun adjacent_wordbook_cards_are_separated_by_a_real_outline_soft_divider() {
+    fun the_picker_lays_word_books_out_in_two_equal_columns() {
         val first = WordBook("wb-first", "第一册", "L1", 100, "v1", "user-provided-xlsx")
         val second = WordBook("wb-second", "第二册", "L2", 100, "v1", "user-provided-xlsx")
+        val third = WordBook("wb-third", "第三册", "L3", 100, "v1", "user-provided-xlsx")
         composeRule.setContent {
             MintGlassTheme(themeMode = ThemeMode.Light) {
-                WordBookList(
-                    wordBooks = listOf(first, second),
-                    loading = false,
-                    selectedId = null,
-                    progressByBook = emptyMap(),
-                    progressLoading = false,
-                    canDelete = { true },
-                    onSelect = {},
-                    onRequestDelete = {},
-                    modifier = androidx.compose.ui.Modifier.testTag(LIST_TAG),
-                )
+                Column(Modifier.background(AppColorLight.background)) {
+                    WordBookPicker(
+                        wordBooks = listOf(first, second, third),
+                        loading = false,
+                        selectedId = null,
+                        progressByBook = emptyMap(),
+                        progressLoading = false,
+                        canDelete = { true },
+                        onSelect = {},
+                        onRequestDelete = {},
+                        modifier = Modifier.testTag(LIST_TAG),
+                    )
+                }
             }
         }
 
         val listBounds = composeRule.onNodeWithTag(LIST_TAG).fetchSemanticsNode().boundsInRoot
-        val upperBounds = composeRule.onNodeWithTag("wordbook_swipe_${first.id}")
-            .fetchSemanticsNode().boundsInRoot
-        val lowerBounds = composeRule.onNodeWithTag("wordbook_swipe_${second.id}")
-            .fetchSemanticsNode().boundsInRoot
+        fun tileBounds(id: String) = composeRule.onNodeWithTag("wordbook_tile_$id").fetchSemanticsNode().boundsInRoot
+        val b1 = tileBounds(first.id)
+        val b2 = tileBounds(second.id)
+        val b3 = tileBounds(third.id)
 
+        val gapPx = WordBookTileGap.value * composeRule.density.density
+        assertTrue("第一册必须从列表左缘起（实测 ${b1.left - listBounds.left}）", abs(b1.left - listBounds.left) <= 1f)
+        assertTrue("同排两册必须等高（${b1.height} / ${b2.height}）", abs(b1.height - b2.height) <= 1f)
+        assertTrue("同排两册必须等宽（${b1.width} / ${b2.width}）", abs(b1.width - b2.width) <= 1f)
+        assertTrue(
+            "同排两册之间的缝必须正好是 ${WordBookTileGap.value}dp（实测 ${(b2.left - b1.right) / composeRule.density.density}dp）",
+            abs((b2.left - b1.right) - gapPx) <= 1f,
+        )
+        assertTrue("第二册必须落在第一册右侧（否则不是两列）", b2.left > b1.right)
+        assertTrue("第二册必须换行到下一排（否则三册挤成一行）", b3.top > b1.top + b1.height - 1f)
+        assertTrue(
+            "第三册独占一排时仍须保持半宽（实测 ${b3.width} / 同排格宽 ${b1.width}）——少一个占位 Spacer 就会被撑成通栏",
+            abs(b3.width - b1.width) <= 1f,
+        )
+
+        // 缝里透出的必须是页底 background，而不是某条实心分隔线。
         val bitmap = composeRule.onNodeWithTag(LIST_TAG).captureToImage().asAndroidBitmap()
-        val listTop = listBounds.top
-        // 缝的中点（根坐标）→ 位图坐标；卡片描边/圆角离中点至少 6dp，取样窗只覆盖缝本身。
-        val seamMidPointY = ((upperBounds.bottom + lowerBounds.top) / 2f - listTop).roundToInt()
-        val window = (SEAM_SAMPLE_WINDOW_DP * composeRule.density.density).roundToInt()
-        val x = bitmap.width / 2
-
-        val expectedOutline = rgb(AppColorLight.outlineSoft)
-        val surface = rgb(AppColorLight.surface)
-        val background = rgb(AppColorLight.background)
-        // 自检：outlineSoft 必须与相邻两档（卡片底 surface、页底 background）逐通道分得开，
-        // 否则「缝漏画、透出底」或「取样点到卡片边」都会被本用例误判成通过。
+        val seamX = ((b1.right + b2.left) / 2f - listBounds.left).roundToInt()
+        val seamY = ((b1.top + b1.bottom) / 2f - listBounds.top).roundToInt()
+        val expectedBackground = rgb(AppColorLight.background)
+        val expectedSurface = rgb(AppColorLight.surface)
         assertTrue(
-            "outlineSoft 与 surface 太接近，取样失去判别力",
-            maxChannelDelta(expectedOutline, surface) > CHANNEL_TOLERANCE * 2,
+            "background 与 surface 太接近，缝取样失去判别力",
+            maxChannelDelta(expectedBackground, expectedSurface) > CHANNEL_TOLERANCE * 2,
         )
+        val argb = bitmap.getPixel(seamX, seamY)
         assertTrue(
-            "outlineSoft 与 background 太接近，取样失去判别力",
-            maxChannelDelta(expectedOutline, background) > CHANNEL_TOLERANCE * 2,
-        )
-
-        var opaque = 0
-        var matched = 0
-        for (y in (seamMidPointY - window)..(seamMidPointY + window)) {
-            if (y < 0 || y >= bitmap.height) continue
-            val argb = bitmap.getPixel(x, y)
-            if (((argb ushr 24) and 0xFF) >= OPAQUE_ALPHA_FLOOR) {
-                opaque++
-                if (maxChannelDelta(argb and 0xFFFFFF, expectedOutline) <= CHANNEL_TOLERANCE) matched++
-            }
-        }
-        // 判据：缝的中点必须存在 outlineSoft 的不透明像素（=真的画了分隔线）。
-        // 变异证据：删掉那条 `.background(appColors().outlineSoft)` 后，中点只剩透明缝（界外透明像素不算命中），
-        // matched 归 0 → 本条变红。刻意不把判据写成「中点所有不透明像素都等于 outlineSoft」——卡片自带 1dp 阴影/
-        // 描边会在缝的两端混入非 outlineSoft 的不透明像素，那条写法会把「线画对了」也误判成失败。
-        assertTrue(
-            "册间缝的中点没有 outlineSoft 分隔线（缝里 $opaque 个不透明像素，其中命中 outlineSoft $matched 个）——" +
-                "分隔线没画出来（退回 spacedBy 幽灵间距）、读错了令牌，或取样点越过了 outlineSoft 档（期望 $expectedOutline）",
-            matched > 0,
+            "两列之间的缝里必须透出页底（期望 $expectedBackground，实测 ${argb and 0xFFFFFF}）——" +
+                "缝被画成实心色块就等于两列粘成一块",
+            maxChannelDelta(argb and 0xFFFFFF, expectedBackground) <= CHANNEL_TOLERANCE,
         )
     }
 
@@ -201,6 +226,4 @@ class WordbookPickerHeaderTest {
 }
 
 private const val LIST_TAG = "wordbook_list_probe"
-private const val SEAM_SAMPLE_WINDOW_DP = 4f
 private const val CHANNEL_TOLERANCE = 2
-private const val OPAQUE_ALPHA_FLOOR = 250

@@ -117,7 +117,7 @@ class BackupEntryUnificationTest {
             "认证导出（可用于新设备恢复）",
             "从旧设备恢复（认证恢复）",
             "删除全部学习数据",
-            "生成 `.elpbak` 留档文件；不含密钥，不能用于换机恢复",
+            "生成 .elpbak 留档文件；不含密钥，不能用于换机恢复",
             "旧设备系统认证后生成配对码与受保护备份",
             "扫描旧设备配对码并替换本机数据",
             "清空学习记录、复习调度、每日计划与阅读完成；文章与收藏保留",
@@ -155,8 +155,34 @@ class BackupEntryUnificationTest {
         assertEquals("删除回调", 1, delete)
     }
 
-    /** 页头返回键：固定 `contentDescription = "返回"`。 */
+    /**
+     * 两条导出分主次（批 5 Task 4）：推荐徽标只挂在留档导出那一行，且留档导出排在认证导出之前；
+     * 危险行是全屏最后一枚入口（它下面不许再挂任何入口）。
+     */
     @Test
+    fun theRecommendedExportComesFirstAndTheDangerRowIsLast() {
+        setHub()
+        // 徽标落在 `BareRow` 内部，而裸行的 `clickable` 默认 `mergeDescendants`：
+        // 未合并树才拿得到这枚尾部节点（同 `GlobalVocabularySearchScreenTest` 的口径）。
+        composeRule.onNodeWithTag("backup_hub_export_recommended", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("推荐", useUnmergedTree = true).assertExists()
+
+        val exportTop = composeRule.onNodeWithTag("backup_hub_open_export").getUnclippedBoundsInRoot().top.value
+        val pairingTop =
+            composeRule.onNodeWithTag("backup_hub_open_pairing_export").getUnclippedBoundsInRoot().top.value
+        val restoreTop = composeRule.onNodeWithTag("backup_hub_open_restore").getUnclippedBoundsInRoot().top.value
+        val deleteTop = composeRule.onNodeWithTag("backup_hub_delete_all").getUnclippedBoundsInRoot().top.value
+        assertTrue(
+            "留档导出（推荐那条）必须排在认证导出之前，实测 $exportTop vs $pairingTop",
+            exportTop < pairingTop,
+        )
+        assertTrue(
+            "清空数据必须是最后一枚入口（实测恢复 $restoreTop / 清空 $deleteTop）",
+            restoreTop < deleteTop,
+        )
+    }
+
+    /** 页头返回键：固定 `contentDescription = "返回"`。 */    @Test
     fun headerBackInvokesOnBack() {
         var back = 0
         setHub(onBack = { back++ })
