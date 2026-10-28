@@ -5,7 +5,6 @@ import com.example.englishlearning.learning.UnlockMode
 import com.example.englishlearning.learning.UnlockPolicy
 import com.example.englishlearning.learning.TodayPlan
 import java.time.Instant
-import java.time.LocalDateTime
 
 /**
  * F4-02 提醒的调度决策，纯函数、无 Android 依赖。
@@ -36,7 +35,9 @@ object ReminderSchedulingPolicy {
         if (plan != null && isPlanComplete(plan, completedCardIds)) return ReminderDecision.Cancel
 
         val zone = clock.zoneId()
-        val now = LocalDateTime.ofInstant(clock.instant(), zone)
+        // 不用 `LocalDateTime.ofInstant(...)`：那是 API 34+ 的静态工厂，Android 13（API 33）上会
+        // NoSuchMethodError（批 1 真机实证，同类写法见 ReadingAccessViewModel）。`atZone` 自 API 26 起可用。
+        val now = clock.instant().atZone(zone).toLocalDateTime()
         var next = now.toLocalDate().atTime(preference.time)
         if (!next.isAfter(now)) next = next.plusDays(1)
         return ReminderDecision.Schedule(next.atZone(zone).toInstant(), ReminderMessageText)
