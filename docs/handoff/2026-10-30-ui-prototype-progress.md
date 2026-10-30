@@ -8,6 +8,11 @@
 > 均为必须 `font_scale 2.0` 的双字号用例，该档 6/6 绿）；真机清单可代理项已在模拟器代跑（§9），
 > 新发现 **F-1 插入页按钮标签对比度 1.10:1** 与 F-2~F-5 待下一轮开单，见
 > `docs/handoff/2026-10-31-batch4-full-qa-report.md`；**推送待用户开代理**（远端落后 42 提交）。
+>
+> **2026-10-31 用户追加裁定**：删除「AI 助学」头卡表情 —— 组件 `ui/mascot/` 三源 + 两套测试已删，
+> 棘轮 seed 清零，许可台账条目移除，规格 §4.5 作废（新增 §4.6 承接「动画时长缩放」结论）。
+> 门禁 JVM **2209/0/0**（2221 − 12 条随组件删除的几何用例），connected `AiLearningScreenTest` **OK (19)**。
+> 见 `docs/decisions/2026-10-31-remove-ai-mascot.md`。**信息架构去重盘点已提交待拍板**（我的 vs 关于两处重复出口）。
 
 分支：`stage-5-ui-r2-learning-path` · 计划：`docs/superpowers/plans/2026-10-29-ui-prototype-alignment.md`
 原型目录（**只读**）：`C:\Users\steveliuyan\AppData\Roaming\Open Design\namespaces\release-stable-win\data\projects\6a0aa00b-6bfc-43e7-b35f-13f7478d3147`

@@ -112,7 +112,7 @@ enum class AppTab(val label: String, val contentDescription: String) {
 ### 4.1 头部渐变卡
 
 - 背景：既有 `AppleMintGradient`（`#A8F3C8 → #5DDFB4 → #35B9B5`），圆角 24dp。
-- 布局自上而下三段：**居中的大号 AI 表情**（详见 §4.5）→ 主标题 + 副标题 → 状态徽章。
+- 布局自上而下两段：主标题 + 副标题 → 状态徽章。（原第三段「居中的大号 AI 表情」已于 2026-10-31 移除，见 §4.5 与 `docs/decisions/2026-10-31-remove-ai-mascot.md`。）
 - 主标题：「AI 学」
 - 副标题：「用你学过的词，生成专属的阅读与练习」
 - 状态徽章：显示 AI 是否已配置。因为当前 AI 网关未接通，恒显示「AI 尚未接通」的浅色徽章——**这是实情，不隐藏**。
@@ -138,9 +138,18 @@ enum class AppTab(val label: String, val contentDescription: String) {
 
 「AI 学如何起作用」折叠说明：讲清 AI 会用哪些数据（今日词、词书等级、历史错词）、数据发往哪里（用户自己配置的第三方服务）、未配置时如何降级（离线学习不受影响）。文案必须与 PRD「安全、隐私与合规」章节一致，不得承诺尚未实现的能力。
 
-### 4.5 AI 表情（头部卡顶部）
+### 4.5 AI 表情（头部卡顶部）——已作废
 
-头部卡顶部一张居中的、会动的 AI 形象，作为「AI 学」页的视觉锚点。
+> **2026-10-31 用户裁定移除。** 原文「头部卡顶部一张居中的、会动的 AI 形象」不再成立：组件
+> `ui/mascot/`（`AiMascot.kt` / `AiMascotExpression.kt` / `AiMascotGeometry.kt`）及其 JVM/instrumentation
+> 两套测试已删除，`RawColorLiteralRatchetTest` 的 `EyeColor` 债务项随之清零。原因、候选方案与影响见
+> `docs/decisions/2026-10-31-remove-ai-mascot.md`。
+>
+> 下方原文仅作归档，用于回答「当初为什么这样做」，**不得据此恢复实现**。其中「动画时长缩放」一节的价值
+> 超出表情本身（任何 Compose 无限动画都受它影响），已另立 §4.6 继续有效。
+
+<details>
+<summary>历史原文（已作废，勿据此实施）</summary>
 
 **形象与质感**
 
@@ -182,7 +191,20 @@ enum class AppTab(val label: String, val contentDescription: String) {
 **来源（许可）**
 
 - **完全自撰**，不引入任何第三方库、素材或 SVG。形象为原创，**刻意不模仿 xAI Grok 吉祥物的造型**——即使某些开源实现对那个形象的代码是 MIT，形象本身仍属他人品牌资产。
-- 在 `docs/third-party-notices.md` 登记 `app-authored-ai-mascot` 条目，明确声明「非第三方、亦非派生自任何第三方形象」，以便日后回答「是否抄了 Grok」。
+- 曾在 `docs/third-party-notices.md` 登记 `app-authored-ai-mascot` 条目；**该条目已随组件删除一并移除**（2026-10-31），仓库内不再有该形象的实现或素材，本段仅存档当时的许可声明结论。
+
+</details>
+
+### 4.6 系统「动画时长缩放」与 Compose 无限动画（跨页面有效）
+
+> 本节原属 §4.5（AI 表情）的真机实测发现。表情移除后结论仍适用于页面上任何 Compose 无限动画，
+> 故独立保留；日后新增循环动效前先读这一节。
+
+- 真机实测：`animator_duration_scale = 0.0` 时（开发者选项的「动画时长缩放」被关掉，等同无障碍里的「移除动画」），Compose 会**整体挂起**无限动画：同一场景连拍 20 帧，动画区逐像素完全相同（平均绝对差 `0.000`，静态对照区同为 `0.000`），摆幅 `0px`。
+- 把该值改回 `1.0` 后立刻恢复（当时呼吸摆幅 14px，与几何公式 `0.07 × 192.5 ≈ 13.5px` 吻合；14s 录屏检出 4 次眨眼）。
+- **这是遵守系统减弱动效偏好的正确行为，不要绕开**（不要改用裸 `Choreographer` 之类的方式强行播放）。若在真机上看到动效「静止」，先查配置再怀疑代码：
+  `adb shell settings get global animator_duration_scale`
+- 本项目测试设备长期把该值设为 `0.0`（避免 UI 测试被动画拖住）；instrumentation 用 `mainClock.autoAdvance = false`，与系统该设置无关，两种取值下都稳定。
 
 ## 5. 四个功能的页面骨架
 
@@ -215,8 +237,16 @@ enum class AppTab(val label: String, val contentDescription: String) {
 | AC-13 | 表情不可点击，且确实有动画（呼吸 + 眨眼） | `assertHasNoClickAction()`；动画由多帧截图/录屏佐证 |
 | AC-14 | 几何不变量：眼睛始终在身体内、眨眼只闭眼不动身体、越界输入被夹住 | JVM `AiMascotGeometryPolicyTest` |
 
+**AC-10 ~ AC-14 已于 2026-10-31 作废**（用户裁定移除 AI 表情，见 `docs/decisions/2026-10-31-remove-ai-mascot.md`）。
+保留编号只为不打断既有引用，**不得再作为验收依据**，对应测试与被测组件已一并删除。替代承接关系：
+- 原 AC-11/AC-12（表情文案复述真实配置状态、且不含「正在忙」类声称）的**实质要求不丢失**——状态徽章
+  `ai_learning_status_badge` 仍复述「AI 已配置 / AI 尚未接通」，且由 `AiLearningScreenTest` 断言；
+- 新增守护断言 `header_no_longer_carries_the_ai_mascot`：头卡语义树内不得再出现 `ai_mascot` 节点，
+  防止表情被重新引入而不更新规格。
+
 ## 7. 明确不做（本轮）
 
+- **AI 表情与吉祥物（已于 2026-10-31 移除，不再新增）**——用户明确不需要；任何新形象须先开单、更新本节与许可台账
 - 除「AI 是否已配置」以外的任何表情状态（思考 / 工作中 / 成功 / 失败等）——F2-03 接通前没有真实驱动，加了就是假功能
 - 表情的点击交互、自定义换装与多套形象
 - AI 网络客户端、`INTERNET` 权限、Endpoint 真实连通

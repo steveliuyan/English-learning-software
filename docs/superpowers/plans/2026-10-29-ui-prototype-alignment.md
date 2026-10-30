@@ -676,3 +676,12 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 10 | 迁移策略第 1 条「批 4 删除兼容字段」 | ❌ **未删**，改口见上文迁移策略段的 2026-10-31 注 | 实跑计数：`onBrand` 38 处/11 文件、`surfaceGlass` 12/5、`tint3` 14/7、`onMint` 30/11、`errorFill` 10/3（`for f in …; do grep -rn "\b$f\b" app/src/main/java --include=*.kt \| wc -l; done`，含声明与 KDoc 提及）；`PrototypeTokenContractTest` 仍钉五字段在册 |
 | 11 | 双字号可达性修复（`MyWordsScreenTest` 2 条） | ✅ 2.0 下 **OK (17 tests)**，1.0 下同 **OK (17 tests)** | 只改「怎么点到 / 怎么取界」：`performScrollTo` + 行体左段注入（2.0 档动作药片吃掉行中心）+ 未裁切根坐标（页尾提示条被根窗口裁成 `Rect.Zero`）；断言本体一字未动 |
 | 12 | 真机清单可代理项模拟器代跑（`emulator-5574`，浅/深/2.0） | ✅ 可代跑项全过；真机独有 6 项未代跑 | 逐项表见报告 §9.2；数据推进到计划 3/3 + 10/10、文章解锁；**新缺陷 F-1 深色 1.10:1**（`AppType.Label` 内建 `text2` 压掉 M3 `Button` 的 `contentColor`，插入页两枚按钮 + 重试按钮）+ F-2~F-5（2.0 折字/遮挡/文案指向），均待下一轮开单；本批不改源码 |
+
+## 用户裁定台账（2026-10-31，批 4 之后）
+
+原型之外的追加要求，逐条记落点，便于回溯「当时为什么动这里」。
+
+| # | 裁定 | 落点 | 证据 |
+|---|---|---|---|
+| 1 | 删除「AI 助学」头卡表情（用户原话：「那个表情给删掉吧，我不需要」） | `AiLearningScreen.kt` 头卡改两段式（标题 + 副标题 + 状态徽章）；`ui/mascot/` 三源两测删除；`RawColorLiteralRatchetTest` seed 清零（`ui/` 非 theme 目录此后 0 裸 hex）；`docs/third-party-notices.md` 移除 `app-authored-ai-mascot`；规格 §4.5 转「已作废 + 归档」、新增 §4.6 承接「动画时长缩放」、AC-10~14 加作废注并说明替代承接、§7 补「不再新增形象」；`visual-style-guide.md` §5 第 6 行改作废 | 决策 `docs/decisions/2026-10-31-remove-ai-mascot.md`；JVM **2209 / 0 失败 / 0 跳过**（2221 − 12 条删除的几何用例）；connected `AiLearningScreenTest` **OK (19 tests)**（含新增守护 `header_no_longer_carries_the_ai_mascot`）；截图 `.git/qa-scratch/b4emu/60-ai-header-after-mascot-removal.png`；真机 `bf353dda` 已 `install -r` 复装 |
+| 2 | 信息架构去重（我的 vs 关于的重复出口） | **待用户拍板**，未动源码 | 盘点见当轮对话：`LicensesScreen` 与 `BackupHubScreen` 各有两条入口；关于页「隐私说明」为不可点行、内容与许可页重复 |

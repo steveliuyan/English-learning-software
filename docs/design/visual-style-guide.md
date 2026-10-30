@@ -267,7 +267,9 @@
   不得把唯一信息画进图形里让读屏软件读不出来。
 - **静态**：本轮不做动效。打卡页"华丽动效"是视觉定稿后的独立批次，届时须单独处理
   减少动态效果与 TalkBack 朗读口径。
-- 「AI 学」页表情（`ui/mascot/`，台账 `app-authored-ai-mascot`）为既有资产，不占本节的 5 张名额。
+- ~~「AI 学」页表情（`ui/mascot/`，台账 `app-authored-ai-mascot`）为既有资产，不占本节的 5 张名额。~~
+  **2026-10-31 已删除**：组件、测试与许可台账条目一并移除（见 `docs/decisions/2026-10-31-remove-ai-mascot.md`），
+  全站不再有动效形象；本节 5 张名额不受影响。
 - 许可结论登记于 `docs/third-party-notices.md` 的 `app-authored-ui-illustrations`。
 
 ## 6. 交互与动效
