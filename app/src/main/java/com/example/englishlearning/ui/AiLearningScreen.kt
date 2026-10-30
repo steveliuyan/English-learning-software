@@ -33,6 +33,8 @@ import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.InlineIconBadge
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.mascot.AiMascot
@@ -188,6 +190,14 @@ fun AiLearningScreen(
                 }
             }
         }
+        // 原型 `sAiHome` 页末 `notice(…, 'info', 'shield')`：把「什么不出本机」集中说一次。
+        // 两件事都是真实形状——拍照翻译的图只在本机 OCR（AC3-05），AI 生图先把中文转英文提示词
+        // （两段式，省一次按张计费的调用），不是宣传句；因此置在页末而不是头卡里。
+        InlineNotice(
+            text = "拍照翻译的图片只在本机识别，不上传；AI 生图会先把中文描述转成英文提示词。",
+            kind = InlineNoticeKind.Info,
+            modifier = Modifier.testTag("ai_learning_privacy_notice"),
+        )
     }
 }
 

@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,7 +31,9 @@ import com.example.englishlearning.sentence.SentenceAnalysisNotConfiguredReason
 import com.example.englishlearning.sentence.SentenceAnalysisPromptPolicy
 import com.example.englishlearning.sentence.SentenceSegment
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.NotConfiguredCard
+import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -94,9 +97,18 @@ fun SentenceAnalysisScreen(
                         .fillMaxWidth()
                         .testTag("sentence_analysis_input")
                         .semantics { contentDescription = "句子输入" },
-                    label = { Text("输入一句英文（最多 600 字符）") },
+                    label = { Text("英文句子") },
                     supportingText = { Text("${sentence.length}/${SentenceAnalysisPromptPolicy.maxSentenceLength}") },
                     enabled = state != SentenceAnalysisUiState.Analyzing,
+                )
+                // 原型 `sAiSentence` 的 `field-hint`：这一栏唯一的作用说明（标签只写「英文句子」，
+                // 硬上限仍由下面那行计数器兜住）。计数器只能走 `supportingText` 一个槽位，
+                // 所以提示句单独成行，不挤掉「已输入/上限」这枚真实数字。
+                Text(
+                    text = "可以直接粘贴外刊里的长句；长度建议不超过 3 句。",
+                    style = AppType.Footnote,
+                    color = colors.text2,
+                    modifier = Modifier.testTag("sentence_analysis_input_hint"),
                 )
                 PillButton(
                     text = "分析句子",
@@ -170,28 +182,39 @@ private fun SegmentList(
             .testTag("sentence_analysis_result"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        segments.forEachIndexed { index, segment ->
-            SoftCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("sentence_analysis_segment_$index"),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = segment.role.label,
-                        style = AppType.Label,
-                        color = accent,
-                        modifier = Modifier.testTag("sentence_analysis_role_$index"),
-                    )
-                    Text(
-                        text = segment.text,
-                        style = AppType.Body,
-                        color = colors.text1,
-                    )
-                    Text(
-                        text = segment.explanation,
-                        style = AppType.Body,
-                        color = colors.text2,
+        // 原型 `sAiSentence`：`section('切分结果', 一张 card 的 rows, '3 段')`。
+        // 一个分组标题 + 一张卡里逐段一行——旧形状「每段一张软卡」三段就是三张卡，正是 spec §4.3
+        // 点名的卡片汤；计数取真实段数，原型的「3 段」只是样例。
+        SectionHeading(
+            text = "切分结果",
+            trailing = "${segments.size} 段",
+            modifier = Modifier.testTag("sentence_analysis_result_heading"),
+        )
+        SoftCard(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Column(Modifier.fillMaxWidth()) {
+                segments.forEachIndexed { index, segment ->
+                    // 一行 = 角色标签 + 英文原句 + 中文解释（原型 `.row`：chip / row-title / row-sub）。
+                    // 行是内容不是入口：无点击面、无 chevron；段间发丝线由共享裸行的 `topDivider` 画。
+                    BareRow(
+                        title = segment.text,
+                        subtitle = segment.explanation,
+                        leading = {
+                            Text(
+                                text = segment.role.label,
+                                style = AppType.Label,
+                                color = accent,
+                                modifier = Modifier.testTag("sentence_analysis_role_$index"),
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("sentence_analysis_segment_$index"),
+                        showChevron = false,
+                        topDivider = index > 0,
+                        titleMaxLines = 3,
                     )
                 }
             }

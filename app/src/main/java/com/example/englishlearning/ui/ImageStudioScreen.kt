@@ -35,6 +35,7 @@ import com.example.englishlearning.imagegen.DrawingPromptPolicy
 import com.example.englishlearning.imagegen.ImageStudioNotConfiguredReason
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.NotConfiguredCard
+import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -128,6 +129,13 @@ fun ImageStudioScreen(
                     supportingText = { Text("${subject.length}/${DrawingPromptPolicy.maxSubjectLength}") },
                     enabled = !busy,
                 )
+                // 原型 `sAiImage` 的 `field-hint`：这一栏唯一的作用说明（标签只讲上限，计数器兜住真实字数）。
+                Text(
+                    text = "描述越具体越好：主体、材质、光线、构图。",
+                    style = AppType.Footnote,
+                    color = colors.text2,
+                    modifier = Modifier.testTag("image_studio_subject_hint"),
+                )
                 Text(
                     text = "每次调用都会真实使用「设置 · AI」里的服务并可能产生费用",
                     style = AppType.Footnote,
@@ -147,10 +155,16 @@ fun ImageStudioScreen(
                         color = colors.text2,
                         modifier = Modifier.testTag("image_studio_drafting"),
                     )
-                    is ImageStudioUiState.PromptReady -> PromptEditor(
-                        editedPrompt = editedPrompt,
-                        onEditedPromptChange = { editedPrompt = it },
-                    )
+                    is ImageStudioUiState.PromptReady -> {
+                        // 原型 `sAiImage`：`section('英文提示词', card-quiet)`——提示词自成一节，
+                        // 与上面的主题输入、下面的生成结果分开读。标题只在有内容时出现
+                        // （没有提示词就不画一枚空节标题，空节等于编造版面）。
+                        SectionHeading(text = "英文提示词")
+                        PromptEditor(
+                            editedPrompt = editedPrompt,
+                            onEditedPromptChange = { editedPrompt = it },
+                        )
+                    }
                     is ImageStudioUiState.AwaitingConfirmation -> ConfirmationDialog(state, onConfirm)
                     ImageStudioUiState.GeneratingImage -> Text(
                         text = "正在生成图片…",
@@ -158,7 +172,11 @@ fun ImageStudioScreen(
                         color = colors.text2,
                         modifier = Modifier.testTag("image_studio_generating"),
                     )
-                    is ImageStudioUiState.ImageReady -> ResultImage(state.filePath)
+                    is ImageStudioUiState.ImageReady -> {
+                        // 原型 `sAiImage` 的 `section('生成结果', 4:3 占位框)`：出图后结果自成一节。
+                        SectionHeading(text = "生成结果")
+                        ResultImage(state.filePath)
+                    }
                     is ImageStudioUiState.NotConfigured -> NotConfiguredCard(
                         featureLabel = "AI 生图",
                         onConfigure = onOpenAiSettings,

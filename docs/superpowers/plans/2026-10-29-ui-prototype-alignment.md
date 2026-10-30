@@ -439,6 +439,38 @@ ViewModel 与加载态）。**保持两屏**（用户口径），只把原型上
 走同一枚共享件；四枚落点（导出取消 1 + 迁移二选一 2 + 错误屏重试 1）全部点名，判据「不许手搓按钮、
 不许长出未登记的第 5 枚」不变。
 
+### Task 22-I · AI 助学七屏（原型 `sAiHome` `app.js:814`、`sAiSentence` `:841`、`sAiPhoto` `:865`、`sAiWordQa` `:894`、`sAiImage` `:929`、`sAiProfiles` `:952`、`sAiProfileEdit` `:1194`）
+
+批 3。这七屏在批 4（版式重做）已各自换过骨架并由契约 / 像素用例钉住，所以本轮**不是重画**，而是逐屏拿原型再核一遍：
+能真兑现的（提示条、分组标题、单卡逐段、禁用态）照搬；与既有裁决冲突或本仓没有后端的版面（两列卡片格、自由输入气泡流、
+完整扩展参数控件）**不搬**，并在新契约里钉成显式的不存在，避免下一轮「照原型补回来」。
+
+判据总入口：`Batch3AiScreensContractTest`（7 条，一一对应 #17–#23）。connected 实跑：
+`AiLearningScreenTest` 18/18、`SentenceAnalysisScreenTest` 9/9、`PhotoTranslationScreenTest` 8/8、
+`WordAiQaScreenTest` 10/10、`ImageStudioScreenTest` 12/12、`AiProfileSettingsScreenTest` 24/24。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | #17 主页页末补原型 Info 提示「拍照翻译的图片只在本机识别，不上传；AI 生图会先把中文描述转成英文提示词。」（tag `ai_learning_privacy_notice`），排在说明折叠行之后 | 原型 `sAiHome` 末尾 `notice(…, 'info', 'shield')`；两件事都是真实形状（AC3-05 只本机 OCR、生图两段式先转英文提示词），不是宣传句 | `Batch3AiScreensContractTest.the ai home ends with the prototype local only notice` + `AiLearningScreenTest` 18/18 |
+| 2 | #17 原型的**两列卡片格**（44px 图标 + 描述 + `chip-quiet`「即将可用」）与页头密钥按钮**不搬** | 现盘骨架（渐变 hero + 「现在能用」软卡裸行组 + 未上线折叠 + 说明折叠）是批 4 版式重做与 spec §3.5 钉住的形状；卡片格会把 3 枚可用压成 tile、并引入与本仓 `featureStatusBadge`（「未上线」）并存的第二套状态说法；AI 服务入口已由「设置 · AI」与各功能页 `NotConfiguredCard` 的真出口承担 | 同一契约只钉提示条（未新增 grid）；`AiLearningScreenTest` 18/18 原样绿 |
+| 3 | #18 切分结果收成「`SectionHeading`『切分结果』+ 一张 `SoftCard` + 逐段 `BareRow`」，trailing 取**真实段数** `"${segments.size} 段"`；行间发丝线走 `topDivider = index > 0`，`showChevron = false`、`titleMaxLines = 3` | 原型是 `section('切分结果', 一张 card 的 rows, '3 段')`；旧实现「每段一张软卡」三段就是三张卡，正是 spec §4.3 点名的卡片汤。原型的「3 段」是样例值，照抄即编造 | `…sentence analysis groups the segments into one card under a section heading` + `SentenceAnalysisScreenTest` 9/9（`sentence_analysis_segment_0/1`、角色 / 英文 / 中文三档仍逐条在屏） |
+| 4 | #18 输入框标签改「英文句子」，字段下补提示「可以直接粘贴外刊里的长句；长度建议不超过 3 句。」；**硬上限仍露在 `supportingText` 计数器**（`n/600`） | 原型 `field-label` + `field-hint`；旧标签「输入一句英文（最多 600 字符）」把上限塞进标签。计数器只有 `supportingText` 一个槽位，所以提示句单独成行，不挤掉真实数字 | 同一契约（「英文句子」/「可以直接粘贴外刊里的长句」在册）+ `SentenceAnalysisScreenTest.typingEnables…` 原样绿 |
+| 5 | #18 原型「继续追问」三枚 chip **不搬** | 本仓分析是一次性请求，没有多轮会话后端；画出来就是点了没反应的死控件 | 同一契约（`继续追问` 计数 0） |
+| 6 | #19 识别文字编辑框之后、翻译键之前补 Info 提示「先校对文字再翻译，识别错一个词，译文会差很远。」（tag `photo_translation_proofread_notice`） | 原型 `sAiPhoto` 页内提示；译文按次计费，翻完再提醒就晚了 | `…photo translation tells the user to proofread before translating`（编辑框 < 提示 < 翻译键 顺序也钉住）+ `PhotoTranslationScreenTest` 8/8 |
+| 7 | #19 原型 4:3 取景框 +「本机识别 · 不上传」chip + 单枚「打开相机」**不搬**（本仓已有拍照 / 相册两入口、`CameraCaptureBox` 与权限提示） | 本仓取景面挂着真实 CameraX 与权限链；原型的静态渐变框只是画稿。两入口比单入口多一条「相册在图库权限下也可用」的真路径 | 同一契约只钉校对提示；`PhotoTranslationScreenTest` 8/8 原样绿 |
+| 8 | #20 **反向钉住**：原型底部自由输入框（`围绕这个词提问`）与「已发送」回执**不搬**；词头行（`word_qa_lemma`）与三枚固定问法（`word_qa_chip_<Kind>`）保留 | 本仓问词只收 `WordQaKind` 三种固定问法、拒绝任意提示词；把原型输入框补上就是把提示词注入面开到界面上，且没有对话后端可接 | `…word qa keeps its fixed ask list and never grows a free text composer` + `WordAiQaScreenTest` 10/10 |
+| 9 | #21 补两枚 `SectionHeading`：「英文提示词」（描述就绪时）与「生成结果」（出图后），各只随内容出现；主题框下补提示「描述越具体越好：主体、材质、光线、构图。」 | 原型 `section('英文提示词', card-quiet)` / `section('生成结果', 4:3 占位框)`；两节把「主题 → 提示词 → 结果」三段读开。没有内容时不画空节标题（空节等于编造版面） | `…image studio frames the prompt and the result as prototype sections`（`SectionHeading(` 恰 2）+ `ImageStudioScreenTest` 12/12（提示词 / 结果 / 计数锚全在） |
+| 10 | #21 原型页头卡（translate sticker +「中文描述先转成英文提示词」）与常驻「去配置生图服务」键**不搬** | 页头卡与共享页头 + 现有说明句重复；「去配置」在需要时由 `NotConfiguredCard` 的真出口提供，常驻一枚会在已配置时也挂着 | 同一契约；`ImageStudioScreenTest.notConfigured…` 原样绿 |
+| 11 | #22 列表页末补 Info 提示「没有配置密钥时，所有不依赖 AI 的功能照常可用：背词、复习、听写、本机 OCR。」（tag `ai_profiles_offline_notice`），排在「新增配置」之后 | 原型 `sAiProfiles` 页末 `notice`；它逐字成立（AGENTS「本地优先」：背词 / 复习 / 听写 / 本机 OCR 不经过 AI） | `…the ai profile list ends with the prototype offline guarantee` + `AiProfileSettingsScreenTest` 24/24 |
+| 12 | #22 原型列表行的「sticker + 名称 + host · model + 密钥态 + 角色 + 编辑」六件形状**不改为卡片**，仍走裸行 + 动作带 | 批 4 已按 spec §4.3 把描边卡改成裸行（卡片汤）；密钥态在 trailing、模型 · 域名在 subtitle、能力与默认位在动作带——信息一件不少，只是不再包一层卡 | 同屏；`AiProfileLayoutContractTest` 8/8 原样绿 |
+| 13 | #23 编辑页补第 4 枚软卡「未接入的选项」（tag `ai_profile_unsupported_card`）：流式返回 / 音色细化参数 / 生图参数 / 连接测试四枚 `EntryRow(enabled = false)`，尾值统一「暂未接入」，无 chevron | 裁决 B（`docs/decisions/2026-10-29-ui-prototype-token-alignment.md` §已知冲突）：原型的这几组**超出 V1 请求协议白名单**（只有 `temperature/top_p/max_tokens/timeout_seconds` 与受控模板），连接测试还缺探活端点；既不能照搬成可调控件，也不能整块消失 → 画完整版面、真的禁用、统一标注 | `…the ai profile editor draws the unsupported options disabled and labelled`（四枚 tag 各 1、`UnsupportedOption(` 恰 4、助手内 `enabled = false` / `trailing = "暂未接入"` / `showChevron = false`） |
+| 14 | #23 原型的滑块 / 开关 / chip / 参考图等**具体控件形状不复刻**，只以禁用行点名 | 同上（白名单）；逐个复刻滑轨与开关却禁用，会让人以为「拖一下就能生效」，禁用行 + 副标题讲清边界更诚实 | 同一契约；`AiProfileSettingsScreenTest` 24/24 原样绿 |
+
+**连带改动的既有判据（期望值变化，非放宽）**：`AiProfileLayoutContractTest` 的编辑器 `SoftCard(` 计数 **3 → 4**、
+`softCardBodies` 组数 **3 → 4**，测试名改为 `…into three soft cards plus the unsupported fourth`。
+理由写进测试注释：批 3 按裁决 B 补了一枚**只装禁用行**的软卡，13 个可写控件的分组归属（groups[0..2]）一字未减，
+并新增两条反向断言（四枚 `unsupported` tag 必须在 groups[3]；13 个真控件 tag 一个都不许混进 groups[3]）。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -468,13 +500,13 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 14 | `sReadTranslate`（:762） | 双语对照 | `ArticleReadingScreen.kt` 对照态 | 🟡 | Task 21-D：确认「对照态 = 同一支屏内切换」（与 LWT/LinguaCafe 一致，不新开页）；仍缺 `bar-action`「只看中文」与末尾 warning notice、逐段英中的字号/间距对齐 |
 | 15 | `sReadFeed`（:779） | 外刊选读 | `ReadingFeedScreen.kt` | ✅ | Task 21-A 已对（页头 + `BareRow` 列表 + 尾部「来源说明」`QuietCard`）；3 条偏离登记在「Task 21-A」台账（条目栏目/篇幅/词数、`.meta`「不含广告」、VOA 公共领域三处读不到或不成立） |
 | 16 | `sReadHistory`（:796） | 阅读历史 | `ReadingHistoryScreen.kt` | ✅ | Task 21-B 已对（按日期分节 + 逐版行 + 尾部提示；多版本折叠是 F4-01 决策 §8 的产品形状，保留）；3 条登记在「Task 21-B」台账，含「已读 / 未读」无字段整枚不搬 |
-| 17 | `sAiHome`（:814） | AI 助学 | `AiLearningScreen.kt` | ⬜ | 批 3（含未接入控件禁用态） |
-| 18 | `sAiSentence`（:841） | 长难句分析 | `SentenceAnalysisScreen.kt` | ⬜ | 批 3 |
-| 19 | `sAiPhoto`（:865） | 拍照翻译 | `PhotoTranslationScreen.kt` | ⬜ | 批 3 |
-| 20 | `sAiWordQa`（:894） | AI 问词 | `WordAiQaScreen.kt` | ⬜ | 批 3 |
-| 21 | `sAiImage`（:929） | AI 生图 | `ImageStudioScreen.kt` | ⬜ | 批 3 |
-| 22 | `sAiProfiles`（:952） | AI 服务 | `AiProfileSettingsScreen.kt` | ⬜ | 批 3 |
-| 23 | `sAiProfileEdit`（:1194） | AI 服务编辑 | `AiProfileSettingsScreen.kt` 编辑态 | ⬜ | 批 3 |
+| 17 | `sAiHome`（:814） | AI 助学 | `AiLearningScreen.kt` | ✅ | Task 22-I 已对（页末「图片不上传 + 生图先转英文提示词」Info 提示；两列卡片格与页头密钥按钮按批 4 骨架不搬）；2 条登记在「Task 22-I」台账 |
+| 18 | `sAiSentence`（:841） | 长难句分析 | `SentenceAnalysisScreen.kt` | ✅ | Task 22-I 已对（「切分结果」分组 + 单卡逐段 `BareRow` + 真实段数 trailing；输入标签「英文句子」+ field-hint）；「继续追问」不搬；3 条登记在「Task 22-I」台账 |
+| 19 | `sAiPhoto`（:865） | 拍照翻译 | `PhotoTranslationScreen.kt` | ✅ | Task 22-I 已对（识别框与翻译键之间补「先校对文字再翻译」Info 提示）；4:3 静态取景框不搬（本仓是真实 CameraX）；2 条登记在「Task 22-I」台账 |
+| 20 | `sAiWordQa`（:894） | AI 问词 | `WordAiQaScreen.kt` | ✅ | Task 22-I 反向钉住：自由输入框与「已发送」不搬（固定三问法，拒绝任意提示词）；词头 + 三枚问法保留；1 条登记在「Task 22-I」台账 |
+| 21 | `sAiImage`（:929） | AI 生图 | `ImageStudioScreen.kt` | ✅ | Task 22-I 已对（「英文提示词」/「生成结果」两枚 `SectionHeading` + 主题框 field-hint）；页头卡与常驻「去配置」不搬；2 条登记在「Task 22-I」台账 |
+| 22 | `sAiProfiles`（:952） | AI 服务 | `AiProfileSettingsScreen.kt` | ✅ | Task 22-I 已对（页末离线承诺 Info 提示）；列表行保持裸行 + 动作带（批 4 口径）；2 条登记在「Task 22-I」台账 |
+| 23 | `sAiProfileEdit`（:1194） | AI 服务编辑 | `AiProfileSettingsScreen.kt` 编辑态 | ✅ | Task 22-I 已对（第 4 枚软卡「未接入的选项」：四枚 `EntryRow(enabled = false)` 统一标「暂未接入」，裁决 B）；滑块/开关形状不复刻；2 条登记在「Task 22-I」台账 |
 | 24 | `sMeHome`（:1255） | 我的 | `ProfileScreen.kt` | 🟡 | Task 22-A 已对：`.head-sub`「连续打卡 N 天 · 累计学过 N 个词」+ 三格统计（三枚深链）；「我的词汇」三行按「词库页四格分段是唯一出口」不搬；「应用」组的「关于与许可」待关于页新建后接线 |
 | 25 | `sMeWords`（:1285） | 我的词汇 | `WordBankScreen.kt` 的三格（生词/错词/收藏）+ `MyWordsScreen.kt` 各段 | 🟡 | Task 22-C 已落**对应关系裁决**（不新建页：原型三 tab ↔ 词库页三格）；待做：分段计数、段内 caption（需先核三条规则是否与本仓一致）、尾部 notice、页头搜索动作裁决 |
 | 26 | `sMeRecords`（:1304） | 学习记录 | `LearningRecordsScreen.kt` | ✅ | Task 22-D 已对：页尾提示条逐字搬、「历史记录」逐日行补文章态 + 4dp 细条 + 右尾「N 词」、「本周」七格刻度 + 两枚真统计（本周词数 / 打卡天数）；「19 分 · 日均用时」整枚不画（无采集），「本周」区块随惰性统计住进历史页签；8 条登记在「Task 22-D」台账 |
@@ -489,7 +521,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ✅ | Task 22-H 已对：按 `AppError` 分叉（姓名错误保留旧文案 / 其余「词库没能打开」+ 真重试）；`LC-DB-03` 与「从备份恢复」不搬（无诊断码 / 回滚归恢复态）；2 条登记在「Task 22-H」台账 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | **批 2 Task 22-H 新建** `UnavailableScreen.kt`；宿主 = 未知 AI 功能 key 的兜底分支 | ✅ | Task 22-H 已对：原型文案逐字 + 260dp 两枚真出口；`overlayOpen` 与返回键改按 key 判定；JVM 2 条 + connected 2/2；1 条登记在「Task 22-H」台账 |
 
-**小计（Task 22-H 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 23 屏 · 🟡 6 屏 · ⬜ 7 屏。
+**小计（Task 22-I 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 30 屏 · 🟡 6 屏 · ⬜ 0 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、

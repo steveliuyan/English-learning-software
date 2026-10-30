@@ -35,8 +35,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiVoiceCatalog
+import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.EntryRow
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.GlassOverlay
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -171,6 +175,13 @@ private fun AiProfileList(
             testTag = "ai_profiles_add",
             contentDescription = "新增 AI 配置",
         )
+        // 原型 `sAiProfiles` 页末 `notice(…, 'info')`：把本地优先的下限讲清楚——没配密钥不等于不能用。
+        // 它不是安慰句：背词、复习、听写、本机 OCR 都不经过 AI 服务（AGENTS「本地优先」）。
+        InlineNotice(
+            text = "没有配置密钥时，所有不依赖 AI 的功能照常可用：背词、复习、听写、本机 OCR。",
+            kind = InlineNoticeKind.Info,
+            modifier = Modifier.testTag("ai_profiles_offline_notice"),
+        )
     }
 }
 
@@ -249,7 +260,11 @@ private fun AiProfileRow(
 }
 
 /**
- * 编辑页：13 个控件按「服务与模型 / 语音 / 高级与密钥」归 3 枚 [SoftCard]，保存固定吸底。
+ * 编辑页：13 个真控件按「服务与模型 / 语音 / 高级与密钥」归 3 枚 [SoftCard]，外加第 4 枚
+ * 「未接入的选项」（批 3 按裁决 B 从原型补回：四枚禁用行，标注「暂未接入」，见 [UnsupportedOption]），
+ * 保存固定吸底。
+ *
+ * 第 4 枚卡**只装禁用行**：它不持有任何可写入草稿的控件，13 个真控件的分组归属不受它影响。
  *
  * 保存按钮原来跟着表单滚到底部（长表单里最后才看见），现行版式把它从流里搬到页底的吸底条：
  * 滚动面只到吸底条上沿为止，两者互不遮挡（`ai_profile_save` 全文件仍恰 1 处，流内没有第二枚保存入口）。
@@ -448,6 +463,48 @@ private fun AiProfileEditor(
                     }
                 }
 
+                // ---- 第 4 组：原型有、V1 协议不放行的选项（裁决 B：画出来、禁用、标「暂未接入」）----
+                // 原型的编辑页还有流式返回、音色细化、生图参数与「连接测试」四段；它们要么超出
+                // V1 高级参数白名单（`temperature/top_p/max_tokens/timeout_seconds` 与受控模板），
+                // 要么需要本仓还没有的探活端点。既不能照搬成真控件（会让用户以为可调），
+                // 也不能整块消失（原型的版面是产品承诺的形状）——所以逐项画出来、真的禁用、统一标注。
+                SoftCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("ai_profile_unsupported_card"),
+                ) {
+                    Text("未接入的选项", style = AppType.Title, color = appColors().text1)
+                    Text(
+                        text = "这几项在 V1 的请求白名单之外，先把位置留出来；接通后在这里放开。",
+                        style = AppType.Footnote,
+                        color = appColors().text2,
+                    )
+                    UnsupportedOption(
+                        icon = AppIcon.Spark,
+                        title = "流式返回",
+                        subtitle = "边生成边显示；V1 只支持一次性返回",
+                        tag = "ai_profile_unsupported_stream",
+                    )
+                    UnsupportedOption(
+                        icon = AppIcon.Speaker,
+                        title = "音色细化参数",
+                        subtitle = "语速、音高、输出格式；V1 只选音色角色",
+                        tag = "ai_profile_unsupported_voice",
+                    )
+                    UnsupportedOption(
+                        icon = AppIcon.Image,
+                        title = "生图参数",
+                        subtitle = "画面比例、风格预设、张数与参考图",
+                        tag = "ai_profile_unsupported_image",
+                    )
+                    UnsupportedOption(
+                        icon = AppIcon.Info,
+                        title = "连接测试",
+                        subtitle = "发一次探活请求验证地址与密钥；V1 还没有探活端点",
+                        tag = "ai_profile_unsupported_connection_test",
+                    )
+                }
+
                 state.fieldError?.let {
                     Text(
                         text = it.message,
@@ -530,6 +587,38 @@ private fun AiProfileEditor(
             }
         }
     }
+}
+
+/**
+ * 未接入控件的**唯一配方**（裁决 B）：一行禁用入口行，尾部值统一「暂未接入」。
+ *
+ * `enabled = false` 走共享 [EntryRow] 的禁用态——链上不挂 `clickable`、补 `disabled()` 语义，
+ * 所以它不是「能点却不作为」的假入口，TalkBack 也会读出「不可用」。`onClick` 是 [EntryRow] 的
+ * 必填形参，这里给空体：禁用态下它永远不会被调用（不是守卫，是形状要求）。
+ * `showChevron = false`：chevron 是「点得进去」的暗示，禁用行不画。
+ *
+ * 四枚行共用一处实现，不要在调用点逐枚手搓：一处改动（例如将来接通后放开某项）只改这里。
+ */
+@Composable
+private fun UnsupportedOption(
+    icon: AppIcon,
+    title: String,
+    subtitle: String,
+    tag: String,
+) {
+    EntryRow(
+        icon = icon,
+        domain = AppDomain.AiSpeech,
+        title = title,
+        subtitle = subtitle,
+        trailing = "暂未接入",
+        showChevron = false,
+        enabled = false,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(tag),
+        onClick = {},
+    )
 }
 
 @Composable

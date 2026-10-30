@@ -63,6 +63,8 @@ import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.EntryIconTone
 import com.example.englishlearning.ui.components.EntryRow
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
@@ -298,6 +300,13 @@ fun PhotoTranslationScreen(
                     modifier = Modifier.testTag("photo_translation_low_confidence"),
                 )
             }
+            // 原型 `sAiPhoto` 的页内提示：编辑框之后、翻译键之前——先看到字，再被提醒校对，
+            // 翻完再提醒就晚了（识别错一个词，译文会差很远，而译文按次计费）。
+            InlineNotice(
+                text = "先校对文字再翻译，识别错一个词，译文会差很远。",
+                kind = InlineNoticeKind.Info,
+                modifier = Modifier.testTag("photo_translation_proofread_notice"),
+            )
             PillButton(
                 text = "翻译成中文",
                 onClick = onTranslate,

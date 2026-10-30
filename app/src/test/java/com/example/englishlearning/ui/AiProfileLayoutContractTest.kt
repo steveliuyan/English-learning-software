@@ -12,6 +12,10 @@ import kotlin.test.assertTrue
  *    药片下线）；
  *  - 13 个控件按「服务与模型 / 语音 / 高级与密钥」归 3 枚 [com.example.englishlearning.ui.components.SoftCard]，
  *    **字段顺序、tag、校验文案一字不动**（数据与安全零改动：这一屏只搬外观）；
+ *  - 批 3 又补了第 4 枚 `SoftCard`「未接入的选项」（裁决 B：原型有四段超出 V1 请求白名单的控件，
+ *    画出来、禁用、标「暂未接入」）。它只装禁用行、不持有任何可写草稿的控件，
+ *    所以上面「13 个控件归 3 组」的归属判据**一字未减**；下面第 ② 条把容器数从 3 改成 4 是期望值变化
+ *    （新增了一枚有据可依的容器），不是放宽；
  *  - 保存固定吸底，流内不再有第二枚保存入口；
  *  - 「清除密钥 / 删除配置」不再点了就执行：屏内零对话框，点击只发请求，确认框归宿主 `AppScreen`
  *    （判据的另一半在 `AppScreenOverlayContainerContractTest` 的守卫站点与 `DangerInkPlacementContractTest`
@@ -66,14 +70,23 @@ class AiProfileLayoutContractTest {
         )
     }
 
-    // ---------- ② 分 3 组 ----------
+    // ---------- ② 分 3 组（+1 枚禁用组） ----------
 
+    /**
+     * 容器数从 3 改 4 是**期望值变化，不是放宽**：批 3 按裁决 B
+     * （`docs/decisions/2026-10-29-ui-prototype-token-alignment.md` §已知冲突）把原型里超出 V1
+     * 请求白名单的四段控件补回来，落成第 4 枚「未接入的选项」软卡。三条同时成立才算合规：
+     * ① 那枚卡**只装禁用行**（不持有 `EditorField` / 不写草稿），所以 13 个真控件的分组归属不变；
+     * ② 它排在最后，groups[0..2] 的语义与顺序一字不动（下面的组归属断言原样承重）；
+     * ③ 它自己必须真的禁用（`enabled = false` + 尾值「暂未接入」，由 `Batch3AiScreensContractTest` 钉）。
+     */
     @Test
-    fun `the editor groups thirteen controls into exactly three soft cards`() {
+    fun `the editor groups thirteen controls into three soft cards plus the unsupported fourth`() {
         assertEquals(
-            3,
+            4,
             countMatches(editorBody, Regex("""\bSoftCard\(""")),
-            "编辑器的分组容器必须是恰 3 枚 `SoftCard`（服务与模型 / 语音 / 高级与密钥）",
+            "编辑器必须是 4 枚 `SoftCard`：3 枚装 13 个真控件（服务与模型 / 语音 / 高级与密钥）" +
+                "+ 1 枚装未接入选项（批 3 裁决 B 补）",
         )
         assertEquals(
             0,
@@ -97,7 +110,7 @@ class AiProfileLayoutContractTest {
     @Test
     fun `the thirteen controls keep their tags and land in the agreed group`() {
         val groups = softCardBodies(editorBody)
-        assertEquals(3, groups.size, "取不到 3 枚 `SoftCard` 的花括号体，组归属判据会空转")
+        assertEquals(4, groups.size, "取不到 4 枚 `SoftCard` 的花括号体，组归属判据会空转")
 
         val serviceAndModel = listOf(
             "ai_profile_name",
@@ -125,6 +138,22 @@ class AiProfileLayoutContractTest {
         }
         advancedAndKey.forEach { tag ->
             assertTrue(tag in groups[2], "「$tag」必须留在第三组（高级与密钥），tag 一字不动")
+        }
+        // 第 4 枚是新增的禁用组：它只装四枚「未接入」行，13 个可写控件一个都不许混进来
+        // （混进来意味着「把真控件挪进禁用卡」——用户就再也调不了它们）。
+        listOf(
+            "ai_profile_unsupported_stream",
+            "ai_profile_unsupported_voice",
+            "ai_profile_unsupported_image",
+            "ai_profile_unsupported_connection_test",
+        ).forEach { tag ->
+            assertTrue(tag in groups[3], "「$tag」必须落在第 4 枚「未接入的选项」卡里")
+        }
+        (serviceAndModel + voice + advancedAndKey).forEach { tag ->
+            assertTrue(
+                tag !in groups[3],
+                "「$tag」不许混进禁用卡：13 个真控件的分组归属是它的承重面，挪进去等于让用户调不了",
+            )
         }
 
         // 13 个 tag 全文件逐一在册，且恰一处（搬家的手段是换容器，不是改名或复制）。
