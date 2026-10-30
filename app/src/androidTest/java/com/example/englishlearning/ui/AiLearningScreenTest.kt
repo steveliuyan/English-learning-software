@@ -59,6 +59,18 @@ class AiLearningScreenTest {
         composeRule.onNodeWithText("AI 助学").assertExists()
     }
 
+    /**
+     * 2026-10-31 用户裁定：头卡里的动态表情不要了，头卡只留标题 / 副标题 / 状态胶囊。
+     *
+     * 这条断言钉「删干净」而不是只钉「没画出来」：`ai_mascot` 是表情组件自带的 tag，
+     * 只要有人按旧设计图把它加回来（哪怕放进未合并树），这里立刻红。
+     * 规格改动见 `docs/decisions/2026-10-31-remove-ai-mascot.md`。
+     */
+    @Test fun header_no_longer_carries_the_ai_mascot() {
+        setScreen(aiConfigured = true)
+        composeRule.onNodeWithTag("ai_mascot", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     /** AI 网关还没接通，页面必须如实说「尚未接通」，不能让人以为已经能用。 */
     @Test fun badge_admits_the_ai_gateway_is_not_connected_yet() {
         setScreen(aiConfigured = false)

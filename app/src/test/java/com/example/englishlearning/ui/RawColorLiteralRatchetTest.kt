@@ -32,9 +32,9 @@ import kotlin.test.assertTrue
  *    仍是 `0xFF65D3B9`；它是品牌不变族，与 `AppleMintStart/Middle` 同处 `ui/theme/MintPalette.kt`）。
  *  - `launch/BrandLaunchActivity.kt` 的三段渐变 → 直接引用 `AppleMintStart/Middle/End`（逐值相同），
  *    `ui/` 之外的裸 hex 台账随之清空。
- *  - `mascot/AiMascot.kt` 的 `EyeColor` → **保留**，理由是该文件 KDoc 已写死的产品决定：表情是自撰插画，
- *    眼睛必须与白玻璃体保持明确对比，引用随主题变浅的 token 会让眼睛在白底上消失。它属计划 Step 3
- *    允许的「与主题无关、写明理由」残留，不是待迁债务。
+ *  - `mascot/AiMascot.kt` 的 `EyeColor` 曾按「自撰插画、眼睛必须与白玻璃体保持对比」保留；**2026-10-31
+ *    表情功能整体删除**（用户裁定，见 `docs/decisions/2026-10-31-remove-ai-mascot.md`），这条残留随文件消失，
+ *    `ui/` 内（除令牌定义本体外）由此清零。
  *
  * 主题侧豁免口径（修复轮 1 的 I1，替代旧版「整目录豁免 `ui/theme/`」）：
  *  - 旧版把 `ui/theme/` 整个目录划出视野，可洗债：往 `ui/theme/AppShape.kt` 这种「非定义文件」加一枚裸 hex，
@@ -62,18 +62,16 @@ import kotlin.test.assertTrue
 
 /**
  * 债务台账：`ui` 包内（`ui/theme/` 除外）裸 hex 的按文件计数，key 为相对 `ui` 根的路径。
- * 批 2/批 3 每屏迁移的收口证据就是这张表对应行减到 0；批 3 收口时清零，或只剩经计划修订确认的不可迁移站点。
+ * 批 2/批 3 每屏迁移的收口证据就是这张表对应行减到 0。
  *
- * **Task 26 Step 3 收口后只剩一枚**（同类收口动作见文件头 KDoc）：
- * `mascot/AiMascot.kt` 的 `EyeColor` 是画在白色玻璃体上的眼睛，必须主题不变才保证任何主题下都有对比；
- * 该文件 KDoc 已把「刻意不引用 token」写死，属计划允许的「与主题无关，理由是 X」残留。
- * `AppScreen.kt` / `components/glass/GlassButton.kt` / `launch/BrandLaunchActivity.kt` 三行已由本批迁走。
+ * **2026-10-31 已清零**：最后一条 `mascot/AiMascot.kt` 的 `EyeColor` 随表情功能整体删除
+ * （用户裁定不看表情，见 `docs/decisions/2026-10-31-remove-ai-mascot.md`），
+ * `ui/` 内（除令牌定义本体外）**再没有裸 hex**。空表不是 no-op：任何新增站点都会被
+ * `no raw hex outside the seed` 当场挡下。
  * 重算（口径必须与 [actualCounts] 一致：先剥注释、排除 `theme/`）：
- * `grep -rn "Color(0x" app/src/main/java/com/example/englishlearning/ui --include=*.kt | grep -v "/theme/"` ⇒ 只应剩 EyeColor 一枚。
+ * `grep -rn "Color(0x" app/src/main/java/com/example/englishlearning/ui --include=*.kt | grep -v "/theme/"` ⇒ 应无输出。
  */
-internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
-    "mascot/AiMascot.kt" to 1,
-)
+internal val RawColorSeedAllowlist: Map<String, Int> = emptyMap()
 
 /**
  * 同一批站点的「文件名: 折叠源码行」形状，供 `violations` 作行级 allowlist。
@@ -87,9 +85,7 @@ internal val RawColorSeedAllowlist: Map<String, Int> = mapOf(
  * 这种「同债务、换行形」只准改行内容，不准改计数；计数变化必须由 `DarkTokenConsumptionRatchetTest`
  * 与本轮验收一起裁决。
  */
-internal val RawColorSeedSiteLines: List<String> = listOf(
-    "AiMascot.kt: private val EyeColor: Color = Color(0xFF1A7A63)",
-)
+internal val RawColorSeedSiteLines: List<String> = emptyList()
 
 /**
  * 裸 hex 的主题侧豁免名单（修复轮 1 的 I1）：只有这三枚「令牌定义本体」被允许携带裸 hex，因为它们就是

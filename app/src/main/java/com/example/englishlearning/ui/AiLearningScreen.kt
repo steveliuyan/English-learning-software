@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -37,7 +36,6 @@ import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
-import com.example.englishlearning.ui.mascot.AiMascot
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
@@ -49,16 +47,6 @@ import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.appColors
 
 private val AiHeaderGradient = Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))
-
-/**
- * 头卡表情边长。
- *
- * 140dp 是取舍后的结果，不是随手取的数：手机竖屏内容宽约 320dp（360dp 屏宽减去左右 20dp 内边距），
- * 140dp 约占其四成半，在整页最上方形成明确的视觉入口，同时把标题/副标题留在同一屏内。
- * 再大（≥160dp）会把副标题和状态徽章挤出首屏，用户看不到「AI 尚未接通」这句实话；
- * 再小（≤110dp）则退化成装饰小图标，与「要大」的诉求不符。逐项理由见设计文档 §4.5。
- */
-private val AI_MASCOT_SIZE = 140.dp
 
 /**
  * 「AI 助学」一级页（tab 根页）。
@@ -225,9 +213,8 @@ private fun AiHeaderCard(aiConfigured: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // 表情居中独占一行：手机屏宽约 360dp，与文字并排会把它压到 110dp 左右，
-            // 既与「要大」冲突，也会把副标题挤成四五行的窄条。取舍理由见设计文档 §4.5。
-            AiMascot(aiConfigured = aiConfigured, modifier = Modifier.size(AI_MASCOT_SIZE))
+            // 2026-10-31 用户裁定删掉头卡表情（见 `docs/decisions/2026-10-31-remove-ai-mascot.md`）：
+            // 头卡只留标题 / 副标题 / 状态胶囊三段，表情组件与几何纯函数一并删除。
             Text(
                 "AI 助学",
                 style = AppType.Headline,
