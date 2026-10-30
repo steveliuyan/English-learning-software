@@ -353,6 +353,26 @@ connected `ProfileScreenTest` 3/3 通过（副标题期望值随本条改）。
 3. 尾部 notice「词义详情里可以加入生词本或取消收藏」——本仓词义详情确有这两枚能力时再搬；
 4. 页头搜索动作（原型 `barTop` 的 search `icon-btn`）——本仓查词入口在今日学习常驻查词条，是否在这页再开口待裁决。
 
+### Task 22-D · 学习记录（原型 `#/me-records`，`sMeRecords` `app.js:1304-1327`）
+
+本屏原为「今日已学 / 历史记录」双页签、`Mint*` 令牌、`TabRow` 下逐日分组头 + `WordRow` 裸行。
+本轮**保留双页签与既有行族**（connected `LearningRecordsScreenTest` 的可点闭合集与页签语义不动），
+整屏迁到 `appColors()/AppType`，并按原型补「本周」与页尾两件可读的东西。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | 页尾补提示条「记录按天聚合，只保存在本机；卸载 App 前记得导出备份。」（共享 `InlineNotice`，Info） | 这句在本仓**逐字成立**（反馈先落本地、逐日聚合、无云同步），原型 `:1323` 的 `notice(…,'info')` 原样搬 | `LearningRecordsWeekContractTest`（源码无 Mint/裸字号）+ connected `LearningRecordsScreenTest`（本批新增 `weekBlockRendersTheTwoRealStatsAndNeverTheMockedDuration` 顺带断言页尾在场） |
+| 2 | 「历史记录」逐日行改成原型 `.row-flat` 形状：日期 + 「册名 · 新学 x/y · 复习 x/y · 文章态」副案 + 4dp 细条 + 右尾「N 词」 | 两枚数都来自既有字段：`group.count`（当天反馈词条数）、`DailyLearningHistory` 的 `newDone/newTarget/dueDone/dueTarget/articleGenerated/articleRead`；4dp 细条对原型 `.meter-thin` | `LearningRecordsWeekContractTest.the week strip and the two real stats are drawn, the mocked duration is not`（`LinearProgressIndicator(` 恰 1、`learning_records_day_meter_` 在册） |
+| 3 | 补「本周」七格刻度（`learningWeek` 派生）+ 两枚真统计「本周词数 / 打卡天数」 | 原型 `weekRow()` + `.card` 三格；本仓有 7 天详展与派生口径（`learningWeek` 纯函数在 JVM 侧钉死窗口与三态） | `LearningRecordsWeekContractTest`（纯函数 5 条 + 源码「本周」「/ 7 天」「本周词数」「打卡天数」各恰一处、`learning_records_week`/`learning_records_stats` 各 1） |
+| 4 | 原型第三格「19 分 · 日均用时」**整枚不画** | 本仓没有任何「单轮用时 / 日累计时长」采集，写出来就是编造指标（用户 2026-10-29 拍板「读不到的那枚整枚不显示」，Task 18 台账第 2 行同口径） | `LearningRecordsWeekContractTest`（`日均用时` 归零）+ connected 新增用例（`日均用时` 取不到节点） |
+| 5 | 「本周」区块**只在「历史记录」页签渲染**（原型是单页顶部常驻） | `learningWeek` 吃的 `historyStats` 按既有契约**惰性加载**（`LearningRecordsViewModelTest.first load is lazy…` 钉首屏不预取），默认页签没有 7 天数据；要在默认页签也画周条就得改成首屏预取统计——数据层改动且直接破那条既有判据。故周条随其数据住进历史页签（读不到就不画） | `LearningRecordsViewModelTest`（首屏 `historyRangeCalls == 0` 照旧）+ `LearningRecordsWeekContractTest`（`isEmpty` 时不画） |
+| 6 | 统计格从原型 `1fr 1fr 1fr` 三列改**两列占满**（`AppCard` 里两枚 `weight(1f)`） | 第三格（日均用时）整枚不画后，留三列会在收尾处挖一个空位；两格各占一半对齐原型 `.stat` 居中 | `LearningRecordsWeekContractTest`（`AppCard(` 在册、`\bCard\(` 归零、`日均用时` 归零）+ connected 新增用例 |
+| 7 | 「今天」那格刻度用 **1.5dp 内描边**（原型 `.tick[data-today]` 是 `outline + offset:2` 的外描边） | Compose 无「圆角外扩描边」等价物；取同色同粗的内描边，登记为 token 近似（不为此引第二套形状） | connected 新增用例（七格与今天格渲染） |
+| 8 | 整屏令牌迁移：`MintBackground/MintPrimary/MintPrimaryDark/MintTextMuted` 全清零；错误态改用共享 `InlineNotice`（Error + 重试动作） | 旧 `Mint*` 静态桥在批 2 逐屏退役；错误/回执条统一走共享件（提示条族棘轮） | `LearningRecordsWeekContractTest.the screen reads tokens and keeps the shared components`（`Mint*`/`MaterialTheme.typography`/`fontSize` 归零） |
+
+**连带改动**：`LearningRecordsUiState` 新增 `todayLocalDate: LocalDate?`（由既有 `ClockProvider` 在 `load(...)` 取一次，
+不新开时钟读点），屏内不读钟；`load()` 只在状态里带基准日，**不预取** `historyRange`（`LearningRecordsViewModelTest` 5/5 原样绿）。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -391,7 +411,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 23 | `sAiProfileEdit`（:1194） | AI 服务编辑 | `AiProfileSettingsScreen.kt` 编辑态 | ⬜ | 批 3 |
 | 24 | `sMeHome`（:1255） | 我的 | `ProfileScreen.kt` | 🟡 | Task 22-A 已对：`.head-sub`「连续打卡 N 天 · 累计学过 N 个词」+ 三格统计（三枚深链）；「我的词汇」三行按「词库页四格分段是唯一出口」不搬；「应用」组的「关于与许可」待关于页新建后接线 |
 | 25 | `sMeWords`（:1285） | 我的词汇 | `WordBankScreen.kt` 的三格（生词/错词/收藏）+ `MyWordsScreen.kt` 各段 | 🟡 | Task 22-C 已落**对应关系裁决**（不新建页：原型三 tab ↔ 词库页三格）；待做：分段计数、段内 caption（需先核三条规则是否与本仓一致）、尾部 notice、页头搜索动作裁决 |
-| 26 | `sMeRecords`（:1304） | 学习记录 | `LearningRecordsScreen.kt` | ⬜ | 批 2 |
+| 26 | `sMeRecords`（:1304） | 学习记录 | `LearningRecordsScreen.kt` | ✅ | Task 22-D 已对：页尾提示条逐字搬、「历史记录」逐日行补文章态 + 4dp 细条 + 右尾「N 词」、「本周」七格刻度 + 两枚真统计（本周词数 / 打卡天数）；「19 分 · 日均用时」整枚不画（无采集），「本周」区块随惰性统计住进历史页签；8 条登记在「Task 22-D」台账 |
 | 27 | `sMeSettings`（:1328） | 设置 | `SettingsScreen.kt` | ⬜ | 批 2 |
 | 28 | `sMeReminder`（:1345） | 提醒与发音 | `ReminderSettingsScreen.kt` + `SpeechSettingsScreen.kt` | ⬜ | 批 2（原型合成一屏，本仓是两屏——合还是分要按台账裁决） |
 | 29 | `sMeAbout`（:1366） | 关于 | **批 2 Task 22-B 新建** `AboutScreen.kt`；入口 = 设置「外观与关于」组「关于」行（第 10 行，用户拍板） | ✅ | 应用块 / 说明三行 / 致谢；版本取 `BuildConfig.VERSION_NAME`、致谢只留成立的两句；AC-R-21 行数 9→10；JVM 4 条 + connected 全绿；`licenseCount` 注入待补（行文案已能不带数字） |
@@ -403,7 +423,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ⬜ | 错误屏未对 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | 应用侧**无对应屏**（`页面不可用` 全仓 0 命中） | ⬜ | 先确认要不要这一屏（原型画了，本仓没有承载点） |
 
-**小计（Task 22-C 裁决后重算，按本表状态列逐行数）**：✅ 13 屏 · 🟡 7 屏 · ⬜ 16 屏。
+**小计（Task 22-D 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 14 屏 · 🟡 7 屏 · ⬜ 15 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、

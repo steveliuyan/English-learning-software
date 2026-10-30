@@ -20,8 +20,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
+import com.example.englishlearning.learning.UnlockMode
 import com.example.englishlearning.learning.domain.CardFeedback
+import com.example.englishlearning.learning.domain.DailyLearningHistory
 import java.time.Instant
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -112,6 +115,55 @@ class LearningRecordsScreenTest {
 
         assertEquals("已选中", stateDescriptionOfTab("learning_records_tab_today"))
         assertEquals("未选中", stateDescriptionOfTab("learning_records_tab_history"))
+    }
+
+    /**
+     * 原型对齐（`sMeRecords`，`assets/app.js:1304-1327`）：「本周」七格刻度 + 两枚真统计只在
+     * 有 7 天详展数据时渲染；原型的「19 分 · 日均用时」本仓没有采集，整枚不画。
+     *
+     * 周区块住「历史记录」页签（详展统计按既有契约惰性加载，首屏不预取），所以这里直接给
+     * `selectedTab = HISTORY` + 一份 `historyStats` + 基准日，验证渲染侧真把三块画出来。
+     */
+    @Test
+    fun weekBlockRendersTheTwoRealStatsAndNeverTheMockedDuration() {
+        val today = LocalDate.of(2026, 11, 12)
+        val stats = listOf(
+            DailyLearningHistory(
+                localDate = today,
+                activeWordBookId = "cet4",
+                activeWordBookName = "四级",
+                newDone = 12,
+                newTarget = 12,
+                dueDone = 9,
+                dueTarget = 9,
+                unlockMode = UnlockMode.Strict,
+                unlocked = true,
+                articleGenerated = true,
+                articleRead = true,
+            ),
+        )
+        composeRule.setContent {
+            LearningRecordsScreen(
+                state = LearningRecordsUiState(
+                    selectedTab = LearningRecordsTab.HISTORY,
+                    history = listOf(LearningHistoryGroup(today, emptyList())),
+                    historyStats = stats,
+                    todayLocalDate = today,
+                ),
+                onBack = {},
+                onSelectTab = {},
+                onRetry = {},
+                onOpenRecord = {},
+            )
+        }
+        composeRule.onNodeWithTag("learning_records_week").assertIsDisplayed()
+        composeRule.onNodeWithTag("learning_records_stats").assertIsDisplayed()
+        composeRule.onNodeWithText("本周词数").assertIsDisplayed()
+        composeRule.onNodeWithText("打卡天数").assertIsDisplayed()
+        // mock 指标整枚不画：本仓没有「日均用时」的采集，写出来就是编造。
+        composeRule.onNodeWithText("日均用时").assertDoesNotExist()
+        // 逐日行的细进度条按日期挂锚。
+        composeRule.onNodeWithTag("learning_records_day_meter_2026-11-12").assertExists()
     }
 
     private fun stateDescriptionOfTab(tag: String): String =

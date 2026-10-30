@@ -38,6 +38,10 @@ data class LearningRecordsUiState(
     val loading: Set<LearningRecordsTab> = emptySet(),
     val errors: Map<LearningRecordsTab, String> = emptyMap(),
     val selectedDetail: WordCard? = null,
+    // 学习记录屏「本周」刻度的窗口基准日（原型 `sMeRecords` 的 `section('本周', weekRow(), '3 / 7 天')`）。
+    // 由宿主注入的 `ClockProvider` 在 `load(...)` 时取一次，屏内不读钟（AGENTS.md「UI 之外保持原样」）。
+    // 为 `null` 时不画「本周」区块（分母未知，画出来只能是假的）。
+    val todayLocalDate: LocalDate? = null,
 )
 
 @HiltViewModel
@@ -65,6 +69,8 @@ class LearningRecordsViewModel @Inject constructor(
         tabJobs.clear()
         val generation = ++loadGeneration
         context = LoadContext(profileId, planId, activeWordBookId)
+        // 「本周」刻度的窗口基准日：与 `historyRange` 的区间终点取同一个 `clock`（不新开时钟读点）。
+        val todayLocalDate = clock.instant().atZone(clock.zoneId()).toLocalDate()
         mutable.update {
             it.copy(
                 today = emptyList(),
@@ -74,6 +80,7 @@ class LearningRecordsViewModel @Inject constructor(
                 loading = emptySet(),
                 errors = emptyMap(),
                 selectedDetail = null,
+                todayLocalDate = todayLocalDate,
             )
         }
         tabJobs[mutable.value.selectedTab] = launchTab(mutable.value.selectedTab, force = true, generation = generation)
