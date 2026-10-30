@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -109,6 +110,106 @@ class WordBankScreenContractTest {
             2,
             countMatches(host, Regex("""showHeader = false""")),
             "词书段与复用面都必须关掉自己的页头（词库页那枚 AppScreenHeader 是唯一返回位）",
+        )
+    }
+
+    /**
+     * 版式重做批 2（原型 `sMeWords`，`assets/app.js:1292`）：三格标签补「生词 N / 错词 N / 收藏 N」，
+     * 词书格**永远不带数字**——它没有对应的词表 UiState，数字无从谈起。
+     *
+     * 计数是纯显示层：宿主从三段**已有**的 UiState 现算，形参默认 `null`。`null` 的语义是
+     * 「读不到」（Loading / Unavailable），此时必须回落到裸段名——摆一个 0 会把「还没读出来」
+     * 读成「确实是空的」，这是本条的主要反向面。`0` 只有在 `Ready` 且空册时才是真条数。
+     */
+    @Test
+    fun `segment labels carry counts only when the host can read them`() {
+        assertEquals(
+            "词书",
+            wordBankSegmentLabel(WordBankSection.Book, 3),
+            "词书格不带数字：词书段没有条数来源，即使宿主多给一个数也不许显示",
+        )
+        assertEquals("词书", wordBankSegmentLabel(WordBankSection.Book, null))
+        assertEquals("生词 3", wordBankSegmentLabel(WordBankSection.New, 3))
+        assertEquals("错词 12", wordBankSegmentLabel(WordBankSection.Wrong, 12))
+        assertEquals("收藏 8", wordBankSegmentLabel(WordBankSection.Favorite, 8))
+        assertEquals(
+            "生词 0",
+            wordBankSegmentLabel(WordBankSection.New, 0),
+            "0 是读得到的真实条数（Ready 且空册），要如实显示；它与被禁止的「拿 0 冒充读不到」不是一回事",
+        )
+        listOf(WordBankSection.New, WordBankSection.Wrong, WordBankSection.Favorite).forEach { section ->
+            assertEquals(
+                section.label,
+                wordBankSegmentLabel(section, null),
+                "${section.name} 段读不到条数时必须回落到裸段名（不许用 0 冒充）",
+            )
+        }
+        // 三枚形参各恰一处、默认 null：默认值不是 0，壳在没人喂数时不带数字。
+        listOf("newCount", "wrongCount", "favoriteCount").forEach { name ->
+            assertEquals(
+                1,
+                countMatches(bank, Regex("""\b$name: Int\? = null""")),
+                "$name 形参必须恰一处声明且默认 null（0 = 计数无从注入；2 = 两套计数口径）",
+            )
+        }
+        assertEquals(
+            2,
+            countMatches(bank, Regex("""\bwordBankSegmentLabel\(""")),
+            "标签构造必须只有一处调用点（声明 + 调用 = 2）：四格各拼一句就有四份口径",
+        )
+    }
+
+    /**
+     * 计数不许新开数据通路：宿主三枚实参必须直接取自三段自己的 UiState 列表长度。
+     *
+     * 反向面钉「不许造 0 兜底」——`?: 0` 一出现，Loading / 不可用就会显示成「空册」。
+     */
+    @Test
+    fun `the host feeds the three counts straight from the panes own states`() {
+        val wires = mapOf(
+            "newCount" to """newCount = \(vocabularyState as\? VocabularyUiState\.Ready\)\?\.items\?\.size""",
+            "wrongCount" to """wrongCount = \(wrongWordsState as\? WrongWordsUiState\.Ready\)\?\.cards\?\.size""",
+            "favoriteCount" to """favoriteCount = \(favoritesState as\? FavoritesUiState\.Ready\)\?\.words\?\.size""",
+        )
+        wires.forEach { (name, pattern) ->
+            assertEquals(
+                1,
+                countMatches(host, Regex(pattern)),
+                "$name 必须恰一处从该段已有的 UiState 现算（0 = 该格计数没有来源，2 = 同一枚数长出两条来源）",
+            )
+        }
+        assertEquals(
+            0,
+            countMatches(host, Regex("""(newCount|wrongCount|favoriteCount) = [^\n]*\?: 0""")),
+            "宿主不得给计数 `?: 0` 兜底：读不到是 null（不带数字），0 只属于「Ready 且确实为空」",
+        )
+    }
+
+    /**
+     * 页头搜索动作的裁决（原型 `sMeWords` 的 `barTop.action` 那枚 search 图标）：**不搬**。
+     *
+     * 同一能力不在本页开第二个入口——查词是全站能力，今日学习页有常驻查词条
+     * （`today_plan_search_entry`），全站另有查词页。本条的静态凭据 + 反向控一起盯：
+     * 裁决句必须真写在 KDoc 里（源码注释，故读**原文**而不是 `uiScreenSource` 的剥注释版），
+     * 且本屏不得长出任何搜索字形 / 页头 action 槽。
+     */
+    @Test
+    fun `the header search action stays off this page`() {
+        val raw = File(UI_MAIN_SOURCE_PATH, "WordBankScreen.kt").readText()
+        assertTrue(
+            "不搬" in raw && "today_plan_search_entry" in raw,
+            "WordBankScreen 的 KDoc 必须写明搜索动作的裁决（不搬 + 查词入口在哪）：" +
+                "原型页头那枚 search 图标若被当成「补一个入口」搬进来，同一能力就有两个入口",
+        )
+        assertEquals(
+            0,
+            countMatches(bank, Regex("""AppIcon\.Search""")),
+            "本屏不得出现搜索字形（0 = 没有第二个查词入口）",
+        )
+        assertEquals(
+            0,
+            countMatches(bank, Regex("""AppScreenHeader\([\s\S]{0,200}?action =""")),
+            "本屏页头不得挂 action 槽（0 = 页头只有标题与返回位；非 0 = 搜索键从页头长了回来）",
         )
     }
 

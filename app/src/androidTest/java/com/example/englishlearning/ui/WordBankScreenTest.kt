@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -132,5 +133,40 @@ class WordBankScreenTest {
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitForIdle()
         assertTrue("返回位必须把退页交给宿主（缺 = 词库页是死胡同）", backPressed)
+    }
+
+    /**
+     * 分段标签带计数（原型 `sMeWords`，`assets/app.js:1292`）的行为面。
+     *
+     * 三条腿：
+     *  ① 读到条数的两格显示「段名 + 空格 + N」；
+     *  ② 读不到（`null`）的那一格显示**裸段名**——不是「错词 0」：0 是「Ready 且空册」才有资格说的数；
+     *  ③ 词书格不带数字，且 `Ready` 空册的 0 也如实显示（本夹具把收藏格喂 0 证这一半）。
+     * 一次 `setContent` 同时喂三种形态（3 / null / 0），是本仓「一个方法一次组合」的口径。
+     */
+    @Test
+    fun segmentLabelsCarryCountsOnlyWhenTheSectionStateIsReadable() {
+        composeRule.setContent {
+            MintGlassTheme {
+                WordBankScreen(
+                    wordBookName = "四级核心词",
+                    section = WordBankSection.Book,
+                    onSelectSection = {},
+                    onBack = {},
+                    bookPane = pane("pane_book"),
+                    newPane = pane("pane_new"),
+                    wrongPane = pane("pane_wrong"),
+                    favoritePane = pane("pane_favorite"),
+                    newCount = 3,
+                    wrongCount = null,
+                    favoriteCount = 0,
+                )
+            }
+        }
+        composeRule.onNodeWithTag("word_bank_segment_new").assertTextEquals("生词 3")
+        composeRule.onNodeWithTag("word_bank_segment_wrong").assertTextEquals("错词")
+        composeRule.onNodeWithTag("word_bank_segment_favorite").assertTextEquals("收藏 0")
+        composeRule.onNodeWithTag("word_bank_segment_book").assertTextEquals("词书")
+        composeRule.onNodeWithText("错词 0").assertDoesNotExist()
     }
 }

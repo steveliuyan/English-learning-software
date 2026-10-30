@@ -1359,6 +1359,12 @@ fun AppScreen(
                     newPane = { myWordsPane(MyWordsSection.Wordbook) },
                     wrongPane = { myWordsPane(MyWordsSection.Wrong) },
                     favoritePane = { myWordsPane(MyWordsSection.Favorites) },
+                    // 分段标签的条数（原型 `sMeWords` 的三格计数）：只从三段**已有的** UiState 现算，
+                    // 不新开数据通路、不读仓储。读不到就是 null —— 壳会把那一格画成裸段名，
+                    // 而不是用 0 把「还没读出来」说成「确实是空的」。
+                    newCount = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
+                    wrongCount = (wrongWordsState as? WrongWordsUiState.Ready)?.cards?.size,
+                    favoriteCount = (favoritesState as? FavoritesUiState.Ready)?.words?.size,
                 )
             } else if (showAiProfiles) {
                 val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }

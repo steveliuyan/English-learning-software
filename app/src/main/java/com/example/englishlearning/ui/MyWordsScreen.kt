@@ -35,6 +35,8 @@ import com.example.englishlearning.learning.FavoriteWord
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.ScreenUnavailable
 import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.components.glass.GlassDialog
@@ -163,6 +165,13 @@ fun MyWordsScreen(
                 title = "收藏",
                 sectionTag = "my_words_section_favorites",
                 count = (favoritesState as? FavoritesUiState.Ready)?.words?.size,
+                // 原型 `sMeWords`（`assets/app.js:1294`）每段一句说明，只搬**本仓成立**的那一句：
+                // 收藏不参与计划生成（`StoredPlanCardSource` 的新词 / 到期集合只由词书内容与学习事件派生，
+                // 收藏表不在其中），所以「不会被排进复习队列，只做手动回看」是事实。
+                // 生词本那句（明天的词单里排到前面）与易错那句（按答错次数排序、答对两次后移出）在本仓不成立，
+                // 整句不写——检查见 `MyWordsScreenContractTest.favorites_caption_and_the_closing_notice_are_carried_verbatim`。
+                caption = "收藏的词不会被排进复习队列，只做手动回看。",
+                captionTag = "my_words_favorites_caption",
                 onTopChanged = { sectionTops[MyWordsSection.Favorites] = it },
             ) {
                 when (favoritesState) {
@@ -315,6 +324,15 @@ fun MyWordsScreen(
                 }
             }
         }
+        // 原型 `sMeWords`（`assets/app.js:1298`）的页尾提示条：词义详情确有「加入生词本」与「取消收藏」
+        // 两枚能力（`CardDetailScreen` 的生词本开关药片 + 页头收藏键读成「取消收藏 <lemma>」），
+        // 所以逐字搬。外壳只用共享 InlineNotice（提示条族不许自搓），墨色与几何归组件。
+        // 它落在三段之后 = 页尾最后一段；每格单独成面时也是该格的页尾，与原型按 tab 渲染的形状一致。
+        InlineNotice(
+            text = "词义详情里可以加入生词本或取消收藏。",
+            kind = InlineNoticeKind.Info,
+            modifier = Modifier.padding(top = 10.dp),
+        )
     }
     // I-4（修复轮 1）：「标记为已掌握」的二次确认——复用共享 ConfirmDestructiveDialog，不另起私有
     // AlertDialog（对话框份数棘轮把私有确认框记新增债务）。措辞要素照老生词页搬齐：移出行 + 保留面；
@@ -390,6 +408,8 @@ private fun MyWordsSectionCard(
     sectionTag: String,
     count: Int?,
     onTopChanged: (Int) -> Unit,
+    caption: String? = null,
+    captionTag: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = appColors()
@@ -420,6 +440,18 @@ private fun MyWordsSectionCard(
                         modifier = Modifier.semantics { contentDescription = "$title 共 $count 个" },
                     )
                 }
+            }
+            // 段内说明：原型 `.caption` 同档（12sp / text3）。放在标题行与内容之间 = 段的顶部，
+            // 「先说明这一列按什么来、再列词」；挪到内容之后就成脚注。
+            if (caption != null) {
+                Text(
+                    text = caption,
+                    style = AppType.Caption,
+                    color = colors.text3,
+                    modifier = Modifier.then(
+                        if (captionTag == null) Modifier else Modifier.testTag(captionTag),
+                    ),
+                )
             }
             content()
         }

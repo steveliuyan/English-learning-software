@@ -205,6 +205,79 @@ class MyWordsScreenTest {
     }
 
     /**
+     * 版式重做批 2（原型 `sMeWords`，`assets/app.js:1294`）：收藏段顶部的说明行。
+     *
+     * 只搬**在本仓成立**的那一句：收藏不参与计划生成（`StoredPlanCardSource` 只读词书内容与
+     * `learning_events`，收藏表不在其中），所以「不会被排进复习队列，只做手动回看」是事实。
+     * 生词本与错词两句核过不成立（新词顺序由 `NewWordOrdering` 决定；错词按到期先后、一次答对即移出），
+     * 那两段**整句不写**，故这里同时反向钉住两段都没有说明行。
+     *
+     * 位置腿：说明行必须落在收藏段容器内，且在第一枚词行**上方**——「先说明再列词」是这句话的意义，
+     * 挪到列表之后就成了脚注。
+     */
+    @Test
+    fun favoritesSectionExplainsItStaysOutOfTheReviewQueue() {
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = listOf(favorite("anchor", 0))),
+                    vocabularyState = VocabularyUiState.Ready(items = listOf(vocabularyItem("abandon", 1))),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = listOf(card("gossamer", 2))),
+                )
+            }
+        }
+        val caption = composeRule.onNodeWithTag("my_words_favorites_caption")
+        caption.assertExists().assertTextEquals("收藏的词不会被排进复习队列，只做手动回看。")
+        val captionBox = caption.fetchSemanticsNode().boundsInRoot
+        val containerBox = composeRule.onNodeWithTag("my_words_section_favorites")
+            .fetchSemanticsNode().boundsInRoot
+        val firstRowBox = composeRule.onNodeWithTag("my_words_favorite_row_0")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "收藏段说明没有落在收藏段容器内（挂错了段）：说明 $captionBox，容器 $containerBox",
+            captionBox.top >= containerBox.top - 1f && captionBox.bottom <= containerBox.bottom + 1f,
+        )
+        assertTrue(
+            "收藏段说明必须在第一枚词行上方（挪到列表之后 = 说明变脚注）：说明 $captionBox，首行 $firstRowBox",
+            captionBox.top <= firstRowBox.top + 1f,
+        )
+        // 反向控：另外两段的那两句在本仓不成立，整句不写 ⇒ 不得有说明行。
+        composeRule.onNodeWithTag("my_words_wordbook_caption").assertDoesNotExist()
+        composeRule.onNodeWithTag("my_words_wrong_caption").assertDoesNotExist()
+    }
+
+    /**
+     * 版式重做批 2（原型 `sMeWords`，`assets/app.js:1298`）：页尾提示条。
+     *
+     * 文案「词义详情里可以加入生词本或取消收藏。」两条能力在 `CardDetailScreen` 都确有
+     * （生词本开关药片 `card_detail_vocabulary_toggle`；页头收藏键读成「取消收藏 <lemma>」），
+     * 所以逐字搬。位置腿：提示条顶边必须在**最后一段**（错词段）容器底边之下——它是页尾，不是段内。
+     * 外壳是共享 `InlineNotice`，标签取自组件自身（`inline_notice_info`），屏侧不另造提示条。
+     */
+    @Test
+    fun thePageEndsWithTheNoticeAboutTheDetailPageActions() {
+        composeRule.setContent {
+            MintGlassTheme {
+                MyWordsScreen(
+                    favoritesState = FavoritesUiState.Ready(words = listOf(favorite("anchor", 0))),
+                    vocabularyState = VocabularyUiState.Ready(items = listOf(vocabularyItem("abandon", 1))),
+                    wrongWordsState = WrongWordsUiState.Ready(cards = listOf(card("gossamer", 2))),
+                )
+            }
+        }
+        val notice = composeRule.onNodeWithTag("inline_notice_info")
+        notice.assertExists()
+        composeRule.onNodeWithText("词义详情里可以加入生词本或取消收藏。").assertExists()
+        val noticeBox = notice.fetchSemanticsNode().boundsInRoot
+        val lastSectionBox = composeRule.onNodeWithTag("my_words_section_wrong")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "提示条必须是页尾最后一段（应在错词段容器之下）：提示 $noticeBox，末段 $lastSectionBox",
+            noticeBox.top >= lastSectionBox.bottom - 1f,
+        )
+    }
+
+    /**
      * 本节点自己没有 `ContentDescription`（读的是 Text 的逐字文案）。
      * 用 `fetchSemanticsNode().config.contains(...)` 直读（本仓口径先例见 `AppBottomBarTest`）而不选
      * `assertContentDescriptionEquals()` 传空串数组：后者对「键缺失」与「空表」两种状态在本仓

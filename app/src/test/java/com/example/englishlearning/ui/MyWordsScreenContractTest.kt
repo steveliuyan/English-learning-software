@@ -518,6 +518,68 @@ class MyWordsScreenContractTest {
     }
 
     /**
+     * 版式重做批 2（原型 `sMeWords`，`assets/app.js:1294` 的 `.caption` 与 `:1298` 的 `notice`）：
+     * 段内说明与页尾提示条。
+     *
+     * **只搬本仓成立的那一条**。三句原型说明逐条核过生产逻辑：
+     *  - 收藏「收藏的词不会被排进复习队列，只做手动回看。」成立——`StoredPlanCardSource` 的新词 /
+     *    到期集合只由词书内容与 `learning_events` 派生，收藏表（`FavoriteWordRepository`）不在计划生成里，
+     *    收藏只是 `FavoritesViewModel` 的只读回看来源 ⇒ **逐字搬**；
+     *  - 生词本「生词本里的词会在明天的词单里排到前面。」**不成立**——新词顺序由
+     *    `NewWordOrdering`（词头三字母交错、内容哈希决定）给出，生词本条目在计划生成里零参与 ⇒ 整句不写；
+     *  - 易错「易错词按答错次数排序，答对两次后移出。」**不成立**——错词按
+     *    `COALESCE(nextReviewAt, 事件时间)` 升序（`InternalLearningStatsDao.wrongWordRows`），不是按答错次数；
+     *    且「最近一次反馈不是 Again」即移出（一次答对就消失），不是两次 ⇒ 整句不写。
+     *
+     * 本用例同时钉两件形状：说明行必须走 `AppType.Caption` + `colors.text3`（与原型 `.caption` 同档），
+     * 页尾提示条必须复用共享 `InlineNotice`（提示条族不许自搓）。两条不成立的句子留反向控，
+     * 谁把它们「补」回屏里当场红。
+     */
+    @Test
+    fun favorites_caption_and_the_closing_notice_are_carried_verbatim() {
+        assertEquals(
+            1,
+            countMatches(screen, Regex(Regex.escape("\"收藏的词不会被排进复习队列，只做手动回看。\""))),
+            "收藏段说明必须逐字在册（0 = 没搬；2 = 同段两枚说法）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex(Regex.escape("\"my_words_favorites_caption\""))),
+            "收藏段说明必须有 testTag 锚（connected 按它定位；缺 = 说明行没有可定位的节点）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex(Regex.escape("\"词义详情里可以加入生词本或取消收藏。\""))),
+            "页尾提示条文案必须逐字在册（原型 `notice('…', 'info')`）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""(^|[^A-Za-z0-9_])InlineNotice\(""")),
+            "页尾提示条必须复用共享 InlineNotice 且本屏恰一处（0 = 没搬或自搓了一份，2 = 一页两条提示）",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""AppType\.Caption""")),
+            "说明行取 AppType.Caption（与原型 `.caption` 同档）；本屏其余文案仍走既有档位",
+        )
+        assertEquals(
+            1,
+            countMatches(screen, Regex("""colors\.text3""")),
+            "说明行墨色取 colors.text3（原型 `.caption` 的弱化档）；裸取其它档会让它读成正文",
+        )
+        listOf(
+            "生词本里的词会在明天的词单里排到前面",
+            "易错词按答错次数排序",
+        ).forEach { rejected ->
+            assertEquals(
+                0,
+                countMatches(screen, Regex(Regex.escape(rejected))),
+                "原型那句「$rejected」在本仓不成立（计划排序 / 错词派生逻辑对不上），整句不得搬",
+            )
+        }
+    }
+
+    /**
      * m-2（修复轮 1）：重试必须**带段标**——三段各回交自己的段枚举。
      *
      * 旧形状 `onRetry: () -> Unit` 让任一段的「重试」一次拉三册（另外两段被打回 Loading）。
