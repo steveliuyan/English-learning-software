@@ -513,6 +513,33 @@ Task 21-D 只对了元信息行，把 `#13` / `#14` 的其余项留到本轮。�
 改为 `AppType.Prose.copy(color = appColors().text1)`。理由写进测试注释：换的是字号档（原型 `.prose`），
 「显式 `appColors().text1` 的配平形状」与两套 AA 复算的取样面一字未动，仍是精确子串断言。
 
+### Task 22-L · 每日阅读残留项（原型 `#/read-home`，`sReadHome` `app.js:702-737`）
+
+Task 21-C 只对了今日文章卡与「本周阅读」两块，把 #12 的最后一项「旧 `Mint*`/M3 Button 家族的版面重排」
+留到本轮。本轮把整屏从旧令牌桥搬到 `appColors()` + 共享件，补回原型页头副标题；
+两处结构性差异（「继续」组的双语对照独立入口、原型日期眉标）按证据登记为不搬。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | 七个 `Mint*` 令牌全部退场（根底色 `MintBackground` → `colors.background`），屏内配色只走 `appColors()` / 域色 | 旧桥与 `appColors()` 是两套表；深色档靠 `Mint*` 的 getter 兜住，留着就还有第三种取色写法 | `ReadingHomeLayoutContractTest.the legacy mint family and material buttons are retired from the reading home`（七枚计数归零） |
+| 2 | M3 `Button` / `TextButton` / `Card` / `ButtonDefaults` / `CardDefaults` 与自造 `RoundedCornerShape(18/24.dp)` 全部换共享件：动作归 `PillButton` 三档，状态卡与失败横幅归 `AppCard`，更多组与偏好区归 `SoftCard`，今日文章卡圆角取 `AppShape.Card` | 共享件优先 + 组件份数棘轮；屏内自造几何是下一条「第二套按钮语言」的入口 | 同一判据（`RoundedCornerShape(` / `Card(` / `Button(` / `TextButton(` / `ButtonDefaults` / `CardDefaults` 六类计数归零；`AppCard` 2 / `SoftCard` 2 / `clip(AppShape.Card)` 1） |
+| 3 | 动作档位从注释变成可数口径：主色 1（今日文章卡那枚 CTA，`PillStyle.Primary` + 品牌域 `AiSpeech`）、次级 4（参数开关 / 类型行 / 历史入口 / 失败横幅「去配置」）、文字档 1（页头「换一篇」） | Task 7 的「一屏一枚薄荷主色」此前只写在注释里；迁完共享件后可以按源码站点数点出来 | 同一判据（三档各自计数 1 / 4 / 1） |
+| 4 | 主色那对配平（`MintPrimary` 容器 + `appColors().onBrand` 前景）迁进共享纯表 `pillButtonInk`；本屏不再出现 `onBrand` / `onMint` / `MintPrimary` 字面量 | 配平只该有一份定义；深套 `onMint` 压亮薄荷 1.49:1 的坑由纯表 + `PillButtonInkTest` 拦，不靠屏内注释 | `the mint primary pair stays dark ink on both theme sets`（**期望值变化 1 → 0，非放宽**：同一对配平的逐值复算仍在本文件上半截，且迁进 `PillButtonInkTest`；本屏改钉「主 CTA 走 `PillStyle.Primary` + `AppDomain.AiSpeech`」） |
+| 5 | 页头补回原型 `head()` 的副标题（`app.js:706`），末句从「可以在设置里固定」改为「在下方『生成前参数』里设置」 | 本仓的类型与长度不在「设置」屏，而在本屏的展开卡（`ReadingPreference`）；照抄会把用户指去一个没有这两项的页面。前半句成立：生成请求的 `targetCards` 就是今日计划里已完成的词卡 | `…the header carries the prototype subtitle with the location this repo actually has`（逐字 + 「可以在设置里固定」归零） |
+| 6 | 原型页头 `eyebrow`（`planDate · type`）**不搬** | 本仓日期眉标的唯一口径是今日学习页的计划快照 `localDateLabel`；阅读屏只有宿主注入的 `todayLocalDate`，屏内再格式化一份就是第二套日期样式，而一级 tab 不重复「今天是哪天」 | 本行 |
+| 7 | `section('继续')` 的「双语对照」独立入口**继续不搬**（Task 21-C 第 3 行） | 本仓的对照态是 `ArticleReadingScreen` 屏内切换（Task 21-D 裁决「对照态 = 同一支屏内切换」），无独立路由；另开一条属功能改动。Task 22-K 已在正文屏补齐「只看中文」与页脚「双语」，入口已存在于阅读器内 | 本行（21-C / 21-D 的判据仍绿） |
+| 8 | 今日文章卡保留 12% 域色叠层，不改成 `AppCard` | spec §4.4「一屏一域色」：这枚卡是阅读域的唯一色面；共享卡没有「域色叠层」变体，为它单开一份又会破组件份数棘轮 | 同一判据（`clip(AppShape.Card)` 恰 1 处） |
+| 9 | 失败 / 未配置横幅走 `AppCard` + 次级 `PillButton`，**不**改调共享 `InlineNotice` | `InlineNotice` 的动作槽把 tag 固定成 `inline_notice_action`，而本屏出口锚 `generation_failure_action` 是 connected 用例点名的取样点；且这里要的是「一句现状 + 一枚去配置」的块状出口，不是提示条的行内链接 | 同一判据（`AppCard` 2 处）+ connected `generateFailureShowsConstantMessageAndConfigureAction`（18/18 内） |
+
+**连带改动的既有判据（期望值变化，非放宽）**：`ReadingHomeLayoutContractTest.the mint primary pair stays dark ink on both theme sets`
+的屏内形状断言由「`onBrand` 站点 1 / `MintPrimary` 容器 1 / `contentColor` 配对 1」改为
+「`onBrand` / `onMint` / `MintPrimary` 归零 + `PrimaryCtaButton` 本体里 `PillStyle.Primary` 与
+`AppDomain.AiSpeech` 各 1」。三枚 token 级断言（`onBrand` 两套同值、两套 ≥4.5、`onMint` 深档不达线）
+一字未动；换的是「配平写在哪」——定义迁进共享纯表，屏侧只留档位。
+
+JVM 全量 **2219 / 0 失败**（新增 2 条）；connected `ReadingAccessScreenTest` **18/18**、
+`AppScreenTest`（宿主挂载）**57/57**，均原样通过。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -537,7 +564,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 9 | `sBookPicker`（:588） | 选择词书 | `AppScreen.kt` 的 `WordBookPicker` | ✅ | 行形状 Task 13-A 已翻正；Task 22-J 补进「换词书后旧进度保留」Info 提示（list 之后、节内）；页头「导入」/ `.foot`「选用这本书」/ `.meta` 三件按「已有真入口 / 单条保存语义 / 本屏无导入能力」不搬，原型的搜索与排序**源码里不存在**（计划原措辞以 Task 22-J 第 4 行为准）；5 条登记在「Task 22-J」台账 |
 | 10 | `sBookDetail`（:608） | 词书 | **批 1 Task 15 新建** `BookDetailScreen.kt`（词库页「词书」段的默认面；「查看完整词单」切到该段的 `WordBookWordsScreen` 浏览态） | ✅ | Task 15 已对（强卡 `ring(86)` + 正在使用 + 书名 + 已学 x/y、「这本书的情况」四行取真数、「操作」两行）；6 条偏离登记在「Task 15」台账，含按书导出 / 按书删进度两项能力缺失整行不搬、页头 more 菜单不搬 |
 | 11 | `sCardSettings`（:645） | 词卡显示 | 并入 `LearningSetupScreen` | ✅ | Task 12（合成一屏，台账第 1 行留因） |
-| 12 | `sReadHome`（:702） | 每日阅读 | `ReadingAccessScreen.kt` | 🟡 | Task 21-C 已对：今日文章卡（覆盖 N 词 · 第 v 版）+「本周阅读」派生统计卡（近 7 天篇数/字数，无周目标）；仍缺：「继续」组双语对照独立入口（按「阅读器内切换」不搬，见 21-C 第 3 行）、旧 `Mint*`/M3 Button 家族的版面重排 |
+| 12 | `sReadHome`（:702） | 每日阅读 | `ReadingAccessScreen.kt` | ✅ | Task 21-C 已对：今日文章卡（覆盖 N 词 · 第 v 版）+「本周阅读」派生统计卡（近 7 天篇数/字数，无周目标）；Task 22-L 收口：七个 `Mint*` 令牌与 M3 `Button`/`Card` 家族全退场（动作归共享 `PillButton` 三档 1/4/1、承载面归 `AppCard`/`SoftCard`、圆角归 `AppShape`）、页头补原型副标题；「继续」组双语对照独立入口不搬（对照态在阅读器内切换，21-C 第 3 行 / 21-D 裁决）、日期眉标不搬；7 条登记在「Task 22-L」台账 |
 | 13 | `sReadArticle`（:738） | 阅读 | `ArticleReadingScreen.kt` | ✅ | Task 21-D 对元信息行；Task 22-K 补三档排印逐值（`AppType.Prose` 17.5 衬线 / `ProseZh` 13 / `ArticleTitle` 30）与页脚「双语 + 完成阅读」两枚并列；`.prose` 逐段交错按「整块字符串 + 绝对偏移高亮」不搬；4 条登记在「Task 22-K」台账 |
 | 14 | `sReadTranslate`（:762） | 双语对照 | `ArticleReadingScreen.kt` 对照态 | ✅ | Task 21-D 定「对照态 = 同一支屏内切换」；Task 22-K 补「只看中文」（落模式行，中文态隐藏英文侧）与按来源分三支的译文提醒；逐段交错不搬（无段落结构）；5 条登记在「Task 22-K」台账 |
 | 15 | `sReadFeed`（:779） | 外刊选读 | `ReadingFeedScreen.kt` | ✅ | Task 21-A 已对（页头 + `BareRow` 列表 + 尾部「来源说明」`QuietCard`）；3 条偏离登记在「Task 21-A」台账（条目栏目/篇幅/词数、`.meta`「不含广告」、VOA 公共领域三处读不到或不成立） |
@@ -563,7 +590,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ✅ | Task 22-H 已对：按 `AppError` 分叉（姓名错误保留旧文案 / 其余「词库没能打开」+ 真重试）；`LC-DB-03` 与「从备份恢复」不搬（无诊断码 / 回滚归恢复态）；2 条登记在「Task 22-H」台账 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | **批 2 Task 22-H 新建** `UnavailableScreen.kt`；宿主 = 未知 AI 功能 key 的兜底分支 | ✅ | Task 22-H 已对：原型文案逐字 + 260dp 两枚真出口；`overlayOpen` 与返回键改按 key 判定；JVM 2 条 + connected 2/2；1 条登记在「Task 22-H」台账 |
 
-**小计（Task 22-K 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 33 屏 · 🟡 3 屏 · ⬜ 0 屏。
+**小计（Task 22-L 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 34 屏 · 🟡 2 屏 · ⬜ 0 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、

@@ -1,7 +1,6 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,16 +8,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailure
@@ -39,6 +30,7 @@ import com.example.englishlearning.reading.NotConfiguredReason
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
+import com.example.englishlearning.ui.components.AppCard
 import com.example.englishlearning.ui.components.AppGlyph
 import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
@@ -53,17 +45,13 @@ import com.example.englishlearning.ui.components.PayloadKind
 import com.example.englishlearning.ui.components.QuietCard
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
+import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTint
-import com.example.englishlearning.ui.theme.MintTextMuted
 
 sealed interface ReadingAccessUiState {
     data object Loading : ReadingAccessUiState
@@ -115,6 +103,18 @@ val ReadingAccessUiState.historyOrEmpty: List<Article>
  *
  * Ready 态的三个来源入口（AI 生成 / 外刊选取 / 粘贴文章）与生成状态都由
  * [ReadingAccessViewModel] 编排；本文件只做呈现，不持有任何业务判断。
+ *
+ * ## 令牌与动作档（Task 22-L 收口）
+ *
+ * 本屏是最后一批还画在 `Mint*` 旧桥上的页面之一：底色写 `MintBackground`、卡片铺 `MintSurface`/
+ * `MintTint`、按钮走 M3 `Button` + `ButtonDefaults`、圆角是屏内自造的 `RoundedCornerShape(18.dp)`。
+ * Task 22-L 把这套全部换掉：
+ *  - 底色 `colors.background`，卡面 `AppCard`（状态卡 / 失败横幅）与 `SoftCard`（更多组 / 生成前参数），
+ *    今日文章卡保留 12% 域色叠层但圆角取 `AppShape.Card`；
+ *  - 动作全部归共享 `PillButton` 三档：主色恰一枚（今日文章卡里那枚 CTA），次级四枚
+ *    （参数开关 / 类型行 / 历史入口 / 失败横幅「去配置」），文字档一枚（页头「换一篇」）。
+ *    主色那对「亮薄荷容器 + 主题无关深墨」的逐值复算归共享纯表 `pillButtonInk` 与 `PillButtonInkTest`，
+ *    屏侧只回答「用哪一档、用几枚」（`ReadingHomeLayoutContractTest` 第 6 节）。
  */
 @Composable
 fun ReadingAccessScreen(
@@ -146,7 +146,7 @@ fun ReadingAccessScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MintBackground)
+            .background(colors.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp)
             .testTag("reading_access_screen"),
@@ -154,18 +154,29 @@ fun ReadingAccessScreen(
     ) {
         // 一级 tab 页头：无返回键；「换一篇」只在今天已有文章时进 action 槽——
         // 没文章可换时那枚按钮不该在场（也就不必回答「换掉的是什么」）。
+        //
+        // 副标题取原型 `head()` 的 `sub`（`app.js:706`），末句按本仓落点改写：原型写「可以在设置里固定」，
+        // 但本仓的类型与长度不在「设置」屏，而在本屏下方那张「生成前参数」展开卡（`ReadingPreference`）。
+        // 前半句「文章由今日学过的词生成」成立：生成请求的 `targetCards` 就是今日计划里已完成的词卡。
+        // 原型同一处的 `eyebrow`（`planDate · type`）**不搬**：本仓日期眉标由今日学习页的计划快照
+        // （`localDateLabel`）提供，是唯一日期口径；阅读屏只有注入的 `todayLocalDate`，屏内再格式化一份
+        // 就是第二套日期样式，而一级 tab 也不重复「今天是哪天」。
         AppScreenHeader(
             title = "每日阅读",
+            subtitle = "文章由今日学过的词生成；长度与题材在下方「生成前参数」里设置。",
             hero = true,
             badge = { EntryIconBadge(icon = AppIcon.Newspaper, domain = AppDomain.Reading) },
             action = if (state is ReadingAccessUiState.Ready && state.todayArticle != null) {
                 {
-                    TextButton(
+                    // 页头动作是「纯文字动作」而不是第二枚带底的按钮（原型 `.bar-action` 口径）：
+                    // 实底按钮会把「一屏一个主操作」的重量抢走，主色留在今日文章卡里那枚 CTA 上。
+                    PillButton(
+                        text = "换一篇",
                         onClick = { regenerateConfirm = true },
-                        modifier = Modifier.testTag("reading_regenerate"),
-                    ) {
-                        Text("换一篇", style = AppType.Body, color = colors.text2)
-                    }
+                        style = PillStyle.Text,
+                        domain = AppDomain.Reading,
+                        testTag = "reading_regenerate",
+                    )
                 }
             } else {
                 null
@@ -243,7 +254,7 @@ private fun ReadyContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
+                .clip(AppShape.Card)
                 .background(colors.surface)
                 .background(readingPalette.base.copy(alpha = 0.12f))
                 .padding(16.dp)
@@ -332,15 +343,13 @@ private fun ReadyContent(
 
     GenerationParamsToggle(expanded = generationParamsExpanded, onClick = onToggleGenerationParams)
     if (generationParamsExpanded) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MintTint),
-            shape = RoundedCornerShape(18.dp),
-            modifier = Modifier.fillMaxWidth().testTag("reading_preference"),
-        ) {
+        // 偏好区收进共享软卡（旧实现是 `Card(containerColor = MintTint)` + 自造 18dp 圆角）。
+        // 文案仍是一句现状 + 当前取值，读的是 `ReadingPreference` 的真字段，不是稿面常量。
+        SoftCard(modifier = Modifier.testTag("reading_preference")) {
             Text(
-                "默认类型：${state.preference.defaultArticleType.label} · 长度：${state.preference.explicitLengthTier?.label ?: "按词书默认"}",
-                color = MintPrimaryDark,
-                modifier = Modifier.padding(18.dp),
+                text = "默认类型：${state.preference.defaultArticleType.label} · 长度：${state.preference.explicitLengthTier?.label ?: "按词书默认"}",
+                style = AppType.Body,
+                color = colors.text1,
             )
         }
         ArticleType.entries.forEach { type ->
@@ -424,44 +433,45 @@ private fun ReadyContent(
 }
 
 /**
- * 主 CTA 一档：`MintPrimary` 容器 + `appColors().onBrand` 前景。
+ * 主 CTA 一档：共享 `PillButton` 的主色档（`PillStyle.Primary` + 品牌域 `AiSpeech`）。
  *
- * 容器 `MintPrimary` 是 `LocalDomainColors` 的组合期读点，两套都落在**亮**薄荷上
- * （浅 #2EC99C / 深 #35E0AC），所以前景必须**与套无关**：
- *  - 不能用 `appColors().onMint`——它随套翻转，深套取值是浅墨 #DFF6EC，压 #35E0AC 只有 1.49:1；
- *  - `onBrand` 明暗两套同值 #04241C（裁决 3「品牌渐变用深字」那枚 token），
- *    压浅套 7.81:1 / 深套 9.74:1，两套都过正文线。
- * 亮度复算与这条判据见 `ReadingHomeLayoutContractTest` 的姊妹用例
- * `[the mint primary pair stays dark ink on both theme sets]`。批 1 Task 7 起本屏只剩**这一枚**主色按钮
- * （今日文章卡里的阅读 CTA，或无文章时的生成 CTA）：类型行与两张横幅的动作已降为次级档，
- * 「一屏一枚薄荷主色」因此既是运行时事实、也能在源码里按站点数点出来。
+ * 为什么域取 `AiSpeech` 而不是 `Reading`：原型 `head()` 的主按钮就是品牌薄荷那一档，
+ * 本仓的 `PillStyle.Primary + AiSpeech` 正是它的同义（品牌渐变 + **主题无关**深墨 `set.onBrand`）。
+ * 其余六域的 Primary 是 `palette.deep` 纯色档，那是另一种视觉重量（深底白字），不是本屏那枚。
+ *
+ * 墨色配平**不在本屏**：旧实现把 `MintPrimary` 容器与 `appColors().onBrand` 前景写在屏内两行，
+ * 深套 `onMint` 压亮薄荷只有 1.49:1 的坑因此要靠本屏注释防；Task 22-L 起这对配平归共享纯表
+ * `pillButtonInk`，逐值复算在 `PillButtonInkTest`，本屏只声明「一屏一枚主色」（第 6 节契约）。
+ *
+ * 批 1 Task 7 起本屏只剩**这一枚**主色按钮（今日文章卡里的阅读 CTA，或无文章时的生成 CTA）：
+ * 类型行、页头动作与两张横幅的动作都已降为次级 / 文字档，「一屏一枚薄荷主色」因此既是运行时事实、
+ * 也能在源码里按站点数点出来。
  */
 @Composable
 private fun PrimaryCtaButton(title: String, tag: String, description: String, onClick: () -> Unit) {
-    Button(
+    PillButton(
+        text = title,
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag(tag).semantics { contentDescription = description },
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
-    ) { Text(title, fontWeight = FontWeight.Bold) }
+        modifier = Modifier.fillMaxWidth(),
+        style = PillStyle.Primary,
+        domain = AppDomain.AiSpeech,
+        testTag = tag,
+        contentDescription = description,
+    )
 }
 
 /** 「生成前参数」开关：偏好区不再常驻长列，随这一次动作出现（裁决⑤ 第三件）。 */
 @Composable
 private fun GenerationParamsToggle(expanded: Boolean, onClick: () -> Unit) {
-    Button(
+    PillButton(
+        text = if (expanded) "收起生成前参数" else "生成前参数：类型与长度",
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 54.dp)
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("reading_generation_params_toggle")
-            .semantics { contentDescription = if (expanded) "收起生成前参数" else "展开生成前参数" },
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-    ) {
-        Text(if (expanded) "收起生成前参数" else "生成前参数：类型与长度", fontWeight = FontWeight.Bold)
-    }
+        modifier = Modifier.fillMaxWidth(),
+        style = PillStyle.Secondary,
+        domain = AppDomain.Reading,
+        testTag = "reading_generation_params_toggle",
+        contentDescription = if (expanded) "收起生成前参数" else "展开生成前参数",
+    )
 }
 
 /** 生成失败横幅：文案与按钮标签全部来自常量（AiFailure 的泄露防线），不发自由文本。 */
@@ -476,59 +486,61 @@ private fun NotConfiguredBanner(reason: NotConfiguredReason, onOpenAiSettings: (
         NotConfiguredReason.InvalidEndpoint,
         -> "本机 AI 配置暂时不可用，请检查设置。"
     }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(18.dp)).testTag("generation_failure"),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(message, color = MintPrimaryDark, modifier = Modifier.semantics { contentDescription = "生成失败原因" })
-            Button(
-                onClick = onOpenAiSettings,
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .border(1.dp, MintOutline, RoundedCornerShape(14.dp))
-                    .testTag("generation_failure_action"),
-                colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-            ) { Text("去配置", fontWeight = FontWeight.Bold) }
-        }
-    }
+    GenerationFailureCard(message = message, actionLabel = "去配置", onOpenAiSettings = onOpenAiSettings)
 }
 
 @Composable
 private fun GenerationFailureBanner(failure: AiFailure, onOpenAiSettings: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(18.dp)).testTag("generation_failure"),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(failure.uiText.message, color = MintPrimaryDark, modifier = Modifier.semantics { contentDescription = "生成失败原因" })
-            if (failure.toUserAction() == UserAction.ConfigureProfile) {
-                Button(
-                    onClick = onOpenAiSettings,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .border(1.dp, MintOutline, RoundedCornerShape(14.dp))
-                        .testTag("generation_failure_action"),
-                    colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-                ) { Text(UserAction.ConfigureProfile.label, fontWeight = FontWeight.Bold) }
-            }
+    GenerationFailureCard(
+        message = failure.uiText.message,
+        actionLabel = if (failure.toUserAction() == UserAction.ConfigureProfile) {
+            UserAction.ConfigureProfile.label
+        } else {
+            null
+        },
+        onOpenAiSettings = onOpenAiSettings,
+    )
+}
+
+/**
+ * 两张横幅共用的承载面：`AppCard`（surface 底 + 1dp 描边 + 共享圆角）装一句常量文案与一枚次级出口。
+ *
+ * 不是共享 `InlineNotice`：提示条的动作槽把 tag 固定成 `inline_notice_action`（见该组件 KDoc），
+ * 而本屏的出口锚 `generation_failure_action` 是 connected 用例点名的取样点；且这里要的是
+ * 「一句现状 + 一枚去配置」的可点击出口，不是提示条那种行内链接。承载面仍归共享卡，不自造第二份几何。
+ *
+ * [actionLabel] 为 `null` 时只画一句原因（`AiFailure` 的处置动作不是「去配置」时那枚按钮点不出路，
+ * 画出来就是假出口）。`contentDescription = "生成失败原因"` 留在原因句上，语义与既有接线一字未改。
+ */
+@Composable
+private fun GenerationFailureCard(message: String, actionLabel: String?, onOpenAiSettings: () -> Unit) {
+    val colors = appColors()
+    AppCard(modifier = Modifier.testTag("generation_failure")) {
+        Text(
+            text = message,
+            style = AppType.Body,
+            color = colors.text1,
+            modifier = Modifier.semantics { contentDescription = "生成失败原因" },
+        )
+        if (actionLabel != null) {
+            PillButton(
+                text = actionLabel,
+                onClick = onOpenAiSettings,
+                modifier = Modifier.fillMaxWidth(),
+                style = PillStyle.Secondary,
+                domain = AppDomain.Reading,
+                testTag = "generation_failure_action",
+            )
         }
     }
 }
 
 @Composable
 private fun AccessCard(title: String, message: String, tag: String) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MintSurface),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth().border(1.dp, MintOutline, RoundedCornerShape(24.dp)).testTag(tag),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, color = MintPrimaryDark)
-            Text(message, color = MintTextMuted)
-        }
+    val colors = appColors()
+    AppCard(modifier = Modifier.testTag(tag)) {
+        Text(title, style = AppType.Label, color = colors.text1)
+        Text(message, style = AppType.Footnote, color = colors.text2)
     }
 }
 
@@ -540,27 +552,28 @@ private fun AccessCard(title: String, message: String, tag: String) {
  */
 @Composable
 private fun TypeButton(type: ArticleType, onSelectType: (ArticleType) -> Unit) {
-    Button(
+    PillButton(
+        text = type.label,
         onClick = { onSelectType(type) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 54.dp)
-            .border(1.dp, MintOutline, RoundedCornerShape(18.dp))
-            .testTag("reading_type_${type.name.lowercase()}")
-            .semantics { contentDescription = "${type.label}文章" },
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-    ) { Text(type.label, fontWeight = FontWeight.Bold) }
+        modifier = Modifier.fillMaxWidth(),
+        style = PillStyle.Secondary,
+        domain = AppDomain.Reading,
+        testTag = "reading_type_${type.name.lowercase()}",
+        contentDescription = "${type.label}文章",
+    )
 }
 
 @Composable
 private fun HistoryButton(onOpenHistory: () -> Unit, historyCount: Int? = null) {
-    Button(
+    PillButton(
+        text = if (historyCount == null) "查看本地阅读历史" else "查看本地阅读历史（$historyCount）",
         onClick = onOpenHistory,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).border(1.dp, MintOutline, RoundedCornerShape(18.dp)).testTag("reading_history_entry").semantics { contentDescription = "本地阅读历史" },
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MintSurface, contentColor = MintPrimaryDark),
-    ) { Text(if (historyCount == null) "查看本地阅读历史" else "查看本地阅读历史（$historyCount）", fontWeight = FontWeight.Bold) }
+        modifier = Modifier.fillMaxWidth(),
+        style = PillStyle.Secondary,
+        domain = AppDomain.Reading,
+        testTag = "reading_history_entry",
+        contentDescription = "本地阅读历史",
+    )
 }
 
 private val ArticleType.label: String

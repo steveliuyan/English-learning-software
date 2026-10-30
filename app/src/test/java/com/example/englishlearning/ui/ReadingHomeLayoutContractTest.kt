@@ -30,6 +30,10 @@ import kotlin.test.assertTrue
  *
  * 第四族 [the_home_leads_with_a_today_article_card_and_a_single_more_group] 是版式重做批 1 Task 7
  * （spec §3.4）：页头 + 今日文章卡 + 单个「更多」组，锁定态一句说明替代四枚类型按钮。
+ *
+ * 第五、六族是 Task 22-L 的收口：旧 `Mint*` 桥与 M3 `Button` / `Card` 家族退场（动作归共享 `PillButton`
+ * 三档、承载面归 `AppCard` / `SoftCard`），页头补回原型 `head()` 的副标题。主色那对配平的逐值复算
+ * 随迁移改由 `PillButtonInkTest` 承重，本条只留「走哪一档」的可数口径。
  */
 class ReadingHomeLayoutContractTest {
 
@@ -310,6 +314,108 @@ class ReadingHomeLayoutContractTest {
         )
     }
 
+    // ---------- 6. 旧 Mint*/M3 Button 家族退场（Task 22-L） ----------
+
+    /**
+     * Task 22-L 收掉本屏最后一支旧家族（计划台账 #12 的最后一项「旧 `Mint*`/M3 Button 家族的版面重排」）。
+     *
+     * 三件事，逐件钉住：
+     *  ① 七个 `Mint*` 令牌全部退场——它们是批 0 之前的旧桥（`MintSurface`/`MintTint` 那一族），
+     *    本屏的配色此后只走 `appColors()` / 域色，与房内其余屏同一张表；
+     *  ② M3 `Button` / `TextButton` / `Card` 家族与自造 `RoundedCornerShape(` 全部换成共享件
+     *    （`PillButton` 三档 / `AppCard` / `SoftCard` / `AppShape`），屏内不再有一份自己的按钮几何；
+     *  ③ 动作档位可数：主色恰一枚（`PillStyle.Primary`＝今日文章卡里那枚 CTA），次级四枚
+     *    （生成前参数开关 / 类型行 / 历史入口 / 失败横幅的「去配置」），文字档一枚（页头「换一篇」）。
+     *
+     * 这里**不**钉墨色比值：主色那对配平的逐值复算归共享纯表 `pillButtonInk` 与
+     * [com.example.englishlearning.ui.PillButtonInkTest]，本屏只负责「用哪一档、用几枚」。
+     */
+    @Test
+    fun `the legacy mint family and material buttons are retired from the reading home`() {
+        listOf(
+            "MintBackground", "MintSurface", "MintTint", "MintOutline",
+            "MintPrimary", "MintPrimaryDark", "MintTextMuted",
+        ).forEach { token ->
+            assertEquals(
+                0,
+                countMatches(home, Regex("""\b$token\b""")),
+                "旧 `$token` 必须退场：它是 `appColors()` 之前的旧桥，留着就是两套配色表并存",
+            )
+        }
+        listOf(
+            """RoundedCornerShape\(""" to "自造圆角",
+            """\bCard\(""" to "M3 `Card(`",
+            """CardDefaults""" to "`CardDefaults`",
+            """\bButton\(""" to "M3 `Button(`",
+            """\bTextButton\(""" to "M3 `TextButton(`",
+            """ButtonDefaults""" to "`ButtonDefaults`",
+        ).forEach { (pattern, label) ->
+            assertEquals(
+                0,
+                countMatches(home, Regex(pattern)),
+                "本屏不得再出现$label：几何与墨色归共享件，屏侧再写一份就是第二套按钮语言",
+            )
+        }
+        // 共享件落点：主色一枚 / 次级四枚 / 文字档一枚。
+        assertEquals(
+            1,
+            countMatches(home, Regex("""style = PillStyle\.Primary""")),
+            "主色档必须恰一枚（今日文章卡或无文章时同一位置的那枚 CTA）：多一枚就是两枚主任务并列",
+        )
+        assertEquals(
+            4,
+            countMatches(home, Regex("""style = PillStyle\.Secondary""")),
+            "次级档应有四枚：生成前参数开关、类型行、历史入口、失败横幅的「去配置」",
+        )
+        assertEquals(
+            1,
+            countMatches(home, Regex("""style = PillStyle\.Text""")),
+            "文字档恰一枚：页头的「换一篇」——它是页头动作位，不是带底的按钮",
+        )
+        // 承载面：状态卡与失败卡归 `AppCard`，更多组与偏好区归 `SoftCard`，今日文章卡保留域色叠层但形状走 `AppShape`。
+        assertEquals(
+            2,
+            countMatches(home, Regex("""\bAppCard\(""")),
+            "`AppCard` 两处：文章状态卡（已解锁 / 尚未解锁）与生成失败横幅",
+        )
+        assertEquals(
+            2,
+            countMatches(home, Regex("""\bSoftCard\(""")),
+            "`SoftCard` 两处：更多组与生成前参数偏好区（旧 `MintTint` 卡的位置）",
+        )
+        assertEquals(
+            1,
+            countMatches(home, Regex("""clip\(AppShape\.Card\)""")),
+            "今日文章卡的域色叠层保留（spec §4.4 一屏一域色），但圆角必须取 `AppShape.Card` 而不是自造 `RoundedCornerShape(20.dp)`",
+        )
+    }
+
+    /**
+     * 页头副标题按原型 `head()` 的 `sub` 补回（`app.js:706`）。
+     *
+     * 末句是**期望值变化**而不是照抄：原型写「可以在设置里固定」，本仓的类型与长度并不在「设置」屏，
+     * 而是本屏下方「生成前参数」那张展开卡（`ReadingPreference`，Task 7 裁决⑤ 第三件）。照抄就是
+     * 把用户指去一个没有这两项的页面。前半句「文章由今日所学的词生成」在本仓成立——
+     * 生成请求的 `targetCards` 就是今日计划里**已完成**的词卡（`ReadingAccessViewModel` 的
+     * `completedCards(plan)`），不是 mock。
+     */
+    @Test
+    fun `the header carries the prototype subtitle with the location this repo actually has`() {
+        assertEquals(
+            1,
+            countMatches(
+                home,
+                Regex(Regex.escape("文章由今日学过的词生成；长度与题材在下方「生成前参数」里设置。")),
+            ),
+            "页头副标题必须逐字在位：前半句取原型语义（今日学过的词），后半句指向本屏真实落点",
+        )
+        assertEquals(
+            0,
+            countMatches(home, Regex(Regex.escape("可以在设置里固定"))),
+            "原型那句「设置里固定」在本仓不成立（类型与长度在本屏「生成前参数」里），不得照抄",
+        )
+    }
+
     private fun rgbOf(color: Color): Int = color.toArgb() and 0xFFFFFF
 
     /**
@@ -347,13 +453,17 @@ class ReadingHomeLayoutContractTest {
      * 既满足**与套无关**，又把浅套比值从 4.62 抬到 7.81（深套 9.74）。
      *
      * 本条钉四件事：`onBrand` 两套同值；两套压亮薄荷都 ≥4.5；`onMint` 深档不达线（禁迁）；
-     * 屏内**唯一**一枚主色按钮（今日文章 / 生成那一枚）换到 `appColors().onBrand`，且没有一枚混进 `onMint`。
+     * 屏内**唯一**一枚主色按钮（今日文章 / 生成那一枚）走共享 `PillButton` 的主色档 + 品牌域。
      *
      * 批 1 Task 7 把站点数 4 → 1：计划 §Task 7 Step 1 的口径是「一屏只剩主 CTA 一枚薄荷主色」。
      * 原四枚里另外三枚不在页面上、而在三个辅助函数里——四枚类型行（`TypeButton`）、
-     * 生成失败横幅与未配置横幅里的「去配置」各一枚。Task 7 把它们降为次级档（`MintSurface` / `MintTint`
-     * 容器 + 1dp `MintOutline` 描边），于是「一屏一枚主色」既是运行时事实、也是源码级计数：
-     * 类型行与横幅动作都不再抢主任务叙事。主 CTA 本体（`PrimaryCtaButton`）的配平与亮度判据一字未改。
+     * 生成失败横幅与未配置横幅里的「去配置」各一枚。Task 7 把它们降为次级档。
+     *
+     * Task 22-L（期望值变化，**不是放宽**）：屏内那对配平（`MintPrimary` 容器 + `appColors().onBrand` 前景）
+     * 随旧 `Mint*` 家族一起迁进共享纯表 `pillButtonInk`，本屏的墨色字面量计数因此 1 → 0。
+     * 同一对配平的逐值复算现在由 `PillButtonInkTest` 承重（浅套 7.81 / 深套 9.74、深套 `onMint` 1.49
+     * 不达线仍在那组断言里）；本屏留下的可数口径变成「那一枚主色走哪一档」——把档位换成 Reading 域、
+     * 或退回 M3 `Button`，仍会在这里红。
      */
     @Test
     fun `the mint primary pair stays dark ink on both theme sets`() {
@@ -382,11 +492,11 @@ class ReadingHomeLayoutContractTest {
             "若 `appColors().onMint` 压深套 MintPrimary 也过正文线，那本条就该反向要求迁移；" +
                 "现实测 ${"%.4f".format(onMintDark)} 必须不达线，才证明不能拿套内墨来配这四枚",
         )
-        // 屏内形状：主 CTA 这一枚绑在同一枚容器表达式上，且没有混进 onMint / 旧静态符号。
+        // 屏内形状：主 CTA 那一枚必须走共享主色档 + 品牌域，且屏内不得再出现那对墨色字面量。
         assertEquals(
-            1,
+            0,
             countMatches(home, Regex("""appColors\(\)\.onBrand\b""")),
-            "阅读主页的 onBrand 站点数必须与 DarkTokenConsumptionRatchetTest 的口径同步（现 1：只有主 CTA 一枚）",
+            "Task 22-L 起屏内不再直接取 `onBrand`：配平归 `pillButtonInk` 纯表，屏侧再写一份就是第二份定义",
         )
         assertEquals(
             0,
@@ -396,21 +506,20 @@ class ReadingHomeLayoutContractTest {
         assertEquals(
             0,
             countMatches(home, Regex("""appColors\(\)\.onMint\b""")),
-            "阅读主页不得出现 `appColors().onMint`：它配的是暗薄荷容器，不是本屏的亮 MintPrimary 容器",
+            "阅读主页不得出现 `appColors().onMint`：它配的是暗薄荷容器，不是本屏的亮薄荷主 CTA",
         )
-        // 配对的**写法**有两种（同一行的 `containerColor = MintPrimary, contentColor = appColors().onBrand`
-        // 与 TypeButton 那种逐枚换行的 `colors = ButtonDefaults.buttonColors(...)`），所以按两侧符号各自点数，
-        // 两数相等才说明深墨没有压到别的容器上；不按单行正则判，那种判法会把换行写法静默漏掉。
-        assertEquals(
-            1,
-            countMatches(home, Regex("""containerColor = MintPrimary\b""")),
-            "阅读主页应恰一枚 `MintPrimary` 亮面容器（主 CTA）：站点数一变，本条与 onBrand 那两枚计数必须同步改，" +
-                "否则等于放开「深墨压到别的容器」的口子",
+        val primaryCta = balancedBranchBody(home, "private fun PrimaryCtaButton(")
+        assertTrue(
+            primaryCta.isNotEmpty(),
+            "取不到 `PrimaryCtaButton` 本体：下面两条会空转，先把函数形状恢复",
         )
-        assertEquals(
-            1,
-            countMatches(home, Regex("""contentColor = appColors\(\)\.onBrand\b""")),
-            "唯一一枚深墨前景必须挂在 MintPrimary 容器档上：与上一枚计数相等才配对",
+        assertTrue(
+            "style = PillStyle.Primary" in primaryCta,
+            "主 CTA 必须走共享主色档（亮薄荷 + 主题无关深墨）：换档次级档就没有主任务了",
+        )
+        assertTrue(
+            "domain = AppDomain.AiSpeech" in primaryCta,
+            "主 CTA 必须绑品牌域 `AiSpeech`：其余六域的 Primary 是 `palette.deep` 深底白字，不是这枚亮薄荷",
         )
     }
 }
