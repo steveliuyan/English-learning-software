@@ -29,6 +29,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.ai.AiPreferenceRepository
 import com.example.englishlearning.ai.DefaultImageProfileResult
 import com.example.englishlearning.ai.DefaultImageProfileResolver
@@ -139,7 +140,7 @@ class AppScreenTest {
 
     @Test
     fun errorScreenRendersSafeStableTextOnly() {
-        composeRule.setContent { ErrorScreen(onRetry = {}) }
+        composeRule.setContent { ErrorScreen(error = AppError.InvalidProfileName, onRetry = {}) }
         composeRule.onNodeWithText("无法创建资料，请检查姓名").assertExists()
         composeRule.onNodeWithText("Exception").assertDoesNotExist()
         composeRule.onNodeWithText("/secret").assertDoesNotExist()
@@ -148,10 +149,26 @@ class AppScreenTest {
     @Test
     fun errorScreenOffersReturnActionSoUserIsNotStuck() {
         var returned = false
-        composeRule.setContent { ErrorScreen(onRetry = { returned = true }) }
+        composeRule.setContent { ErrorScreen(error = AppError.InvalidProfileName, onRetry = { returned = true }) }
         composeRule.onNodeWithContentDescription("返回重新填写").assertExists().performClick()
         composeRule.waitForIdle()
         assertEquals(true, returned)
+    }
+
+    @Test
+    fun errorScreenNamesTheRealFailureAndNeverShowsAMockedDiagnosticCode() {
+        // 批 2 Task 22-H（#35 `sError`）：旧形态把任何失败都说成「无法创建资料，请检查姓名」，
+        // 数据库打不开时用户会去改名字。非姓名类失败落「词库没能打开」+ 一枚真重试；
+        // 原型那枚 `LC-DB-03` 是画稿样例，`AppError` 不带可展示诊断码，屏幕上不许出现。
+        var retried = false
+        composeRule.setContent { ErrorScreen(error = AppError.StorageUnavailable, onRetry = { retried = true }) }
+        composeRule.onNodeWithText("词库没能打开").assertExists()
+        composeRule.onNodeWithText("本机数据库读取时出了点问题。可以先重试。").assertExists()
+        composeRule.onNodeWithText("无法创建资料，请检查姓名").assertDoesNotExist()
+        composeRule.onNodeWithText("LC-DB-03", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("error_retry").assertExists().performClick()
+        composeRule.waitForIdle()
+        assertEquals(true, retried)
     }
 
     @Test

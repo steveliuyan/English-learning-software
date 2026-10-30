@@ -418,6 +418,27 @@ ViewModel 与加载态）。**保持两屏**（用户口径），只把原型上
 「回执只有一枚」的实质仍由 `deleteAllLearningDataNotice?.let` 条件渲染 + 「第一枚 `InlineNotice(` 必须排在危险区之前」
 两条断言守住（页尾那条在危险区之后）。
 
+### Task 22-H · 启动 / 建档两屏 / 错误 / 页面不可用（原型 `sSplash` `app.js:1424`、`sOnboarding1` `:1442`、`sOnboarding2` `:1467`、`sError` `:1493`、`sUnavailable` `:1511`）
+
+批 2 余下五屏。共同口径：原型画了且本仓承载得住的照搬；承载不住的一枚不补，理由逐条落表。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | 启动屏（`BrandLaunchSurface`）补原型品牌帧：88dp 圆角 logo、`AppType.ArticleTitle`（30sp 衬线）标题「英语学习」、副标题「背词 · 阅读 · AI 助学」、120×4 不确定进度条、「正在打开本机词库…」 | 原型 `:1424-1438`；这一帧是数据库探针慢 / 首启建档前的 Loading 面，旧形态只有一枚 48dp logo | `Batch2EntryScreensContractTest.the splash shows the prototype brand frame but never fakes a skip route` + connected `AppScreenTest` 57/57 |
+| 2 | 启动屏底色**沿用品牌渐变**（与 `launch/BrandLaunchActivity` 同源，`AppleMintGradient` 恰 1 处） | 原型是页底；但系统启动 Activity 刚用同一组三段渐变画过 1.2 秒，这里换白底会连闪两帧。两帧同底是启动连续性，不是第二套皮肤 | 同判据（`AppleMintGradient` 计数 1；墨一律 `onBrand`） |
+| 3 | 原型进度条的 62% **不搬**，改不确定态；「开始建档」「跳过，直接进入」两枚**不画** | 62% 是画稿静态演示值，本仓不知道真实加载进度；两枚按钮在本时机没有路由（首启强制建档、无跳过），画出来就是假入口 | 同判据（`progress = 0.62f` / 两枚文案归零）+ `LinearProgressIndicator(` 恰 1 |
+| 4 | 建档·姓名补眉题「第 1 步 / 共 2 步」、原型副标题「只为把每天的量定得刚好，随时可以改。」、字段标签「怎么称呼你」、主键可见文案「下一步 · 选词书」 | 原型 `:1444-1463`；副标题解释「为什么要问名字」，主键说清下一步真是选词书。**可及名仍是「创建资料」**，`AppScreenTest` 的取样锚不动 | `Batch2EntryScreensContractTest.the name step frames itself as step one and keeps the connected anchors` + `LearningSetupLayoutContractTest` 建档条原样绿 |
+| 5 | 建档·姓名的「每天有多少时间」「你的目标」两节**不搬** | 本仓没有时长档 / 学习目标偏好字段，原型的 chip 与 `.pick` 只接 toast | 同判据（四枚文案归零） |
+| 6 | `sOnboarding2` 与「学习计划」并屏：眉题「第 2 步」、`词卡显示` 分段、「建档完成后…1 篇文章」三样**不搬** | 并屏后同一屏还要从设置反复打开（步骤框只在首启成立）；`cardFirst` 全仓零字段；文章按需生成，「建档就发一篇」为假 | `Batch2EntryScreensContractTest.the book step stays one editable screen and drops what it cannot say`（`篇文章` 归零）+ 既有 `AppScreenTest.profileCreation…`（落到「学习计划」） |
+| 7 | 错误屏按 `AppError` 分叉：`InvalidProfileName` 保留「无法创建资料，请检查姓名 / 返回重新填写」；其余落 `EmptyState(Sticker.Warning)`「词库没能打开」+ 一枚真「重试」；静态 Mint 桥清零 | 旧形态把**任何**失败都说成姓名问题——数据库打不开时用户会去改名字。失败类型本该决定文案（`AppUiState.Error` 一直带着它，宿主却没传） | `Batch2EntryScreensContractTest.the error screen branches on the real failure and never invents a diagnostic` + connected `AppScreenTest.errorScreenNamesTheRealFailureAndNeverShowsAMockedDiagnosticCode` |
+| 8 | 原型错误码「`LC-DB-03` · 记录时间 07:5x」与「从备份恢复」**不搬** | `AppError` 不携带可展示诊断码（编一个就是假数据）；回滚归恢复态（`NeedsRecovery` 分支已有完整导出/恢复），在普通错误屏再挂一枚会绕过恢复流程的前置校验 | 同判据（两枚归零） |
+| 9 | **新建** `UnavailableScreen.kt`（共享页头「页面不可用」+ `EmptyState(Sticker.Info)` + 260dp 两枚真出口），作为「未知 AI 功能 key」的兜底；`overlayOpen` 与返回键改按 `selectedFeatureKey` 判定 | 原型 `sUnavailable`（用户 2026-10-29 拍板授权的五枚新屏之一）。`selectedFeatureKey` 是 `rememberSaveable` 的字符串，枚举改名/删项后旧 key 仍会恢复；旧链条没有分支，覆盖层会静默消失 | `Batch2EntryScreensContractTest.the unavailable page is a real screen with two honest exits` + `…is mounted as the unknown feature fallback` + connected `UnavailableScreenTest` 2/2 |
+
+**连带改动的既有判据（期望值变化，非放宽）**：`AppScreenOverlayContainerContractTest` 的
+`AppScreen.kt` 内 `PillButton(` 计数 **3 → 4**。理由写进测试注释：错误屏的「重试」是第 4 处真动作、
+走同一枚共享件；四枚落点（导出取消 1 + 迁移二选一 2 + 错误屏重试 1）全部点名，判据「不许手搓按钮、
+不许长出未登记的第 5 枚」不变。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -462,13 +483,13 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 29 | `sMeAbout`（:1366） | 关于 | **批 2 Task 22-B 新建** `AboutScreen.kt`；入口 = 设置「外观与关于」组「关于」行（第 10 行，用户拍板） | ✅ | 应用块 / 说明三行 / 致谢；版本取 `BuildConfig.VERSION_NAME`、致谢只留成立的两句；AC-R-21 行数 9→10；JVM 4 条 + connected 全绿；`licenseCount` 注入待补（行文案已能不带数字） |
 | 30 | `sMeLicenses`（:1385） | 开源许可 | `LicensesScreen.kt` | ✅ | Task 22-G 已对：条目副标题补用途、页尾提示条（原型自我指涉句改写为真实动作）、meta「完整文本随安装包提供」不搬（无打包证据）；5 条登记在「Task 22-G」台账 |
 | 31 | `sMeData`（:1402） | 数据与备份 | `BackupHubScreen.kt` | ✅ | Task 22-G 已对：页尾提示条逐字搬；顶部「本机数据 14.2 MB / 最近备份 3 天前」整张不画（无采集）；页名与四行入口文案保持既有唯一真值；3 条登记在「Task 22-G」台账 |
-| 32 | `sSplash`（:1424） | 启动 | `AppScreen.kt` 的 `BrandLaunchSurface` 分支 | ⬜ | 启动那一屏未逐屏对 |
-| 33 | `sOnboarding1`（:1442） | 建档·姓名 | `ProfileCreationScreen`（在 `AppScreen.kt`） | ⬜ | 批 2 的「其他 5 屏」 |
-| 34 | `sOnboarding2`（:1467） | 建档·选词书与目标 | `AppScreen.kt` 建档分支 | 🟡 | 选词书那份 `.pick.pick-radio` 与 Task 13-A 同一体（已对）；**建档整屏的其余节**（页头、目标、保存路径）未对 |
-| 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ⬜ | 错误屏未对 |
-| 36 | `sUnavailable`（:1511） | 页面不可用 | 应用侧**无对应屏**（`页面不可用` 全仓 0 命中） | ⬜ | 先确认要不要这一屏（原型画了，本仓没有承载点） |
+| 32 | `sSplash`（:1424） | 启动 | `AppScreen.kt` 的 `BrandLaunchSurface` 分支 | ✅ | Task 22-H 已对：88dp logo + 30sp 衬线标题 + 副标题 + 不确定进度条 + 「正在打开本机词库…」；底色沿用品牌渐变（启动两帧不换底）；62% 假进度与两枚无路由按钮不搬；3 条登记在「Task 22-H」台账 |
+| 33 | `sOnboarding1`（:1442） | 建档·姓名 | `ProfileCreationScreen`（在 `AppScreen.kt`） | ✅ | Task 22-H 已对：眉题「第 1 步 / 共 2 步」+ 原型副标题 + 「怎么称呼你」+ 「下一步 · 选词书」；「每天有多少时间」「你的目标」不搬（无偏好字段）；可及名「创建资料」保留；2 条登记在「Task 22-H」台账 |
+| 34 | `sOnboarding2`（:1467） | 建档·选词书与目标 | `AppScreen.kt` 建档分支（`LearningSetupScreen`） | ✅ | Task 22-H 已对（**并屏裁决**）：选词书行列表与每日新增档位已对；眉题「第 2 步」不搬（同一屏还用于后续编辑）、`词卡显示` 无字段、`建档完成后…1 篇文章` 为假（按需生成）；1 条登记在「Task 22-H」台账 |
+| 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ✅ | Task 22-H 已对：按 `AppError` 分叉（姓名错误保留旧文案 / 其余「词库没能打开」+ 真重试）；`LC-DB-03` 与「从备份恢复」不搬（无诊断码 / 回滚归恢复态）；2 条登记在「Task 22-H」台账 |
+| 36 | `sUnavailable`（:1511） | 页面不可用 | **批 2 Task 22-H 新建** `UnavailableScreen.kt`；宿主 = 未知 AI 功能 key 的兜底分支 | ✅ | Task 22-H 已对：原型文案逐字 + 260dp 两枚真出口；`overlayOpen` 与返回键改按 key 判定；JVM 2 条 + connected 2/2；1 条登记在「Task 22-H」台账 |
 
-**小计（Task 22-G 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 18 屏 · 🟡 7 屏 · ⬜ 11 屏。
+**小计（Task 22-H 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 23 屏 · 🟡 6 屏 · ⬜ 7 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、

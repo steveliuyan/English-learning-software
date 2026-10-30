@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.FlowRow
@@ -24,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -61,6 +64,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.export.WorksheetShareLauncher
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.BuildConfig
@@ -72,10 +76,12 @@ import com.example.englishlearning.ui.components.AppChip
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.AppSwitch
 import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
+import com.example.englishlearning.ui.components.EmptyState
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.PickRow
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SectionHeading
+import com.example.englishlearning.ui.components.Sticker
 import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -88,8 +94,6 @@ import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
 import kotlin.math.roundToInt
 import java.time.Instant
 
@@ -523,7 +527,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || showTodayWordList || showReviewQueue || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBank ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null
@@ -658,7 +662,8 @@ fun AppScreen(
                 showAiProfiles = false
                 speechSettingsViewModel?.load()
             }
-            BackHandler(enabled = selectedFeature != null) { selectedFeatureKey = null }
+            // 按 key 而不是按枚举判定：未知 key 时 `selectedFeature` 为 null，旧条件会让用户困在兜底页。
+            BackHandler(enabled = selectedFeatureKey != null) { selectedFeatureKey = null }
             if (selectedSearchCard != null) {
                 val card = selectedSearchCard
                 if (card != null) {
@@ -1681,6 +1686,21 @@ fun AppScreen(
                         selectedTab = AppTab.LEARNING
                     },
                 )
+            } else if (selectedFeatureKey != null) {
+                // 未知 AI 功能 key：`selectedFeatureKey` 是 rememberSaveable 的字符串，枚举改名 / 删项后
+                // 旧状态仍可能带着一个认不出的 key 恢复回来。旧链条在这里没有任何分支，整个覆盖层会静默
+                // 消失；落到授权新建的「页面不可用」（原型 `sUnavailable`），两枚出口都是真导航。
+                UnavailableScreen(
+                    onBack = { selectedFeatureKey = null },
+                    onGoLearning = {
+                        selectedFeatureKey = null
+                        selectedTab = AppTab.LEARNING
+                    },
+                    onBrowseFeatures = {
+                        selectedFeatureKey = null
+                        selectedTab = AppTab.AI
+                    },
+                )
             } else if (showReadingHistory && historyArticle == null) {
                 // 锁定态同样要给出历史：历史与解锁正交，未解锁只挡住「今天生成新文章」。
                 val history = readingState.historyOrEmpty
@@ -2137,21 +2157,56 @@ fun AppScreen(
                 )
             }
         }
-        is AppUiState.Error -> ErrorScreen(onRetry = { viewModel.reload() })
+        is AppUiState.Error -> ErrorScreen(error = state.error, onRetry = { viewModel.reload() })
     }
 }
 
+/**
+ * 启动态（原型 `sSplash`，`app.js:1424-1440`）。这是 `AppUiState.Loading` 的那一帧：系统的
+ * `launch/BrandLaunchActivity` 只活 1.2 秒，数据库探针慢或首启建档前，用户看到的是这里。
+ *
+ * 搬过来的：88px 圆角 logo + 30sp 衬线标题 + 一句副标题 + 120×4 进度条 + 「正在打开本机词库…」。
+ * 不搬的两样与理由：
+ *  - `开始建档` / `跳过，直接进入`：本时机没有这两条路由——首启必须先建档，也不存在无档进入；
+ *    画出来就是两枚点了没反应的假入口（零假入口原则）。
+ *  - 原型进度条写死的 62%：那是画稿里的静态演示值，本仓不知道真实加载到哪一步，只能画不确定态。
+ * 底色沿用品牌渐变（与 `launch/BrandLaunchActivity` 同一组三端 token）：两帧之间不换底色，
+ * 否则启动会闪一次白。墨一律 `onBrand`——渐变是浅薄荷，白字对比不足（禁令 2 同口径）。
+ */
 @Composable
 private fun BrandLaunchSurface() {
+    val colors = appColors()
     Box(
         modifier = Modifier.fillMaxSize().background(AppleMintGradient),
         contentAlignment = Alignment.Center,
     ) {
-        Image(
-            painter = painterResource(R.drawable.ic_learning_mark),
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_learning_mark),
+                contentDescription = null,
+                modifier = Modifier.size(88.dp).clip(AppShape.Dialog),
+            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(text = "英语学习", style = AppType.ArticleTitle, color = colors.onBrand)
+                Text(text = "背词 · 阅读 · AI 助学", style = AppType.Caption, color = colors.onBrand)
+            }
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .width(120.dp)
+                    .height(4.dp)
+                    .clip(AppShape.Pill)
+                    .testTag("brand_launch_progress"),
+                color = colors.brandDeep,
+                trackColor = colors.outline,
+            )
+            Text(text = "正在打开本机词库…", style = AppType.Caption, color = colors.onBrand)
+        }
     }
 }
 
@@ -2206,15 +2261,18 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
             // （族判定面带「本文件调了共享页头即整体合规」出口，残余读数会跟着永久隐形，见 SharedComponentUniquenessRatchetTest）。
             // 色值安全：组件标题读 `colors.text1`、副标题读 `colors.text2`。
             // 首启流程没有「上一层」可返回，故 `onBack = null`（R-9.2：不渲染返回位、不留占位）。
+            // 眉题与副标题按原型 `sOnboarding1`（`app.js:1444-1446`）：这一屏是首启两步里的第一步，
+            // 副标题解释「为什么要问名字」——不是为了账号，只为把每天的量定得刚好。
             AppScreenHeader(
                 title = "先认识一下你",
-                subtitle = "填写一个称呼，学习记录只保存在这台设备上。",
+                subtitle = "只为把每天的量定得刚好，随时可以改。",
+                eyebrow = "第 1 步 / 共 2 步",
                 onBack = null,
             )
             TextField(
                 value = name,
                 onValueChange = onNameChange,
-                label = { Text("姓名") },
+                label = { Text("怎么称呼你") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "姓名输入" },
                 // 输入框是「一屏一个输入面」，底色取 surface、焦点态用深实底描边（与主操作同色），
@@ -2257,8 +2315,10 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
             ) {
                 // 前景色跟着按钮下发的 ink 走（`contentColor` / `disabledContentColor`）：
                 // `AppType.Label` 自带 `text2`，自钉 `onStrong` 又会让禁用态变成近白字压浅底。
+                // 按钮文案按原型（`app.js:1463`）：它通向「选词书 + 每日新增」那一屏，不是终局动作；
+                // 可及名仍是「创建资料」（`AppScreenTest` 的取样锚），标签只改可见字。
                 Text(
-                    text = "创建",
+                    text = "下一步 · 选词书",
                     style = AppType.Label,
                     color = LocalContentColor.current,
                     fontWeight = FontWeight.Bold,
@@ -2268,21 +2328,72 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
     }
 }
 
+/**
+ * 顶层失败态（原型 `sError`，`app.js:1493-1509`）。
+ *
+ * 旧形态把**任何**失败都写成「无法创建资料，请检查姓名」——数据库打不开时用户会去改名字。
+ * 现在按真实失败类型分叉：只有 `InvalidProfileName` 是「姓名不合规」，保留原文案与原可及名
+ * （`AppScreenTest` 的两个取样锚）；其余一律落「词库没能打开」+ 重试。
+ *
+ * 原型那两样不搬：
+ *  - `LC-DB-03 · 记录时间 07:5x`：画稿样例，`AppError` 不携带可展示诊断码，编一个就是假数据；
+ *  - 「从备份恢复」：回滚归恢复态（`NeedsRecovery` 分支已交付完整的导出/恢复路径），
+ *    在普通错误屏再挂一枚会绕过恢复流程的前置校验。
+ */
 @Composable
-internal fun ErrorScreen(onRetry: () -> Unit) {
+internal fun ErrorScreen(error: AppError, onRetry: () -> Unit) {
+    val colors = appColors()
     Column(
-        modifier = Modifier.fillMaxSize().background(MintBackground).imePadding().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .imePadding()
+            .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("无法创建资料，请检查姓名", color = MintPrimaryDark, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = onRetry,
-            modifier = Modifier.semantics { contentDescription = "返回重新填写" },
-            colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
-        ) {
-            Text("返回重新填写")
+        if (error == AppError.InvalidProfileName) {
+            Text(
+                text = "无法创建资料，请检查姓名",
+                style = AppType.Body,
+                color = colors.text1,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.semantics { contentDescription = "返回重新填写" },
+                shape = AppShape.Button,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.strongSurface,
+                    contentColor = colors.onStrong,
+                ),
+            ) {
+                Text(text = "返回重新填写", style = AppType.Label, color = LocalContentColor.current)
+            }
+        } else {
+            EmptyState(
+                sticker = Sticker.Warning,
+                title = "词库没能打开",
+                body = "本机数据库读取时出了点问题。可以先重试。",
+                modifier = Modifier.testTag("error_screen"),
+                action = {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 260.dp)
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    ) {
+                        PillButton(
+                            text = "重试",
+                            onClick = onRetry,
+                            modifier = Modifier.fillMaxWidth(),
+                            testTag = "error_retry",
+                            contentDescription = "重试",
+                        )
+                    }
+                },
+            )
         }
     }
 }

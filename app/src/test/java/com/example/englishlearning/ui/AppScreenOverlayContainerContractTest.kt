@@ -581,7 +581,11 @@ class AppScreenOverlayContainerContractTest {
         listOf("settings_export_book_\$bookId", "wordbook_migration_confirm", "wordbook_migration_skip").forEach { tag ->
             assertEquals(1, count(source, tag), "路 B 自渲染 tag「$tag」必须恰一处保留（它不是路 A 的组件固定 tag，不许收敛）")
         }
-        assertEquals(3, count(source, "PillButton("), "AppScreen.kt 的药片调用必须恰 3 枚（导出取消 1 + 迁移二选一 2），不得手搓按钮")
+        // 期望值变化（3 → 4），不是放宽：批 2 Task 22-H 的 `sError` 分叉在 AppScreen.kt 里新增第 4 处
+        // 药片调用——「词库没能打开」那一支的「重试」（`error_retry`）。它同样是真动作、走同一枚共享件；
+        // 四枚的落点是：导出取消 1 + 迁移二选一 2 + 错误屏重试 1。判据本身（药片计数 == 手搓按钮的
+        // 兜底、不许长出未登记的第 5 枚）不变，下一屏再加动作时必须把落点清单一起改。
+        assertEquals(4, count(source, "PillButton("), "AppScreen.kt 的药片调用必须恰 4 枚（导出取消 1 + 迁移二选一 2 + 错误屏重试 1），不得手搓按钮")
     }
 
     // ---------- 用例 5：路 A 组件本体冻结（不许为迁站点加参数） ----------
