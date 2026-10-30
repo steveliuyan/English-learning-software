@@ -283,9 +283,11 @@ class ReadingHomeLayoutContractTest {
             "Color(0xFF17342A)" !in stripComments(readingScreen),
             "英文正文前景仍带裸 hex：本席要摘的就是这一枚（台账两处同批，见 RawColorLiteralRatchetTest）",
         )
+        // 期望值变化（Body → Prose），不是放宽：Task 22-K 按原型 `.prose`（17.5px 衬线 / 1.72）把正文字档
+        // 换成 `AppType.Prose`；「显式 `appColors().text1` 的配平形状」与两套 AA 复算的取样面都不变。
         assertTrue(
-            "style = AppType.Body.copy(color = appColors().text1)" in stripComments(readingScreen),
-            "英文正文必须归到房内 `AppType.Body` + 显式 `appColors().text1` 的配平形状（R-22.3 方向，只限这一行）",
+            "style = AppType.Prose.copy(color = appColors().text1)" in stripComments(readingScreen),
+            "英文正文必须归到房内 `AppType.Prose` + 显式 `appColors().text1` 的配平形状（R-22.3 方向，只限这一行）",
         )
         val lightRatio = ratio(lightInk, lightBg)
         val darkRatio = ratio(darkInk, darkBg)

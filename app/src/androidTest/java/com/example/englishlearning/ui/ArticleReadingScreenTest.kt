@@ -126,6 +126,77 @@ class ArticleReadingScreenTest {
         composeRule.onNodeWithTag("article_translation").assertExists()
     }
 
+    /**
+     * Task 22-K（#14）：原型 `sReadTranslate` 的「只看中文」在本仓是屏内开关。
+     * 点开后英文正文整块不组合、译文与提醒在场；再点「看回英文」回到原状。
+     */
+    @Test
+    fun chineseOnlyHidesTheEnglishBodyAndRevealsTheTranslation() {
+        composeRule.setContent {
+            var expanded = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            ArticleReadingScreen(
+                state(article()).copy(translationExpanded = expanded.value),
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = { expanded.value = !expanded.value },
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("article_chinese_only_toggle").performClick()
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_translation").assertExists()
+        composeRule.onNodeWithTag("article_translation_caution").assertExists()
+
+        composeRule.onNodeWithTag("article_chinese_only_toggle").performClick()
+        composeRule.onNodeWithTag("article_english").assertExists()
+    }
+
+    /**
+     * Task 22-K（#13）：原型 `.foot` 两枚并列。原型「双语」是跳页，本仓是切到对照态；
+     * 译文折叠时点它必须把译文展开（而不是只改模式），并且没有译文时这枚不画。
+     */
+    @Test
+    fun footerBilingualExpandsTheTranslationAndDisappearsWithoutOne() {
+        composeRule.setContent {
+            var expanded = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            ArticleReadingScreen(
+                state(article()).copy(translationExpanded = expanded.value),
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = { expanded.value = !expanded.value },
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("article_translation").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_open_bilingual").performClick()
+        composeRule.onNodeWithTag("article_translation").assertExists()
+        composeRule.onNodeWithTag("article_complete_reading").assertExists()
+    }
+
+    @Test
+    fun footerBilingualStaysOffWhenTheArticleHasNoTranslation() {
+        composeRule.setContent {
+            ArticleReadingScreen(
+                state(article(chineseText = "")),
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("article_open_bilingual").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_chinese_only_toggle").assertIsNotEnabled()
+    }
+
     @Test
     fun clickingAHighlightOpensTheCard() {
         val opened = mutableListOf<WordCard>()

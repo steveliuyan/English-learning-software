@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +23,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.reading.domain.ArticleDisplayMode
@@ -58,6 +59,8 @@ import com.example.englishlearning.ui.components.AppGlyph
 import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
@@ -84,7 +87,7 @@ internal fun formatImportedAt(epochMillis: Long): String =
  * 1. **两枚自写页头按钮**：「返回」与「发音」都是 M3 实底 `Button`，返回位连 `testTag` 都没有，
  *    屏标题是 `headlineSmall`。现在返回位归共享 [AppScreenHeader]，发音收进它的 `action` 槽
  *    （40dp 视觉容器 + 48dp 可点区，与返回位同族几何），标题用页头的 `AppType.Title`。
- *    正文标题 `article_title` **仍留在正文侧**（`AppType.Headline`）：它是文章内容本身，
+ *    正文标题 `article_title` **仍留在正文侧**（Task 22-K 起是 `AppType.ArticleTitle`，原型 `.article-title` 的 30sp 衬线）：它是文章内容本身，
  *    connected 按这个 tag 取样，也是长标题唯一能完整显示的地方——页头两行 `Clip` 只承担
  *    「滚动后我还知道在读哪篇」。
  * 2. **主操作埋在流末尾**：「完成阅读」排在正文与未覆盖词之后，文章越长越够不着。现在它是
@@ -197,6 +200,10 @@ fun ArticleReadingScreen(
             var coverageOpen by rememberSaveable(current.article.articleId) {
                 mutableStateOf(current.article.coveredLemmas.isNotEmpty())
             }
+            // 原型 `sReadTranslate` 的 `bar-action`「只看中文」：本仓不新开页（Task 21-D 裁决），
+            // 落成屏内一个开关。按 articleId 记忆，换文章回到默认（先看英文）。
+            var chineseOnly by rememberSaveable(current.article.articleId) { mutableStateOf(false) }
+            val translationVisible = current.translationExpanded || chineseOnly
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -218,20 +225,35 @@ fun ArticleReadingScreen(
                     mode = current.mode,
                     translationExpanded = current.translationExpanded,
                     translationAvailable = current.article.chineseText.isNotEmpty(),
-                    onModeChange = onModeChange,
+                    chineseOnly = chineseOnly,
+                    // 模式 chip 是唯一真状态：切它必须退出中文态，否则一个隐藏开关会盖住屏上的选择。
+                    onModeChange = { mode ->
+                        chineseOnly = false
+                        onModeChange(mode)
+                    },
                     onToggleTranslation = onToggleTranslation,
+                    onToggleChineseOnly = {
+                        val next = !chineseOnly
+                        chineseOnly = next
+                        // 只开中文却没展开译文，屏幕上会只剩标题——顺手把译文展开。
+                        if (next && !current.translationExpanded) onToggleTranslation()
+                    },
                 )
-                ArticleMarksRow(
-                    checked = current.showLearnedMarks,
-                    onSetLearnedMarks = onSetLearnedMarks,
-                )
-                HighlightedEnglish(
-                    englishText = current.article.englishText,
-                    highlights = current.highlights,
-                    cards = current.cards,
-                    onOpenCard = onOpenCard,
-                    onOpenDictionary = onOpenDictionary,
-                )
+                // 中文态下英文侧整块不组合：原型对照页只有英文与中文两段，没有标注行、
+                // 未覆盖词与覆盖入口；留着它们等于在「只看中文」里塞一堆英文控件。
+                if (!chineseOnly) {
+                    ArticleMarksRow(
+                        checked = current.showLearnedMarks,
+                        onSetLearnedMarks = onSetLearnedMarks,
+                    )
+                    HighlightedEnglish(
+                        englishText = current.article.englishText,
+                        highlights = current.highlights,
+                        cards = current.cards,
+                        onOpenCard = onOpenCard,
+                        onOpenDictionary = onOpenDictionary,
+                    )
+                }
                 if (current.article.chineseText.isEmpty()) {
                     Text(
                         text = "该来源没有中文翻译",
@@ -240,20 +262,33 @@ fun ArticleReadingScreen(
                         modifier = Modifier.testTag("article_no_translation_notice"),
                     )
                 }
-                if (current.translationExpanded) {
+                if (translationVisible) {
+                    // 原型 `.prose-zh`：无衬线 13px / 行高 1.75、次要墨，没有容器——
+                    // 字号与字体本身就把译文和衬线正文分开，不必再套一层卡。
                     Text(
                         text = current.article.chineseText,
-                        style = AppType.Body,
-                        color = colors.text1,
+                        style = AppType.ProseZh,
+                        color = colors.text2,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(AppShape.Inline)
-                            .background(colors.surface)
-                            .padding(14.dp)
                             .testTag("article_translation"),
                     )
+                    // 原型对照页末尾的 `notice(…, 'info', 'warning')`。「本机 AI 配置生成」只对
+                    // AI 文章成立，导入文章的译文随包进来，所以按来源分三支写（共享件只有 Info 档，取 Info）。
+                    InlineNotice(
+                        text = when (current.article.source) {
+                            is ArticleSource.AiGenerated ->
+                                "译文由你配置的 AI 服务生成，仅作辅助理解；正式引用请以英文原文为准。"
+                            is ArticleSource.UserImported ->
+                                "译文随文章一起导入，仅作辅助理解；正式引用请以英文原文为准。"
+                            is ArticleSource.WebFetched ->
+                                "译文仅作辅助理解；正式引用请以英文原文为准。"
+                        },
+                        kind = InlineNoticeKind.Info,
+                        modifier = Modifier.testTag("article_translation_caution"),
+                    )
                 }
-                if (current.uncoveredLemmas.isNotEmpty()) {
+                if (!chineseOnly && current.uncoveredLemmas.isNotEmpty()) {
                     Text(
                         text = "未覆盖词",
                         style = AppType.Title,
@@ -274,7 +309,7 @@ fun ArticleReadingScreen(
                         }
                     }
                 }
-                if (current.article.coveredLemmas.isNotEmpty()) {
+                if (!chineseOnly && current.article.coveredLemmas.isNotEmpty()) {
                     CoverageEntryRow(
                         count = current.article.coveredLemmas.size,
                         onClick = { coverageOpen = true },
@@ -283,6 +318,13 @@ fun ArticleReadingScreen(
             }
             ArticleCompleteBar(
                 completed = current.completed,
+                bilingualAvailable = current.article.chineseText.isNotEmpty(),
+                onOpenBilingual = {
+                    // 页脚第二枚：切到双语并把译文展开（已展开时不重复 toggle，否则会收起）。
+                    if (current.mode != ArticleDisplayMode.BILINGUAL) onModeChange(ArticleDisplayMode.BILINGUAL)
+                    chineseOnly = false
+                    if (!current.translationExpanded) onToggleTranslation()
+                },
                 onCompleteReading = onCompleteReading,
             )
             if (coverageOpen && current.article.coveredLemmas.isNotEmpty()) {
@@ -317,9 +359,11 @@ private fun ArticleHeadlineAndSpeech(
 ) {
     val colors = appColors()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // 原型 `.article-title`：衬线 30px / 行高 1.18（`AppType.ArticleTitle` 逐值取自这张样式表）。
+        // 旧实现是 24sp 的 `Headline`——正文标题是文章内容本身，不是屏头，档位跟着原型走。
         Text(
             text = article.title,
-            style = AppType.Headline,
+            style = AppType.ArticleTitle,
             color = colors.text1,
             modifier = Modifier.testTag("article_title"),
         )
@@ -489,8 +533,10 @@ private fun ArticleModeRow(
     mode: ArticleDisplayMode,
     translationExpanded: Boolean,
     translationAvailable: Boolean,
+    chineseOnly: Boolean,
     onModeChange: (ArticleDisplayMode) -> Unit,
     onToggleTranslation: () -> Unit,
+    onToggleChineseOnly: () -> Unit,
 ) {
     val colors = appColors()
     val presentedMode = if (mode == ArticleDisplayMode.FULL_TRANSLATION) ArticleDisplayMode.BILINGUAL else mode
@@ -512,6 +558,22 @@ private fun ArticleModeRow(
         ) {
             Text(
                 text = if (translationExpanded) "收起译文" else "显示译文",
+                style = AppType.Label,
+                color = if (translationAvailable) colors.text1 else colors.text3,
+            )
+        }
+        // 原型 `sReadTranslate` 的页头 `bar-action`「只看中文」。落点从页头改到这一行：页头动作位
+        // 已被发音占用，2× 字号下再塞一枚文字动作会把标题挤成竖条；模式与译文开关都在这一行，
+        // 「只看中文」本来就是它们三者的第三种读法。没有译文时禁用（点了只会看到空屏）。
+        TextButton(
+            onClick = onToggleChineseOnly,
+            enabled = translationAvailable,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .testTag("article_chinese_only_toggle"),
+        ) {
+            Text(
+                text = if (chineseOnly) "看回英文" else "只看中文",
                 style = AppType.Label,
                 color = if (translationAvailable) colors.text1 else colors.text3,
             )
@@ -674,6 +736,8 @@ private fun CoverageSheet(
 @Composable
 private fun ArticleCompleteBar(
     completed: Boolean,
+    bilingualAvailable: Boolean,
+    onOpenBilingual: () -> Unit,
     onCompleteReading: () -> Unit,
 ) {
     val colors = appColors()
@@ -685,26 +749,49 @@ private fun ArticleCompleteBar(
             .then(hairlineTop(colors.outlineSoft))
             .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
-        Button(
-            onClick = onCompleteReading,
-            enabled = !completed,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 50.dp)
-                .testTag("article_complete_reading"),
-            shape = AppShape.Button,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colors.strongSurface,
-                contentColor = colors.onStrong,
-                disabledContainerColor = colors.tint3,
-                disabledContentColor = colors.text3,
-            ),
+        // 原型 `.foot` 是两枚并列：`btn-secondary`「双语」+ `btn-primary`「读完了」。
+        // 本仓不新开对照页（Task 21-D 裁决），第二枚的落点因此是「切到双语 + 展开译文」。
+        // 没有译文时整枚不画：一枚点了没反应的按钮比没有更糟。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = if (completed) "已完成阅读" else "完成阅读",
-                style = AppType.Label,
-                color = if (completed) colors.text3 else colors.onStrong,
-            )
+            if (bilingualAvailable) {
+                OutlinedButton(
+                    onClick = onOpenBilingual,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 50.dp)
+                        .testTag("article_open_bilingual"),
+                    shape = AppShape.Button,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.text1),
+                    border = BorderStroke(1.dp, colors.outlineSoft),
+                ) {
+                    Text(text = "双语", style = AppType.Label, color = colors.text1)
+                }
+            }
+            Button(
+                onClick = onCompleteReading,
+                enabled = !completed,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 50.dp)
+                    .testTag("article_complete_reading"),
+                shape = AppShape.Button,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.strongSurface,
+                    contentColor = colors.onStrong,
+                    disabledContainerColor = colors.tint3,
+                    disabledContentColor = colors.text3,
+                ),
+            ) {
+                Text(
+                    text = if (completed) "已完成阅读" else "完成阅读",
+                    style = AppType.Label,
+                    color = if (completed) colors.text3 else colors.onStrong,
+                )
+            }
         }
     }
 }
@@ -790,10 +877,10 @@ private fun HighlightedEnglish(
         // `ReadingHomeLayoutContractTest` `[the english body ink clears the AA gate on both theme sets]`。
         // 形状按 R-22.3 归 `AppType.Body` 并显式给墨（房内配平先例：面板内前景必须逐枚给 `appColors()`，
         // 只借 `AppType` 会连着它自带的主题墨一起落下——这里显式给是为了让判据能逐字取样）。
-        // 行高按 spec §4.2「多行段落在使用点给 lineHeight = fontSize × 1.5」：15sp × 1.5 = 22.5sp。
-        // 逐字保留 `style = AppType.Body.copy(color = appColors().text1)` 这一段前缀是**判据契约**，
-        // 行高因此接在第二个 `.copy` 上（`ReadingHomeLayoutContractTest:287` 按精确子串取样）。
-        style = AppType.Body.copy(color = appColors().text1).copy(lineHeight = 22.5.sp),
+        // 原型 `.prose`：衬线 17.5px / 行高 1.72 —— `AppType.Prose` 已是这两项的逐值档（17.5sp / 30sp），
+        // 旧实现在 15sp 正文上手写 22.5sp 行高，等于给正文配了第二套行距。
+        // `ReadingHomeLayoutContractTest` 按精确子串取样，形状仍保持「token + 显式 appColors().text1」。
+        style = AppType.Prose.copy(color = appColors().text1),
         modifier = Modifier
             .testTag("article_english")
             .semantics { customActions = wordActions },

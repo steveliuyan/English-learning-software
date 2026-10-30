@@ -17,6 +17,10 @@ import kotlin.test.assertTrue
  *  - 7 是**防回潮**（现状本来就绿）：正文墨绑定与滚动位置回传是两条被别的契约逐字钉住的判据，
  *    换骨架时最可能的破坏不是删掉而是「顺手重排」把字面改掉。
  *
+ * Task 22-K（#13 / #14 残留项）在 7 之前补了三块：三档排印逐值（`.prose` / `.prose-zh` / `.article-title`
+ * 接到 `AppType` 的对应 token）、页脚两枚并列出口（「双语」+「完成阅读」）、对照态「只看中文」与译文提醒。
+ * 原第 7 节顺延为第 9 节，内容未动。
+ *
  * 取窗一律按符号深度配对（注释先剥），锚点改名即 `fail`，不会静默空转。
  */
 class ArticleReadingLayoutContractTest {
@@ -282,22 +286,136 @@ class ArticleReadingLayoutContractTest {
         )
     }
 
-    // ---------- 7. 既有锚点（防回潮） ----------
+    // ---------- 7. 原型逐值（Task 22-K：#13 / #14 的残留项） ----------
+
+    /**
+     * 原型 `sReadArticle` 的三档排印逐值搬：
+     *
+     *  - `.prose`：衬线 17.5px / 行高 1.72 → `AppType.Prose`（17.5sp / 30sp），旧实现是 15sp 正文 + 手写 22.5sp 行高；
+     *  - `.prose-zh`：无衬线 13px / 1.75 → `AppType.ProseZh`（13sp / 23sp）；
+     *  - `.article-title`：衬线 30px → `AppType.ArticleTitle`（30sp / 35sp），旧实现是 24sp 的 `Headline`。
+     *
+     * 三档 token 本来就在主题里（`AppType.kt` 的 `ProseSpec` / `ProseZhSpec` / `ArticleTitleSpec` 逐值取自
+     * 这张样式表），本轮只是把屏侧接到它们上面——不是新字号，也不是手写 `fontSize`。
+     */
+    @Test
+    fun `the prose tiers come from the serif tokens with the prototype sizes`() {
+        assertTrue(
+            "style = AppType.Prose.copy(color = appColors().text1)" in source,
+            "英文正文取 `AppType.Prose`（17.5sp 衬线 / 30sp 行高，原型 `.prose` 的逐值档）",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex(Regex.escape("lineHeight = 22.5.sp"))),
+            "旧「15sp 正文 + 手写 22.5sp 行高」必须退役：行高已由 `AppType.Prose` 承担，两处并存就是第二套行距",
+        )
+        assertTrue(
+            countMatches(source, Regex(Regex.escape("style = AppType.ProseZh"))) == 1,
+            "整段译文取 `AppType.ProseZh`（13sp / 23sp，原型 `.prose-zh`）",
+        )
+        assertTrue(
+            "style = AppType.ArticleTitle" in source,
+            "正文标题取 `AppType.ArticleTitle`（30sp 衬线，原型 `.article-title`）",
+        )
+    }
+
+    /**
+     * 原型 `.foot` 是**两枚并列**：`btn-secondary`「双语」+ `btn-primary`「读完了」。
+     *
+     * 本仓的对照态是同一支阅读屏的呈现（Task 21-D 裁决不新开页），所以页脚第二枚的落点是
+     * 「切到双语 + 展开译文」而不是跳页；没有译文时整枚不画（点了没反应等于死控件）。
+     * 主操作仍是「完成阅读」，两枚各占一半宽，主次同原型。
+     */
+    @Test
+    fun `the sticky footer pairs the prototype bilingual and finish exits`() {
+        val bar = bodyOf("private fun ArticleCompleteBar(")
+        assertTrue(bar.isNotEmpty(), "取不到 `ArticleCompleteBar(` 本体：判据会空转")
+        assertTrue(
+            "\"article_open_bilingual\"" in bar,
+            "页脚第二枚「双语」必须带锚 `article_open_bilingual`（connected 侧按它取样）",
+        )
+        assertTrue("双语" in bar, "第二枚文案逐字取原型「双语」")
+        assertTrue(
+            "weight(1f)" in bar,
+            "两枚并列：原型 `.foot` 的 `flex:1 1 0`，主次各占一半",
+        )
+    }
+
+    // ---------- 8. 对照态（Task 22-K：#14 的残留项） ----------
+
+    /**
+     * 原型 `sReadTranslate` 的 `bar-action`「只看中文」：本仓不新开页（Task 21-D 裁决），
+     * 把它落成模式行上的第三枚文字动作 `article_chinese_only_toggle`。
+     *
+     * 形状钉三条：①点开自动展开译文（否则屏幕上会只剩标题）；②中文态下英文正文 / 未覆盖词 /
+     * 覆盖入口 / 标注行都不组合（原型对照页只有英文与中文两段，没有这些英文侧控件）；
+     * ③切回「英文优先 / 双语」即退出中文态（模式 chip 是真状态，不能被一个隐藏开关盖住）。
+     */
+    @Test
+    fun `the reader offers the prototype chinese only action and hides the english side`() {
+        val screen = bodyOf("fun ArticleReadingScreen(")
+        assertTrue(screen.isNotEmpty(), "取不到 `ArticleReadingScreen(` 本体：判据会空转")
+        assertTrue("\"article_chinese_only_toggle\"" in source, "「只看中文」动作必须带锚 `article_chinese_only_toggle`")
+        assertTrue("只看中文" in source, "文案逐字取原型 `bar-action`「只看中文」")
+        assertTrue("看回英文" in source, "同一枚在中文态要把返回路径说出来：文案翻成「看回英文」")
+        assertTrue(
+            "if (!chineseOnly)" in screen,
+            "英文侧（正文 / 未覆盖词 / 覆盖入口 / 标注行）必须在中文态下整块不组合",
+        )
+        assertTrue(
+            "onToggleTranslation()" in screen,
+            "点「只看中文」且在译文折叠时，必须先展开译文，否则中文态屏幕是空的",
+        )
+        assertTrue(
+            "chineseOnly = false" in screen,
+            "切模式 chip 必须退出中文态：模式是唯一真状态，不许被隐藏开关盖住",
+        )
+    }
+
+    /**
+     * 原型对照页末尾的 `notice(…, 'info', 'warning')`：「译文由本机 AI 配置生成，仅作辅助理解；
+     * 正式引用请以英文原文为准。」
+     *
+     * 「本机 AI 配置生成」只对 AI 生成的文章成立：导入的文章译文随包进来、外刊抓取没有译文。
+     * 所以这句按 `ArticleSource` 分三支写，落在译文之后、只在译文可见时出现（隐藏状态下提醒没有对象）。
+     * 原型那枚 icon 是 warning，但语气档是 info——共享件只有 Error / Info / Success 三档，取 Info。
+     */
+    @Test
+    fun `the translation carries the prototype caution for the source it actually has`() {
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("\"article_translation_caution\""))),
+            "译文提醒必须恰一处（`article_translation_caution`）",
+        )
+        assertTrue(
+            "仅作辅助理解；正式引用请以英文原文为准。" in source,
+            "后半句逐字取原型：这是「别拿译文当原文」的唯一一句人话",
+        )
+        assertTrue("译文由你配置的 AI 服务生成" in source, "AI 分支按真实来源改写成「你配置的 AI 服务」")
+        assertTrue("译文随文章一起导入" in source, "导入分支单列一句：原型那句对导入文章不成立")
+        assertTrue("InlineNotice(" in source, "提醒走共享 `InlineNotice`，屏侧不手搓提示条")
+        val cautionAt = source.indexOf("article_translation_caution")
+        val translationAt = source.indexOf("\"article_translation\"")
+        assertTrue(translationAt > 0 && translationAt < cautionAt, "提醒必须排在译文块之后")
+    }
+
+    // ---------- 9. 既有锚点（防回潮） ----------
 
     /**
      * 正文墨绑定与滚动位置回传**逐字**保留。
      *
-     * 两条都被别的契约钉着：`ReadingHomeLayoutContractTest` 按精确子串钉
-     * `style = AppType.Body.copy(color = appColors().text1)`（两套 AA 复算的取样形），
+     * 两条都被别的契约钉着：`ReadingHomeLayoutContractTest` 按精确子串钉正文那一行（两套 AA 复算的取样形），
      * `SearchCloseReadingStateRetentionTest` 按逐字钉 `rememberScrollState(articleScrollPosition)` 与
      * `snapshotFlow { scrollState.value }.collect(onArticleScrollPositionChange)`。
      * 换骨架时最可能的破坏是「顺手重排」把这三行改掉——那会让两条既有判据在别处变红却指不到本屏。
      */
     @Test
     fun `the reading body keeps its ink binding and scroll handoff verbatim`() {
+        // 期望值变化（Body → Prose），不是放宽：Task 22-K 按原型 `.prose` 把正文字档换成 17.5sp 衬线，
+        // 「显式 `appColors().text1` 配平」这个形状本身一字未动，两套 AA 复算的取样面也不变。
         assertTrue(
-            "style = AppType.Body.copy(color = appColors().text1)" in source,
-            "英文正文墨必须逐字保留 `style = AppType.Body.copy(color = appColors().text1)`（R-22.3 配平形状）",
+            "style = AppType.Prose.copy(color = appColors().text1)" in source,
+            "英文正文墨必须逐字保留 `style = AppType.Prose.copy(color = appColors().text1)`（R-22.3 配平形状）",
         )
         assertTrue(
             "rememberScrollState(articleScrollPosition)" in source,

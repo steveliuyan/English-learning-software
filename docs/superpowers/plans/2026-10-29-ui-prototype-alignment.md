@@ -490,6 +490,29 @@ ViewModel 与加载态）。**保持两屏**（用户口径），只把原型上
 `InlineNoticeKind.Info` 计数 **1 → 2**。理由写进测试注释：#9 把 `sBookPicker` 自带的那枚 info 提示搬进了本屏，
 两处讲的是两件事（保存时机 / 进度保留），总数仍被钉死、两句各自逐字有判据。
 
+### Task 22-K · 阅读正文 / 双语对照残留项（原型 `sReadArticle` `app.js:738-761`、`sReadTranslate` `app.js:762-778`）
+
+Task 21-D 只对了元信息行，把 `#13` / `#14` 的其余项留到本轮。三档排印的逐值都能直接落到
+`AppType` 已有的 `ProseSpec` / `ProseZhSpec` / `ArticleTitleSpec` 上（取值逐字来自 `assets/app.css:875-899`），
+不必新造字号；两处结构性差异（逐段交错、独立对照页）按证据登记为不搬。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | #13 英文正文 `AppType.Body`（15sp）+ 手写 `lineHeight = 22.5.sp` → `AppType.Prose`（17.5sp 衬线 / 30sp，原型 `.prose` 的 17.5px / 1.72） | 原型的正文档就是 `ProseSpec` 的出处；旧实现在正文档上手写行高，等于给正文配了第二套行距 | `ArticleReadingLayoutContractTest.the prose tiers come from the serif tokens with the prototype sizes`（`Prose` 逐字 + `lineHeight = 22.5.sp` 归零） |
+| 2 | #13 正文标题 `AppType.Headline`（24sp）→ `AppType.ArticleTitle`（30sp 衬线，原型 `.article-title`） | 正文标题是文章内容，不是屏头；`ArticleTitleSpec` 早就在令牌表里，只是没接 | 同一判据（`AppType.ArticleTitle` 在册） |
+| 3 | #13 页脚改成原型 `.foot` 的两枚并列：「双语」（次要，`article_open_bilingual`）+「完成阅读」（主）；没有译文时「双语」整枚不画 | 原型是 `flex:1 1 0` 的两枚；本仓不新开对照页（Task 21-D 裁决），第二枚的落点因此是「切到双语 + 展开译文」。无译文还画它，就是一枚点了没反应的按钮 | `…the sticky footer pairs the prototype bilingual and finish exits` + connected `footerBilingualExpandsTheTranslationAndDisappearsWithoutOne` / `footerBilingualStaysOffWhenTheArticleHasNoTranslation` |
+| 4 | #13 原型 `.prose` 的**逐段**排布（`<p>` + 段间距）**不搬**：正文仍是单个 `ClickableText` 节点 | `Article` 只存 `englishText` / `chineseText` 两块字符串，没有段落结构；英文正文的高亮用**绝对偏移**写进一个 `AnnotatedString`（连同读屏逐词 `customActions`），拆成多个节点要先重算偏移，等于改既有高亮/无障碍契约；数据层没有可对齐的段落边界，按块猜段落就是编造 | 本屏仍只有一枚 `article_english` 节点（既有锚不变）；段落交错见第 8 条 |
+| 5 | #14 「只看中文」从原型页头 `bar-action` 改落**模式行第三枚**（`article_chinese_only_toggle`）；点开时若译文折叠，顺手展开译文；切「英文优先 / 双语」即退出中文态 | 页头动作位已被发音占用，2× 字号下再塞一枚文字动作会把标题挤成竖条；模式与译文开关本来就同住这一行，「只看中文」是这两种状态的第三种读法。不展开译文就进中文态，屏幕上只剩标题 | `…the reader offers the prototype chinese only action and hides the english side`（tag / 两句文案 / `if (!chineseOnly)` / `onToggleTranslation()` / 切模式清位）+ connected `chineseOnlyHidesTheEnglishBodyAndRevealsTheTranslation` |
+| 6 | #14 中文态下英文侧整块不组合：标注行、英文正文、未覆盖词、覆盖入口都不画 | 原型对照页只有英文与中文两段，没有这些英文侧控件；留着它们等于在「只看中文」里塞一堆英文控件 | 同一判据（`if (!chineseOnly)` 包住英文侧）+ 同一 connected 用例（`article_english` 不存在） |
+| 7 | #14 末尾译文提醒按 `ArticleSource` 分三支（AI / 导入 / 外刊）写，排在译文之后、只在译文可见时出现；语气取共享件 `Info` 档（原型 icon 是 warning，但 tone 是 info，共享件没有 warning 档） | 原型那句「译文由本机 AI 配置生成」只对 AI 文章成立；导入文章的译文随包进来、外刊抓取根本没有译文。隐藏译文时挂一条「请以原文为准」没有对象 | `…the translation carries the prototype caution for the source it actually has`（tag 1 处 + 三支文案 + 位置在译文之后） |
+| 8 | #14 原型逐段 `prose` + `prose-zh` 的**交错排布**不搬（整块译文仍是整块，只是换了 `AppType.ProseZh` 的字档） | 同第 4 条：两块字符串之间没有段落对齐信息；按空行猜配对，猜错就是把 A 段中文配到 B 段英文下面——比不交错更糟 | 同上；`AppType.ProseZh` 的取值由第 1 条判据钉住 |
+| 9 | 译文块的 `surface` 容器撤掉（原 `clip + background(colors.surface) + padding(14.dp)`） | 原型 `.prose-zh` 没有容器，靠衬线 / 无衬线 + 字号差分层；再套一层卡就是卡片汤 | 同一契约；`article_translation` 锚仍恰一处 |
+
+**连带改动的既有判据（期望值变化，非放宽）**：`ArticleReadingLayoutContractTest` 第 9 节与
+`ReadingHomeLayoutContractTest` 的两处正文取样从 `AppType.Body.copy(color = appColors().text1)`
+改为 `AppType.Prose.copy(color = appColors().text1)`。理由写进测试注释：换的是字号档（原型 `.prose`），
+「显式 `appColors().text1` 的配平形状」与两套 AA 复算的取样面一字未动，仍是精确子串断言。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -515,8 +538,8 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 10 | `sBookDetail`（:608） | 词书 | **批 1 Task 15 新建** `BookDetailScreen.kt`（词库页「词书」段的默认面；「查看完整词单」切到该段的 `WordBookWordsScreen` 浏览态） | ✅ | Task 15 已对（强卡 `ring(86)` + 正在使用 + 书名 + 已学 x/y、「这本书的情况」四行取真数、「操作」两行）；6 条偏离登记在「Task 15」台账，含按书导出 / 按书删进度两项能力缺失整行不搬、页头 more 菜单不搬 |
 | 11 | `sCardSettings`（:645） | 词卡显示 | 并入 `LearningSetupScreen` | ✅ | Task 12（合成一屏，台账第 1 行留因） |
 | 12 | `sReadHome`（:702） | 每日阅读 | `ReadingAccessScreen.kt` | 🟡 | Task 21-C 已对：今日文章卡（覆盖 N 词 · 第 v 版）+「本周阅读」派生统计卡（近 7 天篇数/字数，无周目标）；仍缺：「继续」组双语对照独立入口（按「阅读器内切换」不搬，见 21-C 第 3 行）、旧 `Mint*`/M3 Button 家族的版面重排 |
-| 13 | `sReadArticle`（:738） | 阅读 | `ArticleReadingScreen.kt` | 🟡 | Task 21-D 已对元信息行（「约 N 词 · 第 v 版」真数，「5 分钟」不搬）；仍缺 `.prose` 字号/行距逐值、底部两枚并列出口的形态对齐 |
-| 14 | `sReadTranslate`（:762） | 双语对照 | `ArticleReadingScreen.kt` 对照态 | 🟡 | Task 21-D：确认「对照态 = 同一支屏内切换」（与 LWT/LinguaCafe 一致，不新开页）；仍缺 `bar-action`「只看中文」与末尾 warning notice、逐段英中的字号/间距对齐 |
+| 13 | `sReadArticle`（:738） | 阅读 | `ArticleReadingScreen.kt` | ✅ | Task 21-D 对元信息行；Task 22-K 补三档排印逐值（`AppType.Prose` 17.5 衬线 / `ProseZh` 13 / `ArticleTitle` 30）与页脚「双语 + 完成阅读」两枚并列；`.prose` 逐段交错按「整块字符串 + 绝对偏移高亮」不搬；4 条登记在「Task 22-K」台账 |
+| 14 | `sReadTranslate`（:762） | 双语对照 | `ArticleReadingScreen.kt` 对照态 | ✅ | Task 21-D 定「对照态 = 同一支屏内切换」；Task 22-K 补「只看中文」（落模式行，中文态隐藏英文侧）与按来源分三支的译文提醒；逐段交错不搬（无段落结构）；5 条登记在「Task 22-K」台账 |
 | 15 | `sReadFeed`（:779） | 外刊选读 | `ReadingFeedScreen.kt` | ✅ | Task 21-A 已对（页头 + `BareRow` 列表 + 尾部「来源说明」`QuietCard`）；3 条偏离登记在「Task 21-A」台账（条目栏目/篇幅/词数、`.meta`「不含广告」、VOA 公共领域三处读不到或不成立） |
 | 16 | `sReadHistory`（:796） | 阅读历史 | `ReadingHistoryScreen.kt` | ✅ | Task 21-B 已对（按日期分节 + 逐版行 + 尾部提示；多版本折叠是 F4-01 决策 §8 的产品形状，保留）；3 条登记在「Task 21-B」台账，含「已读 / 未读」无字段整枚不搬 |
 | 17 | `sAiHome`（:814） | AI 助学 | `AiLearningScreen.kt` | ✅ | Task 22-I 已对（页末「图片不上传 + 生图先转英文提示词」Info 提示；两列卡片格与页头密钥按钮按批 4 骨架不搬）；2 条登记在「Task 22-I」台账 |
@@ -540,7 +563,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ✅ | Task 22-H 已对：按 `AppError` 分叉（姓名错误保留旧文案 / 其余「词库没能打开」+ 真重试）；`LC-DB-03` 与「从备份恢复」不搬（无诊断码 / 回滚归恢复态）；2 条登记在「Task 22-H」台账 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | **批 2 Task 22-H 新建** `UnavailableScreen.kt`；宿主 = 未知 AI 功能 key 的兜底分支 | ✅ | Task 22-H 已对：原型文案逐字 + 260dp 两枚真出口；`overlayOpen` 与返回键改按 key 判定；JVM 2 条 + connected 2/2；1 条登记在「Task 22-H」台账 |
 
-**小计（Task 22-J 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 31 屏 · 🟡 5 屏 · ⬜ 0 屏。
+**小计（Task 22-K 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 33 屏 · 🟡 3 屏 · ⬜ 0 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、
