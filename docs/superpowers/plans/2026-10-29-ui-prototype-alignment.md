@@ -471,6 +471,25 @@ ViewModel 与加载态）。**保持两屏**（用户口径），只把原型上
 理由写进测试注释：批 3 按裁决 B 补了一枚**只装禁用行**的软卡，13 个可写控件的分组归属（groups[0..2]）一字未减，
 并新增两条反向断言（四枚 `unsupported` tag 必须在 groups[3]；13 个真控件 tag 一个都不许混进 groups[3]）。
 
+### Task 22-J · 选择词书残留项（原型 `#/book-picker`，`sBookPicker` `app.js:588-606`）
+
+#9 的行形状早在 Task 13-A 翻正（`.pick.pick-radio` 通栏行），「仍缺」那四项（页头「导入」、搜索、排序、
+`.foot`「选用这本书」、notice）里的 notice 本轮补齐；独立屏的其余三件按下面的证据不搬。
+**先核原型再说**：`sBookPicker` 的函数体只有 `barTop({title:'选择词书', action: 导入})`、一句 `.meta`、
+`.rows`、`notice(…, 'info', 'shield')`、`.foot`「选用这本书」——**没有搜索框、也没有排序控件**。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | 选词书列表之后补原型 Info 提示「换词书后，旧词书的进度会保留在本机，随时可以换回来。」（tag `learning_setup_wordbook_notice`），留在本节内、不漂到页末 | 原型 `sBookPicker` 在 `.rows` 与 `.foot` 之间的 `notice(…, 'info', 'shield')`；这句话是本仓真规则（AGENTS.md：切换词书不得删除旧记录），也是换词书时最担心的一件事 | `LearningSetupLayoutContractTest.the wordbook section ends with the prototype progress retention notice`（tag 1 处 + 逐字 + Info 档 + 列表之后 /「每日新增」之前） |
+| 2 | 页头「导入」`bar-action` **不搬** | 导入已有真入口且带完整链路：「设置 · 词书与每日目标」的「导入词书」（SAF 选文件 → `.wbpack` 校验 → 登记元数据 → 刷新列表，`WordBookTransferViewModel`）；本屏页头只有一个动作位、已被「保存」占用，要加就得再拉一份 transfer VM 与文件选择器，还会把「导入成功 → 列表刷新」的时序拧进保存路径 | 本节第 1 条判据不新增导入锚；既有 `the header is the prototype plan title with its save action`（页头动作位恰一枚保存）原样绿 |
+| 3 | `.foot`「选用这本书」**不搬** | 本屏的选择是**草稿**（`selectedWordBookId`），生效靠页头 / 吸底条同一条保存路径；再长出一枚「选用这本书」就是第二条保存语义，而点它的人会以为当场生效（实际要保存才换册） | 全文件 `选用这本书` 为 0（reverse pin 见 `the wordbook section ends…` 同节注释）；`SetupSaveBar` 判据原样绿 |
+| 4 | 原型的**搜索 / 排序**：`sBookPicker` 源码里不存在，**不补** | 计划表 #9 行原措辞「搜索、排序」与原型文件不符；按「原型 > 本文描述」以本节为准，补出来就是自创控件（且本仓词书是十位数以内的固定集合，没有搜索的需要） | 本节文档裁决；不新增任何搜索 / 排序锚（`LearningSetupLayoutContractTest` 现有网格清零判据里同样不含这两项） |
+| 5 | `.meta`「内置词书随 App 打包，导入的词书放在本机，不上传。」**不搬** | 本屏没有导入入口（见第 2 条），这句话指向的能力不在这一屏；同一口径已由设置页「导入 / 导出 .wbpack · 全离线」承担。本屏保留 Task 13-A 那句「这是应用内学习分组，不是官方考试大纲」——它讲的是词书性质，与本屏的问题相关 | `LearningSetupLayoutContractTest.the wordbook section keeps its source policy note in the caption tier` 原样绿 |
+
+**连带改动的既有判据（期望值变化，非放宽）**：`the info notice tells what saving actually does` 的
+`InlineNoticeKind.Info` 计数 **1 → 2**。理由写进测试注释：#9 把 `sBookPicker` 自带的那枚 info 提示搬进了本屏，
+两处讲的是两件事（保存时机 / 进度保留），总数仍被钉死、两句各自逐字有判据。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -492,7 +511,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 6 | `sLearnEmpty`（:501） | 今日学习·空态 | `TodayPlanScreen.kt` 空态（Ready 分支 `todayAllDone` 那一支，**不新增屏**） | ✅ | Task 19 已对（`EmptyState(star, 今天的词都学完了, …)` + 两枚 260dp 出口「调整每日新增」/「去读今日文章」+ `.head-plain` 撤齿轮）；`section('明天')` 整节不搬，8 条偏离登记在「Task 19」台账 |
 | 7 | `sWordDetail`（:519） | 词义详情 | `CardDetailScreen.kt` | ✅ | Task 11 已对 |
 | 8 | `sPlanEdit`（:562） | 学习计划 | `AppScreen.kt` 的 `LearningSetupScreen` | ✅ | Task 12 已对（含与 `sCardSettings` 合成一屏的裁决，台账第 1 行） |
-| 9 | `sBookPicker`（:588） | 选择词书 | `AppScreen.kt` 的 `WordBookPicker` | 🟡 | **行形状已翻正**（Task 13-A）；独立屏那一份（页头「导入」`bar-action`、搜索、排序、`.foot`「选用这本书」、notice）未对 → Task 15 |
+| 9 | `sBookPicker`（:588） | 选择词书 | `AppScreen.kt` 的 `WordBookPicker` | ✅ | 行形状 Task 13-A 已翻正；Task 22-J 补进「换词书后旧进度保留」Info 提示（list 之后、节内）；页头「导入」/ `.foot`「选用这本书」/ `.meta` 三件按「已有真入口 / 单条保存语义 / 本屏无导入能力」不搬，原型的搜索与排序**源码里不存在**（计划原措辞以 Task 22-J 第 4 行为准）；5 条登记在「Task 22-J」台账 |
 | 10 | `sBookDetail`（:608） | 词书 | **批 1 Task 15 新建** `BookDetailScreen.kt`（词库页「词书」段的默认面；「查看完整词单」切到该段的 `WordBookWordsScreen` 浏览态） | ✅ | Task 15 已对（强卡 `ring(86)` + 正在使用 + 书名 + 已学 x/y、「这本书的情况」四行取真数、「操作」两行）；6 条偏离登记在「Task 15」台账，含按书导出 / 按书删进度两项能力缺失整行不搬、页头 more 菜单不搬 |
 | 11 | `sCardSettings`（:645） | 词卡显示 | 并入 `LearningSetupScreen` | ✅ | Task 12（合成一屏，台账第 1 行留因） |
 | 12 | `sReadHome`（:702） | 每日阅读 | `ReadingAccessScreen.kt` | 🟡 | Task 21-C 已对：今日文章卡（覆盖 N 词 · 第 v 版）+「本周阅读」派生统计卡（近 7 天篇数/字数，无周目标）；仍缺：「继续」组双语对照独立入口（按「阅读器内切换」不搬，见 21-C 第 3 行）、旧 `Mint*`/M3 Button 家族的版面重排 |
@@ -521,7 +540,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ✅ | Task 22-H 已对：按 `AppError` 分叉（姓名错误保留旧文案 / 其余「词库没能打开」+ 真重试）；`LC-DB-03` 与「从备份恢复」不搬（无诊断码 / 回滚归恢复态）；2 条登记在「Task 22-H」台账 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | **批 2 Task 22-H 新建** `UnavailableScreen.kt`；宿主 = 未知 AI 功能 key 的兜底分支 | ✅ | Task 22-H 已对：原型文案逐字 + 260dp 两枚真出口；`overlayOpen` 与返回键改按 key 判定；JVM 2 条 + connected 2/2；1 条登记在「Task 22-H」台账 |
 
-**小计（Task 22-I 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 30 屏 · 🟡 6 屏 · ⬜ 0 屏。
+**小计（Task 22-J 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 31 屏 · 🟡 5 屏 · ⬜ 0 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、

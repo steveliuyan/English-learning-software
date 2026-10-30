@@ -557,10 +557,13 @@ class LearningSetupLayoutContractTest {
      */
     @Test
     fun `the info notice tells what saving actually does`() {
+        // 期望值变化（1 → 2），不是放宽：原型 `sBookPicker` 自己就带一枚 info `notice`（换词书后进度保留），
+        // 它随 #9 搬进了「选择词书」这一节（见 `the wordbook section ends with the prototype progress retention notice`）。
+        // 两处讲的是两件事（保存时机 vs 进度保留），总数仍被钉死，各自的句子由本文件两条判据逐字钉住。
         assertEquals(
-            1,
+            2,
             countMatches(setup, Regex(Regex.escape("InlineNoticeKind.Info"))),
-            "本屏恰一处 info 提示（原型的 `notice(..., 'info')`）",
+            "本屏两处 info 提示：页末的保存时机 + 选词书节的进度保留（原型的两条 `notice(..., 'info')`）",
         )
         assertEquals(
             1,
@@ -899,6 +902,45 @@ class LearningSetupLayoutContractTest {
         assertTrue(
             "verticalScroll(" in setup,
             "内容段必须仍可滚（吸底条只负责「永远在屏底」，不负责替代滚动）",
+        )
+    }
+
+    /**
+     * 原型 `sBookPicker`（`app.js:588-606`）在行列表与 `.foot` 之间还有一句 `notice(…, 'info', 'shield')`：
+     * 「换词书后，旧词书的进度会保留在本机，随时可以换回来。」
+     *
+     * 这句话在本仓是**真规则**（AGENTS.md：切换词书不得删除旧记录），也是用户换词书时最担心的一件事，
+     * 所以照搬进「选择词书」这一节；页末那枚提示条讲的是保存时机（Task 12 第 8 行），两件事不重复。
+     * 位置必须落在列表之后、下一节之前——漂到页末就等于把「属于这一节的风险说明」变成全屏附注。
+     */
+    @Test
+    fun `the wordbook section ends with the prototype progress retention notice`() {
+        assertEquals(
+            1,
+            countMatches(setup, Regex(Regex.escape("learning_setup_wordbook_notice"))),
+            "选词书节的保留进度提示必须恰一处（`learning_setup_wordbook_notice`）",
+        )
+        assertTrue(
+            "换词书后，旧词书的进度会保留在本机，随时可以换回来。" in setup,
+            "提示必须逐字照原型那句：这是换词书时唯一能消除「进度会不会没了」担心的话",
+        )
+        assertTrue(
+            countMatches(setup, Regex(Regex.escape("kind = InlineNoticeKind.Info"))) >= 2,
+            "保留进度提示必须走共享 `InlineNotice` 的 Info 档（页末那枚之外再多一处）",
+        )
+        val pickerAt = setup.indexOf("WordBookPicker(")
+        val noticeAt = setup.indexOf("learning_setup_wordbook_notice")
+        val nextSectionAt = setup.indexOf("SectionHeading(text = \"每日新增\"")
+        assertTrue(pickerAt > 0, "取不到 `WordBookPicker(` 调用点：判据会空转")
+        assertTrue(nextSectionAt > pickerAt, "取不到「每日新增」节标题：判据会空转")
+        assertTrue(pickerAt < noticeAt, "提示必须排在选词书列表之后")
+        assertTrue(noticeAt < nextSectionAt, "提示必须留在「选择词书」这一节内，不许漂到页末变成全屏附注")
+        // 反向钉（Task 22-J 第 3 行）：原型 `.foot` 那枚「选用这本书」是独立屏的第二条保存入口。
+        // 本屏的选择是草稿、生效靠页头 / 吸底条同一条保存路径，补出来就多一条「点了以为当场生效」的假语义。
+        assertEquals(
+            0,
+            countMatches(source, Regex(Regex.escape("选用这本书"))),
+            "独立屏的「选用这本书」不得补进合并屏：选择是草稿，保存只有一条路径",
         )
     }
 

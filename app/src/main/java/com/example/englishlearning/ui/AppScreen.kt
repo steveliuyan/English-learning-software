@@ -2540,6 +2540,13 @@ internal fun LearningSetupScreen(
                 onSelect = viewModel::selectWordBook,
                 onRequestDelete = viewModel::requestDelete,
             )
+            // 原型 `sBookPicker` 行列表之后的 `notice(…, 'info', 'shield')`：换词书时最担心的是进度丢失，
+            // 而「各册进度独立保留、随时换回来」正是本仓的真规则（AGENTS.md：切换词书不得删除旧记录）。
+            InlineNotice(
+                text = "换词书后，旧词书的进度会保留在本机，随时可以换回来。",
+                kind = InlineNoticeKind.Info,
+                modifier = Modifier.testTag("learning_setup_wordbook_notice"),
+            )
 
             // ---------- 节 2：每日新增（原型 `chip(n + ' 个')` 那一行） ----------
             val selectedBook = state.wordBooks.firstOrNull { it.id == state.selectedWordBookId }
