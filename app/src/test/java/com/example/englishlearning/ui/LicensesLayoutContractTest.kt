@@ -196,6 +196,32 @@ class LicensesLayoutContractTest {
         )
     }
 
+    // ---------- ⑥b 原型 sMeLicenses 的行副标题与页尾（Task 22-G） ----------
+
+    @Test
+    fun `rows carry version and usage and the page closes with a true tail notice`() {
+        assertTrue(
+            """notice.field("用途")""" in source,
+            "行副标题要按原型 `app.js:1395`「版本 · 用途」补上用途：台账里有这枚字段，不是编造",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("点开任意一条，可以查看用途、数据流与 NOTICE 位置。"))),
+            "页尾提示条必须恰 1 处：原型那句「完整许可证文本在『设置 → 关于 → 开源许可』里可以逐条查看」" +
+                "在本页是自我指涉（本页就是那一页），换成这一页真正提供的动作",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex(Regex.escape("设置 → 关于 → 开源许可"))),
+            "原型页尾那句自我指涉不得抄进来（同一句话在这一页说会当场说假话）",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex(Regex.escape("完整文本随安装包提供"))),
+            "「完整文本随安装包提供」在全仓没有逐条许可证原文的打包证据（assets 只有 kokoro 的 notices），不写",
+        )
+    }
+
     // ---------- ⑦ 三档容器、零投影 ----------
 
     @Test

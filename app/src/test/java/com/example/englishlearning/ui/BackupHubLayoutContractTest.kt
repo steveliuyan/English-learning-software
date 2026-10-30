@@ -236,10 +236,15 @@ class BackupHubLayoutContractTest {
 
     @Test
     fun `the receipt notice is conditional and sits above the danger zone`() {
+        // 期望值变化（1 → 2），不是放宽：原型 `sMeData` 本页末有一条**常驻**安全提示条
+        // （「所有数据默认只在本机；卸载 App 会一并删除，请先导出备份。」），与条件回执**是两件事**；
+        // 两条都走共享 `InlineNotice`，没有第二套提示形状（该口径原句仍成立）。
+        // 「回执只有一枚」的实质由下面两条断言守住：条件渲染是 `deleteAllLearningDataNotice?.let`，
+        // 且第一枚 `InlineNotice(` 必须排在危险区之前——页尾那条在危险区之后，不影响这两条。
         assertEquals(
-            1,
+            2,
             countMatches(source, Regex("""\bInlineNotice\(""")),
-            "`InlineNotice(` 必须恰 1 处：回执条只有一枚（不许自写第二条提示形状）",
+            "`InlineNotice(` 必须恰 2 处：条件回执 + 原型页尾常驻安全提示，都走共享组件（不许自写第二条形状）",
         )
         assertTrue(
             "deleteAllLearningDataNotice?.let" in source,
@@ -256,6 +261,25 @@ class BackupHubLayoutContractTest {
             "回执条必须排在危险区之前（实测 $noticeAt vs $deleteSectionAt）：危险区是全屏最后一段，" +
                 "回执不许把「清空数据」这行顶到屏幕中间",
         )
+    }
+
+    // ---------- ⑦ 原型的页尾安全提示与本机数据读数（Task 22-G） ----------
+
+    @Test
+    fun `the page closes with the local only notice and invents no storage numbers`() {
+        assertTrue(
+            "所有数据默认只在本机；卸载 App 会一并删除，请先导出备份。" in source,
+            "原型 `app.js:1421` 的页尾提示条在本仓逐字成立（本地优先、无云同步、卸载即删），原样搬",
+        )
+        // 原型顶部那张卡是 mock：本仓没有「本机占用空间」的读数，也没有「最近一次备份时间」的记录，
+        // 两格整枚不画（用户 2026-10-29 拍板「读不到的那枚整枚不显示」）。
+        listOf("14.2 MB", "最近备份", "3 天前").forEach { mock ->
+            assertEquals(
+                0,
+                countMatches(source, Regex(Regex.escape(mock))),
+                "原型 mock 读数「$mock」不得写死：本仓没有对应采集，画出来就是编造指标",
+            )
+        }
     }
 
     // ---------- 夹具 ----------

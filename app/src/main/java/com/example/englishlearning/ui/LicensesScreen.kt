@@ -26,6 +26,8 @@ import com.example.englishlearning.notices.parseThirdPartyNotices
 import com.example.englishlearning.notices.thirdPartyPrivacyStatements
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
@@ -88,6 +90,16 @@ fun LicensesScreen(
             ) {
                 item { PrivacyStatement() }
                 items(notices, key = { it.id }) { notice -> NoticeCard(notice) }
+                // 原型 `sMeLicenses`（`app.js:1399`）的页尾提示条。原型那句是
+                // 「完整许可证文本在「设置 → 关于 → 开源许可」里可以逐条查看」——本页**就是**那一页，
+                // 照抄就是自我指涉；改成这一页真正提供的动作（点开每条看用途 / 数据流 / NOTICE 位置）。
+                item {
+                    InlineNotice(
+                        text = "点开任意一条，可以查看用途、数据流与 NOTICE 位置。",
+                        kind = InlineNoticeKind.Info,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
             }
         }
     }
@@ -154,9 +166,21 @@ private fun NoticeCard(notice: ThirdPartyNotice) {
             },
         contentPadding = PaddingValues(0.dp),
     ) {
+        // 副标题按原型 `app.js:1395` 的「版本 · 用途」补上用途，许可证仍排在最前（本仓台账的字段顺序）；
+        // 空字段整段不拼——拼出「Apache-2.0 · v · 」就是把「不知道」写成「是」。
+        val version = notice.field("版本")
+        val license = notice.field("许可证")
+        val usage = notice.field("用途")
+        val subtitle = listOfNotNull(
+            license.takeIf { it.isNotBlank() },
+            version.takeIf { it.isNotBlank() }?.let { "v$it" },
+            usage.takeIf { it.isNotBlank() },
+        ).joinToString(" · ")
         BareRow(
             title = title,
-            subtitle = "${notice.field("许可证")} · v${notice.field("版本")}",
+            subtitle = subtitle.ifBlank { null },
+            // 右尾保留展开态而不是原型那格许可证：本仓这一行可以原地展开五枚字段，
+            // 「展开 / 收起」是唯一可见的展开线索；许可证已进副标题，不丢信息。
             trailing = if (expanded) "收起" else "展开",
         )
         if (expanded) {

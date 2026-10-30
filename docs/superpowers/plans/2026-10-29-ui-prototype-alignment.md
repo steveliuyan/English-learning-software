@@ -398,6 +398,26 @@ ViewModel 与加载态）。**保持两屏**（用户口径），只把原型上
 | 5 | 原型页头「保存」、口音「英式 / 美式」、语速「0.9 倍」、试听「delicate」四处**不搬** | 保存是 `data-act="toast"` 的 mock（本仓改完即落库，一枚只弹提示的键就是假入口）；`SpeechPreference` 无 `accent` 字段；0.9 不是 `SpeechRateSteps` 合法档（0.75/1.0/1.25/1.5）；试听卡接受用户输入 | 同判据（`口音` / `0.9 倍` 归零）+ `SpeechSettingsScreenTest` 13/13 原样绿 |
 | 6 | 保持两屏，不合成原型的一屏 | 两条独立二级路由各带 ViewModel 与加载态；合成需要合并导航与状态，属导航改动且用户口径是「保持两屏」 | connected `ReminderSettingsScreenTest` 3/3 + `SpeechSettingsScreenTest` 13/13 |
 
+### Task 22-G · 开源许可 / 数据与备份（原型 `sMeLicenses` `app.js:1385-1401`、`sMeData` `:1402-1423`）
+
+两屏都已有共享页头 + 三档容器 + `BareRow` 行；本轮只补原型里**本仓读得到**的内容，并把读不到的两处登记为偏离。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | 许可条目副标题从「许可证 · v版本」补成「许可证 · v版本 · 用途」 | 原型 `:1395` 的行副是「version · use」；本仓台账 `用途` 字段真实存在（`docs/third-party-notices.md`），不是编造。空字段整段不拼 | `LicensesLayoutContractTest.rows carry version and usage and the page closes with a true tail notice` |
+| 2 | 许可页页尾加提示条「点开任意一条，可以查看用途、数据流与 NOTICE 位置。」（共享 `InlineNotice`，Info） | 原型那句「完整许可证文本在『设置 → 关于 → 开源许可』里可以逐条查看」在**本页**是自我指涉（本页就是那一页）；改成这一页真实提供的动作 | 同判据（适配句恰 1、原型自我指涉句归零） |
+| 3 | 许可条目右尾保留「展开 / 收起」而不是原型的许可证名 | 本仓这一行可以原地展开五枚字段，「展开 / 收起」是唯一可见的展开线索；许可证已进副标题，不丢信息 | 同判据 + 既有 `AccessibilityStateSemanticsContractTest` 的展开态播报不动 |
+| 4 | 原型 meta「以下组件均以其许可证原文使用，完整文本随安装包提供」**不搬** | 全仓没有逐条许可证原文的打包证据（`assets/` 只有 `kokoro-production/notices` 一组），照抄就是空头承诺 | 同判据（`完整文本随安装包提供` 归零） |
+| 5 | 许可页页名保持「开源许可与隐私说明」（原型「开源许可」）；隐私说明卡保留 | spec §5 要求**入口名与页名统一**（设置入口就是这句），改名会与台账入口分叉；隐私说明是本仓 spec 要求与既有内容 | 既有 `LicensesLayoutContractTest.the screen wears the shared header under the unified page name` 原样绿 |
+| 6 | 备份页页尾加提示条「所有数据默认只在本机；卸载 App 会一并删除，请先导出备份。」（原型 `:1421`） | 本地优先 + 无云同步 + 卸载随应用数据删除，这句在本仓**逐字成立** | `BackupHubLayoutContractTest.the page closes with the local only notice and invents no storage numbers` |
+| 7 | 原型顶部那张「本机数据 14.2 MB / 最近备份 3 天前」**整张不画** | 本仓没有「本机占用空间」的读数，也没有「最近一次备份时间」的记录；两格都是 mock（用户 2026-10-29 拍板「读不到的那枚整枚不显示」） | 同判据（`14.2 MB` / `最近备份` / `3 天前` 归零） |
+| 8 | 备份页页名保持「备份与恢复」（原型「数据与备份」）；入口文案与四行结构（留档导出 / 认证导出 / 恢复 / 删除）不动 | 页名与设置入口同名（统一口径）；四枚行文案是 `BackupEntryUnificationTest` 钉住的唯一真值，本仓把「从文件恢复」与「配对另一台设备」拆成认证导出 / 认证恢复两条真实通路，原型的「清除全部学习数据」与本仓「删除全部学习数据」同义 | 既有 `BackupHubLayoutContractTest` 6 条 + connected `BackupEntryUnificationTest` 7/7 原样绿 |
+
+**连带改动的既有判据（期望值变化，非放宽）**：`BackupHubLayoutContractTest` 的 `InlineNotice(` 计数 **1 → 2**。
+理由写进测试注释：原型本页末有一条**常驻**安全提示条，与条件回执是两件事，两条都走共享 `InlineNotice`（没有第二套提示形状）；
+「回执只有一枚」的实质仍由 `deleteAllLearningDataNotice?.let` 条件渲染 + 「第一枚 `InlineNotice(` 必须排在危险区之前」
+两条断言守住（页尾那条在危险区之后）。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -440,15 +460,15 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 27 | `sMeSettings`（:1328） | 设置 | `SettingsScreen.kt` | ✅ | Task 22-E 已对：「学习提醒」行补原型副标题；「词卡显示」行与页末 notice 不搬（无偏好项 / 与 4 组 10 行矛盾）；4 组 10 行形状不动，4 条登记在「Task 22-E」台账 |
 | 28 | `sMeReminder`（:1345） | 提醒与发音 | `ReminderSettingsScreen.kt` + `SpeechSettingsScreen.kt` | ✅ | Task 22-F 已对：提醒页开启行副标题 + 只读「重复」行；发音页「用本机离线合成，不联网」按系统 TTS 条件渲染；保存 / 口音 / 0.9 倍 / 试听 delicate 四处不搬；保持两屏，6 条登记在「Task 22-F」台账 |
 | 29 | `sMeAbout`（:1366） | 关于 | **批 2 Task 22-B 新建** `AboutScreen.kt`；入口 = 设置「外观与关于」组「关于」行（第 10 行，用户拍板） | ✅ | 应用块 / 说明三行 / 致谢；版本取 `BuildConfig.VERSION_NAME`、致谢只留成立的两句；AC-R-21 行数 9→10；JVM 4 条 + connected 全绿；`licenseCount` 注入待补（行文案已能不带数字） |
-| 30 | `sMeLicenses`（:1385） | 开源许可 | `LicensesScreen.kt` | ⬜ | 批 2 |
-| 31 | `sMeData`（:1402） | 数据与备份 | `BackupHubScreen.kt` | ⬜ | 批 2 |
+| 30 | `sMeLicenses`（:1385） | 开源许可 | `LicensesScreen.kt` | ✅ | Task 22-G 已对：条目副标题补用途、页尾提示条（原型自我指涉句改写为真实动作）、meta「完整文本随安装包提供」不搬（无打包证据）；5 条登记在「Task 22-G」台账 |
+| 31 | `sMeData`（:1402） | 数据与备份 | `BackupHubScreen.kt` | ✅ | Task 22-G 已对：页尾提示条逐字搬；顶部「本机数据 14.2 MB / 最近备份 3 天前」整张不画（无采集）；页名与四行入口文案保持既有唯一真值；3 条登记在「Task 22-G」台账 |
 | 32 | `sSplash`（:1424） | 启动 | `AppScreen.kt` 的 `BrandLaunchSurface` 分支 | ⬜ | 启动那一屏未逐屏对 |
 | 33 | `sOnboarding1`（:1442） | 建档·姓名 | `ProfileCreationScreen`（在 `AppScreen.kt`） | ⬜ | 批 2 的「其他 5 屏」 |
 | 34 | `sOnboarding2`（:1467） | 建档·选词书与目标 | `AppScreen.kt` 建档分支 | 🟡 | 选词书那份 `.pick.pick-radio` 与 Task 13-A 同一体（已对）；**建档整屏的其余节**（页头、目标、保存路径）未对 |
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ⬜ | 错误屏未对 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | 应用侧**无对应屏**（`页面不可用` 全仓 0 命中） | ⬜ | 先确认要不要这一屏（原型画了，本仓没有承载点） |
 
-**小计（Task 22-F 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 16 屏 · 🟡 7 屏 · ⬜ 13 屏。
+**小计（Task 22-G 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 18 屏 · 🟡 7 屏 · ⬜ 11 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、
