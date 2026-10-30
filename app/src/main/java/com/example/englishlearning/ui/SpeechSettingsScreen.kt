@@ -260,8 +260,14 @@ fun SpeechSettingsScreen(
                             ),
                         )
                     }
+                    // 原型 `app.js:1360` 的 row-sub「用本机离线合成，不联网」：**只对系统 TTS 成立**。
+                    // 小米 MiMo 走已保存的 AI 服务（经网络），无条件写这句就是假话，故按当前供应商条件渲染。
                     Text(
-                        "新词卡出现时自动朗读一次；关闭后仅点击「播放发音」时朗读。",
+                        text = if (state.selectedEngine == PronunciationEngine.SystemTts) {
+                            "用本机离线合成，不联网。新词卡出现时自动朗读一次；关闭后仅点击「播放发音」时朗读。"
+                        } else {
+                            "走已保存的 AI 服务。新词卡出现时自动朗读一次；关闭后仅点击「播放发音」时朗读。"
+                        },
                         style = AppType.Footnote,
                         color = colors.text2,
                     )

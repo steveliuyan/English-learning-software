@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeAction
 import com.example.englishlearning.ui.components.InlineNoticeKind
@@ -159,12 +160,15 @@ fun ReminderSettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "开启提醒",
-                    style = AppType.Label,
-                    color = colors.text2,
+                // 原型 `app.js:1332` 的 row：标题 + 副案「只在当天没完成计划时提醒」（本仓
+                // `ReminderSchedulingPolicy` 当日计划完成即取消，同一行为，不是空话）。
+                Column(
                     modifier = Modifier.weight(1f),
-                )
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(text = "开启提醒", style = AppType.Body, color = colors.text1)
+                    Text(text = "只在当天没完成计划时提醒", style = AppType.Caption, color = colors.text3)
+                }
                 Switch(
                     checked = state.enabled,
                     onCheckedChange = { checked ->
@@ -179,6 +183,16 @@ fun ReminderSettingsScreen(
                     ),
                 )
             }
+            // 原型 `app.js:1334` 的「重复 / 周一到周日 / 每天」：本仓没有按星期配置提醒的能力
+            // （`ReminderSchedulingPolicy` 固定每天最多一次），所以这一行是**只读说明**，不给 `onClick`。
+            BareRow(
+                title = "重复",
+                subtitle = "周一到周日",
+                trailing = "每天",
+                showChevron = false,
+                topDivider = true,
+                modifier = Modifier.testTag("reminder_repeat_row"),
+            )
         }
 
         if (!state.enabled) {
