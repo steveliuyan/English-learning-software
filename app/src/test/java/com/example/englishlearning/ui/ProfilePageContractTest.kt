@@ -5,9 +5,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 我的页（spec §3.6）的源码契约：档案头 + 三格统计深链 + 学习记录行 + 原设置四组九行。
+ * 我的页（spec §3.6）的源码契约：档案头 + 三格统计深链 + 学习记录行 + 设置四组十行（Task 22-B 加关于）。
  *
- * 为什么这层必须有：我的页是「设置 tab」的新根页，而它并不自己实现设置内容——四组九行仍归
+ * 为什么这层必须有：我的页是「设置 tab」的新根页，而它并不自己实现设置内容——四组十行仍归
  * `SettingsScreen.kt`。抽出 `SettingsGroupsContent` 后有两件容易发生的回归：
  *  ① 页头与滚动各抄一份（我的页与设置页各带一个 `settings_screen` 根、各滚各的），
  *  ② 统计格只画数字不接深链（用户点了没反应，还把「已学词」冤枉成一个死数字）。
@@ -72,6 +72,45 @@ class ProfilePageContractTest {
         assertTrue("profile_open_learning_records" in profile, "学习记录一行的锚必须存在")
         assertEquals(0, countMatches(profile, Regex("""Mint[A-Z]\w*""")), "我的页不得读 Mint* 静态 token")
         assertEquals(0, countMatches(profile, Regex("""Color\(0x""")), "我的页不得出现裸 hex")
+    }
+
+    /**
+     * 「关于与许可」（原型 `sMeHome` 的「应用」组末行）通过**设置内容槽**到达本页，不另立一行。
+     *
+     * 2026-10-29 用户拍板把「关于」放成设置「外观与关于」组的第 10 行（Task 22-B，AC-R-21 9→10）；
+     * 而设置内容在本 tab 里正是我的页的 `settingsContent()`，所以原型那一行在页面上**已经存在**。
+     * 再按原型在「应用」组补一条同落点的行，就是同一条通路的第二份入口（与「我的词汇」三行同口径）。
+     *
+     * 本条钉三层接线：本页不写这一行 → 设置内容里有这一行且指向回调 → 宿主把回调接到 About 分支。
+     * 「点得到、点完回得来」的行为判据在 connected `AppScreenTest`，源码里看不到渲染。
+     */
+    @Test
+    fun `the about page is reached through the injected settings ledger, not a second row`() {
+        assertEquals(
+            0,
+            countMatches(profile, Regex(Regex.escape("关于与许可"))),
+            "我的页源码不得出现原型的「关于与许可」行：关于入口在设置内容的「外观与关于」组里（Task 22-B 第 10 行）",
+        )
+        assertEquals(
+            0,
+            countMatches(profile, Regex(Regex.escape("onOpenAbout"))),
+            "我的页不持有关于回调：它随 `settingsContent` 注入，本页不转发第二份",
+        )
+        assertEquals(
+            1,
+            countMatches(settings, Regex(Regex.escape("tag = \"settings_open_about\","))),
+            "设置内容里「关于」行恰一处（0 = 关于页没有入口；2 = 两行都叫关于）",
+        )
+        assertEquals(
+            1,
+            countMatches(settings, Regex(Regex.escape("onClick = onOpenAbout,"))),
+            "那一行必须接到 `onOpenAbout`（只画行不接回调 = 点不动的行）",
+        )
+        assertEquals(
+            1,
+            countMatches(host, Regex(Regex.escape("onOpenAbout = { showAbout = true },"))),
+            "宿主必须把关于回调接到 About 分支（0 = 行在但点了没反应）",
+        )
     }
 
     @Test

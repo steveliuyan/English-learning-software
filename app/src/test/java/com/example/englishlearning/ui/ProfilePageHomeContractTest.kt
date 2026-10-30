@@ -20,6 +20,19 @@ import kotlin.test.assertTrue
  *     （`WordBankScreen` 的 收藏 / 生词 / 错词），再在本页放三条同一落点的行就是同一条通路的第二份入口。
  *  3. 三格中间那格的原型标名是「掌握词数」，本页仍用「已学词」：本仓没有「掌握」这一档口径
  *     （`learnedWordCount` 是已学词数），改名会把「学过」说成「掌握」。
+ *
+ * Task 22-M（#24 收口）补两处：
+ *
+ *  4. 原型第三格是「收藏」（`D.favorites`，点开进 `me-words/fav`），本页第三格仍是「文章」。
+ *     收藏数在宿主侧读得到（`FavoritesUiState.Ready.words.size`），但它的出口就是词库页的
+ *     收藏分段——Task 22-A 第 2 行已裁定那一段**是唯一出口**，再在本页放一枚同落点的数字格
+ *     等于同一条通路开第二个入口。文章数没有这个重复问题：它指向阅读历史，且是真正的进度事实。
+ *  5. 原型页头 `eyebrow: '我的'` **不搬**：一级 tab 的底部导航已经回答「在哪一页」，
+ *     眉标在本仓留给会变的位置信息（今日学习页的计划日期），不重复 tab 名。
+ *
+ * 「应用」组的「关于与许可」不落在本页源码里，而是随宿主注入的设置内容（`SettingsGroupsContent`
+ * 的「外观与关于」组第 10 行，Task 22-B 拍板）到达——本页再写一行就是同一落点的第二份入口。
+ * 该接线的形状判据在 `ProfilePageContractTest`，行为判据在 connected `AppScreenTest`。
  */
 class ProfilePageHomeContractTest {
 
@@ -52,6 +65,33 @@ class ProfilePageHomeContractTest {
             0,
             countMatches(screen, Regex("""掌握词数""")),
             "原型 mock 的「掌握词数」不搬（`learnedWordCount` 是已学词数）",
+        )
+    }
+
+    /**
+     * 原型第三格是「收藏」，本页第三格是「文章」。这不是「读不到」——收藏数在 `FavoritesUiState.Ready`
+     * 里现算得到；不搬的理由是**落点重复**：收藏数的唯一出口是词库页收藏分段（Task 22-A 第 2 行），
+     * 而在三格上再挂一枚通向同一分段的数字，就是那条通路开第二个入口。
+     *
+     * 反向钉住：一旦有人照原型把第三格改成收藏，这条会红，逼他先回答「那条唯一出口的裁决还成不成立」。
+     */
+    @Test
+    fun `the third stat cell stays the article fact instead of the prototype favorite count`() {
+        assertTrue("\"文章\"" in screen, "第三格标签是「文章」（阅读历史的真数，锁定态也读得到）")
+        assertEquals(
+            1,
+            countMatches(screen, Regex(Regex.escape("profile_stat_articles"))),
+            "第三格的锚是 `profile_stat_articles`：改名等于把既有 connected 判据与宿主接线静默断开",
+        )
+        assertEquals(
+            0,
+            countMatches(screen, Regex("""收藏""")),
+            "收藏不在本页出现：它的出口是词库页收藏分段（Task 22-A 第 2 行），三格不得成第二入口",
+        )
+        assertEquals(
+            0,
+            countMatches(screen, Regex("""eyebrow\s*=""")),
+            "原型 eyebrow「我的」不搬：一级 tab 的页名由底部导航回答，眉标留给会变的位置信息（Task 22-M 第 5 条）",
         )
     }
 

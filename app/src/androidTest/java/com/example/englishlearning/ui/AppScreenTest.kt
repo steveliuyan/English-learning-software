@@ -2471,6 +2471,36 @@ class AppScreenTest {
         assertEquals(1, invocations)
     }
 
+    /**
+     * #24 收口（Task 22-M）：「关于与许可」在「我的」页上真的存在、真的能点开、真的回得来。
+     *
+     * 关于页本身与它那一行都是 Task 22-B 建好的（用户拍板放成设置「外观与关于」组第 10 行），
+     * 而设置内容在这个 tab 里由我的页的 `settingsContent()` 承载——所以「从我的页进关于」这条
+     * 通路此前**没有任何行为判据**：`SettingsScreenTest` 直接挂 `SettingsScreen`（装载缝），
+     * `ProfileScreenTest` 的 `settingsContent` 是替身。本用例补的正是宿主这一层。
+     *
+     * 写法照邻座 `optionalSetupCanBeCancelledBackToTheProfilePageWithoutReloading`：建完档 →
+     * 切设置 tab → 在「我的」页里滚动到设置行。`performScrollTo()` 同时证了那一行住在本页的
+     * 滚动容器内（我的页把设置内容装在同一个可滚列里）。
+     */
+    @Test
+    fun theAboutRowOnTheProfilePageOpensTheAboutScreenAndComesBack() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+
+        composeRule.onNodeWithTag("settings_open_about").assertExists().performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("about_screen").assertExists()
+
+        // 返回位只有共享页头这一处（R-9.2），点回去必须落在「我的」页，而不是别的 tab 或空白。
+        composeRule.onNodeWithContentDescription("返回").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+    }
+
     @Test
     fun mandatorySetupOffersNoCancelEntry() {
         val repository = InMemoryLocalProfileRepository()
