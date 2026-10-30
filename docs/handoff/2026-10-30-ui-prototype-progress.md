@@ -4,7 +4,9 @@
 > 剩余 6 屏 🟡（#9/#12/#13/#14/#24/#25）已于同日后半段全部收口，对账小计为
 > **✅ 36 · 🟡 0 · ⬜ 0**，全量门禁重跑通过（JVM 2221/0）。以
 > `docs/handoff/2026-10-30-ui-prototype-alignment-completion-report.md` 为准；
-> 下一步是批 4 全量 QA，**推送仍待用户批准**。
+> **批 4 全量 QA 已于 2026-10-31 完成**（门禁 BUILD SUCCESSFUL，JVM 2221/0；`ui` 包 561 条/失败 3 条
+> 均为必须 `font_scale 2.0` 的双字号用例，该档 6/6 绿；真机走查清单待人工执行），见
+> `docs/handoff/2026-10-31-batch4-full-qa-report.md`；**推送仍待用户批准**（远端落后 41 提交，代理恢复后重试）。
 
 分支：`stage-5-ui-r2-learning-path` · 计划：`docs/superpowers/plans/2026-10-29-ui-prototype-alignment.md`
 原型目录（**只读**）：`C:\Users\steveliuyan\AppData\Roaming\Open Design\namespaces\release-stable-win\data\projects\6a0aa00b-6bfc-43e7-b35f-13f7478d3147`

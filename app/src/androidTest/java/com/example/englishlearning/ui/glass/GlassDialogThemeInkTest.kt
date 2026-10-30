@@ -186,15 +186,24 @@ class GlassDialogThemeInkTest {
      * 渗色方向不可能把「画成不透明实底」这种缺陷往下拉，alpha 腿照样判红（详见下面自检②）。
      */
     private fun assertPanelPaints(expectedGlass: Int, expectedInk: Int): Int {
-        val container = modeOfPanelPixels()
-        assertRgbWithinTolerance("面板容器底（玻璃填充）", container, expectedGlass, GLASS_CHANNEL_TOLERANCE)
-        val actualAlpha = (container ushr 24) and 0xFF
         val expectedAlpha = (expectedGlass ushr 24) and 0xFF
+        // 两条腿读**两张切片**（2026-10-31 批 4 全量 QA 订正取样口径，容差与阈值一格未动）：
+        //  - alpha 腿读「全档众数」——它就是投影渗色的证据，判据仍是「≥ 该套玻璃且增幅 ≤ 容差」；
+        //  - RGB / 墨 / 对比三腿读「alpha 恰等于该套玻璃」的那一档众数——那是填充**本身**，
+        //    没有被背后 24dp 投影染过。为什么必须分开：填充 alpha 在批 0 从 `0xEF` 改成原型的 `0xE0`
+        //    （`surfaceGlass`），投影透过率随之从 6.3% 翻到 12.2%，实测众数被推到 #E6F8F8F8
+        //    （RGB −7、alpha +6），恰好越过 6 档容差；而位图里纯填充像素 #E0FFFFFF 仍有万余枚。
+        //    这不是放宽：把「容器到底画了哪枚填充」的读数从「被渗色污染的档」换成「填充原值」，
+        //    同时实底仍由 alpha 腿与「找不到纯填充像素即判红」两条把死。
+        val containerAll = modeOfPanelPixels()
+        val container = modeOfPanelPixels(alphaExactly = expectedAlpha)
+        assertRgbWithinTolerance("面板容器底（玻璃填充）", container, expectedGlass, GLASS_CHANNEL_TOLERANCE)
+        val actualAlpha = (containerAll ushr 24) and 0xFF
         assertTrue(
             "面板容器底的 alpha 必须停在「该套玻璃」这一档：深套 surface（#FF17201C）与 surfaceGlass（#E617201C）" +
                 "RGB 逐字相同，不比 alpha 就分不清「画了玻璃」与「漏画玻璃画成实底」；" +
                 "容许投影从半透明填充背后渗上来（alpha 只增不减），但增幅不得超过 $GLASS_ALPHA_TOLERANCE 档。" +
-                "期望 ≥${expectedAlpha}（${expectedGlass.hex()}）、≤${expectedAlpha + GLASS_ALPHA_TOLERANCE}，实际 $actualAlpha（${container.hex()}）",
+                "期望 ≥${expectedAlpha}（${expectedGlass.hex()}）、≤${expectedAlpha + GLASS_ALPHA_TOLERANCE}，实际 $actualAlpha（${containerAll.hex()}）",
             expectedAlpha <= actualAlpha && actualAlpha <= expectedAlpha + GLASS_ALPHA_TOLERANCE,
         )
         val ink = modeOfTitleInkPixels(container)
@@ -284,8 +293,11 @@ class GlassDialogThemeInkTest {
     }
 
     /** 面板节点不透明像素（含 alpha 作键）的众数 = 玻璃填充。 */
-    private fun modeOfPanelPixels(): Int =
-        modeOfSampledPixels(composeRule.onNodeWithTag(PANEL_TAG).captureToImage().asAndroidBitmap())
+    private fun modeOfPanelPixels(alphaExactly: Int? = null): Int =
+        modeOfSampledPixels(
+            composeRule.onNodeWithTag(PANEL_TAG).captureToImage().asAndroidBitmap(),
+            alphaExactly = alphaExactly,
+        )
 
     /**
      * 标题节点的墨核众数。
@@ -316,19 +328,26 @@ class GlassDialogThemeInkTest {
      * 该族若凑不出 [INK_MIN_FAMILY_COUNT] 像素，说明这张位图里根本没有字身（漏画字 / 取错节点），当场判红，
      * 不让众数退化回容器。
      */
-    private fun modeOfSampledPixels(bitmap: Bitmap, awayFrom: Int? = null): Int {
+    private fun modeOfSampledPixels(bitmap: Bitmap, awayFrom: Int? = null, alphaExactly: Int? = null): Int {
         val counts = HashMap<Int, Int>()
         for (y in 0 until bitmap.height) {
             for (x in 0 until bitmap.width) {
                 val argb = bitmap.getPixel(x, y)
-                if (((argb ushr 24) and 0xFF) < GLASS_ALPHA_FLOOR) continue
+                val alpha = (argb ushr 24) and 0xFF
+                if (alpha < GLASS_ALPHA_FLOOR) continue
+                if (alphaExactly != null && alpha != alphaExactly) continue
                 if (awayFrom != null && rgbChannelDelta(argb, awayFrom) < INK_MIN_DELTA_FROM_BACKDROP) continue
                 counts[argb] = (counts[argb] ?: 0) + 1
             }
         }
         val winner = counts.maxByOrNull { it.value }
         checkNotNull(winner) {
-            "节点位图里没有 alpha ≥ $GLASS_ALPHA_FLOOR 的像素（尺寸 ${bitmap.width}x${bitmap.height}），取样对象根本没渲染？"
+            if (alphaExactly != null) {
+                "节点位图里没有 alpha 恰为 $alphaExactly 的像素（尺寸 ${bitmap.width}x${bitmap.height}）——" +
+                    "容器不是按该套玻璃 alpha 画的（画成实底 ⇒ 一个纯填充像素也没有）"
+            } else {
+                "节点位图里没有 alpha ≥ $GLASS_ALPHA_FLOOR 的像素（尺寸 ${bitmap.width}x${bitmap.height}），取样对象根本没渲染？"
+            }
         }
         if (awayFrom != null) {
             assertTrue(

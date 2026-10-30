@@ -4,15 +4,18 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -20,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -151,13 +155,26 @@ class MyWordsScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("my_words_favorite_row_0").performClick()
-        composeRule.onNodeWithTag("my_words_wordbook_row_0").performClick()
-        composeRule.onNodeWithTag("my_words_wrong_row_0").performClick()
-        composeRule.waitForIdle()
+        // 批 4 全量 QA（fontScale 2.0）：两处可达性问题，判据（回调顺序/次数/实参）一字未动 —— 可达性修复，不是放宽。
+        // ① 2.0 档三行都不在首屏视口内，点击前必须 `performScrollTo`（本文件既有配方，
+        //    见 `wordbook_offers_relearn_and_mastered_behind_confirmation`）。
+        // ② 生词本行带「标记为已掌握」药片，2.0 档药片吃掉大半行宽，**点行几何中心会落在药片上**
+        //    （实测中心 x=540 落在药片内 ⇒ `onOpenVocabularyCard` 零调用），而用户点行点的是词条一侧——
+        //    所以三行统一点行体左段（见下方 `openRow`），触摸仍落在行 clickable 上。
+        fun openRow(tag: String) {
+            val row = composeRule.onNodeWithTag(tag)
+            row.performScrollTo()
+            // 点行体左段（词条一侧，局部 x=40px），**不点行几何中心**：2.0 档行内动作药片
+            // （「标记为已掌握」「取消收藏」）会伸到行中心，中心点落进药片 = 行回调零调用。
+            row.performTouchInput { click(Offset(40f, centerY)) }
+            composeRule.waitForIdle()
+        }
+        openRow("my_words_favorite_row_0")
+        openRow("my_words_wordbook_row_0")
+        openRow("my_words_wrong_row_0")
         assertEquals(listOf("fav:anchor", "wb:crisp", "wrong:dune"), opened)
 
-        composeRule.onNodeWithTag("my_words_favorite_unfavorite_1").assertHasClickAction().performClick()
+        composeRule.onNodeWithTag("my_words_favorite_unfavorite_1").performScrollTo().assertHasClickAction().performClick()
         composeRule.waitForIdle()
         assertEquals(listOf("beacon"), unfavorited)
     }
@@ -268,12 +285,18 @@ class MyWordsScreenTest {
         val notice = composeRule.onNodeWithTag("inline_notice_info")
         notice.assertExists()
         composeRule.onNodeWithText("词义详情里可以加入生词本或取消收藏。").assertExists()
-        val noticeBox = notice.fetchSemanticsNode().boundsInRoot
+        // 批 4 全量 QA（fontScale 2.0）：2.0 档页尾提示条整枚落在根窗口之外，`boundsInRoot` 会被根窗口
+        // 裁成 `Rect.Zero`（实测 0,0,0,0，而末段仍是真实矩形 53,1465,1027,1731）——两腿量到的不是同一种坐标，
+        // 比较就没有意义。这里改量**未裁切**的根坐标（`getUnclippedBoundsInRoot`，`DpRect`），
+        // 位置腿判据本体不变：「提示条顶边 ≥ 末段底边」；并把「提示条真能被滚到并显示」补成显式前置。
+        notice.performScrollTo()
+        notice.assertIsDisplayed()
+        val noticeBox = notice.getUnclippedBoundsInRoot()
         val lastSectionBox = composeRule.onNodeWithTag("my_words_section_wrong")
-            .fetchSemanticsNode().boundsInRoot
+            .getUnclippedBoundsInRoot()
         assertTrue(
             "提示条必须是页尾最后一段（应在错词段容器之下）：提示 $noticeBox，末段 $lastSectionBox",
-            noticeBox.top >= lastSectionBox.bottom - 1f,
+            noticeBox.top >= lastSectionBox.bottom - 1.dp,
         )
     }
 

@@ -55,6 +55,10 @@
 ## 迁移策略
 
 - 既有 57 个屏在批 0 不重写；保留同名兼容字段（`surfaceGlass`、`tint3`、`onMint`、`onBrand`、`errorFill`）以免半迁移屏编译失败，批 1–3 逐屏改用新 token，批 4 删除兼容字段。
+  - **2026-10-31 批 4 实跑后改口：五字段未删**。`PrototypeTokenContractTest` 仍钉五字段存在，且实跑引用计数不为零
+    （`onBrand` 38 处/11 文件、`surfaceGlass` 12/5、`tint3` 14/7、`onMint` 30/11、`errorFill` 10/3，命令、含声明与 KDoc 提及的口径见
+    文末「批 4 全量 QA 台账」第 10 行）。`onMint` 现为 `brandDeep` 别名、`surfaceGlass` 仍是玻璃面语义、`tint3` 在 7 个屏有实义，
+    直接删会把 5 个屏打回半迁移。删除属独立重构，需先为这些字段找替代语义，不在批 4 内做——记偏离，待用户裁决是否另立任务。
 - `AppType` 六档保留名字、换成原型度量；新增 `Eyebrow / Caption / Meta / BodyLg / Lemma / StatNum / Prose / ProseZh / NavLabel / StrongTitle / ArticleTitle / PlanNum` 供共享组件与新屏使用。
 - M3 的 15 个排印角色由六档派生；M3 颜色角色改映到新 token，不再使用旧 `onMint / errorFill` 语义。
 
@@ -651,3 +655,23 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 `BackupPairingExportScreen`、`BackupRestoreScreen`、`GlobalVocabularySearchScreen`、`RecoveryScreen`、
 `VocabularyRelearnScreen`、`WorksheetSettingsScreen`、`WorksheetPreviewScreen`，以及词卡内层的错词 / 收藏视图。
 这些屏在原型里没有对应画板，按「原型没画到的状态先问用户」的口径处理：不自行发明版面，也不许顺手改。
+
+## 批 4 全量 QA 台账（2026-10-31）
+
+验收口径（批次表第 4 行）：**门禁 + 真机清单**。connected 只在 `emulator-5574`（API 30 / 2GB）用
+`adb install -r` + `am instrument`；真机 `bf353dda` 只做手工 `install -r` 目视，清单与逐项判据见
+`docs/handoff/2026-10-31-batch4-full-qa-report.md` §8。本轮**零 main 源码改动**（只改 5 个 connected 测试类与文档）。
+
+| # | 项 | 结果 | 判据 / 证据 |
+|---|---|---|---|
+| 1 | 门禁 `assembleDebug → testDebugUnitTest → compileDebugAndroidTestKotlin` | ✅ BUILD SUCCESSFUL（61 tasks） | JVM 按 XML 聚合 **tests 2221 · failures 0 · errors 0 · skipped 0**（`--rerun` 强制重跑，`.git/qa-scratch/batch4-jvm-rerun.log`） |
+| 2 | 全部 connected 包一次跑完 | ⚠️ 不能，拆为 #3/#4 两条环境债 | 实跑到 `VocabularySearchGramIndexTest` 中止：`INSTRUMENTATION_RESULT: shortMsg=Process crashed.`（`.git/qa-scratch/batch4-full-fontscale-1.0.log` 末两行） |
+| 3 | `DevicePairedRestoreE2ETest` 2 条 | ⚠️ 环境前置缺失，不是回归 | `FileNotFoundException: /data/local/tmp/qa-b1-package.zip: open failed: ENOENT`（`loadInputs(DevicePairedRestoreE2ETest.kt:159)`）；造包 + 挑战码流程见 `docs/handoff/2026-10-14-qa-round2-closeout-briefing.md` §4，且 `recordCount==23` 依赖当时的 A 机演示数据 |
+| 4 | `VocabularySearchGramIndexTest` 真实语料全表对照 | ⚠️ 2GB AVD 上整库复制/加载把进程拖崩（非回归） | 同上日志：`…VocabularySearchGramIndexTest:.`（已过 7 条）后直接 `Process crashed` |
+| 5 | `com.example.englishlearning.ui` 全包（1.0 档） | ✅ **561 条 / 失败 3**，3 条全是必须 `font_scale 2.0` 的双字号用例 | 同类在 2.0 下 **OK (6 tests)**；日志 `.git/qa-scratch/batch4-ui-package-1.0.log` |
+| 6 | fontScale 2.0 冒烟（6 类 / 134 条） | ✅ `AppScreenTest` 58 · `WordBankScreenTest` 4 · `TodayPlanScreenTest` 27 · `WordCardScreenTest` 22 · `MyWordsScreenTest` 17 · `AppScreenOverlayContainerTest` 6 | 跑前 `settings put system font_scale 2.0`，跑后复原并实测 `settings get system font_scale` = `1.0` |
+| 7 | 深色两套 | ✅ 组件/像素层有判据；**36 屏逐屏深色截图无 golden** | `androidTest` 全目录 33 行显式深色构造（`AppThemeMode.Dark` / `darkTheme = true` / `ThemeMode.Dark`），`AppColorDark` 76 处/8 文件（`ui` 目录），含 `ThemeModeSwitchTest` 19 处；逐屏目视归真机清单 |
+| 8 | TalkBack | ⚠️ 模拟器无 TalkBack 包（`pm list packages \| grep -i talkback` 空输出） | 语义层由 connected 语义断言 + 契约测试承重；TalkBack 实读归真机清单 §8 第 7 项 |
+| 9 | 动效减弱 | ✅ `settings put global animator_duration_scale 0` → `TodayPlanScreenTest` **OK (27 tests)**，随后 `settings delete global …` 复原为 `null` | 平台 `MotionDurationScale` 直接缩放 Compose 补间（`AppMotion` 只提供 160/220/300 常量与缓动，不读该设置） |
+| 10 | 迁移策略第 1 条「批 4 删除兼容字段」 | ❌ **未删**，改口见上文迁移策略段的 2026-10-31 注 | 实跑计数：`onBrand` 38 处/11 文件、`surfaceGlass` 12/5、`tint3` 14/7、`onMint` 30/11、`errorFill` 10/3（`for f in …; do grep -rn "\b$f\b" app/src/main/java --include=*.kt \| wc -l; done`，含声明与 KDoc 提及）；`PrototypeTokenContractTest` 仍钉五字段在册 |
+| 11 | 双字号可达性修复（`MyWordsScreenTest` 2 条） | ✅ 2.0 下 **OK (17 tests)**，1.0 下同 **OK (17 tests)** | 只改「怎么点到 / 怎么取界」：`performScrollTo` + 行体左段注入（2.0 档动作药片吃掉行中心）+ 未裁切根坐标（页尾提示条被根窗口裁成 `Rect.Zero`）；断言本体一字未动 |

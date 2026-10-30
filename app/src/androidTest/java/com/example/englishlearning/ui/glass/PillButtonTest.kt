@@ -134,7 +134,13 @@ class PillButtonTest {
 
     /**
      * 4.016 残口真实修复的设备侧证据：Secondary + 默认 AiSpeech + 浅套 ⇒
-     * 前景取 `AppColorLight.onMint`（#174C44），**不**取域色 deep（#188F76）。
+     * 前景取 `AppColorLight.onMint`（迁移后是 `brandDeep` 别名 #1A7A63）。
+     *
+     * **2026-10-31 批 4 全量 QA 订正反向腿**：原来「不得回落到域色 deep」读的是活 token
+     * `DomainLight.AiSpeech.deep`，而原型 token 迁移（2026-10-29）把 `onMint` 改成 `brandDeep` 别名后，
+     * 浅套 `onMint` 与浅套 `AiSpeech.deep` 是**同一枚** #1A7A63 —— 正向腿要求出现它、反向腿要求不出现它，
+     * 两条自相矛盾（实测恒红，与渲染无关）。4.016 那条缺陷的墨是**当年的字面量** #188F76，
+     * 所以反向腿改钉这枚历史值：判据（精确到该枚 4.016 墨不得出现）不变，只是不再拿换色后的活 token 当它。
      */
     @Test fun secondary_ai_speech_light_uses_on_mint_ink() {
         composeRule.setContent {
@@ -149,10 +155,11 @@ class PillButtonTest {
             "Secondary/AiSpeech (light) foreground should be onMint ink",
             pixels.minOf { colorDistance(it, onMint) } <= 18.0,
         )
-        val domainDeep = DomainLight.getValue(AppDomain.AiSpeech).deep.toArgb()
+        // 4.016 缺陷墨的历史字面量（迁移前浅套 `AiSpeech.deep`）：它若出现在药片上，说明回落到当年的错墨。
+        val preFixDeep = Color(0xFF188F76).toArgb()
         assertFalse(
-            "Secondary/AiSpeech (light) must not fall back to domain deep (4.016 resurgence)",
-            pixels.any { colorDistance(it, domainDeep) <= 18.0 },
+            "Secondary/AiSpeech (light) must not fall back to the 4.016 ink #188F76",
+            pixels.any { colorDistance(it, preFixDeep) <= 18.0 },
         )
     }
 

@@ -63,10 +63,17 @@ class SetupScreenScreenshotTest {
         }
         // R-13.1 / C-1：首启创建资料页的页头同样由统一组件承载（这一屏与词书选取屏同属核心学习路径，
         // 页头族 seed 摘行的判据是「本文件 headline 读点清零」，残余裸页头必须一并换掉）。
-        // 断言按新组件形状走：testTag 是 `AppScreenHeader` 的承载证据，两行文案逐字命中。
+        // 断言按新组件形状走：testTag 是 `AppScreenHeader` 的承载证据，三行文案（眉题 / 标题 / 副标题）逐字命中。
+        //
+        // 2026-10-31 批 4 全量 QA：副标题**期望值变更**（不是放宽）——批 2 按原型 `sOnboarding1`
+        // （`assets/app.js:1444-1446`）把这一屏改成首启两步的第一步，副标题从
+        // 「填写一个称呼，学习记录只保存在这台设备上。」换成「只为把每天的量定得刚好，随时可以改。」，
+        // 并新增眉题「第 1 步 / 共 2 步」。旧断言查的是**已被原型裁决替换掉的文案**，
+        // 它红的原因不是页头坏了，而是本文件没跟上那次改版；三行仍逐字命中，判据强度不变。
         composeRule.onNodeWithTag("app_screen_header").assertExists()
+        composeRule.onNodeWithText("第 1 步 / 共 2 步").assertExists()
         composeRule.onNodeWithText("先认识一下你").assertExists()
-        composeRule.onNodeWithText("填写一个称呼，学习记录只保存在这台设备上。").assertExists()
+        composeRule.onNodeWithText("只为把每天的量定得刚好，随时可以改。").assertExists()
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
