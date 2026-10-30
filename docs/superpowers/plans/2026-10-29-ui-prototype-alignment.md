@@ -373,6 +373,17 @@ connected `ProfileScreenTest` 3/3 通过（副标题期望值随本条改）。
 **连带改动**：`LearningRecordsUiState` 新增 `todayLocalDate: LocalDate?`（由既有 `ClockProvider` 在 `load(...)` 取一次，
 不新开时钟读点），屏内不读钟；`load()` 只在状态里带基准日，**不预取** `historyRange`（`LearningRecordsViewModelTest` 5/5 原样绿）。
 
+### Task 22-E · 设置（原型 `#/me-settings`，`sMeSettings` `app.js:1328-1344`）
+
+本屏已是原型「四组十行」的骨架（`SettingsGroups` 台账，AC-R-21）。本轮**只补一行副标题**，不增删任何行。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | 「学习提醒」行副标题补「只在当天没完成计划时提醒 · 默认关闭（非精确、每天最多一次）」 | 原型 `:1332` 开启提醒行的 row-sub 就是「只在当天没完成计划时提醒」；本仓 `ReminderSchedulingPolicy` 当日计划完成即取消当日提醒，同一行为，不是空话 | `SettingsPrototypeAlignmentContractTest.the reminder row carries the prototype subtitle without gaining a row` |
+| 2 | 原型「背词」组的「词卡显示」行**不搬** | 本仓没有「首面语言 / 认识也看释义」的偏好项（全仓零 `cardFirst` / `revealKnown` 读点），画出来是死控件；且会把 10 行变 11 行、直接破 AC-R-21 | 同判据（`词卡显示` 归零） |
+| 3 | 原型页末 notice「这一页只放全局开关…」与 `caption` **不抄** | 本屏的 4 组 10 行**正是**提醒 / 词书 / 备份 / 许可的入口，照抄当场说假话 | 同判据（`这一页只放全局开关` 归零） |
+| 4 | 外观分段 / 四组十行形状一格不动 | AC-R-21 台账锁死；本批只改文案 | 同判据（`SettingsGroups.all` 4 组、10 行）+ `SettingsNoDeveloperJargonTest` 5/5 原样绿 |
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -412,7 +423,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 24 | `sMeHome`（:1255） | 我的 | `ProfileScreen.kt` | 🟡 | Task 22-A 已对：`.head-sub`「连续打卡 N 天 · 累计学过 N 个词」+ 三格统计（三枚深链）；「我的词汇」三行按「词库页四格分段是唯一出口」不搬；「应用」组的「关于与许可」待关于页新建后接线 |
 | 25 | `sMeWords`（:1285） | 我的词汇 | `WordBankScreen.kt` 的三格（生词/错词/收藏）+ `MyWordsScreen.kt` 各段 | 🟡 | Task 22-C 已落**对应关系裁决**（不新建页：原型三 tab ↔ 词库页三格）；待做：分段计数、段内 caption（需先核三条规则是否与本仓一致）、尾部 notice、页头搜索动作裁决 |
 | 26 | `sMeRecords`（:1304） | 学习记录 | `LearningRecordsScreen.kt` | ✅ | Task 22-D 已对：页尾提示条逐字搬、「历史记录」逐日行补文章态 + 4dp 细条 + 右尾「N 词」、「本周」七格刻度 + 两枚真统计（本周词数 / 打卡天数）；「19 分 · 日均用时」整枚不画（无采集），「本周」区块随惰性统计住进历史页签；8 条登记在「Task 22-D」台账 |
-| 27 | `sMeSettings`（:1328） | 设置 | `SettingsScreen.kt` | ⬜ | 批 2 |
+| 27 | `sMeSettings`（:1328） | 设置 | `SettingsScreen.kt` | ✅ | Task 22-E 已对：「学习提醒」行补原型副标题；「词卡显示」行与页末 notice 不搬（无偏好项 / 与 4 组 10 行矛盾）；4 组 10 行形状不动，4 条登记在「Task 22-E」台账 |
 | 28 | `sMeReminder`（:1345） | 提醒与发音 | `ReminderSettingsScreen.kt` + `SpeechSettingsScreen.kt` | ⬜ | 批 2（原型合成一屏，本仓是两屏——合还是分要按台账裁决） |
 | 29 | `sMeAbout`（:1366） | 关于 | **批 2 Task 22-B 新建** `AboutScreen.kt`；入口 = 设置「外观与关于」组「关于」行（第 10 行，用户拍板） | ✅ | 应用块 / 说明三行 / 致谢；版本取 `BuildConfig.VERSION_NAME`、致谢只留成立的两句；AC-R-21 行数 9→10；JVM 4 条 + connected 全绿；`licenseCount` 注入待补（行文案已能不带数字） |
 | 30 | `sMeLicenses`（:1385） | 开源许可 | `LicensesScreen.kt` | ⬜ | 批 2 |
@@ -423,7 +434,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ⬜ | 错误屏未对 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | 应用侧**无对应屏**（`页面不可用` 全仓 0 命中） | ⬜ | 先确认要不要这一屏（原型画了，本仓没有承载点） |
 
-**小计（Task 22-D 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 14 屏 · 🟡 7 屏 · ⬜ 15 屏。
+**小计（Task 22-E 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 15 屏 · 🟡 7 屏 · ⬜ 14 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、

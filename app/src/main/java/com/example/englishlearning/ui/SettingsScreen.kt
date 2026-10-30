@@ -344,7 +344,7 @@ internal fun SettingsGroupsContent(
             )
             LedgerEntryRow(
                 tag = "settings_open_reminder",
-                subtitle = "每日提醒，默认关闭（非精确、每天最多一次）",
+                subtitle = "只在当天没完成计划时提醒 · 默认关闭（非精确、每天最多一次）",
                 topDivider = true,
                 onClick = onOpenReminderSettings,
             )
