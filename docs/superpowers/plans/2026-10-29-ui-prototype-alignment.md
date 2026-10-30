@@ -336,6 +336,23 @@ connected `ProfileScreenTest` 3/3 通过（副标题期望值随本条改）。
 许可条数注入是下一步小事）。JVM 2181 条全绿；connected `SettingsScreenTest` 18/18、
 `ProfileScreenTest` 3/3、`BackupEntryUnificationTest` 全绿。
 
+### Task 22-C · 我的词汇（原型 `#/me-words`，`sMeWords` `app.js:1285-1303`）— 对应关系裁决（未动版面）
+
+**裁决（本仓形状与原型不同，先定对应关系再改版面）**：
+原型是一页「我的词汇」+ 一枚三段 `seg-solid`（收藏 / 生词本 / 易错，标签带计数）+ 每段一句 caption
++ 该段词行 + 尾部 notice。本仓的等价物**已经存在**：
+- 三分类 = `WordBankScreen` 的「生词 / 错词 / 收藏」三格（`WordBankSection` 四格里的三格，第一格是词书）；
+- 各段的面 = `MyWordsScreen` 以 `showHeader = false` 注入的三段（它自己不再自带页头与分段）。
+
+因此：**不新建「我的词汇」页**；原型的三个 tab ↔ 本仓三格的映射是
+`收藏 → WordBankSection.Favorite`、`生词本 → WordBankSection.New`、`易错 → WordBankSection.Wrong`。
+待做（下一轮按 TDD 推进，每条各配判据）：
+1. 三格标签补计数（`收藏 N` / `生词 N` / `错词 N`）——计数由各段 UiState 的列表长度给，读不到就不带数字；
+2. 段内 caption 三句（收藏不排复习 / 生词明日前排 / 错词按答错次数，答对两次移出）——先核这三条**规则是否与本仓一致**，
+   不一致的按「读不到/不成立就不写」处理（这三句是原型的产品口径，不是本仓现有规则）；
+3. 尾部 notice「词义详情里可以加入生词本或取消收藏」——本仓词义详情确有这两枚能力时再搬；
+4. 页头搜索动作（原型 `barTop` 的 search `icon-btn`）——本仓查词入口在今日学习常驻查词条，是否在这页再开口待裁决。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -373,7 +390,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 22 | `sAiProfiles`（:952） | AI 服务 | `AiProfileSettingsScreen.kt` | ⬜ | 批 3 |
 | 23 | `sAiProfileEdit`（:1194） | AI 服务编辑 | `AiProfileSettingsScreen.kt` 编辑态 | ⬜ | 批 3 |
 | 24 | `sMeHome`（:1255） | 我的 | `ProfileScreen.kt` | 🟡 | Task 22-A 已对：`.head-sub`「连续打卡 N 天 · 累计学过 N 个词」+ 三格统计（三枚深链）；「我的词汇」三行按「词库页四格分段是唯一出口」不搬；「应用」组的「关于与许可」待关于页新建后接线 |
-| 25 | `sMeWords`（:1285） | 我的词汇 | `MyWordsScreen.kt` / `WordBankScreen.kt` | ⬜ | 批 2（两屏对应关系待确认：收藏的词 / 生词 / 错词 / 词库） |
+| 25 | `sMeWords`（:1285） | 我的词汇 | `WordBankScreen.kt` 的三格（生词/错词/收藏）+ `MyWordsScreen.kt` 各段 | 🟡 | Task 22-C 已落**对应关系裁决**（不新建页：原型三 tab ↔ 词库页三格）；待做：分段计数、段内 caption（需先核三条规则是否与本仓一致）、尾部 notice、页头搜索动作裁决 |
 | 26 | `sMeRecords`（:1304） | 学习记录 | `LearningRecordsScreen.kt` | ⬜ | 批 2 |
 | 27 | `sMeSettings`（:1328） | 设置 | `SettingsScreen.kt` | ⬜ | 批 2 |
 | 28 | `sMeReminder`（:1345） | 提醒与发音 | `ReminderSettingsScreen.kt` + `SpeechSettingsScreen.kt` | ⬜ | 批 2（原型合成一屏，本仓是两屏——合还是分要按台账裁决） |
@@ -386,7 +403,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ⬜ | 错误屏未对 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | 应用侧**无对应屏**（`页面不可用` 全仓 0 命中） | ⬜ | 先确认要不要这一屏（原型画了，本仓没有承载点） |
 
-**小计（Task 22-B 接线后重算，按本表状态列逐行数）**：✅ 13 屏 · 🟡 6 屏 · ⬜ 17 屏。
+**小计（Task 22-C 裁决后重算，按本表状态列逐行数）**：✅ 13 屏 · 🟡 7 屏 · ⬜ 16 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、
