@@ -31,6 +31,7 @@ import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.learning.domain.DailyLearningHistory
+import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.MintBackground
@@ -56,25 +57,13 @@ fun LearningRecordsScreen(
             .background(MintBackground)
             .testTag("learning_records_screen"),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-            Text(
-                text = "← 返回",
-                modifier = Modifier
-                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                    .clickable(onClick = onBack)
-                    .padding(8.dp)
-                    .testTag("learning_records_back")
-                    .semantics { contentDescription = "返回" },
-                color = MintPrimaryDark,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "学习记录",
-                modifier = Modifier.padding(start = 12.dp, top = 8.dp),
-                color = MintPrimaryDark,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        // 批 2 Task 22-D：页头换成共享 `AppScreenHeader`（原型 `barTop('学习记录')`）。
+        // 旧的自写「← 返回 + 标题」两枚 Text 是同一件事的第二套实现；返回位与朗读定语归组件。
+        AppScreenHeader(
+            title = "学习记录",
+            onBack = onBack,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+        )
         TabRow(selectedTabIndex = selectedIndex) {
             tabs.forEach { tab ->
                 val label = tab.label()

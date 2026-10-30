@@ -13,6 +13,8 @@ import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -64,13 +66,13 @@ class LearningRecordsScreenTest {
     fun backLinkMeetsTheMinimumTouchTarget() {
         composeRule.setContent { LearningRecordsScreen(LearningRecordsUiState(), {}, {}, {}, {}) }
 
-        composeRule.onNodeWithTag("learning_records_back").assertIsDisplayed()
-        composeRule.onNodeWithTag("learning_records_back").assertHeightIsAtLeast(48.dp)
-        composeRule.onNodeWithTag("learning_records_back").assertWidthIsAtLeast(48.dp)
+        // 批 2 Task 22-D：返回位改为共享 `AppScreenHeader` 的返回位（组件只带朗读定语「返回」，
+        // 不再有屏侧 tag）——判据从「按 tag 取」换成「按描述取」，仍是「点得到、≥48dp」。
+        composeRule.onNodeWithContentDescription("返回").assertIsDisplayed().assertHasClickAction()
 
-        val bounds = composeRule.onNodeWithTag("learning_records_back").getUnclippedBoundsInRoot()
-        assertTrue("learning_records_back 的触控目标应至少 48dp 高，实际=$bounds", bounds.bottom - bounds.top >= 48.dp)
-        assertTrue("learning_records_back 的触控目标应至少 48dp 宽，实际=$bounds", bounds.right - bounds.left >= 48.dp)
+        val bounds = composeRule.onNodeWithContentDescription("返回").getUnclippedBoundsInRoot()
+        assertTrue("返回位的触控目标应至少 48dp 高，实际=$bounds", bounds.bottom - bounds.top >= 48.dp)
+        assertTrue("返回位的触控目标应至少 48dp 宽，实际=$bounds", bounds.right - bounds.left >= 48.dp)
     }
 
     /**
