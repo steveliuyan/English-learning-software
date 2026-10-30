@@ -323,6 +323,15 @@ private fun ArticleHeadlineAndSpeech(
             color = colors.text1,
             modifier = Modifier.testTag("article_title"),
         )
+        // 原型 `.article-meta`（`app.js:748`）：`source · 约 214 词 · 5 分钟`。
+        // 这里只搬读得到的那一枚——词数按 `englishText` 空白切分真算；版本号取 `Article.version`。
+        // 「5 分钟」不画：本仓没有阅读速度口径，按固定词/分钟换算就是编造。
+        Text(
+            text = "约 ${article.englishText.split(Regex("\\s+")).count { it.isNotBlank() }} 词 · 第 ${article.version} 版",
+            style = AppType.Meta,
+            color = colors.text2,
+            modifier = Modifier.testTag("article_meta"),
+        )
         Column(
             modifier = Modifier
                 .testTag("article_status_live_region")

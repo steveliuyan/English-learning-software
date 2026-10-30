@@ -70,7 +70,9 @@ class SetupScreenScreenshotTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+        // 批 1 Task 12：合并屏页名取原型 `#/plan-edit` 的「学习计划」，旧页名整文件清零；
+        // 「每日新增」现在是四枚 chip（`DailyTargetChips`），节标题文案不变所以锚不动。
+        composeRule.onNodeWithText("学习计划").assertExists()
         composeRule.onNodeWithText("选择词书").assertExists()
         composeRule.onNodeWithText("每日新增").assertExists()
         composeRule.onNodeWithContentDescription("保存学习设置").assertExists()

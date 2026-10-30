@@ -6,6 +6,14 @@
 > `2026-10-30-layout-redesign-batch-2-learning-path.md`、`2026-10-31-layout-redesign-batch-3-reading-path.md`、
 > `2026-11-01-layout-redesign-batch-4-ai-path.md`）。
 
+> **⚠ 改判留痕（2026-10-29）**：本计划里凡是把选词书写成「**2 列色块卡**」的条目——开篇范围那句、
+> 对账 4、Task 9 Step 3.1 与验收清单第 1 条、状态表「两列色块选词书」那几处——**版面均已作废**，
+> 逐屏对照原型后由用户改判为通栏 `.pick.pick-radio` 行列表，见
+> `docs/decisions/2026-10-29-word-book-picker-rows-supersede-tiles.md` 与
+> `docs/superpowers/plans/2026-10-29-ui-prototype-alignment.md` 的 Task 13-A 台账。
+> 本计划其余条目不受影响；对账 4 里「删除走长按 + `customActions`」「不引 `LazyVerticalGrid`」
+> 两条结论随版面一起搬到了行列表上，仍然有效。下面原文按当时事实保留，不覆写。
+
 **Goal:** 把设置与系统九屏（语音合成、学习提醒、许可证、备份中心、导出、恢复、认证导出、恢复异常、启动/建档）
 从「M3 默认主题 + 自写返回按钮 + 静态 `Mint*` 桥 + `fontSize = xx.sp` 手搓字号 + 卡片汤」推到批 1 已立的骨架：
 `AppType` 六档排印、`appColors()` / `appDomain()` 令牌、`AppScreenHeader` 共享页头、

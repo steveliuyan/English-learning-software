@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.example.englishlearning.reading.domain.Article
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
@@ -92,28 +93,46 @@ fun ReadingHistoryScreen(
                 }
             } else {
                 // findHistory 已按 localDate DESC, generatedAt DESC, version DESC 排全部版本行；
-                // groupBy 保持遭遇顺序，组内顺序即版本从新到旧。
-                val groups = history.groupBy { it.versionGroupKey }
-                groups.forEach { (key, versions) ->
-                    item(key) {
-                        if (versions.size == 1) {
-                            val article = versions.single()
-                            BareRow(
-                                title = article.title,
-                                subtitle = article.localDate,
-                                topDivider = true,
-                                onClick = { onOpenArticle(article) },
-                                modifier = Modifier.testTag("reading_history_item_${article.articleId}"),
-                            )
-                        } else {
-                            VersionGroup(
-                                groupKey = key,
-                                versions = versions,
-                                onOpenArticle = onOpenArticle,
-                                onRequestDeleteVersion = onRequestDeleteVersion,
-                            )
+                // 先按日期分节（原型 `section(h.date, …)`），再在节内按版本组分株：两层 `groupBy`
+                // 都保持遭遇顺序，所以节与组内都仍是「新的在前」。
+                val byDate = history.groupBy { it.localDate }
+                byDate.forEach { (date, articlesOnThatDate) ->
+                    item("date-$date") {
+                        SectionHeading(text = date)
+                    }
+                    articlesOnThatDate.groupBy { it.versionGroupKey }.forEach { (key, versions) ->
+                        item(key) {
+                            if (versions.size == 1) {
+                                val article = versions.single()
+                                BareRow(
+                                    title = article.title,
+                                    subtitle = article.localDate,
+                                    topDivider = true,
+                                    onClick = { onOpenArticle(article) },
+                                    modifier = Modifier.testTag("reading_history_item_${article.articleId}"),
+                                )
+                            } else {
+                                VersionGroup(
+                                    groupKey = key,
+                                    versions = versions,
+                                    onOpenArticle = onOpenArticle,
+                                    onRequestDeleteVersion = onRequestDeleteVersion,
+                                )
+                            }
                         }
                     }
+                }
+                // 原型 `app.js:811` 的尾部提示：本仓这句成立（旧版本不被覆盖、都在这份列表里），逐字搬。
+                item("notice") {
+                    Text(
+                        text = "同一天可以重新生成文章；旧版本不会被覆盖，都在这份列表里。",
+                        style = AppType.Footnote,
+                        color = colors.text2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                            .testTag("reading_history_notice"),
+                    )
                 }
             }
         }

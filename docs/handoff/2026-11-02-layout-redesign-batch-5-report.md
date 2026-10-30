@@ -3,6 +3,10 @@
 计划文档：`docs/superpowers/plans/2026-11-02-layout-redesign-batch-5-settings-and-system.md`
 规范文档：`docs/superpowers/specs/2026-10-25-full-layout-redesign-design.md`
 裁决文档：`docs/decisions/2026-11-02-batch-5-routing-and-picker-rulings.md`
+改判留痕：本文记录的「选词书改 **2 列色块卡**」版面在 2026-10-29 逐屏对照原型后被用户翻掉，现行是通栏
+`.pick.pick-radio` 行列表（`docs/decisions/2026-10-29-word-book-picker-rows-supersede-tiles.md`、
+批 1 台账 Task 13-A）。本文其余记录仍是当时的事实，不覆写；「删除走长按」「不引 `LazyVerticalGrid`」
+两条结论搬进行列表后继续有效。
 范围：`SpeechSettingsScreen` / `ReminderSettingsScreen` / `LicensesScreen` / `BackupHubScreen` /
 `BackupExportScreen` / `BackupRestoreScreen` / `BackupPairingExportScreen` / `RecoveryScreen` +
 `AppScreen.kt` 内启动/建档窗口（九屏 2160 行，全量重排 8 个屏文件 + 宿主分支）

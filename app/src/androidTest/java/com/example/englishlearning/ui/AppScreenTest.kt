@@ -131,7 +131,9 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+        // 页名锚随批 1 Task 12（合并屏 = 原型 `#/plan-edit`）换成「学习计划」；
+        // 旧页名「选好词书，开始今天的积累」已整文件清零，判据由 `LearningSetupLayoutContractTest` 钉住。
+        composeRule.onNodeWithText("学习计划").assertExists()
         composeRule.onNodeWithContentDescription("保存学习设置").assertExists()
     }
 
@@ -212,7 +214,10 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("测试词书").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performScrollTo().performClick()
+        // 批 1 Task 12：保存键进原型 `.foot` 的**吸底条**（在 `verticalScroll` 之外），`performScrollTo()`
+        // 必须去掉——吸底节点没有可滚的父布局（留着就报「Semantic Node has no parent layout with a Scroll
+        // SemanticsAction」）。判据反而更严：不滚就能点到的节点，若哪天被塞回滚动区，`performClick` 先失败。
+        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) { invocations == 2 }
         assertEquals(2, invocations)
     }
@@ -247,6 +252,10 @@ class AppScreenTest {
         composeRule.waitForIdle()
         // 批 1 Task 5 起词书单词列表是词库页的第一段（默认落点），词库壳先在场。
         composeRule.onNodeWithTag("word_bank_screen").assertExists()
+        // 批 1 Task 15 起词书段默认面是**词书详情**（原型 `sBookDetail`），词单浏览从它的
+        // 「查看完整词单」那一行进（原型 `to:'learn-queue'`）。
+        composeRule.onNodeWithTag("book_detail_open_word_list").performScrollTo().performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_screen").assertExists()
         composeRule.onNodeWithTag("wordbook_words_row_aword").assertExists()
         scrollToRailLetter("W")
@@ -279,14 +288,21 @@ class AppScreenTest {
         }
         createProfile()
         composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
+        composeRule.onNodeWithTag("book_detail_open_word_list").performScrollTo().performClick()
         scrollToRailLetter("W")
         composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("wordbook_words_rail_active_W").assertExists()
-        // Task 5 后词书段没有自己的返回位：退页只由词库页页头那一枚承载。
+        // 批 1 Task 15 起壳那枚返回键按态分派：词单浏览里退回**词书详情**，详情里那枚才退出词库页。
         composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("book_detail_screen").assertExists()
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
         composeRule.waitForIdle()
+        // 新会话仍从详情起（`rememberSaveable(showWordBank)`），再进词单落在 A 组。
+        composeRule.onNodeWithTag("book_detail_open_word_list").performScrollTo().performClick()
         composeRule.onNodeWithTag("wordbook_words_rail_active_A").assertExists()
         composeRule.onNodeWithTag("wordbook_words_row_aword").assertExists()
     }
@@ -302,6 +318,7 @@ class AppScreenTest {
         }
         createProfile()
         composeRule.onNodeWithTag("today_plan_open_word_bank").performScrollTo().performClick()
+        composeRule.onNodeWithTag("book_detail_open_word_list").performScrollTo().performClick()
         scrollToRailLetter("W")
         composeRule.onNodeWithTag("wordbook_words_rail_W").performClick()
         composeRule.waitForIdle()
@@ -749,6 +766,158 @@ class AppScreenTest {
         composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
     }
 
+    /**
+     * 批 1 Task 16 的导航接线：今日学习裸行组首位「今日词单」开新建屏，返回键回今日学习。
+     *
+     * 这一条钉的是新建屏四件套接线里 JVM 侧问不到的三件事：状态位真的挂载了那支分支、
+     * `overlayOpen` 聚合里登记了这一枚（底部一级导航必须让位），以及那条 `BackHandler` 的
+     * `enabled` 守卫没有把返回键让给隔壁（本条的判据形状与
+     * `openingAnAiFeatureHidesTheBottomBarAndBackReturnsToTheAiTab` 同族）。
+     *
+     * 本 harness 的 `placeholderCardPlan()` 不带内容源，两节队列都是空的——这正是屏侧
+     * 「某一节 0 个词就整节不渲染」的形态，所以这里只按 `today_word_list_screen` 一枚屏锚点判存在性，
+     * 词行/筛选/吸底按钮的版面由 `TodayWordListScreenTest` 逐条承担。
+     */
+    @Test
+    fun theWordListEntryOpensTheTodayWordListAndBackReturnsToTheLearningTab() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_word_list").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        // 只按屏锚点判定：今日学习那枚入口行的标题逐字也叫「今日词单」，页内还是同一句页名，
+        // 覆盖层与底 tab 同树时按文案取节点会撞上两枚（本条要证的是挂载与返回键，不是文案）。
+        composeRule.onNodeWithTag("today_word_list_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
+
+        pressSystemBack()
+        // 注入的按键事件是异步派发的：`pressSystemBack()` 里的 `waitForIdle()` 可能在 `BackHandler`
+        // 还没跑之前就先idle 返回，所以覆盖层的拆除要等——这与
+        // `startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan` 用同一枚 waitUntil 的原因是同一个，
+        // 不是本层的返回守卫没生效（返回守卫不生效的话这里等不到节点消失）。
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_word_list_screen").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        composeRule.onNodeWithTag("app_tab_learning").assertExists()
+    }
+
+    /**
+     * 批 1 Task 17 的导航接线：今日学习裸行组第二行「复习队列」开新建屏，返回键回今日学习。
+     *
+     * 与上一条同族，钉的是四件套接线里 JVM 侧问不到的三件事：状态位挂载了那支分支、`overlayOpen`
+     * 聚合登记了这一枚（底部一级导航让位）、那条 `BackHandler` 的 `enabled` 守卫没把返回键让给隔壁。
+     *
+     * 本 harness 的 `placeholderCardPlan()` 不带内容源，到期队列是空的 → 屏侧「0 个到期词就不画
+     * 到期词节与吸底」的形态生效，所以这里同样只按 `review_queue_screen` 一枚屏锚点判存在性；
+     * 队列有词时的行、说明卡与「开始复习」由 `ReviewQueueScreenTest` 逐条承担。
+     */
+    @Test
+    fun theReviewQueueEntryOpensTheReviewQueueAndBackReturnsToTheLearningTab() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_open_review_queue").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("review_queue_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_learning").assertDoesNotExist()
+
+        pressSystemBack()
+        // 同 `theWordListEntryOpensTheTodayWordListAndBackReturnsToTheLearningTab`：注入按键异步派发，
+        // 覆盖层的拆除要等，不能紧跟 `pressSystemBack()` 直接断言。
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("review_queue_screen").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        composeRule.onNodeWithTag("app_tab_learning").assertExists()
+    }
+
+    /**
+     * 批 1 Task 18 的导航接线（本仓第一枚「由学习流程内部推进出来」的新建屏）。
+     *
+     * 与 Task 16 / 17 那两条的**关键区别**：那两枚是今日学习裸行组点开的覆盖层，本屏没有入口行——
+     * 原型的入口是流程自身的末张卡推进（`assets/app.js:1688` / `:1701` 的 `go('learn-summary')`），
+     * 所以这条用例必须真的把一张卡提交完才谈得上挂载，JVM 侧的源码判据问不到这一层：
+     *  1. `AllDone` 到达时宿主挂的是**收尾屏**，词卡屏同时离开组合（本屏不新增导航状态位，
+     *     全部靠 `showLearning` + 状态分派，所以两侧只可能有一侧在场）；
+     *  2. 页头「完成」把三个出口共用的那条 `exitLearning` 走通：回到今日学习**并重算计划**
+     *     （F1-04：刚提交的词要从今日学习的数字里立刻看得见，不是重启App 才刷新）；
+     *  3. 收尾屏上出现的是宿主给的真实日期与真实完成数，不是原型 mock 的 `6:42 / 82%`。
+     *
+     * 走的是真实数据通路：harness 的 `placeholderCardPlan()` 是 1 张新词、0 张到期，
+     * `openDetailOnKnown` 按默认 false（「认识」直接进回执，不弹词义详情），回执 `hasNext = false`
+     * 所以主操作文案就是「完成本轮」。
+     */
+    @Test
+    fun finishingTheLastCardHandsTheScreenToTheTodaySummaryAndDoneReturnsToThePlan() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_feedback_known").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_next").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("完成本轮").assertExists()
+        // 回执仍在词卡屏上：收尾屏只在**推进之后**出现，评分成功那一刻就换屏等于把回执抽走。
+        composeRule.onNodeWithTag("today_summary_screen").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("word_card_next").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_summary_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_screen").assertDoesNotExist()
+        composeRule.onNodeWithText("今日完成").assertIsDisplayed()
+        // 宿主给的是计划快照的真实日期（`placeholderCardPlan()` = 2026-09-19），不是原型那句 mock。
+        composeRule.onNodeWithTag("today_summary_date").assertIsDisplayed()
+        composeRule.onNodeWithText("2026-09-19").assertIsDisplayed()
+        composeRule.onNodeWithText("用时").assertDoesNotExist()
+        composeRule.onNodeWithText("一次答对").assertDoesNotExist()
+
+        composeRule.onNodeWithContentDescription("完成，回到今日学习").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("today_summary_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("app_tab_learning").assertExists()
+    }
+
+    /**
+     * Task 18 的第二件事：收尾屏**不新置导航状态位**，所以系统返回键由既有那条
+     * `BackHandler(enabled = showLearning)` 接管，行为与原型一致（三个出口全指 learn-home）。
+     *
+     * 这条同时钉住「退出通路只有一条」：返回键退出时必须走 `exitLearning`（关浮层**且**重算计划），
+     * 接线若写成只把 `showLearning` 置 false 的半边退出，今日学习的数字会停在进流程之前的那份快照上，
+     * `today_plan_summary` 照样出现、看上去没错——所以这里额外断言重进学习时词卡屏回到首卡，
+     * 而不是顶着 `AllDone` 又开一张收尾屏。
+     */
+    @Test
+    fun systemBackOnTheTodaySummaryExitsTheLearningFlowTheSameWay() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+
+        composeRule.onNodeWithContentDescription("开始学习").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_feedback_known").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_next").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_next").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_summary_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        pressSystemBack()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("today_summary_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("app_tab_learning").assertExists()
+    }
+
     @Test
     fun recordingProviderKeepsLegacyWordAndSentenceVerbsDistinct() = kotlinx.coroutines.runBlocking {
         val provider = RecordingPronunciationProvider(PronunciationResult.Played)
@@ -830,7 +999,10 @@ class AppScreenTest {
             ),
             provider.wordCalls.map { it.second },
         )
-        composeRule.onNodeWithText("发音已播放。").assertExists()
+        // 详情是叠在学习词卡之上的覆盖层：词卡自己的 live region 还留在树里（同为「发音已播放。」），
+        // 故按详情那一枚 tag 点名，而不是按全屏同文案找唯一节点——后者量的是「整棵树里恰好一处」，
+        // 与它真正要证的「详情接住了宿主呈现态」无关。
+        composeRule.onNodeWithTag("card_detail_pronunciation_message").assertExists()
     }
 
     /** D1：开关关闭后词卡就绪不自动发音，点击仍恰好触发一次。 */
@@ -1163,8 +1335,8 @@ class AppScreenTest {
                 readingAccessViewModel = reading.access,
                 articleReadingViewModel = reading.article,
                 // 本用例要「阅读入口」与「学习入口」同时可达，见 `planUnlockedWithPendingReview()`：
-                // `readingFixture()` 自带的计划（严格档、当日新词已学完）只有前者，主 CTA 会落到
-                // 「去读今日文章／复习生词本」，点了不进学习流。
+                // `readingFixture()` 自带的计划（严格档、当日新词已学完）已经走到空态（`sLearnEmpty`），
+                // 那一态没有主 CTA、也没有进学习流的出口。
                 todayPlanViewModel = planUnlockedWithPendingReview(),
             )
         }
@@ -1182,9 +1354,9 @@ class AppScreenTest {
         // 退文章 → 今日计划 → 进学习流，提交一张卡打开「下一处详情」（学习流宿主）。
         pressSystemBack()
         composeRule.onNodeWithTag("app_tab_learning").performClick()
-        // 主 CTA 按 tag 取，不按内容描述取：`TodayPlanScreen` 头注释写明「四态同锚点
-        // `today_plan_start_learning`，文案随状态换」（未学完→开始学习／欠复习→开始复习／
-        // 未读文章→去读今日文章／读完→复习生词本）。本用例喂的是 `planUnlockedWithPendingReview()`，
+        // 主 CTA 按 tag 取，不按内容描述取：`TodayPlanScreen` 头注释写明「主 CTA 两态同锚点
+        // `today_plan_start_learning`，文案随状态换」（未学完→开始学习／新词学完仍欠复习→开始复习；
+        // 全学完则换空态，主 CTA 整枚不在）。本用例喂的是 `planUnlockedWithPendingReview()`，
         // 文案是「开始复习」，按描述取恒红。
         composeRule.onNodeWithTag("today_plan_start_learning").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -1735,8 +1907,9 @@ class AppScreenTest {
      *
      *  - `UnlockPolicy.isUnlocked` 在严格档（`v1`）要求新词与复习**都**完成，阅读页才拿得到
      *    `isUnlocked = true`（`AppScreen` 把 `todayReady.isUnlocked` 透给 `ReadingAccessViewModel.load`）；
-     *  - `TodayPlanScreen` 的主 CTA 只在「没全完成」时才走 `onStartLearning`，全完成就换成
-     *    「去读今日文章」/「复习生词本」。
+     *  - `TodayPlanScreen` 的主 CTA 只在「没全完成」时才在场，且只在 `newDone < newTarget` 时是
+     *    「开始学习」，其余是「开始复习」（批 1 Task 19：全完成换原型空态 `sLearnEmpty`，
+     *    主 CTA 与进学习流的出口一并离场）。
      *
      * 唯一让两者并存的杠杆是宽松档（`v1-relaxed`，只要求新词完成）：把 `apple-id` 记作已学 →
      * `newDone == newTarget` → 解锁；复习位再留一枚没做过的 `due-orange-id` → `allDone == false`
@@ -2206,7 +2379,11 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("today_plan_summary").assertExists()
+        // 建完档落在学习 tab。按**屏根**判存在性而不是 `today_plan_summary`：批 1 Task 19 起
+        // 「今天全学完了」那一态换的是空态（原型的 `sLearnEmpty`），强档卡整段不在——
+        // 而 `readingFixture()` 这类夹具恰好是「当日新词已学完」的计划，拿 `today_plan_summary`
+        // 当「建完档了」的凭据会把这批用例误判成失败。
+        composeRule.onNodeWithTag("today_plan_screen").assertExists()
     }
 
     private fun todayPlanViewModel(): TodayPlanViewModel = TodayPlanViewModel({ TodayPlanResult.MissingLearningSetup }, FakeLearningProfileRepository())
@@ -2230,9 +2407,9 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_open_setup").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+        composeRule.onNodeWithText("学习计划").assertExists()
 
-        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
         composeRule.waitForIdle()
         // 存完落回入口所在页（「我的」），再回学习页看计划是否重算——原用例「回今日计划 + 重算一次」
         // 的判据原样保留，只把「回哪一页」按新版式改准。
@@ -2261,7 +2438,7 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_open_setup").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+        composeRule.onNodeWithText("学习计划").assertExists()
 
         // 批 2 Task 6：旧版另有一枚 `← 返回上一层` 文字按钮（朗读文案「返回上一层」）；现在返回位
         // 只剩共享页头一处，朗读文案随之变成页头固定的「返回」。判据仍是「点得到、点完回到「我的」」。
@@ -2286,7 +2463,7 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("选好词书，开始今天的积累").assertExists()
+        composeRule.onNodeWithText("学习计划").assertExists()
         // 强制首设路径 `onCancel == null`：共享页头在 `onBack == null` 时整段不渲染（R-9.2），
         // 所以这里断言的是「页头返回位不存在」。批 2 Task 6 起返回位只有页头这一处，
         // 原来的「返回上一层」文字按钮已删，判据跟着换到新的唯一入口上，不放宽。

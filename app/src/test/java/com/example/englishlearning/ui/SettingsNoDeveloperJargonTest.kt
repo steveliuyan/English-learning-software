@@ -60,7 +60,7 @@ class SettingsNoDeveloperJargonTest {
     }
 
     /**
-     * IA 台账（AC-R-21 / 裁决②/⑥）：**恰 4 组、恰 9 行**，行标题与 tag 逐字钉死。
+     * IA 台账（AC-R-21 / 裁决②/⑥）：**恰 4 组、恰 10 行**，行标题与 tag 逐字钉死。
      * 直读生产码里的 [SettingsGroups]（纯数据 object，JVM 可加载），connected 侧
      * `SettingsScreenTest` 再核对这些 tag 真的渲染出来——两张脸对不上都会红。
      */
@@ -72,16 +72,16 @@ class SettingsNoDeveloperJargonTest {
             "四个分组标题按裁决②钉死（「学习提醒」归「学习」组，不再有「账户」「阅读」组）",
         )
         val rows = SettingsGroups.all.flatMap { it.entries }
-        assertEquals(9, rows.size, "设置页一级行必须恰 9 条，实为 ${rows.size} 条")
+        assertEquals(10, rows.size, "设置页一级行必须恰 10 条（9 + 批 2 Task 22-B 的「关于」行），实为 ${rows.size} 条")
         assertEquals(
             listOf(
                 "词书与每日目标", "学习提醒", "生成默写纸",
                 "AI 服务与密钥", "语音朗读",
-                "主题", "开源许可与隐私说明",
+                "主题", "开源许可与隐私说明", "关于",
                 "词书内容包", "备份与恢复",
             ),
             rows.map { it.title },
-            "九行标题按稿 §7④ 与裁决②钉死",
+            "十行标题按稿 §7④ 与裁决②钉死（第 10 行为批 2 Task 22-B 的「关于」，用户拍板加）",
         )
         val tags = rows.map { it.tag } + SettingsGroups.all.map { it.tag }
         assertEquals(tags.size, tags.toSet().size, "组与行的 testTag 不得重复：$tags")
@@ -112,7 +112,7 @@ class SettingsNoDeveloperJargonTest {
         val titles = SettingsGroups.all.flatMap { group ->
             listOf(group.title) + group.entries.map { it.title }
         }
-        assertEquals(13, titles.size, "4 组 + 9 行共 13 枚标题（台账形状变了先改这条）")
+        assertEquals(14, titles.size, "4 组 + 10 行共 14 枚标题（台账形状变了先改这条）")
         titles.forEach { title ->
             val quoted = Regex(""""\Q$title\E"""")
             assertEquals(

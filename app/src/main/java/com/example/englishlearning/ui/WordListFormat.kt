@@ -60,3 +60,23 @@ internal fun wordListSourceLabel(feedback: String): String = when (feedback) {
 internal fun wordListMeaning(card: WordCard): String? =
     card.meaningZh.ifBlank { card.senses.firstOrNull()?.meaningZh.orEmpty() }
         .ifBlank { null }
+
+/**
+ * 「词性 + 释义」那一档（批 1 Task 16，今日词单屏的行副文案）。
+ *
+ * 原型 `wordRow` 的 `row-sub` 逐字是 `w.pos + ' ' + w.meaning`（`assets/app.js:228`）——一个空格把两截
+ * 拼成一行。这里保住那一档形状，同时补原型没有的**空值口径**（原型是写死的数据，两截都有值）：
+ *  - 词性取主档，主档为空退第一枚义项的词性——**跟着释义那一档走**：释义取自第一枚义项时词性也取自
+ *    同一枚，不许「主档词性 + 义项释义」这种拼法（会读出「v. 波浪」一类错配）。
+ *  - 两截里哪一截空就不留前导/尾随空格；两截都空给 `null`，调用方据此不渲染副文案槽。
+ *
+ * 与 [wordListMeaning] 同住本文件（m-5 立的规矩：词汇列表的格式化 helper 只有这一处），
+ * 屏侧再拼一份「词性 + 释义」就是第二份口径。
+ */
+internal fun wordListGloss(card: WordCard): String? {
+    val meaning = wordListMeaning(card)
+    val partOfSpeech = card.partOfSpeech.ifBlank { card.senses.firstOrNull()?.partOfSpeech.orEmpty() }
+    return listOfNotNull(partOfSpeech.takeIf { it.isNotBlank() }, meaning)
+        .joinToString(separator = " ")
+        .ifBlank { null }
+}

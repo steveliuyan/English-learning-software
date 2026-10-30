@@ -1,14 +1,9 @@
 package com.example.englishlearning.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,19 +16,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -61,27 +55,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import com.example.englishlearning.export.WorksheetShareLauncher
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.BuildConfig
 import com.example.englishlearning.R
 import com.example.englishlearning.learning.WordBook
-import com.example.englishlearning.ui.components.AppIcon
+import com.example.englishlearning.learning.WordBookRecordStatus
+import com.example.englishlearning.ui.components.AppCard
+import com.example.englishlearning.ui.components.AppChip
 import com.example.englishlearning.ui.components.AppScreenHeader
-import com.example.englishlearning.ui.components.IllustratedIcon
+import com.example.englishlearning.ui.components.AppSwitch
 import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
 import com.example.englishlearning.ui.components.InlineNotice
+import com.example.englishlearning.ui.components.PickRow
 import com.example.englishlearning.ui.components.InlineNoticeKind
-import com.example.englishlearning.ui.components.SoftCard
+import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -89,12 +83,10 @@ import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.appColors
-import com.example.englishlearning.ui.theme.appDomain
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
 import com.example.englishlearning.ui.theme.AppType
-import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintPrimary
 import com.example.englishlearning.ui.theme.MintPrimaryDark
@@ -111,7 +103,7 @@ private val AppleMintGradient = Brush.linearGradient(listOf(AppleMintStart, Appl
  * 之前 `detailSource = "search"` 就同时被旧词书搜索页和主页全量搜索页复用，
  * 从主页搜索结果点进去再按「下一个」，推进的是旧页面那份列表。
  */
-private enum class DetailSource { VOCABULARY, RECORDS, ARTICLE, GLOBAL_SEARCH }
+private enum class DetailSource { VOCABULARY, RECORDS, ARTICLE, GLOBAL_SEARCH, TODAY_QUEUE }
 
 /**
  * `items` 里第一项满足 [matches] 的元素的**下一项**；没命中或已在末尾时返回 `null`。
@@ -190,7 +182,14 @@ fun AppScreen(
             // 打开子屏时它保持 true（`else if` 先真先赢，子屏压在上面），子屏返回自然回到本页。
             var showBackupHub by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showLicenses by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 批 2 Task 22-B：独立「关于」页（原型 `sMeAbout`）。
+            var showAbout by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 批 1 Task 16：新建的「今日词单」二级层（原型 `learn-queue`）。路由照本文件的既有四件套——
+            // 状态位 + overlayOpen 追加一项 + BackHandler + `else if` 挂载分支；主页只留那一条裸行入口。
+            var showTodayWordList by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 批 1 Task 17：新建的「复习队列」二级层（原型 `learn-review`）。同一套四件套接线。
+            var showReviewQueue by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // Task 26 Step 3：四枚 AI 屏的「未配置卡」出口统一送到 AI 配置页（共享 `NotConfiguredCard` 的
             // 必填 `onConfigure`）。少了这个 ViewModel（预览/测试夹具）时退回「设置」栏，不假装能直达——
             // 与 AiFeatureScreen 的 `onOpenSettings` 同一口径。
@@ -218,6 +217,11 @@ fun AppScreen(
             // 段位随开关一起 rememberSaveable：关掉再开回到「词书」段（默认落点也是唯一带筛选与字母栏的一段）。
             var showWordBank by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var wordBankSection by rememberSaveable(state.profile.id) { mutableStateOf(WordBankSection.Book) }
+            // 批 1 Task 15：词库页「词书」段的两态（词书详情 ↔ 词单浏览）。开关**必须住在这一层**：
+            // 词卡详情是 `else if (selectedLearningRecordCard != null)` 那一支，词库那一支在详情打开时
+            // 会离开组合——开关若写在词库分支内部，从详情退回时会被忘掉、词单凭空跳回详情。
+            // 键带 `showWordBank`：关掉词库再开，回到默认的详情面。
+            var bookPaneShowsWordList by rememberSaveable(state.profile.id, showWordBank) { mutableStateOf(false) }
             var showLearningRecords by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 词书段的列表滚动位置：键带开关，关掉再开回到 A 组顶部（Task 21 的会话口径逐字保留）。
             val wordBookWordsListState = key(state.profile.id, showWordBank) {
@@ -518,8 +522,8 @@ fun AppScreen(
             LaunchedEffect(showCheckIn, state.profile.id) {
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
-            val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showLearningRecords || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+            val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || showTodayWordList || showReviewQueue || selectedRelearnCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeature != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBank ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null
@@ -535,6 +539,21 @@ fun AppScreen(
             // Feed 二级层与阅读历史同优先级档：文章层（下方后声明）永远先拿走返回键。
             BackHandler(enabled = showReadingFeed) { showReadingFeed = false }
             BackHandler(enabled = showCheckIn) { showCheckIn = false }
+            // 批 1 Task 16：「今日词单」二级层。挂载位置在打卡之前（于是它压得住打卡页），
+            // 所以返回处理器也声明在打卡之后；但它压不住学习流程 / 设置 / 词义详情那三层（挂载更靠前、
+            // z 序更高），而本文件的声明顺序学不到这一点——`showLearning` 的处理器声明在本条**之前**，
+            // 「后声明者优先」会让词单抢走返回键。故按 `showArticleImport` / `historyArticle` 那两枚的同款
+            // 写法（「本层 && !更高层 && 详情未开」）把让位条件写进 `enabled`，不靠声明顺序赌。
+            BackHandler(
+                enabled = showTodayWordList && !showLearning && !setupRequired && !showSetup &&
+                    selectedSearchCard == null && selectedRelearnCard == null,
+            ) { showTodayWordList = false }
+            // 批 1 Task 17：「复习队列」二级层，与词单同一优先级档（两条路由互斥，不会同开）。
+            // 让位条件照抄上面那枚，不靠声明顺序赌（同一条理由见 Task 16 的注释）。
+            BackHandler(
+                enabled = showReviewQueue && !showLearning && !setupRequired && !showSetup &&
+                    selectedSearchCard == null && selectedRelearnCard == null,
+            ) { showReviewQueue = false }
             BackHandler(enabled = selectedLearningRecordCard != null) {
                 selectedLearningRecordCard = null
                 detailPronunciationMessage = PronunciationStatus.Idle
@@ -631,6 +650,7 @@ fun AppScreen(
             // 裁决⑥：hub 声明在三枚子屏**之前**（后声明者优先）——子屏开着时返回键先关子屏，
             // 再从 hub 回到设置页。
             BackHandler(enabled = showBackupHub) { showBackupHub = false }
+            BackHandler(enabled = showAbout) { showAbout = false }
             BackHandler(enabled = showBackupExport) { showBackupExport = false }
             BackHandler(enabled = showBackupRestore) { showBackupRestore = false }
             BackHandler(enabled = showBackupPairingExport) { showBackupPairingExport = false }
@@ -666,6 +686,12 @@ fun AppScreen(
                         DetailSource.GLOBAL_SEARCH ->
                             nextAfter(globalSearchResults) { it.result.cardId == card.cardId }
                                 ?.let { next -> { globalVocabularySearchViewModel?.open(next.result) } }
+                        // 批 1 Task 16：「今日词单」点开的那一枚，「下一个」沿**该屏的呈现序**推进
+                        // （新学段在前、复习段在后，与词单屏两节的上下次序逐字一致），
+                        // 不借用生词本 / 词书那两份列表。
+                        DetailSource.TODAY_QUEUE ->
+                            nextAfter(todayReady?.newQueue.orEmpty() + todayReady?.dueQueue.orEmpty()) { it.cardId == card.cardId }
+                                ?.let { next -> { selectedSearchCard = next } }
                         else -> null
                     }
                     CardDetailScreen(
@@ -960,48 +986,79 @@ fun AppScreen(
                             wordCardPronunciationMessage = resultStatus.message()
                         }
                     }
-                    WordCardScreen(
-                        state = cardState,
-                        onSubmit = wordCardViewModel::submit,
-                        onReveal = wordCardViewModel::revealMeaning,
-                        onSpeak = { lemma ->
-                            val request = ++wordCardPronunciationRequest
-                            wordCardPronunciationStatus = PronunciationStatus.Playing
-                            wordCardPronunciationMessage = PronunciationStatus.Playing.message()
-                            pronunciationScope.launch {
-                                val resultStatus = pronunciationStatus(pronunciationProvider?.speakWord(lemma))
-                                if (request == wordCardPronunciationRequest) {
-                                    wordCardPronunciationStatus = resultStatus
-                                    wordCardPronunciationMessage = resultStatus.message()
+                    if (cardState is WordCardUiState.AllDone) {
+                        // 批 1 Task 18（新建屏 sSummary；原型 `app.js:1688` / `:1701` 末卡推进 → `go('learn-summary')`）：
+                        // 本轮最后一张卡提交完、按「完成本轮」之后，画面交给「今日完成」而不是词卡屏——
+                        // 原型在这条路径上画的是收尾屏，不是「词卡都提交完了」那一行字。
+                        // 三个要件：
+                        //  - **不新增导航状态位**：收尾屏挂在既有的 `showLearning` 分支里、按 `AllDone` 分派，
+                        //    所以系统返回键仍由 `BackHandler(enabled = showLearning)` 那一条接管（原型三个出口
+                        //    全指 learn-home，与之一致），`overlayOpen` 也不必再改；
+                        //  - **三个出口同一条 `exitLearning`**：页头 ← / 页头「完成」/ 吸底「回到今日」在原型里
+                        //    都是 `data-to="learn-home"`，这里复用同一枚退出通路（回今日学习并重算计划），
+                        //    不另写一份「只关浮层不重算」的半边退出；
+                        //  - **收尾屏不碰播放器**：换成这一屏时 `WordCardScreen` 自己离开组合，F5-03 的退出停播
+                        //    守卫照常把停播恰好委托给宿主一次（`AppScreenTest` / `WordCardScreenTest` 钉着计数）。
+                        // `dateLabel` 只在计划快照就绪时给；没就绪就传 null，屏侧 `.eyebrow` 整行不进组合。
+                        val done = cardState as WordCardUiState.AllDone
+                        TodaySummaryScreen(
+                            state = done,
+                            dateLabel = todayReady?.localDateLabel,
+                            articleRead = todayArticleRead,
+                            onBack = exitLearning,
+                            onDone = exitLearning,
+                            onOpenReading = {
+                                exitLearning()
+                                selectedTab = AppTab.READING
+                            },
+                        )
+                    } else {
+                        WordCardScreen(
+                            state = cardState,
+                            onSubmit = wordCardViewModel::submit,
+                            onReveal = wordCardViewModel::revealMeaning,
+                            onSpeak = { lemma ->
+                                val request = ++wordCardPronunciationRequest
+                                wordCardPronunciationStatus = PronunciationStatus.Playing
+                                wordCardPronunciationMessage = PronunciationStatus.Playing.message()
+                                pronunciationScope.launch {
+                                    val resultStatus = pronunciationStatus(pronunciationProvider?.speakWord(lemma))
+                                    if (request == wordCardPronunciationRequest) {
+                                        wordCardPronunciationStatus = resultStatus
+                                        wordCardPronunciationMessage = resultStatus.message()
+                                    }
                                 }
-                            }
-                        },
-                        pronunciationMessage = wordCardPronunciationMessage,
-                        pronunciationStatus = wordCardPronunciationStatus,
-                        pauseResumeSupported = pauseResumeSupported,
-                        onPauseResume = {
-                            val next = when {
-                                wordCardPronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
-                                wordCardPronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
-                                // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
-                                else -> wordCardPronunciationStatus
-                            }
-                            wordCardPronunciationStatus = next
-                            wordCardPronunciationMessage = next.message()
-                        },
-                        // 裁决 B3：先自增代次再 stopPlayback()——播放器层把用户主动停止以 Played 收口，
-                        // 迟到的 Played 会被代次挡掉，不会覆盖这里的 Idle 呈现；也禁止另立「已停止」文案。
-                        onStopPronunciation = {
-                            wordCardPronunciationRequest++
-                            pronunciationProvider?.stopPlayback()
-                            wordCardPronunciationStatus = PronunciationStatus.Idle
-                            wordCardPronunciationMessage = null
-                        },
-                        onRetry = { wordCardViewModel.load(state.profile.id) },
-                        onStartNewPhase = wordCardViewModel::startNewPhase,
-                        onBackToPlan = exitLearning,
-                    )
+                            },
+                            pronunciationMessage = wordCardPronunciationMessage,
+                            pronunciationStatus = wordCardPronunciationStatus,
+                            pauseResumeSupported = pauseResumeSupported,
+                            onPauseResume = {
+                                val next = when {
+                                    wordCardPronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                    wordCardPronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                    // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                    // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                    else -> wordCardPronunciationStatus
+                                }
+                                wordCardPronunciationStatus = next
+                                wordCardPronunciationMessage = next.message()
+                            },
+                            // 裁决 B3：先自增代次再 stopPlayback()——播放器层把用户主动停止以 Played 收口，
+                            // 迟到的 Played 会被代次挡掉，不会覆盖这里的 Idle 呈现；也禁止另立「已停止」文案。
+                            onStopPronunciation = {
+                                wordCardPronunciationRequest++
+                                pronunciationProvider?.stopPlayback()
+                                wordCardPronunciationStatus = PronunciationStatus.Idle
+                                wordCardPronunciationMessage = null
+                            },
+                            onRetry = { wordCardViewModel.load(state.profile.id) },
+                            onStartNewPhase = wordCardViewModel::startNewPhase,
+                            // 回执态的唯一推进口（原型「下一个词 / 完成本轮」）：只有它换卡，
+                            // 评分成功后的三档按钮已经不在组合里。
+                            onNext = wordCardViewModel::advance,
+                            onBackToPlan = exitLearning,
+                        )
+                    }
                     if (detailCard != null) {
                         val card = detailCard!!
                         // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
@@ -1147,6 +1204,46 @@ fun AppScreen(
                     },
                     onBack = { showWorksheetSettings = false },
                 )
+            } else if (showReviewQueue && todayReady != null) {
+                // 批 1 Task 17：复习队列（原型 `learn-review`）。数据不另开通路——到期队列就是今日计划快照的
+                // `dueCardIds` 取到内容后的那份列表，与「今日词单」的复习节同一份快照、同一个来源。
+                // 挂载位置排在词单分支之前：两条路由互斥（没有一处界面能同时打开它们），但「挂载更早 = z 序更高」
+                // 与本文件「后声明的 BackHandler 优先」必须配成一对，否则以后有人照着返回键去猜层级。
+                ReviewQueueScreen(
+                    state = todayReady,
+                    onBack = { showReviewQueue = false },
+                    onStartReview = {
+                        showReviewQueue = false
+                        wordCardViewModel.load(state.profile.id)
+                        showLearning = true
+                    },
+                    onOpenWord = { card ->
+                        selectedSearchCard = card
+                        detailSource = DetailSource.TODAY_QUEUE
+                    },
+                )
+            } else if (showTodayWordList && todayReady != null) {
+                // 批 1 Task 16：今日词单（原型 `learn-queue`）。数据不另开一条通路——词单就是今日计划快照
+                // 的 `newCardIds` / `dueCardIds` 取到内容后的那份列表，与同屏强卡的计数同一份快照。
+                TodayWordListScreen(
+                    state = todayReady,
+                    onBack = { showTodayWordList = false },
+                    onOpenSetup = {
+                        // 原型 `.bar-action「调整」→ plan-edit`：设置层压在本层之上（挂载更早 = z 序更高），
+                        // 这里把本层关掉，返回时回到学习主页，而不是留下两层叠着等返回键逐层拆。
+                        showTodayWordList = false
+                        showSetup = true
+                    },
+                    onStartLearning = {
+                        showTodayWordList = false
+                        wordCardViewModel.load(state.profile.id)
+                        showLearning = true
+                    },
+                    onOpenWord = { card ->
+                        selectedSearchCard = card
+                        detailSource = DetailSource.TODAY_QUEUE
+                    },
+                )
             } else if (showCheckIn) {
                 // 批 1 Task 6：快照在宿主层统一收（见上方 checkInState），这里不再收第二份。
                 CheckInScreen(
@@ -1208,23 +1305,56 @@ fun AppScreen(
                     wordBookName = todayReady?.wordBookName ?: "未选择词书",
                     section = wordBankSection,
                     onSelectSection = { wordBankSection = it },
-                    onBack = { showWordBank = false },
+                    onBack = {
+                        if (bookPaneShowsWordList) bookPaneShowsWordList = false else showWordBank = false
+                    },
                     bookPane = {
-                        // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
-                        WordBookWordsScreen(
-                            state = wordBookWordsState,
-                            listState = wordBookWordsListState,
-                            onBack = {},
-                            onFilter = { wordBookWordsViewModel?.selectFilter(it) },
-                            onRetry = { wordBookWordsViewModel?.retry() },
-                            onOpenWord = {
-                                detailPronunciationMessage = PronunciationStatus.Idle
-                                learningRecordPronunciationRequest++
-                                detailSource = DetailSource.RECORDS
-                                selectedLearningRecordCard = it.card
-                            },
-                            showHeader = false,
-                        )
+                        if (bookPaneShowsWordList) {
+                            // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
+                            // 页头关掉（`showHeader = false`）：返回位只留壳那一枚，否则同屏两个「返回」。
+                            WordBookWordsScreen(
+                                state = wordBookWordsState,
+                                listState = wordBookWordsListState,
+                                onBack = { bookPaneShowsWordList = false },
+                                onFilter = { wordBookWordsViewModel?.selectFilter(it) },
+                                onRetry = { wordBookWordsViewModel?.retry() },
+                                onOpenWord = {
+                                    detailPronunciationMessage = PronunciationStatus.Idle
+                                    learningRecordPronunciationRequest++
+                                    detailSource = DetailSource.RECORDS
+                                    selectedLearningRecordCard = it.card
+                                },
+                                showHeader = false,
+                            )
+                        } else {
+                            // 两枚状态计数只在词单真读出来时给：`null` 让详情页把那两行整行不画，
+                            // 而不是在「还没读出来」时摆一个「0」（读不到的那枚整枚不显示）。
+                            val bookWords = wordBookWordsState.words
+                            val wordsReadable = !wordBookWordsState.loading &&
+                                wordBookWordsState.error == null &&
+                                bookWords.isNotEmpty()
+                            BookDetailScreen(
+                                bookName = todayReady?.wordBookName ?: "未选择词书",
+                                progress = todayReady?.bookProgress,
+                                learningCount = if (wordsReadable) {
+                                    bookWords.count { it.status == WordBookRecordStatus.Learning }
+                                } else {
+                                    null
+                                },
+                                dueCount = if (wordsReadable) {
+                                    bookWords.count { it.status == WordBookRecordStatus.Due }
+                                } else {
+                                    null
+                                },
+                                onOpenWordList = { bookPaneShowsWordList = true },
+                                // 「更换词书」走既有学习设置（选词书在那里）：先关词库再把设置层压上来，
+                                // 返回时回到学习主页，不留两层叠着等返回键逐层拆（与今日词单同一条口径）。
+                                onOpenPicker = {
+                                    showWordBank = false
+                                    showSetup = true
+                                },
+                            )
+                        }
                     },
                     newPane = { myWordsPane(MyWordsSection.Wordbook) },
                     wrongPane = { myWordsPane(MyWordsSection.Wrong) },
@@ -1374,6 +1504,16 @@ fun AppScreen(
                         learningDataDeletionViewModel?.requestDelete(state.profile.id)
                     },
                     deleteAllLearningDataNotice = learningDataDeletionUi.notice,
+                )
+            } else if (showAbout) {
+                // 「关于」页：版本号从构建信息取（`buildConfig = true`），许可数暂留 `null`
+                // （行文案退成不带数字的那一句；许可条数以 `LicensesScreen` 的解析结果为准，后续注入）。
+                AboutScreen(
+                    versionName = BuildConfig.VERSION_NAME,
+                    licenseCount = null,
+                    onBack = { showAbout = false },
+                    onOpenLicenses = { showAbout = false; showLicenses = true },
+                    onOpenBackup = { showAbout = false; showBackupHub = true },
                 )
             } else if (showLicenses) {
                 // F5-04：许可台账页。数据源=构建期从 docs/third-party-notices.md 同步的 assets；
@@ -1769,13 +1909,16 @@ fun AppScreen(
                                 // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
                                 // 全屏页，避免出现「底导之上再压一层」的混乱层级。
                                 onOpenReading = { selectedTab = AppTab.READING },
-                                // 批 1 Task 4/5：学习页只剩两条裸行，目的地分别是今日文章与本机词库。
-                                // 两条打开通路都必须**同时**点名段位：只赋 showWordBank 不赋段位 =
-                                // 「复习生词本」落到词书段（用户点的是复习，看到的是列表第一页）。
+                                // 批 1 Task 4/5 + Task 16/17：学习页的四条裸行，目的地分别是今日词单 / 复习队列 /
+                                // 今日文章 / 本机词库。词库那条打开通路必须**同时**点名段位：只赋 showWordBank 不赋段位 =
+                                // 从复习行落到词书段（用户点的是复习，看到的是列表第一页）。
+                                onOpenWordList = { showTodayWordList = true },
+                                onOpenReviewQueue = { showReviewQueue = true },
                                 onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
-                                // 「复习生词本」落在词库页的生词段（`WordBankSection.New`）：
-                                // 只改落位，不新建数据通路——三段 ViewModel 与 retry 口径全不动。
-                                onReviewWords = { wordBankSection = WordBankSection.New; showWordBank = true },
+                                // 批 1 Task 19：「复习生词本」那枚终点（`onReviewWords` → 词库生词段）随原型
+                                // `sLearnEmpty`（`assets/app.js:501-518`）下线——那一屏只画两枚出口，而它的两枚
+                                // 走下面的既有通路（onOpenSetup / onOpenReading）。生词段的出口是词库页自己的
+                                // 分段控件（`WordBankScreen` 的四格 tab），不留第二条绕过 tab 的暗线。
                                 onOpenSearch = {
                                     // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
                                     // 「浏览词书」——那属于词书管理语义，不是「查一个词」。
@@ -1784,6 +1927,10 @@ fun AppScreen(
                                     globalVocabularySearchViewModel?.openSearch("")
                                     showGlobalVocabularySearch = globalVocabularySearchViewModel != null
                                 },
+                                // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
+                                // 应用里没有独立的设置页，设置九行住在「我的」一级页，故落到该 tab——
+                                // 不新建路由、不叠浮层。
+                                onOpenSettings = { selectedTab = AppTab.SETTINGS },
                                 // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
                                 // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
                                 streakDays = streakDays,
@@ -1921,6 +2068,7 @@ fun AppScreen(
                                             // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
                                             onOpenBackupHub = { showBackupHub = true },
                                             onOpenLicenses = { showLicenses = true },
+                                            onOpenAbout = { showAbout = true },
                                             speechEngineStatuses = speechState.engineStatuses(),
                                             aiProfileSubtitle = aiProfiles?.let { ready ->
                                                 if (ready.items.isEmpty()) {
@@ -2220,98 +2368,300 @@ internal fun LearningSetupScreen(
     }
 
     val colors = appColors()
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background)
-            .verticalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        // 返回入口只留一处：页头返回位（spec §4.1「一屏一返回」）。`onBack = onCancel`——强制首设路径
-        // 传 null 时页头整段不渲染，用不着再包一层 `if (onCancel != null)`。
-        AppScreenHeader(
-            title = "选好词书，开始今天的积累",
-            subtitle = "每天一点点，学习会自然变成习惯。",
-            onBack = onCancel,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = "选择词书", style = AppType.Title, color = colors.text1)
+    // 原型 `sPlanEdit` / `sCardSettings` 的版面是「可滚表单 + `.foot` 吸底条」，所以这里拆两段：
+    // 内容段 `weight(1f).verticalScroll()`，条在滚动区**之外**——用 `align(Alignment.BottomCenter)`
+    // 要给外层铺 `fillMaxSize` 再叠内容，与 `verticalScroll` 的高度约束打架（`StickyFooterHairlineGuardTest` 同口径）。
+    Column(modifier = Modifier.fillMaxSize().background(colors.background)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // 页头承担「我在哪 + 怎么提交」（原型 `barTop({title:'学习计划', action: 保存})`）。
+            // 返回位仍由共享页头承载，旧版那枚 `← 返回上一层` 的 `TextButton` 已退役；
+            // 强制首设路径 `onCancel == null` 时页头返回位整段不渲染（R-9.2）。
+            AppScreenHeader(
+                title = "学习计划",
+                onBack = onCancel,
+                action = { SetupHeaderSave(
+                    enabled = !state.saving && !state.deleting,
+                    onSave = { viewModel.save(profileId) },
+                ) },
+            )
+            // 原型 `.meta`：这一句讲的是「这一屏改了什么、不改什么」——词书切换最怕被理解成清进度。
+            // 旧 subtitle 那句「每天一点点，学习会自然变成习惯。」不携带口径，随合并屏退役。
+            Text(
+                text = "计划只影响每天排几个词，不会清掉你已经学过的进度。",
+                style = AppType.Meta,
+                color = colors.text3,
+            )
+
+            // ---------- 节 1：选择词书 ----------
+            SectionHeading(text = "选择词书")
             Text(
                 text = "这是应用内学习分组，不是官方考试大纲。",
-                style = AppType.Footnote,
-                color = colors.text2,
+                style = AppType.Caption,
+                color = colors.text3,
             )
-        }
-        // 选词书本体是两列色块网格（spec §5）：读取还在进行时先立 3 行 × 2 列同尺寸骨架，
-        // 让这一屏的第一帧就不是空的；真实列表到位后逐册渲染。只在列表为空时占位——删除词书后的
-        // 重载不得把已有列表顶掉闪一次。用户投诉的是「打开选取词书先卡一下，然后整列突然蹦出来」
-        // （spec F1-01，决策 2026-10-17）。删除入口是色块的长按（左滑随两列一起退役）。
-        WordBookPicker(
-            wordBooks = state.wordBooks,
-            loading = state.wordBooksLoading,
-            selectedId = state.selectedWordBookId,
-            progressByBook = state.progressByBook,
-            progressLoading = state.progressLoading,
-            canDelete = state::canDelete,
-            onSelect = viewModel::selectWordBook,
-            onRequestDelete = viewModel::requestDelete,
-        )
-        DailyTargetSection(
-            target = state.dailyNewTarget,
-            onTargetChange = viewModel::updateDailyNewTarget,
-        )
-        // 四枚开关按主题收进两枚软卡：三档「评分后看详情」是一件事，搜索计数是另一件事。
-        // 一屏至多一枚 StrongCard——这里根本不需要强调层，主操作是底下的保存按钮（spec §4.1）。
-        SoftCard {
-            Text(text = "词卡显示", style = AppType.Title, color = colors.text1)
+            // 选词书本体是原型 `.pick.pick-radio` 的通栏行列表（`app.js:587-606`；批 5 spec §5 的
+            // 「2 列色块卡」于批 1 Task 13-A 作废）：读取还在进行时先立 3 行同形状骨架，让这一屏的
+            // 第一帧就不是空的；真实列表到位后逐册渲染。只在列表为空时占位——删除词书后的
+            // 重载不得把已有列表顶掉闪一次。用户投诉的是「打开选取词书先卡一下，然后整列突然蹦出来」
+            // （spec F1-01，决策 2026-10-17）。删除入口是行上的长按（滑删与色块都已退役）。
+            // 「使用中」给的是**已生效**的活动册（`savedWordBookId`），不是屏上的草稿选中位：
+            // 用户点了另一本还没保存时，那一本还不「在使用」。
+            WordBookPicker(
+                wordBooks = state.wordBooks,
+                loading = state.wordBooksLoading,
+                selectedId = state.selectedWordBookId,
+                activeBookId = state.savedWordBookId,
+                progressByBook = state.progressByBook,
+                progressLoading = state.progressLoading,
+                canDelete = state::canDelete,
+                onSelect = viewModel::selectWordBook,
+                onRequestDelete = viewModel::requestDelete,
+            )
+
+            // ---------- 节 2：每日新增（原型 `chip(n + ' 个')` 那一行） ----------
+            val selectedBook = state.wordBooks.firstOrNull { it.id == state.selectedWordBookId }
+            SectionHeading(text = "每日新增", trailing = "当前 ${state.dailyNewTarget} 个")
+            DailyTargetChips(
+                target = state.dailyNewTarget,
+                onTargetChange = viewModel::updateDailyNewTarget,
+            )
+            // 预估句绑真数据：数字来自当前所选册的真实剩余词量，读不到就整句不显示
+            // （决策 2026-10-29「样例指标一律绑真数据」；原型的 4308 / 756 是样例且自身不自洽）。
+            val estimate = planEstimateText(
+                bookName = selectedBook?.displayName,
+                remainingWords = selectedBook?.id?.let { state.progressByBook[it]?.unlearned },
+            )
+            if (estimate != null) {
+                Text(text = estimate, style = AppType.Caption, color = colors.text3)
+            }
+
+            // ---------- 节 3：复习上限（原型 `.card` + `.stat-num` + `.range`） ----------
+            SectionHeading(text = "复习上限")
+            ReviewLimitSection(
+                limit = state.dailyReviewLimit,
+                onLimitChange = viewModel::updateReviewLimit,
+            )
+
+            // ---------- 节 4：评分之后怎么走（原型 `sCardSettings` 唯一可迁移的那一节） ----------
+            SectionHeading(
+                text = "评分之后怎么走",
+                trailing = if (state.openDetailOnKnown) "认识后停留" else "认识后直接下一个",
+            )
+            AppCard {
+                DetailToggleRow(
+                    label = "评「认识」也展开释义",
+                    description = "关：认识直接进入下一个词。开：多看一眼释义与例句再继续。",
+                    checked = state.openDetailOnKnown,
+                    onToggle = viewModel::setOpenDetailOnKnown,
+                )
+                DetailToggleRow(
+                    label = "评「模糊」也展开释义",
+                    description = "默认开启：没想起来的词需要先看一眼",
+                    checked = state.openDetailOnFuzzy,
+                    onToggle = viewModel::setOpenDetailOnFuzzy,
+                    topDivider = true,
+                )
+                DetailToggleRow(
+                    // 第三档术语跟词卡屏对齐：词卡评级是「认识 / 模糊 / 不认识」，这里不再是「忘记了」。
+                    label = "评「不认识」也展开释义",
+                    description = "默认开启：没想起来的词需要先看一眼",
+                    checked = state.openDetailOnForgotten,
+                    onToggle = viewModel::setOpenDetailOnForgotten,
+                    topDivider = true,
+                )
+            }
             Text(
-                text = "提交评分后是否直接打开词义详情。",
-                style = AppType.Footnote,
-                color = colors.text2,
+                text = revealCaptionText(openDetailOnKnown = state.openDetailOnKnown),
+                style = AppType.Caption,
+                color = colors.text3,
             )
-            DetailToggleRow(
-                label = "提交「认识」后查看词义详情",
-                description = "默认关闭",
-                checked = state.openDetailOnKnown,
-                onToggle = viewModel::setOpenDetailOnKnown,
-                topDivider = true,
+
+            // ---------- 节 5：搜索历史 ----------
+            SectionHeading(text = "搜索历史")
+            AppCard {
+                DetailToggleRow(
+                    label = "显示词汇搜索次数",
+                    description = "搜索历史中显示累计搜索次数",
+                    checked = state.showVocabularySearchCount,
+                    onToggle = viewModel::setShowVocabularySearchCount,
+                )
+            }
+
+            // 原型 `notice(..., 'info')`。后半句按本仓真实规则改写（`GetOrCreateTodayPlanUseCase`
+            // 只在「同一本地日 + 同一活动词书」时复用旧快照）：照抄那句「今日词单会立刻按新计划重排」
+            // 是一个能被证伪的谎，AGENTS.md 明写「设置默认从次日生效」。
+            InlineNotice(
+                text = "改完点右上角「保存」。换词书会立刻重排今日词单，调整每日量从次日生效。",
+                kind = InlineNoticeKind.Info,
             )
-            DetailToggleRow(
-                label = "提交「模糊」后查看词义详情",
-                description = "默认开启",
-                checked = state.openDetailOnFuzzy,
-                onToggle = viewModel::setOpenDetailOnFuzzy,
-                topDivider = true,
-            )
-            DetailToggleRow(
-                // 第三档术语跟词卡屏对齐：词卡评级是「认识 / 模糊 / 不认识」，这里不再是「忘记了」。
-                label = "提交「不认识」后查看词义详情",
-                description = "默认开启",
-                checked = state.openDetailOnForgotten,
-                onToggle = viewModel::setOpenDetailOnForgotten,
-                topDivider = true,
+            state.message?.let {
+                // Task 26 Step 3：错误行收口到共享 `InlineNotice`（族 2 的清零动作），墨色/底线/字形由组件承担。
+                InlineNotice(text = it, kind = InlineNoticeKind.Error)
+            }
+        }
+        SetupSaveBar(
+            saving = state.saving,
+            deleting = state.deleting,
+            onSave = { viewModel.save(profileId) },
+        )
+    }
+}
+
+/** 原型 `var opts = [3, 5, 10, 20]`：每日新增只给四枚离散档位（滑杆上的 7 词、13 词用户自己也不信）。 */
+internal val DAILY_TARGET_OPTIONS = listOf(3, 5, 10, 20)
+
+/** 复习上限的刻度，逐字取原型 `<input class="range" min="10" max="80" step="5">`。 */
+internal const val MIN_REVIEW_LIMIT = 10
+internal const val MAX_REVIEW_LIMIT = 80
+internal const val REVIEW_LIMIT_STEP = 5
+
+/**
+ * `Slider.steps` 要的是**中间**分段数，不是步长：10..80 每 5 一格 = 15 段 − 1 = 14 枚中间档。
+ * 由上面三常量推导而不是写死 14，改 min/max/step 时滑杆不会停在错的格子上。
+ */
+internal const val REVIEW_LIMIT_STEPS = (MAX_REVIEW_LIMIT - MIN_REVIEW_LIMIT) / REVIEW_LIMIT_STEP - 1
+
+/**
+ * 页头右侧的保存位（原型 `.bar-action`）：`brand-deep` 的**纯文字动作**，不是第二枚带底的按钮——
+ * 页头出现一枚实底就把「一屏一个主操作」的重量抢走（spec §4.1）。
+ *
+ * 可及名「页头保存学习设置」与吸底条那枚「保存学习设置」**必须不同**：两处同名会让 connected 侧
+ * `onNodeWithContentDescription` 撞成多节点、取样当场失败。
+ */
+@Composable
+private fun SetupHeaderSave(enabled: Boolean, onSave: () -> Unit) {
+    val colors = appColors()
+    Text(
+        text = "保存",
+        style = AppType.Label,
+        color = if (enabled) colors.brandDeep else colors.text3,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .clip(AppShape.Pill)
+            .clickable(enabled = enabled, onClick = onSave)
+            .semantics { contentDescription = "页头保存学习设置" }
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+    )
+}
+
+/**
+ * 「每日新增」的四枚 chip（原型 `section('每日新增', chips[3,5,10,20], '当前 N 个')`）。
+ *
+ * `FlowRow` 而不是 `Row`：原型是 `flex-wrap`，2× 字号下四枚 chip 必然超一行，`Row` 会挤破这节。
+ */
+@Composable
+private fun DailyTargetChips(target: Int, onTargetChange: (Int) -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        DAILY_TARGET_OPTIONS.forEach { option ->
+            AppChip(
+                label = "$option 个",
+                selected = option == target,
+                onClick = { onTargetChange(option) },
             )
         }
-        SoftCard {
-            Text(text = "搜索历史", style = AppType.Title, color = colors.text1)
-            DetailToggleRow(
-                label = "显示词汇搜索次数",
-                description = "搜索历史中显示累计搜索次数",
-                checked = state.showVocabularySearchCount,
-                onToggle = viewModel::setShowVocabularySearchCount,
-                topDivider = true,
-            )
+    }
+}
+
+/**
+ * 「复习上限」那张卡（原型 `.card` 里的 `.stat-num` + `.range` + `.caption`）。
+ *
+ * 末行 caption **不照抄原型那句**：原型写的是「超过上限时先复习最久没见的」，是一条排序承诺，
+ * 而本轮 `dueTarget` 生成逻辑零改动（spec 01:28 V1 不设复习硬上限），照抄就是空头承诺。
+ * 用户 2026-10-29 裁决：先把文案改成不承诺的口径，等真接进排期再回到原型那句
+ * （判据 `LearningSetupLayoutContractTest.the review limit keeps the prototype number and range`，
+ * 台账 `docs/decisions/2026-10-29-plan-review-limit-preference.md`）。
+ *
+ * 拖动只改屏上的草稿，提交点在「保存计划」（`LearningSetupViewModel.updateReviewLimit` 的草稿口径）：
+ * 这条滑杆不像开关那样即时落库。可及名内嵌当前值（F5-03 规则 5，锚点从旧「每日新词目标」滑杆换过来，
+ * 判据不降级）。
+ *
+ * 轨道色不走批 5 的「深套换域色」三元式：原型那根 `.range` 的 CSS 只有一句
+ * `accent-color: var(--brand-deep)`（`assets/app.css:761`），和 `.switch[aria-checked='true']` 同一条品牌深绿
+ * ——它不是一屏一域色的成员。`brandDeep` 两套主题各自有值（浅 #1A7A63 / 深 #7FE3C1），
+ * 深套天然压在 `surface` 上可见，批 5 那条「轨道消失」缺陷在这里由 token 自己解决；
+ * 未填充段是浏览器默认的中性浅灰，取 `outline`（不是 tint 系，绿底会把「未填」读成淡化的「已填」）。
+ */
+@Composable
+private fun ReviewLimitSection(limit: Int, onLimitChange: (Int) -> Unit) {
+    val colors = appColors()
+    var dragValue by remember { mutableFloatStateOf(limit.toFloat()) }
+    var isDragging by remember { mutableStateOf(false) }
+    LaunchedEffect(limit, isDragging) {
+        if (!isDragging) dragValue = limit.toFloat()
+    }
+    val displayed = dragValue.roundToInt()
+    AppCard {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(text = "$displayed", style = AppType.StatNum, color = colors.text1)
+            Text(text = "个 / 天", style = AppType.Caption, color = colors.text3)
         }
+        Slider(
+            value = dragValue,
+            onValueChange = { value ->
+                isDragging = true
+                dragValue = value
+                onLimitChange(value.roundToInt())
+            },
+            onValueChangeFinished = {
+                isDragging = false
+                onLimitChange(dragValue.roundToInt())
+            },
+            valueRange = MIN_REVIEW_LIMIT.toFloat()..MAX_REVIEW_LIMIT.toFloat(),
+            steps = REVIEW_LIMIT_STEPS,
+            colors = SliderDefaults.colors(
+                thumbColor = colors.brandDeep,
+                activeTrackColor = colors.brandDeep,
+                inactiveTrackColor = colors.outline,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
+                .semantics { contentDescription = "每日复习上限，当前 ${displayed} 个" },
+        )
+        Text(
+            text = "当前版本先记下这个上限，今日复习仍会排完全部到期词。",
+            style = AppType.Caption,
+            color = colors.text3,
+        )
+    }
+}
+
+/**
+ * 原型 `.foot` 的吸底保存条：主操作永远在屏底，与页头那枚文字动作是同一条动作的两个入口。
+ *
+ * 条自铺页底色（`colors.background`），所以槽顶必须一条 `hairlineTop`——表单卡从它上面滚过时，
+ * 没有那条线就会被读成「内容被截断」（批 5 遗留 7，站点登记在 `StickyFooterHairlineGuardTest`）。
+ */
+@Composable
+private fun SetupSaveBar(saving: Boolean, deleting: Boolean, onSave: () -> Unit) {
+    val colors = appColors()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("setup_save_bar")
+            .background(colors.background)
+            .then(hairlineTop(colors.outline))
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
         Button(
-            onClick = { viewModel.save(profileId) },
-            enabled = !state.saving && !state.deleting,
+            onClick = onSave,
+            enabled = !saving && !deleting,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 54.dp)
                 .semantics { contentDescription = "保存学习设置" },
-            // 主操作改实心块：撤掉品牌渐变与透明底（渐变抢眼、白字压不住），深色实底 + 反白字才是
-            // 「一屏一个主操作」该有的重量（spec §4.1）。圆角交 `AppShape.Button`（14dp），不再手搓。
+            // 主操作是单实底（撤掉品牌渐变与透明底）：深色实底 + 反白字才是「一屏一个主操作」
+            // 该有的重量（spec §4.1）。圆角交 `AppShape.Button`，不手搓。
             shape = AppShape.Button,
             colors = ButtonDefaults.buttonColors(
                 containerColor = colors.strongSurface,
@@ -2323,27 +2673,10 @@ internal fun LearningSetupScreen(
             // 前景色跟着按钮下发的 ink 走（`contentColor` / `disabledContentColor`）：`AppType.Label`
             // 自带 `text2`，自钉 `onStrong` 又会让禁用态变成近白字压浅底——两态都得由按钮说。
             Text(
-                text = if (state.saving) "保存中…" else "保存并开始学习",
+                text = if (saving) "保存中…" else "保存计划",
                 style = AppType.Label,
                 color = LocalContentColor.current,
                 fontWeight = FontWeight.Bold,
-            )
-        }
-        state.savedWordBookName?.let {
-            Text(
-                text = "已保存：$it · 每日新增 ${state.dailyNewTarget} 词",
-                style = AppType.Footnote,
-                color = colors.text2,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            )
-        }
-        state.message?.let {
-            // Task 26 Step 3：错误行收口到共享 `InlineNotice`（族 2 的清零动作），墨色/底线/字形由组件承担。
-            InlineNotice(
-                text = it,
-                kind = InlineNoticeKind.Error,
-                modifier = Modifier.padding(bottom = 10.dp),
             )
         }
     }
@@ -2354,40 +2687,48 @@ internal fun LearningSetupScreen(
 internal const val WORD_BOOK_PLACEHOLDER_ROWS = 3
 
 /**
- * 两列网格的列数：全仓唯一的「两列」数字来源。
+ * 一行的最小高：与共享 [PickRow] 的触控下限同一档（原型 `.pick` 自然高 22 + 上下 `var(--s3)`×2 = 46dp，
+ * F5-03 抬到 48dp）。
  *
- * 不写成 `GridCells.Fixed(2)` + `LazyVerticalGrid`：本屏整页已是 `Column(verticalScroll)`，
- * 竖向滚动容器里嵌懒网格会被测成无限高约束，Compose 直接抛
- * `Vertically scrollable component was measured with an infinity maximum height constraints`。
- * 词书是十位数以内的固定集合，本来也不需要懒加载，故按本常量 `chunked` 切行、行内各块 `weight(1f)` 均分。
- * 列数只在这一处：改成 1 退化成单列、改成 3 就挤成一排，`LearningSetupLayoutContractTest` 立刻红。
+ * 声明为 internal 是给 connected 侧的：骨架行高与真实行的判据必须读生产真值，
+ * 不该在测试里另抄一份 `48f` 靠巧合对齐（R-13.1 / m-4）。
  */
-internal const val WORD_BOOK_TILE_COLUMNS = 2
-
-// 色块与它的首帧骨架共用同一份版面参数，两边改一处就一起改，不会各漂各的。
-// 圆角回到形状档的 `AppShape.Card`（20dp）：滑删时代那份 18dp 是「卡片必须与红色删除底同角」逼出来的，
-// 红底随左滑一起退役后，色块不再需要为同角单钉一个数字（`WordBookSwipeRowTest` 那条同角守卫随之退役）。
-// 声明为 internal 是给 connected 侧的：骨架高度与行数的判据必须读生产真值，
-// 不该在测试里另抄一份、靠巧合对齐（R-13.1 / m-4）。
-internal val WordBookTileShape = AppShape.Card
-internal val WordBookTileMinHeight = 132.dp
-internal val WordBookTileGap = 12.dp
+internal val WordBookRowMinHeight = 48.dp
 
 /**
- * 选词书的呈现层：两列色块网格（spec §5「选词书 2 列色块卡（域色 tint + `Book` + 书名 + 词数）」）。
+ * 选词书的呈现层：原型 `.pick.pick-radio` 的**通栏行列表**（`app.js:587-606` `sBookPicker` 与
+ * `app.js:1467-1487` `sOnboarding2` 用的是同一个形状）。
+ *
+ * **批 1 Task 13-A 改判留因**：批 5 spec §5 那句「选词书 2 列色块卡（域色 tint + `Book` + 书名 + 词数）」
+ * 作废（用户 2026-10-29 裁决：原型为准）。原型全篇没有任何词书网格画法——`app.css` 里
+ * `grid-template-columns` 0 命中。于是两列的机械形状（`chunked` / `weight(1f)` / 格缝 / 色块锚）整体退役，
+ * 逐册一行、行与行之间一条 `line-soft` 细线、首行不画线（`.pick:first-child { border-top: 0 }`）。
+ *
+ * 不引 `LazyVerticalGrid` 这条**不随版面翻**：本屏整页已是 `Column(verticalScroll)`，竖向滚动容器里嵌
+ * 懒网格会被测成无限高约束并抛 `Vertically scrollable component was measured with an infinity maximum
+ * height constraints`；词书是十位数以内的固定集合，本来也不需要懒加载。
  *
  * 从 `LearningSetupScreen` 里抽出为可独立渲染的层，是为了让 connected 侧能脱离 ViewModel 的 `load`
- * 派发（在测试宿主里永不执行）直接喂真实色块来验两列像素与长按删除——整屏路径只能停在骨架那一态。
+ * 派发（在测试宿主里永不执行）直接喂真实行来验通栏几何与长按删除——整屏路径只能停在骨架那一态。
  *
- * 首帧读盘时铺 [WORD_BOOK_PLACEHOLDER_ROWS] 行 × [WORD_BOOK_TILE_COLUMNS] 列骨架，真实列表到位后
- * 逐册渲染。只在列表为空时用骨架占位——删除词书后的重载不得把已有列表顶掉闪一次。
- * 行内各块一律 `weight(1f)`：少一个权重就等于让那一块撑满整行，两列会悄悄退化成单列。
+ * 首帧读盘时铺 [WORD_BOOK_PLACEHOLDER_ROWS] 行同形状骨架，真实列表到位后逐册渲染。只在列表为空时用
+ * 骨架占位——删除词书后的重载不得把已有列表顶掉闪一次。容器挂 `selectableGroup()`：这一组是单选，
+ * TalkBack 靠它把「在册与册之间滑动」讲成一组互斥选项，而不是一串按钮。
  */
 @Composable
 internal fun WordBookPicker(
     wordBooks: List<WordBook>,
     loading: Boolean,
     selectedId: String?,
+    /**
+     * 当前**已生效**的活动词书 id（宿主角取 `state.savedWordBookId`，不是屏上的草稿选中位）。
+     * 原型 `.row-value`「使用中」按 `b.learnt > 0` 判，而 mock 里「有进度」与「被选中」恰好是同一本
+     * （`data.js:10-17`）；真数据里两者会分家，绑进度会把学过但没在用的册念成使用中，绑草稿会在用户
+     * 还没保存时就把「使用中」搬到别的册上。三种绑法里只有活动册这一种说的是实话。
+     *
+     * 刻意不给默认值：漏传等于整屏永远念不出「使用中」，那是一条会静默失效的原型文案。
+     */
+    activeBookId: String?,
     progressByBook: Map<String, com.example.englishlearning.learning.WordBookProgress>,
     progressLoading: Boolean,
     canDelete: (String) -> Boolean,
@@ -2396,45 +2737,34 @@ internal fun WordBookPicker(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(WordBookTileGap),
+        modifier = modifier
+            .fillMaxWidth()
+            .selectableGroup(),
     ) {
         if (loading && wordBooks.isEmpty()) {
-            repeat(WORD_BOOK_PLACEHOLDER_ROWS) { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(WordBookTileGap)) {
-                    repeat(WORD_BOOK_TILE_COLUMNS) { column ->
-                        WordBookTileSkeleton(
-                            // 骨架锚由行/列拼出：两列的首帧与真实列表同一套列数，回填时列不许跳。
-                            tag = "wordbook_tile_skeleton_${row * WORD_BOOK_TILE_COLUMNS + column}",
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
+            repeat(WORD_BOOK_PLACEHOLDER_ROWS) { index ->
+                WordBookRowSkeleton(
+                    // 骨架与真实行同一套形状与线序：首行不画线，回填时线不许从别处冒出来。
+                    tag = "wordbook_row_skeleton_$index",
+                    topDivider = index > 0,
+                )
             }
         } else {
-            wordBooks.chunked(WORD_BOOK_TILE_COLUMNS).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(WordBookTileGap)) {
-                    row.forEach { book ->
-                        key(book.id) {
-                            WordBookTile(
-                                book = book,
-                                selected = book.id == selectedId,
-                                progress = progressByBook[book.id],
-                                progressLoading = progressLoading,
-                                // 内置册 deletable 为 false：色块上既没有长按，也没有「删除词书」
-                                // 自定义动作——从结构上保证内置册没有被删的可能，不靠运行时拦一下。
-                                deletable = canDelete(book.id),
-                                onSelect = { onSelect(book.id) },
-                                onRequestDelete = { onRequestDelete(book) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                    // 单数册的最后一行：补一枚同权的空位，免得唯一那块被 weight 拉成通栏。
-                    // 它是 grid 的最后一格，没有底色也没有描边，不是 `Arrangement.spacedBy` 那种幽灵间距。
-                    if (row.size < WORD_BOOK_TILE_COLUMNS) {
-                        Spacer(Modifier.weight(1f))
-                    }
+            wordBooks.forEachIndexed { index, book ->
+                key(book.id) {
+                    WordBookPickRow(
+                        book = book,
+                        selected = book.id == selectedId,
+                        active = book.id == activeBookId,
+                        progress = progressByBook[book.id],
+                        progressLoading = progressLoading,
+                        // 内置册 deletable 为 false：行上既没有长按，也没有「删除词书」自定义动作——
+                        // 从结构上保证内置册没有被删的可能，不靠运行时拦一下。
+                        deletable = canDelete(book.id),
+                        topDivider = index > 0,
+                        onSelect = { onSelect(book.id) },
+                        onRequestDelete = { onRequestDelete(book) },
+                    )
                 }
             }
         }
@@ -2442,25 +2772,33 @@ internal fun WordBookPicker(
 }
 
 /**
- * 一枚词书色块：域色描边/选中态 + `Book` 插画 + 书名 + 等级 + 词量 + 进度。
+ * 一行词书（原型 `.pick.pick-radio`）：22dp 圆标记 + `.row-title` 书名 + `.row-sub` 词量与进度 +
+ * 可选 `.row-value`「使用中」。
  *
- * 三件事在这一层说清：
- *  1. **不引封面图**（spec §5）。应用里没有封面资产，引进来就得给 28 枚插画之外再造一套位图；
- *     域色 + 一枚 `Book` 插画已足够把「这是一本书」和「这是哪个域」说清。插画一律走
- *     [IllustratedIcon]（位图插画的唯一入口，枚举↔资源名映射在 `AppIllustrations`），
- *     本层不自己写 `Image(` / `painterResource(`，否则等于绕过那张映射表。
- *  2. **四条进度字面跟着壳一起搬**：`共 N 词` / `已学 N` / `进度计算中` / `暂时读不到进度`。
- *     词量是册自带的元数据，首发布列表时就在手里，绝不挂在 progress 上——否则「进度计算中」的册
- *     连一共有多少词都念不出来。没算出来的进度也不画 0% 轨道：0% 等于把「不知道」说成「一点没学」。
- *  3. **删除入口从左滑换成左/长按**：两列布局下横滑与列内横向手势、页面滚动互相抢，滑删也没有对应的
- *     视觉出口。长按只**请求**删除（弹确认框），两步确认红线仍在宿主 `ConfirmDestructiveDialog`。
- *     读屏用户做不出长按手势，故同一节点仍登记 `customActions` 里的「删除词书」（F5-03：手势不是可及路径）。
+ * 形状全部交共享 [PickRow]，本层只负责「这一行说什么」三件事：
+ *  1. **副行是唯一的数据行**：`4308 词 · 已学 3` / `4308 词 · 未开始`，逐字取 `app.js:595`。
+ *     词量取册元数据（`book.totalWords`），首发布列表时就在手里，绝不挂在 progress 上——否则
+ *     「进度计算中」的册连一共有多少词都念不出来（`WordBookCardProgressContractTest` 规则 1）。
+ *     进度三种状态分开说，降级态替换的是「· 已学 M」那一段，绝不写成「已学 0」（本地优先：降级要
+ *     如实呈现）。批 5 色块那句「共 N 词」的「共」是原型没有的修饰，随色块一起退役。
+ *  2. **等级行撤下**（CET-4 / 博士）：原型 `.pick` 只有 title + sub + value 三档，没有第四行。
+ *     等级还在词书详情屏与导入流程里念得到，不在这儿补。
+ *  3. **进度条撤下**：通栏行里塞一条 `LinearProgressIndicator` 会把行高顶起来，原型没有这一档；
+ *     「已学 N」的文字已经承担同一件事。
+ *
+ * 删除入口是**长按**（原型这一档没画删除，本仓的删除也只有这里，撤掉就砍掉唯一路径；用户 2026-10-29
+ * 裁定沿用长按、不加原型没有的控件）。长按与读屏自定义动作都由 [PickRow] 挂在同一个语义节点上
+ * （终审 A 的 I-A2：手势、`contentDescription`、`stateDescription`、`customActions`、testTag 不得分家），
+ * 本层因此不许自己再挂 `combinedClickable` / `selectable`——第二枚可点面会让手势与语义各走各的。
+ *
+ * 顶部分隔线归宿主：[topDivider] 由调用方按行序给（原型 `:first-child` 无线），画在行**外侧**、全宽。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun WordBookTile(
+private fun WordBookPickRow(
     book: WordBook,
     selected: Boolean,
+    /** 是不是当前活动词书 → 原型 `.row-value` 那句「使用中」（绑法理由见 [WordBookPicker]）。 */
+    active: Boolean,
     progress: com.example.englishlearning.learning.WordBookProgress?,
     /**
      * 整页进度回填是否还在进行：用来区分「还在算」与「这一本算不出来」两种 `progress == null`。
@@ -2468,170 +2806,103 @@ private fun WordBookTile(
      */
     progressLoading: Boolean,
     deletable: Boolean,
+    topDivider: Boolean,
     onSelect: () -> Unit,
     onRequestDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
-    // 域色只借 Library 一档的 base/deep：一屏十册同属词书库，颜色承担的是「这是词书域」的身份，
-    // 不是「每册一个随机色」的装饰。选中态仍走 tint 底 + deep 描边，与其他屏的选中口径同一套。
-    val library = appDomain(AppDomain.Library)
-    val containerColor by animateColorAsState(
-        targetValue = if (selected) colors.tint else colors.surface,
-        animationSpec = tween(180),
-        label = "wordBookTileColor",
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (selected) library.deep else colors.outlineSoft,
-        animationSpec = tween(180),
-        label = "wordBookTileBorder",
-    )
-    Column(
-        // 语义全部挂在这一个节点上：`combinedClickable` 的点击、长按与下方 `semantics` 的
-        // 内容描述/选中态/自定义动作合并成 TalkBack 实际聚焦的那个节点（父节点属性不会下发给子节点，
-        // 所以动作声明必须与手势同节点，见终审 A 的 I-A2）。
+    // 副行后半段：四档形状各写各的，`已学 0` 那种合并写法在这儿会当场说谎。
+    val learned = when {
+        progress != null && progress.learned > 0 -> "已学 ${progress.learned}"
+        progress != null -> "未开始"
+        progressLoading -> "进度计算中"
+        else -> "暂时读不到进度"
+    }
+    PickRow(
+        label = book.displayName,
+        subtitle = "${book.totalWords} 词 · $learned",
+        checked = selected,
+        radio = true,
+        trailing = if (active) "使用中" else null,
+        trailingTag = if (active) "wordbook_active_${book.id}" else null,
+        contentDescription = "选择词书 ${book.displayName}",
+        onClickLabel = "选择词书",
+        secondaryActionLabel = if (deletable) "删除词书" else null,
+        onSecondaryAction = if (deletable) onRequestDelete else null,
         modifier = modifier
-            .heightIn(min = WordBookTileMinHeight)
-            .clip(WordBookTileShape)
-            .background(containerColor)
-            .border(1.dp, borderColor, WordBookTileShape)
-            .combinedClickable(
-                onClickLabel = "选择词书",
-                onLongClickLabel = if (deletable) "删除词书" else null,
-                onLongClick = if (deletable) onRequestDelete else null,
-                onClick = onSelect,
-            )
-            .semantics {
-                contentDescription = "选择词书 ${book.displayName}"
-                stateDescription = if (selected) "已选" else "未选"
-                if (deletable) {
-                    customActions = listOf(
-                        CustomAccessibilityAction(
-                            label = "删除词书",
-                            // Boolean 返回值语义是「动作是否已执行」：确认框弹出来了就算执行。
-                            action = {
-                                onRequestDelete()
-                                true
-                            },
-                        ),
-                    )
-                }
-            }
-            // testTag 挂在 `padding` **之前**：语义节点要覆盖整块色块（含内边距），
-            // 否则 connected 侧量到的 bounds 只有内容区，两列几何断言会整体缩水一圈。
-            .testTag("wordbook_tile_${book.id}")
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .fillMaxWidth()
+            // testTag 挂在 `padding` **之前**（本轮是行内侧的 12dp 上下内距）：语义节点要覆盖整行，
+            // 否则 connected 侧量到的 bounds 只有内容区，通栏宽度与行高断言会整体缩水一圈。
+            .testTag("wordbook_pick_${book.id}")
+            .then(hairlineTop(if (topDivider) colors.outlineSoft else null, startIndent = 0.dp)),
+        // 单选行的语义是「这一点把这本勾上」，`onCheckedChange` 给的是新布尔值；
+        // 宿主只关心「哪一本被点」，故忽略布尔值直接转给 onSelect（取消选中不是一条路：活动册不许为空）。
+        onCheckedChange = { onSelect() },
+    )
+}
+
+/**
+ * 一行的首帧骨架：与 [WordBookPickRow] 同形状、同线序，但不写任何数字、也不画任何文案。
+ *
+ * 骨架里出现「0 词」是最容易被写进去的假信号（F1-01：首帧不许放假数字），所以这里只有形状。
+ * 与真实行同样的是：22dp 标记盒、12dp 间隙、上下 12dp、`heightIn(min = WordBookRowMinHeight)`、
+ * 首行不画线；不一样的是它没有可点面（骨架不是入口，读屏也不该聚焦它）。
+ */
+@Composable
+private fun WordBookRowSkeleton(
+    tag: String,
+    topDivider: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = appColors()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            // 线与真实行同序、同宽度，但它挂在 testTag **外侧**：`hairlineTop` 的 1dp 顶内距会裁掉
+            // 内侧语义节点的 bounds（`PaddingModifier.semanticsBounds`），真实行因为 `PickRow` 里那条
+            // 更靠内的 `semantics{}` 也被裁掉 1dp，骨架这一支没有内层语义节点——不把它放在外侧，
+            // 骨架量到的行框就比真实行**多出** 1dp，「骨架与真实行同形状」这条判据会自己骗自己。
+            .then(hairlineTop(if (topDivider) colors.outlineSoft else null, startIndent = 0.dp))
+            .testTag(tag)
+            .heightIn(min = WordBookRowMinHeight)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IllustratedIcon(icon = AppIcon.Book, size = 32.dp)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = book.displayName,
-                style = AppType.Body,
-                color = colors.text1,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Text(
-            text = book.level,
-            style = AppType.Footnote,
-            color = colors.text2,
+        Box(
+            Modifier
+                .size(22.dp)
+                .background(colors.outlineSoft.copy(alpha = 0.30f), CircleShape),
         )
-        // 词量在「已学」上方单独一行：一屏两列时它是最能帮人挑册的信息，压在边框上会先被读成一串数字。
-        Text(
-            text = "共 ${book.totalWords} 词",
-            style = AppType.Footnote,
-            color = colors.text2,
-            modifier = Modifier.testTag("wordbook_total_${book.id}"),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                // 三种状态要分开说：进度已算出 / 整页还在逐册回填 / 这一本读不出来。
-                // 最后一种绝不写成「已学 0」——那是个假数字（本地优先：降级要如实呈现）。
-                text = when {
-                    progress != null -> "已学 ${progress.learned}"
-                    progressLoading -> "进度计算中"
-                    else -> "暂时读不到进度"
-                },
-                style = AppType.Footnote,
-                color = colors.text1,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f).testTag("wordbook_learned_${book.id}"),
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                Modifier
+                    .fillMaxWidth(0.42f)
+                    .height(12.dp)
+                    .background(colors.outlineSoft.copy(alpha = 0.22f), AppShape.Icon),
             )
-            if (selected) {
-                Text(
-                    text = "已选",
-                    style = AppType.Label,
-                    color = colors.onMint,
-                    modifier = Modifier
-                        .clip(AppShape.Pill)
-                        .background(colors.tint3)
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-            }
-        }
-        // 没算出来的进度不画条、也不报「未学」：一条 0% 的实心轨道等于把「不知道」说成
-        // 「一点没学」，和今日计划里「无数据不画进度条」的既有口径相冲（同一类假信号）。
-        progress?.let {
-            LinearProgressIndicator(
-                progress = { it.fraction },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("wordbook_progress_${book.id}"),
-                color = library.deep,
-                trackColor = colors.outlineSoft.copy(alpha = 0.35f),
+            Box(
+                Modifier
+                    .fillMaxWidth(0.24f)
+                    .height(10.dp)
+                    .background(colors.outlineSoft.copy(alpha = 0.22f), AppShape.Icon),
             )
         }
     }
 }
 
 /**
- * 色块的首帧骨架：与 [WordBookTile] 同尺寸、同列数，但不写任何数字、也不画任何文案。
+ * 一行开关（原型 `.row`：`.row-title` 15px + `.row-sub` 12px / ink-3 + `.switch` 46×28 药片）。
  *
- * 骨架里出现「0 词」是最容易被写进去的假信号（F1-01：首帧不许放假数字），所以这里只有形状。
- * 锚由调用方按行/列拼好传进来（[WordBookPicker] 一处前缀），两列的骨架才能在 connected 侧被逐格取样。
+ * 开关交共享 [AppSwitch]：轨道色由组件统一承担（开 `brandDeep` / 关 `surface2`，正是原型
+ * `.switch.on` 与 `.switch` 的两档），批 5 那套「屏侧深套三元式自调 `checkedTrackColor`」在这一行退役——
+ * 换的是控件本身，不是把自调色再调一次；台账里本屏的轨道站点因此只剩「复习上限」那枚滑杆。
+ *
+ * 行不自带卡壳（外层已是 [AppCard]，卡里套卡就是「卡片汤」），组内多行靠一条 [hairlineTop] 分开；
+ * 行高仍留 56dp 下限，保可点区与 2× 字号下的换行余量。
+ * `contentDescription = label` 是 F5-03 的既有要求：裸开关在 TalkBack 里只会念「开 / 关」。
  */
-@Composable
-private fun WordBookTileSkeleton(tag: String, modifier: Modifier = Modifier) {
-    val colors = appColors()
-    Column(
-        modifier = modifier
-            .heightIn(min = WordBookTileMinHeight)
-            .clip(WordBookTileShape)
-            .background(colors.surface)
-            // 同色块：锚在 `padding` 之前，量到的是整格（含内边距）而不是内容区。
-            .testTag(tag)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            Modifier
-                .size(32.dp)
-                .background(colors.outlineSoft.copy(alpha = 0.30f), AppShape.Icon),
-        )
-        Box(
-            Modifier
-                .fillMaxWidth(0.70f)
-                .height(10.dp)
-                .background(colors.outlineSoft.copy(alpha = 0.22f), AppShape.Icon),
-        )
-        Box(
-            Modifier
-                .fillMaxWidth(0.45f)
-                .height(10.dp)
-                .background(colors.outlineSoft.copy(alpha = 0.22f), AppShape.Icon),
-        )
-    }
-}
-
 @Composable
 private fun DetailToggleRow(
     label: String,
@@ -2641,11 +2912,6 @@ private fun DetailToggleRow(
     topDivider: Boolean = false,
 ) {
     val colors = appColors()
-    // 本屏是「选词书」设置页，强调色统一取 Library 域（§4.4 一屏一域色；同屏 `WordBookPicker` 与
-    // 迁移对话框的按钮都用 Library）。开关轨道在深套下改读它，见下方 `checkedTrackColor`。
-    val library = appDomain(AppDomain.Library)
-    // 撤掉自有卡壳（不是把 24dp 收成 20dp）：外层已经是 SoftCard，行内再套一层就是「卡片汤」。
-    // 同一组内多行靠一条发丝线分开，行高仍留 56dp 保可点区与 2× 字号下的换行余量。
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2656,78 +2922,12 @@ private fun DetailToggleRow(
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text(label, style = AppType.Body, color = colors.text1)
-            Text(description, style = AppType.Footnote, color = colors.text2)
+            Text(description, style = AppType.Caption, color = colors.text3)
         }
-        Switch(
+        AppSwitch(
             checked = checked,
             onCheckedChange = onToggle,
-            // 深套轨道改域色（批 5 遗留 1 收口，口径同 `SpeechSettingsScreen.kt:258`）：
-            // 深套 `strongSurface`(#22332C) 与 `surface`(#17201C) 几乎同色，「开」态等于没画。
-            // 浅套保持签署过的 `strongSurface`，观感逐值不变。
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = if (LocalIsDark.current) library.base else colors.strongSurface,
-                uncheckedTrackColor = colors.tint3,
-            ),
             modifier = Modifier.semantics { contentDescription = label },
         )
-    }
-}
-
-@Composable
-private fun DailyTargetSection(target: Int, onTargetChange: (Int) -> Unit) {
-    val colors = appColors()
-    // 与同屏开关同一域（Library），见 `DetailToggleRow` 的说明。
-    val library = appDomain(AppDomain.Library)
-    var dragValue by remember { mutableFloatStateOf(target.toFloat()) }
-    var isDragging by remember { mutableStateOf(false) }
-    LaunchedEffect(target, isDragging) {
-        if (!isDragging) dragValue = target.toFloat()
-    }
-    val displayedTarget = dragValue.roundToInt()
-    // 同样撤掉自有卡壳：这一段和「选择词书」「词卡显示」同属屏内区块，平铺在页面上即可。
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("每日新增", style = AppType.Title, color = colors.text1)
-                Text("轻轻拖动，实时看到今天的学习量", style = AppType.Footnote, color = colors.text2)
-            }
-            Text(
-                text = "$displayedTarget",
-                style = AppType.Headline,
-                color = colors.text1,
-            )
-            Text(
-                text = " 词",
-                style = AppType.Footnote,
-                color = colors.text2,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        Slider(
-            value = dragValue,
-            onValueChange = { value ->
-                isDragging = true
-                dragValue = value
-                onTargetChange(value.roundToInt())
-            },
-            onValueChangeFinished = {
-                isDragging = false
-                onTargetChange(dragValue.roundToInt())
-            },
-            valueRange = LearningSetupUiState.MIN_DAILY_TARGET.toFloat()..LearningSetupUiState.MAX_DAILY_TARGET.toFloat(),
-            // 滑杆与上面的开关同因（批 5 遗留 1）：深套下 `strongSurface` 压在 `surface` 上，
-            // 拇指会「消失」；深套改域色，浅套保持签署过的取值。
-            colors = SliderDefaults.colors(
-                thumbColor = if (LocalIsDark.current) library.base else colors.strongSurface,
-                activeTrackColor = if (LocalIsDark.current) library.base else colors.strongSurface,
-                inactiveTrackColor = colors.tint3,
-            ),
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp).semantics { contentDescription = "每日新词目标，当前 ${displayedTarget} 词" },
-        )
-        Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("1", style = AppType.Footnote, color = colors.text2)
-            Text("25", style = AppType.Footnote, color = colors.text2)
-            Text("50", style = AppType.Footnote, color = colors.text2)
-        }
     }
 }

@@ -282,12 +282,15 @@ class PrototypeTokenContractTest {
         assertSpec("StrongTitle", "fontSize = 27.sp", "fontWeight = FontWeight(500)", "fontFamily = AppFont.Serif", "letterSpacing = (-0.27).sp", "lineHeight = 32.sp")
         assertSpec("ArticleTitle", "fontSize = 30.sp", "fontWeight = FontWeight(500)", "fontFamily = AppFont.Serif", "letterSpacing = (-0.6).sp", "lineHeight = 35.sp")
         assertSpec("PlanNum", "fontSize = 32.sp", "fontWeight = FontWeight(500)", "fontFamily = AppFont.Serif", "letterSpacing = (-0.64).sp", "lineHeight = 32.sp")
+        // 按钮档（批 1 补）：原型 `.btn` = `--fs-body`（15）+ `font-weight:600` + `letter-spacing:-.005em`。
+        // 它不是新字号，是 Body 的字号 + 按钮的字重/字距——`.btn-sm` 与 `.feedback .btn` 同样是「Meta 字号 + 600」。
+        assertSpec("ButtonLabel", "fontSize = 15.sp", "fontWeight = FontWeight(600)", "letterSpacing = (-0.075).sp", "lineHeight = 24.sp")
         assertSpec("Lemma", "fontSize = 46.sp", "fontFamily = AppFont.Serif")
     }
 
     @Test
     fun `sans tiers do not opt into the serif family`() {
-        listOf("Headline", "Title", "Body", "Footnote", "Label", "Eyebrow", "Caption", "Meta", "BodyLg", "ProseZh", "NavLabel")
+        listOf("Headline", "Title", "Body", "Footnote", "Label", "Eyebrow", "Caption", "Meta", "BodyLg", "ProseZh", "NavLabel", "ButtonLabel")
             .forEach { tier ->
                 assertTrue(
                     !specBlock(tier).contains("fontFamily"),
@@ -298,7 +301,7 @@ class PrototypeTokenContractTest {
 
     @Test
     fun `tier inks read the current theme set per prototype hierarchy`() {
-        val textInk = setOf("Display", "Headline", "Title", "Body", "BodyLg", "StrongTitle", "ArticleTitle", "Lemma", "StatNum", "PlanNum", "Prose")
+        val textInk = setOf("Display", "Headline", "Title", "Body", "BodyLg", "StrongTitle", "ArticleTitle", "Lemma", "StatNum", "PlanNum", "Prose", "ButtonLabel")
         val secondaryInk = setOf("Meta", "Footnote", "Label", "ProseZh")
         val tertiaryInk = setOf("Caption", "Eyebrow", "NavLabel")
         (textInk + secondaryInk + tertiaryInk).forEach { tier ->

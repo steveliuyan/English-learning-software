@@ -191,15 +191,14 @@ class MyWordsScreenContractTest {
             countMatches(appScreen, Regex("""(^|[^A-Za-z0-9_])WordBankScreen\(""")),
             "AppScreen 必须挂载 WordBankScreen 恰一处（0 = 词库没有宿主，2 = 长出第二份挂载）",
         )
-        // 两条打开通路都必须**同时**点名段位：只赋 showWordBank 不赋段位 = 「复习生词本」落到词书段，
-        // 用户点的是「复习」却看到列表第一页。逐环点名形状而不是数计数：
-        // 「点了真的会开吗、开在哪一段」的用户面由 connected `AppScreenTest` 的端到端用例承重。
+        // 打开通路必须**同时**点名段位：只赋 showWordBank 不赋段位 = 用户点的是「生词」却看到列表第一页。
+        // 逐环点名形状而不是数计数：「点了真的会开吗、开在哪一段」的用户面由 connected `AppScreenTest`
+        // 的端到端用例承重。
         //
         // 批 1 Task 6 长出第二处**合法**出口：我的页三格统计里的「词库」格开的也是词库页（同为词书段）。
         // 因此 onOpenWordBank 的期望值从「全文件恰一处」改为「每个站点各恰一处 **且** 全文件恰两处」：
         // 站点内仍是精确等号，第三人偷偷补出第三条打开通路时总数变 3，照样当场红。
         val wordBankWiring = "onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true }"
-        val reviewWiring = "onReviewWords = { wordBankSection = WordBankSection.New; showWordBank = true }"
         val learningStation = appScreen
             .substringAfter("AppTab.LEARNING -> TodayPlanScreen(")
             .substringBefore("AppTab.READING ->")
@@ -209,7 +208,7 @@ class MyWordsScreenContractTest {
         // 取样器自检：两段必须真的切得开，否则 substringAfter 落空会把整份源码当成一个站点、
         // 「各恰一处」退化成「整体恰一处」。
         assertTrue(
-            "ProfileScreen(" !in learningStation && "onReviewWords" in learningStation,
+            "ProfileScreen(" !in learningStation && "onOpenWordBank" in learningStation,
             "学习页站点切片落空或越界（必须切到 AppTab.READING 之前、且不含 ProfileScreen）",
         )
         assertTrue(
@@ -231,11 +230,22 @@ class MyWordsScreenContractTest {
             countMatches(appScreen, Regex(Regex.escape(wordBankWiring))),
             "打开词库的接线全文件必须恰两处（学习页词库行 + 我的页词库格）；再多一处就是绕过台账的新入口",
         )
+        // 批 1 Task 19：今日学习屏的「复习生词本」终点随原型 `sLearnEmpty`（`assets/app.js:501-518`）下线——
+        // 那一屏只画两枚出口（调整每日新增 / 去读今日文章），四态主 CTA 里「做完了才出现」的那两枚
+        // 从来没有被画在任何一屏上。生词段不是断头路：词库页自己的分段控件（`WordBankScreen.kt` 的
+        // `WordBankSection.entries` 四格 tab）是它的全站出口，「我的」页词库格开的是同一页。
+        // 反向钉住「宿主不再持有这条接线」，谁把它接回来必须同时指名是哪一屏、并回到本条改判据。
         assertEquals(
-            1,
-            countMatches(appScreen, Regex(Regex.escape(reviewWiring))),
-            "入口接线「$reviewWiring」必须恰一处：段位与开关同点同赋（0 = 这条通路断了，" +
-                "2 = 长出第二条打开通路）",
+            0,
+            countMatches(appScreen, Regex("""\bonReviewWords\b""")),
+            "AppScreen 不得再持有 onReviewWords 接线：今日学习屏两态的出口逐字取自原型，" +
+                "生词段的出口是词库页的分段控件（0 = 与原型一致，1 = 补回一枚原型没画的终点）",
+        )
+        assertEquals(
+            0,
+            countMatches(appScreen, Regex("""wordBankSection = WordBankSection\.New""")),
+            "段位赋值 `wordBankSection = WordBankSection.New` 在宿主归零：留下的只许是 `when (section)` " +
+                "那侧的读取，写入端一处都不该有（否则就是绕过词库页 tab 的第三条暗线）",
         )
         val overlayOpenBlock = appScreen.substringAfter("val overlayOpen =").substringBefore("BackHandler(")
         assertTrue(

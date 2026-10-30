@@ -200,9 +200,15 @@ fun PillButton(
     if (contentDescription != null) m = m.semantics { this.contentDescription = contentDescription }
     // Surface 无 brush 重载的等价写法：渐变档用透明容器 + Modifier.background(brush, shape)，纯色档交回 Surface.color。
     val gradient = ink.gradient?.let { Brush.verticalGradient(it) }
-    if (gradient != null) m = m.background(gradient, AppShape.Pill)
+    if (gradient != null) m = m.background(gradient, AppShape.Button)
     Surface(
-        shape = AppShape.Pill,
+        // 批 1 补的批 0 漏项：形状/文案对位原型 `.btn`（`assets/app.css:565`）——
+        // `border-radius: var(--r-md)` = 14、`font-size: var(--fs-body)` + `font-weight: 600` = 15sp/600、
+        // `padding: 0 var(--s5)` = 左右 20。原型的 `--r-pill` 只给导航/分段/芯片/进度条/开关这类轨道件，
+        // 不给按钮；本组件名里的 Pill 是历史 API（全仓 50+ 调用点），形状按原型走 14。
+        // 登记偏离：`min-height` 原型 46，这里取无障碍下限 48（spec §2.3「不得靠 padding 凑触控高度」），
+        // 竖直内距 12 是为了让 15sp/24 行高的字形在 48 高里居中，不是把触控目标从别处凑出来。
+        shape = AppShape.Button,
         color = ink.container,
         contentColor = ink.foreground,
         border = ink.border?.let { BorderStroke(1.dp, it) },
@@ -219,7 +225,7 @@ fun PillButton(
         ),
     ) {
         Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
-            Text(text, style = AppType.Title, color = ink.foreground, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+            Text(text, style = AppType.ButtonLabel, color = ink.foreground, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
         }
     }
 }

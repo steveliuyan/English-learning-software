@@ -116,6 +116,18 @@ object AppType {
         @Composable
         @ReadOnlyComposable
         get() = ArticleTitleSpec.copy(color = appColors().text1)
+
+    /**
+     * 按钮文案档（原型 `.btn` = `--fs-body` 15 + `font-weight:600` + `letter-spacing:-.005em`）。
+     *
+     * 批 1 补：它不是新字号，是 Body 的字号配上按钮的字重/字距。墨在按钮里由
+     * `pillButtonInk(...).foreground` 显式给出（本档 getter 的 `text1` 只是兜底），所以深浅两套的
+     * 对比度由 `PillButtonInkTest` 负责，不由本档负责。
+     */
+    val ButtonLabel: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = ButtonLabelSpec.copy(color = appColors().text1)
 }
 
 /** 原型度量表：字号/字重/字族/字距/行高；墨不在这里，见 [AppType] 的 getter。 */
@@ -137,6 +149,11 @@ private val ProseZhSpec = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.No
 private val NavLabelSpec = TextStyle(fontSize = 11.sp, fontWeight = FontWeight(600), letterSpacing = 0.11.sp, lineHeight = 11.sp)
 private val StrongTitleSpec = TextStyle(fontSize = 27.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.27).sp, lineHeight = 32.sp)
 private val ArticleTitleSpec = TextStyle(fontSize = 30.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.6).sp, lineHeight = 35.sp)
+/**
+ * 原型 `.btn` 的按钮文案：15 / 600 / -.005em（= 15sp × -0.005 = -0.075sp）/ 行高 24 同 Body。
+ * 见 [AppType.ButtonLabel]。
+ */
+private val ButtonLabelSpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight(600), letterSpacing = (-0.075).sp, lineHeight = 24.sp)
 
 /**
  * 装进 M3 `Typography` 前摘掉各档自带的墨：M3 角色的前景应由 `LocalContentColor` 决定。

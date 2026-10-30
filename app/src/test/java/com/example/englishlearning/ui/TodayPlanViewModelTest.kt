@@ -233,6 +233,101 @@ class TodayPlanViewModelTest {
         Dispatchers.resetMain()
     }
 
+    /**
+     * 批 1 Task 16：「今日词单」屏（原型 `sLearnQueue`，`app.js:357-390`）的数据面。
+     *
+     * 计划快照本来就有 `newCardIds` / `dueCardIds`，但只读计数的 `Ready` 画不出词单——
+     * 这一条钉的是**快照口径**：行序 = 快照里的 id 序（复习那节就是 DAO 的
+     * `ORDER BY nextReviewAtEpochMillis ASC`，屏侧那句「按遗忘曲线排序」靠它才是真话），
+     * 今日已完成的 id 单独给出，供行尾标「已学 / 待学 / 到期」。
+     */
+    @Test
+    fun `load exposes today's queue words in snapshot order`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val viewModel = TodayPlanViewModel(
+            { TodayPlanResult.Ready(planWith(newTarget = 2, dueTarget = 2)) },
+            FakeLearningProfileRepository(),
+            FakeLearningEventRepository(listOf("n1", "d1")),
+            bundledIds = bundled,
+            cards = ContentWordCardSource(
+                listOf(
+                    queueCard("d1", "obscure", "adj.", "晦涩的"),
+                    queueCard("n1", "vivid", "adj.", "生动的"),
+                    queueCard("n2", "prevail", "v.", "盛行"),
+                    queueCard("d2", "tedious", "adj.", "冗长乏味的"),
+                ),
+            ),
+        )
+        viewModel.load("profile-1")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as TodayPlanUiState.Ready
+        assertEquals(
+            listOf("n1", "n2"),
+            state.newQueue.map { it.cardId },
+            "新学节按快照 newCardIds 的原序，不按内容源那册的字典序（快照是不可变权威）",
+        )
+        assertEquals(
+            listOf("d1", "d2"),
+            state.dueQueue.map { it.cardId },
+            "复习节按快照 dueCardIds 的原序（DAO 已按 nextReviewAt 升序排好，屏侧不再排）",
+        )
+        assertEquals(setOf("n1", "d1"), state.doneCardIds, "今日已完成集合要逐 id 给：行尾状态靠它，不靠计数")
+        Dispatchers.resetMain()
+    }
+
+    /** 内容源缺某张卡（词书包被换掉 / 那册不再可见）时只丢那一行，不得把整节或整屏带走。 */
+    @Test
+    fun `queue drops ids the content source has no card for`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val viewModel = TodayPlanViewModel(
+            { TodayPlanResult.Ready(planWith(newTarget = 2, dueTarget = 1)) },
+            FakeLearningProfileRepository(),
+            FakeLearningEventRepository(),
+            bundledIds = bundled,
+            cards = ContentWordCardSource(listOf(queueCard("n1", "vivid", "adj.", "生动的"))),
+        )
+        viewModel.load("profile-1")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as TodayPlanUiState.Ready
+        assertEquals(listOf("n1"), state.newQueue.map { it.cardId }, "读不到内容的 n2 只丢自己那一行")
+        assertEquals(
+            emptyList<com.example.englishlearning.learning.domain.WordCard>(),
+            state.dueQueue,
+            "整节都读不到时那一节是空的，不是拿 id 当词头凑一行",
+        )
+        Dispatchers.resetMain()
+    }
+
+    private fun queueCard(cardId: String, lemma: String, pos: String, meaning: String) =
+        com.example.englishlearning.learning.domain.WordCard(
+            cardId = cardId,
+            wordBookId = "primary-school",
+            lemma = lemma,
+            ipa = "",
+            partOfSpeech = pos,
+            meaningZh = meaning,
+        )
+
+    /**
+     * 带内容的卡片来源。
+     *
+     * 与 [FakeWordCardSource] 分开写：那枚的 `cards()` 永远返回空是**刻意的**（它的 KDoc 写明「若这里也返回
+     * 内容，就会掩盖分母取自声明值」那条取舍）。本屏要读词头与释义，必须让内容真流到界面，
+     * 所以另起一枚，不动那位的口径。
+     */
+    private class ContentWordCardSource(private val contents: List<com.example.englishlearning.learning.domain.WordCard>) :
+        com.example.englishlearning.learning.WordCardSource {
+        override suspend fun cardIds(wordBookId: String) = contents.map { it.cardId }
+
+        /** 端口契约：按**请求序**返回，没有内容的 id 直接丢（`WordCardSource.kt` 的 KDoc 逐字）。 */
+        override suspend fun cards(cardIds: List<String>) =
+            cardIds.mapNotNull { id -> contents.firstOrNull { it.cardId == id } }
+    }
+
     private fun plan() = TodayPlan("p1", "profile-1", LocalDate.of(2026, 9, 19), "Asia/Shanghai", "primary-school", 0, 5, emptyList(), listOf("d1", "d2", "d3", "d4", "d5"), "f1-v1", Instant.EPOCH)
 
     /** 测试里的活动词书是 `primary-school`，显式声明为内置册，否则会被可见性判定拦下。 */

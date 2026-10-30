@@ -52,6 +52,12 @@
 
 ## 3. 选词书：滑删 → 长按删除，`LazyVerticalGrid` → `chunked(2)`（对账 4，Task 9）
 
+> **本节 §3 的「两列色块」版面已作废（2026-10-29）**：逐屏对照原型后由用户改判为通栏 `.pick.pick-radio` 行列表，
+> 见 `docs/decisions/2026-10-29-word-book-picker-rows-supersede-tiles.md`。**本节两条结论仍然有效**——
+> 「删除走长按 + `customActions`「删除词书」、内置册不挂」「不引 `LazyVerticalGrid`（根已 `Column(verticalScroll)`，
+> 嵌懒网格抛无限高约束）」，这两条随版面一起搬到了行列表上；作废的只有「列数 = 2、行内等宽、缝宽 = `WordBookTileGap`、
+> 单数行半宽」那四条几何约束与色块容器本身。下面原文按当时事实保留，不覆写。
+
 **原判**：2 列色块卡，`LazyVerticalGrid(GridCells.Fixed(2))`；删除入口按计划推荐为长按。
 
 **事实两点**：

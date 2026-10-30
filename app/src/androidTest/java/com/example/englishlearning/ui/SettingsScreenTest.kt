@@ -43,7 +43,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 设置一级页 connected 回归（Task 19 / AC-R-21）：**4 组 9 行、行行可点、主题三态真像素**。
+ * 设置一级页 connected 回归（Task 19 / AC-R-21）：**4 组 10 行、行行可点、主题三态真像素**。
  *
  * 三条口径约束（本包既有纪律，逐条落到用例形状上）：
  *  - **一个 `@Test` 只 `setContent` 一次**（本仓真机怪癖：同一次测试两次 `setContent` 必崩）。
@@ -153,7 +153,7 @@ class SettingsScreenTest {
         composeRule.onNodeWithTag("settings_screen").assertExists()
 
         assertEquals(4, SettingsGroups.all.size)
-        assertEquals(9, SettingsGroups.all.sumOf { it.entries.size })
+        assertEquals(10, SettingsGroups.all.sumOf { it.entries.size })
 
         SettingsGroups.all.forEach { group ->
             composeRule.onNodeWithTag(group.tag).performScrollTo().assertExists()
@@ -584,7 +584,7 @@ private const val BACKGROUND_CHANNEL_TOLERANCE = 2
  * 收起态的可点节点数现盘读数：8 枚一级行（学习 3 + AI 与语音 2 + 许可 1 + 折叠 2）+ 3 枚主题分段
  * = 11。「主题」那张卡本体不可点，可点面只有分段。
  */
-private const val CLICKABLE_WHEN_COLLAPSED = 11
+private const val CLICKABLE_WHEN_COLLAPSED = 12
 
 /**
  * 「词书内容包」展开、且已导入 2 册（`transferBusy = false`）时的现盘读数：
@@ -593,7 +593,7 @@ private const val CLICKABLE_WHEN_COLLAPSED = 11
  * 空闲且有册时两枚子行都可点；任一子行被禁用（busy / 未导入）时它就不在该态的计数里，
  * 所以那两个禁用态各另有自己的用例，不混进这一条。
  */
-private const val CLICKABLE_WHEN_WORD_BOOKS_OPEN = 13
+private const val CLICKABLE_WHEN_WORD_BOOKS_OPEN = 14
 
 /**
  * 「待接入」厂商名占位清单：这一族护栏钉的是「六枚厂商名一律不得回到设置一级页」，

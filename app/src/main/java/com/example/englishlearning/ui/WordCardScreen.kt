@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -43,6 +45,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.ui.components.AppGlyph
@@ -53,9 +56,11 @@ import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.SpeakerButton
 import com.example.englishlearning.ui.components.SpeakerState
+import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
 
@@ -86,6 +91,11 @@ fun WordCardScreen(
     pauseResumeSupported: Boolean = false,
     onRetry: () -> Unit = {},
     onStartNewPhase: () -> Unit = {},
+    /**
+     * 回执态的主操作（原型「下一个词 / 完成本轮」）。评分成功后来到这里，只有它推进画面——
+     * 三档评分在回执态不再呈现，免得同一条回执上写出第二个学习事件。
+     */
+    onNext: () -> Unit = {},
     onBackToPlan: () -> Unit = {},
 ) {
     // F5-03 移交账「退出学习不停播」的还账点：本屏离开组合（退出学习浮层、切走学习流、宿主销毁整屏）
@@ -177,19 +187,14 @@ fun WordCardScreen(
                 BackToPlanButton(onBackToPlan)
             }
 
-            is WordCardUiState.AllDone -> WordCardStateBody {
-                Text(
-                    text = "今天的词卡都提交完了",
-                    style = AppType.Title,
-                    modifier = Modifier.testTag("word_card_all_done"),
-                )
-                Text("共完成 ${state.completedCount} / ${state.total} 张", style = AppType.Body)
-                Text(
-                    text = "复习 ${state.reviewCompleted}/${state.reviewTotal} · 新增 ${state.newCompleted}/${state.newTotal}",
-                    style = AppType.Body,
-                    modifier = Modifier.testTag("word_card_completion_breakdown"),
-                )
-                BackToPlanButton(onBackToPlan)
+            is WordCardUiState.AllDone -> {
+                // 批 1 Task 18：本轮收尾不再由本屏呈现。原型在末张卡推进后走的是 `go('learn-summary')`
+                // （`assets/app.js:1688` / `:1701`），对应新建的 `TodaySummaryScreen`；宿主在 `showLearning`
+                // 分支里按 `AllDone` 直接挂那一屏，所以本分支**在本仓的导航里到不了**。
+                // 保留它是为了 `when (state)` 的穷尽性（漏分支等于给未来的接线留一个编译期空档），
+                // 但绝不在此处再画一份收尾版面——同一条状态两处渲染，就是 Task 10 台账里
+                // 「回执与评分同屏」那一族重复画面的回归。
+                // 屏侧的退出停播守卫挂在 `when` 之外：本屏换成收尾屏时照样离开组合、照样补一次停播。
             }
 
 
@@ -198,6 +203,11 @@ fun WordCardScreen(
                 // 不主动把焦点移过去，「显示释义」按钮离开组合后焦点就落空（设备 RED 实测：
                 // 揭晓后获焦节点集合为空），读屏/键盘用户要从卡片顶部重新念，跳过刚揭晓的释义。
                 // wasRevealed 用来区分「本次揭晓」与「重进组合时已是揭晓态」，后者不抢焦点。
+                val receipt = state.receipt
+                // 回执态一律按揭晓态画：回执若配着一张还藏着释义的卡，用户看不出自己刚才是凭印象
+                // 还是凭释义选的。VM 在提交成功时已把 meaningRevealed 翻真，这里的 `||` 只是让
+                // 宿主直接喂回执（测试/预览）时也不会出现「有回执、没释义」的半截卡。
+                val revealed = state.meaningRevealed || receipt != null
                 val meaningFocusRequester = remember { FocusRequester() }
                 var wasRevealed by remember { mutableStateOf(state.meaningRevealed) }
                 LaunchedEffect(state.meaningRevealed) {
@@ -206,6 +216,17 @@ fun WordCardScreen(
                         runCatching { meaningFocusRequester.requestFocus() }
                     }
                     wasRevealed = state.meaningRevealed
+                }
+                // 回执同理：它是提交成功后才出现的新节点，不迁焦点的话读屏用户只会听到释义，
+                // 听不到「记成了哪一档、下次什么时候再见」。与释义焦点的先后由声明顺序决定——
+                // 回执在后，读到的是回执（那才是这次操作的结果）。重进组合时已有回执不抢焦点。
+                val receiptFocusRequester = remember { FocusRequester() }
+                var hadReceipt by remember { mutableStateOf(receipt != null) }
+                LaunchedEffect(receipt) {
+                    if (receipt != null && !hadReceipt) {
+                        runCatching { receiptFocusRequester.requestFocus() }
+                    }
+                    hadReceipt = receipt != null
                 }
                 // 顶栏（spec §5）：× 关闭 + 计数 + 进度条，固定不滚 —— 旧版把这三件混在页头与滚动流里，
                 // 大字号下要滚到底才知道自己在第几张。
@@ -310,7 +331,7 @@ fun WordCardScreen(
                                 modifier = Modifier.testTag("word_card_speak"),
                             )
                         }
-                        if (state.meaningRevealed) {
+                        if (revealed) {
                             Text(
                                 text = state.card.meaningZh,
                                 style = AppType.Title,
@@ -384,7 +405,7 @@ fun WordCardScreen(
                                     .semantics { contentDescription = "例句 $example" },
                             )
                         }
-                        if (state.meaningRevealed && state.card.inflections.isNotEmpty()) {
+                        if (revealed && state.card.inflections.isNotEmpty()) {
                             val inflections = state.card.inflections.joinToString("、")
                             Text(
                                 text = "词形变化：$inflections",
@@ -392,6 +413,14 @@ fun WordCardScreen(
                                 modifier = Modifier
                                     .testTag("word_card_inflections")
                                     .semantics { contentDescription = "词形变化 $inflections" },
+                            )
+                        }
+                        // 评分回执（原型 `recap()`）：跟着卡片一起读，而不是把卡翻走只剩一句 toast——
+                        // 「记为哪一档 + 下次什么时候再见」要能被反复看。时间一律取调度器真写进去的那个。
+                        if (receipt != null) {
+                            WordCardReceipt(
+                                receipt = receipt,
+                                focusRequester = receiptFocusRequester,
                             )
                         }
                     }
@@ -433,9 +462,13 @@ fun WordCardScreen(
                         }
                     }
                 }
-                // 吸底评分条：三档反馈不再排在滚动流末尾（旧版大字号下要滚过整张卡才够得着），
-                // 「不认识 / 模糊 / 认识」是这一屏唯一的主操作，永远在拇指下方。
-                WordCardFeedbackBar(state = state, onSubmit = onSubmit)
+                // 吸底区：评分前/揭晓后是三档反馈，回执态换成唯一的主推进按钮（原型 `sSession` 的
+                // 两种 foot）。两者互斥——回执还挂着三档按钮，用户就会在同一条回执上写第二个事件。
+                if (receipt != null) {
+                    WordCardReceiptBar(receipt = receipt, onNext = onNext)
+                } else {
+                    WordCardFeedbackBar(state = state, onSubmit = onSubmit)
+                }
             }
         }
     }
@@ -470,16 +503,37 @@ private fun WordCardFeedbackBar(
     state: WordCardUiState.Ready,
     onSubmit: (CardFeedback) -> Unit,
 ) {
-    Row(
+    val colors = appColors()
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("word_card_feedback_bar")
             .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FeedbackButton(state, CardFeedback.Unknown, "不认识", "word_card_feedback_unknown", onSubmit, Modifier.weight(1f))
-        FeedbackButton(state, CardFeedback.Fuzzy, "模糊", "word_card_feedback_fuzzy", onSubmit, Modifier.weight(1f))
-        FeedbackButton(state, CardFeedback.Known, "认识", "word_card_feedback_known", onSubmit, Modifier.weight(1f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("word_card_feedback_bar"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FeedbackButton(state, CardFeedback.Unknown, "不认识", "想不起来", "word_card_feedback_unknown", onSubmit, Modifier.weight(1f))
+            FeedbackButton(state, CardFeedback.Fuzzy, "模糊", "差点没想起", "word_card_feedback_fuzzy", onSubmit, Modifier.weight(1f))
+            FeedbackButton(state, CardFeedback.Known, "认识", "脱口而出", "word_card_feedback_known", onSubmit, Modifier.weight(1f))
+        }
+        // 原型揭晓态脚下那句（`sSession` 的 revealed 分支）。这是唯一一句在**两套流程**里都成立的
+        // 评分提示：原型另一句「「认识」直接下一个；模糊/忘记展开释义」描述的是它的揭晓后重评流程，
+        // 本应用的评分一律推进，照抄就是假话，故不落。
+        if (state.meaningRevealed) {
+            Text(
+                text = "看过释义也可以照实选，这一档决定它下次什么时候再出现。",
+                style = AppType.Caption,
+                color = colors.text3,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("word_card_feedback_caption"),
+            )
+        }
     }
 }
 
@@ -488,23 +542,33 @@ private fun FeedbackButton(
     state: WordCardUiState.Ready,
     feedback: CardFeedback,
     label: String,
+    subCaption: String,
     tag: String,
     onSubmit: (CardFeedback) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
-    val learn = appDomain(AppDomain.Learn)
-    // 「认识」档是浅薄荷底，白字只有 ≈2.1:1（决策 §3 禁令2），统一改深字 token。
-    val container = when (feedback) {
-        CardFeedback.Known -> learn.base
-        CardFeedback.Fuzzy -> colors.tint
-        CardFeedback.Unknown -> colors.surface
-    }
-    val content = when (feedback) {
-        CardFeedback.Known -> colors.onBrand
-        CardFeedback.Fuzzy -> colors.onMint
-        CardFeedback.Unknown -> colors.text1
-    }
+    // 原型 `.feedback .btn`（app.css:848-852）：负向两档是白面 + 40% 描边 + 档色文字，
+    // 「认识」是实心档色 + 反白。三档不再借用域色与薄荷底——域色把「记不记得」和「学什么」混成一件事。
+    val container =
+        when (feedback) {
+            CardFeedback.Known -> colors.feedbackKnown
+            CardFeedback.Fuzzy, CardFeedback.Unknown -> colors.surface
+        }
+    val content =
+        when (feedback) {
+            // 实心档色上的墨：浅套反白、深套近黑（原型 `html[data-theme='dark'] .fb-known { color:#08130f }`）。
+            // 走 `background` 这一对中性 token 而不是新增专用 token：两套取值恰好就是原型要的那两个极端。
+            CardFeedback.Known -> if (LocalIsDark.current) colors.background else Color.White
+            CardFeedback.Fuzzy -> colors.feedbackFuzzy
+            CardFeedback.Unknown -> colors.feedbackAgain
+        }
+    val border =
+        when (feedback) {
+            CardFeedback.Known -> null
+            CardFeedback.Fuzzy -> BorderStroke(1.dp, colors.feedbackFuzzy.copy(alpha = 0.4f))
+            CardFeedback.Unknown -> BorderStroke(1.dp, colors.feedbackAgain.copy(alpha = 0.4f))
+        }
     Button(
         onClick = { onSubmit(feedback) },
         enabled = !state.submitting,
@@ -513,13 +577,142 @@ private fun FeedbackButton(
             .testTag(tag)
             .semantics { contentDescription = label },
         shape = AppShape.Button,
+        border = border,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
             disabledContainerColor = colors.tint2,
             disabledContentColor = colors.text3,
         ),
-    ) { Text(label, style = AppType.Label, color = content, fontWeight = FontWeight.Bold) }
+    ) {
+        // 副标（原型 `.fb-cap` 10px/500/80%）：10sp 在动态字体下过小且不在 AppType 档位表里，
+        // 这里取 Caption 12/400，登记为批 1 偏离项。
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            Text(label, style = AppType.Label, color = content, fontWeight = FontWeight.Bold)
+            Text(subCaption, style = AppType.Caption, color = content.copy(alpha = 0.8f))
+        }
+    }
+}
+
+/**
+ * 评分回执（原型 `recap()`）：一枚档色圆点 + 「记为「档名」 + 下次时间」+ 一句解释。
+ *
+ * 文案里没有任何数字是写死的：时间来自 [FeedbackReceipt.whenLabel]（由调度器真正写入的
+ * `nextReviewAt` 反推），解释句只描述 V1 的间隔方向（不会出现原型的「本轮末尾再出现一次」
+ * 或「六天后答对再翻倍」——本应用都不做）。
+ */
+@Composable
+private fun WordCardReceipt(
+    receipt: FeedbackReceipt,
+    focusRequester: FocusRequester,
+) {
+    val colors = appColors()
+    val announcement =
+        "记为「${feedbackTierLabel(receipt.feedback)}」，${receipt.whenLabel}。" +
+            feedbackTierTip(receipt.feedback)
+    val dot =
+        when (receipt.feedback) {
+            CardFeedback.Unknown -> colors.feedbackAgain
+            CardFeedback.Fuzzy -> colors.feedbackFuzzy
+            CardFeedback.Known -> colors.feedbackKnown
+        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 14.dp)
+            .testTag("word_card_recap")
+            // 整块作为一个可朗读节点：焦点迁到回执时读一遍「记为哪档 + 下次何时 + 为什么」，
+            // 而不是让读屏在三段之间逐节点跳。
+            .focusRequester(focusRequester)
+            .focusable()
+            .semantics(mergeDescendants = true) { contentDescription = announcement },
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(colors.outline),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                Modifier
+                    .padding(top = 6.dp)
+                    .size(6.dp)
+                    .clip(AppShape.Pill)
+                    .background(dot),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "记为「${feedbackTierLabel(receipt.feedback)}」",
+                        style = AppType.Meta,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.text1,
+                    )
+                    Text(
+                        text = receipt.whenLabel,
+                        style = AppType.Meta,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.text3,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                Text(
+                    text = feedbackTierTip(receipt.feedback),
+                    style = AppType.Caption,
+                    color = colors.text2,
+                )
+            }
+        }
+    }
+}
+
+/** 回执与学习记录用同一组档名（应用术语「不认识」，不是原型的「忘记」，见批 1 报告）。 */
+private fun feedbackTierLabel(feedback: CardFeedback): String =
+    when (feedback) {
+        CardFeedback.Unknown -> "不认识"
+        CardFeedback.Fuzzy -> "模糊"
+        CardFeedback.Known -> "认识"
+    }
+
+/** 回执的解释句只描述 V1 真做的事：Again 10 分钟 / Hard 1 天 / Good 3 天，且不在本轮重排。 */
+private fun feedbackTierTip(feedback: CardFeedback): String =
+    when (feedback) {
+        CardFeedback.Unknown -> "这条记忆几乎没接通。看完例句，下次从头再回想一次。"
+        CardFeedback.Fuzzy -> "想起来了，但花了时间。间隔先收短，下次会更早见到它。"
+        CardFeedback.Known -> "脱口而出。间隔拉长了，下次会更晚再见到它。"
+    }
+
+/** 回执态的主推进条（原型 `.foot` 的 btn-primary btn-block）。 */
+@Composable
+private fun WordCardReceiptBar(
+    receipt: FeedbackReceipt,
+    onNext: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        PillButton(
+            text = if (receipt.hasNext) "下一个词" else "完成本轮",
+            onClick = onNext,
+            modifier = Modifier.fillMaxWidth(),
+            domain = AppDomain.Learn,
+            testTag = "word_card_next",
+        )
+    }
 }
 
 @Composable

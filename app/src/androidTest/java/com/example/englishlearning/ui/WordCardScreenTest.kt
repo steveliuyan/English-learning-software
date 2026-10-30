@@ -179,6 +179,69 @@ class WordCardScreenTest {
         )
     }
 
+    /** 原型 `feedbackBlock()`：三档各带一枚副标，让「选哪档」不只靠一个词猜。 */
+    @Test
+    fun eachFeedbackTierShowsItsPrototypeSubCaption() {
+        composeRule.setContent { WordCardScreen(state = ready()) }
+
+        composeRule.onNodeWithText("想不起来").assertExists()
+        composeRule.onNodeWithText("差点没想起").assertExists()
+        composeRule.onNodeWithText("脱口而出").assertExists()
+    }
+
+    /**
+     * 批 1 Task 10：评分后停在原卡上看回执（原型 `sSession` 的 `recap()` + 「下一个词」）。
+     *
+     * 互斥性只能在这里量：回执态若还留着三档按钮，用户会在同一条回执上再写第二个事件。
+     */
+    @Test
+    fun theReceiptReplacesTheFeedbackBarAndForwardsTheNextActionOnce() {
+        var advanced = 0
+        composeRule.setContent {
+            WordCardScreen(
+                state = ready(
+                    meaningRevealed = true,
+                    receipt = FeedbackReceipt(CardFeedback.Known, java.time.Instant.EPOCH, "3 天后再问一次", hasNext = true),
+                ),
+                onNext = { advanced++ },
+            )
+        }
+
+        composeRule.onNodeWithTag("word_card_recap").assertExists()
+        composeRule.onNodeWithText("记为「认识」").assertExists()
+        composeRule.onNodeWithText("3 天后再问一次").assertExists()
+        composeRule.onNodeWithTag("word_card_feedback_bar").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_feedback_known").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_next").assertExists().assertHasClickAction().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("回执态的主操作每点一次只前进一次", 1, advanced)
+    }
+
+    @Test
+    fun theLastCardsReceiptOffersCompletingTheRound() {
+        composeRule.setContent {
+            WordCardScreen(
+                state = ready(
+                    meaningRevealed = true,
+                    receipt = FeedbackReceipt(CardFeedback.Fuzzy, java.time.Instant.EPOCH, "明天再问一次", hasNext = false),
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText("完成本轮").assertExists()
+        composeRule.onNodeWithText("下一个词").assertDoesNotExist()
+    }
+
+    /** 原型揭晓态脚下那句唯一的、两套流程都成立的评分提示。 */
+    @Test
+    fun theRevealedCardShowsTheHonestRatingCaption() {
+        composeRule.setContent { WordCardScreen(state = ready(meaningRevealed = true)) }
+
+        composeRule.onNodeWithTag("word_card_feedback_caption").assertExists()
+        composeRule.onNodeWithText("看过释义也可以照实选，这一档决定它下次什么时候再出现。").assertExists()
+    }
+
     @Test
     fun englishExampleStaysVisibleBeforeRevealAsRecallContext() {
         composeRule.setContent {
@@ -243,18 +306,30 @@ class WordCardScreenTest {
         assertEquals(1, retried)
     }
 
+    /**
+     * 批 1 Task 18 的回归位：本轮收尾**不再由本屏呈现**。
+     *
+     * 原型在末张卡推进后走的是 `go('learn-summary')`（`assets/app.js:1688` / `:1701`），收尾画面归新建的
+     * `TodaySummaryScreen`；宿主按 `WordCardUiState.AllDone` 直接挂那一屏（`AppScreen.kt`），本屏的 `AllDone`
+     * 分支只剩穷尽性、不画版面。所以这里钉的是「本屏不出现收尾屏的任何锚点」——若有人把「今天的词都过了一遍」
+     * 或统计卡搬回词卡屏（同一状态两处渲染），下面的 `assertDoesNotExist` 当场红。
+     * 「返回今日计划」仍由 NoCards / ReviewCompleted 两态提供（`noCardsKeepsTheWayBackToTheTodayPlan` 钉着），
+     * 本态不给第二枚出口：出口在收尾屏的三个位上。
+     */
     @Test
-    fun allDoneOffersTheWayBackToTheTodayPlan() {
+    fun allDoneIsNoLongerRenderedByTheCardScreen() {
         var returned = 0
         composeRule.setContent {
             WordCardScreen(state = WordCardUiState.AllDone(total = 3, completedCount = 3), onBackToPlan = { returned++ })
         }
 
-        composeRule.onNodeWithTag("word_card_all_done").assertExists()
-        composeRule.onNodeWithContentDescription("返回今日计划").assertExists().assertHasClickAction().performClick()
-        composeRule.waitForIdle()
-
-        assertEquals(1, returned)
+        composeRule.onNodeWithTag("word_card_screen").assertExists()
+        composeRule.onNodeWithTag("word_card_all_done").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_card_completion_breakdown").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_summary_screen").assertDoesNotExist()
+        composeRule.onNodeWithText("今天的词都过了一遍").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("返回今日计划").assertDoesNotExist()
+        assertEquals("收尾态不给词卡屏留第二枚出口", 0, returned)
     }
 
     @Test

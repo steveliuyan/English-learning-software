@@ -33,7 +33,9 @@ import org.junit.runner.RunWith
  * 学习页（2026-10-25 版式重做 §3.2）的 connected 判据。
  *
  * 本文件随「搜索 / 强档卡 / 今日文章 / 词库」四段式重写：旧版把八枚入口平铺在 Ready 分支里，
- * 本次只留两条裸行，其余入口迁去词库页与我的页。因此这里**下线**的用例（`ready_offers_check_in_entry`
+ * 本次只留裸行，其余入口迁去词库页与我的页。批 1 Task 16 按原型 `app.js:342` 在裸行组首位
+ * 补进「今日词单」（新建今日词单屏在本屏的唯一入口），本文件的裸行枚数与可点闭合集合随
+ * `rowTags` 现算，不抄绝对数。因此这里**下线**的用例（`ready_offers_check_in_entry`
  * / `ready_offers_a_labelled_word_book_words_entry` / `ready_offers_setup_entry_to_reopen_word_book_settings`
  * / `progress_card_uses_neutral_surface_with_quiet_ink` / `available_actions_keep_one_mint_gradient_and_quiet_supporting_actions`
  * / `locked_reading_action_is_neutral_and_not_clickable` / `ready_groups_entry_actions_and_keeps_one_primary_cta`）
@@ -103,10 +105,12 @@ class TodayPlanScreenTest {
             TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5), onStartLearning = { started++ })
         }
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
-        // 计数并进了强档卡的一行「新学 x/y · 复习 x/y」：两张并排计数卡下线后，这里正向钉住
-        // 「分子分母仍在、合并在同一行」，反向钉住旧卡与其无障碍标签不再回来。
-        composeRule.onNodeWithTag("today_plan_task_total").assertTextEquals("新学 0/2 · 复习 0/3")
-        composeRule.onNodeWithTag("today_plan_total_progress").assertTextEquals("0/5")
+        // 原型对齐批 1：两个计数从「一行新学 x/y · 复习 x/y」换成原型 `.plan-legend` 的两枚键
+        // （`assets/app.js:328-331`），权威数仍是 `today_plan_total_progress` 那一枚 PlanNum。
+        composeRule.onNodeWithTag("today_plan_new_legend").assertTextEquals("新学 0 / 2")
+        composeRule.onNodeWithTag("today_plan_due_legend").assertTextEquals("复习 0 / 3")
+        composeRule.onNodeWithTag("today_plan_total_progress").assertTextEquals("0")
+        composeRule.onNodeWithTag("today_plan_remaining").assertTextEquals("还剩 5 个词")
         composeRule.onNodeWithTag("today_plan_new_count").assertDoesNotExist()
         composeRule.onNodeWithTag("today_plan_due_count").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("今日新增 2 词").assertDoesNotExist()
@@ -119,6 +123,42 @@ class TodayPlanScreenTest {
             .performClick()
         composeRule.waitForIdle()
         assertEquals(1, started)
+    }
+
+    /** 页头行尾的齿轮（原型 `.icon-btn` + `data-to="me-settings"`）：可点、带无障碍名、落到「我的」。 */
+    @Test fun header_gear_opens_settings() {
+        var opened = 0
+        composeRule.setContent {
+            TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5), onOpenSettings = { opened++ })
+        }
+        composeRule.onNodeWithTag("today_plan_settings_action")
+            .assertExists()
+            .assertHasClickAction()
+            .performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, opened)
+        composeRule.onNodeWithContentDescription("设置").assertExists()
+    }
+
+    /** 「计划」次按钮（原型 `.plan-head` 下那枚 secondary）与主 CTA 同屏，各走各的回调。 */
+    @Test fun secondary_plan_button_opens_the_plan_editor() {
+        var planned = 0
+        var started = 0
+        composeRule.setContent {
+            TodayPlanScreen(
+                TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5),
+                onOpenSetup = { planned++ },
+                onStartLearning = { started++ },
+            )
+        }
+        composeRule.onNodeWithTag("today_plan_open_plan")
+            .performScrollTo()
+            .assertTextEquals("计划")
+            .assertHasClickAction()
+            .performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, planned)
+        assertEquals(0, started)
     }
 
     @Test fun ready_with_no_tasks_renders_empty_state() {
@@ -206,15 +246,13 @@ class TodayPlanScreenTest {
             .assertTextContains("小学")
     }
 
-    /** 主 CTA 四态同锚点：新词学完但仍欠复习 →「开始复习」，仍走学习入口。 */
+    /** 主 CTA 两态同锚点：新词学完但仍欠复习 →「开始复习」，仍走学习入口。 */
     @Test fun cta_switches_to_review_when_new_words_are_done() {
         var started = 0
-        var reviewed = 0
         composeRule.setContent {
             TodayPlanScreen(
                 TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 2),
                 onStartLearning = { started++ },
-                onReviewWords = { reviewed++ },
             )
         }
         composeRule.onNodeWithTag("today_plan_start_learning")
@@ -223,79 +261,135 @@ class TodayPlanScreenTest {
             .performClick()
         composeRule.waitForIdle()
         assertEquals(1, started)
-        assertEquals(0, reviewed)
     }
 
-    /** 计划全做完而文章未读 → 主 CTA 指向今日文章（闭环的最后一步不是又一次学习）。 */
-    @Test fun cta_sends_the_user_to_todays_article_when_the_plan_is_done() {
+    /**
+     * 计划全做完 → 换成原型的空态（`sLearnEmpty`，`assets/app.js:501-518`）。
+     *
+     * 这是本屏的**换态**，不是新增一屏：强档卡、进度条、权威数字、「接下来」节标题与四条裸行
+     * 在那一态整段不进组合，`.scr-body` 只剩 `emptyState`。两枚出口的落点也在这里钉：
+     * 「调整每日新增」→ 既有设置通路、「去读今日文章」→ 既有阅读通路。
+     */
+    @Test fun all_done_state_swaps_in_the_prototype_empty_state_with_two_exits() {
         var openedReading = 0
-        var reviewed = 0
+        var openedSetup = 0
         composeRule.setContent {
             TodayPlanScreen(
                 TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 2, dueDone = 3),
                 onOpenReading = { openedReading++ },
-                onReviewWords = { reviewed++ },
+                onOpenSetup = { openedSetup++ },
             )
         }
-        composeRule.onNodeWithTag("today_plan_start_learning")
+        // 换态：空态整块在，未学完那一支的那几件都不在。
+        composeRule.onNodeWithTag("today_plan_all_done_state").assertExists()
+        composeRule.onNodeWithTag("today_plan_summary").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_plan_bar").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_total_progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_secondary_card").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_start_learning").assertDoesNotExist()
+        listOf(
+            "today_plan_open_word_list",
+            "today_plan_open_review_queue",
+            "today_plan_reading_status",
+            "today_plan_open_word_bank",
+        ).forEach { composeRule.onNodeWithTag(it).assertDoesNotExist() }
+        composeRule.onAllNodesWithText("今天的词都学完了").assertCountEquals(1)
+        // 说明句的两枚数量取**快照目标数**（新学 2 / 复习 3），不是原型 mock 的「4 个 / 2 个」。
+        composeRule.onAllNodesWithText(
+            "新学 2 个、复习 3 个都已完成。想多学可以调整每日新增，或者读一篇今天生成的文章。",
+        ).assertCountEquals(1)
+        // 原型那一屏没有第三枚出口：做了才出现的「复习生词本」不复存在。
+        composeRule.onAllNodesWithText("复习生词本").assertCountEquals(0)
+        // 空态只许一枚品牌渐变：主出口是 primary（`.btn-primary`），次出口走 `PillStyle.Secondary` 的
+        // surface 底 + 描边（`.btn-secondary`）。两枚都长成渐变就等于同屏两个「主操作」。
+        assertRenderedColor("today_plan_adjust_goal", 0xFFA8F3C8.toInt())
+        assertNoRenderedColor("today_plan_read_article", 0xFFA8F3C8.toInt())
+
+        composeRule.onNodeWithTag("today_plan_adjust_goal")
             .performScrollTo()
-            .assertTextEquals("去读今日文章")
+            .assertHasClickAction()
+            .performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, openedSetup)
+        assertEquals(0, openedReading)
+
+        composeRule.onNodeWithTag("today_plan_read_article")
+            .performScrollTo()
+            .assertHasClickAction()
             .performClick()
         composeRule.waitForIdle()
         assertEquals(1, openedReading)
-        assertEquals(0, reviewed)
     }
 
-    /** 文章也读完了 → 主 CTA 收口到「复习生词本」，指向词库页的生词本段。 */
-    @Test fun cta_closes_the_loop_on_wordbook_review() {
-        var openedReading = 0
-        var reviewed = 0
+    /**
+     * 空态的可点节点**闭合集合**：常驻查词 + 两枚出口 = 3，且页头齿轮在空态撤掉
+     * （原型 `head({plain:true})` 没有 action 位，`assets/app.js:503`）。
+     */
+    @Test fun all_done_state_keeps_a_closed_clickable_set_and_no_gear() {
         composeRule.setContent {
-            TodayPlanScreen(
-                TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 2, dueDone = 3),
-                onOpenReading = { openedReading++ },
-                onReviewWords = { reviewed++ },
-                todayArticleRead = true,
-            )
+            TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 2, dueDone = 3))
         }
-        composeRule.onNodeWithTag("today_plan_start_learning")
-            .performScrollTo()
-            .assertTextEquals("复习生词本")
-            .performClick()
-        composeRule.waitForIdle()
-        assertEquals(1, reviewed)
-        assertEquals(0, openedReading)
+        composeRule.onNodeWithTag("today_plan_settings_action").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_search_entry").assertHasClickAction()
+        composeRule.onNodeWithTag("today_plan_adjust_goal").assertHasClickAction()
+        composeRule.onNodeWithTag("today_plan_read_article").assertHasClickAction()
+        assertEquals(
+            "空态可点节点必须是 1 常驻查词 + 2 出口 = 3 枚：多一枚（齿轮回来了 / 新长出第三枚出口）" +
+                "少一枚（某条出口丢了）都红",
+            3,
+            composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size,
+        )
     }
 
-    @Test fun completed_plan_shows_the_streak() {
+    /** 空态页头按原型 `.head-plain`：副标题只剩「连续打卡 N 天」，「今日目标」那一句随强卡一起离场。 */
+    @Test fun all_done_state_keeps_only_the_streak_in_the_plain_head() {
         composeRule.setContent {
             TodayPlanScreen(
                 TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 2, dueDone = 3),
                 streakDays = 12,
             )
         }
-        composeRule.onNodeWithTag("today_plan_plan_footnote").assertTextEquals("今日已完成 · 连续 12 天")
+        composeRule.onAllNodesWithText("连续打卡 12 天").assertCountEquals(1)
+        composeRule.onAllNodesWithText("今日目标", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithTag("today_plan_settings_action").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_all_done_state").assertExists()
         composeRule.onNodeWithTag("today_plan_empty").assertDoesNotExist()
         composeRule.onNodeWithTag("today_plan_progress").assertDoesNotExist()
     }
 
-    /** 没有连续天数记录时不摆「连续 0 天」：那是把「还没开始」说成了「断了」。 */
-    @Test fun completed_plan_without_streak_omits_the_counter() {
+    /** 没有连续天数记录时不摆「连续 0 天」：空态页头连副标题一起不出现。 */
+    @Test fun all_done_state_without_streak_hides_the_subtitle() {
         composeRule.setContent {
             TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 2, dueDone = 3))
         }
-        composeRule.onNodeWithTag("today_plan_plan_footnote").assertTextEquals("今日已完成")
+        composeRule.onAllNodesWithText("连续打卡", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithTag("today_plan_all_done_state").assertExists()
+        composeRule.onNodeWithTag("today_plan_settings_action").assertDoesNotExist()
     }
 
-    /** 两条细进度：新学一条、复习一条，各自带自己的分子分母。 */
-    @Test fun ready_renders_two_thin_progress_rows() {
+    /** 未学完那一态仍挂齿轮、仍说「今日目标」：空态撤齿轮不是把页头整体改掉。 */
+    @Test fun not_done_state_still_shows_the_gear_and_the_goal() {
+        composeRule.setContent {
+            TodayPlanScreen(
+                TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 1, dueDone = 1),
+                streakDays = 12,
+            )
+        }
+        composeRule.onNodeWithTag("today_plan_settings_action").assertExists()
+        composeRule.onAllNodesWithText("连续打卡 12 天 · 今日目标 5 个词").assertCountEquals(1)
+    }
+
+    /** 原型图例两段各带自己的分子分母（`.plan-key` 的「新学 a / b」「复习 a / b」）。 */
+    @Test fun ready_renders_the_two_legend_keys_with_their_own_counts() {
         composeRule.setContent {
             TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5, newDone = 1, dueDone = 2))
         }
-        composeRule.onNodeWithTag("today_plan_new_progress").performScrollTo().assertExists()
-        composeRule.onNodeWithTag("today_plan_review_progress").performScrollTo().assertExists()
-        composeRule.onAllNodesWithText("1/2").assertCountEquals(1)
-        composeRule.onAllNodesWithText("2/3").assertCountEquals(1)
+        composeRule.onNodeWithTag("today_plan_new_legend").performScrollTo().assertTextEquals("新学 1 / 2")
+        composeRule.onNodeWithTag("today_plan_due_legend").performScrollTo().assertTextEquals("复习 2 / 3")
+        composeRule.onNodeWithTag("today_plan_plan_bar").performScrollTo().assertExists()
+        // 旧的两条 `ThinProgress` 随原型「一屏一根进度条」下线，不许以第二根细条回来。
+        composeRule.onNodeWithTag("today_plan_new_progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_review_progress").assertDoesNotExist()
     }
 
     /**
@@ -337,26 +431,32 @@ class TodayPlanScreenTest {
     /**
      * 强档卡的分套层次（2026-10-31 用户评审 ③：「四级词汇 · 开始学习」那块深墨实底太重、喧宾夺主）。
      *
-     * 浅套底从 `strongSurface`（`#1F4739`）改成 `tint2`（`#E4EFE9`，浅薄荷一档），前景随之从 `onStrong`
-     * 换成 `text1`（`#1F2B26`）；深套一字不动（`#22332C` 压深背景只差一档明度，深底浅字本来就是对的）。
+     * 浅套底从 `strongSurface`（`#1F4739`）改成 `tint2`（浅薄荷一档），前景随之从 `onStrong`
+     * 换成 `text1`；深套一字不动（`#22332C` 压深背景只差一档明度，深底浅字本来就是对的）。
      * 判据仍是三条合取、温度不变：底色在、前景色在、这一对过 4.5——外加一条反向对偶：
      * 这张卡的**底**不许再是旧深墨 `#1F4739`（只判前三条会被「上下两块底色都画了」这种半迁移放过）。
+     *
+     * 两枚期望字面量取的是 **token 逐值**而不是文档里的抄录：浅套 `tint2 = #DCEBE1`
+     * （`AppColors.kt:72`）与 `text1 = #15211C`（`:76`）。旧版写的是 `#E4EFE9` / `#1F2B26`
+     * ——`WordbookPickerHeaderTest.kt:38` 已经登记过同一类漂移（「brief 与旧注释里抄成 `#E5EFE9` /
+     * `0xFFE4EFE9` 都是抄录漂移，取 token 才不会被带偏」），它们靠 12.0 与 17.3 的欧氏距离勉强落在阈值 18
+     * 之内，等于把判据泡在余量里。改成逐值后同样的阈值只给渲染取整留位置。
      *
      * 反向对偶为什么**不能**用 [assertNoRenderedColor] 整卡扫：卡片里嵌着主 CTA（`today_plan_start_learning`），
      * 它的墨是 `onBrand` `#04241C`（品牌渐变键的深墨），文字抗锯齿把 `#04241C` 与薄荷渐变混出 `#19483A` 一档，
      * 这枚**合成色**与 `#1F4739` 的欧氏距离只有 6.2（阈值 18.0）——整卡禁色会把合法的 CTA 字形边缘
      * 判成「旧底色回退」，量的是渲染伪影而不是版式。所以反向对偶改成 [assertCardFillBands]：
-     * 只在只由底色构成的三点上取色（见该函数 KDoc）。
+     * 只在只由底色构成、且落在原型装饰光晕盘外的三点上取色（理由见该函数 KDoc）。
      */
     @Test fun ready_strong_card_paints_the_light_tone_and_the_container_ink() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        assertRenderedColor("today_plan_summary", 0xFFE4EFE9.toInt())
-        assertRenderedColor("today_plan_total_progress", 0xFF1F2B26.toInt())
+        assertRenderedColor("today_plan_summary", 0xFFDCEBE1.toInt())
+        assertRenderedColor("today_plan_total_progress", 0xFF15211C.toInt())
         assertTrue(
             "text1 压 tint2 必须过 4.5:1（浅套强档卡前景的分套墨）",
-            contrastRatio(0xFF1F2B26.toInt(), 0xFFE4EFE9.toInt()) >= 4.5,
+            contrastRatio(0xFF15211C.toInt(), 0xFFDCEBE1.toInt()) >= 4.5,
         )
-        assertCardFillBands("today_plan_summary", 0xFFE4EFE9.toInt(), 0xFF1F4739.toInt())
+        assertCardFillBands("today_plan_summary", 0xFFDCEBE1.toInt(), 0xFF1F4739.toInt())
     }
 
     /**
@@ -377,59 +477,74 @@ class TodayPlanScreenTest {
             )
         }
         assertRenderedColor("today_plan_start_learning", 0xFF04241C.toInt())
-        // 软档卡（今日文章 / 词库两条裸行）里不得出现品牌渐变的两个可辨认端点。
+        // 软档卡（词单 / 复习队列 / 今日文章 / 词库四条裸行）里不得出现品牌渐变的两个可辨认端点。
         assertNoRenderedColor("today_plan_secondary_card", 0xFFA8F3C8.toInt())
         assertNoRenderedColor("today_plan_secondary_card", 0xFF65D3B9.toInt())
     }
 
     /**
-     * 两条裸行各自带一枚**插画**徽标，外卡仍是中性白（2026-10-30 位图档改判：判据随形改，不放宽）。
+     * 四条裸行各自带一枚**插画**徽标，外卡是原型 `.card-soft` 的 `tint` 薄荷底（判据随形改，不放宽）。
      *
      * 旧断言取「行内徽标那层域 `deep` 矢量墨」（今日文章 = `Reading #9C3B4F`、词库 = `Library #65478A`）。
      * 插画档上线后，行内徽标走 `InlineIconBadge` 的插画分支：颜色写在母版位图里（**母版定主域**，
      * 例如词库那枚是蓝皮合书，不是 Library 的紫），域色只留给兜底的 5 枚豁免字形，旧断言必然判红
-     * （实测最近距离 49.6）。设备侧因此改判两件可执行的事：两行都必须真的挂着插画位图（证明插画分支
-     * 走通、没有静默退回 24×24 线框），且外层软卡仍是中性白（「域色只出现在字形上、不铺成色块」不变）。
+     * （实测最近距离 49.6）。设备侧因此改判两件可执行的事：每行都必须真的挂着插画位图（证明插画分支
+     * 走通、没有静默退回 24×24 线框），且外层软卡仍是**中性冷底**（「域色只出现在字形上、不铺成色块」不变）。
+     *
+     * 批 1 Task 16 起名单多一枚 `today_plan_open_word_list`（原型 `app.js:342` 的贴纸 `list`，
+     * 插画在 `AppIllustrations.kt:56` → `R.drawable.app_icon_list`）；Task 17 再起一枚
+     * `today_plan_open_review_queue`（原型 `app.js:343` 的贴纸 `clock` → `R.drawable.app_icon_clock`，
+     * `AppIllustrations.kt:45`）。
+     *
+     * **外卡期望色在批 0 之后从白改成 `tint`**（本轮统一验收前发现的两处设备侧陈旧期望之一）：
+     * `39e826a`（共享组件与令牌对齐冻结原型）把 `SoftCard` 的填充按原型
+     * `.card-soft { background: var(--tint) }`（`app.css:369-374`）从 `surface` 改成 `tint`
+     * （浅套 `#E8F2EA`），2026-10-30 位图档那句「外卡仍是中性白」量的是改令牌之前的版面。
+     * 这条改判不是放宽：它原来只能证「白」，现在只能证「原型那一档薄荷」，两者都是**单点期望**；
+     * 「域色不铺成色块」那层立法由 `the_primary_cta_keeps_the_only_brand_gradient` 的反向扫禁
+     * （软卡里禁 `#A8F3C8` / `#65D3B9` 两枚渐变端点）继续承担。
      */
-    @Test fun the_two_bare_rows_carry_illustrated_badges_on_a_neutral_card() {
+    @Test fun the_four_bare_rows_carry_illustrated_badges_on_the_prototype_soft_tint_card() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        listOf("today_plan_reading_status", "today_plan_open_word_bank").forEach { tag ->
+        listOf(
+            "today_plan_open_word_list",
+            "today_plan_open_review_queue",
+            "today_plan_reading_status",
+            "today_plan_open_word_bank",
+        ).forEach { tag ->
             composeRule.onNode(
                 hasTestTag(tag) and hasAnyDescendant(hasTestTag(IllustratedIconTag)),
                 useUnmergedTree = true,
             ).assertExists()
         }
-        assertRenderedColor("today_plan_secondary_card", 0xFFFFFFFF.toInt())
+        assertRenderedColor("today_plan_secondary_card", 0xFFE8F2EA.toInt())
     }
 
     /**
      * AC-R-20 的像素侧：今日数字只留**一处**权威尺寸。
      *
-     * 「今天完成了几项」那一格用 `AppType.Display`（44sp），其余数字（小标题、明细注脚）只能是它的注脚。
-     * compose-ui 1.10 的语义节点里**没有** FontSize 属性（`SemanticsProperties.FontSize` 在这个 BOM 上不存在），
-     * 所以改从 `SemanticsActions.GetTextLayoutResult` 取**解析后的字号**（`TextLayoutResult.layoutInput.style.fontSize`）复算：
-     *  | 档 | sp | 对 Display（44sp）的字号比 | 本用例采样 |
-     *  |---|---|---|---|
-     *  | `Display`（今日完成数） | 44 | 1.000 | 参照 |
-     *  | `Label`（细进度两侧标签） | 12 | 0.273 | 否（非本屏数字主体） |
-     *  | `Footnote`（小标题 / 明细注脚） | 13 | 0.295 | 是 |
-     *  | `Body` | 15 | 0.341 | 否 |
-     *  | `Title`（词书名那一处） | 17 | 0.386 | 否（由源码判据钉唯一性） |
+     * 原型对齐批 1 起权威数是 `AppType.PlanNum`（32sp serif，原型 `.plan-count b`），
+     * 其余数字（还剩 N 个词、卡外注脚）只能是它的注脚。语义节点里没有 FontSize 属性，
+     * 所以改从 `SemanticsActions.GetTextLayoutResult` 取**解析后的字号**复算：
+     *  | 档 | sp | 对 PlanNum（32sp）的字号比 |
+     *  |---|---|---|
+     *  | `PlanNum`（今日完成数） | 32 | 1.000（参照） |
+     *  | `Footnote`（还剩 / 注脚 / 图例） | 13 | 0.406 |
+     *  | `Body` | 15 | 0.469 |
+     *  | `Title` | 17 | 0.531 |
+     *  | `Display` | 46 | 1.438 |
      *
-     * 阈值取 **0.34**：相对 `Footnote` 的 0.295 留 0.045 余量（字体度量 / 整数像素取整的抖动），
-     * 又相对 `Title` 的 0.386 留 0.046 的**判红**空间——「把注脚升回 Title」或「升到 Headline/Display」
-     * 都会当场红，`Body`（0.341）也落在判红侧（本屏的注脚只许 `Footnote`/`Label`）。
-     * 覆盖声明：本条兜住 ≥ `Title`（17sp）的所有升档；`AppType.Display` 全屏恰一枚、`Title` 只给词书名
-     * 由 `TodayPlanNumberAuthorityTest` 的源码读数负责（本条只采样固定标签，新标签天然不在名单里）。
+     * 阈值取 **0.43**：相对 Footnote 的 0.406 留 0.024 余量（字体度量 / 取整抖动），
+     * 又相对 Body 的 0.469 留 0.039 的判红空间——「把注脚升到 Body/Title/Headline」都会当场红。
+     * 覆盖声明：本条兜住 ≥ Body（15sp）的所有升档；`AppType.PlanNum` 全屏恰一枚、其余大档归零
+     * 由 `TodayPlanNumberAuthorityTest` 的源码读数负责（本条只采样固定标签）。
      *
      * ## 为什么不再按「渲染高度」算（2026-10-26 真机回归）
      *
      * 旧版用 `boundsInRoot.height` 当字号比的代理，前提是「两档行高与字号成正比（同一字体）」。
-     * 这个前提在真机上不成立：参照文本是 `2/5`（Roboto 数字，垂直度量约 1.17×字号），
-     * 被采样的注脚是「新学 1/3 · 复习 1/2」（CJK 混排，约 1.43×字号），两者字体族不同。
-     * 小米 M2102J2SC / Android 13 上一条**确实是 13sp Footnote** 的文本量出 51/142 = 0.359 被判红，
-     * 同一用例在 API 30 模拟器上通过——说明失败来自设备字体度量差异，不是排版升档。
-     * 改为直接读解析字号后，比值回到 0.295（= 13/44），判据比原来更严（不再有字体度量抖动余量可吃）。
+     * 这个前提在真机上不成立：参照文本是数字（Roboto 数字，垂直度量约 1.17×字号），
+     * 被采样的注脚是 CJK 混排（约 1.43×字号），两者字体族不同。
+     * 改为直接读解析字号后，比值回到纯字号比，判据比原来更严（不再有字体度量抖动余量可吃）。
      */
     @Test fun ready_presents_todays_numbers_with_one_display_authority() {
         composeRule.setContent {
@@ -441,11 +556,11 @@ class TodayPlanScreenTest {
                 ),
             )
         }
-        composeRule.onNodeWithTag("today_plan_total_progress").performScrollTo().assertTextEquals("2/5")
+        composeRule.onNodeWithTag("today_plan_total_progress").performScrollTo().assertTextEquals("2")
         val displaySize = resolvedFontSizeSp("today_plan_total_progress")
         assertTrue("权威数字解析字号为 ${displaySize}sp，判据失去参照（本用例空转）", displaySize > 0f)
         listOf(
-            "today_plan_task_total",
+            "today_plan_remaining",
             "today_plan_progress",
         ).forEach { tag ->
             val size = resolvedFontSizeSp(tag)
@@ -453,32 +568,40 @@ class TodayPlanScreenTest {
             assertTrue(
                 "$tag 的解析字号 ${size}sp 对权威数字 ${displaySize}sp 的比值=$ratio，" +
                     "超过注脚上限阈值 $MaxFootnoteToDisplayRatio——它没降到注脚档" +
-                    "（字号比：Footnote 13/44=0.295、Body 15/44=0.341、Title 17/44=0.386）",
+                    "（字号比：Footnote 13/32=0.406、Body 15/32=0.469、Title 17/32=0.531）",
                 ratio <= MaxFootnoteToDisplayRatio,
             )
         }
     }
 
     /**
-     * 版面侧：可点目标的**闭合集合** + 两条裸行的触控水线。
+     * 版面侧：可点目标的**闭合集合** + 四条裸行的触控水线。
      *
-     * ① 闭合集合 = 1 枚主 CTA + 1 条常驻查词 + `rowTags.size` 条裸行。枚数由 `rowTags` 现算，
-     *    注释不抄绝对数；增删入口必须**同时**改这条判据，并在本轮计划里留名说明理由。
+     * ① 闭合集合 = 1 枚主 CTA + 1 条常驻查词 + `rowTags.size` 条裸行 + 卡内次按钮与页头齿轮。
+     *    枚数由 `rowTags` 现算，注释不抄绝对数；增删入口必须**同时**改这条判据，并在本轮计划里留名说明理由。
      * ② 每条裸行 ≥ 48dp（F5-03），且软档卡高 = 各行之和（分组是真的，不是贴了个 tag 的空壳）。
      * ③ 查词条落在软档卡**之外**（F3：它四态常驻，跟着卡走就只在 Ready 态出现）。
      */
-    @Test fun ready_keeps_a_closed_clickable_set_and_two_touch_sized_bare_rows() {
+    @Test fun ready_keeps_a_closed_clickable_set_and_touch_sized_bare_rows() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        val rowTags = listOf("today_plan_reading_status", "today_plan_open_word_bank")
-        val ctaTags = listOf("today_plan_start_learning")
+        // 批 1 Task 17 起四条：词单 / 复习队列（原型 `app.js:343` 的 `to:'learn-review'`）/ 文章 / 词库。
+        val rowTags = listOf(
+            "today_plan_open_word_list",
+            "today_plan_open_review_queue",
+            "today_plan_reading_status",
+            "today_plan_open_word_bank",
+        )
+        // 原型批 1：强卡底部是一对按钮（主 CTA「继续学习族」+ 次按钮「计划」），加上页头齿轮。
+        val ctaTags = listOf("today_plan_start_learning", "today_plan_open_plan")
+        val headerActionTag = "today_plan_settings_action"
         val persistentSearchTag = "today_plan_search_entry"
         val clickable = composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes()
         assertEquals(
-            "本屏可点节点的闭合集合必须是 ${ctaTags.size + 1 + rowTags.size} = " +
-                "${ctaTags.size} 主 CTA + 1 常驻查词($persistentSearchTag) + ${rowTags.size} 条裸行。" +
-                "这是四段式重做的收成结果，多一枚（新的整宽按钮 / 第二枚主 CTA）少一枚" +
+            "本屏可点节点的闭合集合必须是 ${ctaTags.size + 2 + rowTags.size} = " +
+                "${ctaTags.size} 枚卡内按钮 + 1 枚页头齿轮($headerActionTag) + 1 常驻查词($persistentSearchTag) + " +
+                "${rowTags.size} 条裸行。这是原型对齐后的收成结果，多一枚（新的整宽按钮 / 第二枚主 CTA）少一枚" +
                 "（把查词又收进卡里 / 删掉某条出口）都红；增删入口须同时改本条与计划文档。",
-            ctaTags.size + 1 + rowTags.size,
+            ctaTags.size + 2 + rowTags.size,
             clickable.size,
         )
 
@@ -541,13 +664,13 @@ class TodayPlanScreenTest {
 
     private companion object {
         /**
-         * 注脚**解析字号**对权威数字（`AppType.Display` 44sp）的上限阈值。
+         * 注脚**解析字号**对权威数字（`AppType.PlanNum` 32sp）的上限阈值。
          *
-         * 字号比：Footnote 13/44=0.295、Label 12/44=0.273（放行）、Body 15/44=0.341、
-         * Title 17/44=0.386（判红）。0.34 处在 Footnote 与 Title 之间，两侧各留约 0.045。
+         * 字号比：Footnote 13/32=0.406（放行）、Body 15/32=0.469（判红）、Title 17/32=0.531（判红）。
+         * 0.43 处在 Footnote 与 Body 之间，两侧各留约 0.03–0.04。
          * 取值理由与采样清单见 [ready_presents_todays_numbers_with_one_display_authority] 的 KDoc。
          */
-        const val MaxFootnoteToDisplayRatio = 0.34f
+        const val MaxFootnoteToDisplayRatio = 0.43f
     }
 
     private fun contrastRatio(a: Int, b: Int): Double {
@@ -601,29 +724,47 @@ class TodayPlanScreenTest {
      * 阈值沿用全局 18.0 欧氏距离，与 [assertRenderedColor] 同温；报的是点位坐标与实际色，
      * 改色时一眼能看出哪条边带先漏。为什么要「取样点」而不是整卡扫，见
      * [ready_strong_card_paints_the_light_tone_and_the_container_ink] 的 KDoc。
+     *
+     * **点位必须落在光晕之外**（本轮统一验收前发现的第二处设备侧陈旧期望）：原型
+     * `.strong-card::after` 是一枚 `radial-gradient(rgba(108,203,171,.3) → transparent 68%)`
+     * 的装饰光斑（`app.css:392-402`），`StrongCard` 按它画了 `drawBehind` 的
+     * `brand(30%)` 径向渐变（`Containers.kt:87-99`，圆心 `(宽-149dp, 3dp)`、半径 114dp）。
+     * 旧点位里的「上沿居中」正落在亮核覆盖区（圆心 `宽-149dp, 3dp`、半径 114dp 的盘罩住整条上沿中段），
+     * 实测取到的是底色与光晕合成后的 (197,228,214)，离当时那枚期望底 38.0（阈值 18.0）——那枚**合法的装饰层**
+     * 被读成了「底色漏画」。三条点位因此全部搬到光晕盘外（左右内边带各自离圆心远超 114dp，
+     * 判据的「底必须是这一档」一字未松）：左内边带上段 / 左内边带下段 / 右内边带中段，
+     * 且都避开了 26dp 圆角（角弧只咬住两轴同时 5dp 的角落点）。三点的色一起报，任何一点偏了都能看见是哪条边带先漏。
      */
     private fun assertCardFillBands(tag: String, expectedFill: Int, forbiddenFill: Int) {
         val bitmap = composeRule.onNodeWithTag(tag).performScrollTo().captureToImage().asAndroidBitmap()
         val insetPx = with(composeRule.density) { 5.dp.roundToPx() }
         val midY = bitmap.height / 2
         val probes = listOf(
-            "上沿居中" to (bitmap.width / 2 to insetPx),
-            "左内边带" to (insetPx to midY),
-            "右内边带" to (bitmap.width - 1 - insetPx to midY),
+            "左内边带上段" to (insetPx to bitmap.height / 4),
+            "左内边带下段" to (insetPx to bitmap.height * 3 / 4),
+            "右内边带中段" to (bitmap.width - 1 - insetPx to midY),
         )
-        probes.forEach { (label, point) ->
+        val readings = probes.map { (label, point) ->
             val pixel = bitmap.getPixel(point.first, point.second)
-            val actual = "(${AndroidColor.red(pixel)},${AndroidColor.green(pixel)},${AndroidColor.blue(pixel)})"
+            Triple(label, point, pixel)
+        }
+        val report = readings.joinToString("\n") { (label, point, pixel) ->
+            "  $label x=${point.first} y=${point.second} 实际 (${AndroidColor.red(pixel)}," +
+                "${AndroidColor.green(pixel)},${AndroidColor.blue(pixel)})" +
+                " / 距底色=${colorDistance(pixel, expectedFill)}" +
+                " / 距旧深墨=${colorDistance(pixel, forbiddenFill)}"
+        }
+        readings.forEach { (label, point, pixel) ->
             assertTrue(
                 "$tag 的$label x=${point.first} y=${point.second} 应是底色" +
                     "(${AndroidColor.red(expectedFill)},${AndroidColor.green(expectedFill)},${AndroidColor.blue(expectedFill)})，" +
-                    "实际 $actual（距离=${colorDistance(pixel, expectedFill)}，阈值 18.0）",
+                    "阈值 18.0。三点读数：\n$report",
                 colorDistance(pixel, expectedFill) <= 18.0,
             )
             assertTrue(
                 "$tag 的$label 不许是旧深墨底" +
                     "(${AndroidColor.red(forbiddenFill)},${AndroidColor.green(forbiddenFill)},${AndroidColor.blue(forbiddenFill)})，" +
-                    "实际 $actual（距离=${colorDistance(pixel, forbiddenFill)}，阈值 18.0）",
+                    "阈值 18.0。三点读数：\n$report",
                 colorDistance(pixel, forbiddenFill) > 18.0,
             )
         }

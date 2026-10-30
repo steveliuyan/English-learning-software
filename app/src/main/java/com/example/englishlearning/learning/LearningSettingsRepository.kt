@@ -8,15 +8,28 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
+/**
+ * 学习偏好（词卡屏的三档展开 + 查词历史计数 + 每日复习上限）。
+ *
+ * `dailyReviewLimit` 的默认值 30 逐字取原型 `sPlanEdit` 里 `S.planReview` 的初值，是**领域侧的缺省源**：
+ * 屏侧只提供滑杆刻度（10/80/5），不再另写一份 30；实体侧因分层约束独立写死同值，理由见
+ * `LearningSettingsEntity.dailyReviewLimit` 的 KDoc。
+ * 决策口径见 `docs/decisions/2026-10-29-plan-review-limit-preference.md`：V1 存这个数并把它交给排期侧读取，
+ * 但不改 FSRS 的硬上限规则（`docs/specs/01-vocabulary-learning-and-review.md` 仍写「V1 不设置复习硬上限」）。
+ */
 data class LearningSettings(
     val profileId: String,
     val openDetailOnKnown: Boolean,
     val openDetailOnFuzzy: Boolean,
     val openDetailOnForgotten: Boolean,
     val showVocabularySearchCount: Boolean = true,
+    val dailyReviewLimit: Int = DEFAULT_DAILY_REVIEW_LIMIT,
 ) {
     companion object {
-        fun defaults(profileId: String) = LearningSettings(profileId, false, true, true, true)
+        const val DEFAULT_DAILY_REVIEW_LIMIT = 30
+
+        fun defaults(profileId: String) =
+            LearningSettings(profileId, false, true, true, true, DEFAULT_DAILY_REVIEW_LIMIT)
     }
 }
 
@@ -54,8 +67,22 @@ class RoomLearningSettingsRepository(
         }
 
     private fun LearningSettingsEntity.toDomain() =
-        LearningSettings(profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten, showVocabularySearchCount)
+        LearningSettings(
+            profileId,
+            openDetailOnKnown,
+            openDetailOnFuzzy,
+            openDetailOnForgotten,
+            showVocabularySearchCount,
+            dailyReviewLimit,
+        )
 
     private fun LearningSettings.toEntity() =
-        LearningSettingsEntity(profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten, showVocabularySearchCount)
+        LearningSettingsEntity(
+            profileId,
+            openDetailOnKnown,
+            openDetailOnFuzzy,
+            openDetailOnForgotten,
+            showVocabularySearchCount,
+            dailyReviewLimit,
+        )
 }

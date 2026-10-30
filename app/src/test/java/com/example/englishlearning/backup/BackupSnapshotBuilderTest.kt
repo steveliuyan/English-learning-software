@@ -3,6 +3,7 @@ package com.example.englishlearning.backup
 import com.example.englishlearning.backup.domain.BackupRecordTypes
 import com.example.englishlearning.backup.domain.BackupSnapshotBuilder
 import com.example.englishlearning.backup.domain.BackupSourceRows
+import com.example.englishlearning.backup.domain.LearningSettingsRecord
 import com.example.englishlearning.core.storage.entity.AssetRecordEntity
 import com.example.englishlearning.core.storage.entity.ArticleEntity
 import com.example.englishlearning.core.storage.entity.CardReviewStateEntity
@@ -20,6 +21,7 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchHistoryEn
 import com.example.englishlearning.core.storage.entity.WordAiNoteEntity
 import com.example.englishlearning.core.storage.entity.WordBookEntity
 import com.example.englishlearning.core.storage.entity.WordBookProgressMigrationAuditEntity
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -53,7 +55,7 @@ class BackupSnapshotBuilderTest {
     private val sampleRows = emptyRows.copy(
         profiles = listOf(LocalProfileEntity("p-1", "Me", 100L)),
         learningProfiles = listOf(LearningProfileEntity("p-1", "wb-1", 20)),
-        learningSettings = listOf(LearningSettingsEntity("p-1", true, false, true, true)),
+        learningSettings = listOf(LearningSettingsEntity("p-1", true, false, true, true, dailyReviewLimit = 45)),
         todayPlans = listOf(TodayPlanEntity("plan-1", "p-1", "2026-10-13", "Asia/Shanghai", "wb-1", 20, 5, "v1", 111L)),
         todayPlanTasks = listOf(TodayPlanTaskEntity("plan-1", "card-1", "new", 0)),
         learningEvents = listOf(LearningEventEntity("ev-1", "p-1", "plan-1", "card-1", "wb-1", "known", 120L, "fsrs-1", "params-1", null, 130L)),
@@ -148,7 +150,7 @@ class BackupSnapshotBuilderTest {
         assertEquals(setOf("schemaVersion", "id", "displayName", "createdAt"), keysOf("profiles"))
         assertEquals(setOf("schemaVersion", "profileId", "activeWordBookId", "dailyNewTarget"), keysOf("learning-profiles"))
         assertEquals(
-            setOf("schemaVersion", "profileId", "openDetailOnKnown", "openDetailOnFuzzy", "openDetailOnForgotten", "showVocabularySearchCount"),
+            setOf("schemaVersion", "profileId", "openDetailOnKnown", "openDetailOnFuzzy", "openDetailOnForgotten", "showVocabularySearchCount", "dailyReviewLimit"),
             keysOf("learning-settings"),
         )
         assertEquals(
@@ -205,6 +207,39 @@ class BackupSnapshotBuilderTest {
         )
         assertEquals(setOf("schemaVersion", "id", "sha256", "byteSize", "createdAt"), keysOf("asset-records"))
     }
+
+    /**
+     * 批 1 Task 12「复习上限」的两条备份账：
+     *  ① 导出侧必须把**盘上的值**写进 payload——只加字段不接线时，导出仍是 record 自己的默认 30，
+     *     所以样本行故意用 45（见 `sampleRows.learningSettings`），断言的是「非默认值出得来」；
+     *  ② 恢复侧必须读得懂**旧包**（v32 之前的包没有这一枚键）：`RestoreEntityDecoder` 与 `RestoreRecordCodec`
+     *     的 Json 都是 `ignoreUnknownKeys = false` 的严格档，缺键只有在属性带默认值时才放行，
+     *     默认值取原型初值 30。这条一失败就是「升级之后旧备份恢复全红」，属于最贵的那类回归。
+     */
+    @Test
+    fun `learning settings payload carries the stored review limit and legacy payloads still decode`() {
+        val records = BackupSnapshotBuilder.buildRecords(sampleRows, includeMediaAssets = true)
+        val payload = records.first { it.path.startsWith("records/learning-settings/") }.jsonText()
+        assertEquals(
+            "45",
+            Json.parseToJsonElement(payload).jsonObject["dailyReviewLimit"]?.jsonPrimitive?.content,
+            "复习上限必须随实体一起进导出包（值来自盘，不是 record 的默认）",
+        )
+
+        val legacy =
+            """{"schemaVersion":1,"profileId":"p-1","openDetailOnKnown":true,"openDetailOnFuzzy":false,""" +
+                """"openDetailOnForgotten":true,"showVocabularySearchCount":true}"""
+        val decoded = strictJson.decodeFromString<LearningSettingsRecord>(legacy)
+        assertEquals(
+            30,
+            decoded.dailyReviewLimit,
+            "旧备份包缺这一枚键时必须回填原型初值 30，不是 0：0 会被滑杆读成「上限关到最小」，" +
+                "而严格档（ignoreUnknownKeys = false）一旦连缺键也拒绝，升级后的恢复就会整包判失败",
+        )
+    }
+
+    /** 与恢复侧逐字同构的严格 Json 配置（`RestoreEntityDecoder.kt:50` / `RestoreRecordCodec.kt:29`）。 */
+    private val strictJson = Json { ignoreUnknownKeys = false; isLenient = false }
 
     @Test
     fun `asset payload never carries the private relative location`() {

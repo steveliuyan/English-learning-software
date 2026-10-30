@@ -70,7 +70,7 @@ import org.junit.runner.RunWith
  * 真实语义动作），不在用例里复刻任何生产分支：
  *  - 路 A：`LearningSetupScreen` 的词书卡「删除词书」**自定义无障碍动作**真实触发
  *    `LearningSetupViewModel.requestDelete` → `pendingDelete` → 面板组合（这条动作是
- *    `WordBookSwipeRowTest` I-A2 钉过的同一条真实入口，不是测试替身直接调 VM）；
+ *    `WordBookPickRowTest` I-A2 钉过的同一条真实入口，不是测试替身直接调 VM）；
  *  - 路 B：设置页「导出词书」入口在册数 ≥ 2 时真实打开 `GlassDialog` 选择器，
  *    列表项 tag（`settings_export_book_*`）仍逐项可达——**只断存在与可点，绝不点击**
  *    （点击会拉起 SAF 系统界面，设备用例不该把系统文件选择器卷进来）。
@@ -168,7 +168,7 @@ class AppScreenOverlayContainerTest {
         }
         composeRule.onNodeWithText("删除《我的词书》？").assertDoesNotExist()
         assertEquals("取消不得落库：deleteWordBook 调用数必须不变", deleteCallsAtOpen, repository.deleteCalls.size)
-        composeRule.onNodeWithTag("wordbook_tile_my-pack").assertExists()
+        composeRule.onNodeWithTag("wordbook_pick_my-pack").assertExists()
     }
 
     /**
@@ -484,13 +484,13 @@ class AppScreenOverlayContainerTest {
     private fun createProfileAndOpenSetup() {
         createProfile()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("wordbook_tile_my-pack").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("wordbook_pick_my-pack").fetchSemanticsNodes().isNotEmpty()
         }
     }
 
     /**
      * 用**真实无障碍动作**触发删除请求：TalkBack 用户走的就是这条「删除词书」自定义动作
-     * （同 `WordBookSwipeRowTest` 的 I-A2 取证口径），不是测试替身直接调 `requestDelete`。
+     * （同 `WordBookPickRowTest` 的 I-A2 取证口径），不是测试替身直接调 `requestDelete`。
      */
     private fun requestWordBookDeleteThroughTheAccessibilityAction() {
         val nodes = composeRule.onAllNodes(clickableWithDeleteWordBookAction()).fetchSemanticsNodes()

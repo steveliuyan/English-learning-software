@@ -103,7 +103,9 @@ data class SettingsGroup(
 )
 
 /**
- * 设置页信息架构的唯一台账（AC-R-21 / 裁决②）：**恰 4 组、恰 9 行**。
+ * 设置页信息架构的唯一台账（AC-R-21 / 裁决②）：**恰 4 组、恰 10 行**。
+ * 第 10 行「关于」是批 2 Task 22-B 按用户拍板加的（原型 `sMeAbout` 需要独立入口）；该行登记在这里，
+ * AC-R-21 的行数期望值随之由 9 改为 10（判据形状不变，只是行数）。
  *
  * 落位：「学习」3 行（词书与每日目标 / 学习提醒 / 生成默写纸）、「AI 与语音」2 行、
  * 「外观与关于」2 行（主题三态 / 开源许可与隐私说明）、「数据与安全」2 行
@@ -138,6 +140,7 @@ object SettingsGroups {
             entries = listOf(
                 SettingsEntry("主题", "settings_theme_mode", null, AppDomain.Settings),
                 SettingsEntry("开源许可与隐私说明", "settings_open_licenses", AppIcon.Info, AppDomain.Settings),
+                SettingsEntry("关于", "settings_open_about", AppIcon.Info, AppDomain.Settings),
             ),
         ),
         SettingsGroup(
@@ -255,6 +258,8 @@ fun SettingsScreen(
     transferMessage: String? = null,
     /** F5-04「关于与开源许可」入口（AC5-04）：必须是真实可达页面，不许做假入口。 */
     onOpenLicenses: () -> Unit = {},
+    /** 批 2 Task 22-B：独立「关于」页入口（原型 `sMeAbout`，`app.js:1366`）。 */
+    onOpenAbout: () -> Unit = {},
 ) {
     val colors = appColors()
     Column(
@@ -287,6 +292,7 @@ fun SettingsScreen(
             transferBusy = transferBusy,
             transferMessage = transferMessage,
             onOpenLicenses = onOpenLicenses,
+            onOpenAbout = onOpenAbout,
         )
     }
 }
@@ -318,6 +324,8 @@ internal fun SettingsGroupsContent(
     transferBusy: Boolean,
     transferMessage: String?,
     onOpenLicenses: () -> Unit,
+    /** 批 2 Task 22-B：独立「关于」页入口（原型「应用」组「关于与许可」）。 */
+    onOpenAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val themeMode = rememberAppThemeMode()
@@ -370,6 +378,11 @@ internal fun SettingsGroupsContent(
         SettingsGroupSectionHeader(settingsGroup("settings_group_appearance"))
         ThemeModeRow(mode = themeMode, onSelect = { AppThemePreferences.write(context, it) })
         SettingsGroupCard {
+            LedgerEntryRow(
+                tag = "settings_open_about",
+                subtitle = "版本、致谢与来源说明",
+                onClick = onOpenAbout,
+            )
             LedgerEntryRow(
                 tag = "settings_open_licenses",
                 subtitle = "第三方组件、许可证与隐私说明",

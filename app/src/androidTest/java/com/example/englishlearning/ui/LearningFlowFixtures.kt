@@ -149,14 +149,16 @@ internal fun ready(
     submitting: Boolean = false,
     message: String? = null,
     meaningRevealed: Boolean = false,
+    receipt: FeedbackReceipt? = null,
 ) = WordCardUiState.Ready(
     card = card,
     position = 1,
     total = 3,
-    completedCount = 0,
+    completedCount = if (receipt == null) 0 else 1,
     submitting = submitting,
     message = message,
     meaningRevealed = meaningRevealed,
+    receipt = receipt,
 )
 
 /** 占位词卡构造器（同上：从 `WordCardScreenTest` 私有成员原样上移）。 */

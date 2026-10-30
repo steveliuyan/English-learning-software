@@ -272,6 +272,96 @@ class LearningSetupViewModelTest {
         assertEquals(true, viewModel.uiState.value.canDelete("my-pack"))
     }
 
+    // ---- 批 1 Task 12：复习上限（原型 `#/plan-edit` 的 `.range`，10..80 step 5，初值 30） ----
+
+    @Test
+    fun `defaults the daily review limit to the prototype initial value when nothing is stored`() =
+        runTest(dispatcher) {
+            val viewModel = setupViewModel()
+
+            viewModel.load("default")
+            advanceUntilIdle()
+
+            // 30 是原型 `S.planReview` 的初值；它只许在域侧（`LearningSettings.dailyReviewLimit`）写一次。
+            assertEquals(30, viewModel.uiState.value.dailyReviewLimit)
+        }
+
+    @Test
+    fun `loads the stored daily review limit for the profile`() = runTest(dispatcher) {
+        val settingsRepo = FakeSettingsRepository().apply {
+            stored["default"] = LearningSettings(
+                "default",
+                openDetailOnKnown = true,
+                openDetailOnFuzzy = true,
+                openDetailOnForgotten = true,
+                dailyReviewLimit = 45,
+            )
+        }
+        val viewModel = setupViewModel(settingsRepo = settingsRepo)
+
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        assertEquals(45, viewModel.uiState.value.dailyReviewLimit)
+    }
+
+    @Test
+    fun `updateReviewLimit clamps to the prototype range without snapping off-range values`() =
+        runTest(dispatcher) {
+            val viewModel = setupViewModel()
+            viewModel.load("default")
+            advanceUntilIdle()
+
+            viewModel.updateReviewLimit(3)
+            assertEquals(10, viewModel.uiState.value.dailyReviewLimit, "低于原型 min=10 必须被抬到 10")
+
+            viewModel.updateReviewLimit(500)
+            assertEquals(80, viewModel.uiState.value.dailyReviewLimit, "高于原型 max=80 必须被压回 80")
+
+            viewModel.updateReviewLimit(47)
+            assertEquals(47, viewModel.uiState.value.dailyReviewLimit, "区间内的取值不许被 VM 改写：步进是滑杆的事")
+        }
+
+    @Test
+    fun `a drafted review limit is not persisted by toggling a switch`() = runTest(dispatcher) {
+        val settingsRepo = FakeSettingsRepository()
+        val viewModel = setupViewModel(settingsRepo = settingsRepo)
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        // 拖了滑杆但没点保存，随后顺手关掉一枚开关：即时落库的那次写入必须带**已提交**的上限（30），
+        // 否则一次与「保存」无关的点击会替用户悄悄改掉复习上限——屏上那条口径就散了。
+        viewModel.updateReviewLimit(60)
+        viewModel.setOpenDetailOnKnown(true)
+        advanceUntilIdle()
+
+        assertEquals(30, settingsRepo.stored["default"]?.dailyReviewLimit)
+        assertEquals(true, settingsRepo.stored["default"]?.openDetailOnKnown)
+        assertEquals(60, viewModel.uiState.value.dailyReviewLimit, "草稿仍要留在屏上，等保存那一下")
+    }
+
+    @Test
+    fun `saving persists the drafted review limit`() = runTest(dispatcher) {
+        val repository = FakeRepository().apply {
+            books += WordBook("cet4", "大学英语四级", "CET-4", 0, "v1", "ngsl-nawl-1.2")
+        }
+        val settingsRepo = FakeSettingsRepository()
+        val viewModel = setupViewModel(repository, settingsRepo = settingsRepo)
+        viewModel.load("default")
+        advanceUntilIdle()
+
+        viewModel.updateReviewLimit(60)
+        viewModel.save("default")
+        advanceUntilIdle()
+
+        assertEquals(60, settingsRepo.stored["default"]?.dailyReviewLimit, "「保存计划」必须把滑杆草稿一起提交")
+
+        // 提交之后再动开关，落库的是刚提交的上限而不是旧值。
+        viewModel.setOpenDetailOnKnown(true)
+        advanceUntilIdle()
+        assertEquals(60, settingsRepo.stored["default"]?.dailyReviewLimit)
+    }
+
     @Test
     fun `requesting delete on a bundled book is ignored`() = runTest(dispatcher) {
         val repository = FakeRepository().apply {

@@ -34,7 +34,7 @@ import com.example.englishlearning.ui.theme.appColors
  *    比什么都不念更糟（F1-01 无障碍口径）。这里只有色块。
  *  - **圆角 / 行高 / 内边距全走形参**，组件不写死 `AppShape.Card`：词书卡的圆角是 18dp（滑动删除底、描边
  *    与卡片必须同角，换 `AppShape.Card` 的 20dp 会让红底从四角渗出；同角这件事由「卡身与删除底读调用方传入的
- *    **同一份** shape」保证，`WordBookSwipeRowTest` 钉的是静止时不露红底，它按整行捕获，两处一起改成 20dp
+ *    **同一份** shape」保证，`WordBookPickRowTest` 的前身 `WordBookSwipeRowTest` 钉的是静止时不露红底，它按整行捕获，两处一起改成 20dp
  *    它照样绿，所以它不是同角约束的守卫——R-13.1 / m-6 措辞订正），由调用方把那组参数传进来。
  *  - **行与行之间的 14dp `spacedBy` 不是 spec §2.3 禁的「幽灵间距」**（R-13.1 / m-2）：那条禁令管的是
  *    **真实列表**里「本该有一条线、却只靠 spacedBy 撑出来的缝」。占位行此刻手里没有内容可分隔，那道缝本来就该是

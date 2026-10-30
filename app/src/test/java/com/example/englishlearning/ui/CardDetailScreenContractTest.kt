@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
  * 「锚必须绑在生效路径上」（progress.md 记的 14B C-1 / Task 15 修复轮口径）在本屏落成三条判据：
  *  - [callWindows] 的实参窗口钉 **tag / 口音标注归属**（防上提、防把 tag 错挂给另一枚药片）；
  *  - 同一批窗口内钉 **`contentDescription =` 整体缺席**（防拼接 / 模板 / 局部 val 等一切复述形态）；
- *  - 窗口起点必须落在**真正被渲染的那一段组合体**里：药片三枚钉在单词卡函数体内、
- *    词行三枚钉在各自行小节的区间内。只在别处补一枚同形调用（死函数、临时 val）当场判红。
+ *  - 窗口起点必须落在**真正被渲染的那一段组合体**里：药片三枚钉在词头函数体内、
+ *    小节内容钉在各自小节的区间内。只在别处补一枚同形调用（死函数、临时 val）当场判红。
  *
  * 简报里那句 `grep -c "SpeakerButton(" == 1` 在本屏**不可满足**：详情页的现场形状是
  * 美 / 英两枚待播药片 + 播控组一枚暂停-继续药片（三处调用点，各自带自己的 tag），
@@ -49,13 +49,21 @@ class CardDetailScreenContractTest {
     private companion object {
         const val CARD_DETAIL_SCREEN = "CardDetailScreen.kt"
 
-        /** 单词卡（发音件与播控组的实际渲染体）取样起点。 */
-        const val HERO_FUNCTION_START = "private fun WordHeroCard("
+        /**
+         * 词头（发音件与播控组的实际渲染体）取样起点。
+         *
+         * 批 1 Task 11 起原型 `sWordDetail` 没有英雄卡：主词站在页面上，卡片从「释义」小节才开始，
+         * 旧 `WordHeroCard` 随之退役、改由 `WordHead` 承载口音行与播控组。
+         */
+        const val HERO_FUNCTION_START = "private fun WordHead("
 
-        const val DERIVED_SECTION = """title = "派生词""""
-        const val PHRASES_SECTION = """title = "关联短语""""
+        /** 原型小节锚：标题逐字取自 `sWordDetail`（`常用搭配` / `近义词` / `词形与派生`）。 */
+        const val PHRASES_SECTION = """title = "常用搭配""""
         const val SYNONYMS_SECTION = """title = "近义词""""
-        const val INFLECTIONS_SECTION = """title = "词形变化""""
+        const val WORDFORMS_SECTION = """title = "词形与派生""""
+
+        /** 最后一节的收尾锚：页末提示是原型 `sWordDetail` 里小节的下一块内容。 */
+        const val PAGE_END_ANCHOR = "InlineNotice("
 
         const val SPEAK_TAG = """testTag("card_detail_speak")"""
         const val BRITISH_TAG = """testTag("card_detail_speak_british")"""
@@ -117,14 +125,11 @@ class CardDetailScreenContractTest {
     private val arrowBackLiteral = Regex(""""←"""")
     private val backReadoutLiteral = Regex(""""返回"""")
 
-    // ---------- 词行（派生词 / 关联短语 / 近义词三节的私有行件） ----------
+    // ---------- 关联词三节（批 1 Task 11 起按原型形状：搭配行 / 静态芯片 / 合并串） ----------
 
     private val sharedWordRowCall = Regex("""(^|[^A-Za-z0-9_.])WordRow\(""")
     private val privateRelationLineDefinition = Regex("""private fun RelationLine\(""")
     private val privateRelationLineCall = Regex("""(^|[^A-Za-z0-9_.])RelationLine\(""")
-    private val wordRowLemmaArgument = Regex("""lemma =""")
-    private val wordRowGlossArgument = Regex("""gloss =""")
-    private val wordRowMetaArgument = Regex("""meta =""")
 
     // ---------- 取样 ----------
 
@@ -388,49 +393,58 @@ class CardDetailScreenContractTest {
         )
     }
 
-    /** 三节关联词行走共享词行：每节恰一枚、实参带齐 lemma/gloss，带词性的两节还带 meta。 */
+    /**
+     * 关联词三节按原型形状渲染（批 1 Task 11，对齐 `sWordDetail`）：
+     * 常用搭配一行搭配 + 一行释义，近义词是静态芯片，派生词与词形变化合并成「词形与派生」一节。
+     * 原型这三节都没有「lemma + 释义」的词行，故本屏不再调共享 `WordRow`，私有行件一并退场
+     * （其他屏对 `WordRow` 的使用不受本屏影响）。
+     */
     @Test
-    fun the_relation_rows_use_the_shared_word_row() {
+    fun the_relation_sections_follow_the_prototype_shapes() {
         val source = uiScreenSource(CARD_DETAIL_SCREEN)
         assertEquals(0, countMatches(source, privateRelationLineDefinition), "私有行件的定义必须删净")
         assertEquals(0, countMatches(source, privateRelationLineCall), "私有行件的调用点必须删净")
-        assertEquals(3, countMatches(source, sharedWordRowCall), "派生词 / 关联短语 / 近义词三节各一枚共享词行")
+        assertEquals(
+            0,
+            countMatches(source, sharedWordRowCall),
+            "原型三节里没有词行：本屏不得再调共享 WordRow（三节各自是搭配行 / 芯片 / 合并串）",
+        )
 
-        val windows = callWindows(source, sharedWordRowCall)
-        assertEquals(3, windows.size, "WordRow 的调用窗口应恰三枚，实际=${windows.size}")
-        windows.forEach { window ->
-            val text = windowText(source, window)
+        val phrases = source.substring(sectionRange(source, PHRASES_SECTION, SYNONYMS_SECTION))
+        listOf("phrase.text", "phrase.meaningZh").forEach { field ->
             assertTrue(
-                countMatches(text, wordRowLemmaArgument) == 1 && countMatches(text, wordRowGlossArgument) == 1,
-                "词行的 lemma / gloss 槽必须以具名实参各传一次，实际窗口：$text",
+                field in phrases,
+                "$PHRASES_SECTION 必须逐条渲染 $field（原型：搭配一行、释义一行）；实际区间：$phrases",
             )
         }
 
-        val derived = sectionRange(source, DERIVED_SECTION, PHRASES_SECTION)
-        val phrases = sectionRange(source, PHRASES_SECTION, SYNONYMS_SECTION)
-        val synonyms = sectionRange(source, SYNONYMS_SECTION, INFLECTIONS_SECTION)
-        listOf(
-            DERIVED_SECTION to derived,
-            PHRASES_SECTION to phrases,
-            SYNONYMS_SECTION to synonyms,
-        ).forEach { (anchor, range) ->
-            val inRegion = windows.filter { it.first in range }
-            assertEquals(1, inRegion.size, "$anchor 小节里的词行调用应恰一枚（渲染路径归属），实际=${inRegion.size}")
-            val text = windowText(source, inRegion.single())
-            if (anchor == PHRASES_SECTION) {
-                assertEquals(
-                    0,
-                    countMatches(text, wordRowMetaArgument),
-                    "关联短语没有词性这一栏，不许拿 meta 槽塞别的东西凑数；实际窗口：$text",
-                )
-            } else {
-                assertEquals(
-                    1,
-                    countMatches(text, wordRowMetaArgument),
-                    "$anchor 带词性，必须以 meta 槽保留（丢了就是详情页少一栏信息）；实际窗口：$text",
-                )
-            }
-        }
+        val synonyms = source.substring(sectionRange(source, SYNONYMS_SECTION, WORDFORMS_SECTION))
+        assertTrue(
+            "SynonymChips(" in synonyms,
+            "$SYNONYMS_SECTION 必须走静态芯片渲染（原型 `.chip chip-static`）；实际区间：$synonyms",
+        )
+
+        val wordforms = source.substring(sectionRange(source, WORDFORMS_SECTION, PAGE_END_ANCHOR))
+        assertTrue("joinToString(\"；\")" in wordforms, "派生词按原型用「；」连接成一串；实际区间：$wordforms")
+        assertTrue("joinToString(\" · \")" in wordforms, "词形变化按原型用「 · 」连接成一串；实际区间：$wordforms")
+        assertTrue("""testTag("card_detail_derived")""" in wordforms, "派生词锚留在这一节")
+        assertTrue("""testTag("card_detail_inflections")""" in wordforms, "词形变化锚与派生词同节")
+
+        assertEquals(
+            1,
+            countMatches(source, Regex("\"词形与派生\"")),
+            "派生词与词形变化合并成一节：标题恰好一处",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex("""title = "词形变化"""")),
+            "旧「词形变化」小节标题已并入「词形与派生」（两节各占一张卡是原型没有的排印）",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex("""title = "派生词"""")),
+            "旧「派生词」小节标题同上（原型只有一节 `词形与派生`）",
+        )
     }
 
     /**
@@ -498,7 +512,7 @@ class CardDetailScreenContractTest {
     @Test
     fun the_samplers_fail_loudly_when_a_region_cannot_be_closed() {
         val pillLine = "    SpeakerButton(state = SpeakerState.Idle, onClick = {}, modifier = Modifier.testTag(\"card_detail_speak\"))"
-        val unclosedHero = "private fun WordHeroCard(card: String) {\n$pillLine\n" +
+        val unclosedHero = "private fun WordHead(card: String) {\n$pillLine\n" +
             "private fun UnusedBlock() {\n    Text(\"appDomain(AppDomain.Review)\")\n}\n"
         val unclosedFailure = assertFailsWith<AssertionError> { heroBodyRange(unclosedHero) }
         assertTrue(
@@ -506,7 +520,7 @@ class CardDetailScreenContractTest {
             "① 单词卡体未闭合时取样器没有响亮判红（旧写法会吞到文末照常绿）：实际消息「${unclosedFailure.message}」",
         )
 
-        val indentedCloseHero = "private fun WordHeroCard(card: String) {\n$pillLine\n    }\n" +
+        val indentedCloseHero = "private fun WordHead(card: String) {\n$pillLine\n    }\n" +
             "private fun DeadCard() {\n" +
             "    SpeakerButton(state = SpeakerState.Idle, onClick = {}, modifier = Modifier.testTag(\"dead_tag\"))\n" +
             "    Row(modifier.background(MintTint, AppShape.Pill))\n}"
@@ -614,7 +628,7 @@ class CardDetailScreenContractTest {
         )
 
         // 渲染路径归属的合成自证：把一枚药片挪进没被调用的私有件，计数仍三枚，但函数体归属只剩两枚。
-        val deadFakeSource = "private fun WordHeroCard(card: String) {\n$pill\n" +
+        val deadFakeSource = "private fun WordHead(card: String) {\n$pill\n" +
             "    SpeakerButton(state = SpeakerState.Idle, onClick = {}, modifier = Modifier.testTag(\"card_detail_speak_british\"), accentLabel = \"英\")\n" +
             "}\n" +
             "private fun UnusedBlock() {\n    SpeakerButton(state = SpeakerState.Idle, onClick = {}, modifier = Modifier.testTag(\"dead_tag\"))\n}"
@@ -640,39 +654,24 @@ class CardDetailScreenContractTest {
 
         val rowWithMeta = "WordRow(lemma = row.lemma, gloss = row.meaningZh, meta = row.partOfSpeech)"
         assertEquals(1, callWindows(rowWithMeta, sharedWordRowCall).size, "正控：共享词行调用取到窗口")
-        assertEquals(1, countMatches(rowWithMeta, wordRowMetaArgument), "正控：词性走 meta 槽命中")
-        assertEquals(0, countMatches("WordRow(lemma = row.lemma, gloss = row.meaningZh)", wordRowMetaArgument), "负控：短语节（无词性）不该有 meta")
         assertEquals(0, countMatches("Row { Text(card.lemma); Text(card.meaningZh) }", sharedWordRowCall), "负控：裸组合行不得算成共享调用")
         assertEquals(1, countMatches("private fun RelationLine(word: String) {}", privateRelationLineDefinition), "正控：私有行件定义命中")
         assertEquals(0, countMatches("private fun SenseRow(partOfSpeech: String) {}", privateRelationLineDefinition), "负控：释义行不是本行件")
 
-        val threeSections = "DetailSection(title = \"派生词\") {\n    WordRow(lemma = a, gloss = b, meta = c)\n}\n" +
-            "DetailSection(title = \"关联短语\") {\n    WordRow(lemma = d, gloss = e)\n}\n" +
-            "DetailSection(title = \"近义词\") {\n    WordRow(lemma = f, gloss = g, meta = h)\n}\n" +
-            "DetailSection(title = \"词形变化\") {}"
-        val syntheticDerived = sectionRange(threeSections, DERIVED_SECTION, PHRASES_SECTION)
+        // 小节取样面自证：三节按原型形状各装自己的内容，页末提示不落进最后一节。
+        val threeSections = "DetailSection(title = \"常用搭配\") {\n    Text(phrase.text)\n}\n" +
+            "DetailSection(title = \"近义词\") {\n    SynonymChips(lemmas)\n}\n" +
+            "DetailSection(title = \"词形与派生\") {\n    Text(card.derived.joinToString(\"；\"))\n}\n" +
+            "InlineNotice(\"页末提示\", InlineNoticeKind.Info)\n"
         val syntheticPhrases = sectionRange(threeSections, PHRASES_SECTION, SYNONYMS_SECTION)
-        val syntheticSynonyms = sectionRange(threeSections, SYNONYMS_SECTION, INFLECTIONS_SECTION)
-        val syntheticWindows = callWindows(threeSections, sharedWordRowCall)
-        assertEquals(
-            listOf(1, 1, 1),
-            listOf(syntheticDerived, syntheticPhrases, syntheticSynonyms).map { range -> syntheticWindows.count { it.first in range } },
-            "正控：三节各落一枚词行——小节取样面本身必须站得住",
-        )
-        assertEquals(
-            0,
-            syntheticWindows.count { window ->
-                window.first !in syntheticDerived && window.first !in syntheticPhrases && window.first !in syntheticSynonyms
-            },
-            "合成前提：片段里没有小节外的词行，取样面闭合（否则下面那条负控无意义）",
-        )
-        val misplaced = threeSections.replace("    WordRow(lemma = f, gloss = g, meta = h)\n}\n", "}\n") +
-            "private fun DeadRelationBlock() {\n    WordRow(lemma = f, gloss = g, meta = h)\n}"
-        assertEquals(
-            0,
-            callWindows(misplaced, sharedWordRowCall).count { it.first in syntheticSynonyms },
-            "负控：把近义词那节的词行挪出小节（塞进死函数），本节的渲染路径归属判据必须失守——" +
-                "整文件计数仍三枚、 lemma/gloss/meta 也在，只有本锚认得出「它不在这一节渲染」",
+        val syntheticSynonyms = sectionRange(threeSections, SYNONYMS_SECTION, WORDFORMS_SECTION)
+        val syntheticWordforms = sectionRange(threeSections, WORDFORMS_SECTION, PAGE_END_ANCHOR)
+        assertTrue("Text(phrase.text)" in threeSections.substring(syntheticPhrases), "正控：常用搭配区间罩住搭配行")
+        assertTrue("SynonymChips(" in threeSections.substring(syntheticSynonyms), "正控：近义词区间罩住静态芯片")
+        assertTrue("joinToString" in threeSections.substring(syntheticWordforms), "正控：词形与派生区间罩住合并串")
+        assertTrue(
+            "InlineNotice(" !in threeSections.substring(syntheticWordforms),
+            "负控：页末提示不得被算进最后一节（收尾锚失效 = 小节归属判据失去边界）",
         )
     }
 }

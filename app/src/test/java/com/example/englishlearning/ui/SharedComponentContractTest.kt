@@ -201,7 +201,19 @@ class SharedComponentContractTest {
         assertTrue("Color.White" in source, "选中勾为白色（原型 .pick[aria-checked] color:#fff）")
         assertTrue("padding(vertical = 12.dp)" in source, "选择行上下 12dp（原型 .pick padding var(--s3) 0）")
         assertTrue("spacedBy(12.dp)" in source, "标记与文字间隙 12dp")
-        assertTrue("selectable(" in source, "选择行必须 selectable（单选/复选语义）")
+        assertTrue("heightIn(min = 48.dp)" in source, "选择行最小高 48dp（F5-03 下限；原型自然高 46dp）")
+        assertTrue("selectable(" in source, "无第二动作的选择行仍走 selectable（单选/复选语义 + ToggleableState）")
+        // 批 1 Task 13-A：词书行要在同一枚节点上再挂一条长按（删除），`selectable` 给不出第二个动作，
+        // 故组件多出一条 `combinedClickable` 形。两条并存是**刻意的**，不是把 selectable 放宽成 clickable：
+        // 角色、Selected、stateDescription 三样在两条形状上都在，TalkBack 念得出的东西一件没少。
+        assertTrue("combinedClickable(" in source, "带第二动作的选择行走 combinedClickable（点按选中 + 长按删除同一个节点）")
+        assertTrue("Role.RadioButton" in source, "单选角色随 radio=true 落到语义上（原型 .pick-radio）")
+        assertTrue("Role.Checkbox" in source, "复选角色：非单选档仍是 Checkbox，不许统一降级成 Button")
+        assertTrue("selected = checked" in source, "combinedClickable 自己不发 Selected，组件必须自己写进语义")
+        assertTrue("CustomAccessibilityAction(" in source, "第二动作要登记成读屏自定义动作（F5-03：手势不是可及路径）")
+        assertTrue("stateDescription = if (checked) \"已选\" else \"未选\"" in source, "选中态双值进语义，不只靠标记变色")
+        assertTrue("AppType.Meta" in source, "尾部值取 `.row-value` 档（13sp / ink-3，原型 app.css:544）")
+        assertTrue("trailing" in source && "onCheckedChange(!checked)" in source, "尾部值形参与「点按翻选中」都在组件里")
     }
 
     @Test
@@ -242,6 +254,42 @@ class SharedComponentContractTest {
         assertTrue("0.62f" in source, "复习段 on-strong 62%（原型 .plan-seg-due）")
         assertTrue("progressBarRangeInfo" in source, "必须暴露 progressbar 语义（原型 role=progressbar + aria-valuenow）")
         assertTrue("AppMotion.Slow" in source && "AppMotion.EasingOut" in source, "段宽过渡 300ms 入场缓动")
+    }
+
+    /**
+     * 按钮 = 原型 `.btn`（批 0 漏项，批 1 学习页主 CTA 对照时补上）。
+     *
+     * 原型出处（`assets/app.css:565`）：
+     * ```
+     * .btn { min-height:46px; padding:0 var(--s5); border-radius:var(--r-md);
+     *        font-size:var(--fs-body); font-weight:600; letter-spacing:-.005em }
+     * ```
+     * 即「14 圆角 / 15px 600 / 左右 20」，**不是药片**——`--r-pill` 在原型只给导航、分段、芯片、
+     * 进度条、开关这些轨道件。本仓的 `PillButton` 名字是历史 API（全仓 50+ 调用点），形状按原型走 14。
+     *
+     * 两处登记偏离：
+     *  - `min-height` 取 **48** 而非原型 46：无障碍触控下限，spec §2.3「不得靠 padding 凑」；
+     *  - 竖直内距从 0 改为 12：48 高减 15sp/24 行高后上下各 12，字形仍居中。
+     */
+    @Test
+    fun `the button mirrors the prototype btn geometry`() {
+        val source = stripComments(uiComponentSource("GlassButton.kt"))
+        val body = functionBody(source, "fun PillButton(")
+        assertTrue(body.isNotEmpty(), "GlassButton.kt 里取不到 `fun PillButton(` 的签名 + 函数体")
+        assertTrue("shape = AppShape.Button" in body, "按钮圆角 14dp（原型 .btn → var(--r-md)）")
+        assertTrue(
+            "AppShape.Pill" !in body,
+            "按钮不再是药片：--r-pill 在原型只给导航/分段/芯片/进度条/开关，.btn 是 14",
+        )
+        assertTrue("heightIn(min = 48.dp)" in body, "触控下限 48dp（原型 min-height 46，无障碍取 48）")
+        assertTrue(
+            "AppType.ButtonLabel" in body,
+            "按钮文案 15sp/600（原型 .btn = --fs-body + font-weight 600），不是 Title 的 17sp",
+        )
+        assertTrue(
+            "padding(horizontal = 20.dp, vertical = 12.dp)" in body,
+            "左右 20dp（原型 padding 0 var(--s5)）+ 竖直 12dp 撑到 48 高",
+        )
     }
 
     @Test

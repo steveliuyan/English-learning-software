@@ -63,8 +63,10 @@ class CardDetailScreenTest {
         composeRule.onNodeWithText("ability").assertExists()
         composeRule.onNodeWithTag("card_detail_ipa").assertExists()
         composeRule.onNodeWithText("əˈbɪləti").assertExists()
+        // 词性两处按原型共存：词头的 `.word-pos`（card_detail_pos）+ 释义行的词性栏。
+        composeRule.onNodeWithTag("card_detail_pos").assertExists()
         composeRule.onNodeWithTag("card_detail_part_of_speech").assertExists()
-        composeRule.onNodeWithText("n.").assertExists()
+        composeRule.onAllNodesWithText("n.").assertCountEquals(2)
         composeRule.onNodeWithTag("card_detail_meaning").assertExists()
         composeRule.onNodeWithText("能力；才能").assertExists()
         composeRule.onNodeWithTag("card_detail_illustration").assertExists()
@@ -96,8 +98,8 @@ class CardDetailScreenTest {
         composeRule.onNodeWithTag("card_detail_example").assertExists()
         composeRule.onNodeWithText("She has the ability to explain ideas.").assertExists()
         composeRule.onNodeWithTag("card_detail_inflections").assertExists()
-        // 词形变化是一个带标题的小节，不再是「词形变化：…」一行灰字
-        composeRule.onNodeWithText("词形变化").assertExists()
+        // 词形变化与派生词合并成「词形与派生」一节（原型 sWordDetail：一节两行）
+        composeRule.onNodeWithText("词形与派生").assertExists()
         composeRule.onNodeWithText("abilities").assertExists()
     }
 
@@ -114,7 +116,7 @@ class CardDetailScreenTest {
         composeRule.onNodeWithTag("card_detail_inflections").assertDoesNotExist()
         // 缺模块整块隐藏：连小节标题也不留
         composeRule.onNodeWithText("例句").assertDoesNotExist()
-        composeRule.onNodeWithText("词形变化").assertDoesNotExist()
+        composeRule.onNodeWithText("词形与派生").assertDoesNotExist()
     }
 
     @Test
@@ -363,7 +365,8 @@ class CardDetailScreenTest {
 
         composeRule.onAllNodesWithText("冲浪；（在互联网上）冲浪，浏览").assertCountEquals(1)
         composeRule.onNodeWithText("v.").assertExists()
-        composeRule.onNodeWithText("n.").assertExists()
+        // 「n.」两处按原型共存：词头 `.word-pos` 一枚 + 第二条释义的词性栏一枚。
+        composeRule.onAllNodesWithText("n.").assertCountEquals(2)
     }
 
     @Test
@@ -377,14 +380,72 @@ class CardDetailScreenTest {
         assertTrue("返回的点击区域至少 48dp 高", back.bottom - back.top >= 48.dp)
     }
 
+    /**
+     * 原型 `sWordDetail` 的口音排在音标**下一行**（`p.word-ipa` 之后是一行 `btn-secondary btn-sm`），
+     * 不挤在音标同一行里；本仓发音入口走共享药片，药片比原型 `btn-sm` 高（48dp 触控下限），
+     * 所以这里判「整枚落在这行下方、且紧贴音标行」，不再断言同一行相交。
+     */
+    /**
+     * F4-01 决策⑦ + 原型 `barTop`：收藏是页头右上角的一枚图标键（`icon-btn`），不是正文里的动作药片。
+     * 断言三件事：与标题同一行、触控区 ≥48dp（本仓的可点下限）、点下去走宿主回调。
+     */
     @Test
-    fun speakButtonSitsOnTheIpaLine() {
+    fun favoriteToggleLivesInTheHeaderRow() {
+        var toggled = 0
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(),
+                onBack = {},
+                favoritePresent = false,
+                onToggleFavorite = { toggled++ },
+            )
+        }
+
+        val toggle = composeRule.onNodeWithContentDescription("收藏 ability")
+        toggle.assertExists().assertHasClickAction()
+
+        val title = composeRule.onNodeWithText("词义详情").getUnclippedBoundsInRoot()
+        val bounds = toggle.getUnclippedBoundsInRoot()
+        val titleCenter = (title.top + title.bottom) / 2
+        assertTrue(
+            "收藏键应与页头标题同一行（原型 barTop 右侧 icon-btn），实际 title=$title toggle=$bounds",
+            bounds.top <= titleCenter && titleCenter <= bounds.bottom,
+        )
+        assertTrue(
+            "收藏键的触控区至少 48dp 高，实际=$bounds",
+            bounds.bottom - bounds.top >= 48.dp,
+        )
+
+        toggle.performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, toggled)
+        // 宿主没翻转状态前，键的语义仍是「收藏」——屏侧不做乐观翻转（状态只在宿主）。
+        composeRule.onNodeWithContentDescription("取消收藏 ability").assertDoesNotExist()
+    }
+
+    /** 宿主不给收藏状态 / 回调时，页头尾槽整枚不渲染（不占位、不留空键）。 */
+    @Test
+    fun favoriteToggleStaysHiddenWithoutHostState() {
+        composeRule.setContent { CardDetailScreen(card = card(), onBack = {}) }
+
+        composeRule.onNodeWithTag("card_detail_favorite_toggle").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("收藏 ability").assertDoesNotExist()
+    }
+
+    @Test
+    fun speakButtonsSitOnTheirOwnRowBelowTheIpa() {
         composeRule.setContent { CardDetailScreen(card = card(), onBack = {}) }
 
         val ipa = composeRule.onNodeWithTag("card_detail_ipa").getUnclippedBoundsInRoot()
         val speak = composeRule.onNodeWithTag("card_detail_speak").getUnclippedBoundsInRoot()
-        val ipaCenter = (ipa.top + ipa.bottom) / 2
-        assertTrue("发音按钮应紧跟音标", speak.top <= ipaCenter && ipaCenter <= speak.bottom)
+        assertTrue(
+            "发音入口应在音标行下方（原型：音标一行、口音与次键一行），实际 ipa=$ipa speak=$speak",
+            speak.top >= ipa.bottom,
+        )
+        assertTrue(
+            "发音入口应紧跟音标行，不应被推到远处，实际间距=${speak.top - ipa.bottom}",
+            speak.top - ipa.bottom <= 24.dp,
+        )
     }
 
     /**
@@ -453,29 +514,50 @@ class CardDetailScreenTest {
     }
 
     /**
-     * 关联词三节的行是共享词行（Task 16）：词头、释义、词性各是**独立节点**，
-     * 不再由私有行件拼成一整条 `AnnotatedString`。
-     *
-     * 这处口径换掉了原来的「英文加粗」断言：词行的层级按六档锁交给墨色落差
-     * （lemma `text1` / gloss+meta `text2`，`WordRow.kt` 的 `wordRowInks` 纯表），
-     * 组件不 `copy(fontWeight = …)`；而 connected 读不到颜色（Task 9 实测口径），
-     * 所以设备侧能证、也该证的是「三栏各自成节点、拼接那一行已消失」。
+     * 关联词三节按原型形状渲染（批 1 Task 11）：派生词与词形变化并进「词形与派生」一节，
+     * 各按「；」/「 · 」连接成一串；近义词是静态芯片；常用搭配一行搭配 + 一行释义。
+     * 旧「lemma + 释义」词行与私有行件已从本屏退场（其他屏对 `WordRow` 的用法不受影响）。
      */
     @Test
-    fun relationRowsRenderAsThreeSeparateWordRowColumns() {
+    fun relationSectionsFollowThePrototypeShapes() {
         composeRule.setContent {
             CardDetailScreen(
-                card = card(lemma = "surf", derived = listOf(DerivedWord("surfer", "n.", "冲浪者；网虫"))),
+                card = card(
+                    lemma = "surf",
+                    derived = listOf(DerivedWord("surfer", "n.", "冲浪者；网虫")),
+                    inflections = listOf("surfed", "surfing"),
+                    phrases = listOf(PhraseEntry("surf the Internet", "在网上冲浪")),
+                    synonyms = listOf(RelatedWord("breaker", "n.", "碎浪")),
+                ),
                 onBack = {},
             )
         }
 
-        composeRule.onNodeWithText("surfer").assertIsDisplayed()
-        composeRule.onNodeWithText("冲浪者；网虫").assertIsDisplayed()
-        // 「n.」恰两枚独立节点：单词卡词性小标签一枚 + 词行 meta 栏一枚（connected 实测口径）。
-        // 若词行回退成整条拼接文本，这里会掉回 1 枚并当场红——比单点存在断言更强的钉法。
+        composeRule.onNodeWithTag("card_detail_wordforms").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("词形与派生").assertExists()
+        // 派生词只留 lemma 串（原型 `w.derived.join('；')`）：不再有词性 / 释义两栏。
+        assertEquals(
+            "surfer",
+            composeRule.onNodeWithTag("card_detail_derived").annotatedText().text,
+        )
+        assertEquals(
+            "surfed · surfing",
+            composeRule.onNodeWithTag("card_detail_inflections").annotatedText().text,
+        )
+
+        composeRule.onNodeWithTag("card_detail_synonyms").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("breaker").assertExists()
+
+        composeRule.onNodeWithTag("card_detail_phrases").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("surf the Internet").assertExists()
+        composeRule.onNodeWithText("在网上冲浪").assertExists()
+
+        // 「n.」两处按原型共存：词头 `.word-pos` 一枚 + 释义行词性栏一枚；三节关联词里没有第三处。
         composeRule.onAllNodesWithText("n.").assertCountEquals(2)
-        // 私有行件那一整条拼接文本不再存在（三栏各一枚节点，读屏与省略号都按栏走）。
+        // 私有行件那一整条拼接文本不再存在。
         composeRule.onNodeWithText("surfer  n.  冲浪者；网虫").assertDoesNotExist()
     }
 

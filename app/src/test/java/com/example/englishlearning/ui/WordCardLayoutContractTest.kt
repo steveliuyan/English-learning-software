@@ -177,6 +177,52 @@ class WordCardLayoutContractTest {
         assertTrue("appDomain(AppDomain.Learn)" in source, "本屏唯一承担主操作的域色是 Learn（spec §4.4）")
     }
 
+    // ---------- 收尾版面撤出本屏 ----------
+
+    /**
+     * 批 1 Task 18：本轮收尾版面**整块搬出词卡屏**，这里钉撤干净了没有。
+     *
+     * 原型在末张卡推进后走的是 `go('learn-summary')`（`assets/app.js:1688` / `:1701`），收尾画面归新建的
+     * `TodaySummaryScreen`，宿主按 `WordCardUiState.AllDone` 直接挂那一屏（`AppScreen.kt`），所以本屏的
+     * `AllDone` 分支只剩 `when` 的穷尽性。三条判据各自的变异形态：
+     *  - 两枚旧锚点若被搬回来（同一条状态两处渲染，正是 Task 10 台账点过名的重复画面），tag 计数当场非零；
+     *  - 收尾屏若被词卡屏自己调用（把新建屏当成词卡流程的一个子视图），`TodaySummaryScreen(` 会出现在这份源码里；
+     *  - `word_card_back_to_plan` 必须**仍在且只有一处**：撤收尾版面不等于撤 `NoCards` / `ReviewCompleted`
+     *    那两态的出口，两态仍共享 `BackToPlanButton`（只定义一处，所以计数恰 1）。
+     *
+     * 渲染侧的对偶判据是 `WordCardScreenTest.allDoneIsNoLongerRenderedByTheCardScreen`，
+     * 挂载与三个出口归 `AppScreenTest` 那两条 Task 18 用例。
+     */
+    @Test
+    fun `the session summary layout no longer lives on the card screen`() {
+        listOf("word_card_all_done", "word_card_completion_breakdown").forEach { tag ->
+            assertEquals(
+                0,
+                countMatches(source, Regex(Regex.escape("""testTag("$tag")"""))),
+                "$tag 是撤掉的收尾锚点：再出现就是同一条状态两处渲染",
+            )
+        }
+        assertEquals(
+            0,
+            countMatches(source, Regex("""TodaySummaryScreen\(""")),
+            "收尾屏由宿主挂载，不由词卡屏内嵌：这里出现调用就是把两层版面叠在了一起",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex("""testTag\("word_card_back_to_plan"\)""")),
+            "「返回今日计划」仍由 NoCards / ReviewCompleted 共享同一枚 `BackToPlanButton`（定义一处、tag 一处）",
+        )
+        assertTrue(
+            "is WordCardUiState.AllDone ->" in source,
+            "`AllDone` 分支要留在 `when (state)` 里保住穷尽性（撤分支等于给未来接线留编译期空档）",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex("今天的词卡都提交完了")),
+            "旧收尾那句文案整句撤走：留在词卡屏就是第二份收尾版面",
+        )
+    }
+
     // ---------- 取样助手 ----------
 
     /** 按花括号配对取 `fun X(` 的函数体（源已剥注释）；取不到返回空串，让调用处各自响亮判红。 */

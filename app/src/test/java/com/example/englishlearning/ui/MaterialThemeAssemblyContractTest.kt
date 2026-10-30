@@ -63,6 +63,7 @@ class MaterialThemeAssemblyContractTest {
         "NavLabel" to "private val NavLabelSpec = TextStyle(fontSize = 11.sp, fontWeight = FontWeight(600), letterSpacing = 0.11.sp, lineHeight = 11.sp)",
         "StrongTitle" to "private val StrongTitleSpec = TextStyle(fontSize = 27.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.27).sp, lineHeight = 32.sp)",
         "ArticleTitle" to "private val ArticleTitleSpec = TextStyle(fontSize = 30.sp, fontWeight = FontWeight(500), fontFamily = AppFont.Serif, letterSpacing = (-0.6).sp, lineHeight = 35.sp)",
+        "ButtonLabel" to "private val ButtonLabelSpec = TextStyle(fontSize = 15.sp, fontWeight = FontWeight(600), letterSpacing = (-0.075).sp, lineHeight = 24.sp)",
     )
 
     /**
@@ -88,6 +89,7 @@ class MaterialThemeAssemblyContractTest {
         "NavLabel" to "text3",
         "StrongTitle" to "text1",
         "ArticleTitle" to "text1",
+        "ButtonLabel" to "text1",
     )
 
     /**
@@ -537,16 +539,16 @@ class MaterialThemeAssemblyContractTest {
             )
         }
         assertEquals(
-            18,
-            Regex("""private val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle)Spec = TextStyle\(""")
+            19,
+            Regex("""private val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle|ButtonLabel)Spec = TextStyle\(""")
                 .findAll(text).count(),
-            "AppType 必须有恰好十八个语义档的度量表（原型字号表全量）：多出任何一档就是引入新字号（R3 禁止）",
+            "AppType 必须有恰好十九个语义档的度量表（原型字号表全量 + 批 1 补的按钮档）：多出任何一档就是引入新字号（R3 禁止）",
         )
         assertEquals(
-            18,
-            Regex("""val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle): TextStyle\r?\n""")
+            19,
+            Regex("""val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle|ButtonLabel): TextStyle\r?\n""")
                 .findAll(text).count(),
-            "十八个语义档必须各自有一枚 `val <Tier>: TextStyle` 组合期 getter：少一枚就是某档的直读点失去主题墨",
+            "十九个语义档必须各自有一枚 `val <Tier>: TextStyle` 组合期 getter：少一枚就是某档的直读点失去主题墨",
         )
     }
 
@@ -563,9 +565,9 @@ class MaterialThemeAssemblyContractTest {
         val text = appTypeText()
         assertEquals(
             appTypeInkTiers.keys,
-            Regex("""val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle): TextStyle""")
+            Regex("""val (Display|Headline|Title|Body|Footnote|Label|Eyebrow|Caption|Meta|BodyLg|Lemma|StatNum|PlanNum|Prose|ProseZh|NavLabel|StrongTitle|ArticleTitle|ButtonLabel): TextStyle""")
                 .findAll(text).map { it.groupValues[1] }.toSet(),
-            "十八档 getter 的集合与墨对位表不一致（少一档 = 那张档的直读点没有主题墨）",
+            "十九档 getter 的集合与墨对位表不一致（少一档 = 那张档的直读点没有主题墨）",
         )
         appTypeInkTiers.forEach { (tier, ink) ->
             val getter = Regex(

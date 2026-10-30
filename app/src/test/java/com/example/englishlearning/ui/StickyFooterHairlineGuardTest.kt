@@ -61,8 +61,9 @@ class StickyFooterHairlineGuardTest {
         val filled = StickyFooterLedger.filter { it.paintsOwnFill }
         assertTrue(
             filled.size >= 7,
-            "自铺底色的吸底槽至少 7 处（六屏各一 + 备份导出一处无 testTag 的槽）；" +
-                "少于这个数说明台账被削薄，闸的可信度随之下降。",
+            "自铺底色的吸底槽的下界是 7（六屏各一 + 备份导出一处无 testTag 的槽）；" +
+                "实际枚数随批次增（批 1 Task 16 / 17 起再加词单屏与复习队列屏各一处），本条只防「台账被削薄」，" +
+                "少于这个数说明闸的可信度随之下降。",
         )
         val offenders = filled.flatMap { footer ->
             val source = sources[footer.file]
@@ -145,9 +146,10 @@ class StickyFooterHairlineGuardTest {
         private const val ClaimBottomCenter = "align:BottomCenter"
 
         /**
-         * 吸底槽台账（8 处、11 枚认领符号）。
+         * 吸底槽台账（13 处、16 枚认领符号）。
          *
-         * 前七处都自铺底色，槽顶必须有 `hairlineTop`；最后一处（词卡屏）透明，登记但不要求补线。
+         * 前十一处都自铺底色，槽顶必须有 `hairlineTop`；后两处登记但不要求补线——
+         * 词卡屏的评分条透明压底，学习页的 `.plan-bar` 是强档卡体内的行内控件（只因命名族含 `bar` 才被扫到）。
          */
         private val StickyFooterLedger: List<StickyFooter> = listOf(
             StickyFooter(
@@ -193,11 +195,53 @@ class StickyFooterHairlineGuardTest {
                 reason = "导出条铺 `surface`，预览页正文从它上面滚过",
             ),
             StickyFooter(
+                file = "AppScreen.kt",
+                claims = listOf("testTag:setup_save_bar"),
+                paintsOwnFill = true,
+                reason = "批 1 Task 12：学习设置屏（`LearningSetupScreen`）的保存条按原型 `.foot` 改成吸底槽，" +
+                    "自铺页底色 `colors.background`，学习计划表单从它上面滚过（同批把 `verticalScroll` " +
+                    "留在内容段、条放在滚动区之外）",
+            ),
+            StickyFooter(
+                file = "TodayWordListScreen.kt",
+                claims = listOf(ClaimBottomCenter),
+                paintsOwnFill = true,
+                reason = "批 1 Task 16（原型 `sLearnQueue` 的 `.foot`）：吸底主按钮「开始第 N 个词」自铺页底色 " +
+                    "`colors.background`，词单裸行从它上面滚过；槽顶按仓内口径补 `hairlineTop`" +
+                    "（原型的 `.foot` 是渐变底，差异登记在计划批 1 偏离表）",
+            ),
+            StickyFooter(
+                file = "ReviewQueueScreen.kt",
+                claims = listOf(ClaimBottomCenter),
+                paintsOwnFill = true,
+                reason = "批 1 Task 17（原型 `sReview` 的 `.foot`）：吸底主按钮「开始复习」自铺页底色 " +
+                    "`colors.background`，到期词裸行从它上面滚过；槽顶按仓内口径补 `hairlineTop`" +
+                    "（与词单屏同一形态，原型的 `.foot` 是渐变底，差异登记在计划批 1 偏离表）",
+            ),
+            StickyFooter(
+                file = "TodaySummaryScreen.kt",
+                claims = listOf(ClaimBottomCenter),
+                paintsOwnFill = true,
+                reason = "批 1 Task 18（原型 `sSummary` 的 `.foot`）：吸底主按钮「回到今日」自铺页底色 " +
+                    "`colors.background`，收尾屏的 hero / 统计卡 / 「还差一步」裸行从它上面滚过；槽顶按仓内口径补 " +
+                    "`hairlineTop`（与词单、复习队列两屏同一形态，本屏那条不随剩余量收条——收尾永远有" +
+                    "「回到今日」这一件事可做）",
+            ),
+            StickyFooter(
                 file = "WordCardScreen.kt",
                 claims = listOf("testTag:word_card_progress_bar", "testTag:word_card_feedback_bar"),
                 paintsOwnFill = false,
                 reason = "评分条不铺底色（透明压在 `background` 上，`colors.surface` 一次都不出现），" +
                     "进度条是行内控件不是吸底槽；两者都没有颜色缝，故不补线",
+            ),
+            StickyFooter(
+                file = "TodayPlanScreen.kt",
+                claims = listOf("testTag:today_plan_plan_bar"),
+                paintsOwnFill = false,
+                reason = "原型 `sLearnHome` 的 .plan-bar：强档卡**体内**的两段进度条（本体 `PlanProgressBar` " +
+                    "在 `components/PlanBar.kt`，自铺的只是轨道 `colors.track` 14% 底），既不在屏底也不压滚动内容，" +
+                    "没有「内容被截断」的缝。它落进本表只因命名族含 `bar`（与词卡屏进度条同一情形）：" +
+                    "登记而不是改名，是为了保留双向判据——锚点若被删/改名，本表会当场红",
             ),
         )
     }

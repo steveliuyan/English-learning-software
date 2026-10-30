@@ -50,6 +50,8 @@ import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.PayloadKind
+import com.example.englishlearning.ui.components.QuietCard
+import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
@@ -126,6 +128,13 @@ fun ReadingAccessScreen(
     onOpenAiSettings: () -> Unit = {},
     onOpenImport: () -> Unit = {},
     onOpenFeed: () -> Unit = {},
+    /**
+     * 「本周阅读」统计卡的窗口基准日（本地时区的今天）。
+     *
+     * 由调用方注入而不是屏内读钟：本仓所有「今天」的口径都由宿主层给出（今日计划按本地 0 点生成），
+     * 屏侧再读一次系统时钟就是第二份时间权威，且会让 connected 用例不可确定。
+     */
+    todayLocalDate: java.time.LocalDate = java.time.LocalDate.now(),
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
@@ -180,6 +189,7 @@ fun ReadingAccessScreen(
             }
             is ReadingAccessUiState.Ready -> ReadyContent(
                 state = state,
+                todayLocalDate = todayLocalDate,
                 generationParamsExpanded = generationParamsExpanded,
                 onToggleGenerationParams = { generationParamsExpanded = !generationParamsExpanded },
                 onSelectType = onSelectType,
@@ -211,6 +221,7 @@ fun ReadingAccessScreen(
 @Composable
 private fun ReadyContent(
     state: ReadingAccessUiState.Ready,
+    todayLocalDate: java.time.LocalDate,
     generationParamsExpanded: Boolean,
     onToggleGenerationParams: () -> Unit,
     onSelectType: (ArticleType) -> Unit,
@@ -258,6 +269,16 @@ private fun ReadyContent(
                 "${state.todayArticle.articleType.label} · ${state.todayArticle.lengthTier.label}",
                 style = AppType.Label,
                 color = colors.text2,
+            )
+            // 原型今日文章卡上的两枚 chip（`app.js:717-719`）：「覆盖 N 词」与版本号。
+            // 两枚都取 `Article` 自己的真字段（`coveredLemmas.size` / `version`）；
+            // 第三枚「未读 / 已读」**不画**——`Article` 没有阅读态字段，推断就是编造
+            // （与阅读历史屏同一条口径，Task 21-B 台账第 3 行）。
+            Text(
+                text = "覆盖 ${state.todayArticle.coveredLemmas.size} 词 · 第 ${state.todayArticle.version} 版",
+                style = AppType.Label,
+                color = colors.text2,
+                modifier = Modifier.testTag("reading_today_meta"),
             )
             PrimaryCtaButton("阅读今天的文章", "reading_open_today", "阅读今天的文章", onOpenTodayArticle)
         }
@@ -376,6 +397,28 @@ private fun ReadyContent(
             topDivider = true,
             modifier = Modifier.testTag("reading_more_history"),
             onClick = onOpenHistory,
+        )
+    }
+
+    // —— 原型 `section('本周阅读', .card-quiet)`（`app.js:730-735`）：只搬本仓能派生的事实。
+    // 同族开源项目（LWT / LinguaCafe）的阅读侧也只报统计、不设周目标，所以「目标是每周 5 篇，还差 2 篇」
+    // 那句不写（本仓没有每周篇数配置）。窗口 = [today-6, today]，基准日由宿主注入（本地时区的今天）；
+    // 字数按 `englishText` 的空白切分计数——两枚都是真数，读不到日期的行直接不计入。
+    val weekStart = todayLocalDate.minusDays(6)
+    val weekArticles = state.history.filter { article ->
+        val date = runCatching { java.time.LocalDate.parse(article.localDate) }.getOrNull()
+        date != null && !date.isBefore(weekStart) && !date.isAfter(todayLocalDate)
+    }
+    val weekWords = weekArticles.sumOf { article ->
+        article.englishText.split(Regex("\\s+")).count { it.isNotBlank() }
+    }
+    SectionHeading(text = "本周阅读")
+    QuietCard(modifier = Modifier.testTag("reading_week_card")) {
+        Text(
+            text = "近 7 天：生成 ${weekArticles.size} 篇 · 共 $weekWords 词",
+            style = AppType.Body,
+            color = colors.text1,
+            modifier = Modifier.testTag("reading_week_stats"),
         )
     }
 }

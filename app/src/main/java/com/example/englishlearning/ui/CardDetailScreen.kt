@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,12 +16,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +40,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -43,20 +48,25 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.wordqa.WordAiNote
+import com.example.englishlearning.ui.components.AppGlyph
+import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.SpeakerButton
 import com.example.englishlearning.ui.components.SpeakerState
-import com.example.englishlearning.ui.components.WordRow
+import com.example.englishlearning.ui.components.glass.PillButton
+import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppFont
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
@@ -68,7 +78,10 @@ import com.example.englishlearning.ui.theme.appDomain
  * Every content module renders only when its data is present. A blank field hides
  * the whole module: no empty heading, no "暂无" placeholder (AC1-12).
  *
- * 阅读顺序：单词卡（音标、发音、全部词性释义、操作）→ 配图 → 例句 → 派生词 / 短语 / 近义词 / 词形变化。
+ * 版式按原型 `sWordDetail`（`assets/app.js:519-559`，对齐批 1 Task 11）：
+ * 页头 → 主词 / 音标 / 词性 → 口音与次键行 → 释义 → 例句 → 我的笔记 → 常用搭配 → 近义词 →
+ * 词形与派生 → 页末提示 → 「用 AI 追问这个词」块按钮。
+ * 主词站在页面上，卡片从「释义」小节才开始——原型没有英雄卡。
  *
  * The screen stays UI-only: it receives a [WordCard] and explicit callbacks for navigation,
  * pronunciation and relearning. Storage, provider selection and learning state remain outside
@@ -113,16 +126,17 @@ fun CardDetailScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
             .testTag("card_detail_screen"),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // 页头交给统一组件承载（spec §3 页头族）：标题 + 返回位的几何与墨色一处定义，
-        // 本屏只传标题和导航回调。
+        // 页头交给统一组件承载（spec §3 页头族）：原型 `barTop` 的标题 + 返回位 + 右上收藏键。
+        // 收藏是「对词本身」的一枚图标动作，按原型收进页头尾槽；收藏浮层这类只读宿主不传状态时不渲染。
         AppScreenHeader(
             title = "词义详情",
             onBack = onBack,
+            action = favoriteHeaderAction(card.lemma, favoritePresent, onToggleFavorite),
         )
+        Spacer(Modifier.height(10.dp))
 
-        WordHeroCard(
+        WordHead(
             card = card,
             pronunciationStatus = pronunciationStatus,
             pronunciationControlsEnabled = pronunciationControlsEnabled,
@@ -135,21 +149,40 @@ fun CardDetailScreen(
             onNext = onNext,
             vocabularyPresent = vocabularyPresent,
             onToggleVocabulary = onToggleVocabulary,
-            favoritePresent = favoritePresent,
-            onToggleFavorite = onToggleFavorite,
-            onAskAi = onAskAi,
         )
 
-        // 配图不再是通栏大图：72dp 缩略图挂在词头行尾（spec §5），
-        // 「有没有配图」这条信息留着，纵向空间还给释义。
+        val hasSenses = card.senses.isNotEmpty() ||
+            card.meaningZh.isNotBlank() ||
+            card.partOfSpeech.isNotBlank()
+        if (hasSenses) {
+            SectionGap()
+            DetailSection(title = "释义") {
+                if (card.senses.isNotEmpty()) {
+                    SenseList(card.senses)
+                } else {
+                    SenseRow(
+                        partOfSpeech = card.partOfSpeech,
+                        meaningZh = card.meaningZh,
+                        posModifier = Modifier
+                            .testTag("card_detail_part_of_speech")
+                            .semantics { contentDescription = "词性 ${card.partOfSpeech}" },
+                        meaningModifier = Modifier
+                            .testTag("card_detail_meaning")
+                            .semantics { contentDescription = "释义 ${card.meaningZh}" },
+                    )
+                }
+            }
+        }
+
         val example = card.example?.takeIf { it.isNotBlank() }
         val exampleZh = card.exampleZh?.takeIf { it.isNotBlank() }
         if (example != null || exampleZh != null) {
+            SectionGap()
             DetailSection(title = "例句") {
                 example?.let { sentence ->
                     Text(
                         text = highlightLemma(sentence, card.lemma),
-                        style = AppType.Body,
+                        style = AppType.BodyLg.copy(fontFamily = AppFont.Serif, color = colors.text1),
                         modifier = Modifier
                             .testTag("card_detail_example")
                             .semantics { contentDescription = "例句 $sentence" },
@@ -158,8 +191,9 @@ fun CardDetailScreen(
                 exampleZh?.let { translation ->
                     Text(
                         text = translation,
-                        style = AppType.Footnote,
+                        style = AppType.Meta.copy(color = colors.text2),
                         modifier = Modifier
+                            .padding(top = 6.dp)
                             .testTag("card_detail_example_zh")
                             .semantics { contentDescription = "例句译文 $translation" },
                     )
@@ -171,6 +205,7 @@ fun CardDetailScreen(
         // 打开词就能看到笔记内容；添加/删除仍收在弹窗里，页面不噪。
         if (notes.isNotEmpty() || onSavePersonalNote != null) {
             var showNotesDialog by remember { mutableStateOf(false) }
+            SectionGap()
             DetailSection(title = "我的笔记", tag = "card_detail_notes_section") {
                 if (notes.isEmpty()) {
                     Text(
@@ -189,9 +224,9 @@ fun CardDetailScreen(
                     }
                 }
                 PillButton(
-                    label = "添加 / 管理",
-                    description = "管理我的笔记",
+                    text = "添加 / 管理",
                     onClick = { showNotesDialog = true },
+                    contentDescription = "管理我的笔记",
                     modifier = Modifier.testTag("card_detail_notes_manage"),
                 )
             }
@@ -206,38 +241,117 @@ fun CardDetailScreen(
             }
         }
 
-        // 关联词三节的行归一到共享词行（spec §3「一行 lemma + 释义」族）：私有那一枚行件用
-        // 加粗 + 拼字符串把三栏塞进同一枚 Text，词头、词性、释义在读屏与深色模式下都分不开；
-        // 词行的四枚槽位墨由组件的墨色纯表给，层级靠 text1 / text2 的落差而不是字重。
-        if (card.derived.isNotEmpty()) {
-            DetailSection(title = "派生词", tag = "card_detail_derived") {
-                card.derived.forEach { WordRow(lemma = it.lemma, gloss = it.meaningZh, meta = it.partOfSpeech) }
-            }
-        }
-
         if (card.phrases.isNotEmpty()) {
-            DetailSection(title = "关联短语", tag = "card_detail_phrases") {
-                card.phrases.forEach { WordRow(lemma = it.text, gloss = it.meaningZh) }
+            SectionGap()
+            DetailSection(title = "常用搭配", tag = "card_detail_phrases") {
+                card.phrases.forEachIndexed { index, phrase ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = colors.outlineSoft,
+                            modifier = Modifier.padding(vertical = 12.dp),
+                        )
+                    }
+                    Text(
+                        text = phrase.text,
+                        style = AppType.Body.copy(
+                            fontFamily = AppFont.Serif,
+                            fontSize = 16.sp,
+                            color = colors.text1,
+                        ),
+                    )
+                    Text(
+                        text = phrase.meaningZh,
+                        style = AppType.Caption.copy(color = colors.text3),
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
         }
 
         if (card.synonyms.isNotEmpty()) {
+            SectionGap()
             DetailSection(title = "近义词", tag = "card_detail_synonyms") {
-                card.synonyms.forEach { WordRow(lemma = it.lemma, gloss = it.meaningZh, meta = it.partOfSpeech) }
+                SynonymChips(card.synonyms.map { it.lemma })
             }
         }
 
-        if (card.inflections.isNotEmpty()) {
-            DetailSection(title = "词形变化", tag = "card_detail_inflections") {
-                Text(text = card.inflections.joinToString("、"), style = AppType.Body)
+        if (card.derived.isNotEmpty() || card.inflections.isNotEmpty()) {
+            SectionGap()
+            DetailSection(title = "词形与派生", tag = "card_detail_wordforms") {
+                if (card.derived.isNotEmpty()) {
+                    Text(
+                        text = card.derived.joinToString("；") { it.lemma },
+                        style = AppType.Meta.copy(color = colors.text2),
+                        modifier = Modifier
+                            .testTag("card_detail_derived")
+                            .semantics { contentDescription = "派生词 ${card.derived.joinToString("、") { it.lemma }}" },
+                    )
+                }
+                if (card.inflections.isNotEmpty()) {
+                    Text(
+                        text = card.inflections.joinToString(" · "),
+                        style = AppType.Caption.copy(color = colors.text3),
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .testTag("card_detail_inflections")
+                            .semantics { contentDescription = "词形变化 ${card.inflections.joinToString("、")}" },
+                    )
+                }
             }
+        }
+
+        SectionGap()
+        InlineNotice(
+            text = "长难句分析、AI 问词都从这里进入，围绕这一个词继续追问。",
+            kind = InlineNoticeKind.Info,
+        )
+
+        onAskAi?.let { ask ->
+            Spacer(Modifier.height(12.dp))
+            AskAiButton(lemma = card.lemma, onAskAi = ask)
         }
     }
 }
 
-/** 单词卡：单词、音标 + 发音、全部词性释义、重新学习 / 问 AI。 */
+/** 页头尾槽的收藏键（原型 `barTop` 的 `icon-btn`）：图标按收藏态换成实心星 / 书签。 */
 @Composable
-private fun WordHeroCard(
+private fun favoriteHeaderAction(
+    lemma: String,
+    favoritePresent: Boolean?,
+    onToggleFavorite: (() -> Unit)?,
+): (@Composable () -> Unit)? {
+    if (favoritePresent == null || onToggleFavorite == null) return null
+    val colors = appColors()
+    return {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(AppShape.Icon)
+                .testTag("card_detail_favorite_toggle")
+                .clickable(role = Role.Button, onClick = onToggleFavorite)
+                .semantics {
+                    contentDescription = if (favoritePresent) "取消收藏 $lemma" else "收藏 $lemma"
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            AppGlyph(
+                icon = if (favoritePresent) AppIcon.Star else AppIcon.Bookmark,
+                tint = colors.text1,
+                size = 22.dp,
+            )
+        }
+    }
+}
+
+/**
+ * 词头：主词（46sp 衬线）+ 音标 / 词性 + 口音药片 + 次键行 + 播控组。
+ *
+ * 不装卡（原型 sWordDetail 的主词直接落在页面上）；配图缩略图挂在主词行尾，
+ * 「有没有配图」这条信息留着，纵向空间还给释义。
+ */
+@Composable
+private fun WordHead(
     card: WordCard,
     pronunciationStatus: PronunciationStatus,
     pronunciationControlsEnabled: Boolean,
@@ -250,18 +364,17 @@ private fun WordHeroCard(
     onNext: (() -> Unit)?,
     vocabularyPresent: Boolean?,
     onToggleVocabulary: (() -> Unit)?,
-    favoritePresent: Boolean?,
-    onToggleFavorite: (() -> Unit)?,
-    onAskAi: (() -> Unit)?,
 ) {
     val colors = appColors()
     val illustration = rememberIllustrationSource(card.lemma, card.imagePath)
-    DetailCard {
-        // 词头行：词 + 72dp 配图缩略图。缩略图只是「有图」的凭证，读屏仍给一句说明。
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = card.lemma,
-                style = AppType.Display.copy(fontSize = 36.sp),
+                style = AppType.Lemma,
                 modifier = Modifier
                     .weight(1f)
                     .testTag("card_detail_lemma")
@@ -295,29 +408,42 @@ private fun WordHeroCard(
                     .semantics { contentDescription = "配图读不出来" },
             )
         }
-        // 音标 + 美/英发音药片：整行**可换行**（`FlowRow`），不是挤在一行里。
-        //
-        // 真机取证（批 2 Task 7）：1080×2340 上「音标 + 两枚 `播放发音` 药片」的自然宽度超出卡内
-        // 可用宽度约 27dp，`Row` 的度量方式是按顺序扣减剩余空间，最后那枚英式药片被压到只剩字宽，
-        // 「播放发音」竖排成一列乱码。换成 `FlowRow` 后每枚药片量自然尺寸，放不下就整枚挪到下一行——
-        // 2.0 字号下同理（一片一行），只换行、不压扁、不裁字。
+        // 音标 + 词性同一行（原型 .word-ipa + .word-pos）：词性是衬线斜体品牌深色。
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
             if (card.ipa.isNotBlank()) {
                 Text(
                     text = card.ipa,
-                    style = AppType.Body.copy(color = colors.text2),
+                    style = AppType.Meta.copy(color = colors.text3),
                     modifier = Modifier
                         .testTag("card_detail_ipa")
                         .semantics { contentDescription = "音标 ${card.ipa}" },
                 )
             }
-            // 发音入口归一到共享药片（spec §3「两套同构几何」的详情页那一半）：
-            // 喇叭字形、48dp 触控下限、三态可见文案都由组件一处交付，本屏只给态、动作、tag 与口音尾缀。
-            // 默认美式；英式仅在调用方提供时出现，两口音靠尾缀分档，屏侧不写任何朗读定语。
+            if (card.partOfSpeech.isNotBlank()) {
+                Text(
+                    text = card.partOfSpeech,
+                    style = AppType.Meta.copy(
+                        fontFamily = AppFont.Serif,
+                        fontStyle = FontStyle.Italic,
+                        color = colors.brandDeep,
+                    ),
+                    modifier = Modifier
+                        .testTag("card_detail_pos")
+                        .semantics { contentDescription = "词性 ${card.partOfSpeech}" },
+                )
+            }
+        }
+        // 口音与次键行：原型「英式 / 美式 / 生词本」三枚次键并排；本仓发音入口归一到共享药片
+        // （三态文案一处定义，spec §3），触控下限与配色由组件交付，屏侧只给 tag、动作与口音尾缀。
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
             SpeakerButton(
                 state = SpeakerState.Idle,
                 onClick = { onSpeak() },
@@ -332,8 +458,44 @@ private fun WordHeroCard(
                     accentLabel = "英",
                 )
             }
+            if (vocabularyPresent != null && onToggleVocabulary != null) {
+                PillButton(
+                    text = if (vocabularyPresent) "移出生词本" else "加入生词本",
+                    onClick = onToggleVocabulary,
+                    style = PillStyle.Secondary,
+                    domain = AppDomain.Learn,
+                    contentDescription = if (vocabularyPresent) "移出 ${card.lemma} 生词本" else "加入 ${card.lemma} 生词本",
+                    modifier = Modifier.testTag("card_detail_vocabulary_toggle"),
+                )
+            }
         }
-        // F3-02 播控组（与词卡同款 OutlinedButton 形态、同一呈现窗口 Playing/Paused）：
+        if (onRelearn != null || onNext != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                onRelearn?.let { callback ->
+                    PillButton(
+                        text = "重新学习",
+                        onClick = callback,
+                        style = PillStyle.Secondary,
+                        domain = AppDomain.Learn,
+                        contentDescription = "重新学习 ${card.lemma}",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                onNext?.let { callback ->
+                    PillButton(
+                        text = "下一个单词",
+                        onClick = callback,
+                        style = PillStyle.Secondary,
+                        domain = AppDomain.Learn,
+                        contentDescription = "查看下一个单词",
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("card_detail_next"),
+                    )
+                }
+            }
+        }
+        // F3-02 播控组（与词卡同款共享药片、同一呈现窗口 Playing/Paused）：
         // 只出现在宿主点头的三处详情（学习流 / 记录 / 阅读），收藏浮层与搜索卡详情保持纯浏览。
         val speakingOrPaused =
             pronunciationStatus == PronunciationStatus.Playing ||
@@ -358,43 +520,10 @@ private fun WordHeroCard(
                 ) { Text("停止") }
             }
         }
-
-        // 有多词性释义时逐条列出（替代原先顶部那一行重复的首条释义）；占位词卡只有一条。
-        if (card.senses.isNotEmpty()) {
-            Column(Modifier.testTag("card_detail_senses"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                card.senses.forEach { SenseRow(it.partOfSpeech, it.meaningZh) }
-            }
-        } else if (card.meaningZh.isNotBlank() || card.partOfSpeech.isNotBlank()) {
-            SenseRow(
-                partOfSpeech = card.partOfSpeech,
-                meaningZh = card.meaningZh,
-                posModifier = Modifier
-                    .testTag("card_detail_part_of_speech")
-                    .semantics { contentDescription = "词性 ${card.partOfSpeech}" },
-                meaningModifier = Modifier
-                    .testTag("card_detail_meaning")
-                    .semantics { contentDescription = "释义 ${card.meaningZh}" },
-            )
-        }
-
-        // 五枚动作药片拆两行（3 + 2）：一行放五枚时窄屏 + 大字号会把最后一枚压成竖排单字。
-        WordActionPillGrid(
-            lemma = card.lemma,
-            favoritePresent = favoritePresent,
-            onToggleFavorite = onToggleFavorite,
-            vocabularyPresent = vocabularyPresent,
-            onToggleVocabulary = onToggleVocabulary,
-            onRelearn = onRelearn,
-            onNext = onNext,
-            onAskAi = onAskAi,
-        )
-        // F5-03 决策 §4（Task 10 携带的 T9 复评 N-4，口径同阅读页 `article_status_live_region`）：
-        // 发音状态文字由**常驻 live region 容器**承载，靠子节点进出触发播报
+        // F5-03 决策 §4：发音状态文字由**常驻 live region 容器**承载，靠子节点进出触发播报
         // （Task 6 判例 WordCardScreen.word_card_status_live_region）。
         // ①tag `card_detail_pronunciation_message` 留在瞬时 Text 上（既有引用不破）；
         // ②liveRegion 只在容器上，瞬时子节点不得再带；③容器零子节点时不留任何可见/占位面积。
-        // 排版上排到卡内最后一块：外层 `spacedBy(10.dp)` 的幽灵间距只会落在卡片底部，
-        // 不再把「词头 / 音标 / 释义」之间的距离撑开（UI 重设计轮要解决的正是这条）。
         Column(
             modifier = Modifier
                 .testTag("card_detail_status_live_region")
@@ -413,78 +542,134 @@ private fun WordHeroCard(
     }
 }
 
+/** 小节之间的 24dp 节奏（原型 `.sec` margin-top: var(--s6)）。 */
+@Composable
+private fun SectionGap() {
+    Spacer(Modifier.height(24.dp))
+}
+
 /**
- * 动作药片网格（spec §5：5 枚改两行 3 + 2）。
+ * 小节：标题一行（原型 `.sec-title`，17sp/650）+ 卡片本体（`SoftCard`，白面 / 无描边 / 20 圆角）。
  *
- * 分工分两行：收藏 / 生词本 / 重新学习是**对词本身**的动作，下一个 / 问 AI 是**继续读下去**的动作。
- * 每枚拿 `weight(1f)`，窄屏和大字号下不会再把「词 + 图标」压成竖排单字。
+ * 标题在卡外、卡内不再有第二层壳——旧 `DetailCard` 私壳退役。
  */
 @Composable
-private fun WordActionPillGrid(
-    lemma: String,
-    favoritePresent: Boolean?,
-    onToggleFavorite: (() -> Unit)?,
-    vocabularyPresent: Boolean?,
-    onToggleVocabulary: (() -> Unit)?,
-    onRelearn: (() -> Unit)?,
-    onNext: (() -> Unit)?,
-    onAskAi: (() -> Unit)?,
+private fun DetailSection(
+    title: String,
+    tag: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (favoritePresent != null && onToggleFavorite != null) {
-            PillButton(
-                label = if (favoritePresent) "★ 已收藏" else "☆ 收藏",
-                description = if (favoritePresent) "取消收藏 $lemma" else "收藏 $lemma",
-                onClick = onToggleFavorite,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("card_detail_favorite_toggle"),
-            )
-        }
-        if (vocabularyPresent != null && onToggleVocabulary != null) {
-            PillButton(
-                label = if (vocabularyPresent) "移出生词本" else "加入生词本",
-                description = if (vocabularyPresent) "移出 $lemma 生词本" else "加入 $lemma 生词本",
-                onClick = onToggleVocabulary,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("card_detail_vocabulary_toggle"),
-            )
-        }
-        onRelearn?.let { callback ->
-            PillButton(
-                label = "重新学习",
-                description = "重新学习 $lemma",
-                onClick = callback,
-                modifier = Modifier.weight(1f),
-            )
-        }
+    Column(modifier = if (tag != null) Modifier.testTag(tag) else Modifier) {
+        Text(
+            text = title,
+            style = AppType.Title,
+            modifier = Modifier
+                .padding(start = 2.dp, bottom = 12.dp)
+                .semantics { heading() },
+        )
+        SoftCard(contentPadding = PaddingValues(16.dp), content = content)
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        onNext?.let { callback ->
-            PillButton(
-                label = "下一个单词",
-                description = "查看下一个单词",
-                onClick = callback,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("card_detail_next"),
+}
+
+/**
+ * 释义行：词性一列（38dp 定宽、衬线斜体、brand-deep）+ 释义（15sp/500）。
+ *
+ * 多词性时逐条列出；占位词卡只有一条，走 [posModifier] / [meaningModifier] 的既有锚。
+ */
+@Composable
+private fun SenseRow(
+    partOfSpeech: String,
+    meaningZh: String,
+    posModifier: Modifier = Modifier,
+    meaningModifier: Modifier = Modifier,
+) {
+    val colors = appColors()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (partOfSpeech.isNotBlank()) {
+            Text(
+                text = partOfSpeech,
+                style = AppType.Meta.copy(
+                    fontFamily = AppFont.Serif,
+                    fontStyle = FontStyle.Italic,
+                    color = colors.brandDeep,
+                ),
+                modifier = posModifier.width(38.dp),
             )
         }
-        onAskAi?.let { callback ->
-            PillButton(
-                label = "问 AI",
-                description = "问 AI（$lemma）",
-                onClick = callback,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("card_detail_ask_ai"),
+        if (meaningZh.isNotBlank()) {
+            Text(
+                text = meaningZh,
+                style = AppType.Body.copy(fontWeight = FontWeight(500), color = colors.text1),
+                modifier = meaningModifier.weight(1f),
             )
         }
     }
 }
 
-/** 一条词性释义：词性做成浅绿小标签（深色字，保证对比度），释义用正文深色。 */
+/**
+ * 近义词静态芯片（原型 `.chip chip-static`）：30dp 本体、药片形、surface 底 + line 描边 + ink-2 墨。
+ *
+ * 静态：近义词是给读的信息，不是筛选操作，所以没有 clickable / toggleable 语义。
+ */
+@Composable
+private fun SynonymChips(synonyms: List<String>) {
+    val colors = appColors()
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        synonyms.forEach { lemma ->
+            Box(
+                modifier = Modifier
+                    .height(30.dp)
+                    .clip(AppShape.Pill)
+                    .background(colors.surface)
+                    .border(1.dp, colors.outline, AppShape.Pill)
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = lemma,
+                    style = AppType.Caption.copy(color = colors.text2, fontWeight = FontWeight(600)),
+                )
+            }
+        }
+    }
+}
+
+/** 页末的 AI 追问块按钮（原型 `btn btn-secondary btn-block` + spark 字形）。 */
+@Composable
+private fun AskAiButton(lemma: String, onAskAi: () -> Unit) {
+    PillButton(
+        text = "用 AI 追问这个词",
+        onClick = onAskAi,
+        style = PillStyle.Secondary,
+        domain = AppDomain.AiSpeech,
+        contentDescription = "问 AI（$lemma）",
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("card_detail_ask_ai"),
+    )
+}
+
+/** 一条词性释义的承载行（保留给多词性列表）。 */
+@Composable
+private fun SenseList(senses: List<com.example.englishlearning.learning.domain.WordSense>) {
+    val colors = appColors()
+    Column(Modifier.testTag("card_detail_senses")) {
+        senses.forEachIndexed { index, sense ->
+            if (index > 0) {
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = colors.outlineSoft,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            }
+            SenseRow(partOfSpeech = sense.partOfSpeech, meaningZh = sense.meaningZh)
+        }
+    }
+}
+
 @Composable
 private fun PersonalNoteEditor(
     onSave: (String) -> Unit,
@@ -605,57 +790,6 @@ private fun PersonalNotesDialog(
  */
 internal fun cardDetailSpeakerState(status: PronunciationStatus): SpeakerState =
     if (status == PronunciationStatus.Paused) SpeakerState.Paused else SpeakerState.Playing
-
-@Composable
-private fun SenseRow(
-    partOfSpeech: String,
-    meaningZh: String,
-    posModifier: Modifier = Modifier,
-    meaningModifier: Modifier = Modifier,
-) {
-    val colors = appColors()
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-        if (partOfSpeech.isNotBlank()) {
-            Text(
-                text = partOfSpeech,
-                style = AppType.Label.copy(color = colors.text1, fontWeight = FontWeight.SemiBold),
-                modifier = posModifier
-                    .clip(AppShape.Pill)
-                    .background(colors.tint)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-            )
-        }
-        if (meaningZh.isNotBlank()) {
-            Text(text = meaningZh, style = AppType.Body, modifier = meaningModifier.weight(1f))
-        }
-    }
-}
-
-/** 浅底、深字的胶囊按钮：容器取中性 tint，墨取 text1，与卡片同一套色阶。 */
-@Composable
-private fun PillButton(label: String, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = appColors()
-    TextButton(
-        onClick = onClick,
-        shape = AppShape.Pill,
-        colors = ButtonDefaults.textButtonColors(containerColor = colors.tint, contentColor = colors.text1),
-        modifier = modifier.semantics { contentDescription = description },
-    ) { Text(label, style = AppType.Footnote, color = colors.text1, fontWeight = FontWeight.SemiBold) }
-}
-
-@Composable
-private fun DetailCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    SoftCard(modifier = modifier, contentPadding = PaddingValues(18.dp), content = content)
-}
-
-/** 例句、派生词、短语、近义词、词形变化共用的小节：一个标题 + 内容。 */
-@Composable
-private fun DetailSection(title: String, tag: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    DetailCard(modifier = if (tag != null) Modifier.testTag(tag) else Modifier) {
-        Text(text = title, style = AppType.Title, modifier = Modifier.semantics { heading() })
-        content()
-    }
-}
 
 /** 例句里把单词加粗、用当前主题的品牌深绿标出，其余保持正文样式。 */
 @Composable

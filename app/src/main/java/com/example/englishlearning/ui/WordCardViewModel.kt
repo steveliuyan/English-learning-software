@@ -19,6 +19,8 @@ import com.example.englishlearning.learning.LearningSettingsRepositoryResult
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.learning.domain.WordCard
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Duration
+import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +47,13 @@ sealed interface WordCardUiState {
          * re-entering a session resets it.
          */
         val meaningRevealed: Boolean = false,
+        /**
+         * Non-null while the just-graded card is held for reading its receipt (prototype
+         * `sSession` keeps the card on screen with `recap()` until the user taps 下一个词 /
+         * 完成本轮). Completion is already recorded at this point; [WordCardViewModel.advance]
+         * is the only action that moves on, so a second tap can never write a second event.
+         */
+        val receipt: FeedbackReceipt? = null,
     ) : WordCardUiState
 
     /** Every card of the session has a recorded feedback; unlocking is F1-04's concern. */
@@ -68,6 +77,36 @@ sealed interface WordCardUiState {
     data object MissingSetup : WordCardUiState
 
     data object Unavailable : WordCardUiState
+}
+
+/**
+ * What the user sees right after a recorded rating (prototype `recap()`).
+ *
+ * [nextReviewAt] and [whenLabel] are the **recorded** interval, not the prototype's demo copy:
+ * the prototype's "6 天 / 本轮末尾再出现一次" describe a scheduling rule this app does not have
+ * (V1: Again 10 分钟 / Hard 1 天 / Good 3 天, and a forgotten word is not re-queued this round).
+ * [hasNext] picks 下一个词 vs 完成本轮 without the screen having to re-derive the session.
+ */
+data class FeedbackReceipt(
+    val feedback: CardFeedback,
+    val nextReviewAt: Instant,
+    val whenLabel: String,
+    val hasNext: Boolean,
+)
+
+/**
+ * 回执上的时间口径：一律从调度器真正写入的 [nextReviewAt] 反推，禁止写死原型的演示数字。
+ * 回执出现在提交成功之后，所以 [now] 就是提交时刻。
+ */
+internal fun receiptWhenLabel(nextReviewAt: Instant, now: Instant): String {
+    val minutes = Duration.between(now, nextReviewAt).toMinutes()
+    return when {
+        minutes <= 0L -> "稍后再问一次"
+        minutes < 60L -> "约 $minutes 分钟后再问一次"
+        minutes < 24L * 60L -> "约 ${minutes / 60} 小时后再问一次"
+        minutes < 48L * 60L -> "明天再问一次"
+        else -> "${minutes / (24L * 60L)} 天后再问一次"
+    }
 }
 
 /**
@@ -146,7 +185,7 @@ class WordCardViewModel @Inject constructor(
         // is already recorded must be a no-op rather than a second event.
         val ready =
             (_uiState.value as? WordCardUiState.Ready)
-                ?.takeIf { !it.submitting && it.card.cardId !in current.completed }
+                ?.takeIf { !it.submitting && it.receipt == null && it.card.cardId !in current.completed }
                 ?: return
         val card = ready.card
 
@@ -163,16 +202,22 @@ class WordCardViewModel @Inject constructor(
                     wordBookId = current.wordBookId,
                     feedback = feedback,
                 )
-            when (submitFeedback(command)) {
+            when (val result = submitFeedback(command)) {
                 is SubmitFeedbackResult.Recorded,
                 is SubmitFeedbackResult.AlreadyRecorded,
                 -> {
+                    val nextReviewAt =
+                        when (result) {
+                            is SubmitFeedbackResult.Recorded -> result.nextReviewAt
+                            is SubmitFeedbackResult.AlreadyRecorded -> result.nextReviewAt
+                            SubmitFeedbackResult.StorageUnavailable -> return@launch
+                        }
                     pendingEventId = null
                     if (feedback == CardFeedback.Unknown) {
                         vocabulary.add(current.profileId, current.wordBookId, card.cardId, "Again", clock.instant())
                     }
                     current.completed += card.cardId
-                    emit(current)
+                    holdWithReceipt(ready, current, card, feedback, nextReviewAt)
                     // Only after the local event is written and the completion set is updated do we
                     // read the current profile's tier settings and decide whether to surface the
                     // just-submitted card's detail page. A settings read failure must never open it.
@@ -182,6 +227,61 @@ class WordCardViewModel @Inject constructor(
                     emit(current, message = FEEDBACK_NOT_SAVED)
             }
         }
+    }
+
+    /**
+     * 提交成功后**停在原卡**上出回执（原型 `sSession` 的 `recap()` + 下一个词）。
+     *
+     * 与 [emit] 的差别只在「换不换卡」：完成数、区间、详情开合都照常推进，唯一变化是
+     * 画面不立刻翻到下一张，让用户读完「记为哪一档、下次什么时候再见」。释义同时展开——
+     * 回执若配着一张还藏着释义的卡，用户看不出自己刚才是凭印象还是凭释义选的。
+     */
+    private fun holdWithReceipt(
+        ready: WordCardUiState.Ready,
+        current: Session,
+        card: WordCard,
+        feedback: CardFeedback,
+        nextReviewAt: Instant,
+    ) {
+        _uiState.value =
+            ready.copy(
+                submitting = false,
+                message = null,
+                completedCount = ready.completedCount + 1,
+                taskCompletedCount = ready.taskCompletedCount + 1,
+                meaningRevealed = true,
+                receipt =
+                    FeedbackReceipt(
+                        feedback = feedback,
+                        nextReviewAt = nextReviewAt,
+                        whenLabel = receiptWhenLabel(nextReviewAt, clock.instant()),
+                        hasNext = hasFollowingCard(current, card),
+                    ),
+            )
+    }
+
+    /**
+     * 离开回执、进入下一张卡（原型「下一个词 / 完成本轮」）。没有回执时是空操作——
+     * 否则一次误触就能跳过一张还没评分的卡。
+     */
+    fun advance() {
+        val ready = _uiState.value as? WordCardUiState.Ready ?: return
+        if (ready.receipt == null) return
+        val current = session ?: return
+        emit(current)
+    }
+
+    /**
+     * 回执之后本阶段是否还有下一张卡。复习阶段收尾时**不算**新词：这时 [emit] 会落到
+     * `ReviewCompleted`，用户先看到「复习完成 → 开始新词」，所以文案应是「完成本轮」。
+     */
+    private fun hasFollowingCard(current: Session, card: WordCard): Boolean {
+        val phaseIds =
+            when (current.phase) {
+                SessionPhase.REVIEW -> current.reviewCardIds
+                SessionPhase.NEW -> current.newCardIds
+            }
+        return current.cards.any { it.cardId != card.cardId && it.cardId in phaseIds && it.cardId !in current.completed }
     }
 
     /**

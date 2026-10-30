@@ -132,6 +132,10 @@ internal data class LearningSettingsRecord(
     val openDetailOnFuzzy: Boolean,
     val openDetailOnForgotten: Boolean,
     val showVocabularySearchCount: Boolean,
+    // 批 1 Task 12（复习上限）。默认值不是装饰：恢复侧两处 Json 都是 `ignoreUnknownKeys = false`
+    // 的严格档，但**缺键**只靠属性默认值放行——v33 之前的包根本没有这一枚键，没有默认值就是整包恢复失败。
+    // 取 30 = 原型初值，与 `LearningSettings.DEFAULT_DAILY_REVIEW_LIMIT` 同值。
+    val dailyReviewLimit: Int = 30,
 ) {
     constructor(entity: LearningSettingsEntity) : this(
         profileId = entity.profileId,
@@ -139,6 +143,7 @@ internal data class LearningSettingsRecord(
         openDetailOnFuzzy = entity.openDetailOnFuzzy,
         openDetailOnForgotten = entity.openDetailOnForgotten,
         showVocabularySearchCount = entity.showVocabularySearchCount,
+        dailyReviewLimit = entity.dailyReviewLimit,
     )
 }
 

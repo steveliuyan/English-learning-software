@@ -23,6 +23,8 @@ import com.example.englishlearning.reading.FeedItem
 import com.example.englishlearning.reading.FetchFailure
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.QuietCard
+import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import java.time.Instant
@@ -63,6 +65,14 @@ import java.time.ZoneId
  * 来源署名仍取 `colors.text1`（而非令牌表里更轻的 `text2`）：`ReadingFeedScreenTest` 的两条像素腿
  * 逐值钉住「浅套 / 深套 text1」，那是本层唯一的深色档证据；把它降档会连带改掉那两条期望值，
  * 而此处的立论（署名是来源归属，属正文级信息）也不要求降档。
+ *
+ * ## 批 2 Task 21-A：补上原型「来源说明」那一节
+ *
+ * 原型 `sReadFeed`（`app.js:779-795`）在列表尾部还有 `section('来源说明', .card-quiet)`。本轮把它补上，
+ * 但只写本仓读得到的那件事：来源名 + 「按其来源许可仅供学习使用」+ 指向既有的「开源许可与来源」页。
+ * 三处不搬：① 条目副案的 `section · length · words 词`（`FeedItem` 没有这三枚字段，改数据形状撞
+ * 「数据层零改动」、按摘要长度糊字数就是编造）；② `.meta`「正文不含广告」（读不到来源页，无法证实）；
+ * ③ 「VOA … 公共领域」写死（来源可配置，换来源即假话）。判据见 `ReadingFeedScreenContractTest`。
  */
 @Composable
 fun ReadingFeedScreen(
@@ -117,6 +127,30 @@ fun ReadingFeedScreen(
                                 .testTag("feed_item_$index")
                                 .semantics { contentDescription = "阅读外刊文章 ${item.title}" },
                         )
+                    }
+                    // 原型 `section('来源说明', .card-quiet)`（`app.js:792-794`）：只写本仓读得到的
+                    // 那一件事——来源名与它自己的许可口径，并把来源台账指向既有的「开源许可与来源」页。
+                    // 不写死 VOA / 「公共领域」（来源是可配置的），也不断言「正文不含广告」（读不到来源页）。
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                        ) {
+                            SectionHeading(text = "来源说明")
+                            QuietCard(
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .testTag("feed_source_notice"),
+                            ) {
+                                Text(
+                                    text = "本屏文章来自 ${feed.sourceDisplayName}，" +
+                                        "按其来源许可仅供学习使用；App 内的来源台账见「我的 · 开源许可与来源」。",
+                                    style = AppType.Caption,
+                                    color = colors.text3,
+                                )
+                            }
+                        }
                     }
                 }
 

@@ -52,6 +52,11 @@ data class LearningSetupUiState(
     val importedBookIds: Set<String> = emptySet(),
     val selectedWordBookId: String? = null,
     val dailyNewTarget: Int = DEFAULT_DAILY_TARGET,
+    /**
+     * 复习上限（原型 `#/plan-edit` 的 `.range`）。这是**滑杆草稿**：拖动只改屏上的数，
+     * 点「保存计划」才提交（与每日新增、词书选择同一条口径，见类内 [updateReviewLimit]）。
+     */
+    val dailyReviewLimit: Int = LearningSettings.DEFAULT_DAILY_REVIEW_LIMIT,
     /** 当前已生效的活动词书 id，用于判断是否真的发生了切换。 */
     val savedWordBookId: String? = null,
     val savedWordBookName: String? = null,
@@ -151,6 +156,17 @@ class LearningSetupViewModel @Inject constructor(
     val effects: SharedFlow<LearningSetupEffect> = _effects
     private var settingsProfileId: String? = null
 
+    /**
+     * 复习上限里**已经落库**的那一份。
+     *
+     * 屏上的 `dailyReviewLimit` 是滑杆草稿（点「保存计划」才提交），而开关行是即时落库的
+     * （词卡屏当下就要读它）。两者共用同一条 `LearningSettings` 写路径，所以即时落库时必须带这个
+     * 已提交值而不是草稿——否则「拖了滑杆、顺手关了枚开关」会替用户悄悄改掉复习上限，
+     * 屏上那句「改完点右上角『保存』」就撒了谎。判据在
+     * `LearningSetupViewModelTest.a drafted review limit is not persisted by toggling a switch`。
+     */
+    private var committedReviewLimit: Int = LearningSettings.DEFAULT_DAILY_REVIEW_LIMIT
+
     /** 当前这一次加载的任务。新的 `load()` 必须取消它，见 [load]。 */
     private var loadJob: Job? = null
 
@@ -169,6 +185,7 @@ class LearningSetupViewModel @Inject constructor(
         val wordBooksResult = repository.listWordBooks()
         val profileResult = repository.current(profileId)
         if (wordBooksResult is RepositoryResult.Failure || profileResult is RepositoryResult.Failure) {
+            committedReviewLimit = LearningSettings.DEFAULT_DAILY_REVIEW_LIMIT
             _uiState.value = LearningSetupUiState(
                 message = "暂时无法加载学习设置",
                 wordBooksLoading = false,
@@ -190,6 +207,9 @@ class LearningSetupViewModel @Inject constructor(
                 LearningSettingsRepositoryResult.StorageUnavailable -> LearningSettings.defaults(profileId)
             }
         val activeId = profile?.activeWordBookId?.takeIf { id -> wordBooks.any { it.id == id } }
+        // 复习上限的「已提交」基线跟着这一次读盘一起归位：读到的就是库里生效的那份，
+        // 草稿从同一点起算，之后拖动才有明确的「相对谁在改」。
+        committedReviewLimit = settings.dailyReviewLimit
         // 落笔前查一次任务是否还作数：上面这几步读盘一旦开始就停不下来（真实盘上拷贝不可中断），
         // `loadJob?.cancel()` 只能让协作式挂起点抛异常，挡不住「已经读完、正要写出去」的过期结果。
         if (!coroutineContext.isActive) return
@@ -206,6 +226,7 @@ class LearningSetupViewModel @Inject constructor(
                 importedBookIds = imported.filterTo(mutableSetOf()) { it in wordBooks.map(WordBook::id) },
                 selectedWordBookId = activeId ?: wordBooks.firstOrNull()?.id,
                 dailyNewTarget = profile?.dailyNewTarget ?: LearningSetupUiState.DEFAULT_DAILY_TARGET,
+                dailyReviewLimit = settings.dailyReviewLimit,
                 savedWordBookId = activeId,
                 savedWordBookName = wordBooks.find { it.id == activeId }?.displayName,
                 openDetailOnKnown = settings.openDetailOnKnown,
@@ -276,6 +297,23 @@ class LearningSetupViewModel @Inject constructor(
         )
     }
 
+    /**
+     * 改复习上限（原型 `#/plan-edit` 的 `.range`，10–80、步长 5）。
+     *
+     * 只夹区间、**不吸步进**：把 47 抹成 45 是滑杆的事（`steps = REVIEW_LIMIT_STEPS` 已经在屏侧
+     * 把住了 5 的格），VM 再吸一次会让「程序设值」和「用户拖出来的值」给出两种答案。
+     * 边界常量与滑杆同源（`AppScreen.kt` 的 `MIN/MAX_REVIEW_LIMIT`，同一 `ui` 包），
+     * 不在这里另抄一份数字。
+     *
+     * 这一手只落屏上的草稿，不写库：提交点在 [save] 走通之后，理由见 [committedReviewLimit]。
+     */
+    fun updateReviewLimit(limit: Int) {
+        _uiState.value =
+            _uiState.value.copy(
+                dailyReviewLimit = limit.coerceIn(MIN_REVIEW_LIMIT, MAX_REVIEW_LIMIT),
+            )
+    }
+
     fun setOpenDetailOnKnown(value: Boolean) {
         _uiState.value = _uiState.value.copy(openDetailOnKnown = value)
         persistSettings()
@@ -307,6 +345,8 @@ class LearningSetupViewModel @Inject constructor(
                     openDetailOnFuzzy = state.openDetailOnFuzzy,
                     openDetailOnForgotten = state.openDetailOnForgotten,
                     showVocabularySearchCount = state.showVocabularySearchCount,
+                    // 已提交的那份，不是滑杆草稿——见 [committedReviewLimit]。
+                    dailyReviewLimit = committedReviewLimit,
                 ),
             )
         }
@@ -377,6 +417,10 @@ class LearningSetupViewModel @Inject constructor(
         val state = _uiState.value
         when (selectWordBook(profileId, target, state.dailyNewTarget)) {
             SetupResult.Saved -> {
+                // 「保存计划」是复习上限唯一的提交点：先让草稿转正，再跟着这次保存落库，
+                // 之后任意一次开关写入带的都是这个新值（原型 `.foot` 那枚「保存计划」的语义）。
+                committedReviewLimit = _uiState.value.dailyReviewLimit
+                persistSettings()
                 _uiState.value = _uiState.value.copy(
                     saving = false,
                     savedWordBookId = target,

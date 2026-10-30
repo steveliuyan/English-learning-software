@@ -160,21 +160,35 @@ class ThemeModeSwitchTest {
     }
 
     /**
-     * 深色偏好下，今日计划屏那块承载两条裸行的**软档卡**（`today_plan_secondary_card`）的容器像素
-     * 必须落在深套 `surface` 那一档。
+     * 深色偏好下，今日计划屏那块承载四条裸行的**软档卡**（`today_plan_secondary_card`）的容器像素
+     * 必须落在深套 `tint` 那一档。
      *
      * 为什么这条排在批 2 最前面（Task 12.5 的行为面）：批 1 Task 3 已把 `Mint*` 墨色改成组合期读取，
      * 而业务屏容器仍写静态 `AppPalette.Surface`（浅套写死白）。两者配对后，真机 `bf353dda` 深色档实测到
      * 「白底 + 主题浅墨」的近不可读文案（`docs/verification/ui-redesign-2026-10.md`「真机深色实勘」）。
-     * 本用例就是把那枚缺陷钉成像素判据：容器底必须是**当前主题的 surface**，而不是永远 `#FFFFFFFF`。
+     * 本用例就是把那枚缺陷钉成像素判据：容器底必须是**当前主题的那一档填充**，而不是永远 `#FFFFFFFF`。
      *
      * **判据对象在批 1 Task 4 换过一次**，换的理由留在原处而不是悄悄改锚：原先取的是「今日学习进度」卡
      * （`today_plan_progress_summary`）；版式重做后那张卡升格为强档卡，深套容器画 `strongSurface`
      * （前景 `onStrong`），它与深套相邻填充（`tint` / `background`）只差个位数通道，
      * 本用例的「容差 2 / 相邻档门槛 4」在强档卡上会当场失守，而放大容差就是放「漏画容器」过去。
-     * 于是对象换成**仍然画 `surface` 的那块业务容器**——两条裸行同住的软档卡：缺陷形状不变
-     * （容器读点跟不跟主题）、期望 token 不变、三条自检的实测数值也不变（它们本来就是按 `surface`
-     * 与相邻三档的间距算的）。
+     * 于是对象换成**仍然按主题铺底的那块业务容器**——四条裸行同住的软档卡（批 1 Task 17 起第四条
+     * 是「复习队列」）：缺陷形状不变（容器读点跟不跟主题）。
+     *
+     * **期望档在批 0 之后从 `surface` 改成 `tint`**（本轮统一验收前发现的第三处设备侧陈旧期望）：
+     * `39e826a`（共享组件与令牌对齐冻结原型）把 `SoftCard` 的填充按原型
+     * `.card-soft { background: var(--tint) }`（`app.css:369-374`）从 `surface` 改成 `tint`
+     * （深套实测众数 1845796 = `#1C2A24` = `AppColorDark.tint`，与 token 逐通道差 0）。
+     * 这条改判**不是放宽**，判据的三件事一件都没少：
+     *  - 立法目的仍是「容器读点跟不跟主题」——`tint` 同样按套取值（浅 #E8F2EA / 深 #1C2A24，
+     *    逐通道差 204，容差 2 踩不过来），写静态白一样判红；
+     *  - 容差不变（2，只抗实现侧取整）；
+     *  - 相邻档自检的候选集**改档不减压**：原来扫 `background` / `tint` / `outlineSoft`（期望档还是
+     *    `surface`），现在扫能透出来的三档**填充** `background` / `surface` / `surface2`——`tint` 升成
+     *    期望值本身（留在候选里就是自己减自己 = 0），`outlineSoft` 是描边档、不是能透出的底。
+     *    按 token 逐值算，离深套 `tint` 最近的一档是 `surface2`（6 档），容差 2 依然踩不进去。
+     * 软卡的语义随原型从「白卡」变成「薄荷卡」这件事，`.superpowers/sdd/2026-10-17-ui-redesign/
+     * task-12.5-report.md` 那份历史报告里写的是改判之前的档，报告不追改。
      *
      * 注意这条换锚只跟**深套**有关：浅套的强档卡在 2026-10-31 用户评审 ③ 之后不再用 `strongSurface`
      * （浅底「深墨实底太重、喧宾夺主」），改画 `tint2` 底 + `text1` 墨；深套一字未动，仍是
@@ -186,30 +200,28 @@ class ThemeModeSwitchTest {
      * 三条取样口径，都不是随手写的：
      *  - **偏好显式写 `ThemeMode.Dark`，不再走「与平台相反」那一档**：本类前两已经把「prefs 压过平台」与
      *    「prefs 改动翻活组合」两条链路证完了；这一条要证的是**业务容器的读点跟不跟主题**。
-     *    若把偏好读取链路再复制一遍，本用例就成了前两件的影子；此处刻意只留「容器色 == 深套 surface」这一件事。
+     *    若把偏好读取链路再复制一遍，本用例就成了前两件的影子；此处刻意只留「容器色 == 深套 tint」这一件事。
      *  - **取样用「整节点不透明像素直方图的众数」，不再固定取宽 9/10、高 1/2**：旧进度卡里是三行左对齐
-     *    文案，9/10 那一列是它的内边距；软档卡里是两条带前导图标、副标题与右侧尖头的裸行，同一列会落到
-     *    尖头或两行之间的 1dp 发丝线上。众数不依赖「这一行右边排了什么」这种版面细节（版面重排不会把
+     *    文案，9/10 那一列是它的内边距；软档卡里是四条（批 1 Task 17 起）带前导图标、副标题与右侧尖头的裸行，
+     *    同一列会落到尖头或两行之间的 1dp 发丝线上。众数不依赖「这一行右边排了什么」这种版面细节（版面重排不会把
      *    判据挪到图标上）：填色是面积最大的一档，字身、图标、描边都只是少数派（与 AI 服务行那条同一取样器）。
      *  - **逐通道容差比较（评审 m-1 后的口径：容差取小，判别力靠三条自检钉住）**：`captureToImage()` 是离屏
-     *    渲染成位图，不经显示链的色彩管理，本卡实测取样像素与 `AppColorDark.surface` 逐通道差为 0；
-     *    容差留 2 只抗实现侧取整。曾经取 24，那是「覆盖显示链取整」的误判——24 宽到能把深套相邻三档填充
-     *    （`background` 离 `surface` 11、`tint` 12、`outlineSoft` 16）都算成命中，于是「容器漏画、直接透出页底」
+     *    渲染成位图，不经显示链的色彩管理，本卡实测取样像素与 `AppColorDark.tint` 逐通道差为 0；
+     *    容差留 2 只抗实现侧取整。曾经取 24，那是「覆盖显示链取整」的误判——24 宽到能把深套相邻几档填充
+     *    （`surface` 离 `tint` 11、`surface2` 6、`background` 18）都算成命中，于是「容器漏画、直接透出页底」
      *    这条缺陷反而测不出来。收紧后由三条自检当场钉住判据不退化：
-     *    ①换套判别力（容差的两倍远小于浅/深两套 `surface` 的最大逐通道间距，浅色档踩不进来）；
+     *    ①换套判别力（容差的两倍远小于浅/深两套 `tint` 的最大逐通道间距，浅色档踩不进来）；
      *    ②取样点判别力（取样必须离该套正文墨足够远，证量的是容器填充而不是字身——大字号、取样点改动或
      *    卡内排版重排都可能把取样点挪到笔画上，动态字体 2.0 档正是这条兜住的方向，见下）；
      *    ③相邻档判别力（容差必须容不下深套相邻填充，证「漏画容器」会在本用例判红而不是蒙过）。
-     *    **①的前提写在主题侧**：本主题把 `surfaceTint` 设为 `set.onMint`（`MintGlassTheme.kt:113/151`），
-     *    它与 `surface` 逐通道差 200 上下；当前不混色是**实测事实**——这张软档卡没显式传 `tonalElevation`
-     *    （`SoftCard` 自身也不传，见 `components/Containers.kt` 的「不描边、不提权」口径），
-     *    `DefaultElevationOverlay` 的叠加 alpha 因此为 0，取样与 token 的逐通道差实测 0。
-     *    注意混色通道并没有被关掉：主题把 M3 `surface` 也设成了同一枚 `set.surface`
-     *    （`MintGlassTheme.kt:109/147`），`isSurfaceColor` 按数值成立，所以一旦有人给这张卡显式加
-     *    `tonalElevation` 到 ≥3dp，十几个百分点的 tint 会立刻把 2 档容差撑破——
-     *    届时必须重算期望值（改用 `surfaceColorAtElevation`）而不是放大容差。
+     *    **混色通道在本档不存在**（批 0 换填充时一并核实）：`SoftCard` 是普通 `Column` 上的
+     *    `Modifier.background(colors.tint)`（`components/Containers.kt:144-150`），不是 M3 `Surface`，
+     *    所以主题的 `surfaceTint`（`MintGlassTheme.kt:113/151` 设成 `set.onMint`，与 `surface` 逐通道差
+     *    200 上下）与 `DefaultElevationOverlay` 都碰不到这枚底——取样与 token 的逐通道差实测 0。
+     *    如果哪天有人把软卡改回 M3 `Surface` 并显式 `tonalElevation ≥ 3dp`，十几个百分点的 tint
+     *    会立刻把 2 档容差撑破：届时必须重算期望值（改用 `surfaceColorAtElevation`）而不是放大容差。
      *
-     * 期望值取自 [AppColorDark] / [AppColorLight] 的 `surface` token，不重抄 hex（同前两例的口径）。
+     * 期望值取自 [AppColorDark] / [AppColorLight] 的 `tint` token，不重抄 hex（同前两例的口径）。
      * 一个 `@Test` 只 `setContent` 一次（本仓真机怪癖：同一测试内两次 `setContent` 必崩）。
      *
      * 动态字体（m-3 的处置）：本用例的 `composeRule` 没有钉 fontScale 的公开口子（`setDensity` 只管密度），
@@ -218,7 +230,7 @@ class ThemeModeSwitchTest {
      * 属取样问题而非容器回归。
      */
     @Test
-    fun a_business_container_paints_the_stored_set_surface_in_dark_mode() {
+    fun a_business_container_paints_the_stored_set_soft_card_tint_in_dark_mode() {
         AppThemePreferences.write(appContext, ThemeMode.Dark)
         composeRule.setContent {
             MintGlassTheme(themeMode = rememberAppThemeMode()) {
@@ -235,27 +247,27 @@ class ThemeModeSwitchTest {
                 )
             }
         }
-        composeRule.onNodeWithTag(TODAY_PLAN_SURFACE_TAG).performScrollTo()
+        composeRule.onNodeWithTag(TODAY_PLAN_SOFT_CARD_TAG).performScrollTo()
 
-        val actual = dominantRgb(TODAY_PLAN_SURFACE_TAG)
-        val dark = surfaceRgb(AppColorDark)
-        val light = surfaceRgb(AppColorLight)
+        val actual = dominantRgb(TODAY_PLAN_SOFT_CARD_TAG)
+        val dark = tintRgb(AppColorDark)
+        val light = tintRgb(AppColorLight)
         assertEquals(
-            "今日计划屏的软档卡容器必须画深套 surface（写静态 AppPalette.Surface 时这里是白底，" +
-                "即真机实勘那处「白底 + 主题浅墨」）：期望 $dark ±$SURFACE_CHANNEL_TOLERANCE，实际 $actual",
+            "今日计划屏的软档卡容器必须画深套 tint（原型 `.card-soft`；写静态白底时这里是「白底 + 主题浅墨」，" +
+                "即真机实勘那处缺陷）：期望 $dark ±$SURFACE_CHANNEL_TOLERANCE，实际 $actual",
             0,
             maxChannelDelta(actual, dark).let { if (it <= SURFACE_CHANNEL_TOLERANCE) 0 else it },
         )
         // 自检①（m-2 / m-4）：容差小到浅色档绝不可能被判成深色（否则上面那条断言就成了「任何非白都算过」）。
-        // 用的是 maxChannelDelta —— 两套 surface 之间**最宽**的那条通道；判据按最宽通道都还成立，
-        // 说明这条自检离失配还有余量（消息与算式必须同名，别写「最小」却算「最大」）。
+        // 用的是 maxChannelDelta —— 两套 tint 之间**最宽**的那条通道（浅 #E8F2EA / 深 #1C2A24，按 token
+        // 逐值算为 204）；判据按最宽通道都还成立，说明这条自检离失配还有余量（消息与算式必须同名，别写「最小」却算「最大」）。
         assertTrue(
-            "容差必须远小于浅/深两套 surface 的最大逐通道间距，否则本用例失去换套判别力",
+            "容差必须远小于浅/深两套 tint 的最大逐通道间距，否则本用例失去换套判别力",
             SURFACE_CHANNEL_TOLERANCE * 2 < maxChannelDelta(light, dark),
         )
         // 自检②（m-3）：取样点必须落在容器填充上，不能是字身。深套两档正文墨（text1 / text2）与
-        // surface 的最大逐通道差实测为 210 / 136，都远大于容差，所以「离墨够远」是一条硬判据：
-        // 大字号、取样点挪位或卡内排版重排把 9/10 那一列推到笔画上时，本条当场判红，
+        // tint 的最大逐通道差按 token 逐值算为 205 / 142，都远大于容差，所以「离墨够远」是一条硬判据：
+        // 大字号、取样点挪位或卡内排版重排把众数推到笔画上时，本条当场判红，
         // 而不是让上面那条容差断言靠「恰好量到某个深色像素」蒙过去。
         val nearestInkDelta = minOf(
             maxChannelDelta(actual, rgb(AppColorDark.text1)),
@@ -266,21 +278,29 @@ class ThemeModeSwitchTest {
                 "取样 $actual，离最近的一档墨只有 $nearestInkDelta 档（门槛 $INK_MIN_CHANNEL_DELTA）",
             INK_MIN_CHANNEL_DELTA <= nearestInkDelta,
         )
-        // 自检③（m-1）：容差必须窄到容不下深套**相邻**填充档，否则「容器漏画、透出页底」会被本用例判成通过。
-        // 这三档都是这张卡底下可能透出来的底：background 是页底、tint 是卡内 tinted 区块、outlineSoft 是弱描边档。
-        // 间距算式与主断言同为 maxChannelDelta（消息与算式必须同名），因此这里取三档里**最近**的那一档：
-        // 连最近那一档都踩不进容差，相邻档判别力才成立（背景实测 11 / tint 12 / outlineSoft 16，容差 2）。
-        val nearestAdjacentFill = minOf(
-            maxChannelDelta(dark, rgb(AppColorDark.background)),
-            maxChannelDelta(dark, rgb(AppColorDark.tint)),
-            maxChannelDelta(dark, rgb(AppColorDark.outlineSoft)),
+        // 自检③（m-1）：容差必须窄到容不下深套**相邻填充**档，否则「容器漏画、透出页底」会被本用例判成通过。
+        // 候选三档都是这张卡底下可能透出来的**填充**：background 是页底、surface 是白卡档（`AppCard`）、
+        // surface2 是次级填充。两档退出候选，各有各的理由，写在常量注释里而不藏进代码：
+        //  - `tint` 现在就是期望值本身（批 0 按原型 `.card-soft { background: var(--tint) }` 换的填充），
+        //    留在候选里等于自己减自己 = 0，会把本条自检直接判红；
+        //    （旧版把它当「卡内 tinted 区块」列进候选时，期望档还是 `surface`，两档是相邻的填充。）
+        //  - `outlineSoft` 是描边档，不是能透出来的底。
+        // 间距算式与主断言同为 maxChannelDelta（消息与算式必须同名），逐档各判一次：
+        // 按 token 逐值算，离深套 tint 最远/最近的分别是 background 18 / surface2 6，容差 2、门槛 4。
+        val adjacentFills = listOf(
+            "background" to rgb(AppColorDark.background),
+            "surface" to rgb(AppColorDark.surface),
+            "surface2" to rgb(AppColorDark.surface2),
         )
-        assertTrue(
-            "容差必须容不下深套相邻填充档，否则「容器漏画、透出页底」会在本用例蒙过（m-1）：" +
-                "容差 $SURFACE_CHANNEL_TOLERANCE，最近的一档离 surface 只有 $nearestAdjacentFill 档（门槛 $ADJACENT_FILL_MIN_CHANNEL_DELTA）",
-            ADJACENT_FILL_MIN_CHANNEL_DELTA <= nearestAdjacentFill &&
-                SURFACE_CHANNEL_TOLERANCE < nearestAdjacentFill,
-        )
+        assertTrue("自检③的候选集不许空转（三档相邻填充都要在列）", adjacentFills.size == 3)
+        adjacentFills.forEach { (name, rgb) ->
+            val delta = maxChannelDelta(dark, rgb)
+            assertTrue(
+                "容差必须容不下深套相邻填充档 $name，否则「容器漏画、透出页底」会在本用例蒙过（m-1）：" +
+                    "容差 $SURFACE_CHANNEL_TOLERANCE，$name 离深套 tint 只有 $delta 档（门槛 $ADJACENT_FILL_MIN_CHANNEL_DELTA）",
+                ADJACENT_FILL_MIN_CHANNEL_DELTA <= delta && SURFACE_CHANNEL_TOLERANCE < delta,
+            )
+        }
     }
 
     /**
@@ -412,6 +432,12 @@ class ThemeModeSwitchTest {
     /** 该套 `surface` 的期望像素（丢掉 alpha：卡片容器同为不透明填充，容差事由见用例注释）。 */
     private fun surfaceRgb(set: AppColorSet): Int = set.surface.toArgb() and 0xFFFFFF
 
+    /**
+     * 该套 `tint` 的期望像素（丢掉 alpha）。软档卡按原型 `.card-soft { background: var(--tint) }`
+     * 铺这一档（批 0 起；`components/Containers.kt:149`），所以它是那张卡的容器期望值。
+     */
+    private fun tintRgb(set: AppColorSet): Int = set.tint.toArgb() and 0xFFFFFF
+
     /** 任意不透明 token 的 RGB（丢掉 alpha，与 [surfaceRgb] 同一比较口径，供「离墨够远」那条反向断言用）。 */
     private fun rgb(color: Color): Int = color.toArgb() and 0xFFFFFF
 
@@ -517,10 +543,10 @@ private const val TOKEN_PROBE_TAG = "theme_probe_token_channel"
 
 /**
  * 批 1 里程碑真机实勘判红的那枚卡（今日计划屏「今日学习进度」，容器读点迁移的行为面）在版式重做后
- * 升格为强档卡（画 `strongSurface`）；**仍然画 `surface`** 的那块业务容器是两条裸行同住的软档卡，
- * 本用例的判据对象随之落到它上面（理由见用例 KDoc）。
+ * 升格为强档卡（画 `strongSurface`）；按主题铺底的那块业务容器是四条裸行同住的软档卡，
+ * 本用例的判据对象随之落到它上面（理由见用例 KDoc；批 0 起它的填充档从 `surface` 变成原型的 `tint`）。
  */
-private const val TODAY_PLAN_SURFACE_TAG = "today_plan_secondary_card"
+private const val TODAY_PLAN_SOFT_CARD_TAG = "today_plan_secondary_card"
 
 /** AI 服务列表行的 testTag 前缀（生产码里为 `ai_profile_item_<profileId>`）。 */
 private const val AI_PROFILE_ROW_TAG_PREFIX = "ai_profile_item_"

@@ -5,9 +5,9 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * 词书卡进度呈现契约（spec F1-01 渐进发布 + 决策 2026-10-17 §决定 2；终审 I-1）。
+ * 词书进度呈现契约（spec F1-01 渐进发布 + 决策 2026-10-17 §决定 2；终审 I-1）。
  *
- * 规则（都是对 `AppScreen.WordBookCard` 的文件级形状断言，JVM 侧无 Compose 测试设施，
+ * 规则（都是对 `AppScreen.WordBookPickRow` 的文件级形状断言，JVM 侧无 Compose 测试设施，
  * 与本目录 F5-03 禁令族同口径：先锚点存在性防契约空转，再判规则）：
  *  规则1 词量必须来自册元数据本身（文案取自 book.totalWords 的插值形状），不得挂在 progress 上——
  *        spec 第 17 行写明「册列表（名称、等级、词量）读到即先发布」，而 `WordBookProgress.total`
@@ -19,6 +19,11 @@ import kotlin.test.assertTrue
  *        这一本读不出来（「暂时读不到进度」）。后两态都对应 `progress == null`，只有 `progressLoading`
  *        能把它们分开；合成一个「已学 0」就是撒谎（AGENTS.md「降级要如实呈现」）。
  *
+ * **批 1 Task 13-A 换锚留因**：选词书从两列色块改成原型 `app.js:587-606` 的 `.pick.pick-radio` 通栏行，
+ * 承载这些文案的函数由 `WordBookTile` 变成 `WordBookPickRow`，副行形状由色块的「共 N 词」变成原型
+ * `.row-sub` 的「N 词 · <进度段>」。三条规则一条没松，另加一条反向禁令：「共」是色块时代自加的修饰，
+ * 原型没有 → 残留即违规（`legacyTotalPrefix`）。
+ *
  * 已知局限（如实记录）：剥注释口径已统一到共享夹具（批 1 终审 F6）——本类私有的正则版实现已删除，
  * 改调 `SourceRatchet.kt` 那份字符串感知实现，所以 F5-03 债 M-B2 记的「字符串里的双斜杠之后整行被抹掉」
  * 「字面量里的星号紧跟斜杠吞掉其后真实代码」两条对本类都不再成立；
@@ -28,7 +33,8 @@ import kotlin.test.assertTrue
 class WordBookCardProgressContractTest {
     private val uiDir = File(WORD_BOOK_PROGRESS_CONTRACT_SOURCE_PATH)
 
-    private val totalFromBook = "text = \"共 \${book.totalWords} 词\""
+    private val totalFromBook = "\${book.totalWords} 词 · "
+    private val legacyTotalPrefix = "\"共 "
     private val totalFromProgress = "共 \${it.total}"
     private val zeroPercentBar = "progress = { progress?.fraction ?: 0f }"
     private val learnedShape = "\"已学 \${progress.learned}\""
@@ -40,10 +46,13 @@ class WordBookCardProgressContractTest {
         val stripped = stripComments(source)
         val offenders = mutableListOf<String>()
         if (!stripped.contains(totalFromBook)) {
-            offenders += "WordBookCard 缺 $totalFromBook —— 词量是册元数据，必须随册列表首帧可见（spec F1-01）"
+            offenders += "WordBookPickRow 缺 $totalFromBook —— 词量是册元数据，必须随册列表首帧可见（spec F1-01）"
         }
         if (stripped.contains(totalFromProgress)) {
-            offenders += "WordBookCard 仍用 $totalFromProgress —— 词量被绑在 progress 上，进度未到位的册会连词量一起消失"
+            offenders += "WordBookPickRow 仍用 $totalFromProgress —— 词量被绑在 progress 上，进度未到位的册会连词量一起消失"
+        }
+        if (stripped.contains(legacyTotalPrefix)) {
+            offenders += "WordBookPickRow 残留 $legacyTotalPrefix —— 「共」是两列色块自加的修饰，原型 `.row-sub` 没有这个字"
         }
         return offenders
     }
@@ -51,7 +60,7 @@ class WordBookCardProgressContractTest {
     /** 规则2 纯函数（禁令形）：无进度不许画 0% 实心轨道。 */
     private fun zeroPercentBarOffenders(source: String): List<String> =
         if (stripComments(source).contains(zeroPercentBar)) {
-            listOf("WordBookCard 出现 $zeroPercentBar —— 把「不知道」画成「一点没学」")
+            listOf("WordBookPickRow 出现 $zeroPercentBar —— 把「不知道」画成「一点没学」")
         } else {
             emptyList()
         }
@@ -63,18 +72,18 @@ class WordBookCardProgressContractTest {
             learnedShape to "缺进度已算出文案 $learnedShape",
             computingShape to "缺回填中文案 $computingShape —— 与下一态混成同一个数字",
             unreadableShape to "缺读不出文案 $unreadableShape —— 降级被写成假数字",
-        ).filterNot { (shape, _) -> stripped.contains(shape) }.map { (_, message) -> "WordBookCard $message" }
+        ).filterNot { (shape, _) -> stripped.contains(shape) }.map { (_, message) -> "WordBookPickRow $message" }
     }
 
     private fun scanUiSources(dir: File = uiDir): List<File> {
         assertTrue(
             dir.isDirectory,
-            "词书卡进度契约扫描目录缺失（期望 $WORD_BOOK_PROGRESS_CONTRACT_SOURCE_PATH）：${dir.path}，" +
+            "词书进度契约扫描目录缺失（期望 $WORD_BOOK_PROGRESS_CONTRACT_SOURCE_PATH）：${dir.path}，" +
                 "相对 JVM 工作目录 ${File(".").absolutePath}；" +
                 "walkTopDown() 对缺失路径返回空序列，会让契约测试无声通过——包名重构或工作目录变化必须先修此处路径。",
         )
         val files = dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
-        assertTrue(files.isNotEmpty(), "词书卡进度契约空扫：${dir.path} 下没有 .kt 文件（文件数 0 不是合规，是漏扫）。")
+        assertTrue(files.isNotEmpty(), "词书进度契约空扫：${dir.path} 下没有 .kt 文件（文件数 0 不是合规，是漏扫）。")
         return files
     }
 
@@ -82,7 +91,7 @@ class WordBookCardProgressContractTest {
         val matches = scanUiSources().filter { it.name == fileName }
         assertTrue(
             matches.size == 1,
-            "词书卡进度契约目标文件应恰好一个（$WORD_BOOK_PROGRESS_CONTRACT_SOURCE_PATH/$fileName），实际 ${matches.size} 个",
+            "词书进度契约目标文件应恰好一个（$WORD_BOOK_PROGRESS_CONTRACT_SOURCE_PATH/$fileName），实际 ${matches.size} 个",
         )
         return matches.single().readText()
     }
@@ -92,7 +101,7 @@ class WordBookCardProgressContractTest {
         val files = scanUiSources()
         assertTrue(
             files.any { it.name == "AppScreen.kt" },
-            "词书卡进度契约没扫到 AppScreen.kt（${files.size} 个 .kt 文件里没有它）",
+            "词书进度契约没扫到 AppScreen.kt（${files.size} 个 .kt 文件里没有它）",
         )
     }
 
@@ -100,8 +109,8 @@ class WordBookCardProgressContractTest {
     fun `word count comes from the book and never from progress`() {
         val source = sourceOf("AppScreen.kt")
         assertTrue(
-            stripComments(source).contains("fun WordBookTile("),
-            "AppScreen.kt 找不到锚点 \"fun WordBookTile(\"：契约空转（组件被改名/删除必须显式失败）",
+            stripComments(source).contains("fun WordBookPickRow("),
+            "AppScreen.kt 找不到锚点 \"fun WordBookPickRow(\"：契约空转（组件被改名/删除必须显式失败）",
         )
         val found = wordCountOffenders(source)
         assertTrue(found.isEmpty(), "AppScreen.kt:\n${found.joinToString("\n")}")
@@ -126,20 +135,25 @@ class WordBookCardProgressContractTest {
     @Test
     fun `word count rule accepts the book-bound shape and rejects the progress-bound one`() {
         val compliant = """
-            private fun WordBookCard(book: WordBook, progress: WordBookProgress?) {
-                Text(text = "共 ${'$'}{book.totalWords} 词")
+            private fun WordBookPickRow(book: WordBook, progress: WordBookProgress?) {
+                val learned = if (progress != null) "已学 ${'$'}{progress.learned}" else "进度计算中"
+                Text(text = "${'$'}{book.totalWords} 词 · ${'$'}{learned}")
             }
         """.trimIndent()
         assertTrue(wordCountOffenders(compliant).isEmpty(), "合规形状被误判：${wordCountOffenders(compliant)}")
 
         val offender = """
-            private fun WordBookCard(book: WordBook, progress: WordBookProgress?) {
+            private fun WordBookPickRow(book: WordBook, progress: WordBookProgress?) {
                 progress?.let { Text(text = "共 ${'$'}{it.total} 词") }
             }
         """.trimIndent()
         assertTrue(
             wordCountOffenders(offender).isNotEmpty(),
             "progress-bound 词量被放行：规则1 抓不到它，等于没判",
+        )
+        assertTrue(
+            wordCountOffenders(offender).any { it.contains(legacyTotalPrefix) },
+            "「共 N 词」的旧修饰必须单独成一条 offender：原型 `.row-sub` 没有这个字，混在缺形状里会被当成漏判",
         )
     }
 

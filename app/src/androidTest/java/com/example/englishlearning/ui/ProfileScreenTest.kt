@@ -51,7 +51,8 @@ class ProfileScreenTest {
         }
         composeRule.onNodeWithTag("profile_screen").assertExists()
         composeRule.onNodeWithText("小刘").assertExists()
-        composeRule.onNodeWithText("连续学习 5 天 · API Key 只保存在本机加密区。").assertExists()
+        // 批 2 Task 22-A：副标题改成原型 `.head-sub`「连续打卡 N 天 · 累计学过 N 个词」（两枚真值）。
+        composeRule.onNodeWithText("连续打卡 5 天 · 累计学过 42 个词").assertExists()
         composeRule.onNodeWithTag("profile_stat_learned").assertExists().assertHasClickAction()
         composeRule.onNodeWithTag("profile_stat_streak").assertExists().assertHasClickAction()
         composeRule.onNodeWithTag("profile_stat_articles").assertExists().assertHasClickAction()

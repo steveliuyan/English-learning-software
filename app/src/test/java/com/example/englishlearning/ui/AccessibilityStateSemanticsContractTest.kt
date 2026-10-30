@@ -10,12 +10,16 @@ import kotlin.test.assertTrue
  * TalkBack 只播报 stateDescription、role 与带值的 contentDescription，视觉强调
  * （选中卡底色、Tab 加粗、卡面「点按展开」文案）不构成播报。五个生产站点全部是
  * 正向存在性契约（Task 1–4 的禁令族是反向禁令：不许出现），结构沿用同一模板：
- *  规则1 AppScreen.WordBookCard：stateDescription = if (selected) "已选" else "未选"；
+ *  规则1 components.PickRow：stateDescription = if (checked) "已选" else "未选"
+ *        （批 1 Task 13-A 换锚：选词书从两列色块改成原型 `.pick.pick-radio` 通栏行，选中态声明
+ *         随手势一起搬进共享件；判据形状本身不变，只把色块的布尔量 `selected` 换成组件形参 `checked`。）；
  *  规则2 AppBottomBar.TabSlot：role = Role.Tab 且 stateDescription = if (selected) …;
  *  规则3 LearningRecordsScreen TabRow：role = Role.Tab；
  *  规则4 LicensesScreen.NoticeCard 与 ReadingHistoryScreen 组卡：
  *         stateDescription = if (expanded) "已展开" else "已收起"；
- *  规则5 AppScreen.DailyTargetSection Slider：contentDescription = "每日新词目标，当前 ${displayedTarget} 词"。
+ *  规则5 AppScreen.ReviewLimitSection Slider：contentDescription = "每日复习上限，当前 ${displayed} 个"。
+ *        （批 1 Task 12 换锚：原型的「每日新增」从滑杆改成四枚 chip，屏内唯一滑杆移到复习上限，
+ *         判据本身不变——仍要求 Slider 的描述内嵌当前值；旧锚 `每日新词目标` 随滑杆一起退役。）
  *  规则形状即 brief 的五个正则：它们不含任何通配段（只有 `\(`、`\{`、`\$` 转义的字面字符），
  *  故精确子串断言与正则形态等价，且更直白。
  *
@@ -26,8 +30,8 @@ import kotlin.test.assertTrue
  *     必须被抓；
  *  2. 真实文件走 scanUiSources(dir)：目录缺失或零 .kt 文件立即失败——walkTopDown()
  *     对缺失路径返回空序列，禁止契约静默空扫（包名重构 / 工作目录变化防线）；
- *  3. 每个站点先断言锚点存在（fun WordBookCard( / TabSlot( / TabRow( / fun NoticeCard( /
- *     reading_history_group_ / fun DailyTargetSection(），再断言规则 offender 为空：组件被
+ *  3. 每个站点先断言锚点存在（fun PickRow( / TabSlot( / TabRow( / fun NoticeCard( /
+ *     reading_history_group_ / fun ReviewLimitSection(），再断言规则 offender 为空：组件被
  *     改名或删除、semantics 块被整段搬走时，必须报「契约空转」而不是无声通过。
  *
  * 已知漏判/过判面（启发式局限，如实记录，不为未修复的面做假测试）：
@@ -48,17 +52,22 @@ import kotlin.test.assertTrue
 class AccessibilityStateSemanticsContractTest {
     private val uiDir = File(UI_STATE_SEMANTICS_SOURCE_PATH)
 
-    /** 规则形状 = brief 正则锁定的精确字面文本（正则无通配段，子串匹配与之等价，见类 KDoc）。 */
-    private val wordBookSelectedSemantics = "stateDescription = if (selected) \"已选\" else \"未选\""
+    /**
+     * 规则形状 = brief 正则锁定的精确字面文本（正则无通配段，子串匹配与之等价，见类 KDoc）。
+     *
+     * 规则 1 的那一枚在批 1 Task 13-A 随选词书换版面一起换锚：形状里锁的布尔量从色块的
+     * `selected` 变成共享 `PickRow` 的形参 `checked`——锁写法的判据随之一起改，不是无声放宽。
+     */
+    private val pickRowSelectedSemantics = "stateDescription = if (checked) \"已选\" else \"未选\""
     private val tabRoleSemantics = "role = Role.Tab"
     private val tabSelectedSemantics = "stateDescription = if (selected)"
     private val expandStateSemantics = "stateDescription = if (expanded) \"已展开\" else \"已收起\""
-    private val sliderValueSemantics = "contentDescription = \"每日新词目标，当前 \${displayedTarget} 词\""
+    private val sliderValueSemantics = "contentDescription = \"每日复习上限，当前 \${displayed} 个\""
 
-    /** 规则1 纯函数：WordBookCard 选中态必须进语义（正向存在性：缺则返回 offender，空 = 合规）。 */
-    private fun wordBookSelectedStateOffenders(source: String): List<String> =
-        if (stripComments(source).contains(wordBookSelectedSemantics)) emptyList()
-        else listOf("缺 $wordBookSelectedSemantics —— 选中态只有底色/描边/「已选」标签，TalkBack 念不到已选/未选")
+    /** 规则1 纯函数：选择行选中态必须进语义（正向存在性：缺则返回 offender，空 = 合规）。 */
+    private fun pickRowSelectedStateOffenders(source: String): List<String> =
+        if (stripComments(source).contains(pickRowSelectedSemantics)) emptyList()
+        else listOf("缺 $pickRowSelectedSemantics —— 选中态只有标记变色/描边，TalkBack 念不到已选/未选")
 
     /** 规则2 纯函数：TabSlot 必须同时具备 Tab 角色与选中态播报，两条各计一个 offender。 */
     private fun tabSlotOffenders(source: String): List<String> {
@@ -82,7 +91,7 @@ class AccessibilityStateSemanticsContractTest {
     /** 规则5 纯函数：Slider 描述必须内嵌当前值模板（无值描述与写死数值都不放行）。 */
     private fun sliderValueOffenders(source: String): List<String> =
         if (stripComments(source).contains(sliderValueSemantics)) emptyList()
-        else listOf("DailyTargetSection Slider 缺 $sliderValueSemantics —— 焦点落在滑杆上念不出当前目标词数")
+        else listOf("ReviewLimitSection Slider 缺 $sliderValueSemantics —— 焦点落在滑杆上念不出当前复习上限")
 
     /** 扫描范围守卫：目录与 .kt 文件必须真实存在，否则契约测试静默空扫。 */
     private fun scanUiSources(dir: File = uiDir): List<File> {
@@ -149,8 +158,11 @@ class AccessibilityStateSemanticsContractTest {
     }
 
     @Test
-    fun `wordbook card announces selected state`() {
-        assertSite("AppScreen.kt", listOf("fun WordBookTile("), ::wordBookSelectedStateOffenders)
+    fun `pick rows announce selected state`() {
+        // 批 1 Task 13-A 换锚留因：选词书从两列色块改成原型 `.pick.pick-radio` 通栏行之后，
+        // 选中态声明住在共享 `components/PickRow.kt` 里（手势、语义、testTag 同一个节点，I-A2 口径不变）。
+        // 站点因此从 `AppScreen.kt` 的 `WordBookTile` 挪到 `PickRow.kt`——判据本身一个字没松。
+        assertSite("PickRow.kt", listOf("fun PickRow("), ::pickRowSelectedStateOffenders)
     }
 
     @Test
@@ -182,38 +194,42 @@ class AccessibilityStateSemanticsContractTest {
     }
 
     @Test
-    fun `daily target slider description embeds current value`() {
-        // 批 2 Task 6：`DailyTargetCard` 撤卡壳后改名 `DailyTargetSection`，锚点随实现改，
-        // 判据本身不变——仍要求 Slider 的 contentDescription 内嵌当前词数。
-        assertSite("AppScreen.kt", listOf("fun DailyTargetSection(", "每日新词目标"), ::sliderValueOffenders)
+    fun `review limit slider description embeds current value`() {
+        // 批 1 Task 12：原型把「每日新增」画成四枚 chip，本屏唯一剩下的滑杆是「复习上限」
+        // （`DailyTargetSection` 连同它的 `每日新词目标` 锚一起退役）。锚点随实现改，
+        // 判据本身不变——仍要求 Slider 的 contentDescription 内嵌当前值。
+        assertSite("AppScreen.kt", listOf("fun ReviewLimitSection(", "每日复习上限"), ::sliderValueOffenders)
     }
 
     @Test
-    fun `wordbook selected state rule rejects near misses and accepts fixed shape`() {
+    fun `pick row selected state rule rejects near misses and accepts fixed shape`() {
         val rejected = listOf(
-            // 修复前真实形状（AppScreen 词书卡 Row）：semantics 块只有 contentDescription
+            // 换锚前的真实形状（色块那一版）：semantics 块只有 contentDescription
             """Row(modifier = Modifier.semantics { contentDescription = "选择词书" })""",
-            // 常量播报：没有 if (selected) 双值分支，TalkBack 永远念「已选」
+            // 常量播报：没有 if (checked) 双值分支，TalkBack 永远念「已选」
             """Modifier.semantics { contentDescription = "选择词书"; stateDescription = "已选" }""",
+            // 布尔量写回 `selected`（共享件的形参是 `checked`）：锁的就是这一种书写形状，改名必须显式判违规
+            """Modifier.semantics { stateDescription = if (selected) "已选" else "未选" }""",
             // 播报写在块注释里 = 对 TalkBack 不存在，剥注释后必须判违规
-            """Modifier.semantics { /* stateDescription = if (selected) "已选" else "未选" */ }""",
+            """Modifier.semantics { /* stateDescription = if (checked) "已选" else "未选" */ }""",
         )
         rejected.forEach { snippet ->
-            val found = wordBookSelectedStateOffenders(snippet)
-            assertTrue(found.isNotEmpty(), "状态语义契约漏判词书卡近miss形状：$snippet")
+            val found = pickRowSelectedStateOffenders(snippet)
+            assertTrue(found.isNotEmpty(), "状态语义契约漏判选择行近miss形状：$snippet")
             assertTrue(
-                found.single().contains(wordBookSelectedSemantics),
+                found.single().contains(pickRowSelectedSemantics),
                 "offender 应点名要求形状，实际：$found",
             )
         }
-        // brief Step 3 目标形状（多行 semantics 块，子串匹配允许跨行 contentDescription 与声明分行）
+        // 共享 `PickRow` 的目标形状（多行 semantics 块，子串匹配允许跨行 contentDescription 与声明分行）
         val fixed = """Modifier
-            .clickable(onClick = onSelect)
+            .combinedClickable(onClick = { onCheckedChange(!checked) })
             .semantics {
                 contentDescription = "选择词书"
-                stateDescription = if (selected) "已选" else "未选"
+                selected = checked
+                stateDescription = if (checked) "已选" else "未选"
             }"""
-        assertTrue(wordBookSelectedStateOffenders(fixed).isEmpty(), "状态语义契约误判词书卡合规形状：$fixed")
+        assertTrue(pickRowSelectedStateOffenders(fixed).isEmpty(), "状态语义契约误判选择行合规形状：$fixed")
     }
 
     @Test
@@ -299,12 +315,14 @@ class AccessibilityStateSemanticsContractTest {
     @Test
     fun `slider rule rejects value-free and hard-coded descriptions and accepts embedded value`() {
         val rejected = listOf(
-            // 修复前真实形状（AppScreen Slider）：焦点念得出控件但不知道当前目标
-            "Modifier.semantics { contentDescription = \"每日新词目标\" }",
+            // 修复前真实形状（本屏滑杆）：焦点念得出控件但不知道当前上限
+            "Modifier.semantics { contentDescription = \"每日复习上限\" }",
             // 写死的假数值：拖动后播报不跟随
-            "Modifier.semantics { contentDescription = \"每日新词目标，当前 10 词\" }",
-            // 插值变量改名——锁 displayedTarget 书写形状，必须显式判违规（见类 KDoc 刚性口径）
-            "Modifier.semantics { contentDescription = \"每日新词目标，当前 \$dragValue 词\" }",
+            "Modifier.semantics { contentDescription = \"每日复习上限，当前 30 个\" }",
+            // 插值变量改名——锁 displayed 书写形状，必须显式判违规（见类 KDoc 刚性口径）
+            "Modifier.semantics { contentDescription = \"每日复习上限，当前 \$dragValue 个\" }",
+            // 量词写回旧滑杆的「词」：上限的单位是「个 / 天」，播报口径与界面文案必须同字
+            "Modifier.semantics { contentDescription = \"每日复习上限，当前 \${displayed} 词\" }",
         )
         rejected.forEach { snippet ->
             val found = sliderValueOffenders(snippet)
@@ -315,7 +333,7 @@ class AccessibilityStateSemanticsContractTest {
             )
         }
         // brief Step 3 目标形状：描述内嵌当前值模板
-        val fixed = "Slider(modifier = Modifier.semantics { contentDescription = \"每日新词目标，当前 \${displayedTarget} 词\" })"
+        val fixed = "Slider(modifier = Modifier.semantics { contentDescription = \"每日复习上限，当前 \${displayed} 个\" })"
         assertTrue(sliderValueOffenders(fixed).isEmpty(), "状态语义契约误判 Slider 合规形状")
     }
 }

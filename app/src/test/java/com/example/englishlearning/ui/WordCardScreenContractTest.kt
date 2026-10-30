@@ -151,6 +151,7 @@ class WordCardScreenContractTest {
 
     private val focusRequesterCreation = Regex("""remember \{ FocusRequester\(\) \}""")
     private val revealFocusRequest = Regex("""runCatching \{ meaningFocusRequester\.requestFocus\(\) \}""")
+    private val receiptFocusRequest = Regex("""runCatching \{ receiptFocusRequester\.requestFocus\(\) \}""")
     private val meaningFocusModifier = Regex("""\.focusRequester\(meaningFocusRequester\)""")
     private val meaningFocusableModifier = Regex("""\.focusable\(\)""")
 
@@ -467,15 +468,20 @@ class WordCardScreenContractTest {
         }
     }
 
-    /** 揭晓焦点（F5-03 已建的语义顺序）在本任务里不许动：`WordCardRevealFocusTest` 是它的设备侧护栏。 */
+    /**
+     * 焦点迁移只允许发生在「新内容进入组合」的两处：揭晓释义（F5-03 已建）与评分回执（批 1 Task 10）。
+     * `WordCardRevealFocusTest` 是揭晓那条的设备侧护栏；回执这条由 `WordCardScreenTest` 的结构用例兜住。
+     * 两枚都必须被 `runCatching` 包住——节点可能已随提交/切卡离开组合，丢焦点不是学习流程的失败。
+     */
     @Test
     fun the_reveal_focus_handover_stays_intact() {
         val source = uiScreenSource(WORD_CARD_SCREEN)
-        assertEquals(1, countMatches(source, launchedEffectDefinition), "揭晓焦点的 LaunchedEffect 只此一枚")
-        assertEquals(1, countMatches(source, focusRequesterCreation), "释义焦点把手只此一处")
+        assertEquals(2, countMatches(source, launchedEffectDefinition), "只允许两枚焦点迁移（揭晓 / 回执）；停播不得写成按 key 重跑的形态")
+        assertEquals(2, countMatches(source, focusRequesterCreation), "每枚焦点迁移各配一枚把手")
         assertEquals(1, countMatches(source, revealFocusRequest), "揭晓后 requestFocus 必须仍被 runCatching 包住（释义节点可能已随提交离开组合）")
+        assertEquals(1, countMatches(source, receiptFocusRequest), "回执出现后的 requestFocus 同样要被 runCatching 包住")
         assertEquals(1, countMatches(source, meaningFocusModifier), "释义节点必须仍挂着那枚焦点把手")
-        assertEquals(1, countMatches(source, meaningFocusableModifier), "释义节点必须仍 focusable()：只有 FocusableNode 会写 SemanticsProperties.Focused")
+        assertEquals(2, countMatches(source, meaningFocusableModifier), "释义与回执各一枚 focusable()：只有 FocusableNode 会写 SemanticsProperties.Focused")
     }
 
     // ---------- 正则自证（正片段 + 负片段） ----------
@@ -630,5 +636,70 @@ class WordCardScreenContractTest {
         assertEquals(0, countMatches("LaunchedEffect(revealed) { meaningFocusRequester.requestFocus() }", revealFocusRequest), "负控：丢掉 runCatching 的写法不得算成同一条护栏")
         assertEquals(1, countMatches(legacyFocus, meaningFocusableModifier), "正控：focusable() 命中")
         assertEquals(0, countMatches("Modifier.focusRequester(other)", meaningFocusModifier), "负控：换焦点把手不得命中")
+    }
+
+    // ---------- 批 1 Task 10：三档副标 + 评分回执 ----------
+
+    /**
+     * 原型 `feedbackBlock()`（`assets/app.js:286`）给三档各配一枚 10px 副标：忘记/想不起来、模糊/差点没想起、
+     * 认识/脱口而出。三枚副标必须落在**吸底条**里（`WordCardFeedbackBar` 与 `FeedbackButton` 的定义之间），
+     * 否则「副标挂在别的清单上」这种误放也会让字面量计数照绿。
+     *
+     * 档名保留应用的「不认识」而不是原型的「忘记」：F1-03 与学习记录/生词本用的是同一术语，
+     * 改一名牵动四个屏与既有契约，属产品文案裁决，登记在批 1 报告里。
+     */
+    @Test
+    fun `each feedback tier carries its prototype sub caption inside the pinned bar`() {
+        val source = uiScreenSource(WORD_CARD_SCREEN)
+        val barStart = source.indexOf("private fun WordCardFeedbackBar(")
+        val barEnd = source.indexOf("private fun FeedbackButton(")
+        assertTrue(barStart >= 0 && barEnd > barStart, "取不到吸底条的取样区间（bar=$barStart, button=$barEnd）")
+        listOf("想不起来", "差点没想起", "脱口而出").forEach { caption ->
+            val literal = "\"$caption\""
+            assertEquals(1, countMatches(source, Regex(Regex.escape(literal))), "副标「$caption」必须恰出现一次")
+            val at = source.indexOf(literal)
+            assertTrue(
+                at in barStart until barEnd,
+                "副标「$caption」必须由吸底条给出（当前偏移 $at 不在 $barStart..$barEnd 内）",
+            )
+        }
+    }
+
+    /**
+     * 原型 `sSession()`：评分后吸底条换成「下一个词 / 完成本轮」，回执 `recap()` 画进卡片。
+     * 屏侧要同时具备回执块、「下一个」按钮与两个端点文案；具体「回执态不再出现三档按钮」由
+     * `WordCardScreenTest.theReceiptReplacesTheFeedbackBar` 在设备侧量（源码文本判不出互斥）。
+     *
+     * 两条**不落地**的原型控件在这里点名（原型有、产品不允许）：
+     *  - 「改评分」：spec F1-03 / 决策 2026-09-19 明令 V1 不撤销已提交反馈；
+     *  - 「看完整词条」：详情页由设置档位驱动自动弹出，屏侧再挂一枚就是第二个入口。
+     */
+    @Test
+    fun `the receipt keeps the prototype structure without the forbidden undo entry`() {
+        val source = uiScreenSource(WORD_CARD_SCREEN)
+        // 只数锚点名本身：回执块走 `Modifier.testTag(...)`，「下一个」走 `PillButton(testTag = ...)`，
+        // 两种挂 tag 的合法写法都算数，但各只能有一处。
+        assertEquals(1, countMatches(source, Regex("word_card_recap")), "缺少回执块")
+        assertEquals(1, countMatches(source, Regex("word_card_next")), "缺少「下一个」按钮")
+        assertTrue("下一个词" in source, "回执态的主操作是「下一个词」")
+        assertTrue("完成本轮" in source, "最后一张的回执主操作是「完成本轮」")
+        assertTrue("记为「" in source, "回执标题按原型包住档名")
+        assertFalse("改评分" in source, "V1 不提供撤销已提交反馈（spec F1-03），原型那枚「改评分」不得落地")
+        assertFalse("看完整词条" in source, "详情入口由设置档位驱动，屏侧不得再挂第二入口")
+    }
+
+    /**
+     * 原型揭晓态脚下那句：「看过释义也可以照实选，这一档决定它下次什么时候再出现。」
+     * 它是唯一一句在两套流程里都成立的评分提示（原型另一句「认识直接下一个；模糊/忘记展开释义」
+     * 描述的是原型的揭晓后重评流程，本应用的评分一律推进，照抄就是假话）。
+     */
+    @Test
+    fun `the revealed card keeps the prototype honest-rating caption`() {
+        val source = uiScreenSource(WORD_CARD_SCREEN)
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("\"看过释义也可以照实选，这一档决定它下次什么时候再出现。\""))),
+            "揭晓态要点明「看过释义也可以照实选」",
+        )
     }
 }

@@ -82,7 +82,10 @@ fun ProfileScreen(
     ) {
         AppScreenHeader(
             title = profileName,
-            subtitle = "连续学习 $streakDays 天 · API Key 只保存在本机加密区。",
+            // 原型 `.head-sub`（`app.js:1257`）：「连续打卡 N 天 · 累计学过 N 个词」——两枚都是本页收到的真值。
+            // 旧副标题那句话（「API Key 只保存在本机加密区」）是隐私口径，不属于页头身份行：
+            // 它已在设置页与备份说明里出现，挂在名字下面既不回答问题也不构成信息。
+            subtitle = "连续打卡 $streakDays 天 · 累计学过 $learnedWordCount 个词",
             hero = true,
             badge = { EntryIconBadge(icon = AppIcon.Person, domain = AppDomain.Settings) },
         )

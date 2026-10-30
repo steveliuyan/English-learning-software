@@ -82,7 +82,7 @@ import com.example.englishlearning.core.storage.entity.VocabularySearchGramEntit
         MigrationPairingLedgerEntity::class,
         FavoriteWordEntity::class,
     ],
-    version = 32,
+    version = 33,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -636,6 +636,25 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v32→v33：批 1 Task 12 学习设置屏（原型 `#/plan-edit` 的「复习上限」滑杆落成可存偏好）。
+         *
+         * 照 v27 `autoSpeakOnCardReady` / v32 `speechRate` 的加列先例：列名**隐式驼峰**
+         * （Room 默认列名=字段名，蛇形会让 `runMigrationsAndValidate` 因缺列失败），
+         * `INTEGER NOT NULL DEFAULT 30` 让历史行回填原型初值而不是 0——0 会被读成「今天不复习」，
+         * 这一条由 `AppDatabaseMigrationTest.migrateV32ToV33_addsDailyReviewLimitWithBackfillWithoutLosingRows`
+         * 逐值核验。禁 destructive migration（本仓从未配置，AGENTS.md「学习记录是本地权威」）。
+         *
+         * 存了这个数不等于 FSRS 会硬截断：V1 的排期规则不变（`docs/specs/01-vocabulary-learning-and-review.md`
+         * 仍写「V1 不设置复习硬上限」），取舍与理由记在
+         * `docs/decisions/2026-10-29-plan-review-limit-preference.md`。
+         */
+        val MIGRATION_32_33: Migration = object : Migration(32, 33) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `learning_settings` ADD COLUMN `dailyReviewLimit` INTEGER NOT NULL DEFAULT 30")
+            }
+        }
+
+        /**
          * 统一 Schema 装配工厂：进程级单例、恢复提交的临时实例、RoomRestoreDataWriter
          * 换机新库共用同一迁移与回调，保证三处逐字节同构（D-12 决策，
          * docs/decisions/2026-10-14-restore-commit-temp-instance-and-restart.md）。
@@ -647,7 +666,7 @@ abstract class AppDatabase : RoomDatabase() {
                 .build()
 
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33)
 
         /**
          * 词条字串索引（FTS4 + 3-gram）的表名与建表 DDL。

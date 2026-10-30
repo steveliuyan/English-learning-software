@@ -78,6 +78,25 @@ sealed interface TodayPlanUiState {
          * 而不是把「0 / 0」当成真实进度画出来——0% 和「还不知道」是两件事。
          */
         val bookProgress: WordBookProgress? = null,
+        /**
+         * 今日**新学**那一段的词面（批 1 Task 16，「今日词单」屏）。
+         *
+         * 顺序就是快照里 [com.example.englishlearning.learning.TodayPlan.newCardIds] 的原序——快照是不可变
+         * 权威，屏侧不许再按词头或内容源自己的次序重排。内容源读不到的 id 直接丢行（端口契约），
+         * 所以这一列可能比 `newTarget` 短；那是「那册里没有这张卡」，不是读取失败，界面照常渲染。
+         *
+         * 默认空列表 = 旧构造点与 [EmptyWordCardSource] 的兼容形态：词单屏此时两节皆空。
+         */
+        val newQueue: List<com.example.englishlearning.learning.domain.WordCard> = emptyList(),
+        /** 今日**复习**那一段的词面，原序取自快照 `dueCardIds`（DAO 已按 `nextReviewAt` 升序排好）。 */
+        val dueQueue: List<com.example.englishlearning.learning.domain.WordCard> = emptyList(),
+        /**
+         * 今日计划里**已完成**的 cardId 集合（同一次 `completedCardIds(planId)` 读取，不另开一次查询）。
+         *
+         * 「今日词单」的行尾状态靠它逐 id 判定（已学 / 待学），不靠 `newDone` 计数——计数只说「做了几件」，
+         * 说不出**哪一件**做完了，而词单是逐行摆的。
+         */
+        val doneCardIds: Set<String> = emptySet(),
     ) : TodayPlanUiState
     data object MissingSetup : TodayPlanUiState
     data object Unavailable : TodayPlanUiState
@@ -100,7 +119,7 @@ class TodayPlanViewModel @Inject constructor(
     private val bundledIds: com.example.englishlearning.learning.BundledWordBookIdSource? = null,
     private val importedIds: com.example.englishlearning.learning.ImportedWordBookIdSource? = null,
     /**
-     * 词书卡片来源，用来算「当前词书已学多少 / 共多少」。
+     * 词书卡片来源：算「当前词书已学多少 / 共多少」，也供「今日词单」取词面与释义（批 1 Task 16）。
      *
      * 默认给空实现，与 [NoLearningEventRepository] 同一类兼容语义：旧的两/三参构造点保持既有行为。
      * 生产路径由 Hilt 注入真实的 [com.example.englishlearning.wordbook.CompositeWordCardSource]，
@@ -151,11 +170,17 @@ class TodayPlanViewModel @Inject constructor(
                             val progress = UnlockPolicy.progress(plan, completed.value)
                             val unlocked = UnlockPolicy.isUnlocked(plan, completed.value, mode)
                             val reason = if (unlocked) "今日计划已完成" else UnlockPolicy.lockedReason(mode)
+                            // 词面内容按**快照原序**取（`WordCardSource.cards` 的端口契约就是「按请求序返回、
+                            // 没有内容的 id 丢掉」），屏侧不再排序。这一步放在 completed 的成功分支里：
+                            // 读取失败时整屏走 Unavailable，不必为一份不渲染的界面多打两次内容查询。
                             _uiState.value = TodayPlanUiState.Ready(
                                 name, plan.localDate.toString(), plan.newTarget, plan.dueTarget,
                                 plan.newTarget + plan.dueTarget, progress.newDone, progress.dueDone,
                                 unlocked, reason, plan.planId, plan.activeWordBookId,
                                 bookProgress = bookProgress,
+                                newQueue = cards.cards(plan.newCardIds),
+                                dueQueue = cards.cards(plan.dueCardIds),
+                                doneCardIds = completed.value.toSet(),
                             )
                         }
                         is RepositoryResult.Failure -> _uiState.value = TodayPlanUiState.Unavailable

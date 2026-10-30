@@ -143,6 +143,12 @@
 | StatNum | 26 / 500 / -0.02em / 1.1 / tnum | Newsreader | 统计数字 |
 | Prose | 17.5 / 400 / 1.72 | Newsreader | 英文正文 |
 | ProseZh | 13 / 400 / 1.75 | sans | 中文译文 |
+| ButtonLabel | 15 / 600 / -0.005em / 1.6 | sans | 按钮文案（原型 `.btn`） |
+
+> **2026-10-29 原型对齐（批 1 补）**：`ButtonLabel` 不是新字号（字号仍取 `Body` 的 15），补的是 `.btn` 的
+> `font-weight:600` 与 `letter-spacing:-.005em`。共享按钮 `PillButton` 的形状同时从药片改为
+> **14dp 圆角**（原型 `--r-md`）：`--r-pill` 在原型只给导航、分段、芯片、进度条、开关这类轨道件，
+> `assets/app.css:565` 的 `.btn` 明确是 14。触控高度仍取 48dp 无障碍下限（原型 46，登记偏离）。
 
 M3 十五角色由最近语义档派生（`displayLarge/Medium/Small`→Display，`headline*`→Headline，
 `titleLarge`→Headline、`titleMedium`→Title、`titleSmall`→Body，`bodyLarge/Medium`→Body，

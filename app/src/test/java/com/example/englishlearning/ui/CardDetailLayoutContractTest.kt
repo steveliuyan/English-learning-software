@@ -7,18 +7,15 @@ import kotlin.test.assertTrue
 /**
  * 批 2 Task 2：词义详情屏的新骨架契约（spec §5 逐屏表「词义详情」行）。
  *
- * 与 [CardDetailScreenContractTest] 的分工：那一份钉**发音件归一 + 页头 / 词行接共享组件**
- * （三枚药片、三枚词行、停止文案各恰一处），本份钉**版式**：配图缩略图、动作药片两行网格、
- * 「我的笔记」标题只留一处、空 live region 不吃间距、令牌换装。两份都必须绿。
+ * 与 [CardDetailScreenContractTest] 的分工：那一份钉**发音件归一 + 页头接共享组件 + 三节关联词形状**
+ * （三枚药片、停止文案各恰一处、小节取样面），本份钉**版式**：配图缩略图、动作回词头（原型词头
+ * 次键行 + 继续读一行）、「我的笔记」标题只留一处、空 live region 不吃间距、令牌换装。两份都必须绿。
  *
  * 「行号不锚、注释不计」由 [uiScreenSource] 与 [countMatches] 保证。
  */
 class CardDetailLayoutContractTest {
 
     private val source: String by lazy { uiScreenSource("CardDetailScreen.kt") }
-
-    /** 共享动作药片调用点：前缀组防私有同族名冒充。 */
-    private val pillCall = Regex("""(^|[^A-Za-z0-9_.])PillButton\(""")
 
     private val anyBlockCall = Regex(
         """\b(?:Row|Column|SoftCard|Card|SpeakerButton|PillButton|WordActionPillGrid|SenseRow|Image)\(""",
@@ -53,40 +50,36 @@ class CardDetailLayoutContractTest {
         }
     }
 
-    // ---------- 动作药片：单行 5 枚 → 两行网格 3+2 ----------
+    // ---------- 动作药片：3+2 网格退役，动作回到原型词头 ----------
 
     /**
-     * spec §5：「5 枚动作药片改两行网格（3+2）」。
-     *
-     * 旧形状是一枚 `Row` 里塞五枚药片：320dp 窄屏 + 1.3 字号下第五枚被压成竖排单字或被裁掉。
-     * 取样面是网格本体（私有 [WordActionPillGrid]），判「恰两行、首行 3、次行 2」，
-     * 并反向钉住「药片不许再散落在网格之外」——全屏命中只允许比网格内多出 1 处定义。
+     * 批 1 Task 11 对齐原型 `sWordDetail`：原型没有五枚动作药片网格——收藏是页头尾槽的一枚图标，
+     * 生词本与两道口音并排成次键行，重新学习 / 下一个单词留在其下的一行里。
+     * 旧 3+2 网格（窄屏 + 大字号下的防压扁设计）与其私有件一并退役。
      */
     @Test
-    fun `the action pills form a two row grid of three plus two`() {
-        val grid = bodyOf("private fun WordActionPillGrid(")
-        assertTrue(grid.isNotEmpty(), "取不到 WordActionPillGrid 本体，判据会空转")
+    fun `the word actions follow the prototype head instead of a pill grid`() {
         assertEquals(
-            2,
-            countMatches(grid, Regex(Regex.escape("Row("))),
-            "动作药片必须是两行（3 + 2）：单行 5 枚在窄屏 + 大字号下会压掉最后一枚",
+            0,
+            countMatches(source, Regex(Regex.escape("WordActionPillGrid("))),
+            "3+2 动作网格在原型里不存在：收藏去页头尾槽、生词本进次键行、其余收在词头",
         )
-
-        val secondRowAt = grid.indexOf("Row(", grid.indexOf("Row(") + 1)
-        assertTrue(secondRowAt > 0, "取不到第二行起点，判据会空转")
-        assertEquals(3, countMatches(grid.substring(0, secondRowAt), pillCall), "首行三枚（收藏 / 生词本 / 重新学习）")
-        assertEquals(2, countMatches(grid.substring(secondRowAt), pillCall), "次行两枚（下一个单词 / 问 AI）")
-        // 网格之外只允许两处 `PillButton(`：`private fun PillButton(` 定义本身，以及笔记小节
-        // 那枚「添加 / 管理」——它挂在「我的笔记」标题下，不属于对词的五枚动作，留在网格外是有意的。
+        val head = bodyOf("private fun WordHead(")
+        assertTrue(head.isNotEmpty(), "取不到 WordHead 本体，判据会空转")
         assertEquals(
-            countMatches(grid, pillCall) + 2,
-            countMatches(source, pillCall),
-            "五枚词动作药片必须全落在网格内：网格之外只允许定义本身与笔记小节的「添加 / 管理」入口",
+            1,
+            countMatches(head, Regex(Regex.escape("""testTag("card_detail_vocabulary_toggle")"""))),
+            "生词本开关恰一枚，画在词头次键行里（原型 `btn-secondary btn-sm` 生词本）",
         )
         assertEquals(
             1,
-            countMatches(source, Regex(Regex.escape("""testTag("card_detail_notes_manage")"""))),
-            "网格外那枚药片必须就是笔记小节的「添加 / 管理」入口——多出任何别的散落药片都算违规",
+            countMatches(head, Regex(Regex.escape("""testTag("card_detail_next")"""))),
+            "「下一个单词」恰一枚，留在词头的继续读那一行",
+        )
+        assertEquals(
+            0,
+            countMatches(head, Regex(Regex.escape("""testTag("card_detail_favorite_toggle")"""))),
+            "收藏不再是词头里的动作药片：原型把它收进页头尾槽（见 CardDetailPrototypeContractTest）",
         )
     }
 
@@ -118,23 +111,27 @@ class CardDetailLayoutContractTest {
      * （`CardDetailPronunciationControlsTest` 同期的 N-4 备注已记这笔账）。
      *
      * 修法**不是**按文案门控容器——connected 侧 `liveRegionContainerPersistsWhileNoPronunciationMessageIsShown`
-     * 要求 Idle 时容器仍在树里、仍带 Polite、零子节点。真正的解法是把它排到单词卡的**最后一个**
-     * 内容块：`spacedBy` 只在相邻子节点之间加缝，末尾的空容器因此不再制造幽灵间距。
+     * 要求 Idle 时容器仍在树里、仍带 Polite、零子节点。真正的解法是把它排到词头（批 1 Task 11 起的
+     * `WordHead`）的**最后一个**内容块：`spacedBy` 只在相邻子节点之间加缝，末尾的空容器因此不再制造幽灵间距。
      */
     @Test
     fun `the persistent live region sits last so an empty container costs no gap`() {
-        val hero = bodyOf("private fun WordHeroCard(")
-        assertTrue(hero.isNotEmpty(), "取不到 WordHeroCard 本体，判据会空转")
+        val hero = bodyOf("private fun WordHead(")
+        assertTrue(hero.isNotEmpty(), "取不到 WordHead 本体，判据会空转")
         val statusTag = """testTag("card_detail_status_live_region")"""
         val statusAt = hero.indexOf(statusTag)
-        assertTrue(statusAt >= 0, "单词卡内必须有常驻 live region 容器（N-4：容器不许随文案进出组合）")
+        assertTrue(statusAt >= 0, "词头内必须有常驻 live region 容器（N-4：容器不许随文案进出组合）")
 
-        val lastContentAt = listOf("WordActionPillGrid(", """testTag("card_detail_senses")""", "SenseRow(")
-            .map { hero.indexOf(it) }
+        val lastContentAt = listOf(
+            """testTag("card_detail_pronunciation_stop")""",
+            "cardDetailSpeakerState(",
+            """testTag("card_detail_next")""",
+            """testTag("card_detail_vocabulary_toggle")""",
+        ).map { hero.indexOf(it) }
             .max()
         assertTrue(
             statusAt > lastContentAt,
-            "live region 容器必须是单词卡列里的最后一块：夹在中间时空容器会吃掉 spacedBy 的一份间距",
+            "live region 容器必须是词头列里的最后一块：夹在中间时空容器会吃掉 spacedBy 的一份间距",
         )
 
         val tail = hero.substring(statusAt)
@@ -169,13 +166,19 @@ class CardDetailLayoutContractTest {
         assertTrue("appColors()" in source, "屏侧必须消费 appColors()")
     }
 
-    /** 弱卡收编：小节卡改共享 `SoftCard`（白面、无描边、圆角 20），不再自造 M3 卡 + 1dp 描边。 */
+    /**
+     * 弱卡收编：小节卡改共享 `SoftCard`（白面、无描边、圆角 20），不再自造 M3 卡 + 1dp 描边。
+     *
+     * 批 1 Task 11 起小节从一张大卡拆成「每节一张卡」（原型 `.sec` + `.card`），但卡型仍只有
+     * `DetailSection` 内那一处 `SoftCard(`；全屏唯一的 1dp 描边是近义词的静态芯片（原型 `.chip`
+     * 自带 `border-color: var(--line)`），不许有第二处——更不许是卡片汤。
+     */
     @Test
     fun `the detail sections are built on the shared soft card`() {
         assertEquals(
             1,
             countMatches(source, Regex(Regex.escape("SoftCard("))),
-            "小节卡必须是一处共享软档卡（spec §4.1 弱卡）",
+            "小节卡必须是一处共享软档卡（spec §4.1 弱卡）：各节共用 DetailSection 的那一枚",
         )
         assertEquals(
             0,
@@ -183,9 +186,16 @@ class CardDetailLayoutContractTest {
             "不得再自造 M3 Card：描边卡片汤就是它铺出来的",
         )
         assertEquals(
-            0,
+            1,
             countMatches(source, Regex(Regex.escape("border(1.dp"))),
-            "弱卡不描边（描边只留给输入框与危险动作）",
+            "全屏只允许近义词静态芯片那一处 1dp 描边（原型的 `.chip` 边）；弱卡不描边",
+        )
+        val chips = bodyOf("private fun SynonymChips(")
+        assertTrue(chips.isNotEmpty(), "取不到 SynonymChips 本体，判据会空转")
+        assertEquals(
+            1,
+            countMatches(chips, Regex(Regex.escape("border(1.dp"))),
+            "那唯一一处描边必须长在近义词芯片上（不是卡片、不是动作药片）",
         )
         assertEquals(2, countMatches("Card(\nCard(", Regex("""\bCard\(""")), "反空转：`\\bCard(` 必须能数出 2 份")
     }

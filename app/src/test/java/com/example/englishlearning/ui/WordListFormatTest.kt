@@ -182,4 +182,85 @@ class WordListFormatTest {
             "WordListFormat.kt 必须真实存在于 ui/ 根（缺失时上面的扫描会静默放行）",
         )
     }
+
+    /**
+     * 词性 + 释义那一档（原型 `sLearnQueue` 的 `wordRow` 副文案 `w.pos + ' ' + w.meaning`，`app.js:366`）。
+     *
+     * 批 1 Task 16 新增：今日词单要把它画成词行的副文案。收进本文件而不是屏侧自拼，理由与 m-5 同源——
+     * 「词汇类列表的格式化 helper 只许一处」，屏侧再拼一份 `pos + " " + meaning` 就会在下一屏长出第三档
+     * （空词性留前导空格、空释义留尾随空格这类形状只有在这一处才收敛得掉）。
+     */
+    @Test
+    fun gloss_pairs_part_of_speech_with_the_meaning_and_drops_blanks() {
+        val both = WordCard(
+            cardId = "c1", wordBookId = "cet4", lemma = "surf", ipa = "",
+            partOfSpeech = "v.", meaningZh = "冲浪",
+        )
+        assertEquals("v. 冲浪", wordListGloss(both), "词性与释义都在：`词性 释义`，中间一个空格（原型那一档）")
+
+        val sensesOnly = WordCard(
+            cardId = "c2", wordBookId = "cet4", lemma = "wave", ipa = "",
+            partOfSpeech = "", meaningZh = "",
+            senses = listOf(WordSense(partOfSpeech = "n.", meaningZh = "波浪")),
+        )
+        assertEquals("n. 波浪", wordListGloss(sensesOnly), "主档为空时退到第一枚义项，词性跟着那枚义项走（不混用两档）")
+
+        val meaningOnly = WordCard(
+            cardId = "c3", wordBookId = "cet4", lemma = "surfing", ipa = "",
+            partOfSpeech = "", meaningZh = "冲浪运动",
+        )
+        assertEquals("冲浪运动", wordListGloss(meaningOnly), "词性缺失时不得留前导空格")
+
+        val empty = WordCard(
+            cardId = "c4", wordBookId = "cet4", lemma = "unknown", ipa = "",
+            partOfSpeech = "", meaningZh = "",
+        )
+        assertNull(wordListGloss(empty), "两样都没有就给 null：调用方不渲染副文案槽，而不是画一行空白")
+    }
+
+    /**
+     * 重复门：副文案档只许住在 `WordListFormat.kt`，屏侧不得再拼第二份。
+     *
+     * 判据钉的是**拼法只有一处**，不是调用次数：原型 `wordRow`（`assets/app.js:222-231`）在新学段与
+     * 复习段各调一次，本屏两节同形，所以 `wordListGloss(` 恰 2 处是**预期**；把两节收成一次调用要引入
+     * 「先合并两节再分段渲染」的中间结构，那是原型没有的形态。真正的重复信号是屏侧出现第二份拼法
+     * ——即本屏自己读 `partOfSpeech`（`wordListGloss` 的实现细节），所以那条计数恒 0。
+     */
+    @Test
+    fun gloss_helper_lives_only_in_the_shared_format_file() {
+        val formatSource = File("${UI_MAIN_SOURCE_PATH}/WordListFormat.kt").readText()
+        assertEquals(
+            1,
+            countMatches(formatSource, Regex("""internal fun wordListGloss\(""")),
+            "wordListGloss 必须在 WordListFormat.kt 恰定义一处",
+        )
+        uiScreenSource("TodayWordListScreen.kt").let { queue ->
+            assertEquals(
+                2,
+                countMatches(queue, Regex("""wordListGloss\(""")),
+                "两节各一枚行渲染调用点（原型 wordRow 在新学/复习两段各调一次）：第三处即另起一节或" +
+                    "在别处再拼一遍副文案",
+            )
+            assertEquals(
+                0,
+                countMatches(queue, Regex("""partOfSpeech""")),
+                "屏侧不许自己读词性档：读了就是绕开 wordListGloss 的第二份拼法（空值退让口径会漂）",
+            )
+        }
+        // 批 1 Task 17：复习队列屏的到期词节是这份副文案的第二个消费者，同一个门。
+        uiScreenSource("ReviewQueueScreen.kt").let { review ->
+            assertEquals(
+                1,
+                countMatches(review, Regex("""wordListGloss\(""")),
+                "复习队列只有「到期词」一节摆词行（原型 `sReview` 的 `section('到期词', …)`，`app.js:484-490`）：" +
+                    "第二处即另起一节再拼一遍，零处即绕开共享档自己拼",
+            )
+            assertEquals(
+                0,
+                countMatches(review, Regex("""partOfSpeech""")),
+                "复习队列屏侧同样不许自己读词性档",
+            )
+        }
+        assertTrue("partOfSpeech" in formatSource, "词性档读的是卡片自己的 partOfSpeech，不在屏侧读")
+    }
 }

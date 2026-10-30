@@ -1092,4 +1092,46 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * v32 → v33：批 1 Task 12「复习上限」（原型 `#/plan-edit` 的 `.range`，10..80 step 5，初值 30）。
+     * 照 v27 `autoSpeakOnCardReady` / v32 `speechRate` 加列先例：列名隐式驼峰 `dailyReviewLimit`
+     * （Room 默认列名 = 字段名，蛇形会让 runMigrationsAndValidate 因缺列失败——任务书缺陷 #9 的裁决），
+     * `INTEGER NOT NULL DEFAULT 30` 让历史行回填原型初值。禁 destructive：这一屏读的是用户偏好，
+     * 清空等于把「评分之后怎么走」三枚开关一起抹掉。
+     *
+     * 决策口径见 `docs/decisions/2026-10-29-plan-review-limit-preference.md`：本列只**存**上限，
+     * v1 的排期侧不设硬上限（`docs/specs/01-…md` line 28），所以这条迁移不改任何学习事件与计划表。
+     */
+    @Test
+    fun migrateV32ToV33_addsDailyReviewLimitWithBackfillWithoutLosingRows() {
+        val helper = migrationHelper()
+        helper.createDatabase(TEST_DB, 32).apply {
+            execSQL(
+                "INSERT INTO learning_settings (profileId, openDetailOnKnown, openDetailOnFuzzy, openDetailOnForgotten, showVocabularySearchCount) " +
+                    "VALUES ('default', 1, 1, 0, 0)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 33, true, AppDatabase.MIGRATION_32_33).apply {
+            query("SELECT openDetailOnKnown, openDetailOnForgotten, showVocabularySearchCount, dailyReviewLimit FROM learning_settings WHERE profileId = 'default'").use { cursor ->
+                assertTrue("the v32 settings row must survive", cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
+                assertEquals(0, cursor.getInt(1))
+                assertEquals(0, cursor.getInt(2))
+                // 老用户回填的是原型初值 30，不是 0：0 会被滑杆读成「上限关到最小」，等于迁移偷改了偏好。
+                assertEquals(30, cursor.getInt(3))
+            }
+            // 列尾追加 dailyReviewLimit，与实体声明顺序一致（PRAGMA 是 schema 校验之外的第二道闸）。
+            query("PRAGMA table_info(learning_settings)").use { cursor ->
+                val names = buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
+                assertEquals(
+                    listOf("profileId", "openDetailOnKnown", "openDetailOnFuzzy", "openDetailOnForgotten", "showVocabularySearchCount", "dailyReviewLimit"),
+                    names,
+                )
+            }
+            close()
+        }
+    }
 }

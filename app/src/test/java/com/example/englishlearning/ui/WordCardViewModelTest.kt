@@ -59,11 +59,13 @@ class WordCardViewModelTest {
     }
 
     @Test
-    fun `a submitted feedback completes the card and advances to the next one`() = cardTest { harness ->
+    fun `a submitted feedback completes the card and advancing shows the next one`() = cardTest { harness ->
         harness.viewModel.load(PROFILE_ID)
         advanceUntilIdle()
 
         harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+        harness.viewModel.advance()
         advanceUntilIdle()
 
         val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
@@ -77,10 +79,128 @@ class WordCardViewModelTest {
     }
 
     @Test
+    fun `a recorded feedback holds the card with a receipt until the user advances`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Fuzzy)
+        advanceUntilIdle()
+
+        val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
+        assertEquals("ability", ready.card.lemma, "评分成功后必须停在原卡上，回执读完再走")
+        val receipt = assertNotNull(ready.receipt, "评分成功后必须给出回执")
+        assertEquals(CardFeedback.Fuzzy, receipt.feedback)
+        assertEquals(1, ready.completedCount, "停在原卡上不等于没记完成")
+        assertFalse(ready.submitting)
+        assertTrue(ready.meaningRevealed, "回执与释义必须同屏，否则看不出自己记成了什么")
+    }
+
+    @Test
+    fun `advancing after a receipt shows the next card and clears the receipt`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+
+        harness.viewModel.advance()
+        advanceUntilIdle()
+
+        val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
+        assertEquals("achieve", ready.card.lemma)
+        assertEquals(2, ready.position)
+        assertNull(ready.receipt, "进入下一张卡时回执必须消失")
+        assertFalse(ready.meaningRevealed, "下一张卡重新回到先自评的状态")
+    }
+
+    @Test
+    fun `the receipt carries the interval the scheduler actually recorded`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+
+        val receipt = assertNotNull(assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value).receipt)
+        assertEquals(
+            Instant.EPOCH.plus(java.time.Duration.ofDays(3)),
+            receipt.nextReviewAt,
+            "回执上的时间必须就是调度器写进去的那一个，不能是原型里的演示数字",
+        )
+        assertEquals("3 天后再问一次", receipt.whenLabel)
+    }
+
+    @Test
+    fun `the receipt wording is derived from the recorded instant`() {
+        assertEquals(
+            "约 10 分钟后再问一次",
+            receiptWhenLabel(Instant.EPOCH.plus(java.time.Duration.ofMinutes(10)), Instant.EPOCH),
+        )
+        assertEquals(
+            "明天再问一次",
+            receiptWhenLabel(Instant.EPOCH.plus(java.time.Duration.ofDays(1)), Instant.EPOCH),
+        )
+        assertEquals(
+            "3 天后再问一次",
+            receiptWhenLabel(Instant.EPOCH.plus(java.time.Duration.ofDays(3)), Instant.EPOCH),
+        )
+    }
+
+    @Test
+    fun `a second submission while the receipt is shown records nothing`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+
+        harness.viewModel.submit(CardFeedback.Unknown)
+        advanceUntilIdle()
+
+        assertEquals(1, harness.events.events.size, "回执期间再点三档不能写第二个事件")
+        assertEquals(
+            CardFeedback.Known,
+            assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value).receipt?.feedback,
+            "回执必须还是第一档，不能被第二次点击改写",
+        )
+    }
+
+    @Test
+    fun `advancing without a receipt is a no-op`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+
+        harness.viewModel.advance()
+        advanceUntilIdle()
+
+        val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)
+        assertEquals("ability", ready.card.lemma)
+        assertEquals(1, ready.position)
+        assertTrue(harness.events.events.isEmpty(), "没评分就没有可「下一个」的对象")
+    }
+
+    @Test
+    fun `the last card's receipt is marked as having nothing after it`() = cardTest { harness ->
+        harness.viewModel.load(PROFILE_ID)
+        advanceUntilIdle()
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+        val first = assertNotNull(assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value).receipt)
+        assertTrue(first.hasNext, "第一张后面还有一张，回执要收在「下一个词」上")
+
+        harness.viewModel.advance()
+        advanceUntilIdle()
+        harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+        val last = assertNotNull(assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value).receipt)
+        assertFalse(last.hasNext, "最后一张的回执要收在「完成本轮」上")
+    }
+
+    @Test
     fun `the three tiers are forwarded as their fixed ratings`() = cardTest { harness ->
         harness.viewModel.load(PROFILE_ID)
         advanceUntilIdle()
         harness.viewModel.submit(CardFeedback.Unknown)
+        advanceUntilIdle()
+        harness.viewModel.advance()
         advanceUntilIdle()
         harness.viewModel.submit(CardFeedback.Fuzzy)
         advanceUntilIdle()
@@ -244,6 +364,8 @@ class WordCardViewModelTest {
         advanceUntilIdle()
         harness.viewModel.submit(CardFeedback.Fuzzy)
         advanceUntilIdle()
+        harness.viewModel.advance()
+        advanceUntilIdle()
         assertEquals(2, assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value).position)
 
         harness.viewModel.load(PROFILE_ID)
@@ -260,7 +382,11 @@ class WordCardViewModelTest {
         advanceUntilIdle()
         harness.viewModel.submit(CardFeedback.Known)
         advanceUntilIdle()
+        harness.viewModel.advance()
+        advanceUntilIdle()
         harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+        harness.viewModel.advance()
         advanceUntilIdle()
 
         val done = assertIs<WordCardUiState.AllDone>(harness.viewModel.uiState.value)
@@ -323,6 +449,8 @@ class WordCardViewModelTest {
         advanceUntilIdle()
         harness.viewModel.revealMeaning()
         harness.viewModel.submit(CardFeedback.Known)
+        advanceUntilIdle()
+        harness.viewModel.advance()
         advanceUntilIdle()
 
         val ready = assertIs<WordCardUiState.Ready>(harness.viewModel.uiState.value)

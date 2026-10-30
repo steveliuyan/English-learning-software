@@ -80,7 +80,16 @@ class RestoreEntityDecoder @Inject constructor() {
             learningProfiles = records("learning-profiles").map { json.decodeFromString<LearningProfileRecord>(text(it)).let { d -> LearningProfileEntity(d.profileId, d.activeWordBookId, d.dailyNewTarget) } },
             learningSettings = records("learning-settings").map {
                 json.decodeFromString<LearningSettingsRecord>(text(it)).let { d ->
-                    LearningSettingsEntity(d.profileId, d.openDetailOnKnown, d.openDetailOnFuzzy, d.openDetailOnForgotten, d.showVocabularySearchCount)
+                    // 批 1 Task 12：`dailyReviewLimit` 必须逐字接上——旧包缺键由 record 的默认值 30 兜住，
+                    // 新包则要把盘上的上限带回来，不然恢复完滑杆回到 30、用户的 45 丢了。
+                    LearningSettingsEntity(
+                        profileId = d.profileId,
+                        openDetailOnKnown = d.openDetailOnKnown,
+                        openDetailOnFuzzy = d.openDetailOnFuzzy,
+                        openDetailOnForgotten = d.openDetailOnForgotten,
+                        showVocabularySearchCount = d.showVocabularySearchCount,
+                        dailyReviewLimit = d.dailyReviewLimit,
+                    )
                 }
             },
             todayPlans = records("today-plans").map {

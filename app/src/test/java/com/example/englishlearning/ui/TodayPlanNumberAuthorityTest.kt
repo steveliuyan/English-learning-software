@@ -14,7 +14,8 @@ import kotlin.test.fail
  * 裸 hex 与静态深色读点是否清零，都能在读实现文件时当场判定；把同一件事在真机再数一遍只会得到
  * 一套更脆的判据。真机侧只留 JVM 问不到的那一半（节点实际渲染字号/颜色、整宽与饱和底），
  * 见 `app/src/androidTest/.../TodayPlanScreenTest.kt` 的 `ready_presents_todays_numbers_with_one_display_authority`
- * 与 `ready_groups_entry_actions_and_keeps_one_primary_cta`。
+ * 与 `ready_keeps_a_closed_clickable_set_and_touch_sized_bare_rows`（旧名 `ready_groups_entry_actions_and_keeps_one_primary_cta`
+ * 随批 1 入口组离场一起下线）。
  *
  * 断言的形状刻意复用 `ContainerInkPairingContractTest` 的「按 Text 实参窗口取样」手法，但取样器本身
  * 在修复轮 1 里从「向前找最近一处 `Text(`」改成**枚举 + 归属**（[textWindows] + [textCallContaining]，
@@ -60,13 +61,23 @@ import kotlin.test.fail
  *  - 权威数字搬进强档卡，前景墨从 `text1/text2` 换成卡内分套墨（[NeutralInk] 随之改口径——
  *    这不是放宽：强档卡上的中性墨只有「容器内容色 / 浅套 `text1` / 深套 `onStrong`」这一族，
  *    2026-10-31 用户评审 ③ 起浅套卡底是 `tint2` 浅薄荷，`onStrong` 压浅底反而不可读）；
- *  - 入口组离场：本屏 `EntryRow` 恒 0、裸行恰 2，原「EntryRow ≥3」的下界换成「`BareRow` 恰 2」+「`EntryRow` 恒 0」；
+ *  - 入口组离场：本屏 `EntryRow` 恒 0、裸行恰 4，原「EntryRow ≥3」的下界换成「`BareRow` 恰 4」+「`EntryRow` 恒 0」
+ *    （批 1 时点是两条：今日文章 / 词库；Task 16 按原型 `app.js:342` 补进第三条「今日词单」，
+ *    Task 17 按 `app.js:343` 补进第四条「复习队列」）；
  *  - 阅读文章从受解锁态约束的 M3 `Button` 降为裸行，`Button(` 计数从 1 归 0（阅读的解锁说明改由
  *    行标题与强档卡里的 `unlockReason` 承载，`today_plan_reading_status` 这枚锚不动）；
  *  - 词书卡并入词库裸行，`today_plan_learned_percent` / `today_plan_book_words` /
  *    `today_plan_book_unlearned` 三枚锚随卡下线，注脚墨清单只留本屏仍存在的两枚。
- * 工作量分段条（含三档图例）随本页重排整段下线，其配色同源判据的**具名替代**是同提交的
- * `TodayPlanBareRowContractTest.the_two_bare_rows_carry_their_own_domain_ink_and_nothing_else`。
+ *  工作量分段条（含三档图例）随本页重排整段下线，其配色同源判据的**具名替代**是同提交的
+ * `TodayPlanBareRowContractTest.the_four_bare_rows_carry_their_own_domain_ink_and_nothing_else`。
+ *
+ * **批 1 Task 19（原型 `sLearnEmpty`）改的仍是期望值，判据一条没松**：Ready 分支体里 `PillButton(`
+ *  从 2 枚变 4 枚——多出来的两枚是「今天全学完了」那一态（`assets/app.js:501-518`）里那枚 260dp 网格
+ *  的一对出口，与未学完那一支的主 CTA + 「计划」次按钮互斥渲染，同屏仍然只有一对；标签名册里
+ *  `today_plan_plan_footnote` 换成 `today_plan_all_done_state` / `today_plan_adjust_goal` /
+ *  `today_plan_read_article` 三枚（注脚那行随该态整段离场，原型那一屏没有 `.caption`）。
+ *  「大字号读点恰一处」那道门不受影响：空态那一支不渲染 `PlanNum`，也不带任何大字号读点
+ *  （由同提交的 `TodayPlanEmptyStateContractTest` 按分支体钉住）。
  */
 class TodayPlanNumberAuthorityTest {
 
@@ -293,46 +304,45 @@ class TodayPlanNumberAuthorityTest {
      * （见 `docs/decisions/2026-10-25-ui-simplification-deletions.md`），锚换成紧随其后的主 CTA：
      * 判据强度不变（仍在钉「权威数字不许跑出进度卡这一节」），只是锚点改成屏上必然存在的下一个站点。
      */
+    /**
+     * AC-R-20（原型对齐批 1 改期望值）：今日完成数是**唯一**的大数字，且锁在 `today_plan_total_progress`。
+     *
+     * 为什么从 `AppType.Display` 改成 `AppType.PlanNum`：原型 `sLearnHome` 的 `.plan-count b`
+     * （`assets/app.css:443-449`）是 32px / 500 / serif，正是 `AppType.PlanNum` 的度量；
+     * 46sp 的 Display 在原型里属于词卡 lemma 那一族，不是今日计划。判据内核**一条没松**：
+     *  - 「恰一处」的大字号读点，且必须是今日完成数那一格；
+     *  - 其余大/中号档位（Display/Headline/Title/StatNum/StrongTitle/Lemma/ArticleTitle）全文件归零——
+     *    旧判据守的是「不许再摆第二枚大数字」，这里守的是同一件事，只是把「大」的参照换成了原型那一档；
+     *  - 顺序锚点与中性墨照旧。
+     */
     @Test
-    fun display_is_used_exactly_once_and_anchors_the_total_progress_slot() {
-        val displayRule = Regex("""AppType\.Display\b""")
+    fun the_total_number_is_the_only_big_serif_figure_and_anchors_the_total_progress_slot() {
         assertEquals(
             1,
-            countMatches(source, displayRule),
-            "AC-R-20：`AppType.Display` 在今日计划屏只许一处（今日完成数），其余数字一律降为 Footnote",
+            countMatches(source, Regex("""AppType\.PlanNum\b""")),
+            "AC-R-20：`AppType.PlanNum`（原型 .plan-count b 32px serif）在今日计划屏只许一处（今日完成数）",
         )
-        // F2 / 评审 C-2：只数 `AppType.Display` 的字面量，防得住「把注脚升上去」，防不住「再摆一枚新的」——
-        // 屏内新增一枚自带新 tag 的 `AppType.Headline` 数字时，Display 计数仍为 1、两个顺序锚点仍成立、
-        // connected 侧只采样那 8 个固定 tag，两道门都不红（评审 `/tmp/mut.py` 的 M2 变异）。
-        // 所以这里按**全文件**判大字号读数：`Display` + `Headline` 合计恰 1，即本屏不允许任何第二处
-        // 大字号读点。判据能成立的口径：页头标题在共享组件 `AppScreenHeader` 里，不在本文件，
-        // 故「本屏一处权威呈现」在剥注释源码上就是一个可数的数字。
+        // 第二枚大/中号读点就是复制同一份视觉重量：旧版用 Display+Headline 合计守这条，
+        // 现在大数字换成 PlanNum，于是把整族「比 Footnote 明显大」的档位一并归零。
         assertEquals(
-            1,
-            countMatches(source, Regex("""AppType\.(?:Display|Headline)\b""")),
-            "AC-R-20：本屏大字号读点（AppType.Display + AppType.Headline 合计）只许恰一处——今日完成数那一格；" +
-                "多出来的任何一枚（哪怕是自带新 tag 的第三格数字）都在复制同一份视觉重量，" +
-                "批 3 若确需第二个大字号读点，先改规格再改本判据",
-        )
-        // `AppType.Title`（17sp）是「比注脚大、比 Display 小」的那一档，评审 C-1 指出 connected 的高度代理
-        // 判据对它零余量（34sp/17sp 行高比恰为 2），所以 Title 的回退必须由这条源码侧判据兜住：本屏只许
-        // 词书名那一处文字用 Title。
-        assertEquals(
-            1,
-            countMatches(source, Regex("""AppType\.Title\b""")),
-            "AC-R-20：`AppType.Title` 在本屏只许用于词书名那一处文字（state.wordBookName）；" +
-                "今日数字一律不许升回 Title（connected 的高度代理判据对这一档没有余量）",
+            0,
+            countMatches(
+                source,
+                Regex("""AppType\.(?:Display|Headline|Title|StatNum|StrongTitle|Lemma|ArticleTitle)\b"""),
+            ),
+            "AC-R-20：本屏除了 PlanNum 那一处，不许再出现任何大/中号排印读点——" +
+                "多出来的任何一枚（哪怕是自带新 tag 的第三格数字）都在复制同一份视觉重量",
         )
         val window = textCallContaining(quoted("today_plan_total_progress"))
         assertTrue(
-            "AppType.Display" in window,
-            "唯一那处 Display 必须就是 today_plan_total_progress 那一格，实际窗口：$window",
+            "AppType.PlanNum" in window,
+            "唯一那处 PlanNum 必须就是 today_plan_total_progress 那一格，实际窗口：$window",
         )
         val cardAt = source.indexOf("\"today_plan_progress_summary\"")
         val ctaAt = source.indexOf("\"today_plan_start_learning\"")
-        val displayAt = source.indexOf("AppType.Display")
-        assertTrue(cardAt in 0 until displayAt, "Display 必须在 today_plan_progress_summary 之后（进度卡里）")
-        assertTrue(ctaAt > displayAt, "Display 必须在主 CTA today_plan_start_learning 之前（不得跑到主操作下方另起一节）")
+        val numberAt = source.indexOf("AppType.PlanNum")
+        assertTrue(cardAt in 0 until numberAt, "权威数字必须在 today_plan_progress_summary 之后（进度卡里）")
+        assertTrue(ctaAt > numberAt, "权威数字必须在主 CTA today_plan_start_learning 之前（不得跑到主操作下方另起一节）")
         assertTrue(NeutralInk.containsMatchIn(window), "权威数字也得显式给中性墨（AppType 各档自带浅套静态墨）：$window")
     }
 
@@ -351,6 +361,10 @@ class TodayPlanNumberAuthorityTest {
         listOf(
             "today_plan_progress",
             "today_plan_empty",
+            // 原型对齐批 1 新增的小数字位：还剩 N 个词（.plan-left 13px）。图例两段由 `PlanLegendKey`
+            // 承载，标签是**形参**、字面量不在任何 `Text(` 实参里，窗口取样器按设计取不到——
+            // 它俩的档位与墨色改由下面那段组件体判据承担，不留空档。
+            "today_plan_remaining",
         ).forEach { tag ->
             val window = textCallContaining(quoted(tag))
             assertTrue(
@@ -363,14 +377,23 @@ class TodayPlanNumberAuthorityTest {
                 "$tag 不该再带强调色（数字的权威只有一处），实际窗口：$window",
             )
         }
+        // 图例键的组件体判据（替代上面那条窗口口径，强度一致）：数字档位 Footnote、文字取容器内容色、
+        // 文字本身不着强调色（方点色走 `.background(swatch)`，不是 `color = …`，不会误判）。
+        val legendBody = bodyOf(source, "private fun PlanLegendKey(", "图例键组件体取样")
+        assertTrue("AppType.Footnote" in legendBody, "图例键的数字必须走 Footnote 档：$legendBody")
+        assertTrue(NeutralInk.containsMatchIn(legendBody), "图例键的文字必须取容器内容色：$legendBody")
+        assertTrue(
+            AccentInk.find(legendBody) == null,
+            "图例键的文字不许着强调色（方点才是带色的那一枚）：$legendBody",
+        )
     }
 
     /**
-     * 布局收成的源码侧判据（批 1 §3.2：搜索 / 强档卡 / 两条裸行四段）：
+     * 布局收成的源码侧判据（批 1 §3.2：搜索 / 强档卡 / 四条裸行四段）：
      *  - M3 `Button(` 恒 0：阅读文章的解锁动作降为裸行（`PillButton`/`TextButton`/`ButtonDefaults`
      *    都不入计数：左侧词界断言只认独立成名的 `Button(`）；
-     *  - Ready 分支里 `PillButton(` 恰一处（主 CTA 唯一）、`BareRow(` 恰 2、`EntryRow(` 恒 0，
-     *    页头走 `AppScreenHeader`；
+     *  - Ready 分支里 `PillButton(` 恰两处（主 CTA 唯一 + 原型 `.plan-head` 下方那枚「计划」次按钮）、
+     *    `BareRow(` 恰 4、`EntryRow(` 恒 0，页头走 `AppScreenHeader`；
      *  - **查词条的位置**（修复轮 1 的 F3）：`today_plan_search_entry` 必须出现在 `when (state)` 之前，
      *    即四态常驻，不许跟着 Ready 分支走；且它由 `SearchBox` 承载，不是一枚 `EntryRow`。
      */
@@ -393,9 +416,12 @@ class TodayPlanNumberAuthorityTest {
                 "分支区间没界定到渲染体（或该呈现位被挪出分支），实际体起头：${readyBranch.take(80)}",
         )
         assertEquals(
-            1,
+            4,
             countMatches(readyBranch, Regex("""PillButton\(""")),
-            "Ready 分支体里带强调底的主按钮只许一枚（继续学习 CTA）；缺配置/不可用态在别的分支，不受本条约束",
+            "Ready 分支体里恰四枚按钮：未学完那一支的主 CTA（继续学习族）+ 原型 .plan-head 下方那枚「计划」次按钮" +
+                "（`assets/app.js:332-335`），以及空态那一支 260dp 网格里的「调整每日新增」+「去读今日文章」" +
+                "（`assets/app.js:509-511`）。两支按 `todayAllDone` 互斥，同屏只渲染一对；" +
+                "缺配置/不可用态在别的分支，不受本条约束",
         )
         assertTrue(
             readyBranch.contains(quoted("today_plan_start_learning")),
@@ -439,9 +465,9 @@ class TodayPlanNumberAuthorityTest {
             "入口行组已离场：词书单词/我的词去词库页，学习记录/打卡/调整目标去我的页——本屏再出现 EntryRow 即回潮",
         )
         assertEquals(
-            2,
+            4,
             countMatches(source, Regex("""(?<![A-Za-z0-9_])BareRow\(""")),
-            "本屏只剩两条裸行（今日文章状态 / 词库），枚数的落点判据在 TodayPlanBareRowContractTest",
+            "本屏只剩四条裸行（今日词单 / 复习队列 / 今日文章状态 / 词库），枚数的落点判据在 TodayPlanBareRowContractTest",
         )
         assertEquals(
             1,
@@ -459,15 +485,24 @@ class TodayPlanNumberAuthorityTest {
             "today_plan_secondary_card",
             "today_plan_progress_summary",
             "today_plan_total_progress",
-            "today_plan_task_total",
+            "today_plan_remaining",
+            "today_plan_plan_bar",
+            "today_plan_new_legend",
+            "today_plan_due_legend",
+            "today_plan_open_plan",
             "today_plan_progress",
             "today_plan_empty",
             "today_plan_start_learning",
+            "today_plan_open_word_list",
+            "today_plan_open_review_queue",
             "today_plan_reading_status",
-            "today_plan_new_progress",
-            "today_plan_review_progress",
-            "today_plan_plan_footnote",
             "today_plan_open_word_bank",
+            // 批 1 Task 19（原型 `sLearnEmpty`）：「今天全学完了」那一态的三枚锚——整块空态与它的两枚出口。
+            // `today_plan_plan_footnote`（「今日已完成 · 连续 N 天」那行注脚）随该态整段离场：
+            // 原型那一屏没有 `.caption`，连续天数改由页头 `.head-sub` 说（`app.js:503`）。
+            "today_plan_all_done_state",
+            "today_plan_adjust_goal",
+            "today_plan_read_article",
         ).forEach { tag ->
             assertTrue(
                 tag in source,
@@ -537,7 +572,13 @@ class TodayPlanNumberAuthorityTest {
         val styleArgs = countMatches(source, Regex("""(?<![A-Za-z0-9_])style\s*=\s*"""))
         val whitelistedStyleArgs = countMatches(
             source,
-            Regex("""(?<![A-Za-z0-9_])style\s*=\s*AppType\.(?:Display|Headline|Title|Body|Label|Footnote)\b(?![.\w])"""),
+            // 名单随原型对齐批 1 扩到本屏实际用到的九档（新增 Eyebrow 眉标 / PlanNum 权威数），
+            // 并补上 `PillStyle.*`——主 CTA 旁边那枚「计划」次按钮显式传档位，那是**按钮**的 style、
+            // 不是文字排印，不参与 AC-R-20 的字号判据；但它同样只认具名 token，不许写符号。
+            // 扩的是「哪几枚具名 token 算合规」，不是「允许跨文件样式符号」：白名单外的任何写法照旧红。
+            Regex(
+                """(?<![A-Za-z0-9_])style\s*=\s*(?:AppType\.(?:Display|Headline|Title|Body|Label|Footnote|Meta|Eyebrow|PlanNum)|PillStyle\.(?:Primary|Secondary|Text))\b(?![.\w])""",
+            ),
         )
         assertTrue(
             styleArgs > 0,
@@ -601,10 +642,9 @@ class TodayPlanNumberAuthorityTest {
         // ④ 真实源码逐枚自证：每枚受判标签都要回含自身，且各枚窗口两两不同
         val sampledTags = listOf(
             "today_plan_total_progress",
-            "today_plan_task_total",
+            "today_plan_remaining",
             "today_plan_progress",
             "today_plan_empty",
-            "today_plan_plan_footnote",
         )
         val realWindows = sampledTags.map { tag -> tag to textCallContaining(quoted(tag)) }
         realWindows.forEach { (tag, window) ->
@@ -723,11 +763,13 @@ class TodayPlanNumberAuthorityTest {
          * 批 1 起本屏的数字全部住在强档卡里；2026-10-31 用户评审 ③ 起，浅套强档卡是 `tint2` 浅薄荷底
          * （深套仍是 `strongSurface` 深底）。所以卡上的中性墨有两枚合法点：浅套 `text1`、深套 `onStrong`，
          * 而屏侧的首选写法是从容器内容色取（`LocalContentColor.current`，`StrongCard` 已按主题分套提供）。
+         * 批 1 起 `text2` 也计入：强卡**之外**的那行状态注脚（原型 `.caption`，`--ink-2`）走的是屏级次级墨，
+         * 它同样是具名中性 token、同样由 [AccentInk] 反面钉住「不得染色」。
          * 这是换口径，不是放宽：同一处仍然只认「具名中性 token / 容器内容色」，强调色由 [AccentInk] 反面钉住，
          * 且下面 `every_card_ink_comes_from_the_container` 一条把「屏侧钉死 `onStrong`」这个旧形整族禁掉。
          */
         val NeutralInk = Regex(
-            """\bcolor\s*=\s*(?:LocalContentColor\.current|(?:appColors\(\)\.|colors\.|set\.)(?:onStrong|text1))\b"""
+            """\bcolor\s*=\s*(?:LocalContentColor\.current|(?:appColors\(\)\.|colors\.|set\.)(?:onStrong|text1|text2))\b"""
         )
 
         /** 任何强调色读法：`Mint*` 快捷名、静态/动态域色、以及状态色。 */
