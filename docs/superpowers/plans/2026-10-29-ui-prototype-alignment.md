@@ -563,6 +563,27 @@ Task 22-A 已对页头副标题与三格统计，把 `#24` 留成 🟡 的唯一
 JVM：`ProfilePageHomeContractTest` **4/4**、`ProfilePageContractTest` **5/5**（新增 2 条）；
 connected `AppScreenTest#theAboutRowOnTheProfilePageOpensTheAboutScreenAndComesBack` **OK (1 test)**。
 
+### Task 22-N · 我的词汇残留项（原型 `#/me-words`，`sMeWords` `app.js:1285-1303`）
+
+对应关系已由 Task 22-C 定为「原型三 tab ↔ 词库页三格，不新建页」。账上剩的四件事本轮逐条核完：
+**分段计数、段内说明、页尾提示条都已在 22-C 落地并有判据**，页头搜索动作 22-C 已裁决不搬。
+本轮**无生产源码改动**——把 22-C 只做了、没在账上翻正的部分核到源码，把两条说明里「本仓不成立」
+的规则重新核一遍（结论不变），并把四处形状偏离登记成行。
+
+| # | 改动 / 偏离 | 理由 | 判据 |
+|---|---|---|---|
+| 1 | 对应关系：原型三 tab（收藏 / 生词本 / 易错）落成词库页四格中的三格；页名「词库」而非「我的词汇」，且第一格是「词书」（原型无此格），分段文案「生词」vs 原型「生词本」 | 词库页是词汇域的唯一枢纽（spec §3.3），词书是默认落点、也是唯一带筛选与字母栏的一段；段卡标题仍是「生词本」，分段格用两个字是为了四格在 2× 字号下不折行 | `WordBankScreenContractTest.the bank exposes exactly four segments`（四格顺序与四枚锚逐枚） |
+| 2 | 三格标签补「段名 N」；`null` = 读不到时回落裸段名，不摆 0（22-C 已落） | 摆 0 会把「还没读出来」读成「确实是空的」；数字只从宿主已有的三份 UiState 现算，不开新数据通路 | `WordBankScreenContractTest.segment labels carry counts only when the host can read them` + connected `WordBankScreenTest.segmentLabelsCarryCountsOnlyWhenTheSectionStateIsReadable` |
+| 3 | 段内说明只搬**收藏**那一句（「收藏的词不会被排进复习队列，只做手动回看。」）；生词本与易错两句**不写** | 本轮重新核过源码，两条仍不成立：① 生成计划的新词 = `StoredPlanCardSource.newCardIds` 的 `NewWordOrdering.order(词书内容)` 过滤已复习，**生词本表不参与**，「明天的词单排到前面」是假的；② 错词 = `wrongWordRows` 取「最近一次反馈仍为 Again」（**答对一次即移出**，不是两次），排序按 `COALESCE(下次复习时间, 事件时间)` 升序（**不是按答错次数**） | `MyWordsScreenContractTest.favorites_caption_and_the_closing_notice_are_carried_verbatim`（收藏句逐字 + 另两句归零 + `AppType.Caption`/`text3` 形状）+ connected `MyWordsScreenTest` 17/17（说明在段内、在首行之上；另两段无说明锚） |
+| 4 | 页尾提示条「词义详情里可以加入生词本或取消收藏。」逐字搬，走共享 `InlineNotice(Info)` | 原型 `notice(…, 'info')`；词义详情确有这两枚能力（生词本开关药片 + 页头收藏键读成「取消收藏 <lemma>」） | 同一判据（提示条逐字）+ 共享件份数棘轮（不得自搓提示条） |
+| 5 | 页头搜索动作**不搬**（22-C 裁决） | 查词全站已有两处入口（今日学习页常驻查词条与独立查词页）；词库四段各自的面都不含搜索，无通路可接，挂一枚点了没反应的搜索键比缺它更坏 | `WordBankScreenContractTest.the header search action stays off this page` |
+| 6 | 分段控件几何取本仓三档容器语言（`tint2` 凹槽 + 选中格 `surface`、圆角 13 / 10），不取原型 `.seg` 的 pill + 1dp 描边 | 它与设置「主题」行的分段是同一套明度语法（圆角 14 / 11）；要对齐原型须两处一起改，属跨屏改动，不在本屏单独动——本行把差异留成显式账，而不是当成已对齐 | 本行（两处现值在源码里可数：`RoundedCornerShape(13.dp)`/`(10.dp)` 与设置主题行的 `(11.dp)`；两侧既有用例承重） |
+| 7 | 原型行尾「错过 2 次」**不搬** | 错词派生只取「最近一次事件」这一条（`wrongWordRows` 的 `SELECT` 没有次数列），要显示次数得新增聚合，属功能改动 | 本行（`InternalLearningStatsDao.wrongWordRows` 的取数面） |
+| 8 | 段内动作保留老页能力：收藏行「取消收藏」、生词本「开始重新学习 / 标记为已掌握」（原型没有这些动作） | 12-C 起合并三页的硬条件：合并入口不得合并掉能力（「标记为已掌握」还带二次确认与成功/失败回执） | connected `MyWordsScreenTest` 17/17（含 `wordbook_offers_relearn_and_mastered_behind_confirmation`） |
+
+JVM：`WordBankScreenContractTest` **6/6**、`MyWordsScreenContractTest` **13/13**；
+connected `WordBankScreenTest` **4/4**、`MyWordsScreenTest` **17/17**。
+
 ## 全 36 屏对账清单（2026-10-29 复核）
 
 原型 `assets/app.js` 的屏渲染函数共 **36 个**（`grep -oE "(const|function) s[A-Z][A-Za-z0-9]*"` 实跑得 36 条唯一名）；
@@ -600,7 +621,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 22 | `sAiProfiles`（:952） | AI 服务 | `AiProfileSettingsScreen.kt` | ✅ | Task 22-I 已对（页末离线承诺 Info 提示）；列表行保持裸行 + 动作带（批 4 口径）；2 条登记在「Task 22-I」台账 |
 | 23 | `sAiProfileEdit`（:1194） | AI 服务编辑 | `AiProfileSettingsScreen.kt` 编辑态 | ✅ | Task 22-I 已对（第 4 枚软卡「未接入的选项」：四枚 `EntryRow(enabled = false)` 统一标「暂未接入」，裁决 B）；滑块/开关形状不复刻；2 条登记在「Task 22-I」台账 |
 | 24 | `sMeHome`（:1255） | 我的 | `ProfileScreen.kt` | ✅ | Task 22-A 已对：`.head-sub`「连续打卡 N 天 · 累计学过 N 个词」+ 三格统计（三枚深链）；Task 22-M 收口：「关于与许可」随设置内容「外观与关于」组第 10 行到达本页（不另立第二行，补宿主级行为判据）、第三格保持「文章」不换原型的「收藏」（同落点不复开第二入口）、页头 eyebrow 不搬、学习记录行副标题按本仓全量历史改准；「我的词汇」三行按「词库页四格分段是唯一出口」不搬；5 条登记在「Task 22-M」台账 |
-| 25 | `sMeWords`（:1285） | 我的词汇 | `WordBankScreen.kt` 的三格（生词/错词/收藏）+ `MyWordsScreen.kt` 各段 | 🟡 | Task 22-C 已落**对应关系裁决**（不新建页：原型三 tab ↔ 词库页三格）；待做：分段计数、段内 caption（需先核三条规则是否与本仓一致）、尾部 notice、页头搜索动作裁决 |
+| 25 | `sMeWords`（:1285） | 我的词汇 | `WordBankScreen.kt` 的三格（生词/错词/收藏）+ `MyWordsScreen.kt` 各段 | ✅ | Task 22-C 已落**对应关系裁决**（不新建页：原型三 tab ↔ 词库页三格）与三格计数、收藏段说明、页尾提示条；Task 22-N 核完：另两段说明经源码复核仍不成立（新词顺序只由词书内容定 / 错词按下次复习时间排、答对一次即移出）、页头搜索不搬、分段几何与「错过 N 次」登记为偏离；8 条登记在「Task 22-N」台账 |
 | 26 | `sMeRecords`（:1304） | 学习记录 | `LearningRecordsScreen.kt` | ✅ | Task 22-D 已对：页尾提示条逐字搬、「历史记录」逐日行补文章态 + 4dp 细条 + 右尾「N 词」、「本周」七格刻度 + 两枚真统计（本周词数 / 打卡天数）；「19 分 · 日均用时」整枚不画（无采集），「本周」区块随惰性统计住进历史页签；8 条登记在「Task 22-D」台账 |
 | 27 | `sMeSettings`（:1328） | 设置 | `SettingsScreen.kt` | ✅ | Task 22-E 已对：「学习提醒」行补原型副标题；「词卡显示」行与页末 notice 不搬（无偏好项 / 与 4 组 10 行矛盾）；4 组 10 行形状不动，4 条登记在「Task 22-E」台账 |
 | 28 | `sMeReminder`（:1345） | 提醒与发音 | `ReminderSettingsScreen.kt` + `SpeechSettingsScreen.kt` | ✅ | Task 22-F 已对：提醒页开启行副标题 + 只读「重复」行；发音页「用本机离线合成，不联网」按系统 TTS 条件渲染；保存 / 口音 / 0.9 倍 / 试听 delicate 四处不搬；保持两屏，6 条登记在「Task 22-F」台账 |
@@ -613,7 +634,7 @@ Task 17 新建 `ReviewQueueScreen`、Task 18 新建 `TodaySummaryScreen` 后为 
 | 35 | `sError`（:1493） | 词卡没打开 | `ErrorScreen`（在 `AppScreen.kt`） | ✅ | Task 22-H 已对：按 `AppError` 分叉（姓名错误保留旧文案 / 其余「词库没能打开」+ 真重试）；`LC-DB-03` 与「从备份恢复」不搬（无诊断码 / 回滚归恢复态）；2 条登记在「Task 22-H」台账 |
 | 36 | `sUnavailable`（:1511） | 页面不可用 | **批 2 Task 22-H 新建** `UnavailableScreen.kt`；宿主 = 未知 AI 功能 key 的兜底分支 | ✅ | Task 22-H 已对：原型文案逐字 + 260dp 两枚真出口；`overlayOpen` 与返回键改按 key 判定；JVM 2 条 + connected 2/2；1 条登记在「Task 22-H」台账 |
 
-**小计（Task 22-M 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 35 屏 · 🟡 1 屏 · ⬜ 0 屏。
+**小计（Task 22-N 完成后重算，按本表状态列逐行数，命令见本节末）**：✅ 36 屏 · 🟡 0 屏 · ⬜ 0 屏。
 复核时点是「✅ 5 · 🟡 2 · ⬜ 29」，其中 **#2 今日词单 / #4 复习队列 / #5 今日完成 三屏本仓没有承载点**，
 是逐屏核到源码才发现的，见各行「待裁决」——要做得先新建屏与导航，属产品范围变化；
 用户 2026-10-29 拍板「三屏全部新建」，**#2 已于 Task 16 建屏并接线、#4 已于 Task 17 建屏并接线、
