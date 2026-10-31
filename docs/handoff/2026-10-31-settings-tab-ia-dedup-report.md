@@ -76,8 +76,14 @@
 ## 4. Git 状态
 
 - 分支 `stage-5-ui-r2-learning-path`，基线 `097cbe3`。
-- 本批提交：见本节下方回填（提交信息 `feat(ui): 设置升为第五栏并收束关于/许可/备份入口`）。
-- 推送：待用户代理在线后推送并 `ls-remote` 核验（本报告写作时代理 `127.0.0.1:3067` 已配置，推送结果回填）。
+- 本批三个本地提交：
+  `8f3c7b4 feat(ui): 设置升为第五栏并收束关于/许可/备份入口` →
+  `20bb361 test(ui): connected 用例跟随五栏与去重后的入口分工` →
+  `1f85f95 docs(ui): 五栏与去重的工作报告及浅/深色真机证据`。
+- **推送：失败（未备份到远端）**。`git -c credential.interactive=false push origin
+  stage-5-ui-r2-learning-path` 报 `Failed to connect to github.com port 443 via 127.0.0.1
+  after 2051 ms`——全局代理 `http://127.0.0.1:3067` 已配置但代理服务当时未启动。
+  本地提交保留，待用户打开代理后重推并用 `git ls-remote` 核验远端 tip。
 
 ## 5. 未完成 / 遗留问题
 
