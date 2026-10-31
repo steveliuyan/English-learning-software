@@ -103,14 +103,16 @@ data class SettingsGroup(
 )
 
 /**
- * 设置页信息架构的唯一台账（AC-R-21 / 裁决②）：**恰 4 组、恰 10 行**。
- * 第 10 行「关于」是批 2 Task 22-B 按用户拍板加的（原型 `sMeAbout` 需要独立入口）；该行登记在这里，
- * AC-R-21 的行数期望值随之由 9 改为 10（判据形状不变，只是行数）。
+ * 设置页信息架构的唯一台账（AC-R-21 / 裁决②）：**恰 4 组、恰 9 行**。
  *
  * 落位：「学习」3 行（词书与每日目标 / 学习提醒 / 生成默写纸）、「AI 与语音」2 行、
- * 「外观与关于」2 行（主题三态 / 开源许可与隐私说明）、「数据与安全」2 行
+ * 「外观与关于」2 行（主题三态 / 关于）、「数据与安全」2 行
  * （词书内容包、备份与恢复——两行都是折叠入口，展开后才见 SAF 与危险操作子行）。
  * 「学习提醒」按裁决②归「学习」组，不再错挂 AI 组；「账户」整组与两条占位行已删。
+ *
+ * 2026-10-31 去重（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）：本表原有一条
+ * 「开源许可与隐私说明」行，与关于页的「开源许可与来源」是同一落点的第二份入口。现在设置
+ * 独立为第五栏后，许可只留关于页一枚入口（并改名为「开源许可与隐私说明」），本表行数 10 → 9。
  *
  * JVM 侧 `SettingsNoDeveloperJargonTest` 钉本表形状；connected 侧
  * `SettingsScreenTest` 逐条核对这些 tag 真的渲染出来——两边对不上都会红。
@@ -139,7 +141,6 @@ object SettingsGroups {
             tag = "settings_group_appearance",
             entries = listOf(
                 SettingsEntry("主题", "settings_theme_mode", null, AppDomain.Settings),
-                SettingsEntry("开源许可与隐私说明", "settings_open_licenses", AppIcon.Info, AppDomain.Settings),
                 SettingsEntry("关于", "settings_open_about", AppIcon.Info, AppDomain.Settings),
             ),
         ),
@@ -211,6 +212,10 @@ private val ThemeMode.userLabel: String
 /**
  * 「设置」一级页（AC-R-21）：**4 组 9 行**，静态台账见 [SettingsGroups]。
  *
+ * 2026-10-31 起它是**独立的第五个一级 tab**（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）：
+ * 底栏的齿轮终于落到这一页，而不是落到「我的」顶部。「我的」只留档案头 + 三格统计 + 学习记录，
+ * 工具回到工具自己的位置。
+ *
  * - 资料卡刻意**不显示任何今日计划数字**：当日统计的职责归打卡页（裁决③），
  *   而 `newTarget` 在词书新词学完时会小于用户配置的每日目标（PRD FR-01 第 8 条），
  *   把它当「每日新增」印在设置页更是错的。资料卡只报昵称与词书名。
@@ -221,7 +226,7 @@ private val ThemeMode.userLabel: String
  *   SAF 拉起链路一行未动，本屏只改呈现层级。
  * - 「备份与恢复」是**导航行**（裁决⑥）：点击进入 [BackupHubScreen] 三节子页（导出 / 恢复 /
  *   删除全部学习数据），不再就地折叠。删除行只在子页末节出现，级联预览 + 二次确认仍由
- *   AppScreen 宿主承载（F4-01 Spec 04 L18），语义不变。
+ *   AppScreen 宿主承载（F4-01 Spec 04 L18），语义不变。这是备份的**唯一**入口（关于页的同落点行已删）。
  * - 「主题」为三态分段选择：选中即 `AppThemePreferences.write`，回读经
  *   [rememberAppThemeMode] 的监听让整棵树即时换套，无需重启。
  * - 九行标题、图标、域色与 testTag 只在 [SettingsGroups] 定义一处，渲染侧按 tag 经
@@ -234,6 +239,8 @@ private val ThemeMode.userLabel: String
  *   （收起态也读得到）。档位仍取 `InlineNoticeKind.Info`：宿主传来的是裸 `String`，不做文本嗅探。
  * @param onOpenBackupHub 「备份与恢复」导航入口：打开三节子页 [BackupHubScreen]（裁决⑥）。
  *   删除回执与删除回调都在子页，本屏不再持有它们。
+ * @param onOpenAbout 独立「关于」页入口；许可页面与隐私说明从那里进入（2026-10-31 去重后
+ *   设置侧不再有同落点的第二行）。
  */
 @Composable
 fun SettingsScreen(
@@ -256,8 +263,6 @@ fun SettingsScreen(
     importedBookCount: Int = 0,
     transferBusy: Boolean = false,
     transferMessage: String? = null,
-    /** F5-04「关于与开源许可」入口（AC5-04）：必须是真实可达页面，不许做假入口。 */
-    onOpenLicenses: () -> Unit = {},
     /** 批 2 Task 22-B：独立「关于」页入口（原型 `sMeAbout`，`app.js:1366`）。 */
     onOpenAbout: () -> Unit = {},
 ) {
@@ -291,7 +296,6 @@ fun SettingsScreen(
             importedBookCount = importedBookCount,
             transferBusy = transferBusy,
             transferMessage = transferMessage,
-            onOpenLicenses = onOpenLicenses,
             onOpenAbout = onOpenAbout,
         )
     }
@@ -300,9 +304,10 @@ fun SettingsScreen(
 /**
  * 设置的「四组九行」内容本体（批 1 Task 6 抽出）。
  *
- * 抽出的动机是版面：设置 tab 的根页从「设置」变成「我的」（[ProfileScreen]）——档案头 + 三格统计 +
- * 学习记录行之后，仍是这四组九行。内容原样搬过来，**不带** `fillMaxSize` / `verticalScroll` /
- * `testTag("settings_screen")`：滚动与屏根归宿主，否则我的页里会套出第二个滚动容器与第二个根锚。
+ * 抽出的动机是版面：内容槽与屏根分开，宿主（[SettingsScreen] 或测试）自己带页头与滚动容器，
+ * 内容本体**不带** `fillMaxSize` / `verticalScroll` / `testTag("settings_screen")`——否则同一页里
+ * 会套出第二个滚动容器与第二个根锚。2026-10-31 后「我的」不再注入这段内容（设置已独立成第五栏），
+ * 但装载缝保留：connected 测试仍可只挂内容本体核对行清单，不必造一份页头。
  *
  * 台账纪律不变：九行标题、图标、域色与 testTag 仍只在 [SettingsGroups] 定义一处，本函数按 tag
  * 经 [settingsEntry] 取；`SettingsNoDeveloperJargonTest` 的「标题各只写一次」判据跨这次抽出依然成立。
@@ -323,7 +328,6 @@ internal fun SettingsGroupsContent(
     importedBookCount: Int,
     transferBusy: Boolean,
     transferMessage: String?,
-    onOpenLicenses: () -> Unit,
     /** 批 2 Task 22-B：独立「关于」页入口（原型「应用」组「关于与许可」）。 */
     onOpenAbout: () -> Unit = {},
 ) {
@@ -373,8 +377,9 @@ internal fun SettingsGroupsContent(
             )
         }
 
-        // 「外观与关于」：主题三态分段卡（稿 §7④「主题」卡）+ 许可入口行，两张卡共用一个组标题。
+        // 「外观与关于」：主题三态分段卡（稿 §7④「主题」卡）+ 关于入口行，两张卡共用一个组标题。
         // 分段选中即写偏好；[rememberAppThemeMode] 的监听让装配点即时换套。
+        // 2026-10-31 去重：许可入口只留在关于页（「开源许可与隐私说明」），本组不再有第二行。
         SettingsGroupSectionHeader(settingsGroup("settings_group_appearance"))
         ThemeModeRow(mode = themeMode, onSelect = { AppThemePreferences.write(context, it) })
         SettingsGroupCard {
@@ -382,11 +387,6 @@ internal fun SettingsGroupsContent(
                 tag = "settings_open_about",
                 subtitle = "版本、致谢与来源说明",
                 onClick = onOpenAbout,
-            )
-            LedgerEntryRow(
-                tag = "settings_open_licenses",
-                subtitle = "第三方组件、许可证与隐私说明",
-                onClick = onOpenLicenses,
             )
         }
 

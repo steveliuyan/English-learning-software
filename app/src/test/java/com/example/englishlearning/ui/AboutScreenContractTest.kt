@@ -17,12 +17,15 @@ import kotlin.test.assertTrue
  *  3. 致谢只留本仓成立的两句（图标自制 / 字体 Newsreader·OFL）；原型「示例文章由本地模型提供」
  *     与本仓不符（文章由用户配置的 AI 服务按需生成），不搬。
  *
- * 另：隐私说明那一行在原型的动作是 `toast`，本仓没有对应承载（隐私口径分散在设置与备份说明里），
- * 所以它是**不可点的只读行**（`onClick = null`），不假装是个入口。
+ * 2026-10-31 去重（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）：说明区从三行收成**一行**。
+ *  - 「隐私说明」死行删除：它没有落点（`onClick = null`），而隐私说明本身是许可页的第一段；
+ *  - 「备份与恢复」行删除：备份的唯一入口在 设置 → 数据与安全；
+ *  - 「开源许可与来源」改名「开源许可与隐私说明」，与许可页标题逐字一致。
  */
 class AboutScreenContractTest {
 
     private val screen: String by lazy { uiScreenSource("AboutScreen.kt") }
+    private val code: String by lazy { stripComments(screen) }
 
     @Test
     fun `the about page keeps the shared header and the app block`() {
@@ -43,12 +46,29 @@ class AboutScreenContractTest {
     }
 
     @Test
-    fun `the three explanation rows keep their capability`() {
-        listOf("about_privacy_row", "about_licenses_row", "about_backup_row").forEach { tag ->
-            assertEquals(1, countMatches(screen, Regex(Regex.escape(tag))), "说明行锚「$tag」恰一处")
+    fun `the explanation section keeps exactly one entry and it opens the licenses page`() {
+        assertEquals(
+            1,
+            countMatches(screen, Regex(Regex.escape("about_licenses_row"))),
+            "许可入口锚「about_licenses_row」恰一处",
+        )
+        assertTrue("onClick = onOpenLicenses" in code, "那一行必须接到既有许可页（只画行不接回调 = 点不动的行）")
+        assertTrue(
+            "开源许可与隐私说明" in code,
+            "行标题与许可页标题逐字一致：入口名与落地页名指向同一件事",
+        )
+        listOf("about_privacy_row", "about_backup_row").forEach { deadTag ->
+            assertEquals(
+                0,
+                countMatches(screen, Regex(Regex.escape(deadTag))),
+                "「$deadTag」已按 2026-10-31 去重删除：说明区只留许可一条入口",
+            )
         }
-        assertTrue("onClick = onOpenLicenses" in screen, "「开源许可与来源」接到既有许可页")
-        assertTrue("onClick = onOpenBackup" in screen, "「备份与恢复」接到既有备份页")
+        assertEquals(
+            0,
+            countMatches(screen, Regex(Regex.escape("onOpenBackup"))),
+            "关于页不再持有备份回调：备份的唯一入口在 设置 → 数据与安全",
+        )
     }
 
     @Test

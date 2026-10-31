@@ -5,11 +5,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 我的页（spec §3.6）的源码契约：档案头 + 三格统计深链 + 学习记录行 + 设置四组十行（Task 22-B 加关于）。
+ * 我的页（spec §3.6）的源码契约：档案头 + 三格统计深链 + 学习记录行。
  *
- * 为什么这层必须有：我的页是「设置 tab」的新根页，而它并不自己实现设置内容——四组十行仍归
- * `SettingsScreen.kt`。抽出 `SettingsGroupsContent` 后有两件容易发生的回归：
- *  ① 页头与滚动各抄一份（我的页与设置页各带一个 `settings_screen` 根、各滚各的），
+ * 2026-10-31 用户拍板「结构性重排」（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）：
+ * 设置从本页拆出去成为第五个一级 tab，本页只留个人进度。于是这一层要防的回归变了：
+ *  ① 设置内容被塞回本页（同屏两个滚动容器、两枚页头，齿轮又落到「我的」）；
  *  ② 统计格只画数字不接深链（用户点了没反应，还把「已学词」冤枉成一个死数字）。
  * 行为面由 connected `ProfileScreenTest` 与宿主 `AppScreenTest` 承重；本文件钉形状与接线。
  */
@@ -17,6 +17,7 @@ class ProfilePageContractTest {
     private val profile: String by lazy { stripComments(uiScreenSource("ProfileScreen.kt")) }
     private val host: String by lazy { stripComments(uiScreenSource("AppScreen.kt")) }
     private val settings: String by lazy { stripComments(uiScreenSource("SettingsScreen.kt")) }
+    private val about: String by lazy { stripComments(uiScreenSource("AboutScreen.kt")) }
 
     @Test
     fun `three stat cells each carry their own deep link`() {
@@ -53,21 +54,42 @@ class ProfilePageContractTest {
         )
     }
 
+    /**
+     * 2026-10-31 拆分后的形状：我的页**不再**有设置内容槽，设置页是它自己的根页。
+     *
+     * 三条各自关一条回归路径：
+     *  - `settingsContent` 归零：参数回来 = 设置又被塞回「我的」底下，同一页两个滚动容器；
+     *  - 宿主恰挂一枚 `ProfileScreen` 与一枚 `SettingsScreen`：0 = 某一栏没有根页，
+     *    2 = 同一栏挂了两份（旧现场就是设置内容直接挂进我的页）；
+     *  - `SettingsGroupsContent` 保留为装载缝：内容本体与页头分开，connected 测试可只挂内容。
+     */
     @Test
-    fun `the settings ledger is reused not duplicated`() {
-        assertEquals(1, countMatches(profile, Regex("""\bsettingsContent\(\)""")), "我的页必须调用宿主注入的设置内容槽")
-        assertEquals(1, countMatches(settings, Regex("""internal fun SettingsGroupsContent\(""")), "设置内容必须抽成可复用的一段")
-        assertTrue("fun SettingsScreen(" in settings, "旧 SettingsScreen 保留为装载缝（connected 设置页测试仍直接挂它）")
-        // 设置 tab 只许一个根：我的页含设置内容，但宿主不得把两份都挂上去（同屏两个滚动容器、两枚页头）。
+    fun `the profile page no longer hosts the settings ledger`() {
         assertEquals(
             0,
-            countMatches(host, Regex("""(^|[^A-Za-z0-9_])SettingsScreen\(""")),
-            "宿主的设置 tab 只挂 ProfileScreen；再挂一枚 SettingsScreen = 同一 tab 两页叠着",
+            countMatches(profile, Regex(Regex.escape("settingsContent"))),
+            "我的页不得再有设置内容槽：设置已独立为第五个一级 tab",
+        )
+        assertEquals(
+            0,
+            countMatches(profile, Regex(Regex.escape("settings_group_"))),
+            "我的页不得出现任何设置分组",
         )
         assertEquals(
             1,
+            countMatches(settings, Regex("""internal fun SettingsGroupsContent\(""")),
+            "设置内容必须保持为可复用的一段（页头与内容本体分开）",
+        )
+        assertTrue("fun SettingsScreen(" in settings, "设置页是独立根页（页头「设置」+ 滚动容器）")
+        assertEquals(
+            1,
             countMatches(host, Regex("""(^|[^A-Za-z0-9_])ProfileScreen\(""")),
-            "宿主必须恰挂一枚 ProfileScreen（0 = 设置 tab 还是没有根页，2 = 第二份我的页）",
+            "宿主必须恰挂一枚 ProfileScreen（0 = 我的栏没有根页，2 = 第二份我的页）",
+        )
+        assertEquals(
+            1,
+            countMatches(host, Regex("""(^|[^A-Za-z0-9_])SettingsScreen\(""")),
+            "宿主必须恰挂一枚 SettingsScreen（0 = 设置栏没有根页，2 = 设置被挂了两份）",
         )
         assertTrue("profile_open_learning_records" in profile, "学习记录一行的锚必须存在")
         assertEquals(0, countMatches(profile, Regex("""Mint[A-Z]\w*""")), "我的页不得读 Mint* 静态 token")
@@ -75,41 +97,58 @@ class ProfilePageContractTest {
     }
 
     /**
-     * 「关于与许可」（原型 `sMeHome` 的「应用」组末行）通过**设置内容槽**到达本页，不另立一行。
+     * 关于页只从**设置页**进；许可只从**关于页**进。这是 2026-10-31 去重后的唯一通路。
      *
-     * 2026-10-29 用户拍板把「关于」放成设置「外观与关于」组的第 10 行（Task 22-B，AC-R-21 9→10）；
-     * 而设置内容在本 tab 里正是我的页的 `settingsContent()`，所以原型那一行在页面上**已经存在**。
-     * 再按原型在「应用」组补一条同落点的行，就是同一条通路的第二份入口（与「我的词汇」三行同口径）。
-     *
-     * 本条钉三层接线：本页不写这一行 → 设置内容里有这一行且指向回调 → 宿主把回调接到 About 分支。
-     * 「点得到、点完回得来」的行为判据在 connected `AppScreenTest`，源码里看不到渲染。
+     * 三层接线一次钉住：设置页有且只有一条关于行 → 宿主把关于回调接到 About 分支 →
+     * 设置页与宿主都不再持有许可回调（用户点评的「两处都有开源许可」正是旧的双入口）。
+     * 「点得到、点完回得来」的行为判据在 connected `AppScreenTest` 与 `SettingsLicensesEntryTest`。
      */
     @Test
-    fun `the about page is reached through the injected settings ledger, not a second row`() {
-        assertEquals(
-            0,
-            countMatches(profile, Regex(Regex.escape("关于与许可"))),
-            "我的页源码不得出现原型的「关于与许可」行：关于入口在设置内容的「外观与关于」组里（Task 22-B 第 10 行）",
-        )
-        assertEquals(
-            0,
-            countMatches(profile, Regex(Regex.escape("onOpenAbout"))),
-            "我的页不持有关于回调：它随 `settingsContent` 注入，本页不转发第二份",
-        )
+    fun `about is reached from settings and licenses only from about`() {
         assertEquals(
             1,
             countMatches(settings, Regex(Regex.escape("tag = \"settings_open_about\","))),
-            "设置内容里「关于」行恰一处（0 = 关于页没有入口；2 = 两行都叫关于）",
+            "设置页的关于行渲染恰一处（0 = 关于没有入口；2 = 两行都叫关于）",
         )
         assertEquals(
             1,
             countMatches(settings, Regex(Regex.escape("onClick = onOpenAbout,"))),
-            "那一行必须接到 `onOpenAbout`（只画行不接回调 = 点不动的行）",
+            "关于行必须接到 `onOpenAbout`（只画行不接回调 = 点不动的行）",
         )
         assertEquals(
             1,
             countMatches(host, Regex(Regex.escape("onOpenAbout = { showAbout = true },"))),
             "宿主必须把关于回调接到 About 分支（0 = 行在但点了没反应）",
+        )
+        assertEquals(
+            0,
+            countMatches(settings, Regex(Regex.escape("settings_open_licenses"))),
+            "设置页不得再有许可行：唯一入口在关于页",
+        )
+        assertEquals(
+            0,
+            countMatches(settings, Regex(Regex.escape("onOpenLicenses"))),
+            "设置页不得持有许可回调（同落点的第二份入口）",
+        )
+        assertEquals(
+            0,
+            countMatches(profile, Regex(Regex.escape("onOpenAbout"))),
+            "我的页不持有关于回调：它随设置页到达",
+        )
+        assertEquals(
+            0,
+            countMatches(about, Regex(Regex.escape("onOpenBackup"))),
+            "关于页不得再挂备份入口：备份唯一入口在 设置 → 数据与安全",
+        )
+        assertEquals(
+            1,
+            countMatches(host, Regex(Regex.escape("onOpenLicenses = { showAbout = false; showLicenses = true },"))),
+            "许可的唯一入口必须接在关于页（0 = 关于页点了没反应；2 = 又长出第二份）",
+        )
+        assertEquals(
+            1,
+            countMatches(host, Regex(Regex.escape("onOpenBackupHub = { showBackupHub = true },"))),
+            "备份的唯一入口必须接在设置页（0 = 备份进不去；2 = 关于页又开了一个口）",
         )
     }
 

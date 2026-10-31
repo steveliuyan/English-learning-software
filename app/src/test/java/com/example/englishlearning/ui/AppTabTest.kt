@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test
 
 class AppTabTest {
     @Test
-    fun `bottom navigation exposes exactly the four agreed destinations in order`() {
+    fun `bottom navigation exposes exactly the five agreed destinations in order`() {
         assertEquals(
-            listOf(AppTab.LEARNING, AppTab.READING, AppTab.AI, AppTab.SETTINGS),
+            listOf(AppTab.LEARNING, AppTab.READING, AppTab.AI, AppTab.PROFILE, AppTab.SETTINGS),
             AppTab.entries.toList(),
         )
     }
@@ -45,12 +45,21 @@ class AppTabTest {
     }
 
     /**
-     * 第四格是「我的」而不是「设置」：设置内容并入我的页（档案头 + 统计条 + 原 4 组 9 行），
-     * 所以底导标签与无障碍播报都得跟着走，不能只换字形（2026-10-25 规范 §3.1）。
+     * 2026-10-31 用户拍板「结构性重排」：设置从「我的」页里独立出来，底导第五格是设置，
+     * 第四格才是我的。两格的语义不能再互相借用——旧版 `SETTINGS` 枚举装着「我的」页，
+     * 名字与界面相反，正是这轮要修掉的东西（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）。
      */
     @Test
-    fun `the fourth destination is the profile hub rather than plain settings`() {
-        assertEquals("我的", AppTab.SETTINGS.label)
-        assertEquals("我的", AppTab.SETTINGS.contentDescription)
+    fun `the fourth destination is the profile hub and the fifth is plain settings`() {
+        assertEquals("我的", AppTab.PROFILE.label)
+        assertEquals("我的", AppTab.PROFILE.contentDescription)
+        assertEquals("设置", AppTab.SETTINGS.label)
+        assertEquals("设置", AppTab.SETTINGS.contentDescription)
+    }
+
+    @Test
+    fun `profile comes before settings so the bar reads progress then tools`() {
+        assertTrue(AppTab.PROFILE.ordinal < AppTab.SETTINGS.ordinal)
+        assertEquals(AppTab.SETTINGS, AppTab.entries.last())
     }
 }

@@ -278,17 +278,27 @@ class AppBottomBarContractTest {
         assertEquals(1, count(body, themedInkAnchor), "TabSlot 选中/未选中墨色必须按主题取：选中 deep、未选中 text2，恰一处")
     }
 
-    // ---------- 用例：四枚 duotone 字形映射 ----------
+    // ---------- 用例：五枚 duotone 字形映射 ----------
 
     @Test
-    fun `the four tabs map to the pinned duotone glyphs exactly once each`() {
+    fun `the five tabs map to the pinned duotone glyphs exactly once each`() {
         val bar = appBottomBarSource()
-        listOf("AppIcon.Book", "AppIcon.Newspaper", "AppIcon.Spark", "AppIcon.Person").forEach { glyph ->
-            assertEquals(1, count(bar, glyph), "底导字形映射里「$glyph」必须恰一处（学习 Book / 阅读 Newspaper / AI Spark / 我的 Person）")
+        listOf(
+            "AppIcon.Book",
+            "AppIcon.Newspaper",
+            "AppIcon.Spark",
+            "AppIcon.Person",
+            "AppIcon.Gear",
+        ).forEach { glyph ->
+            assertEquals(
+                1,
+                count(bar, glyph),
+                "底导字形映射里「$glyph」必须恰一处（学习 Book / 阅读 Newspaper / AI Spark / 我的 Person / 设置 Gear）",
+            )
         }
         assertTrue(
             bar.contains("tab.glyph"),
-            "TabSlot 必须经 AppTab 的字形映射取 glyph，而不是散落四枚 when 分支",
+            "TabSlot 必须经 AppTab 的字形映射取 glyph，而不是散落五枚 when 分支",
         )
     }
 }

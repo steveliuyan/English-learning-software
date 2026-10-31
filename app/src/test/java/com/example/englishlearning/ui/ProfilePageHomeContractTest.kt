@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * → 三格统计卡 → `section('我的词汇')` 三行 → `section('学习')` 三行 → `section('应用')` 五行。
  *
  * 本页已具备：`hero` 页头（一级 tab 无返回位）、唯一一枚强档卡装三格统计（三格各是深链）、
- * 学习记录行、设置九行由宿主 `settingsContent` 注入。本轮补一处、记两处偏离：
+ * 学习记录行。设置四组九行自 2026-10-31 起搬去独立的设置栏，不再由宿主注入本页。本轮补一处、记两处偏离：
  *
  *  1. **副标题改成原型那句**「连续打卡 N 天 · 累计学过 N 个词」（`streakDays` / `learnedWordCount`
  *     都是本页形参）。旧的「API Key 只保存在本机加密区。」不是页头身份行——它属于隐私口径，
@@ -30,8 +30,8 @@ import kotlin.test.assertTrue
  *  5. 原型页头 `eyebrow: '我的'` **不搬**：一级 tab 的底部导航已经回答「在哪一页」，
  *     眉标在本仓留给会变的位置信息（今日学习页的计划日期），不重复 tab 名。
  *
- * 「应用」组的「关于与许可」不落在本页源码里，而是随宿主注入的设置内容（`SettingsGroupsContent`
- * 的「外观与关于」组第 10 行，Task 22-B 拍板）到达——本页再写一行就是同一落点的第二份入口。
+ * 「应用」组的「关于与许可」不落在本页源码里，而是走 **设置页 →「外观与关于」组 → 关于** 这条通路
+ * （2026-10-31 起设置独立为第五栏，本页不再内联设置内容）。本页再写一行就是同一落点的第二份入口；
  * 该接线的形状判据在 `ProfilePageContractTest`，行为判据在 connected `AppScreenTest`。
  */
 class ProfilePageHomeContractTest {

@@ -35,7 +35,7 @@ import com.example.englishlearning.ui.theme.appColors
  *
  * 新建屏（用户 2026-10-29 拍板的五枚之一）：原型画了、本仓此前没有独立关于页
  * （`关于` 只在设置页里出现过一次）。骨架逐段对原型：`barTop('关于')` → 应用块
- * （56dp `books` 贴纸 + 应用名 + 「版本 x · 单机优先」）→ 一句 `.meta` → `section('说明')` 三行
+ * （56dp `books` 贴纸 + 应用名 + 「版本 x · 单机优先」）→ 一句 `.meta` → `section('说明')`
  * → `section('致谢', .card-quiet)`。
  *
  * 三处按「读不到就整枚不显示 / 不写不成立的话」处理：
@@ -44,6 +44,13 @@ import com.example.englishlearning.ui.theme.appColors
  *     读不到就只写「第三方组件与内容来源」；
  *  3. 「致谢」那段只留**本仓成立**的两句（图标自制、字体 Newsreader / OFL）；原型里
  *     「示例文章由本地模型提供」与本仓不符（文章由用户配置的 AI 服务按需生成），不搬。
+ *
+ * 2026-10-31 去重（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）：说明区从三行收成一行。
+ *  - 「隐私说明」死行（`onClick = null`，只有副标题没有落点）删除——隐私说明本身是许可页的
+ *    第一段，而本页已有 `about_privacy_line` 一句话概述，再画一枚不可点的行只是诱饵；
+ *  - 「备份与恢复」行删除——备份的唯一入口在 设置 → 数据与安全，关于页不是备份的入口；
+ *  - 「开源许可与来源」改名「开源许可与隐私说明」，与许可页标题逐字一致：入口名与落地页名
+ *    指向同一件事，用户不必在两个近义名之间猜是不是两页。
  */
 @Composable
 fun AboutScreen(
@@ -51,7 +58,6 @@ fun AboutScreen(
     licenseCount: Int?,
     onBack: () -> Unit,
     onOpenLicenses: () -> Unit,
-    onOpenBackup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
@@ -86,27 +92,11 @@ fun AboutScreen(
         SectionHeading(text = "说明")
         SoftCard(contentPadding = PaddingValues(vertical = 4.dp)) {
             BareRow(
-                title = "隐私说明",
-                subtitle = "图片本机识别、密钥只存本机、可随时导出",
-                leading = { InlineIconBadge(icon = AppIcon.Shield, domain = AppDomain.Settings) },
-                modifier = Modifier.testTag("about_privacy_row"),
-                onClick = null,
-            )
-            BareRow(
-                title = "开源许可与来源",
+                title = "开源许可与隐私说明",
                 subtitle = if (licenseCount != null) "$licenseCount 项第三方组件与内容来源" else "第三方组件与内容来源",
-                topDivider = true,
                 leading = { InlineIconBadge(icon = AppIcon.Document, domain = AppDomain.Settings) },
                 modifier = Modifier.testTag("about_licenses_row"),
                 onClick = onOpenLicenses,
-            )
-            BareRow(
-                title = "备份与恢复",
-                subtitle = "导出 / 导入本机数据",
-                topDivider = true,
-                leading = { InlineIconBadge(icon = AppIcon.Upload, domain = AppDomain.Settings) },
-                modifier = Modifier.testTag("about_backup_row"),
-                onClick = onOpenBackup,
             )
         }
         SectionHeading(text = "致谢")

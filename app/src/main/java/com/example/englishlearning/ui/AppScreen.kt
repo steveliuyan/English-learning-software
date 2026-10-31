@@ -1523,8 +1523,9 @@ fun AppScreen(
                     versionName = BuildConfig.VERSION_NAME,
                     licenseCount = null,
                     onBack = { showAbout = false },
+                    // 2026-10-31 去重：许可只从关于页进（关于页只剩这一条说明行）；
+                    // 备份的唯一入口在 设置 → 数据与安全，本页不再挂同落点的第二行。
                     onOpenLicenses = { showAbout = false; showLicenses = true },
-                    onOpenBackup = { showAbout = false; showBackupHub = true },
                 )
             } else if (showLicenses) {
                 // F5-04：许可台账页。数据源=构建期从 docs/third-party-notices.md 同步的 assets；
@@ -1916,7 +1917,7 @@ fun AppScreen(
                     }
                 }
             } else {
-                // 四个一级 tab 的根页面装在这里，底部导航只在这一层出现；上面所有分支都是
+                // 五个一级 tab 的根页面装在这里，底部导航只在这一层出现；上面所有分支都是
                 // 覆盖全屏的二级层，因此天然不会显示底导。
                 Scaffold(
                     containerColor = MintBackground,
@@ -1954,8 +1955,8 @@ fun AppScreen(
                                     showGlobalVocabularySearch = globalVocabularySearchViewModel != null
                                 },
                                 // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
-                                // 应用里没有独立的设置页，设置九行住在「我的」一级页，故落到该 tab——
-                                // 不新建路由、不叠浮层。
+                                // 2026-10-31 起设置是独立的第五个一级 tab：齿轮直接落到那一栏，
+                                // 不再落到「我的」（用户点评的「齿轮去哪儿了」正源于此）。
                                 onOpenSettings = { selectedTab = AppTab.SETTINGS },
                                 // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
                                 // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
@@ -1999,6 +2000,18 @@ fun AppScreen(
                                     if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
                                 },
                                 onOpenWordList = { selectedTab = AppTab.LEARNING },
+                            )
+                            AppTab.PROFILE -> ProfileScreen(
+                                profileName = state.profile.displayName,
+                                streakDays = streakDays,
+                                learnedWordCount = learnedWordCount,
+                                // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
+                                // 所以锁定态下这一格也是真数。
+                                articleCount = readingState.historyOrEmpty.size,
+                                onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
+                                onOpenCheckIn = { showCheckIn = true },
+                                onOpenReadingHistory = { showReadingHistory = true },
+                                onOpenLearningRecords = { showLearningRecords = true },
                             )
                             AppTab.SETTINGS -> {
                                 val context = androidx.compose.ui.platform.LocalContext.current
@@ -2056,74 +2069,64 @@ fun AppScreen(
                                         )
                                     }
                                 }
-                                // 批 1 Task 6：设置 tab 的根页换成「我的」（spec §3.6）——档案头 + 三格统计
-                                // + 学习记录行，设置的四组九行原样作为内容槽挂在下面。SettingsScreen 本身
-                                // 保留为装载缝（connected 设置页测试直接挂它），但宿主只挂这一页：
-                                // 同一 tab 里再挂一枚 SettingsScreen 就是两个滚动容器、两枚页头。
-                                ProfileScreen(
+                                // 2026-10-31 用户拍板「结构性重排」：设置从「我的」页里独立出来，
+                                // 成为第五个一级 tab（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）。
+                                // 本分支挂的是完整设置页（页头「设置」+ 四组），我的页只留个人进度；
+                                // 旧写法把 `SettingsGroupsContent` 作为内容槽塞进 ProfileScreen，
+                                // 于是「设置」没有一个自己的首页——用户点评的重复入口正出自这里。
+                                SettingsScreen(
                                     profileName = state.profile.displayName,
-                                    streakDays = streakDays,
-                                    learnedWordCount = learnedWordCount,
-                                    // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
-                                    // 所以锁定态下这一格也是真数。
-                                    articleCount = readingState.historyOrEmpty.size,
-                                    onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
-                                    onOpenCheckIn = { showCheckIn = true },
-                                    onOpenReadingHistory = { showReadingHistory = true },
-                                    onOpenLearningRecords = { showLearningRecords = true },
-                                    settingsContent = {
-                                        SettingsGroupsContent(
-                                            wordBookName = todayReady?.wordBookName,
-                                            onOpenSetup = { showSetup = true },
-                                            onOpenWorksheet = {
-                                                worksheetViewModel?.load(state.profile.id)
-                                                showWorksheetSettings = worksheetViewModel != null
-                                            },
-                                            onOpenAiProfiles = {
-                                                aiProfileViewModel?.load()
-                                                showAiProfiles = aiProfileViewModel != null
-                                            },
-                                            onOpenSpeechSettings = {
-                                                speechSettingsViewModel?.load()
-                                                showSpeechSettings = speechSettingsViewModel != null
-                                            },
-                                            onOpenReminderSettings = {
-                                                reminderSettingsViewModel?.load()
-                                                showReminderSettings = reminderSettingsViewModel != null
-                                            },
-                                            // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
-                                            onOpenBackupHub = { showBackupHub = true },
-                                            onOpenLicenses = { showLicenses = true },
-                                            onOpenAbout = { showAbout = true },
-                                            speechEngineStatuses = speechState.engineStatuses(),
-                                            aiProfileSubtitle = aiProfiles?.let { ready ->
-                                                if (ready.items.isEmpty()) {
-                                                    "尚未添加，点这里添加第一套 OpenAI 兼容服务"
-                                                } else {
-                                                    "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
-                                                }
-                                            },
-                                            onImportWordBook = {
-                                                wordBookTransferViewModel?.consumeMessage()
-                                                importLauncher.launch(arrayOf("*/*"))
-                                            },
-                                            onExportWordBook = {
-                                                val books = transferState?.books.orEmpty()
-                                                if (transferState?.canExport == true) {
-                                                    wordBookTransferViewModel?.consumeMessage()
-                                                    if (books.size == 1) {
-                                                        exportWordBookId = books.single()
-                                                        exportLauncher.launch("${books.single()}.wbpack")
-                                                    } else {
-                                                        showWordBookExportPicker = true
-                                                    }
-                                                }
-                                            },
-                                            importedBookCount = transferState?.books?.size ?: 0,
-                                            transferBusy = transferState?.busy == true,
-                                            transferMessage = transferState?.message,
-                                        )
+                                    wordBookName = todayReady?.wordBookName,
+                                    onOpenSetup = { showSetup = true },
+                                    onOpenWorksheet = {
+                                        worksheetViewModel?.load(state.profile.id)
+                                        showWorksheetSettings = worksheetViewModel != null
                                     },
+                                    onOpenAiProfiles = {
+                                        aiProfileViewModel?.load()
+                                        showAiProfiles = aiProfileViewModel != null
+                                    },
+                                    onOpenSpeechSettings = {
+                                        speechSettingsViewModel?.load()
+                                        showSpeechSettings = speechSettingsViewModel != null
+                                    },
+                                    onOpenReminderSettings = {
+                                        reminderSettingsViewModel?.load()
+                                        showReminderSettings = reminderSettingsViewModel != null
+                                    },
+                                    // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
+                                    // 2026-10-31 起这也是备份的唯一入口——关于页不再重复这一行。
+                                    onOpenBackupHub = { showBackupHub = true },
+                                    speechEngineStatuses = speechState.engineStatuses(),
+                                    aiProfileSubtitle = aiProfiles?.let { ready ->
+                                        if (ready.items.isEmpty()) {
+                                            "尚未添加，点这里添加第一套 OpenAI 兼容服务"
+                                        } else {
+                                            "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                                        }
+                                    },
+                                    onImportWordBook = {
+                                        wordBookTransferViewModel?.consumeMessage()
+                                        importLauncher.launch(arrayOf("*/*"))
+                                    },
+                                    onExportWordBook = {
+                                        val books = transferState?.books.orEmpty()
+                                        if (transferState?.canExport == true) {
+                                            wordBookTransferViewModel?.consumeMessage()
+                                            if (books.size == 1) {
+                                                exportWordBookId = books.single()
+                                                exportLauncher.launch("${books.single()}.wbpack")
+                                            } else {
+                                                showWordBookExportPicker = true
+                                            }
+                                        }
+                                    },
+                                    importedBookCount = transferState?.books?.size ?: 0,
+                                    transferBusy = transferState?.busy == true,
+                                    transferMessage = transferState?.message,
+                                    // 许可唯一入口已移到 关于 →「开源许可与隐私说明」（2026-10-31 去重）：
+                                    // 设置侧不再保留同落点的第二行，故这里不传 onOpenLicenses。
+                                    onOpenAbout = { showAbout = true },
                                 )
                             }
                         }

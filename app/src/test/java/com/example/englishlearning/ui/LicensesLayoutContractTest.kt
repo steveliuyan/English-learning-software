@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
  * 该屏旧形态是「`‹` 方向字形借 `headlineSmall` 凑字号的裸页头（还带一层 `horizontalScroll`）+
  * 静态 `Mint*` 九枚直读 + 自写 `Text` 底板当条目卡 + 空态只有一句话、没有出路」。
  * 重做口径（spec §5 原话「空态带重试；入口名与页名统一「开源许可与隐私说明」」）：
- *  - 页头换共享 `AppScreenHeader`，标题逐字「开源许可与隐私说明」（与 `SettingsScreen.kt:140` 的入口名同一句），
+ *  - 页头换共享 `AppScreenHeader`，标题逐字「开源许可与隐私说明」（与关于页入口名同一句），
  *    旧锚 `licenses_back` 退役（shared 页头的返回位固定 testTag `app_screen_header` + 可及名「返回」）；
  *  - `Mint*` 九枚与 `MaterialTheme.typography` 读点归零，色走 `appColors()`、排印走六档 `AppType`；
  *  - 空态补「重新读取」次键 `licenses_retry`，且它绑的 `onRetry` **没有默认值**——
@@ -55,7 +55,7 @@ class LicensesLayoutContractTest {
             1,
             countMatches(source, Regex(Regex.escape("\"开源许可与隐私说明\""))),
             "页头标题必须逐字「开源许可与隐私说明」：spec §5 要求入口名与页名统一" +
-                "（入口侧 `SettingsScreen.kt` 已是这句，页面侧旧名「关于与开源许可」必须同批改）",
+                "（入口侧 `AboutScreen.kt` 已是这句，页面侧旧名「关于与开源许可」必须同批改）",
         )
         assertEquals(
             0,

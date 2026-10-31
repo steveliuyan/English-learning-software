@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,17 +34,16 @@ import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 
 /**
- * 「我的」一级页（spec §3.6）：档案头 → 三格统计 → 学习记录行 → 原设置四组九行。
+ * 「我的」一级页（spec §3.6，2026-10-31 修订）：档案头 → 三格统计 → 学习记录行。
  *
- * 为什么设置 tab 的根页要换一页：设置的四组九行是**工具**，而用户打开「我的」十次里有九次
- * 想看的是「我学到哪了」。旧版把统计深藏在二级打卡页、把设置摊满第一屏，等于每次都要先翻过
- * 工具才能看到自己的进度。现在数字在最上面，工具在下面，两者之间只隔一条学习记录行。
+ * 为什么这一页只放「进度」：2026-10-31 用户拍板把设置从本页里拆出去、升成第五个一级 tab
+ * （`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）。此前本页同时承担「我的」与「设置」，
+ * 于是「关于 / 许可 / 备份」既像设置又像信息，在关于页里长出了第二份入口。现在两条语义各归各页。
  *
  * 版面口径（与三档容器同一套语义）：
  *  - 三格统计住**唯一一枚**强档卡（§4.1 一屏至多一枚强卡）——它是这一页的主信息；
  *  - 学习记录是软档卡里的一条 [BareRow]（不是又一张描边卡）；
- *  - 设置内容由宿主经 [settingsContent] 注入（`SettingsGroupsContent`），本页**不**重复实现九行，
- *    也不自带第二个页头与滚动容器。
+ *  - 本页**不**自带设置分组、不持有设置内容的滚动容器与页头：设置归 `SettingsScreen`。
  *
  * 三格各自是深链，不是死数字：
  *  - 已学词 → 词库（词书段）：用户看到 42 的第一个动作通常是「看看是哪 42 个」；
@@ -66,7 +64,6 @@ fun ProfileScreen(
     onOpenCheckIn: () -> Unit,
     onOpenReadingHistory: () -> Unit,
     onOpenLearningRecords: () -> Unit,
-    settingsContent: @Composable ColumnScope.() -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
@@ -104,7 +101,6 @@ fun ProfileScreen(
                 modifier = Modifier.testTag("profile_open_learning_records"),
             )
         }
-        settingsContent()
     }
 }
 

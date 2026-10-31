@@ -203,8 +203,8 @@ class MyWordsScreenContractTest {
             .substringAfter("AppTab.LEARNING -> TodayPlanScreen(")
             .substringBefore("AppTab.READING ->")
         val profileStation = appScreen
-            .substringAfter("ProfileScreen(")
-            .substringBefore("settingsContent = {")
+            .substringAfter("AppTab.PROFILE -> ProfileScreen(")
+            .substringBefore("AppTab.SETTINGS ->")
         // 取样器自检：两段必须真的切得开，否则 substringAfter 落空会把整份源码当成一个站点、
         // 「各恰一处」退化成「整体恰一处」。
         assertTrue(
@@ -213,7 +213,7 @@ class MyWordsScreenContractTest {
         )
         assertTrue(
             "TodayPlanScreen(" !in profileStation && "profileName =" in profileStation,
-            "我的页站点切片落空或越界（必须切到 settingsContent 之前、且不含 TodayPlanScreen）",
+            "我的页站点切片落空或越界（必须切到 AppTab.SETTINGS 之前、且不含 TodayPlanScreen）",
         )
         assertEquals(
             1,
