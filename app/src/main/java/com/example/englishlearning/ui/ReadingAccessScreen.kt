@@ -90,6 +90,23 @@ val ReadingAccessUiState.historyOrEmpty: List<Article>
     }
 
 /**
+ * 该状态下「今天这一篇」是否已经在本地、可以直接读。
+ *
+ * 学习页「今日文章」那一行的落点判据（决策
+ * `docs/decisions/2026-11-03-today-article-direct-open-and-checkin-name.md` §1，收盘点 D-5）：
+ * 只有 `Ready` 且 `todayArticle != null` 时，点下去才**有文章可开**；其余一律交给阅读首页说明原因
+ * （锁定原因 / 生成入口 / 读不到库），避免「标签承诺文章、落点是首页」的假直达。
+ *
+ * 与 [historyOrEmpty] 同一口径写成**逐态穷举**的属性：将来 `ReadingAccessUiState` 加状态时，
+ * 编译器逼这里表态，而不是让调用点用 `as? Ready` 悄悄把新状态归成「不直达」。
+ */
+val ReadingAccessUiState.canOpenTodayArticleDirectly: Boolean
+    get() = when (this) {
+        is ReadingAccessUiState.Ready -> todayArticle != null
+        is ReadingAccessUiState.Locked, ReadingAccessUiState.Loading, ReadingAccessUiState.Unavailable -> false
+    }
+
+/**
  * 「阅读」栏的根页面。一级 tab，出口交给底部导航与页内二级层，所以**没有**自带的返回按钮。
  *
  * 版面按裁决⑤ 重排（spec §6 表格 ⑤ 行），版式重做批 1 Task 7 再按 §3.4 收口：

@@ -141,6 +141,12 @@ fun TodayPlanScreen(
     onRetry: () -> Unit = {},
     onOpenSetup: () -> Unit = {},
     onStartLearning: () -> Unit = {},
+    /**
+     * 「今日文章」那一行（以及全学完态的「去读今日文章」）的落点，由宿主判**真值**：
+     * 今天有文章就直接打开文章，没有/未解锁才切到阅读 tab 交代原因
+     * （D-5，决策 `docs/decisions/2026-11-03-today-article-direct-open-and-checkin-name.md` §1）。
+     * 本屏不知道阅读状态，也不自己猜——它只负责把这一行点亮。
+     */
     onOpenReading: () -> Unit = {},
     onOpenWordBank: () -> Unit = {},
     /** 「今日词单」裸行的落点（批 1 Task 16，原型 `to:'learn-queue'`）：打开新建的 [TodayWordListScreen]。 */

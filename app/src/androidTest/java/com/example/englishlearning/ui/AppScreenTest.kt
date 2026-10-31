@@ -27,6 +27,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.core.error.AppError
@@ -1644,6 +1645,125 @@ class AppScreenTest {
         composeRule.onNodeWithText("暂无本地文章", substring = true).assertDoesNotExist()
     }
 
+    /**
+     * D-5（决策 2026-11-03 §1–§2）端到端第一腿：已解锁且今天有文章时，学习页「今日文章」那一行
+     * 点下去**直接读到文章**，不再先跳阅读首页。
+     *
+     * 「没切 tab」用退出后的落点证明：文章覆盖层与 tab 内容在同一条 `else if` 链上（挂载先声明者先赢），
+     * 覆盖层在场时底下那一层根本不组合，所以只有**退出之后**才看得出底导停在哪——
+     * 停在阅读 tab 会露出 `reading_access_screen`，停在学习 tab 才会露出 `today_plan_screen`。
+     * `app_tab_learning` 的 stateDescription 是同一件事的第二枚凭据（选中态进播报由 `AppBottomBarTest` 钉）。
+     */
+    @Test
+    fun learningPageArticleRowOpensTodaysArticleWithoutSwitchingTabs() {
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                // 空态（`sLearnEmpty`）那一屏没有「接下来」四条裸行，取 `planUnlockedWithPendingReview()`
+                // 让学习页停在常规分支，`today_plan_reading_status` 才在场（解锁与主 CTA 的互斥见其注释）。
+                todayPlanViewModel = planUnlockedWithPendingReview(),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_reading_status").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        // F3-01B：文章首次打开会自动展开「覆盖词面板」（`ArticleReadingScreen.kt:200-202` 按 coveredLemmas
+        // 非空判定）。那一层是 ModalBottomSheet 独立窗，系统返回**先收它**、收不到文章。
+        // 这里显式收起，把「返回」这一腿交还给文章本身——否则本用例钉的是面板的返回优先级，不是落点。
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("article_title").assertExists()
+
+        pressSystemBack()
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_screen").assertExists()
+        composeRule.onNodeWithTag("reading_access_screen").assertDoesNotExist()
+        assertEquals(
+            "直达文章不该把底导挪到阅读 tab：用户从学习页点进来，退出就该回学习页",
+            "已选中",
+            composeRule.onNodeWithTag("app_tab_learning").fetchSemanticsNode()
+                .config[SemanticsProperties.StateDescription],
+        )
+    }
+
+    /**
+     * D-5 的空态那一枚入口：学完当天全部任务后，学习页走原型 `sLearnEmpty`，出口是
+     * secondary 按钮「去读今日文章」（`today_plan_read_article`）——这正是用户报的那条路径
+     * 「词学完了，点进去却落在阅读首页」。落点与裸行同一条判定，所以这里只多钉一枚锚点。
+     */
+    @Test
+    fun learningPageAllDoneCtaOpensTodaysArticleInPlace() {
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                // 用夹具自带的「当日全学完」计划 ⇒ 学习页落空态，`today_plan_read_article` 才在场。
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_read_article").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        // 同上：先收 F3-01B 的覆盖词面板，返回腿才归文章。
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        composeRule.waitForIdle()
+        pressSystemBack()
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_screen").assertExists()
+        composeRule.onNodeWithTag("reading_access_screen").assertDoesNotExist()
+    }
+
+    /** D-5 端到端第二腿：未解锁时那一行仍落阅读首页，由首页说明锁定原因（不假装能直达）。 */
+    @Test
+    fun learningPageArticleRowFallsToTheReadingHomeWhenLocked() {
+        val reading = readingFixture(unlocked = false)
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_reading_status").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        // 落点是首页，不是文章；锁定原因必须当场可见——直达判据为假时，用户要看到「为什么读不到」。
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_access_locked_reason").assertExists()
+    }
+
+    /** D-5 端到端第三腿：已解锁但今天还没生成文章 ⇒ 落阅读首页，那里才有「生成今日文章」的出口。 */
+    @Test
+    fun learningPageArticleRowFallsToTheReadingHomeWhenTodayHasNoArticleYet() {
+        val reading = readingFixture(withTodayArticle = false)
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = planUnlockedWithPendingReview(),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_reading_status").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        // `Ready` 但 `todayArticle == null`：开不出文章是事实，落首页把生成入口交给用户
+        // （`ReadingAccessScreen.kt:313-316` 那一支：「今天还没有生成文章」+ `reading_source_ai`）。
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_open_today").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_source_ai").assertExists()
+    }
+
     /** 阅读流导航到点词详情：profile → 阅读 tab → 今日文章 → 关覆盖窗 → 点正文词。 */
     private fun openReadingWordDetail() {
         createProfile()
@@ -1978,7 +2098,7 @@ class AppScreenTest {
         },
     )
 
-    private fun readingFixture(unlocked: Boolean = true): ReadingFixture {
+    private fun readingFixture(unlocked: Boolean = true, withTodayArticle: Boolean = true): ReadingFixture {
         // 固定时钟锚定「今日」：Asia/Shanghai 下 Instant.EPOCH 的本地日就是 1970-01-01，
         // 计划 localDate 与文章 localDate 必须等于它。仓储 fake 按真实检索键校验，
         // 键不匹配一律返回空——无条件返回文章会把生产代码的日期/身份错配掩盖成绿灯。
@@ -2002,6 +2122,10 @@ class AppScreenTest {
             englishText = "apple", chineseText = "苹果", generatedAtEpochMillis = 1,
             coveredLemmas = listOf("apple"), source = ArticleSource.UserImported,
         )
+        // D-5 的第三条腿：`Ready` 但今天还没生成文章。库里仍有历史（findHistory 照旧给 a1），
+        // 只是「今日」这一格空着——学习页那一行点下去必须落阅读首页（那里才有「生成今日文章」的出口），
+        // 而不是开出一篇不存在的文章。
+        val todaysArticle = if (withTodayArticle) article else null
         // unlocked=false 时今日计划一个词都没完成（newTarget=1）→ UnlockPolicy 判锁定。
         // 锁定与否只改完成集合，不改历史来源：两种情况都得能读到那篇文章。
         val completed = if (unlocked) listOf("apple-id") else emptyList()
@@ -2026,7 +2150,7 @@ class AppScreenTest {
                 activeWordBookId == plan.activeWordBookId && articleType == ArticleType.STORY &&
                 lengthTier == ArticleLengthTier.STANDARD
             ) {
-                Result.success(article)
+                Result.success(todaysArticle)
             } else {
                 Result.success(null)
             }

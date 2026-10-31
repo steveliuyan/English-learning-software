@@ -404,11 +404,13 @@ fun AppScreen(
                     WordBankSection.Favorite -> favoritesViewModel?.load(state.profile.id)
                 }
             }
-            // 进入阅读 tab 才算准入；今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
+            // 阅读/学习/我的三个 tab 都要这份取数：阅读 tab 是页面本体，我的页第三格统计读它的历史，
+            // 学习页的「今日文章」直达判据读它的 `todayArticle`（D-5，决策 2026-11-03 §2）。
+            // 今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
             LaunchedEffect(selectedTab, state.profile.id, todayReady?.isUnlocked) {
                 // 批 1 Task 6：我的页第三格统计是「文章数」，它读的就是这份阅读历史；
                 // 只在进阅读 tab 时取数会让那一格在没进过阅读 tab 前恒为 0（假数字）。
-                if (selectedTab == AppTab.READING || selectedTab == AppTab.PROFILE) {
+                if (selectedTab == AppTab.LEARNING || selectedTab == AppTab.READING || selectedTab == AppTab.PROFILE) {
                     readingAccessViewModel?.load(
                         profileId = state.profile.id,
                         isUnlocked = todayReady?.isUnlocked == true,
@@ -526,6 +528,19 @@ fun AppScreen(
                 wordCardPronunciationStatus = PronunciationStatus.Idle
                 showLearning = false
                 todayPlanViewModel.load(state.profile.id)
+            }
+            // D-5（决策 2026-11-03 §1–§2）：学习页「今日文章」那一行的落点**按真值判**，不再无条件切 tab。
+            // 标签承诺的是「文章」，旧落点给的是「阅读首页」——用户还得再点一次今日文章卡才读到东西。
+            // 现在：`Ready` 且今天有文章 ⇒ 直接开文章覆盖层（挂在当前 tab 之上，不切 tab，退出回学习页）；
+            // 其余（`Locked` / `Loading` / `Unavailable` / `Ready` 但今天没生成）⇒ 切阅读 tab，
+            // 由阅读首页交代原因。判定只此一处（[ReadingAccessUiState.canOpenTodayArticleDirectly]），
+            // 取数条件已含学习 tab，所以停在 `Loading` 上的假设不成立。
+            val openTodayArticleFromLearningPage: () -> Unit = {
+                if (readingState.canOpenTodayArticleDirectly) {
+                    readingAccessViewModel?.openTodayArticle()
+                } else {
+                    selectedTab = AppTab.READING
+                }
             }
             LaunchedEffect(showCheckIn, state.profile.id) {
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
@@ -1977,7 +1992,9 @@ fun AppScreen(
                                 },
                                 // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
                                 // 全屏页，避免出现「底导之上再压一层」的混乱层级。
-                                onOpenReading = { selectedTab = AppTab.READING },
+                                // D-5：落点由 [openTodayArticleFromLearningPage] 按真值判——今天有文章就直开，
+                                // 没文章/没解锁才切到阅读 tab 交代原因。
+                                onOpenReading = openTodayArticleFromLearningPage,
                                 // 批 1 Task 4/5 + Task 16/17：学习页的四条裸行，目的地分别是今日词单 / 复习队列 /
                                 // 今日文章 / 本机词库。词库那条打开通路必须**同时**点名段位：只赋 showWordBank 不赋段位 =
                                 // 从复习行落到词书段（用户点的是复习，看到的是列表第一页）。
