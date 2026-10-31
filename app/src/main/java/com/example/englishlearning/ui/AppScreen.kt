@@ -542,6 +542,15 @@ fun AppScreen(
                     selectedTab = AppTab.READING
                 }
             }
+            // §1-B（决策 2026-11-03，用户「并回来」）：全完成收尾屏那枚「去读今日文章」走**同一条**判定，
+            // 所以这里不读第二遍状态——宿主里 `canOpenTodayArticleDirectly` 仍恰一处（`TodayArticleLandingTest` 钉）。
+            // 顺序是挂载链逼的，不是风格：文章覆盖层挂在 `showLearning` 分支**之后**，而挂载 `else if`
+            // 先声明者赢 ⇒ `showLearning` 还成立时直达开出的 `readingTarget` 进不了组合，
+            // 用户只会看到收尾屏关掉、文章没出现。因此先退学习流，再走共用落点。
+            val openTodayArticleFromSummary: () -> Unit = {
+                exitLearning()
+                openTodayArticleFromLearningPage()
+            }
             LaunchedEffect(showCheckIn, state.profile.id) {
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
@@ -1024,11 +1033,13 @@ fun AppScreen(
                         // 原型在这条路径上画的是收尾屏，不是「词卡都提交完了」那一行字。
                         // 三个要件：
                         //  - **不新增导航状态位**：收尾屏挂在既有的 `showLearning` 分支里、按 `AllDone` 分派，
-                        //    所以系统返回键仍由 `BackHandler(enabled = showLearning)` 那一条接管（原型三个出口
-                        //    全指 learn-home，与之一致），`overlayOpen` 也不必再改；
-                        //  - **三个出口同一条 `exitLearning`**：页头 ← / 页头「完成」/ 吸底「回到今日」在原型里
+                        //    所以系统返回键仍由 `BackHandler(enabled = showLearning)` 那一条接管，`overlayOpen`
+                        //    也不必再改；
+                        //  - **三枚「退出」出口同一条 `exitLearning`**：页头 ← / 页头「完成」/ 吸底「回到今日」在原型里
                         //    都是 `data-to="learn-home"`，这里复用同一枚退出通路（回今日学习并重算计划），
-                        //    不另写一份「只关浮层不重算」的半边退出；
+                        //    不另写一份「只关浮层不重算」的半边退出；第四枚「去读今日文章」走 §1-B 的
+                        //    `openTodayArticleFromSummary`（先退学习流，再按真值直达文章或落阅读首页），
+                        //    不再无条件切 tab；
                         //  - **收尾屏不碰播放器**：换成这一屏时 `WordCardScreen` 自己离开组合，F5-03 的退出停播
                         //    守卫照常把停播恰好委托给宿主一次（`AppScreenTest` / `WordCardScreenTest` 钉着计数）。
                         // `dateLabel` 只在计划快照就绪时给；没就绪就传 null，屏侧 `.eyebrow` 整行不进组合。
@@ -1039,10 +1050,7 @@ fun AppScreen(
                             articleRead = todayArticleRead,
                             onBack = exitLearning,
                             onDone = exitLearning,
-                            onOpenReading = {
-                                exitLearning()
-                                selectedTab = AppTab.READING
-                            },
+                            onOpenReading = openTodayArticleFromSummary,
                         )
                     } else {
                         WordCardScreen(

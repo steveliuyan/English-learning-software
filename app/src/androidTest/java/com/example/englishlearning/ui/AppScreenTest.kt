@@ -1764,6 +1764,96 @@ class AppScreenTest {
         composeRule.onNodeWithTag("reading_source_ai").assertExists()
     }
 
+    /**
+     * §1-B（决策 2026-11-03，用户「并回来」）端到端第一腿：全完成收尾屏那枚「去读今日文章」
+     * 与学习页那两枚走同一条落点——已解锁且今天有文章时直接读到文章。
+     *
+     * 这一腿还顺带钉住那条**顺序**约束（不是风格）：收尾屏挂在 `showLearning` 分支内，文章覆盖层挂在
+     * 更靠后的位置，而挂载 `else if` 先声明者赢 ⇒ 接线若少了先行的 `exitLearning()`，
+     * `openTodayArticle()` 开了 `readingTarget` 也进不了组合，画面停在收尾屏，
+     * 本用例会卡在 `waitUntil(article_english)` 上红。
+     */
+    @Test
+    fun summaryScreenArticleRowOpensTodaysArticleWithoutSwitchingTabs() {
+        val reading = readingFixture()
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                // 宽松档：新词已学满 ⇒ 解锁成立、今日文章在场（直达判定要的 `Ready`），
+                // 复习位仍欠一张 ⇒ 学习页还能真的进学习流把末张卡提交完、推进到收尾屏。
+                todayPlanViewModel = planUnlockedWithPendingReview(),
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_start_learning").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_feedback_known").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_next").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_next").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_summary_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("today_summary_open_reading").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("article_english").fetchSemanticsNodes().isNotEmpty()
+        }
+        // F3-01B：文章首开自动展开覆盖词面板（独立窗），先收起，返回腿才归文章。
+        composeRule.onNodeWithTag("coverage_popup_close").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("article_title").assertExists()
+        composeRule.onNodeWithTag("today_summary_screen").assertDoesNotExist()
+
+        pressSystemBack()
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("today_plan_screen").assertExists()
+        composeRule.onNodeWithTag("reading_access_screen").assertDoesNotExist()
+        assertEquals(
+            "收尾屏的直达不该把底导挪到阅读 tab：退出文章该回今日学习，不是阅读首页",
+            "已选中",
+            composeRule.onNodeWithTag("app_tab_learning").fetchSemanticsNode()
+                .config[SemanticsProperties.StateDescription],
+        )
+    }
+
+    /** §1-B 第二腿：锁定态下收尾屏那一行落阅读首页，并当场交代「为什么读不到」。 */
+    @Test
+    fun summaryScreenArticleRowFallsToTheReadingHomeWhenLocked() {
+        val reading = readingFixture(unlocked = false)
+        composeRule.setContent {
+            readyAppScreen(
+                readingAccessViewModel = reading.access,
+                articleReadingViewModel = reading.article,
+                todayPlanViewModel = reading.todayPlan,
+            )
+        }
+        createProfile()
+        composeRule.onNodeWithTag("today_plan_start_learning").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_feedback_known").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_card_next").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_card_next").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_summary_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("today_summary_open_reading").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("reading_access_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("reading_access_locked_reason").assertExists()
+    }
+
     /** 阅读流导航到点词详情：profile → 阅读 tab → 今日文章 → 关覆盖窗 → 点正文词。 */
     private fun openReadingWordDetail() {
         createProfile()

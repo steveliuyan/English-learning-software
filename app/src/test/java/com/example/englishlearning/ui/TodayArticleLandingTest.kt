@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
  *  1. **逐态**——判定本体是 [ReadingAccessUiState] 上的纯扩展属性，五种状态各钉一枚，
  *     这样「加一个新状态时默认不许直达」由编译器逼表态（与 `historyOrEmpty` 同一口径）；
  *  2. **接线形状**——宿主只能有**一处**判定（第二份 `as? Ready` 就是第二份权威）、
- *     学习页那枚 `onOpenReading` 必须换成这条判定，且阅读取数条件必须含学习 tab
+ *     学习页两枚 `onOpenReading`（未学完那档 + 全完成收尾屏）都必须走这条判定，且阅读取数条件必须含学习 tab
  *     （否则停留学习 tab 时 `readingState` 恒为 `Loading`，直达永远是假话）。
  */
 class TodayArticleLandingTest {
@@ -114,6 +114,42 @@ class TodayArticleLandingTest {
             countMatches(host, Regex(Regex.escape("canOpenTodayArticleDirectly"))),
             "宿主只能有一处判定：再写一份 `as? ReadingAccessUiState.Ready` 就是第二份权威，" +
                 "将来加状态时谁会漏改看不出来",
+        )
+    }
+
+    /**
+     * 第三枚入口（决策 §1-B，用户「并回来」）。
+     *
+     * 收尾屏那枚「去读今日文章」原本自己写了一份「退学习流 + 无条件切 tab」。它必须改成
+     * 先 `exitLearning()`、再调学习页那枚共用 lambda——**不能**再读一遍判定，
+     * 否则 `canOpenTodayArticleDirectly` 在宿主出现第二处（上面那条用例当场变红）。
+     *
+     * 顺序是挂载链逼的，不是风格：文章覆盖层挂在 `showLearning` 分支**之后**，
+     * 而挂载 `else if` 先声明者赢 ⇒ `showLearning` 还成立时直达开出的 `readingTarget` 进不了组合，
+     * 用户只会看到收尾屏关掉、文章没出现。
+     */
+    @Test
+    fun theSummaryScreenExitIsMergedIntoTheSameDecision() {
+        assertEquals(
+            1,
+            countMatches(host, Regex(Regex.escape("onOpenReading = openTodayArticleFromSummary"))),
+            "收尾屏那枚「去读今日文章」必须接到共用的落点 lambda（0 = 它还自己切 tab，正是 D-5 报的形状；" +
+                "2 = 两处各接一份，改一处漏一处）",
+        )
+        assertEquals(
+            0,
+            countMatches(host, Regex("""exitLearning\(\)\s*\n\s*selectedTab = AppTab\.READING""")),
+            "收尾屏不得再自己写「退学习 + 切 tab」：切 tab 只能是共用判定的那一支",
+        )
+        val decision = host
+            .substringAfter("val openTodayArticleFromSummary")
+            .substringBefore("}")
+        val exitsAt = decision.indexOf("exitLearning()")
+        val landingAt = decision.indexOf("openTodayArticleFromLearningPage()")
+        assertTrue(
+            exitsAt in 0 until landingAt,
+            "顺序必须是「先 exitLearning() 再走共用判定」：先退学习流，文章覆盖层才轮得到挂载。" +
+                "lambda 体实际内容：$decision",
         )
     }
 

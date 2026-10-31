@@ -89,9 +89,11 @@ import com.example.englishlearning.ui.theme.appColors
  *     副案用今日学习那条行已经在说的「去读今天生成的短文」，不搬原型 `4 段 · 覆盖 4 个今日词`
  *     （文章还没生成，说不出段数与覆盖词）。
  *
- * 三个出口（页头 ← / 页头「完成」/ 吸底「回到今日」）在原型里都指向 `learn-home`，宿主把三者接到
+ * 三枚「退出」出口（页头 ← / 页头「完成」/ 吸底「回到今日」）在原型里都指向 `learn-home`，宿主把三者接到
  * 同一条 `exitLearning`（回今日学习并重算计划状态）；系统返回键由 `BackHandler(enabled = showLearning)`
- * 那一条承担，本屏不新置状态位。[onOpenReading] 的目的地是阅读（原型 `data-to="read-article"`），由宿主接线。
+ * 那一条承担，本屏不新置状态位。[onOpenReading]（原型 `data-to="read-article"`）自 2026-11-03 §1-B 起
+ * 与学习页那两枚入口共用同一条落点判定：先退学习流（文章覆盖层挂在 `showLearning` 之后，不退就开不出来），
+ * 再按阅读状态真值决定「直接开今日文章」还是「切阅读首页交代原因」——本屏只留这枚回调，判定不在屏里。
  */
 @Composable
 fun TodaySummaryScreen(
