@@ -117,7 +117,7 @@ class CheckInScreenTest {
             )
         }
         composeRule.onNodeWithTag("app_screen_header").assertIsDisplayed()
-        composeRule.onNodeWithText("学习打卡").assertIsDisplayed()
+        composeRule.onNodeWithText("打卡与连续").assertIsDisplayed()
         composeRule.onNodeWithTag("check_in_back").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("返回").assertHasClickAction().performClick()
         assertEquals(1, backs)
@@ -187,7 +187,7 @@ class CheckInScreenTest {
                 )
             }
         }
-        val title = composeRule.onNodeWithText("学习打卡").getUnclippedBoundsInRoot()
+        val title = composeRule.onNodeWithText("打卡与连续").getUnclippedBoundsInRoot()
         assertTrue(
             "fontScale=2.0 时页头标题不应塌成 0 宽（无界宽宿主反例实测 0dp），实际边界=$title",
             title.right - title.left >= 48.dp,

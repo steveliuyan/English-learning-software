@@ -38,6 +38,14 @@ class CheckInScreenHeaderShapeContractTest {
     /** `AppScreenHeader` 调用的锚点（与 `MyWordsScreenContractTest` 的页头族同写法）。 */
     private val headerCall = Regex("""AppScreenHeader\(""")
 
+    // D-8 改名的两枚名字。判据里必须用**常量**而不是把旧名写成字面量：本类下方那几枚合成夹具
+    // 与判据说明都会复述页名，字面量会让「旧名归零」这条判据扫到测试自己的文本（main 源码不在
+    // 该风险内，但断言消息里的旧名一旦也写成字面量，将来改名时要同时改多处、必漏一处）。
+    private companion object {
+        const val OLD_CHECK_IN_NAME = "学习打卡"
+        const val NEW_CHECK_IN_NAME = "打卡与连续"
+    }
+
     @Test
     fun checkInScreenMountsTheSharedHeaderExactlyOnce() {
         assertEquals(
@@ -45,6 +53,35 @@ class CheckInScreenHeaderShapeContractTest {
             countMatches(source, headerCall),
             "CheckInScreen.kt 应恰一处 `AppScreenHeader(`（0 = 页头又长成私有 Row/大字号下塌宽的旧形状；" +
                 "2 = 页头长出第二份，屏侧与组件侧从此两套口径）",
+        )
+    }
+
+    /**
+     * D-8（决策 `docs/decisions/2026-11-03-today-article-direct-open-and-checkin-name.md` §3）：
+     * 这一屏的名字从「学习打卡」改成「打卡与连续」。
+     *
+     * 改名理由是**名字撞车**，不是措辞不好：走查里「学习记录」与「学习打卡」都像历史记录，
+     * 用户分不清哪一行是连续天数、哪一行是按天明细。新名把这一屏的两块内容直接念出来
+     * （打卡日历 + 连续天数），与「学习记录」自然分开；「学习记录」按用户裁定**不动**。
+     *
+     * 判据是**跨文件扫 ui main 源码**，而不是只看 `CheckInScreen.kt`：旧名残留在任何一屏
+     * （hub 行名、学习页副标题、深读文案）都是同一枚用户可见 bug，只看本屏会把残留留给下一次走查。
+     * `uiFiles()` 的扫描对象是 main 源码，本类里那几枚合成夹具不被算进来。
+     */
+    @Test
+    fun theCheckInScreenIsNamedAfterItsContent() {
+        val hits = uiFiles().map { it to countMatches(it.readText(), Regex(Regex.escape(OLD_CHECK_IN_NAME))) }
+            .filter { (_, count) -> count > 0 }
+        assertTrue(
+            hits.isEmpty(),
+            "旧页名「$OLD_CHECK_IN_NAME」在 ui main 源码里必须归零（D-8 改名）；残留意味着某屏还在念旧标题，" +
+                "与打卡页的新页头对不上。实际残留：" + hits.joinToString { "${it.first.name} ×${it.second}" },
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape(NEW_CHECK_IN_NAME))),
+            "打卡页页头标题「$NEW_CHECK_IN_NAME」在 `CheckInScreen.kt` 恰一处（0 = 页头没落到新名；" +
+                "2 = 同一屏长出两个标题，屏侧与叙述各写一份）",
         )
     }
 
@@ -84,7 +121,7 @@ class CheckInScreenHeaderShapeContractTest {
                 fun CheckInScreen(onBack: () -> Unit) {
                     // 形如把两条链补回槽位的历史叙述： action = 这一行只是注释，不该被算成命中
                     AppScreenHeader(
-                        title = "学习打卡",
+                        title = "打卡与连续",
                         onBack = onBack,
                         action = {
                             Text("我的收藏")
@@ -122,7 +159,7 @@ class CheckInScreenHeaderShapeContractTest {
                 fun CheckInScreen(onBack: () -> Unit) {
                     // Task 22-B：F5-03 遗留在 action 槽里的两枚裸文字链已摘除
                     AppScreenHeader(
-                        title = "学习打卡",
+                        title = "打卡与连续",
                         onBack = onBack,
                     )
                 }
@@ -140,7 +177,7 @@ class CheckInScreenHeaderShapeContractTest {
      * 反事实自证（第三腿 / R-22B.10）：`AppScreenHeader` 的 `action` 是**末位形参**
      * （`components/AppScreenHeader.kt`：`action: @Composable (() -> Unit)? = null`），
      * 所以把链补回去的人可以不写 `action` 词元、直接写尾随 lambda：
-     * `AppScreenHeader(title = "学习打卡", onBack = onBack) { Text("我的收藏") }`。
+     * `AppScreenHeader(title = "打卡与连续", onBack = onBack) { Text("我的收藏") }`。
      * 这一枚在 Kotlin 里与具名实参**完全等价**（末位形参 = 尾随 lambda 槽），
      * 而「实参区间里不许出现 `action` 词元」这条口径对它是绿的 ⇒ 本腿钉的就是这个漏检形状。
      */
@@ -150,7 +187,7 @@ class CheckInScreenHeaderShapeContractTest {
             """
             class CheckInScreen {
                 fun CheckInScreen(onBack: () -> Unit) {
-                    AppScreenHeader(title = "学习打卡", onBack = onBack) { Text("我的收藏"); Text("错词本") }
+                    AppScreenHeader(title = "打卡与连续", onBack = onBack) { Text("我的收藏"); Text("错词本") }
                 }
             }
             """.trimIndent(),
@@ -212,7 +249,7 @@ class CheckInScreenHeaderShapeContractTest {
             class CheckInScreen {
                 fun CheckInScreen(onBack: () -> Unit, state: CheckInUiState) {
                     Column {
-                        AppScreenHeader(title = "学习打卡", onBack = onBack)
+                        AppScreenHeader(title = "打卡与连续", onBack = onBack)
                         when (state) {
                             CheckInUiState.Loading -> Text("正在读取打卡记录…")
                         }

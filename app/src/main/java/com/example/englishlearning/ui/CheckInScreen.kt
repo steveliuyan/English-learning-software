@@ -62,7 +62,10 @@ fun CheckInScreen(
         // Task 22-B（R-22.1）：F5-03 / Task 10 遗留在 action 槽里的两枚裸文字链（我的收藏 / 错词本）已摘除，
         // 收藏与错词能力由合并页 MyWordsScreen 承载；组件的 action 无默认值（默认 null），故不再传入。
         AppScreenHeader(
-            title = "学习打卡",
+            // D-8（决策 2026-11-03 §3）：旧名「学习打卡」与「学习记录」都像历史记录，走查里用户分不清
+            // 哪一行给连续天数、哪一行给按天明细。新名直接念本屏的两块内容（打卡日历 + 连续天数）；
+            // 「学习记录」按用户裁定不动。
+            title = "打卡与连续",
             onBack = onBack,
         )
         when (state) {
