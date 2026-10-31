@@ -17,7 +17,7 @@
 ## 2. 完成了什么
 
 前五枚提交（决策 / 计划两份文档含在 `0f07b54` 里）净 `58 files changed, 1501 insertions(+), 492 deletions(-)`，
-重算：`git diff --shortstat 0f07b54~1 9432635`；本报告与决策文档 §5-A/实施记录是第 6 枚（纯文档）。
+重算：`git diff --shortstat 0f07b54~1 9432635`；本报告与决策文档 §5-A/实施记录在其后的文档腿提交里（纯文档，不进这份短统计）。
 
 ### 2.1 出站确认：对话框、措辞、策略各只留一份权威（U-1 + U-2 + U-3，`25b9a58`）
 
@@ -124,12 +124,14 @@
 
 ## 4. Git 状态
 
-- 分支 `stage-5-ui-r2-learning-path`；本批 5 枚提交：
+- 分支 `stage-5-ui-r2-learning-path`；本批代码腿 5 枚提交：
   `0f07b54`（决策 + 计划 + U-14 澄清）、`bd020e8`（U-4 + U-5）、`25b9a58`（U-1..U-3）、
-  `5357a96`（U-7 + U-10）、`9432635`（U-11 + U-12 + U-8）；本报告与决策文档 §5-A/实施记录随本批第 6 枚提交。
-- **领先 `origin/stage-5-ui-r2-learning-path` 20 枚，未推送**（含本报告这枚文档提交；重算：
-  `git rev-list --left-right --count origin/stage-5-ui-r2-learning-path...HEAD`）。按红线**不合 `main`、不推送**，
-  等用户说「推送」；用户已交代推送失败时等他开代理再推。
+  `5357a96`（U-7 + U-10）、`9432635`（U-11 + U-12 + U-8）；文档腿是本报告 + 决策 §5-A/实施记录，
+  外加两枚纯订正（本报告 Git 账的数字口径）。
+- **未推送**。领先远端的枚数用
+  `git rev-list --left-right --count origin/stage-5-ui-r2-learning-path...HEAD`
+  现算为准（文档腿每多一枚，写死的数字就漂一枚；本段落笔时读到 20 枚）。
+  按红线**不合 `main`、不推送**，等用户说「推送」；用户已交代推送失败时等他开代理再推。
 - 提交全部带 git 身份 `-c user.name=steveliuyan -c user.email=2021250388@qq.com`。
 - 工作区无其他未提交遗留；QA 日志与截图都在 `.git/qa-scratch/`（不入库）。
 
