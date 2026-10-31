@@ -89,12 +89,15 @@ class ProfileHubLedgerTest {
         assertEquals(13, rows.size, "一级行必须恰 13 条，实为 ${rows.size} 条")
         assertEquals(
             listOf(
-                "收藏的词", "生词本", "易错词",
+                // U-8（决策 2026-11-03 §5）：词汇三行改取词库分段短名；U-12 同批把末行改「关于」。
+                // 行名的**跨屏对齐**由 `WordListEntryNamesFollowBankSegmentsTest` / `AboutRowNameIsJustAboutTest`
+                // 从各自权威源推导，这里只钉台账本体——两套口径别混。
+                "收藏", "生词", "错词",
                 "学习记录", "学习计划", "词书", "生成默写纸", "词书内容包",
-                "AI 服务", "提醒与发音", "设置", "数据与备份", "关于与许可",
+                "AI 服务", "提醒与发音", "设置", "数据与备份", "关于",
             ),
             rows.map { it.title },
-            "十三行标题按参考与决策 §2 钉死",
+            "十三行标题按参考与决策 §2 钉死（U-8 / U-12 之后取分段短名与「关于」）",
         )
         assertEquals(
             listOf(

@@ -50,7 +50,10 @@ import kotlinx.coroutines.flow.first
 
 /**
  * 词汇域三入口的第三枚（裁决① `docs/decisions/2026-10-17-ui-redesign-information-architecture.md` ①）：
- * **收藏 · 生词本 · 错词** 合成一页三段，不再让用户为「我攒下来的词」跑三个页面。
+ * **收藏 · 生词 · 错词** 合成一页三段，不再让用户为「我攒下来的词」跑三个页面。
+ * 三段名一律取词库分段的短名（U-8，决策 2026-11-03 §5）：与 hub 行名、分段名逐字同名，
+ * 「生词本」在本屏只作为**功能名**留在句子里（加入/移出生词本、空态朗读描述），不作为段标题。
+ * 三处对齐由 `WordListEntryNamesFollowBankSegmentsTest` 按 `WordBankSection` 枚举体推导。
  *
  * 三段是**同屏并列的三个容器**，不是 tab 页：`section` 形参只决定初始落位（滚到哪一段），
  * **永远不决定渲染哪一段**（R-20A.2）。这条由两处双向钉住：
@@ -156,7 +159,7 @@ fun MyWordsScreen(
         if (showHeader) {
             AppScreenHeader(
                 title = "我的词",
-                subtitle = "收藏 · 生词本 · 错词，三处攒下来的词都在这一页",
+                subtitle = "收藏 · 生词 · 错词，三处攒下来的词都在这一页",
                 onBack = onBack,
             )
         }
@@ -218,7 +221,7 @@ fun MyWordsScreen(
         }
         if (MyWordsSection.Wordbook in visibleSections) {
             MyWordsSectionCard(
-                title = "生词本",
+                title = "生词",
                 sectionTag = "my_words_section_wordbook",
                 count = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
                 onTopChanged = { sectionTops[MyWordsSection.Wordbook] = it },

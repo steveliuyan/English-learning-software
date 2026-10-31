@@ -95,7 +95,8 @@ class MyWordsScreenTest {
      * R-20A.1 实证 + 三段齐现：一次 `setContent`，三段各自的数据都在，且各落在自己的段容器内。
      *
      * 这条同时钉住 R-20A.2 的后半：`section` 是落位参、不是渲染开关——默认落位收藏段时，
-     * 生词本段与错词段仍被组合出来（做成「只显示一段的 tab 页」在这里当场红）。
+     * 生词段与错词段仍被组合出来（做成「只显示一段的 tab 页」在这里当场红）。
+     * 三段标题取词库分段短名（U-8，决策 2026-11-03 §5）：收藏 / 生词 / 错词。
      */
     @Test
     fun three_sections_render_in_one_composition() {
@@ -111,7 +112,7 @@ class MyWordsScreenTest {
         composeRule.onNodeWithTag("my_words_screen").assertExists()
         listOf(
             Triple("my_words_section_favorites", "delicious", "收藏"),
-            Triple("my_words_section_wordbook", "abandon", "生词本"),
+            Triple("my_words_section_wordbook", "abandon", "生词"),
             Triple("my_words_section_wrong", "gossamer", "错词"),
         ).forEach { (tag, lemma, title) ->
             val container = composeRule.onNodeWithTag(tag)

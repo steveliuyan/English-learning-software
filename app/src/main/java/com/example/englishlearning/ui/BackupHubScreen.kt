@@ -45,6 +45,9 @@ import com.example.englishlearning.ui.theme.appDomain
  *
  * 四枚行标题与副标题在本屏是**唯一真值**（`ProfileGroups` 只管「我的」hub 那一行「数据与备份」的标题，
  * `BackupEntryUnificationTest` 按这几句做文案取证），重排只动容器与顺序，不动一个字。
+ * U-11（决策 2026-11-03 §5）把这句话延伸到落地页：三枚有落地页的行，页标题取「括号限定之前的那半名」
+ * ——「认证导出（可用于新设备恢复）」→「认证导出」、「从旧设备恢复（认证恢复）」→「从旧设备恢复」、
+ * 「导出学习数据留档」原样进页头（判据 `BackupPageNamesFollowHubRowsTest`）。
  *
  * 删除语义一行未动：本屏只发 request，级联预览 + 二次确认仍由宿主 `AppScreen` 的
  * `AppUiState.Ready` 顶层承载（F4-01 Spec 04 L18）。认证链路（配对挑战 / 签名 / BiometricPrompt）

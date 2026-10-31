@@ -91,7 +91,7 @@ private fun UnavailableContent(onBack: () -> Unit) {
             .padding(horizontal = 20.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        AppScreenHeader(title = "导出备份", onBack = onBack)
+        AppScreenHeader(title = "导出学习数据留档", onBack = onBack)
         SoftCard {
             Text(text = "备份导出功能暂不可用", style = AppType.Body, color = colors.text1)
             Text(
@@ -127,7 +127,7 @@ private fun BackupExportContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             AppScreenHeader(
-                title = "导出备份",
+                title = "导出学习数据留档",
                 subtitle = "生成 .elpbak 留档文件，写到你自己选的目录；App 自己不留副本。",
                 onBack = onBack,
             )

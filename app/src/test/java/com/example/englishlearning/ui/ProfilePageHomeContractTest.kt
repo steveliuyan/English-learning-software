@@ -32,6 +32,20 @@ class ProfilePageHomeContractTest {
 
     private val screen: String by lazy { uiScreenSource("ProfileScreen.kt") }
 
+    /**
+     * 三行 `ProfileStatCell(...)` 调用本体（本屏逐枚写成单行）。U-8 之后「收藏」在 hub 行合法在册，
+     * 所以「统计格不许标收藏」这条只能扫这三行，不能扫整份源码。
+     */
+    private val statCellLines: List<String> by lazy {
+        Regex("""(?m)^[ \t]*ProfileStatCell\(""")
+            .findAll(screen)
+            .map { match ->
+                val lineEnd = screen.indexOf('\n', match.range.first).let { i -> if (i == -1) screen.length else i }
+                screen.substring(match.range.first, lineEnd).trim()
+            }
+            .toList()
+    }
+
     @Test
     fun `the header subtitle reads the two real facts the page receives`() {
         assertTrue(
@@ -64,10 +78,15 @@ class ProfilePageHomeContractTest {
 
     /**
      * 原型第三格是「收藏」，本页第三格是「文章」。这不是「读不到」——收藏数在宿主侧读得到；
-     * 不搬的理由是**落点重复**：hub 第一组已经有一行「收藏的词」通往词库收藏分段，
+     * 不搬的理由是**落点重复**：hub 第一组已经有一行通往词库收藏分段，
      * 三格上再挂一枚同落点的数字就是那条通路开第二个入口。
      *
      * 反向钉住：一旦有人照原型把第三格改成收藏，这条会红，逼他先回答「第二入口还成不成立」。
+     *
+     * 口径收窄（U-8，决策 2026-11-03 §5）：hub 那行本来就标作「收藏」——旧写法在整份源码扫
+     * `"收藏"` 并要求归零，改名之后会把 hub 行本身判红，而它恰恰是这句理由里的**合法那一枚入口**。
+     * 本条判据说的是「统计格不许长出一个收藏标签」，所以扫描面只能落在三行 `ProfileStatCell` 上；
+     * 份数钉（恰 3 行）保证这条不会因为写法换行而空转。
      */
     @Test
     fun `the third stat cell stays the article fact instead of the prototype favorite count`() {
@@ -77,11 +96,13 @@ class ProfilePageHomeContractTest {
             countMatches(screen, Regex(Regex.escape("profile_stat_articles"))),
             "第三格的锚是 `profile_stat_articles`：改名等于把既有 connected 判据与宿主接线静默断开",
         )
-        assertEquals(
-            0,
-            countMatches(screen, Regex("\"收藏\"")),
-            "统计格不得有一枚标签就叫「收藏」：它的入口是 hub 第一组那行「收藏的词」",
-        )
+        assertEquals(3, statCellLines.size, "三格统计必须恰 3 行可取（${statCellLines.size} 行＝取法失效，本条会空转）")
+        statCellLines.forEach { line ->
+            assertTrue(
+                "\"收藏\"" !in line,
+                "统计格不得有一枚标签就叫「收藏」：它的入口是 hub 第一组那行（落点重复才是要钉的东西）——命中行：$line",
+            )
+        }
         assertEquals(
             0,
             countMatches(screen, Regex("""eyebrow\s*=""")),
@@ -91,7 +112,7 @@ class ProfilePageHomeContractTest {
 
     /**
      * 词汇三行的落点必须**点名段位**：收藏 → Favorite、生词 → New、错词 → Wrong，
-     * 「词书」格与「词书」行 → Book。只赋 `showWordBank = true` 不赋段位＝点「易错词」看到词书段第一页。
+     * 「词书」格与「词书」行 → Book。只赋 `showWordBank = true` 不赋段位＝点「错词」看到词书段第一页。
      */
     @Test
     fun `the vocabulary rows name their word bank section instead of landing on the default one`() {

@@ -73,9 +73,15 @@ data class ProfileGroup(
  * 宿主逐行接线」；connected 侧 `ProfileScreenTest` 逐条核对这些 tag 真的渲染出来。
  */
 object ProfileGroups {
-    val FavoriteWords = ProfileRow("收藏的词", "profile_open_favorite_words", AppIcon.Star, AppDomain.Review, "不排进复习 · 只做手动回看")
-    val NewWords = ProfileRow("生词本", "profile_open_new_words", AppIcon.Bookmark, AppDomain.Learn, "明天的词单里排到前面")
-    val WrongWords = ProfileRow("易错词", "profile_open_wrong_words", AppIcon.Warning, AppDomain.Review, "按答错次数排序 · 答对两次移出")
+    // U-8（决策 2026-11-03 §5）：三行行名统一到**词库分段的短名**（`WordBankSection.label`：收藏 / 生词 / 错词）。
+    // 改前同一批词在三处三个名字——hub 这三行一套、分段一套、合并页的副标题与段卡标题又一套；
+    // 用户从 hub 点第三行进到的那一格写的是「错词」，他记住的只有最浅那一层。
+    // 分段是落点也是本仓这套词的术语源头，所以以它为准（入口本身按旧 D-6/D-7 裁定保留双入口，收的是名字不是路径）。
+    // 旧名按本批口径在 `ui/` 整棵子树（含注释）归零：注释里的旧名就是下一批会照抄的模板。
+    // 判据在 `WordListEntryNamesFollowBankSegmentsTest`：期望名从枚举体解析，分段改名时闸跟着走。
+    val FavoriteWords = ProfileRow("收藏", "profile_open_favorite_words", AppIcon.Star, AppDomain.Review, "不排进复习 · 只做手动回看")
+    val NewWords = ProfileRow("生词", "profile_open_new_words", AppIcon.Bookmark, AppDomain.Learn, "明天的词单里排到前面")
+    val WrongWords = ProfileRow("错词", "profile_open_wrong_words", AppIcon.Warning, AppDomain.Review, "按答错次数排序 · 答对两次移出")
     val LearningRecords = ProfileRow("学习记录", "profile_open_learning_records", AppIcon.Chart, AppDomain.Learn, "今日与按日的完成情况")
     val LearningPlan = ProfileRow("学习计划", "profile_open_plan", AppIcon.List, AppDomain.Learn, null, EntryIconTone.Gradient)
     val WordBook = ProfileRow("词书", "profile_open_word_book", AppIcon.Book, AppDomain.Library, null)
@@ -85,7 +91,11 @@ object ProfileGroups {
     val ReminderSpeech = ProfileRow("提醒与发音", "profile_open_reminder_speech", AppIcon.Bell, AppDomain.Settings, "提醒时间 · 系统 TTS 与 AI 发音")
     val Settings = ProfileRow("设置", "profile_open_settings", AppIcon.Gear, AppDomain.Settings, "外观（跟随系统 / 浅色 / 深色）")
     val Backup = ProfileRow("数据与备份", "profile_open_backup", AppIcon.Shield, AppDomain.Settings, "导出本机文件、换机恢复与清空学习数据")
-    val About = ProfileRow("关于与许可", "profile_open_about", AppIcon.Info, AppDomain.Settings, "版本、致谢与来源说明")
+    // U-12（决策 2026-11-03 §5）：行名从旧的那枚「关于＋许可」并列名收窄成「关于」，与它打开的页同名。
+    // 旧名把两跳说成一跳——第三方清单不住在关于页里，关于页只留一句进许可页的入口，
+    // 用户在这行下面找不到「许可」那层会以为走错页；直跳许可页又会让「关于」这层没入口，
+    // 所以保留两跳、只改行名（第二跳那句归关于页，hub 不复述）。判据在 `AboutRowNameIsJustAboutTest`。
+    val About = ProfileRow("关于", "profile_open_about", AppIcon.Info, AppDomain.Settings, "版本、致谢与来源说明")
 
     val all: List<ProfileGroup> = listOf(
         ProfileGroup("我的词汇", "profile_group_vocabulary", listOf(FavoriteWords, NewWords, WrongWords)),

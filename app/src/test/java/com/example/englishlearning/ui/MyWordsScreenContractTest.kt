@@ -22,7 +22,7 @@ class MyWordsScreenContractTest {
 
     private val screen = uiScreenSource("MyWordsScreen.kt")
 
-    /** 裁决①逐字：三段 = 收藏 · 生词本 · 错词；容器标签按 R-20A.2 的三条 testTag。 */
+    /** 裁决①逐字：三段 = 收藏 · 生词 · 错词（段名取分段短名，U-8 决策 2026-11-03 §5）；容器标签按 R-20A.2 的三条 testTag。 */
     private val sectionTags = listOf(
         "my_words_section_favorites",
         "my_words_section_wordbook",
@@ -45,7 +45,7 @@ class MyWordsScreenContractTest {
         assertEquals(
             3,
             constants.size,
-            "MyWordsSection 枚举体必须恰为三枚段常量（收藏 / 生词本 / 错词），实际：$constants",
+            "MyWordsSection 枚举体必须恰为三枚段常量（收藏 / 生词 / 错词），实际：$constants",
         )
         listOf("Favorites", "Wordbook", "Wrong").forEach { name ->
             assertTrue(

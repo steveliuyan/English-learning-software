@@ -157,7 +157,7 @@ class SettingsScreenTest {
         ).forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
-        listOf("提醒与发音", "词书内容包", "关于与许可", "数据与备份", "学习计划").forEach { title ->
+        listOf("提醒与发音", "词书内容包", "关于", "数据与备份", "学习计划").forEach { title ->
             composeRule.onNodeWithText(title).assertDoesNotExist()
         }
         // 发音摘要随发音行搬到「提醒与发音」导航页（`ReminderSpeechScreenTest` 承重），这里不该有它。

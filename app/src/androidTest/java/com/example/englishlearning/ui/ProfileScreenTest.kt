@@ -202,6 +202,7 @@ class ProfileScreenTest {
             composeRule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
         // 末组最后一行的**文字**也在视口内：只有 tag 节点可见而文案被裁，用户仍读不到那一行。
-        composeRule.onNodeWithText("关于与许可").performScrollTo().assertIsDisplayed()
+        // 行名 2026-11-03 起是「关于」（U-12，决策 §5）——锚必须跟着改名，否则这条永远在找一个不存在的串。
+        composeRule.onNodeWithText("关于").performScrollTo().assertIsDisplayed()
     }
 }

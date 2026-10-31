@@ -2734,11 +2734,13 @@ class AppScreenTest {
     }
 
     /**
-     * 关于页的宿主端通路：「我的」hub →「关于与许可」行 → 关于页 → 返回 → 落回 hub。
+     * 关于页的宿主端通路：「我的」hub →「关于」行 → 关于页 → 返回 → 落回 hub。
      *
      * 通路的落点换过两次：先是「我的」页尾部设置内容里的一行，2026-10-31 起搬到独立设置栏，
      * 2026-11-02 决策 §2 又收回 hub（设置子页不再有说明出口，见
-     * `SettingsLicensesEntryTest#theSettingsSubpageCarriesNeitherAboutNorLicenseRow`）。
+     * `SettingsLicensesEntryTest#theSettingsSubpageCarriesNeitherAboutNorLicenseRow`）；
+     * 2026-11-03（U-12，决策 `2026-11-03-duplication-consolidation.md` §5）行名改成与落地页同名的「关于」，
+     * 通路本体一格未动——本条全程按 tag 定位，改名不动接线。
      * 本条钉宿主这一层：切到「我的」栏、滚到关于行、点开、点返回，必须回到**hub**，
      * 而不是设置子页或别的 tab——「从哪来回哪去」在 hub 这一站的具体形状。
      *
