@@ -24,16 +24,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailureUiText
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.NotConfiguredCard
+import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.SoftCard
-import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
-import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.wordqa.WordAiNote
@@ -124,7 +124,18 @@ fun WordAiQaScreen(
                 modifier = Modifier.testTag("word_qa_asking"),
             )
             is WordAiQaUiState.Answered -> AnsweredContent(state.kind, state.answer, state.saved, state.saveFailed, onSaveNote)
-            is WordAiQaUiState.NeedsOutboundConfirmation -> OutboundConfirmationDialog(state.host, onConfirmOutbound)
+            // U-1（决策 2026-11-03 整合 §1）：私写的 `OutboundConfirmationDialog` 下线，改调共享件；
+            // 屏侧只补一句「发的是哪个词」，正文配方不再由本屏改写。
+            is WordAiQaUiState.NeedsOutboundConfirmation -> OutboundConfirmDialog(
+                endpointHost = state.host,
+                payloadKind = AiPayloadKind.Text,
+                onConfirm = { onConfirmOutbound(true) },
+                onDismiss = { onConfirmOutbound(false) },
+                note = "发送的是你正在问的那个词与你的问题。",
+                bodyTestTag = "word_qa_outbound_confirmation_text",
+                confirmTestTag = "word_qa_confirm_outbound",
+                dismissTestTag = "word_qa_decline_outbound",
+            )
             is WordAiQaUiState.NotConfigured -> NotConfiguredCard(
                 featureLabel = "AI 问词",
                 onConfigure = onOpenAiSettings,
@@ -273,44 +284,6 @@ private fun SavedNoteList(notes: List<WordAiNote>) {
                 titleMaxLines = 2,
                 topDivider = index > 0,
                 modifier = Modifier.testTag("word_qa_saved_note_${note.noteId}"),
-            )
-        }
-    }
-}
-
-@Composable
-private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean) -> Unit) {
-    GlassDialog(onDismiss = { onConfirmOutbound(false) }) {
-        Text("确认发送请求", style = AppType.Headline, color = appColors().text1)
-        Text(
-            "你的问题与该服务的密钥将发送给 $host，并可能产生费用。",
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .testTag("word_qa_outbound_confirmation_text"),
-            style = AppType.Body,
-            color = appColors().text1,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            PillButton(
-                text = "取消",
-                onClick = { onConfirmOutbound(false) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Secondary,
-                domain = AppDomain.AiSpeech,
-                testTag = "word_qa_decline_outbound",
-            )
-            PillButton(
-                text = "确认发送",
-                onClick = { onConfirmOutbound(true) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Primary,
-                domain = AppDomain.AiSpeech,
-                testTag = "word_qa_confirm_outbound",
             )
         }
     }

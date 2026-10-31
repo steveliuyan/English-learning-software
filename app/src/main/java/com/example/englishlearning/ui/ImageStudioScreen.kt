@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -31,13 +30,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.imagegen.DrawingPromptPolicy
 import com.example.englishlearning.imagegen.ImageStudioNotConfiguredReason
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.NotConfiguredCard
+import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
-import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.components.hairlineTop
@@ -165,7 +165,28 @@ fun ImageStudioScreen(
                             onEditedPromptChange = { editedPrompt = it },
                         )
                     }
-                    is ImageStudioUiState.AwaitingConfirmation -> ConfirmationDialog(state, onConfirm)
+                    // U-1 + U-2（决策 2026-11-03 整合 §1）：私写的 `ConfirmationDialog` 下线，改调共享件。
+                    // 两档正文不再各写一句：Prompt 档走文本配方（域层对文本确实是 `AiPayloadKind.Text`，
+                    // 发出去的是画面描述），Image 档走图片配方（配方本身就说「图片发送每次都需要你确认」，
+                    // 与 `requiredConfirmation` 的 Image 格同口径）；本屏特有的只有**按张计费**这一句，作为 note 追加。
+                    is ImageStudioUiState.AwaitingConfirmation -> OutboundConfirmDialog(
+                        endpointHost = state.host,
+                        payloadKind = when (state.stage) {
+                            ImageStudioConfirmationStage.Prompt -> AiPayloadKind.Text
+                            ImageStudioConfirmationStage.Image -> AiPayloadKind.Image
+                        },
+                        onConfirm = { onConfirm(true) },
+                        onDismiss = { onConfirm(false) },
+                        note = when (state.stage) {
+                            ImageStudioConfirmationStage.Prompt ->
+                                "发送的是你输入的画面描述。同一域名只需确认一次。"
+                            ImageStudioConfirmationStage.Image ->
+                                "生图按张计费，费用可能是文本调用的数十倍。"
+                        },
+                        bodyTestTag = "image_studio_outbound_confirmation_text",
+                        confirmTestTag = "image_studio_confirm_outbound",
+                        dismissTestTag = "image_studio_decline_outbound",
+                    )
                     ImageStudioUiState.GeneratingImage -> Text(
                         text = "正在生成图片…",
                         style = AppType.Footnote,
@@ -289,50 +310,6 @@ private fun PromptEditor(
             color = colors.text3,
             modifier = Modifier.testTag("image_studio_image_cost_hint"),
         )
-    }
-}
-
-@Composable
-private fun ConfirmationDialog(state: ImageStudioUiState.AwaitingConfirmation, onConfirm: (Boolean) -> Unit) {
-    GlassDialog(onDismiss = { onConfirm(false) }) {
-        Text("确认发送请求", style = AppType.Headline, color = appColors().text1)
-        val message = when (state.stage) {
-            ImageStudioConfirmationStage.Prompt ->
-                "你的主题与该服务的密钥将发送给 ${state.host}，并可能产生费用。同一域名只需确认一次。"
-            ImageStudioConfirmationStage.Image ->
-                "将向 ${state.host} 发送一次生图请求：按张计费，费用可能是文本调用的数十倍，每次出图都要重新确认。"
-        }
-        Text(
-            message,
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .testTag("image_studio_outbound_confirmation_text"),
-            style = AppType.Body,
-            color = appColors().text1,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            PillButton(
-                text = "取消",
-                onClick = { onConfirm(false) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Secondary,
-                domain = AppDomain.AiSpeech,
-                testTag = "image_studio_decline_outbound",
-            )
-            PillButton(
-                text = "确认发送",
-                onClick = { onConfirm(true) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Primary,
-                domain = AppDomain.AiSpeech,
-                testTag = "image_studio_confirm_outbound",
-            )
-        }
     }
 }
 

@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.englishlearning.ai.AiFailureUiText
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
@@ -66,8 +67,8 @@ import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.NotConfiguredCard
+import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.SoftCard
-import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
@@ -405,7 +406,20 @@ fun PhotoTranslationScreen(
     }
 
     state.pendingConfirmationHost?.let { host ->
-        OutboundConfirmationDialog(host, onConfirmOutbound)
+        // U-1（决策 2026-11-03 整合 §1）：私写的 `OutboundConfirmationDialog` 下线，改调共享件。
+        // 这一屏原本把「图片不会发送」写在正文里——那半句是真的屏侧事实，保留，但只能作为**追加说明**；
+        // 域名 + 密钥 + 计费三件事改由 `outboundConfirmBody` 一处给（屏侧旧正文连「文本」都说成了「识别文本」，
+        // 与共享件的档名对不上就是漂移的开始）。
+        OutboundConfirmDialog(
+            endpointHost = host,
+            payloadKind = AiPayloadKind.Text,
+            onConfirm = { onConfirmOutbound(true) },
+            onDismiss = { onConfirmOutbound(false) },
+            note = "发送的是识别出的文字（可能是你编辑过的版本），图片不会发送。",
+            bodyTestTag = "photo_translation_outbound_confirmation_text",
+            confirmTestTag = "photo_translation_confirm_outbound",
+            dismissTestTag = "photo_translation_decline_outbound",
+        )
     }
 }
 
@@ -736,44 +750,6 @@ private fun OfflineModelCard(
                 style = AppType.Footnote,
                 color = colors.text2,
                 modifier = Modifier.testTag("photo_translation_model_issue"),
-            )
-        }
-    }
-}
-
-@Composable
-private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean) -> Unit) {
-    GlassDialog(onDismiss = { onConfirmOutbound(false) }) {
-        Text("确认发送请求", style = AppType.Headline, color = appColors().text1)
-        Text(
-            "你的识别文本（编辑后的版本）与该服务的密钥将发送给 $host，并可能产生费用。图片不会发送。",
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .testTag("photo_translation_outbound_confirmation_text"),
-            style = AppType.Body,
-            color = appColors().text1,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            PillButton(
-                text = "取消",
-                onClick = { onConfirmOutbound(false) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Secondary,
-                domain = AppDomain.AiSpeech,
-                testTag = "photo_translation_decline_outbound",
-            )
-            PillButton(
-                text = "确认发送",
-                onClick = { onConfirmOutbound(true) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Primary,
-                domain = AppDomain.AiSpeech,
-                testTag = "photo_translation_confirm_outbound",
             )
         }
     }

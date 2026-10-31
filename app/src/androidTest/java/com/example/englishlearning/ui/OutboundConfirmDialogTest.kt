@@ -12,8 +12,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
-import com.example.englishlearning.ui.components.PayloadKind
 import com.example.englishlearning.ui.components.outboundConfirmBody
 import com.example.englishlearning.ui.theme.MintGlassTheme
 import org.junit.Assert.assertEquals
@@ -25,10 +25,11 @@ import org.junit.Test
  * 批 1 Task 11 的组件级 connected 护栏：[OutboundConfirmDialog]
  * （spec §3「首次调用第三方 Endpoint 前展示域名并确认」）。
  *
- * 分工：「图片每次都问、文本按域名记忆」是**纯函数**规则（[com.example.englishlearning.ui.components.mustAskEveryTime]），
- * 由 `ConfirmDestructiveWordingTest.image_payload_always_asks_even_when_the_host_is_remembered` 四格全钉；
- * 本组件**不接** `rememberedForHost`——「要不要弹」是调用方的业务判断，组件只保证「弹出来必须说全三件事」。
- * 措辞三要素（域名 / 密钥一起外发 / 文本还是图片）同样由那份 JVM 契约钉；本类只钉渲染面：
+ * 分工：「图片每次都问、文本按域名记忆」是**域层**规则
+ * （`ai/AiOutboundConfirmation.kt` 的 `requiredConfirmation`，四格由 `ai/AiRequestPolicyTest` 逐格钉住——
+ * U-3 之后 UI 侧那份零调用的 `mustAskEveryTime` 已删，见决策 2026-11-03 整合 §1）；
+ * 本组件**不接**记忆态——「要不要弹」是调用方与域层的判断，组件只保证「弹出来必须说全三件事」。
+ * 措辞三要素（域名 / 密钥一起外发 / 文本还是图片）由 `ConfirmDestructiveWordingTest` 钉；本类只钉渲染面：
  * 正文真的把域名画在树上、两档正文可区分、两枚按钮各恰一枚可点节点、48dp 触控下限、回调真的接上。
  *
  * 正文期望值一律由纯函数 [outboundConfirmBody] 现算，不在用例里重抄文案（抄两遍 = 改一次要改两处）。
@@ -51,13 +52,13 @@ class OutboundConfirmDialogTest {
             MintGlassTheme {
                 OutboundConfirmDialog(
                     endpointHost = host,
-                    payloadKind = PayloadKind.Text,
+                    payloadKind = AiPayloadKind.Text,
                     onConfirm = { confirmed = true },
                     onDismiss = { dismissed = true },
                 )
             }
         }
-        val body = outboundConfirmBody(host, PayloadKind.Text)
+        val body = outboundConfirmBody(host, AiPayloadKind.Text)
         assertTrue("正文必须点名域名（含糊指代等于没展示）：$body", body.contains(host))
         assertTrue("正文必须说明密钥会一起外发：$body", body.contains("密钥"))
         composeRule.onNodeWithText(body).assertExists()
@@ -98,14 +99,14 @@ class OutboundConfirmDialogTest {
             MintGlassTheme {
                 OutboundConfirmDialog(
                     endpointHost = host,
-                    payloadKind = PayloadKind.Image,
+                    payloadKind = AiPayloadKind.Image,
                     onConfirm = {},
                     onDismiss = {},
                 )
             }
         }
-        val imageBody = outboundConfirmBody(host, PayloadKind.Image)
-        val textBody = outboundConfirmBody(host, PayloadKind.Text)
+        val imageBody = outboundConfirmBody(host, AiPayloadKind.Image)
+        val textBody = outboundConfirmBody(host, AiPayloadKind.Text)
         assertTrue("图片档必须说外发的是图片：$imageBody", imageBody.contains("图片"))
         assertTrue("图片档必须当场告知每次都要确认：$imageBody", imageBody.contains("每次"))
         assertTrue("图片档必须点名域名：$imageBody", imageBody.contains(host))
@@ -129,7 +130,7 @@ class OutboundConfirmDialogTest {
             MintGlassTheme {
                 OutboundConfirmDialog(
                     endpointHost = "api.example.com",
-                    payloadKind = PayloadKind.Text,
+                    payloadKind = AiPayloadKind.Text,
                     onConfirm = {},
                     onDismiss = {},
                 )

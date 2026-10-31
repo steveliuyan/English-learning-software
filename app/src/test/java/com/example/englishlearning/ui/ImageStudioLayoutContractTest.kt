@@ -173,10 +173,19 @@ class ImageStudioLayoutContractTest {
                 "出站确认三要素「$tag」必须恰 1 处：确认前零字节出网这件事实只由它证",
             )
         }
+        // U-1（决策 `docs/decisions/2026-11-03-duplication-consolidation.md` §1）：本屏的出站确认框
+        // 由私写 `GlassDialog` 换成共享件——份数判据跟着换对象，口径没放宽：共享件调用恰一处
+        // （0 = 这屏的出站确认整族消失，2 = 又长出第二份），屏内玻璃面板归零
+        // （面板份数与墨色由 `GlassPanelInkPairingContractTest` 的花名册与 `DangerInkPlacementContractTest` 承重）。
         assertEquals(
             1,
+            countMatches(source, Regex("""\bOutboundConfirmDialog\(""")),
+            "出站确认必须恰一处走共享 `OutboundConfirmDialog(`（U-1）",
+        )
+        assertEquals(
+            0,
             countMatches(source, Regex("""GlassDialog\(""")),
-            "出站确认框必须仍是唯一一枚 `GlassDialog(`",
+            "屏内零玻璃面板：本屏不再自画出站确认框（U-1 之后 `GlassDialog(` 的份数就该是 0）",
         )
         assertEquals(
             0,

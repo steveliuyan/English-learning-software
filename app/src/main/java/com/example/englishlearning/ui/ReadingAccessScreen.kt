@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.ai.UserAction
 import com.example.englishlearning.ai.toUserAction
 import com.example.englishlearning.reading.NotConfiguredReason
@@ -41,7 +42,6 @@ import com.example.englishlearning.ui.components.EntryIconBadge
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
-import com.example.englishlearning.ui.components.PayloadKind
 import com.example.englishlearning.ui.components.QuietCard
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
@@ -344,13 +344,14 @@ private fun ReadyContent(
         }
         is GenerationUiState.Failed -> GenerationFailureBanner(generation.failure, onOpenAiSettings)
         is GenerationUiState.NotConfigured -> NotConfiguredBanner(generation.reason, onOpenAiSettings)
-        // 出站确认走共享件（本席是它第一枚生产接线）：载荷档位显式给 `PayloadKind.Text`。
+        // 出站确认走共享件（本席是它第一枚生产接线）：载荷档位显式给域层 `AiPayloadKind.Text`
+        // （U-3：UI 侧那枚 `PayloadKind` 已删，档位与「图片每次都问」的真值只由 `ai/AiOutboundConfirmation.kt` 定）。
         // 屏侧锚 `outbound_confirmation_text` 随接线收窄为「本屏出站确认槽位」，
         // 正文节点的权威锚是共享件自带的 `outbound_confirm_body`；两枚锚由同一枚 connected 用例点名。
         is GenerationUiState.NeedsConfirmation -> Box(Modifier.testTag("outbound_confirmation_text")) {
             OutboundConfirmDialog(
                 endpointHost = generation.host,
-                payloadKind = PayloadKind.Text,
+                payloadKind = AiPayloadKind.Text,
                 onConfirm = { onConfirmOutbound(true) },
                 onDismiss = { onConfirmOutbound(false) },
             )

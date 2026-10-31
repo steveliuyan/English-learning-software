@@ -113,14 +113,19 @@ class GlassPanelInkPairingContractTest {
         // 由 `ArticleReadingLayoutContractTest` 第 3 条接管（断言面板窗口内逐枚前景显式给
         // `appColors()` 档，且窗口内零静态墨）。重算：
         // `grep -rn 'GlassDialog(' app/src/main/java/com/example/englishlearning/ui/ArticleReadingScreen.kt`（应为零命中）。
-        Panel("ImageStudioScreen.kt", "确认发送请求"),
-        Panel("PhotoTranslationScreen.kt", "确认发送请求"),
         // Task 24（裁决⑤ 第二件）：`ReadingAccessScreen.kt` 的私有玻璃对话框退役、改调共享
         // `OutboundConfirmDialog`，本屏随玻璃面板族摘一行——共享件的面板由 `DialogPanel` 承重，
         // 不属本契约的 `GlassDialog(` 取样族。重算：
         // `grep -rn 'GlassDialog(' app/src/main/java/com/example/englishlearning/ui/ReadingAccessScreen.kt`（应为零命中）。
-        Panel("SentenceAnalysisScreen.kt", "确认发送请求"),
-        Panel("WordAiQaScreen.kt", "确认发送请求"),
+        // 2026-11-03（决策 `docs/decisions/2026-11-03-duplication-consolidation.md` §1，U-1）：
+        // `ImageStudioScreen` / `PhotoTranslationScreen` / `SentenceAnalysisScreen` / `WordAiQaScreen`
+        // 四行随四份私写出站确认框一起退役——那四枚 `GlassDialog` 换成共享 `OutboundConfirmDialog`，
+        // 面板改由共享件的 `DialogPanel` 承重。本族的取样锚是字面 `GlassDialog(`，留着这四行
+        // 就是让锚对着「四枚已经不存在的面板」空转（与上面 ArticleReading / ReadingAccess 两次摘项同理）。
+        // 「容器与前景同源取墨」这条口径**没有放宽**，只是换了执行点：这四屏的确认框墨色现在由
+        // `dialogButtonInk` 角色表 + `DangerInkPlacementContractTest` 的共享件腿负责，份数由
+        // `OutboundDialogFamilyTest` 逐屏钉恰一处调用。重算：
+        // `grep -rn 'GlassDialog(' app/src/main/java/com/example/englishlearning/ui/{ImageStudio,PhotoTranslation,SentenceAnalysis,WordAiQa}Screen.kt`（应为零命中）。
     )
 
     private data class Window(val file: String, val region: String)
@@ -416,7 +421,7 @@ class GlassPanelInkPairingContractTest {
             }
             offenders += panelOffenders(panel, matched.single().region, inkTable)
         }
-        // 无名窗口也算违例：份数相等时若某枚窗口不含任何已登记身份，上面只登记了 8 枚身份而窗口仍有一枚没人认领
+        // 无名窗口也算违例：份数相等时若某枚窗口不含任何已登记身份，登记表少一枚而窗口仍有一枚没人认领
         val claimed = expectedPanels.map { it.file to it.identity }
         windows.forEach { window ->
             if (claimed.none { (file, identity) -> file == window.file && window.region.contains(identity) }) {

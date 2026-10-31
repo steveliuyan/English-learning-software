@@ -27,8 +27,9 @@
 - **对话框组件**只留 `ui/components/OutboundConfirmDialog.kt`。四屏
   （`SentenceAnalysisScreen.kt:253`、`PhotoTranslationScreen.kt:747`、`WordAiQaScreen.kt:284`、
   `ImageStudioScreen.kt:298`）里签名逐字相同的 `private fun OutboundConfirmationDialog(...)` 删除，
-  改调共享件。`ImageStudio` 的两段式正文（图片 / 文本分开说）通过给共享件加**一枚可选正文覆写入参**满足，
-  不为此留一份私写对话框。
+  改调共享件。`ImageStudio` 的两段式正文（图片 / 文本分开说）由共享件的 `payloadKind` 分派 +
+  一枚可选 `note` 实参满足——**屏侧只许在配方之后追加一句自己的业务说明，不许覆写配方**
+  （实施时把原稿的「正文覆写入参」收窄成「追加」：一旦允许整句覆写，U-2 的单一权威就当场作废）。
 - **正文措辞**只由 `outboundConfirmBody(host, kind)` 生成。屏侧只允许决定「发出去的是哪种载荷」，
   不允许自己拼句子——现状 `SentenceAnalysisScreen.kt:255` 那一份漏了「并可能产生费用」，
   这正是四套措辞的必然结果。
@@ -36,9 +37,30 @@
   UI 侧 `components/OutboundConfirmDialog.kt:48 mustAskEveryTime(...)` 与 `PayloadKind`（`:35`）
   改为**基于** `AiPayloadKind`：枚举不再第二份，纯函数不再自称权威却零调用。
   若共享件的可见性确需一个 UI 侧便捷判定，它必须委托域层那枚，而不是平行再算一次。
-- **配套闸**：`SharedComponentUniquenessRatchetTest` 现有的 `(?m)^fun X(` 锚点只数顶层**公开**定义，
-  四份缩进的私有同形态它数不到——所以它才漏掉本次事故。补一枚「对话框族」窗形状判据
-  （在 `OutboundConfirmDialog(` 的调用窗口内禁止再出现同名私写定义），否则下一批还能写第五份。
+- **配套闸（按实测形状落地）**：`SharedComponentUniquenessRatchetTest` 现有的 `(?m)^fun X(` 锚点只数顶层**公开**定义，
+  四份缩进的私有同形态它数不到——所以它才漏掉本次事故。补的闸是 `OutboundDialogFamilyTest` 四条跨文件计数：
+  标题「确认发送请求」全 main 恰一处且就在共享件、正文配方「与该服务的密钥将发送给」只许出现在共享件、
+  四屏各**恰调一次** `OutboundConfirmDialog(`、屏侧 `fun OutboundConfirmationDialog(` / `fun ConfirmationDialog(`
+  归零（计数**不锚进行首**，缩进的私写定义一样能数到，这正是不用「调用窗口内禁同名定义」那条窗形状判据的原因：
+  窗口只对"框住的那一段"有约束力，第五份只要长在窗外就躲过去了）。
+  措辞类判据走 `countMatches`（剥注释）：本仓的注释惯例是把权威措辞引一遍再解释为什么，
+  按原文计数会把诚实的文档判成违规；§2 那类**改名**判据反之必须连注释一起扫。两种口径的差别写在各自的消息里。
+- **连带后果：出站确认两枚按钮的墨色权威搬家（改的是 Task 27 的判据本体，故在此记账）**。
+  Task 27（裁决 22-2）把四屏的出站确认按钮从 `Learn` 绿改成 `AiSpeech` 域色，立论是「按钮与入口图标同色」。
+  并入共享件后，那两枚按钮由屏**画不出来**了——它们来自 `DialogButton(role = Confirm / Dismiss)`，
+  取墨只由 `components/ConfirmDestructiveDialog.kt` 的 `dialogButtonInk` 角色表决定
+  （确认档 = `onMint` 容器 + `background` 前景，即装配点已钉的 `primary`/`onPrimary`）。
+  本批**接受**这个形状，不为此在共享件上开一枚 `domain` 形参：对话框内需要读出来的是
+  「这是本对话框的主操作」，而不是「这属于哪个能力域」——同一枚对话框的标题、正文、取消键都不带域色，
+  只给按钮染域色反而把主次读反；而「和入口图标同色」这条从来只是修 `Learn` 绿的顺带说法。
+  `DangerInkPlacementContractTest` 因此改成钉三件事：屏侧仍禁 `Learn` 绿（Task 27 的病灶一字未放宽）、
+  屏侧确认调用块内零 `AppDomain.` 取墨点、共享件按 `Confirm`/`Dismiss` 各恰一枚且自己也不按域取墨。
+- **连带后果：玻璃面板花名册少四行**。四屏的私写对话框用的是 `GlassDialog`，退役后
+  `GlassPanelInkPairingContractTest.expectedPanels` 从 6 枚减到 2 枚（`WordBookTransferScreen` + `AppScreen`）。
+  判据没放宽，只是换了执行者：面板份数由该花名册 + `OutboundDialogFamilyTest` 逐屏恰一处调用共同承重，
+  确认框两枚按钮的墨色由上一条的共享件腿承重。各屏版式契约里的 `GlassDialog( == 1` 同批改成
+  `OutboundConfirmDialog( == 1` + `GlassDialog( == 0`（`ImageStudio` / `PhotoTranslation` / `WordQa` 三处），
+  `SentenceAnalysisLayoutContractTest` 的药片计数随之从 5/2/1 改为 3/1/0。
 
 ### 2. 指引地图改指向真存在的落点（U-4）
 
@@ -99,8 +121,10 @@
 
 ## 影响
 
-- **改生产**：`components/OutboundConfirmDialog.kt`（正文覆写入参 + 委托域层）、
-  四屏删私写对话框、`ai/AiFailure.kt`、`ui/AiFeature.kt`、四个 AI 屏 + `PhotoTranslationScreen` 的文案、
+- **改生产**：`components/OutboundConfirmDialog.kt`（`note` 追加入参 + 三枚 tag 实参 + 改吃域层 `AiPayloadKind`）、
+  四屏删私写对话框（含三处随之失效的 `GlassDialog` import）、
+  `ReadingAccessScreen.kt`（档位实参换成 `AiPayloadKind`）、
+  `ai/AiFailure.kt`、`ui/AiFeature.kt`、四个 AI 屏 + `PhotoTranslationScreen` 的文案、
   `SpeechSettingsScreen/ViewModel`、`ReminderSettingsScreen`（删死行 + 规则一次）、`ReminderSpeechScreen`、
   `AppScreen.kt`（学习计划页头保存摘除 + `openAiProfilesOrSettings` 兜底）、`BackupExportScreen`、
   `ProfileScreen`、`WordBankScreen`、`MyWordsScreen`、`BackupHubScreen`。

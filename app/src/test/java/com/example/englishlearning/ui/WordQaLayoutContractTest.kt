@@ -213,10 +213,17 @@ class WordQaLayoutContractTest {
                 "出站确认三要素「$tag」必须恰 1 处：确认前零字节出网这件事实只由它证",
             )
         }
+        // U-1（决策 `docs/decisions/2026-11-03-duplication-consolidation.md` §1）：出站确认框改走共享件，
+        // 份数判据跟着换对象、口径不放宽（详见 `ImageStudioLayoutContractTest` 同条附注）。
         assertEquals(
             1,
+            countMatches(source, Regex("""\bOutboundConfirmDialog\(""")),
+            "出站确认必须恰一处走共享 `OutboundConfirmDialog(`（U-1）",
+        )
+        assertEquals(
+            0,
             countMatches(source, Regex("""GlassDialog\(""")),
-            "出站确认框必须仍是唯一一枚 `GlassDialog(`",
+            "屏内零玻璃面板：本屏不再自画出站确认框（U-1 之后 `GlassDialog(` 的份数就该是 0）",
         )
         assertEquals(
             1,

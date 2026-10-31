@@ -150,10 +150,14 @@ class SentenceAnalysisLayoutContractTest {
             countMatches(source, Regex(Regex.escape("\"sentence_analysis_cost_hint\""))),
             "常驻成本句 `sentence_analysis_cost_hint` 必须恰 1 处",
         )
-        assertTrue(
-            countMatches(source, Regex(Regex.escape("并可能产生费用"))) <= 1,
-            "「并可能产生费用」全屏至多讲一次：常驻成本句已经讲清楚，出站确认句不再复读" +
-                "（现值 ${countMatches(source, Regex(Regex.escape("并可能产生费用")))}）",
+        val costPhrase = countMatches(source, Regex(Regex.escape("并可能产生费用")))
+        assertEquals(
+            1,
+            costPhrase,
+            "「并可能产生费用」全屏恰 1 处，且必须是常驻成本句 `sentence_analysis_cost_hint` 那一句（实测 $costPhrase 处）：" +
+                "出站确认里的那一句现在由共享件 `outboundConfirmBody` 说（U-2），屏侧写第二份就是措辞漂移的起点；" +
+                "掉到 0 处同样判红——那说明常驻成本句被顺手删了，" +
+                "而这屏原本私写的那一份正是漏了费用告知那一份（U-2 的病灶）。",
         )
     }
 
@@ -171,20 +175,23 @@ class SentenceAnalysisLayoutContractTest {
             countMatches(source, Regex(Regex.escape("\"sentence_analysis_analyze\""))),
             "主操作 `sentence_analysis_analyze` 必须恰 1 处",
         )
+        // U-1（决策 `docs/decisions/2026-11-03-duplication-consolidation.md` §1）：出站确认框的两枚按钮
+        // 改由共享件画，本屏只剩流内那三枚——计数跟着搬家，「唯一实底主操作」这条立论反而更硬了。
         assertEquals(
-            5,
+            3,
             countMatches(source, Regex("""\bPillButton\(""")),
-            "全屏药片应为 5 枚：主操作 1 + 复制/朗读 2 + 出站确认框取消/确认 2",
-        )
-        assertEquals(
-            2,
-            countMatches(source, Regex("""PillStyle\.Primary""")),
-            "实底药片恰 2 枚：分析句子（主操作）+ 确认发送（出站确认框的确认键）",
+            "全屏药片应为 3 枚：主操作 1 + 复制/朗读 2（出站确认框的取消/确认归共享件，见 U-1）",
         )
         assertEquals(
             1,
+            countMatches(source, Regex("""PillStyle\.Primary""")),
+            "实底药片恰 1 枚：只有「分析句子」是这屏的主操作——「确认发送」那枚实底随对话框搬家，" +
+                "这里再数出第 2 枚就是屏侧私自回写了出站确认框",
+        )
+        assertEquals(
+            0,
             countMatches(source, Regex("""PillStyle\.Secondary""")),
-            "次要药片恰 1 枚：出站确认框的取消键",
+            "次要药片归零：原先那一枚是出站确认框的取消键，现在由共享件按 `DialogButtonRole.Dismiss` 取墨",
         )
     }
 
@@ -197,9 +204,12 @@ class SentenceAnalysisLayoutContractTest {
             countMatches(source, Regex("""\bMint[A-Za-z0-9_]*""")),
             "`Mint*` 全局读点必须清零：配色一律走 `appColors()` / `appDomain()`",
         )
+        // 阈值随 U-1 的搬家从 8 降到 6（不是放宽判据）：对话框那两枚读点（标题档 + 正文档）现在长在
+        // 共享件 `OutboundConfirmDialog.kt` 里，由 `OutboundDialogFamilyTest.theSharedDialogStillSetsItsOwnType` 逐档钉住。
+        // 重算：`grep -c 'AppType\.' app/src/main/java/com/example/englishlearning/ui/SentenceAnalysisScreen.kt`（含注释，比本判据宽）。
         assertTrue(
-            countMatches(source, Regex("""AppType\.""")) >= 8,
-            "六档排印至少要落到 8 处（现 ${countMatches(source, Regex("""AppType\."""))}）：标题/说明/标签/正文/注脚各有所属",
+            countMatches(source, Regex("""AppType\.""")) >= 6,
+            "六档排印至少要落到 6 处（现 ${countMatches(source, Regex("""AppType\."""))}）：标题/说明/标签/正文/注脚各有所属",
         )
         listOf(
             "sentence_analysis_outbound_confirmation_text",

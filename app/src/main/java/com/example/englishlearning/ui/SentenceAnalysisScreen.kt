@@ -27,15 +27,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ai.AiFailureUiText
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.sentence.SentenceAnalysisNotConfiguredReason
 import com.example.englishlearning.sentence.SentenceAnalysisPromptPolicy
 import com.example.englishlearning.sentence.SentenceSegment
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.NotConfiguredCard
+import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
-import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
@@ -145,7 +146,20 @@ fun SentenceAnalysisScreen(
                 speakMessage = speakMessage,
                 onSpeak = onSpeak,
             )
-            is SentenceAnalysisUiState.NeedsOutboundConfirmation -> OutboundConfirmationDialog(state.host, onConfirmOutbound)
+            // U-1（决策 2026-11-03 整合 §1）：私写的 `OutboundConfirmationDialog` 下线，改调共享件。
+            // 私写那一份的正文是「你的句子与该服务的密钥将发送给 X。」——**少了「并可能产生费用」**，
+            // 而这句是 AGENTS.md 要求的外发告知之一；四份私写就是这种漏字的来历。屏侧特有的「发的是句子」
+            // 现在只能以 note 追加，不能再改写配方。
+            is SentenceAnalysisUiState.NeedsOutboundConfirmation -> OutboundConfirmDialog(
+                endpointHost = state.host,
+                payloadKind = AiPayloadKind.Text,
+                onConfirm = { onConfirmOutbound(true) },
+                onDismiss = { onConfirmOutbound(false) },
+                note = "发送的是你输入的这句英文。",
+                bodyTestTag = "sentence_analysis_outbound_confirmation_text",
+                confirmTestTag = "sentence_analysis_confirm_outbound",
+                dismissTestTag = "sentence_analysis_decline_outbound",
+            )
             is SentenceAnalysisUiState.NotConfigured -> NotConfiguredCard(
                 featureLabel = "长难句分析",
                 onConfigure = onOpenAiSettings,
@@ -242,44 +256,6 @@ private fun SegmentList(
                 style = AppType.Footnote,
                 color = colors.text2,
                 modifier = Modifier.testTag("sentence_analysis_speak_feedback"),
-            )
-        }
-    }
-}
-
-@Composable
-private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean) -> Unit) {
-    GlassDialog(onDismiss = { onConfirmOutbound(false) }) {
-        Text("确认发送请求", style = AppType.Headline, color = appColors().text1)
-        Text(
-            text = "你的句子与该服务的密钥将发送给 $host。",
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .testTag("sentence_analysis_outbound_confirmation_text"),
-            style = AppType.Body,
-            color = appColors().text1,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            PillButton(
-                text = "取消",
-                onClick = { onConfirmOutbound(false) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Secondary,
-                domain = AppDomain.AiSpeech,
-                testTag = "sentence_analysis_decline_outbound",
-            )
-            PillButton(
-                text = "确认发送",
-                onClick = { onConfirmOutbound(true) },
-                modifier = Modifier.weight(1f),
-                style = PillStyle.Primary,
-                domain = AppDomain.AiSpeech,
-                testTag = "sentence_analysis_confirm_outbound",
             )
         }
     }

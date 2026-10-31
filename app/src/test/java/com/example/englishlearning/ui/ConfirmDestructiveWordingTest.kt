@@ -1,8 +1,7 @@
 package com.example.englishlearning.ui
 
-import com.example.englishlearning.ui.components.PayloadKind
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.ui.components.destructiveDialogBody
-import com.example.englishlearning.ui.components.mustAskEveryTime
 import com.example.englishlearning.ui.components.outboundConfirmBody
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -79,55 +78,32 @@ class ConfirmDestructiveWordingTest {
     }
 
     /**
-     * AGENTS.md 硬要求的纯函数化：**图片每次都问，文本按域名记忆**。
+     * 「图片每次都问，文本按域名记忆」这条真值表**不在本类钉了**（U-3，决策 2026-11-03 整合 §1）。
      *
-     * 四格真值表全钉，重点是「Image + 已记住域名」这一格——它必须仍然要问。
-     * 出站确认是隐私安全面（图片发送每次都需明确确认），UI 轮只能加强不能软化；
-     * 把它写成纯函数是为了让「记忆域名」这个便利功能在图片上永远开不了口子
-     * （批 3 各屏接 `rememberedForHost` 时读的就是这一格）。
-     */
-    @Test
-    fun image_payload_always_asks_even_when_the_host_is_remembered() {
-        assertTrue(
-            mustAskEveryTime(PayloadKind.Image, rememberedForHost = true),
-            "图片即使域名已记住也必须每次确认（AGENTS.md：图片发送每次都需明确确认）"
-        )
-        assertTrue(
-            mustAskEveryTime(PayloadKind.Image, rememberedForHost = false),
-            "图片未记住域名时当然要问"
-        )
-        assertTrue(
-            mustAskEveryTime(PayloadKind.Text, rememberedForHost = false),
-            "文本首次发往该域名必须问（AGENTS.md：首次调用第三方 Endpoint 前展示域名并确认）"
-        )
-        assertFalse(
-            mustAskEveryTime(PayloadKind.Text, rememberedForHost = true),
-            "文本按域名记忆：已确认过的域名不再逐次打断（AGENTS.md 的「文本按域名记忆」口径）"
-        )
-    }
-
-    /**
-     * 出站确认的正文必须点名三件事：**域名**、**会连密钥一起外发**、**发的是文本还是图片**。
+     * 原来这里用 UI 侧的 `mustAskEveryTime(kind, rememberedForHost)` 四格全钉。那枚函数在生产代码里
+     * **零调用**——显隐实际由域层 `ai/AiOutboundConfirmation.kt` 的 `requiredConfirmation(profile, kind,
+     * confirmedTextHost)` 决定，于是同一规则有两份权威：一份被测试钉得很牢，一份没人调。
+     * 四格真值表已经在 `ai/AiRequestPolicyTest` 逐格钉住（首问 / 同域名复用 / 换域名重新问 /
+     * Image 即使已记住仍 `Required`），删掉这份 UI 侧副本不减少任何覆盖，
+     * 少一份权威才是这次整合要的东西。
      *
-     * 域名逐字出现在文案里（不是「该服务」这种含糊指代），因为 AGENTS.md 要求「首次调用第三方
-     * Endpoint 前展示域名」；密钥外发必须说，否则用户以为只发了内容。
-     * 图片那一档还得多说一句「每次都问」——它解释了为什么这次确认不能一劳永逸。
+     * 本类继续负责的是**措辞**：三件事齐不齐、两档可不可区分、域名是否来自入参。
      */
     @Test
     fun outbound_body_names_host_key_and_payload_kind() {
-        val text = outboundConfirmBody("api.example.com", PayloadKind.Text)
+        val text = outboundConfirmBody("api.example.com", AiPayloadKind.Text)
         assertTrue(text.contains("api.example.com"), "文本档必须点名域名：$text")
         assertTrue(text.contains("密钥"), "必须说明密钥会一起外发：$text")
         assertTrue(text.contains("文本"), "必须说明外发的是文本：$text")
         assertFalse(text.contains("图片"), "文本档不得混进图片措辞（两档措辞必须可区分）：$text")
 
-        val image = outboundConfirmBody("vision.example.com", PayloadKind.Image)
+        val image = outboundConfirmBody("vision.example.com", AiPayloadKind.Image)
         assertTrue(image.contains("vision.example.com"), "图片档必须点名域名：$image")
         assertTrue(image.contains("密钥"), "图片档同样要说明密钥外发：$image")
         assertTrue(image.contains("图片"), "图片档必须说明外发的是图片：$image")
         assertTrue(
             image.contains("每次"),
-            "图片档必须当场告知「每次都要确认」（与 mustAskEveryTime 的 Image 格同口径）：$image"
+            "图片档必须当场告知「每次都要确认」（与域层 `requiredConfirmation` 的 Image 格同口径）：$image"
         )
         assertTrue(image != text, "两档措辞不得逐字相同，否则 payloadKind 形参就是装饰")
     }
@@ -138,8 +114,8 @@ class ConfirmDestructiveWordingTest {
      */
     @Test
     fun outbound_body_follows_the_actual_host() {
-        val a = outboundConfirmBody("one.example.com", PayloadKind.Text)
-        val b = outboundConfirmBody("two.example.com", PayloadKind.Text)
+        val a = outboundConfirmBody("one.example.com", AiPayloadKind.Text)
+        val b = outboundConfirmBody("two.example.com", AiPayloadKind.Text)
         assertTrue(a.contains("one.example.com") && !a.contains("two.example.com"), "域名必须来自入参：$a")
         assertTrue(b.contains("two.example.com") && !b.contains("one.example.com"), "域名必须来自入参：$b")
     }

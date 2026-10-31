@@ -128,18 +128,19 @@ class ReadingHomeLayoutContractTest {
             "锚 `outbound_confirmation_text` 必须在接线后继续存在（connected 侧点名它）",
         )
         // 载荷档位：阅读生成发的是文本，必须显式给 Text——留给默认值就等于把隐私档位交给未来改动者。
+        // U-3 之后档位用域层 `AiPayloadKind`（UI 侧那枚同名枚举已删，见决策 2026-11-03 整合 §1）。
         assertEquals(
             1,
-            countMatches(home, Regex("""PayloadKind\.Text""")),
-            "出站确认必须显式声明 `PayloadKind.Text`：图片档每次都问，两档措辞可区分是共享件的立论",
+            countMatches(home, Regex("""AiPayloadKind\.Text""")),
+            "出站确认必须显式声明 `AiPayloadKind.Text`：图片档每次都问，两档措辞可区分是共享件的立论",
         )
 
         // 「共享件不是摆设」这条由**上一行**兜住（修复轮 1 F-1：删掉原判据）：原判据扫整棵 `ui/` 树却
         // 不排除本屏，主页那枚在场时求和必 ≥1，主页那枚被删时先红的还是上一行 ⇒ 零增量判别力。
-        // 而「除本屏外还 ≥1 枚」这一版也**不能写**：本屏就是共享件当前唯一的生产接线（现算
-        // `grep -rn "OutboundConfirmDialog(" app/src/main --include=*.kt` ⇒ 组件声明 1 处 +
-        // `ReadingAccessScreen.kt` 调用 1 处），把它写成 ≥1 会当场红在别的席的账上。
-        // 后续屏接上共享件时，要钉的是「调用点总数 = 在册份数」这种可数口径，不是一句 ≥1 的安慰句。
+        // **口径已更新（U-1，2026-11-03）**：共享件现在有五处生产接线（本屏 + 长难句 / 拍照翻译 /
+        // 图片工坊 / AI 问词），「唯一接线」这句话不再成立；调用点总数由
+        // `OutboundDialogFamilyTest.eachPrivateScreenCallsTheSharedDialogExactlyOnce` 逐屏钉恰一处，
+        // 本类只对本屏的锚与档位负责。
     }
 
     // ---------- 3. 类型与长度偏好下沉生成前参数 ----------

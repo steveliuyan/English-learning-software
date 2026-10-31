@@ -157,10 +157,19 @@ class PhotoTranslationLayoutContractTest {
                 "屏内零破坏性对话框（$dialog）：确认框归宿主 AppScreen 的 ConfirmDestructiveDialog",
             )
         }
+        // U-1（决策 `docs/decisions/2026-11-03-duplication-consolidation.md` §1）：本屏自画的出站确认
+        // `GlassDialog` 退役、改调共享件。原判据「屏内只留一枚 `GlassDialog(`」换了执行者，
+        // 强度不降：玻璃面板 0 枚（份数归 `GlassPanelInkPairingContractTest` 花名册）
+        // + 共享出站确认恰一处（0 = 出站确认整族消失，2 = 又长出第二份）。
+        assertEquals(
+            0,
+            countMatches(source, Regex("""\bGlassDialog\(""")),
+            "屏内零玻璃面板：出站确认框归共享件，本屏再开一枚就是新增未登记的玻璃面板债务",
+        )
         assertEquals(
             1,
-            countMatches(source, Regex("""\bGlassDialog\(""")),
-            "屏内只留一枚 `GlassDialog(`：出站确认框（`pendingConfirmationHost` 那一枚），别的浮层一律不进本屏",
+            countMatches(source, Regex("""\bOutboundConfirmDialog\(""")),
+            "出站确认必须恰一处走共享 `OutboundConfirmDialog(`（U-1）",
         )
     }
 
