@@ -48,8 +48,9 @@ import com.example.englishlearning.ui.theme.appColors
  *
  *  - `barTop({title:'今日词单', action: .bar-action「调整」→ plan-edit})` → 共享 [AppScreenHeader]；
  *    动作位是原型 `.bar-action`（`:274-286`：透明底、`brand-deep` 墨、`--fs-meta` 13px、字重 600、
- *    `padding: var(--s2)` 8dp）。这里与 `AppScreen.kt` 的 `SetupHeaderSave` 同形——纯 `Text` + 可点，
- *    不另造一枚「页头文字按钮」组件（计划 Task 12 的组件份数棘轮）。
+ *    `padding: var(--s2)` 8dp）。这里自持那份形状——纯 `Text` + 可点、不另造一枚「页头文字按钮」组件
+ *    （计划 Task 12 的组件份数棘轮；U-10 之后 `AppScreen.kt` 那份页头保存位已整段退役，本屏这枚是
+ *    跳转动作，不是第二枚提交入口）。
  *    `.bar-action` 本体 14dp 高、低于 F5-03 的 48dp 水线，取法与 `AppChip` 一致：视觉厚度照原型，
  *    外层给 48dp 触控盒。
  *  - `.meta`（`:376`，样式 `:1020` = 13px `--ink-2`）一句「{planDate} 的词单由…共同决定。」

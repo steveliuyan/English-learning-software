@@ -3,7 +3,6 @@ package com.example.englishlearning.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -220,8 +219,8 @@ fun AppScreen(
             var selectedFavoriteCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
             var favoritesPronunciationMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
             var favoritesPronunciationRequest by remember { mutableIntStateOf(0) }
-            // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词本 · 错词 一页三段。三条更老的路由按 R-22.1 拆成两席
-            // 摘除（`showVocabulary` 归 **Task 22-A**；`showFavorites` / `showWrongWords` 归 **Task 22-B**）。
+            // 裁决①（Task 20-A）：「我的词」= 收藏 · 生词 · 错词 一页三段（段名取分段短名，U-8 决策 2026-11-03 §5）。
+            // 三条更老的路由按 R-22.1 拆成两席摘除（`showVocabulary` 归 **Task 22-A**；`showFavorites` / `showWrongWords` 归 **Task 22-B**）。
             // 批 1 Task 4 + Task 5 再往前并一层：学习页的「词库」行与「复习生词本」CTA 都进**词库页**
             // （四分段），合并页从此是词库页的一段 pane，不再自己持有全屏路由。
             // 批 1 Task 5（spec §3.3）：词库页是词汇域**唯一**的路由叠层。旧的两条独立路由
@@ -2076,7 +2075,7 @@ fun AppScreen(
                                 articleCount = readingState.historyOrEmpty.size,
                                 // 决策 §2：「我的」= 功能入口中心，13 行逐行接线。
                                 // 词汇三行与「已学词」统计格都点名落哪一段：只赋 showWordBank 不赋段位
-                                // = 点「易错词」却看到词书段（同学习页复习行的既有判据）。
+                                // = 点「错词」却看到词书段（同学习页复习行的既有判据）。行名取分段短名（U-8，决策 2026-11-03 §5）。
                                 onOpenWordBankSection = { section -> wordBankSection = section; showWordBank = true },
                                 onOpenCheckIn = { showCheckIn = true },
                                 onOpenReadingHistory = { showReadingHistory = true },
@@ -2476,16 +2475,14 @@ internal fun LearningSetupScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // 页头承担「我在哪 + 怎么提交」（原型 `barTop({title:'学习计划', action: 保存})`）。
-            // 返回位仍由共享页头承载，旧版那枚 `← 返回上一层` 的 `TextButton` 已退役；
-            // 强制首设路径 `onCancel == null` 时页头返回位整段不渲染（R-9.2）。
+            // 页头只承担「我在哪 + 怎么回去」：返回位由共享页头承载（旧版那枚 `← 返回上一层` 的
+            // `TextButton` 已退役），强制首设路径 `onCancel == null` 时页头返回位整段不渲染（R-9.2）。
+            // 原型 `barTop` 那枚 `.bar-action「保存」` 本仓不抄（U-10，决策 2026-11-03 §4）——
+            // 它与屏底 `.foot` 的「保存计划」是同一条动作的两个入口，留两枚就是把「一屏一个主操作」
+            // 拆成两条提交路径，还得给两枚取不同可及名才不被 connected 判成多节点。
             AppScreenHeader(
                 title = "学习计划",
                 onBack = onCancel,
-                action = { SetupHeaderSave(
-                    enabled = !state.saving && !state.deleting,
-                    onSave = { viewModel.save(profileId) },
-                ) },
             )
             // 原型 `.meta`：这一句讲的是「这一屏改了什么、不改什么」——词书切换最怕被理解成清进度。
             // 旧 subtitle 那句「每天一点点，学习会自然变成习惯。」不携带口径，随合并屏退役。
@@ -2601,7 +2598,7 @@ internal fun LearningSetupScreen(
             // 只在「同一本地日 + 同一活动词书」时复用旧快照）：照抄那句「今日词单会立刻按新计划重排」
             // 是一个能被证伪的谎，AGENTS.md 明写「设置默认从次日生效」。
             InlineNotice(
-                text = "改完点右上角「保存」。换词书会立刻重排今日词单，调整每日量从次日生效。",
+                text = "改完点屏底「保存计划」。换词书会立刻重排今日词单，调整每日量从次日生效。",
                 kind = InlineNoticeKind.Info,
             )
             state.message?.let {
@@ -2630,30 +2627,6 @@ internal const val REVIEW_LIMIT_STEP = 5
  * 由上面三常量推导而不是写死 14，改 min/max/step 时滑杆不会停在错的格子上。
  */
 internal const val REVIEW_LIMIT_STEPS = (MAX_REVIEW_LIMIT - MIN_REVIEW_LIMIT) / REVIEW_LIMIT_STEP - 1
-
-/**
- * 页头右侧的保存位（原型 `.bar-action`）：`brand-deep` 的**纯文字动作**，不是第二枚带底的按钮——
- * 页头出现一枚实底就把「一屏一个主操作」的重量抢走（spec §4.1）。
- *
- * 可及名「页头保存学习设置」与吸底条那枚「保存学习设置」**必须不同**：两处同名会让 connected 侧
- * `onNodeWithContentDescription` 撞成多节点、取样当场失败。
- */
-@Composable
-private fun SetupHeaderSave(enabled: Boolean, onSave: () -> Unit) {
-    val colors = appColors()
-    Text(
-        text = "保存",
-        style = AppType.Label,
-        color = if (enabled) colors.brandDeep else colors.text3,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .heightIn(min = 48.dp)
-            .clip(AppShape.Pill)
-            .clickable(enabled = enabled, onClick = onSave)
-            .semantics { contentDescription = "页头保存学习设置" }
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-    )
-}
 
 /**
  * 「每日新增」的四枚 chip（原型 `section('每日新增', chips[3,5,10,20], '当前 N 个')`）。
@@ -2741,7 +2714,7 @@ private fun ReviewLimitSection(limit: Int, onLimitChange: (Int) -> Unit) {
 }
 
 /**
- * 原型 `.foot` 的吸底保存条：主操作永远在屏底，与页头那枚文字动作是同一条动作的两个入口。
+ * 原型 `.foot` 的吸底保存条：本屏**唯一**的提交入口（U-10 之后页头不再并立第二枚文字保存）。
  *
  * 条自铺页底色（`colors.background`），所以槽顶必须一条 `hairlineTop`——表单卡从它上面滚过时，
  * 没有那条线就会被读成「内容被截断」（批 5 遗留 7，站点登记在 `StickyFooterHairlineGuardTest`）。

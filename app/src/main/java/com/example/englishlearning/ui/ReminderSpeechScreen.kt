@@ -59,7 +59,9 @@ fun ReminderSpeechScreen(
                 icon = AppIcon.Bell,
                 domain = AppDomain.Settings,
                 title = "学习提醒",
-                subtitle = "只在当天没完成计划时提醒 · 默认关闭（非精确、每天最多一次）",
+                // U-7（决策 §4）：这行只说「什么时候会提醒 + 默认关着」。「每天最多一次 / 非精确」
+                // 是调度上限，归提醒屏卡内那一句（`reminder_inexact_notice`），不在导航页复读。
+                subtitle = "只在当天没完成计划时提醒 · 默认关闭",
                 iconTone = EntryIconTone.Tint,
                 modifier = Modifier.testTag("reminder_speech_open_reminder"),
                 onClick = onOpenReminderSettings,

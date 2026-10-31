@@ -9,8 +9,9 @@ import kotlin.test.assertTrue
  *
  * 原型是一屏「提醒与发音」，本仓是两屏（`ReminderSettingsScreen` / `SpeechSettingsScreen`）。
  * 本批**保持两屏**，只把原型上缺的段落/文案补到对应屏：
- *  - 提醒屏：「只在当天没完成计划时提醒」（`app.js:1333` 开启提醒行的 row-sub）+「重复 / 周一到周日 / 每天」
- *    （`:1334`）。重复项在本仓是固定行为（`ReminderSchedulingPolicy` 每天最多一次），只作只读说明。
+ *  - 提醒屏：「只在当天没完成计划时提醒」（`app.js:1333` 开启提醒行的 row-sub）。
+ *    原型 `:1334` 那行「重复 / 周一到周日 / 每天」本批**已下线**——它没有 `onClick`，把固定行为
+ *    摆成设置项等于谎称可改；见下面第二条用例与 `ReminderRuleOnceContractTest`（U-7，决策 §4）。
  *  - 发音屏：自动发音的 row-sub「用本机离线合成，不联网」（`:1360`）——仅在当前供应商是系统 TTS 时成立
  *    （小米 MiMo 走网络），故按引擎条件渲染。
  *
@@ -27,15 +28,23 @@ class ReminderSpeechPrototypeAlignmentContractTest {
     private val speech: String by lazy { uiScreenSource("SpeechSettingsScreen.kt") }
 
     @Test
-    fun `the reminder screen gains the prototype subtitle and the read only repeat row`() {
+    fun `the reminder screen keeps the prototype subtitle and the dead repeat row stays gone`() {
         assertEquals(
             1,
             countMatches(reminder, Regex(Regex.escape("只在当天没完成计划时提醒"))),
             "开启提醒行要补原型副标题「只在当天没完成计划时提醒」（当日计划已完成则不发）",
         )
-        assertEquals(1, countMatches(reminder, Regex(Regex.escape("\"重复\""))), "「重复」行必须恰 1 处")
-        assertEquals(1, countMatches(reminder, Regex(Regex.escape("周一到周日"))), "重复行的副标题「周一到周日」")
-        assertEquals(1, countMatches(reminder, Regex(Regex.escape("\"每天\""))), "重复行的值「每天」（本仓固定每天最多一次）")
+        // U-7（决策 §4，2026-11-03）把判据从「恰 1 处」翻成「恰 0 处」：原型 `app.js:1334` 那一行
+        // 没有 `onClick`、`showChevron = false`，读起来是「这里能改重复频率」，而本仓没有这个能力
+        // （`ReminderSchedulingPolicy` 固定每天最多一次）。它承载的事实本来就写在同一张卡的说明里，
+        // 删行不丢信息——与已下线的旧 D-3 死行同一判据，这里钉住它不许回来。
+        listOf("\"重复\"", "周一到周日", "\"每天\"", "reminder_repeat_row").forEach { literal ->
+            assertEquals(
+                0,
+                countMatches(reminder, Regex(Regex.escape(literal))),
+                "只读死行的「$literal」不许回来：本仓没有按星期配置提醒的能力，摆成设置项就是谎称可改",
+            )
+        }
         // 既有判据不许放宽：开关仍是唯一一枚 Material Switch，锚与可及名不动。
         assertEquals(1, countMatches(reminder, Regex("""\bSwitch\(""")), "开关仍恰 1 枚（本批只补文案，不换承载控件）")
         assertEquals(1, countMatches(reminder, Regex(Regex.escape("\"reminder_enabled_switch\""))), "开关锚不动")

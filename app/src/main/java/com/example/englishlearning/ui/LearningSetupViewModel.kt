@@ -162,7 +162,7 @@ class LearningSetupViewModel @Inject constructor(
      * 屏上的 `dailyReviewLimit` 是滑杆草稿（点「保存计划」才提交），而开关行是即时落库的
      * （词卡屏当下就要读它）。两者共用同一条 `LearningSettings` 写路径，所以即时落库时必须带这个
      * 已提交值而不是草稿——否则「拖了滑杆、顺手关了枚开关」会替用户悄悄改掉复习上限，
-     * 屏上那句「改完点右上角『保存』」就撒了谎。判据在
+     * 屏上那句「改完点屏底『保存计划』」就撒了谎。判据在
      * `LearningSetupViewModelTest.a drafted review limit is not persisted by toggling a switch`。
      */
     private var committedReviewLimit: Int = LearningSettings.DEFAULT_DAILY_REVIEW_LIMIT

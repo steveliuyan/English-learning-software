@@ -30,7 +30,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.components.AppScreenHeader
-import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeAction
 import com.example.englishlearning.ui.components.InlineNoticeKind
@@ -80,9 +79,11 @@ fun ReminderSettingsScreen(
                 .testTag("reminder_settings_screen"),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // U-7（决策 §4）：页头不再复读「每天最多一次」——这条规则在本屏只由卡内
+            // `reminder_inexact_notice` 讲一次；降级分支没有那条卡，但它是「设置服务没准备好」
+            // 的只读态，不承诺任何提醒行为，副标题留空比抄一遍规则更诚实。
             AppScreenHeader(
                 title = "学习提醒",
-                subtitle = "每天最多一次，系统可能稍有延迟",
                 onBack = onBack,
             )
             SoftCard {
@@ -115,7 +116,6 @@ fun ReminderSettingsScreen(
     ) {
         AppScreenHeader(
             title = "学习提醒",
-            subtitle = "每天最多一次，系统可能稍有延迟",
             onBack = onBack,
         )
 
@@ -183,16 +183,9 @@ fun ReminderSettingsScreen(
                     ),
                 )
             }
-            // 原型 `app.js:1334` 的「重复 / 周一到周日 / 每天」：本仓没有按星期配置提醒的能力
-            // （`ReminderSchedulingPolicy` 固定每天最多一次），所以这一行是**只读说明**，不给 `onClick`。
-            BareRow(
-                title = "重复",
-                subtitle = "周一到周日",
-                trailing = "每天",
-                showChevron = false,
-                topDivider = true,
-                modifier = Modifier.testTag("reminder_repeat_row"),
-            )
+            // U-7（决策 §4）删除原型 `app.js:1334` 抄来的「重复 / 周一到周日 / 每天」只读行：
+            // 它没有 `onClick`、`showChevron = false`，长得像可点行却不能改任何事，而「每天最多一次」
+            // 上面卡内那句已经说过。与已下线的旧 D-3 死行同一判据。
         }
 
         if (!state.enabled) {

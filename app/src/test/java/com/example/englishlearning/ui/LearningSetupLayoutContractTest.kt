@@ -14,14 +14,18 @@ import kotlin.test.fail
  * 取样窗口按「函数签名 → 它的花括号体」配对取（[windowOf]），与
  * [AppScreenOverlayContainerContractTest] 的 `learningSetupSignature` 同一套口径。
  *
- * 七条窗口：
+ * 窗口（U-10 之后是七条，页头保存位那枚随双主操作一并退役）：
  *  - [setup]：`LearningSetupScreen` 本体（页头 / 分组 / 术语 / 通知条）；
- *  - [headerSave]：`SetupHeaderSave`（原型 `.bar-action` 的页头保存位）；
  *  - [dailyChips]：`DailyTargetChips`（原型 `chip(n + ' 个')` 那一行，取代旧拖动滑杆）；
  *  - [reviewLimit]：`ReviewLimitSection`（原型 `.stat-num` + `.range` 那张 `.card`）；
  *  - [toggleRow]：`DetailToggleRow`（开关行，批 0 之后必须用共享 `AppSwitch`）；
- *  - [saveBar]：`SetupSaveBar`（原型 `.foot` 吸底条）；
+ *  - [saveBar]：`SetupSaveBar`（原型 `.foot` 吸底条，**本屏唯一**提交入口）；
  *  - [picker] / [pickRow] / [profileCreation]：选词书与首启建档（上一批的既有判据，逐条保留）。
+ *
+ * 原型这一屏的顶部确实画了 `.bar-action「保存」`，本仓**不照抄**（U-10，决策
+ * `docs/decisions/2026-11-03-duplication-consolidation.md` §4）：同屏并立页头文字保存与吸底主按钮
+ * 是「一屏一个主操作」被拆成两条提交路径，旧实现还得给两枚取不同可及名才不被 connected 判成多节点
+ * ——那是绕重排，不是设计。页头只承担「我在哪 + 怎么回去」。
  *
  * **合并的理由**（原型是两屏、本仓做一屏）：`sCardSettings` 的可迁移内容只有「评分之后怎么走」那一节
  * 三枚开关（其余三节在本仓没有对应能力，见下面 `the sections without a real backend stay hidden`），
@@ -36,10 +40,6 @@ class LearningSetupLayoutContractTest {
 
     private val setup: String by lazy {
         windowOf("internal fun LearningSetupScreen(", "LearningSetupScreen 本体")
-    }
-
-    private val headerSave: String by lazy {
-        windowOf("private fun SetupHeaderSave(", "SetupHeaderSave 本体")
     }
 
     private val dailyChips: String by lazy {
@@ -98,17 +98,18 @@ class LearningSetupLayoutContractTest {
     /** 裸 `Switch(`：`AppSwitch(` 含子串 `Switch(`，共享件才是本屏的合法形状。 */
     private val bareSwitchCall = Regex("""(?<![A-Za-z])Switch\(""")
 
-    // ---------- 页头：原型 `barTop({title:'学习计划', action: 保存})` ----------
+    // ---------- 页头：只留「我在哪 + 怎么回去」（U-10 摘掉原型那枚 `.bar-action`） ----------
 
     /**
-     * 页名从「选好词书，开始今天的积累」换成原型的**学习计划**，保存位进页头 `action` 槽。
+     * 页名取原型的**学习计划**，但页头**不带保存动作**——提交入口只有吸底那枚「保存计划」。
      *
-     * 原型这一屏的顶部是 `barTop({title:'学习计划', action:'<button class="bar-action">保存</button>'})`：
-     * 页头承担「我在哪 + 怎么提交」，吸底条只是同一条动作的第二枚入口。返回位仍由共享页头承载
-     * （旧版那枚 `← 返回上一层` 的 `TextButton` 已退役，判据保留在第二条断言里）。
+     * 原型 `barTop({title:'学习计划', action:.bar-action「保存」})` 与 `.foot` 的保存按钮是同一条动作的
+     * 两个入口，本仓只留后者（U-10，决策 §4）：拇指区、与全站吸底主操作一致，且「一屏一个主操作」
+     * 不再被拆成两条路径。返回位仍由共享页头承载（旧版那枚 `← 返回上一层` 的 `TextButton` 已退役，
+     * 判据保留在断言里）；强制首设路径 `onCancel == null` 时页头返回位整段不渲染（R-9.2）。
      */
     @Test
-    fun `the header is the prototype plan title with its save action`() {
+    fun `the header is the prototype plan title and carries no second save action`() {
         assertTrue(setup.isNotEmpty(), "取不到 LearningSetupScreen 本体：判据会空转")
         assertEquals(
             1,
@@ -127,9 +128,14 @@ class LearningSetupLayoutContractTest {
                 "的锚随本批一起迁到「学习计划」，不许留第二套页名",
         )
         assertEquals(
+            0,
+            countMatches(setup, Regex(Regex.escape("action ="))),
+            "页头 `action` 槽必须空着（U-10）：给页头挂回保存位，本屏就又是两条提交路径",
+        )
+        assertEquals(
             1,
-            countMatches(setup, Regex(Regex.escape("action = { SetupHeaderSave("))),
-            "保存位必须进页头的 `action` 槽（原型 `.bar-action`），而不是屏侧再搓一枚裸按钮",
+            countMatches(setup, Regex(Regex.escape("SetupSaveBar("))),
+            "吸底条必须恰一处挂载：它是本屏唯一提交入口，摘掉它等于把保存整段删了",
         )
         val headerAt = setup.indexOf("AppScreenHeader(")
         val onBackAt = setup.indexOf("onBack = onCancel")
@@ -155,32 +161,28 @@ class LearningSetupLayoutContractTest {
     }
 
     /**
-     * 页头保存位（`.bar-action`）自己的形状：**文字动作**，不是第二枚实底按钮。
+     * 页头保存位（`SetupHeaderSave`）整段退役，且不许以别的形状回来。
      *
-     * 原型 `.bar-action` 是 `brand-deep` 的 13px/600 纯文字，页头右侧出现一枚带底的按钮会把
-     * 「一屏一个主操作」的重量抢走（spec §4.1）。可及名必须与吸底条那枚**不同**——
-     * 两处都叫「保存学习设置」会让 `onNodeWithContentDescription` 撞成多节点，connected 取样当场失败。
+     * 旧实现需要「页头那枚的可及名必须与吸底条不同」这条判据才站得住——两枚同名会让
+     * `onNodeWithContentDescription` 撞成多节点。一枚入口不存在，就不需要这种区分。
      */
     @Test
-    fun `the header save action is a text action with its own accessible name`() {
-        assertTrue(headerSave.isNotEmpty(), "取不到 SetupHeaderSave 本体：判据会空转")
-        assertTrue("\"保存\"" in headerSave, "动作文案取原型的「保存」")
+    fun `the header save composable is retired file wide`() {
+        assertEquals(
+            0,
+            countMatches(source, Regex(Regex.escape("SetupHeaderSave"))),
+            "`SetupHeaderSave` 必须整文件清零（定义与挂载点都不许留）：留着定义就是给下一屏留一份可抄的双入口模板",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex(Regex.escape("contentDescription = \"页头保存学习设置\""))),
+            "「页头保存学习设置」这枚可及名必须退役：它存在的唯一理由是吸底条已经有一枚「保存学习设置」",
+        )
+        // 反空转：全文件级 == 0 的判据最容易在「窗口取错」时空转，这里用吸底条那枚锚证明扫的是同一份源。
         assertEquals(
             1,
-            countMatches(headerSave, Regex(Regex.escape("contentDescription = \"页头保存学习设置\""))),
-            "页头那枚必须自带**不同于**吸底条的可及名：两枚同名字面会让 connected 的 `onNodeWithContentDescription` 判多节点",
-        )
-        assertEquals(
-            0,
-            countMatches(headerSave, Regex(Regex.escape("Button("))),
-            "页头动作不得是 `Button(`：原型 `.bar-action` 是纯文字，带底就是第二枚主操作",
-        )
-        assertTrue("colors.brandDeep" in headerSave, "文字动作的墨色取 `brandDeep`（原型 `.bar-action` 同值）")
-        assertTrue("clickable(" in headerSave, "`action` 槽的组件不代替点击：动作位必须自己可点")
-        assertEquals(
-            0,
-            countMatches(headerSave, Regex(Regex.escape("RoundedCornerShape("))),
-            "形状只走 `AppShape`（本枚干脆不画形状）",
+            countMatches(source, Regex(Regex.escape("contentDescription = \"保存学习设置\""))),
+            "吸底条的可及名必须恰 1 处：它是本屏唯一提交入口，也是上面两条 == 0 的对照片段",
         )
     }
 
@@ -569,9 +571,14 @@ class LearningSetupLayoutContractTest {
             1,
             countMatches(
                 setup,
-                Regex(Regex.escape("text = \"改完点右上角「保存」。换词书会立刻重排今日词单，调整每日量从次日生效。\"")),
+                Regex(Regex.escape("text = \"改完点屏底「保存计划」。换词书会立刻重排今日词单，调整每日量从次日生效。\"")),
             ),
-            "提示句逐字钉住：前半句取原型，后半句按 `GetOrCreateTodayPlanUseCase` 的真实规则改写",
+            "提示句逐字钉住：前半句指向吸底条（U-10 之后页头没有保存位），后半句按 `GetOrCreateTodayPlanUseCase` 的真实规则改写",
+        )
+        assertEquals(
+            0,
+            countMatches(setup, Regex(Regex.escape("右上角"))),
+            "「右上角」不许回来：页头不再挂保存，这句指路会把用户指向一枚不存在的按钮",
         )
         assertEquals(
             0,
@@ -686,7 +693,6 @@ class LearningSetupLayoutContractTest {
     fun `the screen reads theme tokens instead of the static mint bridge and material type`() {
         listOf(
             "屏体" to setup,
-            "页头保存位" to headerSave,
             "chip 行" to dailyChips,
             "复习上限" to reviewLimit,
             "开关行" to toggleRow,

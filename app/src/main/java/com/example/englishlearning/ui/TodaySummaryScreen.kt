@@ -51,8 +51,9 @@ import com.example.englishlearning.ui.theme.appColors
  *
  *  - `barTop({title:'今日完成', action:.bar-action「完成」→ learn-home})`（`:444`）→ 共享 [AppScreenHeader]。
  *    动作位与「今日词单」的「调整」同形（原型 `.bar-action`，`app.css:274-286`：透明底、`--brand-deep` 墨、
- *    `--fs-meta` 13px、字重 600、`padding: var(--s2)`），也沿用 `AppScreen.kt` 的 `SetupHeaderSave` 那份
- *    「纯 [Text] + 可点」写法，不另造页头文字按钮组件；本体 14dp 高低于 F5-03 的 48dp 水线，
+ *    `--fs-meta` 13px、字重 600、`padding: var(--s2)`），两处都是屏侧自持的「纯 [Text] + 可点」写法，
+ *    不另造页头文字按钮组件（`AppScreen.kt` 那份 `SetupHeaderSave` 已在 U-10 整段退役，不是模板）；
+ *    本体 14dp 高低于 F5-03 的 48dp 水线，
  *    外层给 48dp 触控盒（与 `AppChip` 同一处置）。
  *  - hero 那一排（`:446-451`）：`badge-lg`（`app.css:560` = 64dp / 圆角 20）里一枚 `star` 贴纸 →
  *    共享 [StickerBadge] 的 [StickerSize.Large] 档，底与内描边都由组件给（`.badge` 的两条）；
