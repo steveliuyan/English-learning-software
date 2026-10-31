@@ -80,10 +80,10 @@
   `8f3c7b4 feat(ui): 设置升为第五栏并收束关于/许可/备份入口` →
   `20bb361 test(ui): connected 用例跟随五栏与去重后的入口分工` →
   `1f85f95 docs(ui): 五栏与去重的工作报告及浅/深色真机证据`。
-- **推送：失败（未备份到远端）**。`git -c credential.interactive=false push origin
-  stage-5-ui-r2-learning-path` 报 `Failed to connect to github.com port 443 via 127.0.0.1
-  after 2051 ms`——全局代理 `http://127.0.0.1:3067` 已配置但代理服务当时未启动。
-  本地提交保留，待用户打开代理后重推并用 `git ls-remote` 核验远端 tip。
+- **推送：已成功**。首次因代理未启动失败；代理在线后首次重推撞上僵死 git 进程超时
+  （`taskkill //F //IM git.exe` 后重试），最终 `2d00131..32a4b1c` 推上远端，
+  `git ls-remote origin stage-5-ui-r2-learning-path` 与本地 `HEAD` 均为 `32a4b1c`
+  （本次上推 1491 个对象 / 约 48.6 MiB，含此前 51 个本地提交）。
 
 ## 5. 未完成 / 遗留问题
 
