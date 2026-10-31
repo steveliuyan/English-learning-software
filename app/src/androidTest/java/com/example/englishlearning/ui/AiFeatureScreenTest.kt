@@ -100,8 +100,8 @@ class AiFeatureScreenTest {
 
     /**
      * 2026-10-25 简化批：原先的两条 `data_block_*` 用例随「会用到的数据」卡一并删除
-     * （卡片下线，不是把断言改松）。本机词数仍在 AI 主页的导航卡上如实汇报，
-     * 口径由 `AiLearningScreenTest` 的 wordListLine 用例继续钉住。
+     * （卡片下线，不是把断言改松）。本机词数那句「今日新词 / 待复习」随 AI 主页按参考重做
+     * （2026-11-02）与「查看词表」裸行一起离场，主页不再汇报词数——口径不存在了，不是判据放宽。
      */
     @Test fun the_usable_actions_report_their_callbacks() {
         var toSettings = 0

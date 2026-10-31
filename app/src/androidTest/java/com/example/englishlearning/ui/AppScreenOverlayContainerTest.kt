@@ -71,9 +71,11 @@ import org.junit.runner.RunWith
  *  - 路 A：`LearningSetupScreen` 的词书卡「删除词书」**自定义无障碍动作**真实触发
  *    `LearningSetupViewModel.requestDelete` → `pendingDelete` → 面板组合（这条动作是
  *    `WordBookPickRowTest` I-A2 钉过的同一条真实入口，不是测试替身直接调 VM）；
- *  - 路 B：设置页「导出词书」入口在册数 ≥ 2 时真实打开 `GlassDialog` 选择器，
- *    列表项 tag（`settings_export_book_*`）仍逐项可达——**只断存在与可点，绝不点击**
+ *  - 路 B：「我的」hub 的「词书内容包」行进入子页，册数 ≥ 2 时真实打开 `GlassDialog` 选择器，
+ *    列表项 tag（`word_book_export_pick_*`）仍逐项可达——**只断存在与可点，绝不点击**
  *    （点击会拉起 SAF 系统界面，设备用例不该把系统文件选择器卷进来）。
+ *    2026-11-02（决策 §4）这一族整条通路从「设置页折叠行 + 宿主持有选择器」改为
+ *    「hub 一行 → 子页自持 SAF 与选择器」，驱动链因此多一站、tag 全部改名。
  *
  * 方法名带 `AtDoubleFontScale` 的那几例钉的是大字档下面板正文与按钮仍**整体在视口内**
  * （`assertIsDisplayed()` 要求节点 ≥90% 可见，正文被挤出屏幕或按钮被裁掉都会当场红），
@@ -219,7 +221,7 @@ class AppScreenOverlayContainerTest {
     // ---------- 路 B：导出词书选择器（迁移前 AppScreen.kt:1608） ----------
 
     /**
-     * 钉的破坏：选择器换成共享玻璃档后列表项 tag 被改掉（`settings_export_book_*` 是这枚自渲染
+     * 钉的破坏：选择器换成共享玻璃档后列表项 tag 被改掉（`word_book_export_pick_*` 是这枚自渲染
      * 列表项唯一的取样面），或「取消」不再是共享药片、点了不收场、甚至把导出真的发出去。
      *
      * 只断**存在 + 可点 + 取消收场**，绝不点列表项：那会拉起 SAF 系统文件选择界面。
@@ -238,40 +240,25 @@ class AppScreenOverlayContainerTest {
                     wordBookTransferViewModel = transferViewModel(repository),
                 )
             }
-            createProfile()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("app_tab_settings").performClick()
-            // Task 19 折叠化：词书 SAF 子行收进「词书内容包」一行里，先到达并展开，再走原链路。
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("settings_word_books").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("settings_word_books").performScrollTo().performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("settings_export_word_book").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("settings_export_word_book").performScrollTo().assertIsEnabled().performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isNotEmpty()
-            }
-            // 两册都在，且逐项可点（tag 口径与迁移前一致）。
+            createProfileAndOpenTransferPage()
+            openExportPicker()
+            // 两册都在，且逐项可点（tag 口径随子页改名：`word_book_export_pick_*`）。
             listOf("overlay-pack-a", "overlay-pack-b").forEach { bookId ->
-                composeRule.onNodeWithTag("settings_export_book_$bookId")
+                composeRule.onNodeWithTag("word_book_export_pick_$bookId")
                     .assertIsDisplayed()
                     .assertHasClickAction()
             }
             // 取消是共享药片（tag + 可点 + 朗读文本），且真的收场。
-            val cancel = composeRule.onNodeWithTag("wordbook_export_cancel")
+            val cancel = composeRule.onNodeWithTag("word_book_export_cancel")
             cancel.assertHasClickAction()
             cancel.assertTextEquals("取消")
             cancel.performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) {
                 composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isEmpty()
             }
-            composeRule.onNodeWithTag("settings_export_book_overlay-pack-a").assertDoesNotExist()
-            // 选择器挂在设置页之上一版：关掉后落回设置页（2026-10-31 起设置是独立第五栏）。
-            composeRule.onNodeWithTag("settings_screen").assertExists()
+            composeRule.onNodeWithTag("word_book_export_pick_overlay-pack-a").assertDoesNotExist()
+            // 选择器挂在子页之上：关掉后落回「词书内容包」子页，而不是整层退回 hub。
+            composeRule.onNodeWithTag("word_book_transfer_screen").assertExists()
         } finally {
             books.forEach { it.deleteRecursively() }
         }
@@ -299,28 +286,14 @@ class AppScreenOverlayContainerTest {
                     )
                 }
             }
-            createProfile()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("app_tab_settings").performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("settings_word_books").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("settings_word_books").performScrollTo().performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("settings_export_word_book").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("settings_export_word_book").performScrollTo().performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isNotEmpty()
-            }
+            createProfileAndOpenTransferPage()
+            openExportPicker()
             // 哨兵先行：Headline 标题 scale 1.0 行高 73px、scale 2.0 折两行 ≥150px，取 100 为界。
             assertScaleTookEffect("选择要导出的词书", expectMinHeightPx = 100)
             assertBodyLineSurvivesTheScale("选择要导出的词书")
-            composeRule.onNodeWithTag("settings_export_book_overlay-pack-a").assertIsDisplayed()
-            composeRule.onNodeWithTag("settings_export_book_overlay-pack-b").assertIsDisplayed()
-            composeRule.onNodeWithTag("wordbook_export_cancel").assertIsDisplayed().assertHasClickAction()
+            composeRule.onNodeWithTag("word_book_export_pick_overlay-pack-a").assertIsDisplayed()
+            composeRule.onNodeWithTag("word_book_export_pick_overlay-pack-b").assertIsDisplayed()
+            composeRule.onNodeWithTag("word_book_export_cancel").assertIsDisplayed().assertHasClickAction()
         } finally {
             books.forEach { it.deleteRecursively() }
         }
@@ -335,7 +308,7 @@ class AppScreenOverlayContainerTest {
      * 「取消」既不在视口内、树侧也到不了（`performScrollTo()` 找不到可滚祖先会当场抛）——
      * 这正是 F5-03 那一族「看得见点不着」的宿主侧现形。
      *
-     * 列表项**只断存在、绝不点击**：`settings_export_book_*` 一点就拉起 SAF 系统文件选择界面
+     * 列表项**只断存在、绝不点击**：`word_book_export_pick_*` 一点就拉起 SAF 系统文件选择界面
      * （同一口径见本类路 B 的既有说明）。收场只点「取消」。
      */
     @Test
@@ -356,29 +329,15 @@ class AppScreenOverlayContainerTest {
                     )
                 }
             }
-            createProfile()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("app_tab_settings").performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("settings_word_books").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("settings_word_books").performScrollTo().performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithTag("settings_export_word_book").fetchSemanticsNodes().isNotEmpty()
-            }
-            composeRule.onNodeWithTag("settings_export_word_book").performScrollTo().performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
-                composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isNotEmpty()
-            }
+            createProfileAndOpenTransferPage()
+            openExportPicker()
             // 哨兵先行：设备字号没真的到 2.0 就当场红，护栏不许退化成 scale 1.0 复读。
             assertScaleTookEffect("选择要导出的词书", expectMinHeightPx = 100)
             // 十二册逐项在树（只证存在，绝不点击）；首册必须落在面板首屏内。
-            bookIds.forEach { bookId -> composeRule.onNodeWithTag("settings_export_book_$bookId").assertExists() }
-            composeRule.onNodeWithTag("settings_export_book_${bookIds.first()}").assertIsDisplayed()
+            bookIds.forEach { bookId -> composeRule.onNodeWithTag("word_book_export_pick_$bookId").assertExists() }
+            composeRule.onNodeWithTag("word_book_export_pick_${bookIds.first()}").assertIsDisplayed()
             // 「取消」被内容推出视口后必须靠滚动可达（兜底的唯一判据），且仍可点。
-            val cancel = composeRule.onNodeWithTag("wordbook_export_cancel")
+            val cancel = composeRule.onNodeWithTag("word_book_export_cancel")
             cancel.performScrollTo()
             cancel.assertIsDisplayed().assertHasClickAction()
             // 收场：点取消关掉选择器（不碰 SAF）。
@@ -392,21 +351,22 @@ class AppScreenOverlayContainerTest {
     }
 
     /**
-     * Task 25（裁决⑥）宿主编排腿：**设置页那一行真的导航到备份子页，返回键真的回到设置页**。
+     * Task 25（裁决⑥）+ 2026-11-02（决策 §2）宿主编排腿：**「我的」hub 那一行真的导航到备份子页，
+     * 返回键真的回到 hub**。
      *
      * 子页直测（`BackupEntryUnificationTest`）只证子页自身的形状；这里证宿主那三件接线：
-     *  ① `settings_backup` 点击把 `showBackupHub` 置真（不再就地展开）；
+     *  ① `profile_open_backup` 点击把 `showBackupHub` 置真（不在 hub 就地展开，也不回设置子页）；
      *  ② hub 是全屏层——底导整棵不组合。注意这只由挂载链决定（`showBackupHub` 的 `else if`
      *     排在 Scaffold 的 `else` 之前），**不是** `overlayOpen` 的功劳：`overlayOpen` 全仓唯一
      *     消费者是全局返回键（AppScreen.kt 里那一处）；`overlayOpen` 挂没挂 hub 由 JVM 源契约
      *     `BackupEntryUnificationContractTest#host_wires_backup_hub_at_every_station` 承重；
-     *  ③ `BackHandler` 把返回键交回设置页。
+     *  ③ `BackHandler` 把返回键交回「我的」hub（从哪来回哪去）。
      *
      * 这条**不**证子屏返回栈（导出 / 认证导出 / 恢复三枚子屏需要各自的真实 ViewModel 装配，
      * 本类夹具没有那套依赖）；子屏返回栈的缺口已在 Task 25 报告「未覆盖」里登记。
      */
     @Test
-    fun hostedBackupRowOpensTheHubAndBackReturnsToSettings() {
+    fun hostedBackupRowOpensTheHubAndBackReturnsToTheProfileHub() {
         composeRule.setContent {
             AppScreen(
                 viewModel = appViewModel(),
@@ -420,28 +380,28 @@ class AppScreenOverlayContainerTest {
         }
         createProfile()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("app_tab_profile").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("settings_backup").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("profile_open_backup").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("settings_backup").performScrollTo().performClick()
+        composeRule.onNodeWithTag("profile_open_backup").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("backup_hub_screen").fetchSemanticsNodes().isNotEmpty()
         }
 
         assertTrue(
             "子页打开时底导必须不可见（hub 分支排在 Scaffold 的 else 之前，若被顶掉底导会与子页同时在场）",
-            composeRule.onAllNodesWithTag("app_tab_settings").fetchSemanticsNodes().isEmpty(),
+            composeRule.onAllNodesWithTag("app_tab_profile").fetchSemanticsNodes().isEmpty(),
         )
 
         pressSystemBack()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("backup_hub_screen").fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithTag("settings_screen").assertExists()
-        composeRule.onNodeWithTag("app_tab_settings").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("app_tab_profile").assertExists()
     }
 
     // ---------- 宿主驱动 ----------
@@ -449,7 +409,7 @@ class AppScreenOverlayContainerTest {
     /**
      * 建资料。落点屏由宿主按今日计划的状态决定，所以这里**不等具体节点**，
      * 两路各自等自己那一站：路 A 等 `MissingLearningSetup` 逼出的必填选取屏，
-     * 路 B 等 `placeholderCardPlan()` 给出的今日计划栏（底导五栏都在，才能切设置栏）。
+     * 路 B 等 `placeholderCardPlan()` 给出的今日计划栏（底导四栏都在，才能切「我的」栏）。
      */
     private fun createProfile() {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
@@ -457,11 +417,54 @@ class AppScreenOverlayContainerTest {
     }
 
     /**
+     * 路 B 驱动链（2026-11-02 决策 §4 起）：建资料 → 切到「我的」栏 → 点 hub 的「词书内容包」行 → 子页在场。
+     *
+     * 驱动链比旧口径多一站：从前「设置页折叠行 + 宿主持有选择器」，点一下就在同一屏长出子行；
+     * 现在 SAF、状态与选择器全归 `WordBookTransferScreen`，所以必须先进子页再谈导出。
+     */
+    private fun createProfileAndOpenTransferPage() {
+        createProfile()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("app_tab_profile").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("profile_open_word_book_transfer").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("profile_open_word_book_transfer").performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_book_transfer_screen").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /**
+     * 在子页里打开「选择要导出的词书」玻璃面板。册数 ≥ 2 时导出行才走选择器（单册直发 SAF），
+     * 所以调用方一律先 `prepareImportedWordBookDirectories` 铺两册或十二册。
+     *
+     * 点击前 `assertIsEnabled()` 先行：导出行在无 ViewModel / 在途 / 零册时是**真禁用**
+     * （`EntryRow(enabled = false)`），禁用态点下去静默无回执——那样这里的等待会变成一个
+     * 与「可达性」无关的超时，判据当场失真。禁用态本身的可点性判据在
+     * `WordBookTransferScreenTest`，本类只走启用态那一条通路。
+     */
+    private fun openExportPicker() {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("word_book_transfer_export").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("word_book_transfer_export")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /**
      * 真实系统返回（Task 25 的 hub 返回腿）：`Espresso.pressBack()` 在本仓 no compile classpath，
      * 走 instrumentation 注入 key event——与 `AppScreenTest.pressSystemBack()` 同一口径。
      *
      * **先等窗口真拿到焦点再注入**：`install -r` 之后的第一枚用例里，组合树已经可查
-     * （`settings_backup`/`backup_hub_screen` 都在），但测试活动的窗口焦点还没落定，
+     * （`profile_open_backup`/`backup_hub_screen` 都在），但测试活动的窗口焦点还没落定，
      * 此时 `sendKeyDownUpSync` 会落到别的窗口、静默丢键（2026-10-24 实测两次，
      * 都发生在装包后首跑；紧接着重跑同一条即绿）。焦点没到不许猜——等到为止。
      */

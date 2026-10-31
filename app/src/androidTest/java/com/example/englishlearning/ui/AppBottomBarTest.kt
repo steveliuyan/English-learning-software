@@ -27,7 +27,7 @@ import org.junit.runner.RunWith
 class AppBottomBarTest {
     @get:Rule val composeRule = createComposeRule()
 
-    @Test fun renders_the_five_slots_the_user_asked_for() {
+    @Test fun renders_the_four_slots_the_user_asked_for() {
         composeRule.setContent { AppBottomBar(selected = AppTab.LEARNING, onSelect = {}) }
         AppTab.entries.forEach { tab ->
             composeRule
@@ -39,9 +39,11 @@ class AppBottomBarTest {
 
     @Test fun every_slot_carries_its_label_so_the_bar_reads_by_itself() {
         composeRule.setContent { AppBottomBar(selected = AppTab.LEARNING, onSelect = {}) }
-        listOf("学习", "阅读", "AI 助学", "我的", "设置").forEach { label ->
+        listOf("学习", "阅读", "AI 助学", "我的").forEach { label ->
             composeRule.onNodeWithText(label).assertExists()
         }
+        // 设置不住底导：它是「我的」里的子页（2026-11-02 用户裁定）。
+        composeRule.onNodeWithText("设置").assertDoesNotExist()
     }
 
     @Test fun every_slot_is_reachable_by_its_content_description() {
