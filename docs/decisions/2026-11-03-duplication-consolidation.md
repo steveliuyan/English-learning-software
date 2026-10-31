@@ -103,6 +103,28 @@
   （`MyWordsScreen.kt:159`）。以**分段 tab 的短名为准**（收藏 / 生词 / 错词），三处逐字对齐；
   入口本身按旧 D-6/D-7 裁定保留双入口。
 
+#### 5-A 实施时发现的两句假话副标题（本批未动，登记待拍板）
+
+改名时逐字读到 hub 词汇三行的副标题，其中两句正是 `MyWordsScreenContractTest` 里那段「三句原型说明逐条核过生产逻辑」
+的 KDoc 判定**在本仓不成立**、因此合并页整句不写的那两句说法
+（重算：`grep -n "不成立" app/src/test/java/com/example/englishlearning/ui/MyWordsScreenContractTest.kt`）：
+
+- 「生词」行：「明天的词单里排到前面」——新词顺序由 `NewWordOrdering`（词头三字母交错 + 内容哈希）决定，
+  生词条目在计划生成里零参与；
+- 「错词」行：「按答错次数排序 · 答对两次移出」——错词按**到期先后**排，且**一次**答对即移出。
+
+同一句话在合并页被核过不成立、在 hub 却写给用户看，是比命名更硬的问题（说法本身就是错的），
+但修它改的是文案本体而不是重复项，超出本批「收名字」的范围，且两句 honest 替代在本仓已有成文出处
+（`MyWordsScreen.kt` 两段空态：生词「还没有生词，提交“不认识”后会自动加入。」、
+错词「…复习中标记「不认识」的词会出现在这里，重新答对后自动消失。」）。
+本批**登记不动**，等用户点头再按 TDD 改（改法：两枚副标题换成上面两句，`ProfileHubLedgerTest` 与
+`WordListEntryNamesFollowBankSegmentsTest` 同批加一句形状钉）。
+
+同源未动的一条：`ui/WorksheetSettingsScreen.kt` 的默写纸范围「今天的易错词」保留原措辞——
+它指的是**当天答错的计划项**（`learning/worksheet/BuildWorksheetContentUseCase.kt` 的
+`DIFFICULT_TODAY` 分支按当次反馈 `Again`/`Hard` 筛），不是词库「错词」那一册，
+属于另一个概念，换名反而把两个落点说成同一个。
+
 ### 6. U-6 / U-9 本批只做「不再增加新的」，不做重排
 
 - **U-6**（「本机数据 / 卸载前导出」四屏四套措辞）：单一真源 `thirdPartyPrivacyStatements()` 已存在但只喂许可页，
@@ -141,3 +163,28 @@
 - **验收**：门禁仍是单测（detekt/ktlint 存量基线债 1500+，不作闸）；
   connected 只在 `emulator-5574` 走 `adb install -r` + `am instrument`，真机 `bf353dda` 仅手工试用复装。
 - **推送**：不合 `main`、不推送，等用户说「推送」。
+
+## 实施记录（收口时补，2026-11-01 本地门禁）
+
+- **新增的四枚闸**：`OutboundDialogFamilyTest`（U-1..U-3 跨文件份数与措辞）、
+  `ReminderRuleOnceContractTest`（U-7 规则只讲一遍 + 死行归零 + 「说明必须坐在卡里紧挨开关」的位置窗）、
+  `BackupPageNamesFollowHubRowsTest`（U-11 落地页标题跟 hub 行名）、
+  `WordListEntryNamesFollowBankSegmentsTest`（U-8 三处名字跟 `WordBankSection` 枚举体走，期望名**解析**而非写死）。
+- **改名判据连注释一起扫**（U-8 / U-11 / U-12 三条），措辞判据走 `countMatches`（剥注释）——
+  两套口径的区别写在各自消息里；`AboutRowNameIsJustAboutTest` 的「hub 不许复述许可入口那句」
+  因此**连注释里复述也算命中**，实现侧文档写法要绕开原句而不是引用它（本轮实测被自己这条判红过一次）。
+- **U-8 的连带收窄**：`ProfilePageHomeContractTest` 原按整份 `ProfileScreen.kt` 扫 `"收藏"` 并要求归零，
+  改名后 hub 行本体就是「收藏」——该条讲的是「统计格不许长出一枚收藏标签」，扫描面据此收到三行
+  `ProfileStatCell(`（另加「恰 3 行」防空转）。这是**判据范围**修正，不是放宽。
+- **U-12 的 connected 腿**：`SettingsLicensesEntryTest` 里那条按文字反钉（`onNodeWithText(...)` 断旧行名不在设置页）
+  改名后旧名全站不存在，判据会变成永真空转，故同步换成新名「关于」。
+- **门禁现值**（2026-11-01 终局树重跑，`.git/qa-scratch/final-jvm-gate-2026-11-01.log`）：
+  `assembleDebug` + `testDebugUnitTest` + `compileDebugAndroidTestKotlin` BUILD SUCCESSFUL，
+  JVM 306 类 / 2248 条 / 0 失败 0 跳过。connected 全量 714 条 / 11 失败，
+  11 条**全是设备前置条件缺失**（`/data/local/tmp/qa-b1-package.zip` 已清 → 认证恢复 e2e 2 条、
+  Kokoro 外部模型资产未推 → 2 条、设备 `font_scale` 现为 1.0 → 双字号护栏 3 条、
+  设备未配默认文本服务且不授权为跑测试发付费请求 → 词书包与探针 4 条），
+  与本批改动的屏无交集；把 `font_scale` 置 2.0 单跑 `AppScreenOverlayContainerTest` 得 **OK (6 tests)**
+  （`.git/qa-scratch/connected-overlay-fontscale2.log`），证伪"本批改坏了它"。
+  本批改到的 5 个 connected 类在按名字定位的改名腿上全过
+  （AppScreenTest 64 / MyWordsScreenTest 17 / ProfileScreenTest 6 / SettingsLicensesEntryTest 3 / SettingsScreenTest 5）。
