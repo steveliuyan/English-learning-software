@@ -67,3 +67,14 @@
 - 不加 AI 助学页配置入口（用户 2026-11-02 裁定「暂不加」，方案 C 第 2 条继续挂账）。
 - 不改学习/阅读两个 tab 的版式与内容；不改解锁规则、FSRS、文章生成与网络策略。
 - 不重命名「学习记录」「阅读历史」，不动 hub 三格「连续天数」入口名。
+
+## 追加步骤 6：第三枚入口并回（用户同日令「并回来」，决策 §1-B）
+
+- 范围：`TodaySummaryScreen`（学完末张卡后的「今日完成」收尾屏）那枚「去读今日文章」并入同一条判定；
+  判定本体仍只此一处，新 lambda `openTodayArticleFromSummary` 只做「先 `exitLearning()` 再走共用落点」。
+- 顺序约束由挂载链决定（文章覆盖层的 `else if` 在 `showLearning` 之后，先声明者赢），
+  已用**变异复验**实测：删掉 `exitLearning()` 后 JVM 形状闸与 connected 直达腿双双变红。
+- 门禁：`assembleDebug` → `testDebugUnitTest`（300 / 2225 / 0）→ `compileDebugAndroidTestKotlin`；
+  connected 新增 2 腿（直达 + 锁定落首页）并跑全类 `AppScreenTest` `OK (64 tests)`。
+- 同批交付：`docs/design/2026-11-03-duplication-audit.md`（全站重复项盘点，只研究未实施，待用户拍板范围）。
+- **不推送**，等用户说「推送」。

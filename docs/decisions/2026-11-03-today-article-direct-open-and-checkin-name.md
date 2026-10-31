@@ -1,7 +1,8 @@
 # 学习页「今日文章」直达，打卡屏改名「打卡与连续」
 
 - **日期：** 2026-11-03
-- **状态：** 已接受（用户在两处答复里选定：本批范围 = 「IA 收尾两件」；命名口径 = 「学习打卡」→「打卡与连续」）
+- **状态：** 已接受（用户在两处答复里选定：本批范围 = 「IA 收尾两件」；命名口径 = 「学习打卡」→「打卡与连续」）；
+  同日追加 §1-B：用户令「并回来」，第三枚入口（全完成收尾屏）并入同一条直达判定
 - **上游：** `docs/design/2026-10-31-information-architecture-audit.md` 方案 C 的第 3、4 条（D-5、D-8）
 - **前置：** `docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`（四栏 + 我的 hub 已落地，
   本批只收尾它没碰的两条）
@@ -25,7 +26,7 @@
 
 ### 1. 落点按真值判，不按 tab 判
 
-两枚入口共用一条判定，且**只此一处**：
+学习页的入口共用一条判定，且**只此一处**：
 
 - 阅读状态是 `ReadingAccessUiState.Ready` **且** `todayArticle != null` ⇒
   调 `ReadingAccessViewModel.openTodayArticle()`，文章以覆盖层挂在当前 tab 之上，
@@ -40,6 +41,29 @@
 不在学习页与阅读页各写一份 `as? Ready`（那会是第二份权威）。
 穷举而不是 `this is Ready && todayArticle != null` 的理由与 `historyOrEmpty` 同一条：
 将来给状态机加一档时，编译器逼这里表态，而不是让新状态被默认判成「不直达」。
+
+### 1-B. 第三枚入口：全完成收尾屏的「去读今日文章」（用户 2026-11-03 拍板「并回来」）
+
+首落只并了两枚（学习页四条裸行 + 全完成空态那枚），`TodaySummaryScreen`（学完当日全部卡片后的收尾屏，
+`AppScreen.kt:1036` 起）里那枚「去读今日文章」当时仍是无条件切 tab——用户指出后裁定并回同一条判定。
+
+三枚入口**共用同一处判定读取**：收尾屏不重写一份 `if (readingState ...)`，而是
+`exitLearning()` 之后再调学习页那枚 lambda，所以宿主里 `canOpenTodayArticleDirectly` 仍**恰读一处**。
+
+**为什么必须先 `exitLearning()`（这条不是风格，是挂载链的硬约束，且已做变异复验）**：收尾屏挂在
+`} else if (showLearning) {`（`:991`）分支内，而文章覆盖层挂在更靠后的
+`} else if (readingTarget != null || historyArticle != null) {`（`:1785`）；
+挂载 `else if` **先声明者优先** ⇒ `showLearning` 仍为真时文章分支永远轮不到，
+直达会退化成「关掉了收尾屏、文章没出现」。因此收尾屏这一支的顺序固定是
+「先退学习流（`showLearning = false`）→ 再走共用判定」；共用判定自身的切 tab 那一支
+（`selectedTab = AppTab.READING`）在退出后照常成立，与该屏三个出口原本都回今日学习的语义不冲突
+（直达成功时不切 tab，落阅读首页时才切）。
+
+变异复验（2026-11-03，实测不是推断）：把 lambda 里的 `exitLearning()` 一行删掉、只留共用判定，
+① JVM 形状闸 `TodayArticleLandingTest.theSummaryScreenExitIsMergedIntoTheSameDecision` 报红（顺序断言），
+② 设备用例 `AppScreenTest.summaryScreenArticleRowOpensTodaysArticleWithoutSwitchingTabs` 也报红
+（`ComposeTimeoutException`，卡在等 `article_english` 出现——正是上面那条推断的画面目击），
+装回原实现后两枚复绿（`OK (2 tests)`）。⇒ 这一行的顺序有测试承重，不是注释里的口头规矩。
 
 ### 2. 阅读取数扩到学习 tab
 

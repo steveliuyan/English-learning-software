@@ -68,6 +68,7 @@ JVM 汇总（遍历 `app/build/test-results/testDebugUnitTest/*.xml` 累加，�
 **300 XML / 2224 tests / 0 failures / 0 errors / 0 skipped**
 （上一批 299 / 2216 ⇒ 本批 +1 类 / +8 条 = `TodayArticleLandingTest` 7 + 命名闸 1，对得上）。
 重算命令同上一批 §3.1。
+**追加后的最终数见 §8（同一条命令重算：300 / 2225 / 0 / 0 / 0）。**
 
 detekt/ktlint 未作门禁（存量基线债 1500+ 条，见 `project-acceptance-gate`），本批未新增静态检查项。
 
@@ -143,11 +144,8 @@ adbd 已降回非 root（`service.adb.root 0` + 重启 adbd，模拟器随后冷
 
 ## 5. 未完成 / 遗留问题
 
-1. **第三枚「去读今日文章」没在本批范围内**：`AppScreen.kt:1042-1045` 的 `TodaySummaryScreen`
-   （学完最后一张卡后的「今日完成」收尾屏）出口仍是 `exitLearning(); selectedTab = AppTab.READING`。
-   决策文档 §1 只钉了学习页那两枚入口（盘点表 D-5 的原文也是那两枚），所以**没有顺手改**。
-   建议下一批把它并到同一条 `openTodayArticleFromLearningPage` 上（注意它先 `exitLearning()` 重算计划，
-   直达与退出的先后次序要另写一条 connected 钉住），范围变化先更新决策文档。
+1. ~~**第三枚「去读今日文章」没在本批范围内**~~ —— **已并回**（用户同日令「并回来」，见 §8 与决策 §1-B）：
+   收尾屏那枚出口现在走同一条判定，先 `exitLearning()` 再落点，次序由变异复验实测钉住。
 2. **直达后需按两次返回**（面板 + 文章），见 §3.3 第 1 条与决策风险 #1——F3-01B 面板策略，待用户定。
 3. AI 助学页配置入口：用户已裁定「暂不加」，继续挂账（盘点表方案 C 第 2 条）。
 4. `Gradient` 摘档、Task 42、`MyWordsScreenTest` 在 `font_scale 2.0` 下 `performScrollTo()` 的存量债——
@@ -161,8 +159,9 @@ adbd 已降回非 root（`service.adb.root 0` + 重启 adbd，模拟器随后冷
   再回看 `docs/handoff/2026-11-02-profile-hub-four-tabs-report.md` §6（覆盖层两条优先律、
   connected 纪律、Windows/Git Bash 坑，仍然全部有效）。
 - **落点判定只有一个真值**：`ReadingAccessUiState.canOpenTodayArticleDirectly`（`ReadingAccessScreen.kt:103`）。
-  再加同类入口（含 §5.1 那枚）就调它，别在页面或宿主里再写一份 `as? Ready`——
-  `TodayArticleLandingTest` 的宿主形状闸会抓住第二份权威。
+  三枚入口（学习页裸行 / 全完成空态 / 收尾屏，见 §8）都调同一处；再加同类入口就调它，
+  别在页面或宿主里再写一份 `as? Ready`——`TodayArticleLandingTest` 的宿主形状闸会抓住第二份权威。
+  新入口若住在覆盖层里（像收尾屏那样），**先退出再走判定**，顺序由那条用例与 `AppScreenTest` 的直达腿钉着。
 - 学习页直达依赖「学习 tab 也在取数」（`AppScreen.kt:413`）。若日后把取数收回阅读 tab，
   直达会静默退化成切 tab——那条条件由 `TodayArticleLandingTest` 的窗口断言钉着。
 - 文章页首进会弹覆盖词面板：**connected 里要退出文章前先 `coverage_popup_close` + `waitForIdle()`**，
@@ -183,3 +182,37 @@ adbd 已降回非 root（`service.adb.root 0` + 重启 adbd，模拟器随后冷
 4. 学习 tab 提前取数 = **接受**（代价：首帧多三次本地 Room 读；收益：直达不需要"先访问过阅读页"的隐性前置）。
 5. AI 助学页配置入口 = **本批仍不加**（沿 2026-11-02 裁定）。
 6. 交付节奏 = 不合 `main`、**逐批请示推送**、代理未开不推；不为取证调用会计费的 AI 生成。
+7. 追加裁定 = **第三枚入口「并回来」**（用户原话），并入同一条判定而非新写一份；
+   同一条消息里另派「全仓重复功能盘点 + 整合」，见 `docs/design/2026-11-03-duplication-audit.md`。
+
+## 8. 追加：第三枚入口并回（用户同日令「并回来」，决策 §1-B）
+
+§5.1 那条挂在账上的第三枚入口（`TodaySummaryScreen` 的「去读今日文章」）已并入同一条判定。
+
+### 8.1 改了什么
+
+- `AppScreen.kt:550` 新增 `openTodayArticleFromSummary = { exitLearning(); openTodayArticleFromLearningPage() }`
+  ——**不重读判定**，只包一层退出，所以宿主里 `canOpenTodayArticleDirectly` 仍恰一处（`:539` 那一处不变）。
+- `AppScreen.kt:1053` 收尾屏的 `onOpenReading` 从 `{ exitLearning(); selectedTab = AppTab.READING }`
+  换成 `openTodayArticleFromSummary`。
+- `AppScreen.kt:1031` 起那段收尾屏接线注释随实改正：四枚行里三枚是退出通路，第四枚走 §1-B 的落点。
+- `TodaySummaryScreen.kt` 的类 KDoc 尾段改口径（本屏只留回调、判定不在屏里）。
+
+### 8.2 验证（先红后绿 + 变异复验）
+
+- RED：`TodayArticleLandingTest.theSummaryScreenExitIsMergedIntoTheSameDecision()`（`:132`）首跑报
+  `expected: <1> but was: <0>`（收尾屏那枚 `onOpenReading` 还没接线）⇒ 加 lambda 与接线 ⇒ 8/8 绿。
+- JVM 门禁重跑（`--offline --no-daemon --no-build-cache`，`assembleDebug` → `testDebugUnitTest`）：
+  **300 XML / 2225 tests / 0 failures / 0 errors / 0 skipped**（2224 + 本条）。
+- connected 新增 2 条（`emulator-5574`，`adb install -r` + `am instrument`）：
+  `AppScreenTest.summaryScreenArticleRowOpensTodaysArticleWithoutSwitchingTabs`（`:1777`，
+  宽松档 `planUnlockedWithPendingReview()` ⇒ 解锁且今天有文章：进复习流→末卡推进→收尾屏→
+  点那一行 ⇒ 文章覆盖层在场、收尾屏离场、系统返回后落 `today_plan_screen` 且底导「学习」仍 `已选中`）、
+  `…FallsToTheReadingHomeWhenLocked`（`:1826`，锁定档 ⇒ 落 `reading_access_screen` 见
+  `reading_access_locked_reason`、`article_english` 不在场）。两条 **`OK (2 tests)`**。
+- **变异复验**（把 §1-B 那条顺序约束从推断变成实测）：删掉 lambda 里的 `exitLearning()` 一行后，
+  JVM 形状闸与本条 connected 直达用例**双双变红**（connected 报
+  `ComposeTimeoutException: Condition still not satisfied after 5000 ms`，卡在等 `article_english`——
+  即「`showLearning` 还成立 ⇒ 文章分支在 `else if` 链上轮不到」这一支真的开不出文章）；
+  装回原实现后两枚复绿。
+- 全类回归：`AppScreenTest` 整类 **`OK (64 tests)`**（原 62 + 本批 2）。设备 `font_scale` 保持 1.0。
