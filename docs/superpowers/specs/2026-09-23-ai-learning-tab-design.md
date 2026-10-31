@@ -1,6 +1,7 @@
-# 四栏底部导航与「AI 学」页设计
+# 底部导航与「AI 助学」页设计
 
-**日期：** 2026-09-23
+**日期：** 2026-09-23（2026-10-31 修订：四栏 → 五栏，见 §2 注与
+`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）
 **范围：** 应用级导航改造 + 「AI 学」入口页及其四个功能的页面骨架
 **参考：** 用户提供的扇贝 App 截图（底部导航含「AI 学」标签页）
 **关联：** PRD `FR-04 AI 复习短文`、`FR-05 AI 配置与自定义供应商`
@@ -37,7 +38,7 @@
 | 决定项 | 结论 |
 |---|---|
 | 本轮范围 | 底部导航 + AI 学页骨架；AI 内容生成放后续 |
-| 底导布局 | **四栏：学习 / 阅读 / AI 学 / 设置** |
+| 底导布局 | ~~四栏：学习 / 阅读 / AI 学 / 设置~~ **2026-10-31 修订为五栏：学习 / 阅读 / AI 助学 / 我的 / 设置**（用户拍板「结构性重排」，见 `docs/decisions/2026-10-31-settings-as-fifth-tab.md`；本修订取代 `docs/decisions/2026-10-17-ui-redesign-information-architecture.md` 的「底部四栏不动」约束） |
 | 配色 | **沿用薄荷绿主题**，不引入第二套视觉语言 |
 
 ## 3. 导航架构
@@ -46,7 +47,7 @@
 
 引入两级结构：
 
-- **一级 = tab 根页面**，显示底部导航，四选一。
+- **一级 = tab 根页面**，显示底部导航，五选一。
 - **二级 = 全屏层**，覆盖整个屏幕（含底导），不显示底部导航。
 
 二级层用全屏覆盖而非嵌套在 tab 内，理由：学习流程、默写纸预览这类页面需要完整高度和专注度；且现有 `BackHandler` 链已按「全屏层」语义写好，不改动其语义可以避免返回键行为回退。
@@ -57,21 +58,30 @@
 enum class AppTab(val label: String, val contentDescription: String) {
     LEARNING("学习", "学习"),
     READING("阅读", "阅读"),
-    AI("AI 学", "AI 学"),
+    AI("AI 助学", "AI 助学"),
+    PROFILE("我的", "我的"),
     SETTINGS("设置", "设置"),
 }
 ```
 
-`readonly` 的纯 Kotlin 枚举，无 Android 依赖，可在 JVM 测试中锁定「恰好四栏、顺序固定、标签不重复」。
+`readonly` 的纯 Kotlin 枚举，无 Android 依赖，可在 JVM 测试中锁定「恰好五栏、顺序固定、标签不重复」。
+
+> 2026-10-31 修订说明：原第四格 `SETTINGS("设置")` 在 2026-10-25 起实际渲染的是「我的」页（档案 + 统计 + 设置三合一），
+> 枚举名与界面语义相反。本修订把两者**拆成两格**：`PROFILE` 只放个人进度，`SETTINGS` 承载全部调整入口；
+> 不是简单加一格，而是把被借用的名字还给设置。
 
 ### 3.3 各 tab 内容
 
 | Tab | 根页面 | 说明 |
 |---|---|---|
-| 学习 | `TodayPlanScreen` | 现有页面，原样复用。原「学习工具」按钮改为进入设置 tab 的入口 |
+| 学习 | `TodayPlanScreen` | 现有页面，原样复用。页头齿轮进入设置 tab |
 | 阅读 | `ReadingAccessScreen` | 现有页面，去掉自身「返回」按钮（底导即出口）；进入 tab 时触发 `load` |
-| AI 学 | `AiLearningScreen` | 新建 |
-| 设置 | `SettingsScreen` | 新建，收纳原「学习工具」内容 + 后续设置分组入口 |
+| AI 助学 | `AiLearningScreen` | 新建 |
+| 我的 | `ProfileScreen` | 档案头 + 三格统计（已学词 / 连续天数 / 文章）+ 学习记录行；**不再内联设置分组** |
+| 设置 | `SettingsScreen` 的独立根页 | 页头「设置」+ 四组：学习 / AI 与语音 / 外观与关于 / 数据与安全 |
+
+> 关于页与设置页的入口分工（2026-10-31）：许可唯一入口 = 关于 →「开源许可与隐私说明」；
+> 备份唯一入口 = 设置 →「备份与恢复」；关于页不再重复这两条，也不保留不可点的「隐私说明」行。
 
 ### 3.4 全屏层清单（不显示底导）
 
@@ -222,14 +232,14 @@ enum class AppTab(val label: String, val contentDescription: String) {
 
 | 编号 | 标准 | 验证方式 |
 |---|---|---|
-| AC-1 | 应用底部出现四栏导航，标签依次为 学习 / 阅读 / AI 学 / 设置 | 真机 `uiautomator dump` 读取四栏 `content-desc` |
+| AC-1 | 应用底部出现五栏导航，标签依次为 学习 / 阅读 / AI 助学 / 我的 / 设置 | 真机 `uiautomator dump` 读取五栏 `content-desc` |
 | AC-2 | 点击任一栏切换内容，选中态可见 | adb `input tap` 逐栏切换 + 截图 |
 | AC-3 | 「AI 学」页显示渐变头卡、四个功能行、学习导航卡、说明区 | 真机截图 |
 | AC-4 | 四个功能行都可点开，页面不得空白或崩溃 | adb 逐个点开 + 截图 |
 | AC-5 | 全屏层出现时底导隐藏；返回后回到原 tab | adb 走查 + 截图 |
 | AC-6 | 旋转屏幕后停留 tab 不丢失 | 真机旋转 + 截图（或 instrumentation 断言） |
-| AC-7 | JVM：`AppTab` 恰好四栏、顺序固定、标签不重复；`AiFeature` 的状态文案与「未实现」事实一致 | JVM 测试 |
-| AC-8 | instrumentation：四栏节点存在、点击回调收到正确 tab | `createComposeRule` |
+| AC-7 | JVM：`AppTab` 恰好五栏、顺序固定、标签不重复；`AiFeature` 的状态文案与「未实现」事实一致 | JVM 测试 |
+| AC-8 | instrumentation：五栏节点存在、点击回调收到正确 tab | `createComposeRule` |
 | AC-9 | 真机全量测试 0 失败，且应用数据未被清空 | `install -r` + `am instrument` + `run-as` 比对 databases |
 | AC-10 | 头部卡顶部出现 AI 表情，居中且渲染高度不低于 120dp | instrumentation `assertHeightIsAtLeast(120.dp)` + 真机截图 |
 | AC-11 | 表情的 `contentDescription` 在两种真实配置状态下分别复述「AI 已配置」「AI 尚未接通」 | instrumentation 断言 |
