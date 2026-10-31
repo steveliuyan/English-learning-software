@@ -127,7 +127,7 @@
 - 分支 `stage-5-ui-r2-learning-path`；本批 5 枚提交：
   `0f07b54`（决策 + 计划 + U-14 澄清）、`bd020e8`（U-4 + U-5）、`25b9a58`（U-1..U-3）、
   `5357a96`（U-7 + U-10）、`9432635`（U-11 + U-12 + U-8）；本报告与决策文档 §5-A/实施记录随本批第 6 枚提交。
-- **领先 `origin/stage-5-ui-r2-learning-path` 19 枚，未推送**（重算：
+- **领先 `origin/stage-5-ui-r2-learning-path` 20 枚，未推送**（含本报告这枚文档提交；重算：
   `git rev-list --left-right --count origin/stage-5-ui-r2-learning-path...HEAD`）。按红线**不合 `main`、不推送**，
   等用户说「推送」；用户已交代推送失败时等他开代理再推。
 - 提交全部带 git 身份 `-c user.name=steveliuyan -c user.email=2021250388@qq.com`。
