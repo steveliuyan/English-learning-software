@@ -111,7 +111,7 @@ fun notConfiguredStatusLine(featureLabel: String): String = "「$featureLabel」
  * 同一枚节点（`mergeDescendants = true`），否则标签在父、click 在子，真机上
  * `onNodeWithTag("not_configured_goto").performClick()` 会打在没有 click action 的节点上。
  *
- * [detail] 是可选的第二行（例如「去『设置 · AI』添加一套并设为默认」这类补路指引），
+ * [detail] 是可选的第二行（例如「去『我的 → AI 服务』添加一套并设为默认」这类补路指引），
  * 传 `null` 就只剩一句现状——**但出口始终在**，这正是死屏禁令的落点。
  *
  * [onConfigure] 是必填回调：可空或带默认值都等于允许「渲染一张没有出口的卡」，

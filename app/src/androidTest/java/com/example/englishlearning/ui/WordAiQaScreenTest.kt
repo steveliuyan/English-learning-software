@@ -169,7 +169,7 @@ class WordAiQaScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("密钥被拒绝，去「设置 · AI」换一份有效的密钥。").assertExists()
+        composeRule.onNodeWithText("密钥被拒绝，去「我的 → AI 服务」换一份有效的密钥。").assertExists()
         composeRule.onNodeWithText("k3y", substring = true).assertDoesNotExist()
     }
 

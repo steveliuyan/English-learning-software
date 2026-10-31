@@ -137,7 +137,7 @@ fun ImageStudioScreen(
                     modifier = Modifier.testTag("image_studio_subject_hint"),
                 )
                 Text(
-                    text = "每次调用都会真实使用「设置 · AI」里的服务并可能产生费用",
+                    text = "每次调用都会真实使用「我的 → AI 服务」里的服务并可能产生费用",
                     style = AppType.Footnote,
                     color = colors.text3,
                     modifier = Modifier.testTag("image_studio_cost_hint"),
@@ -368,11 +368,11 @@ private fun ResultImage(filePath: String) {
  */
 private fun ImageStudioNotConfiguredReason.guidance(): String = when (this) {
     ImageStudioNotConfiguredReason.NoDefaultProfile ->
-        "去「设置 · AI」添加一套并设为生图默认。"
+        "去「我的 → AI 服务」添加一套并设为生图默认。"
     ImageStudioNotConfiguredReason.DefaultProfileUnavailable ->
-        "去「设置 · AI」检查默认生图服务或补上密钥。"
+        "去「我的 → AI 服务」检查默认生图服务或补上密钥。"
     ImageStudioNotConfiguredReason.InvalidEndpoint ->
-        "去「设置 · AI」修正生图服务地址后再试。"
+        "去「我的 → AI 服务」修正生图服务地址后再试。"
 }
 
 @Composable

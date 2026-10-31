@@ -158,7 +158,7 @@ class SpeechSettingsViewModel @Inject constructor(
 
     /**
      * 一键创建 Talkify 式 MiMo 预设：服务地址与模型名预填官方默认值，用户之后只需在
-     * 「AI 服务与密钥」里填密钥。先落元数据再绑定选中偏好（与 AI Profile 保存同序）；
+     * 「我的 → AI 服务」里填密钥。先落元数据再绑定选中偏好（与 AI Profile 保存同序）；
      * 刷新与提示在同一次状态赋值里完成，避免 load 协程把 message 覆盖掉。
      */
     fun addMiMoPreset() = viewModelScope.launch {
@@ -189,7 +189,7 @@ class SpeechSettingsViewModel @Inject constructor(
             _state.value = _state.value.copy(message = STORAGE_FAILED_MESSAGE)
             return@launch
         }
-        reload(message = "已创建 MiMo 预设，请在「AI 服务与密钥」中填写密钥。")
+        reload(message = "已创建 MiMo 预设，请在「我的 → AI 服务」中填写密钥。")
     }
 
     /**

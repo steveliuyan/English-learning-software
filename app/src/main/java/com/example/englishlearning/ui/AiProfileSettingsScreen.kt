@@ -56,7 +56,7 @@ import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
 
 /**
- * 「设置 · AI」下的 AI 服务管理页（二级全屏层）。
+ * 「我的 → AI 服务」进来的 AI 服务管理页（二级全屏层）。
  *
  * 同一个 composable 承担列表与编辑两态：`editor == null` 时是列表，否则是编辑页。这样返回键
  * 只有一条链路——编辑态下先关编辑页、列表态下才退出整层，不需要在 [AppScreen] 里再排一次顺序。
@@ -127,7 +127,7 @@ private fun AiProfileList(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         // 旧「← 返回上一层」药片下线：返回位归共享页头（contentDescription 固定「返回」）。
-        // 这一层有两个入口（「设置 · AI 服务与密钥」与「AI 助学」功能页的「去配置 AI 服务」），
+        // 这一层有两个入口（「我的 → AI 服务」与「AI 助学」功能页的「去配置 AI 服务」），
         // 页头那枚返回位不写死具体 tab，所以从 AI 助学进来时也不会指错地方。
         AppScreenHeader(
             title = "AI 服务",

@@ -101,7 +101,7 @@ enum class AiFeature(
         icon = AppIcon.Document,
         title = "长难句分析",
         summary = "把一句英文拆成主句、从句和短语，逐段给中文解释",
-        status = "已可用：去「设置 · AI」选好默认文本服务，回这里输入一句英文即可分析。",
+        status = "已可用：去「我的 → AI 服务」选好默认文本服务，回这里输入一句英文即可分析。",
         implemented = true,
         dependencies = listOf(
             "默认文本 AI 服务：在设置里选好一套带密钥的模型",
@@ -128,7 +128,7 @@ enum class AiFeature(
         icon = AppIcon.Image,
         title = "AI 生图",
         summary = "用文字 AI 生成画面描述，再交给生图服务出图",
-        status = "已可用：去「设置 · AI」添加一套生图服务并设为生图默认，回这里输入主题即可出图。",
+        status = "已可用：去「我的 → AI 服务」添加一套生图服务并设为生图默认，回这里输入主题即可出图。",
         implemented = true,
         dependencies = listOf(
             "生图配置：独立 Profile 指向 OpenAI 兼容生图接口",

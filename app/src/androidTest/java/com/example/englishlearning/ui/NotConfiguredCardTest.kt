@@ -100,7 +100,7 @@ class NotConfiguredCardTest {
     @Test
     fun optional_detail_never_replaces_the_configure_exit() {
         var configured = false
-        val detail = "去「设置 · AI」添加一套服务并设为默认"
+        val detail = "去「我的 → AI 服务」添加一套服务并设为默认"
         composeRule.setContent {
             MintGlassTheme {
                 Column {
@@ -135,7 +135,7 @@ class NotConfiguredCardTest {
     @Test
     fun status_and_detail_wrap_instead_of_clipping_at_font_scale_2() {
         val longLabel = "长难句分析（含从句拆解、成分标注与逐段译文对照）"
-        val longDetail = "去「设置 · AI」添加一套服务并设为默认；若已添加，请检查该服务的 Endpoint 与密钥是否仍然有效"
+        val longDetail = "去「我的 → AI 服务」添加一套服务并设为默认；若已添加，请检查该服务的 Endpoint 与密钥是否仍然有效"
         composeRule.setContent {
             val base = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 2f)) {

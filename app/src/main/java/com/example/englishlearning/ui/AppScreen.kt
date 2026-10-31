@@ -202,14 +202,16 @@ fun AppScreen(
             // 批 1 Task 17：新建的「复习队列」二级层（原型 `learn-review`）。同一套四件套接线。
             var showReviewQueue by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // Task 26 Step 3：四枚 AI 屏的「未配置卡」出口统一送到 AI 配置页（共享 `NotConfiguredCard` 的
-            // 必填 `onConfigure`）。少了这个 ViewModel（预览/测试夹具）时退回「设置」栏，不假装能直达——
-            // 与 AiFeatureScreen 的 `onOpenSettings` 同一口径。
+            // 必填 `onConfigure`）。少了这个 ViewModel（预览/测试夹具）时**退回「我的」hub**——
+            // U-4（决策 2026-11-03 整合 §2）改的这一处：批 5 之后 AI 行在 hub、设置子页只剩外观，
+            // 再退回 `showSettings` 就是把用户送到一个没有 AI 入口的页面，与全站新指引（「我的 → AI 服务」）相反。
+            // hub 那一行本身就写着「AI 服务」，兜底落在它上面才是自洽的地图。
             val openAiProfilesOrSettings: () -> Unit = {
                 aiProfileViewModel?.load()
                 if (aiProfileViewModel != null) {
                     showAiProfiles = true
                 } else {
-                    showSettings = true
+                    selectedTab = AppTab.PROFILE
                 }
             }
             // Task 22-B（R-22.1）：原 `showFavorites` 独立叠层路由已摘除，收藏改由合并页 MyWordsScreen 承载；

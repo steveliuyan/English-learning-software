@@ -54,10 +54,10 @@ sealed interface AiFailure {
 
 /** 用户可见文案。全部是常量，没有一处拼接运行时数据。 */
 enum class AiFailureUiText(val message: String) {
-    NotConfigured("还没有配置 AI 服务，先去「设置 · AI」添加一套。"),
+    NotConfigured("还没有配置 AI 服务，先去「我的 → AI 服务」添加一套。"),
     CapabilityUnsupported("这套配置没开启所需能力，换一个模型或补上能力声明。"),
     NetworkUnavailable("网络不可用，检查网络后重试。"),
-    Unauthorized("密钥被拒绝，去「设置 · AI」换一份有效的密钥。"),
+    Unauthorized("密钥被拒绝，去「我的 → AI 服务」换一份有效的密钥。"),
     RateLimited("请求太频繁或额度用尽，稍后再试。"),
     ServerUnavailable("对方服务暂时不可用，稍后再试。"),
     Timeout("等待超时，稍后再试。"),

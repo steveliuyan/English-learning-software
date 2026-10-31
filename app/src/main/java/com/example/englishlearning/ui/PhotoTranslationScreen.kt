@@ -787,11 +787,11 @@ private fun OutboundConfirmationDialog(host: String, onConfirmOutbound: (Boolean
  */
 private fun PhotoTranslationNotConfiguredReason.guidance(): String = when (this) {
     PhotoTranslationNotConfiguredReason.NoDefaultProfile ->
-        "去「设置 · AI」添加一套并设为默认。"
+        "去「我的 → AI 服务」添加一套并设为默认。"
     PhotoTranslationNotConfiguredReason.DefaultProfileUnavailable ->
-        "去「设置 · AI」检查默认服务或补上密钥。"
+        "去「我的 → AI 服务」检查默认服务或补上密钥。"
     PhotoTranslationNotConfiguredReason.InvalidEndpoint ->
-        "去「设置 · AI」修正服务地址后再试。"
+        "去「我的 → AI 服务」修正服务地址后再试。"
 }
 
 @Composable

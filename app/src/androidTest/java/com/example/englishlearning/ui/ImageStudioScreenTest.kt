@@ -216,7 +216,7 @@ class ImageStudioScreenTest {
             )
         }
         composeRule.onNodeWithTag("image_studio_not_configured")
-            .assertTextContains("设置 · AI", substring = true)
+            .assertTextContains("我的 → AI 服务", substring = true)
     }
 
     @Test

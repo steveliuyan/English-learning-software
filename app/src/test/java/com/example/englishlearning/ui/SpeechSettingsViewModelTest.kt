@@ -385,7 +385,8 @@ class SpeechSettingsViewModelTest {
         assertEquals(PronunciationEngine.MiMo, viewModel.state.value.selectedEngine)
         assertEquals(listOf(preset.profileId), viewModel.state.value.candidates.map { it.profileId })
         assertEquals(AiProviderKind.XIAOMI_MIMO, viewModel.state.value.candidates.single().providerKind)
-        assertTrue(viewModel.state.value.message!!.contains("AI 服务与密钥"))
+        // U-5（决策 2026-11-03 整合 §3）：提示句里的落点用正名「AI 服务」，不再是别名「AI 服务与密钥」。
+        assertTrue(viewModel.state.value.message!!.contains("我的 → AI 服务"))
     }
 
     @Test fun addMiMoPresetKeepsMessageWhenPreferenceSaveFails() = runTest(dispatcher) {

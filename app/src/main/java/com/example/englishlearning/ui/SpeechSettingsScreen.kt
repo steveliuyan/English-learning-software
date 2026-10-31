@@ -126,7 +126,7 @@ fun SpeechSettingsScreen(
 
                 Text(text = "朗读服务", style = AppType.Label, color = colors.text3)
                 Text(
-                    text = "系统朗读用手机自带的声音，离线可用；小米 MiMo 走已保存的 AI 服务，要先在「AI 服务与密钥」里填密钥。",
+                    text = "系统朗读用手机自带的声音，离线可用；小米 MiMo 走已保存的 AI 服务，要先在「我的 → AI 服务」里填密钥。",
                     style = AppType.Footnote,
                     color = colors.text2,
                 )
@@ -217,7 +217,7 @@ fun SpeechSettingsScreen(
                                     )
                                 }
                                 PillButton(
-                                    text = "AI 服务与密钥",
+                                    text = "AI 服务",
                                     onClick = onOpenAiProfiles,
                                     modifier = Modifier.fillMaxWidth(),
                                     style = PillStyle.Text,
