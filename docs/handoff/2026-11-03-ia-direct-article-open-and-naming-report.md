@@ -216,3 +216,13 @@ adbd 已降回非 root（`service.adb.root 0` + 重启 adbd，模拟器随后冷
   即「`showLearning` 还成立 ⇒ 文章分支在 `else if` 链上轮不到」这一支真的开不出文章）；
   装回原实现后两枚复绿。
 - 全类回归：`AppScreenTest` 整类 **`OK (64 tests)`**（原 62 + 本批 2）。设备 `font_scale` 保持 1.0。
+- 真机：§1-B 的实现提交（`a1a8ff8`，01:36:04）之后另做了一次 `adb install -r bf353dda`，收工时核对
+  `dumpsys package com.example.englishlearning` 得 `lastUpdateTime=2026-11-01 01:37:56`、`versionName=0.0.1`
+  ——即带这枚改动的包在真机上，供用户手工试用；**未在真机跑 instrument**（沿 §3.6 口径）。
+
+### 8.3 Git 状态（覆盖 §4 的「5 个提交」）
+
+§4 写的是并回之前的账。并回与盘点另加 3 枚：`a1a8ff8`（实现）、`972cbe9`（决策 §1-B + 计划步骤 6 + 本报告 §8）、
+`ed0f676`（`docs/design/2026-11-03-duplication-audit.md` 盘点），本批累计 8 枚、分支相对
+`origin/stage-5-ui-r2-learning-path` 领先 13 枚（批 5 五枚 + 批 6 五枚 + §1-B 三枚）；
+本枚补记提交后为 9 枚 / 13+1 枚。**仍然未推送**，等用户说「推送」；不合 `main`。
