@@ -270,7 +270,8 @@ class AppScreenOverlayContainerTest {
                 composeRule.onAllNodesWithText("选择要导出的词书").fetchSemanticsNodes().isEmpty()
             }
             composeRule.onNodeWithTag("settings_export_book_overlay-pack-a").assertDoesNotExist()
-            composeRule.onNodeWithTag("profile_screen").assertExists()
+            // 选择器挂在设置页之上一版：关掉后落回设置页（2026-10-31 起设置是独立第五栏）。
+            composeRule.onNodeWithTag("settings_screen").assertExists()
         } finally {
             books.forEach { it.deleteRecursively() }
         }
@@ -439,7 +440,7 @@ class AppScreenOverlayContainerTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("backup_hub_screen").fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
         composeRule.onNodeWithTag("app_tab_settings").assertExists()
     }
 
@@ -448,7 +449,7 @@ class AppScreenOverlayContainerTest {
     /**
      * 建资料。落点屏由宿主按今日计划的状态决定，所以这里**不等具体节点**，
      * 两路各自等自己那一站：路 A 等 `MissingLearningSetup` 逼出的必填选取屏，
-     * 路 B 等 `placeholderCardPlan()` 给出的今日计划栏（底导四栏都在，才能切设置栏）。
+     * 路 B 等 `placeholderCardPlan()` 给出的今日计划栏（底导五栏都在，才能切设置栏）。
      */
     private fun createProfile() {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")

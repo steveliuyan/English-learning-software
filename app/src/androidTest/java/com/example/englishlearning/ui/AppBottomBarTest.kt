@@ -27,7 +27,7 @@ import org.junit.runner.RunWith
 class AppBottomBarTest {
     @get:Rule val composeRule = createComposeRule()
 
-    @Test fun renders_the_four_slots_the_user_asked_for() {
+    @Test fun renders_the_five_slots_the_user_asked_for() {
         composeRule.setContent { AppBottomBar(selected = AppTab.LEARNING, onSelect = {}) }
         AppTab.entries.forEach { tab ->
             composeRule
@@ -39,7 +39,7 @@ class AppBottomBarTest {
 
     @Test fun every_slot_carries_its_label_so_the_bar_reads_by_itself() {
         composeRule.setContent { AppBottomBar(selected = AppTab.LEARNING, onSelect = {}) }
-        listOf("学习", "阅读", "AI 助学", "我的").forEach { label ->
+        listOf("学习", "阅读", "AI 助学", "我的", "设置").forEach { label ->
             composeRule.onNodeWithText(label).assertExists()
         }
     }
@@ -52,10 +52,10 @@ class AppBottomBarTest {
     }
 
     /**
-     * 四个页签的图形腿（2026-10-31 用户评审 ①：选中/未选中必须是同一枚插画；判据随形改，不放宽）。
+     * 每个页签的图形腿（2026-10-31 用户评审 ①：选中/未选中必须是同一枚插画；判据随形改，不放宽）。
      *
-     * 旧判据是「选中槽恰一枚插画位图、另外三槽一枚都没有」——那正是用户看到的那版行为：未选中还是旧线框，
-     * 选中才变成插画。新判据反过来：**四槽在两种状态下都恰一枚插画**（同一枚位图），选取只改两件事——
+     * 旧判据是「选中槽恰一枚插画位图、其余槽一枚都没有」——那正是用户看到的那版行为：未选中还是旧线框，
+     * 选中才变成插画。新判据反过来：**每槽在两种状态下都恰一枚插画**（同一枚位图），选取只改两件事——
      * 有没有药片底、压不压 [TabGlyphIdleAlpha] 半透明。结构（都在）走语义树，视觉（淡出）走像素亮度，
      * 两半各管一件事，见下一条用例。墨色对比度归 JVM 契约 `AppBottomBarContrastTest`，本类不抄色值。
      */

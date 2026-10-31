@@ -240,11 +240,12 @@ class AppScreenTest {
     }
 
     /**
-     * 用户要求「在应用底下加个 AI 学」，2026-11-02 定名为「AI 助学」。这里断言四栏都真的出现在
+     * 用户要求「在应用底下加个 AI 学」，2026-11-02 定名为「AI 助学」。这里断言五栏都真的出现在
      * 应用外壳里，而不只是组件级测试通过——底导没被接进 AppScreen 是很容易发生的回归。
+     * 2026-10-31 起第五栏是「设置」（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）。
      */
     @Test
-    fun readyPlanShowsTheFourSlotBottomNavigation() {
+    fun readyPlanShowsTheFiveSlotBottomNavigation() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
         AppTab.entries.forEach { tab ->
@@ -551,7 +552,8 @@ class AppScreenTest {
         // 打卡入口随 2026-10-25 版式重做搬到「我的」页（`TodayPlanScreen` 头注释：五枚入口锚
         // `_check_in` 等随功能一起离场，判决由 `TodayPlanBareRowContractTest` 双向钉住）：
         // 现行为「我的」页强档卡里的「连续天数」那一格（`profile_stat_streak` → `onOpenCheckIn`）。
-        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        // 2026-10-31 起「我的」是第四栏（`app_tab_profile`），`app_tab_settings` 已是设置页。
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_screen").assertExists()
         composeRule.onNodeWithTag("profile_stat_streak")
@@ -590,17 +592,21 @@ class AppScreenTest {
         composeRule.onNodeWithTag("today_plan_summary").assertDoesNotExist()
     }
 
+    /**
+     * 2026-10-31 结构性重排后，设置栏的根页就是设置页自己：
+     * 设置页在、我的页不在，且设置页的四组行真的渲染出来。
+     *
+     * 之前的形状是「设置 tab 挂 ProfileScreen，设置四组原样接在它尾部」；那正是
+     * 用户点评的「设置没有自己的位置」。这条用例反过来钉：同一栏不得再叠「我的」。
+     */
     @Test
-    fun settingsTabOpensTheProfilePageAndKeepsTheWorksheetEntry() {
+    fun settingsTabOpensItsOwnSettingsPageAndKeepsTheWorksheetEntry() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.waitForIdle()
-        // 批 1 Task 6：「我的」这个 tab 现在的根是 `ProfileScreen`（档案头 + 三格统计 + 学习记录），
-        // 原设置四组九行原样接在它尾部（`SettingsGroupsContent`）。所以这里同时断两件事——
-        // 新根在、旧根不在——否则「ProfileScreen 套在 SettingsScreen 里」这种双滚动壳也能过。
-        composeRule.onNodeWithTag("profile_screen").assertExists()
-        composeRule.onNodeWithTag("settings_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertDoesNotExist()
         composeRule.onNodeWithTag("settings_open_worksheet").performScrollTo().assertExists().assertHasClickAction()
     }
 
@@ -678,7 +684,8 @@ class AppScreenTest {
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        // 入口在设置页（2026-10-31 起设置独立成第五栏），返回键落到设置页。
+        composeRule.onNodeWithTag("settings_screen").assertExists()
     }
 
     @Test
@@ -693,7 +700,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys.clear()
         pressSystemBack()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
         // 一级页不再有引擎状态行；刷新语义下沉到语音二级页——直接进入 AI Profile 改完 Key
         // 返回后再进语音设置，状态必须是新鲜的。
         composeRule.onNodeWithTag("settings_speech_openai").assertDoesNotExist()
@@ -723,7 +730,7 @@ class AppScreenTest {
         composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
         composeRule.onNodeWithTag("settings_open_speech").performScrollTo()
         composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
     }
@@ -767,7 +774,7 @@ class AppScreenTest {
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
 
         pressSystemBack()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
@@ -1058,7 +1065,8 @@ class AppScreenTest {
 
         // 「学习记录」入口随 2026-10-25 版式重做搬到「我的」页（`ProfileScreen` 里那条 BareRow，
         // 锚 `profile_open_learning_records`）：旧锚是内容描述「学习记录」，本屏已不渲染该入口。
-        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        // 2026-10-31 起「我的」是第四栏（`app_tab_profile`）。
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_open_learning_records").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -1515,8 +1523,8 @@ class AppScreenTest {
             )
         }
         createProfile()
-        // 同上：学习记录入口现居「我的」页（`profile_open_learning_records`）。
-        composeRule.onNodeWithTag("app_tab_settings").performClick()
+        // 同上：学习记录入口现居「我的」页（`profile_open_learning_records`，第四栏）。
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_open_learning_records").performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -2418,8 +2426,8 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("today_plan_summary").assertExists()
 
-        // 设置入口随 2026-10-25 版式重做搬到「我的」页的「学习」组（`SettingsScreen` 里 `settings_open_setup`，
-        // 副标题「换词书与目标」）：旧锚是内容描述「调整词书与目标」，本屏已不渲染该入口。
+        // 设置入口在独立的设置栏（`settings_open_setup`，副标题「换词书与目标」）；
+        // 2026-10-31 起它是第五个一级 tab，不再挂在「我的」页尾部。
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_open_setup").assertExists().performScrollTo().performClick()
@@ -2428,9 +2436,9 @@ class AppScreenTest {
 
         composeRule.onNodeWithContentDescription("保存学习设置").assertExists().performClick()
         composeRule.waitForIdle()
-        // 存完落回入口所在页（「我的」），再回学习页看计划是否重算——原用例「回今日计划 + 重算一次」
+        // 存完落回入口所在页（设置页），再回学习页看计划是否重算——原用例「回今日计划 + 重算一次」
         // 的判据原样保留，只把「回哪一页」按新版式改准。
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
         composeRule.onNodeWithTag("app_tab_learning").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("today_plan_summary").fetchSemanticsNodes().isNotEmpty()
@@ -2440,7 +2448,7 @@ class AppScreenTest {
     }
 
     @Test
-    fun optionalSetupCanBeCancelledBackToTheProfilePageWithoutReloading() {
+    fun optionalSetupCanBeCancelledBackToTheSettingsPageWithoutReloading() {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC)
         val vm = AppViewModel(repository, CreateLocalProfileUseCase(repository, clock), AndroidTestHealthyDatabaseStartupProbe)
@@ -2450,7 +2458,7 @@ class AppScreenTest {
         composeRule.onNodeWithContentDescription("姓名输入").assertExists().performTextInput("学习者")
         composeRule.onNodeWithContentDescription("创建资料").assertExists().performClick()
         composeRule.waitForIdle()
-        // 同上：可选设置入口现居「我的」页。
+        // 同上：可选设置入口现居独立的设置栏。
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_open_setup").assertExists().performScrollTo().performClick()
@@ -2458,10 +2466,10 @@ class AppScreenTest {
         composeRule.onNodeWithText("学习计划").assertExists()
 
         // 批 2 Task 6：旧版另有一枚 `← 返回上一层` 文字按钮（朗读文案「返回上一层」）；现在返回位
-        // 只剩共享页头一处，朗读文案随之变成页头固定的「返回」。判据仍是「点得到、点完回到「我的」」。
+        // 只剩共享页头一处，朗读文案随之变成页头固定的「返回」。判据仍是「点得到、点完回到设置页」。
         composeRule.onNodeWithContentDescription("返回").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
         // 取消不得触发重算：回学习页复用已算好的计划。
         composeRule.onNodeWithTag("app_tab_learning").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -2472,33 +2480,31 @@ class AppScreenTest {
     }
 
     /**
-     * #24 收口（Task 22-M）：「关于与许可」在「我的」页上真的存在、真的能点开、真的回得来。
+     * 关于页的宿主端通路：设置页 →「外观与关于」组 → 关于 → 返回。
      *
-     * 关于页本身与它那一行都是 Task 22-B 建好的（用户拍板放成设置「外观与关于」组第 10 行），
-     * 而设置内容在这个 tab 里由我的页的 `settingsContent()` 承载——所以「从我的页进关于」这条
-     * 通路此前**没有任何行为判据**：`SettingsScreenTest` 直接挂 `SettingsScreen`（装载缝），
-     * `ProfileScreenTest` 的 `settingsContent` 是替身。本用例补的正是宿主这一层。
+     * 2026-10-31 结构性重排后通路变短也更明确：关于不再是「我的」页尾部设置内容里的一行
+     * （`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）。本条钉宿主这一层：
+     * 切到设置栏、滚到关于行、点开、点返回，必须回到**设置页**而不是别的 tab 或空白。
      *
-     * 写法照邻座 `optionalSetupCanBeCancelledBackToTheProfilePageWithoutReloading`：建完档 →
-     * 切设置 tab → 在「我的」页里滚动到设置行。`performScrollTo()` 同时证了那一行住在本页的
-     * 滚动容器内（我的页把设置内容装在同一个可滚列里）。
+     * `performScrollTo()` 同时证了那一行住在设置页自己的滚动容器内。
      */
     @Test
-    fun theAboutRowOnTheProfilePageOpensTheAboutScreenAndComesBack() {
+    fun theAboutRowOnTheSettingsPageOpensTheAboutScreenAndComesBack() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
         composeRule.onNodeWithTag("app_tab_settings").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
 
         composeRule.onNodeWithTag("settings_open_about").assertExists().performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("about_screen").assertExists()
 
-        // 返回位只有共享页头这一处（R-9.2），点回去必须落在「我的」页，而不是别的 tab 或空白。
+        // 返回位只有共享页头这一处（R-9.2），点回去必须落在设置页。
         composeRule.onNodeWithContentDescription("返回").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("profile_screen").assertDoesNotExist()
     }
 
     @Test

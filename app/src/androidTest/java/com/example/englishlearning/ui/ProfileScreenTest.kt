@@ -1,9 +1,5 @@
 package com.example.englishlearning.ui
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -26,7 +22,8 @@ import org.junit.runner.RunWith
  * 少接一环时用户看到的是一个死数字——这比缺一个入口更坏，因为它看起来可点。
  *
  * 设置内容用一枚带 tag 的替身：四组九行自己的测试在 `SettingsScreenTest`，
- * 本文件只核「内容槽真的被宿主内容填进这一页」。
+ * 本文件只核「内容槽真的被宿主内容填进这一页」——**2026-10-31 起这一段已改为反向判据**：
+ * 设置独立成第五个一级 tab，本页不再有内容槽，于是这里断的就是「设置分组不在本页」。
  */
 @RunWith(AndroidJUnit4::class)
 class ProfileScreenTest {
@@ -45,7 +42,6 @@ class ProfileScreenTest {
                     onOpenCheckIn = {},
                     onOpenReadingHistory = {},
                     onOpenLearningRecords = {},
-                    settingsContent = {},
                 )
             }
         }
@@ -77,7 +73,6 @@ class ProfileScreenTest {
                     onOpenCheckIn = { opened += "checkIn" },
                     onOpenReadingHistory = { opened += "readingHistory" },
                     onOpenLearningRecords = { opened += "records" },
-                    settingsContent = {},
                 )
             }
         }
@@ -88,8 +83,13 @@ class ProfileScreenTest {
         assertEquals(listOf("wordBank", "checkIn", "readingHistory", "records"), opened)
     }
 
+    /**
+     * 2026-10-31 用户拍板「结构性重排」：设置从本页拆出去成为第五个一级 tab
+     * （`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）。本页到「学习记录」行为止，
+     * 不得再出现任何设置分组——同屏两枚页头、两个滚动容器是拆分前的老毛病。
+     */
     @Test
-    fun theSettingsContentIsRenderedInsideThisPage() {
+    fun thePageEndsAtTheLearningRecordsRowWithoutInlineSettings() {
         composeRule.setContent {
             MintGlassTheme {
                 ProfileScreen(
@@ -101,16 +101,15 @@ class ProfileScreenTest {
                     onOpenCheckIn = {},
                     onOpenReadingHistory = {},
                     onOpenLearningRecords = {},
-                    settingsContent = {
-                        Column {
-                            Text("设置内容替身", modifier = Modifier.testTag("profile_settings_stub"))
-                        }
-                    },
                 )
             }
         }
-        // `performScrollTo()` 本身就是「住在本页滚动容器里」的凭据：内容槽若落在滚动容器之外，
-        // 这一步会因找不到可滚动祖先而当场失败。
-        composeRule.onNodeWithTag("profile_settings_stub").performScrollTo().assertExists()
+        composeRule.onNodeWithTag("profile_open_learning_records").performScrollTo().assertExists()
+        SettingsGroups.all.forEach { group ->
+            composeRule.onNodeWithTag(group.tag).assertDoesNotExist()
+        }
+        SettingsGroups.all.flatMap { it.entries }.forEach { entry ->
+            composeRule.onNodeWithText(entry.title).assertDoesNotExist()
+        }
     }
 }
