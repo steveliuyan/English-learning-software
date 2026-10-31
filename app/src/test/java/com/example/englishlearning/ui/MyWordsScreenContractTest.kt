@@ -195,16 +195,20 @@ class MyWordsScreenContractTest {
         // 逐环点名形状而不是数计数：「点了真的会开吗、开在哪一段」的用户面由 connected `AppScreenTest`
         // 的端到端用例承重。
         //
-        // 批 1 Task 6 长出第二处**合法**出口：我的页三格统计里的「词库」格开的也是词库页（同为词书段）。
-        // 因此 onOpenWordBank 的期望值从「全文件恰一处」改为「每个站点各恰一处 **且** 全文件恰两处」：
-        // 站点内仍是精确等号，第三人偷偷补出第三条打开通路时总数变 3，照样当场红。
-        val wordBankWiring = "onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true }"
+        // 2026-11-02 我的 hub（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）：
+        // 「我的」页不再只有一枚「词库」格，而是「我的词汇」三行（收藏 / 生词 / 错词）各开词库页的对应段。
+        // 若照旧在三行上各写一遍 `wordBankSection = ...; showWordBank = true`，宿主会散落四份同形接线。
+        // 因此 hub 只收**一枚按段回调** `onOpenWordBankSection`，由宿主这一处写段位：
+        // 学习页词库行仍是原来的单段接线，我的 hub 是第二条、也是最后一条打开通路。
+        val learningWiring = "onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true }"
+        val profileWiring = "onOpenWordBankSection = { section -> wordBankSection = section; showWordBank = true }"
         val learningStation = appScreen
             .substringAfter("AppTab.LEARNING -> TodayPlanScreen(")
             .substringBefore("AppTab.READING ->")
+        // 我的分支是 `when` 的最后一条，切片到文件尾即可；它之后只剩 `AppUiState` 的其它分支，
+        // 不含任何词库接线，精确计数不受影响。
         val profileStation = appScreen
             .substringAfter("AppTab.PROFILE -> ProfileScreen(")
-            .substringBefore("AppTab.SETTINGS ->")
         // 取样器自检：两段必须真的切得开，否则 substringAfter 落空会把整份源码当成一个站点、
         // 「各恰一处」退化成「整体恰一处」。
         assertTrue(
@@ -213,22 +217,29 @@ class MyWordsScreenContractTest {
         )
         assertTrue(
             "TodayPlanScreen(" !in profileStation && "profileName =" in profileStation,
-            "我的页站点切片落空或越界（必须切到 AppTab.SETTINGS 之前、且不含 TodayPlanScreen）",
+            "我的页站点切片落空或越界（必须从 AppTab.PROFILE 起、且不含 TodayPlanScreen）",
         )
         assertEquals(
             1,
-            countMatches(learningStation, Regex(Regex.escape(wordBankWiring))),
-            "入口接线「$wordBankWiring」在学习页站点必须恰一处（0 = 这条通路断了，2 = 同屏长出第二条）",
+            countMatches(learningStation, Regex(Regex.escape(learningWiring))),
+            "入口接线「$learningWiring」在学习页站点必须恰一处（0 = 这条通路断了，2 = 同屏长出第二条）",
         )
         assertEquals(
             1,
-            countMatches(profileStation, Regex(Regex.escape(wordBankWiring))),
-            "入口接线「$wordBankWiring」在我的页站点必须恰一处（0 = 统计格成了死链，2 = 同屏长出第二条）",
+            countMatches(profileStation, Regex(Regex.escape(profileWiring))),
+            "我的 hub 的按段接线「$profileWiring」必须恰一处（0 = 三行词汇成了死链，" +
+                "2 = 同屏长出第二条按段通路）",
+        )
+        assertEquals(
+            1,
+            countMatches(appScreen, Regex(Regex.escape(profileWiring))),
+            "按段接线全文件必须恰一处：段位只许在宿主这一处写，hub 的三行共用它（多一处 = 绕过台账的新入口）",
         )
         assertEquals(
             2,
-            countMatches(appScreen, Regex(Regex.escape(wordBankWiring))),
-            "打开词库的接线全文件必须恰两处（学习页词库行 + 我的页词库格）；再多一处就是绕过台账的新入口",
+            countMatches(appScreen, Regex(Regex.escape(learningWiring))) +
+                countMatches(appScreen, Regex(Regex.escape(profileWiring))),
+            "打开词库的接线全文件必须恰两处（学习页词库行 + 我的 hub 按段回调）；再多一处就是绕过台账的新入口",
         )
         // 批 1 Task 19：今日学习屏的「复习生词本」终点随原型 `sLearnEmpty`（`assets/app.js:501-518`）下线——
         // 那一屏只画两枚出口（调整每日新增 / 去读今日文章），四态主 CTA 里「做完了才出现」的那两枚

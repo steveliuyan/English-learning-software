@@ -9,10 +9,16 @@ import kotlin.test.fail
 /**
  * Task 17B 浮层容器契约（批 2 UI 重设计）：`AppScreen.kt` 里那 6 枚裸 `AlertDialog` 必须迁到房内两路共享浮层档，
  * 并且**只能**迁到这两路：
- *  - 路 A（破坏性确认 4 枚）→ `components/ConfirmDestructiveDialog.kt`，正文三要素（级联 → 保留面 → 不可撤销）
+ *  - 路 A（破坏性确认 7 枚）→ `components/ConfirmDestructiveDialog.kt`，正文三要素（级联 → 保留面 → 不可撤销）
  *    由组件的 `destructiveDialogBody` 承载，站点只许逐字给 `cascadeLines` / `keepLines` 与动作；
- *  - 路 B（非破坏选择 2 枚）→ `components/glass/GlassDialog.kt` + 共享 `PillButton`，
- *    自渲染的列表项 tag（`settings_export_book_$bookId`）必须原地保留。
+ *  - 路 B（非破坏选择 1 枚）→ `components/glass/GlassDialog.kt` + 共享 `PillButton`，
+ *    自渲染的 tag（`wordbook_migration_confirm` / `wordbook_migration_skip`）必须原地保留。
+ *
+ * 2026-11-02「我的」hub 批：导出词书选择器（原路 B 第二枚）随 SAF 管线整条搬进
+ * `WordBookTransferScreen.kt`（成例同 `BackupExportScreen` / `BackupRestoreScreen`：拉系统文件/分享
+ * 界面的 launcher 归子页自持）。因此本文件的取景面从「9 枚浮层」缩到「8 枚」、`PillButton(` 从 4 缩到 3，
+ * 选择器的逐字要素与守卫锚**不是删掉而是搬家**——它们在 `ProfileHubLedgerTest` 的
+ * `word book transfer page owns the saf pipeline and the export picker` 里逐字续钉。
  *
  * 判据形状沿用 17A 的成例（`AppBottomBarContractTest` 的 `stripComments` + `extractFunctionBody`
  * 「体内恰一处 / 体外零处」夹击）：本席按同一口径读源码，再按**调用区间**取窗——
@@ -323,10 +329,10 @@ class AppScreenOverlayContainerContractTest {
         assertEquals(1, count("Text(\"删除不可撤销。\", fontWeight = FontWeight.Bold)", "删除不可撤销。"), "反空转失控：旧措辞样片没被数出来")
     }
 
-    // ---------- 用例 2：逐位钉数 —— 路 A 恰 7 枚、路 B 恰 2 枚，且都长在生效宿主函数体内 ----------
+    // ---------- 用例 2：逐位钉数 —— 路 A 恰 7 枚、路 B 恰 1 枚，且都长在生效宿主函数体内 ----------
 
     @Test
-    fun `nine overlays route to exactly seven destructive confirmations and two glass pickers`() {
+    fun `eight overlays route to exactly seven destructive confirmations and one glass picker`() {
         val source = appScreenSource()
         assertEquals(
             7,
@@ -334,11 +340,16 @@ class AppScreenOverlayContainerContractTest {
             "ConfirmDestructiveDialog( 必须恰 7 枚（清空搜索历史 / 删除这一版 / 删除全部学习数据 / 删除词书 / " +
                 "删除这套 AI 配置 / 清除已保存的密钥 / 删除一条拍照翻译记录），实际 ${count(source, destructiveCall)}",
         )
-        assertEquals(2, count(source, glassCall), "GlassDialog( 必须恰 2 枚（导出词书选择器 / 发现已学过的单词），实际 ${count(source, glassCall)}")
+        assertEquals(
+            1,
+            count(source, glassCall),
+            "GlassDialog( 必须恰 1 枚（发现已学过的单词）。导出词书选择器已随 SAF 管线搬进 " +
+                "WordBookTransferScreen.kt，本文件不许再数它；多出的一枚 = 宿主又长出私有选择器",
+        )
         val calls = overlayCalls(source)
-        assertEquals(9, calls.size, "浮层调用取样必须恰 9 枚（迁 3 留 3、或多迁一枚都会掉在这里）")
+        assertEquals(8, calls.size, "浮层调用取样必须恰 8 枚（迁 3 留 3、或多迁一枚都会掉在这里）")
         assertEquals(7, calls.count { it.kind == OverlayKind.Destructive }, "路 A 取样份数不对")
-        assertEquals(2, calls.count { it.kind == OverlayKind.Glass }, "路 B 取样份数不对")
+        assertEquals(1, calls.count { it.kind == OverlayKind.Glass }, "路 B 取样份数不对")
 
         // 体内/体外夹击：6+1 枚属于 AppScreen 宿主，1+1 枚属于 LearningSetupScreen 宿主，两体之外一枚都不许有。
         val appScreenBody = extractFunctionBody(source, appScreenSignature)
@@ -348,7 +359,11 @@ class AppScreenOverlayContainerContractTest {
             count(appScreenBody, destructiveCall),
             "AppScreen 函数体内应有 6 枚破坏性确认（清空搜索历史 / 删除这一版 / 删除全部学习数据 / 删除 AI 配置 / 清除密钥 / 删除一条拍照翻译记录）",
         )
-        assertEquals(1, count(appScreenBody, glassCall), "AppScreen 函数体内应有 1 枚玻璃选择器（导出词书）")
+        assertEquals(
+            0,
+            count(appScreenBody, glassCall),
+            "AppScreen 函数体内不得再有玻璃选择器：导出词书那枚已随 SAF 管线搬进 WordBookTransferScreen.kt",
+        )
         assertEquals(1, count(setupBody, destructiveCall), "LearningSetupScreen 函数体内应有 1 枚破坏性确认（删除词书）")
         assertEquals(1, count(setupBody, glassCall), "LearningSetupScreen 函数体内应有 1 枚玻璃选择器（发现已学过的单词）")
         assertEquals(
@@ -357,7 +372,7 @@ class AppScreenOverlayContainerContractTest {
             "路 A 有一枚不在两个宿主函数体内：幽灵函数或窗外死分支里的假调用不算生效渲染路径",
         )
         assertEquals(
-            2,
+            1,
             count(appScreenBody, glassCall) + count(setupBody, glassCall),
             "路 B 有一枚不在两个宿主函数体内（同上）",
         )
@@ -432,7 +447,7 @@ class AppScreenOverlayContainerContractTest {
         )
     }
 
-    // ---------- 用例 4：六枚的信息要素、tag 与动作逐字保留 ----------
+    // ---------- 用例 4：七枚路 A 的信息要素、tag 与动作逐字保留 ----------
 
     @Test
     fun `each migrated overlay keeps its own numbers, kept surfaces, tags and actions verbatim`() {
@@ -533,27 +548,8 @@ class AppScreenOverlayContainerContractTest {
             assertEquals(1, count(photoTranslationDelete, literal), "「删除这条翻译记录」一枚的级联/保留面/动作变了：$literal")
         }
 
-        // 站点 5（迁移前 `:1608`）导出词书选择器（路 B）：列表项 tag 原地保留，取消动作逐字不变。
-        val exportPicker = glassRegionContaining(source, "选择要导出的词书")
-        listOf(
-            "GlassDialog(onDismiss = { showWordBookExportPicker = false })",
-            "text = \"选择要导出的词书\"",
-            "AppType.Headline",
-            "AppType.Body",
-            "settings_export_book_\$bookId",
-            "exportWordBookId = bookId",
-            "exportLauncher.launch(\"\$bookId.wbpack\")",
-            "testTag = \"wordbook_export_cancel\"",
-            "text = \"取消\"",
-        ).forEach { literal ->
-            assertEquals(1, count(exportPicker, literal), "「选择要导出的词书」一枚的要素/tag/动作变了：$literal")
-        }
-        assertEquals(1, count(exportPicker, "PillButton("), "导出选择器只有「取消」一枚动作，必须走共享 PillButton 且不得长出第二枚")
-        assertEquals(
-            count(exportPicker, "PillButton("),
-            count(exportPicker, "Button("),
-            "路 B 正文按钮不许手搓 Button(：`Button(` 计数必须全部由共享 PillButton 贡献（PillButton 含 Button 子串，两数相等才说明没有裸按钮）",
-        )
+        // 站点 5（迁移前 `:1608`，2026-11-02 搬进 WordBookTransferScreen.kt）导出口径已不在本文件：
+        // 选择器的逐字要素与守卫锚在 `ProfileHubLedgerTest` 续钉。这里只剩反向控——宿主不许留半份。
 
         // 站点 6（迁移前 `:1913`）发现已学过的单词（路 B）：二选一两个动作逐字保留。
         val migration = glassRegionContaining(source, "发现已学过的单词")
@@ -578,14 +574,31 @@ class AppScreenOverlayContainerContractTest {
         assertEquals(1, count(migration, "AppType.Body"), "路 B 正文必须走 AppType.Body（房内约定形状：玻璃面板内前景逐枚显式配 `color = appColors().text1`，取样看共享件 `components/glass/GlassDialog.kt` 的面板内容与 `OutboundConfirmDialog` 的正文行）")
 
         // 路 B 自渲染 tag 不许跟着路 A 一起退役：窗外零处复核。
-        listOf("settings_export_book_\$bookId", "wordbook_migration_confirm", "wordbook_migration_skip").forEach { tag ->
+        listOf("wordbook_migration_confirm", "wordbook_migration_skip").forEach { tag ->
             assertEquals(1, count(source, tag), "路 B 自渲染 tag「$tag」必须恰一处保留（它不是路 A 的组件固定 tag，不许收敛）")
         }
-        // 期望值变化（3 → 4），不是放宽：批 2 Task 22-H 的 `sError` 分叉在 AppScreen.kt 里新增第 4 处
-        // 药片调用——「词库没能打开」那一支的「重试」（`error_retry`）。它同样是真动作、走同一枚共享件；
-        // 四枚的落点是：导出取消 1 + 迁移二选一 2 + 错误屏重试 1。判据本身（药片计数 == 手搓按钮的
-        // 兜底、不许长出未登记的第 5 枚）不变，下一屏再加动作时必须把落点清单一起改。
-        assertEquals(4, count(source, "PillButton("), "AppScreen.kt 的药片调用必须恰 4 枚（导出取消 1 + 迁移二选一 2 + 错误屏重试 1），不得手搓按钮")
+        // 搬家反向控（2026-11-02）：选择器整条去了 WordBookTransferScreen.kt，宿主不许留半份状态位、
+        // launcher 或 tag。判据按标识符计数，不是「注释里说搬了」自证。
+        listOf(
+            "showWordBookExportPicker",
+            "settings_export_book_",
+            "wordbook_export_cancel",
+            "选择要导出的词书",
+        ).forEach { literal ->
+            assertEquals(
+                0,
+                count(source, literal),
+                "AppScreen.kt 不得再出现「$literal」：导出词书选择器已随 SAF 管线整条搬进 WordBookTransferScreen.kt，" +
+                    "留一份就是第二个选择器（两处 tag 口径会漂）",
+            )
+        }
+        // 期望值变化（4 → 3），不是放宽：导出取消那枚随选择器一起搬走，剩下的落点是
+        // 迁移二选一 2 + 错误屏重试 1。判据本身（药片计数 == 手搓按钮的兜底）不变。
+        assertEquals(
+            3,
+            count(source, "PillButton("),
+            "AppScreen.kt 的药片调用必须恰 3 枚（迁移二选一 2 + 错误屏重试 1），不得手搓按钮",
+        )
     }
 
     // ---------- 用例 5：路 A 组件本体冻结（不许为迁站点加参数） ----------
@@ -625,14 +638,14 @@ class AppScreenOverlayContainerContractTest {
         )
     }
 
-    // ---------- 用例 6（修复轮 1，Minor-6）：可达性锚——六枚浮层必须直接长在活分支守卫下 ----------
+    // ---------- 用例 6（修复轮 1，Minor-6）：可达性锚——八枚浮层必须直接长在活分支守卫下 ----------
 
     /**
      * 补的洞：用例 1/2/3/4 全是**字符串判据**，分不清活分支与死分支——评审点名形状「整枚浮层塞进
-     * `if (false) { … }`」时份数、形状、逐字三例照绿，而设备侧只有 2 枚有背书（路 A 删词书、路 B 导出选择器），
-     * 其余 4 枚可以「死着绿」。本用例按现树实际形状逐枚钉守卫字面（六枚各恰一处）：
+     * `if (false) { … }`」时份数、形状、逐字三例照绿，而设备侧只有 2 枚有背书（路 A 删词书、路 B 迁移弹窗），
+     * 其余 5 枚可以「死着绿」。本用例按现树实际形状逐枚钉守卫字面（八枚各恰一处）：
      *  `pendingClear?.let { pending ->` / `pendingDelete?.let { pending ->` / `if (pending != null) {` /
-     *  `state.pendingDelete?.let { book ->` / `if (showWordBookExportPicker) {` / `state.pendingMigration?.let { preview ->`
+     *  `state.pendingDelete?.let { book ->` / `state.pendingMigration?.let { preview ->` 等
      * 四道判据见 [assertOverlayGuardedUnderLiveBranch]。红样留档（修复轮 1）：把站点 4 整枚塞进
      *  `if (false)` 后，旧五例照绿（`fix17b-item4-oldshape-passes.log`）、本例判红
      *  （`fix17b-item4-deadbranch-red.log`）；撤变异复绿。合成对拍：同一条判据拒 `if (false)` 包裹样片、
@@ -649,7 +662,6 @@ class AppScreenOverlayContainerContractTest {
             GuardSite("删除这套 AI 配置？（路 A，批 4 Task 3）", "pendingAiProfileDelete?.let { profileId ->", destructiveCall, "title = \"删除这套 AI 配置？\""),
             GuardSite("清除已保存的密钥？（路 A，批 4 Task 3）", "pendingAiProfileKeyClear?.let { profileId ->", destructiveCall, "title = \"清除已保存的密钥？\""),
             GuardSite("删除一条拍照翻译记录？（路 A，批 4 Task 4）", "pendingPhotoTranslationDelete?.let { recordId ->", destructiveCall, "title = \"删除这条翻译记录？\""),
-            GuardSite("选择要导出的词书（路 B）", "if (showWordBookExportPicker) {", glassCall, "text = \"选择要导出的词书\""),
             GuardSite("发现已学过的单词（路 B）", "state.pendingMigration?.let { preview ->", glassCall, "text = \"发现已学过的单词\""),
         ).forEach { site -> assertOverlayGuardedUnderLiveBranch(source, site) }
 
@@ -657,15 +669,15 @@ class AppScreenOverlayContainerContractTest {
         // 这正是「旧五例放过」的那一发，若本例对它也绿，本例就是第二个恒真式。
         val site = GuardSite(
             "合成样片",
-            "if (showWordBookExportPicker) {",
+            "state.pendingMigration?.let { preview ->",
             glassCall,
-            "text = \"选择要导出的词书\"",
+            "text = \"发现已学过的单词\"",
         )
-        val deadBranchGhost = "if (showWordBookExportPicker) {\n    if (false) {\n        GlassDialog(onDismiss = {}) { Text(text = \"选择要导出的词书\") }\n    }\n}\n"
+        val deadBranchGhost = "state.pendingMigration?.let { preview ->\n    if (false) {\n        GlassDialog(onDismiss = {}) { Text(text = \"发现已学过的单词\") }\n    }\n}\n"
         assertFailsWith<AssertionError>(
             "反空转失控：整枚套进 if (false) 的幽灵样片没被可达性锚咬住——本例与旧三例同病",
         ) { assertOverlayGuardedUnderLiveBranch(deadBranchGhost, site) }
-        val liveShape = "if (showWordBookExportPicker) {\n    GlassDialog(onDismiss = {}) { Text(text = \"选择要导出的词书\") }\n}\n"
+        val liveShape = "state.pendingMigration?.let { preview ->\n    GlassDialog(onDismiss = {}) { Text(text = \"发现已学过的单词\") }\n}\n"
         assertOverlayGuardedUnderLiveBranch(liveShape, site)
     }
 }

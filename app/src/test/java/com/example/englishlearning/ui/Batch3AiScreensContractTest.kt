@@ -52,11 +52,14 @@ class Batch3AiScreensContractTest {
         val screen = bodyOf(home, "fun AiLearningScreen(")
         assertTrue(screen.isNotEmpty(), "取不到 `AiLearningScreen(` 本体，判据会空转")
         val noticeAt = screen.indexOf("ai_learning_privacy_notice")
-        val explainerAt = screen.indexOf("\"ai_learning_explainer_toggle\"")
+        // 2026-11-02 按用户裁定改成参考版面后，页末提示排在那组「还在打磨」卡之后
+        // （原型把 notice 放在 `.scr-body` 末尾；旧判据拿已下线的说明折叠行当地标）。
+        val unreleasedAt = screen.indexOf("\"ai_learning_unreleased_section\"")
         assertTrue(noticeAt > 0, "页末提示不在 `AiLearningScreen(` 体内：它必须长在主页上")
+        assertTrue(unreleasedAt > 0, "取不到「还在打磨」分组（`ai_learning_unreleased_section`）：页末提示失去地标")
         assertTrue(
-            noticeAt > explainerAt,
-            "页末提示必须排在说明折叠行之后（原型把 notice 放在 `.scr-body` 末尾）",
+            noticeAt > unreleasedAt,
+            "页末提示必须排在「还在打磨」之后（原型把 notice 放在 `.scr-body` 末尾）",
         )
     }
 

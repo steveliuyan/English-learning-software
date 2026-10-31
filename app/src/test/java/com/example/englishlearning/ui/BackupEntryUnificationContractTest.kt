@@ -14,15 +14,22 @@ import kotlin.test.assertTrue
  * ——后者是本仓第三次踩同类坑（子屏仍在底导之上，但底导也一起可见）。
  */
 private const val SETTINGS_UI_SOURCE = "src/main/java/com/example/englishlearning/ui/SettingsScreen.kt"
+private const val PROFILE_UI_SOURCE = "src/main/java/com/example/englishlearning/ui/ProfileScreen.kt"
 private const val APP_SCREEN_SOURCE = "src/main/java/com/example/englishlearning/ui/AppScreen.kt"
 private const val HUB_SCREEN_SOURCE = "src/main/java/com/example/englishlearning/ui/BackupHubScreen.kt"
 
 class BackupEntryUnificationContractTest {
     private fun stripped(path: String): String = stripComments(File(path).readText())
 
-    /** 设置页只剩一条通往备份子页的回调；旧的折叠态与三条并行子入口必须消失。 */
-    @Test fun settings_screen_navigates_instead_of_expanding() {
-        val src = stripped(SETTINGS_UI_SOURCE)
+    /**
+     * 备份入口只剩一条通往备份子页的回调；旧的折叠态与三条并行子入口必须消失。
+     *
+     * 2026-11-02 我的 hub 起，备份入口从「设置」移到「我的 → 应用 → 数据与备份」；
+     * 设置降为只放全局开关的子页，因此两屏各钉一侧：hub 必须在册，设置页必须归零。
+     */
+    @Test fun profile_hub_navigates_to_backup_and_settings_does_not() {
+        val hub = stripped(PROFILE_UI_SOURCE)
+        val settings = stripped(SETTINGS_UI_SOURCE)
         listOf(
             "onOpenBackupExport",
             "onOpenBackupRestore",
@@ -30,19 +37,24 @@ class BackupEntryUnificationContractTest {
             "backupExpanded",
         ).forEach { term ->
             assertFalse(
-                src.contains(term),
-                "SettingsScreen.kt 仍出现「$term」：备份已收成子页导航，旧折叠态/并行回调必须摘净" +
+                hub.contains(term),
+                "ProfileScreen.kt 仍出现「$term」：备份已收成子页导航，旧折叠态/并行回调必须摘净" +
                     "（子行删了、宿主还挂着死回调是同一族回归）",
             )
         }
         assertTrue(
-            src.contains("onOpenBackupHub"),
-            "SettingsScreen.kt 必须出现 onOpenBackupHub（备份行是导航到子页，不是折叠）",
+            hub.contains("onOpenBackupHub"),
+            "ProfileScreen.kt 必须出现 onOpenBackupHub（「数据与备份」行是导航到子页，不是折叠）",
         )
         assertFalse(
-            src.contains("settings_open_backup_export") ||
-                src.contains("settings_delete_all_learning_data"),
-            "旧的四枚备份子行 tag 不得再留在设置页（它们已迁到 BackupHubScreen）",
+            hub.contains("settings_open_backup_export") ||
+                hub.contains("settings_delete_all_learning_data"),
+            "旧的四枚备份子行 tag 不得再留在我的页（它们已迁到 BackupHubScreen）",
+        )
+        assertFalse(
+            settings.contains("onOpenBackupHub"),
+            "SettingsScreen.kt 不得再持有 onOpenBackupHub：设置只放外观与全局开关，" +
+                "备份入口唯一落点是「我的」hub（2026-11-02 去重）",
         )
     }
 

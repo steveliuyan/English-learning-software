@@ -278,27 +278,37 @@ class AppBottomBarContractTest {
         assertEquals(1, count(body, themedInkAnchor), "TabSlot 选中/未选中墨色必须按主题取：选中 deep、未选中 text2，恰一处")
     }
 
-    // ---------- 用例：五枚 duotone 字形映射 ----------
+    // ---------- 用例：四枚 duotone 字形映射 ----------
 
+    /**
+     * 2026-11-02 用户裁定底导回四栏（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
+     *
+     * 齿轮不在底导上：设置住在「我的」里，第五格连同 `AppIcon.Gear` 一起退役。
+     * 这条同时防「把设置偷偷加回第五格」——多一枚映射即红。
+     */
     @Test
-    fun `the five tabs map to the pinned duotone glyphs exactly once each`() {
+    fun `the four tabs map to the pinned duotone glyphs exactly once each`() {
         val bar = appBottomBarSource()
         listOf(
             "AppIcon.Book",
             "AppIcon.Newspaper",
             "AppIcon.Spark",
             "AppIcon.Person",
-            "AppIcon.Gear",
         ).forEach { glyph ->
             assertEquals(
                 1,
                 count(bar, glyph),
-                "底导字形映射里「$glyph」必须恰一处（学习 Book / 阅读 Newspaper / AI Spark / 我的 Person / 设置 Gear）",
+                "底导字形映射里「$glyph」必须恰一处（学习 Book / 阅读 Newspaper / AI Spark / 我的 Person）",
             )
         }
+        assertEquals(
+            0,
+            count(bar, "AppIcon.Gear"),
+            "底导不得再出现 Gear：设置是「我的」里的子页，不是第五个一级目的地（2026-11-02）",
+        )
         assertTrue(
             bar.contains("tab.glyph"),
-            "TabSlot 必须经 AppTab 的字形映射取 glyph，而不是散落五枚 when 分支",
+            "TabSlot 必须经 AppTab 的字形映射取 glyph，而不是散落四枚 when 分支",
         )
     }
 }

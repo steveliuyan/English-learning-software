@@ -45,7 +45,7 @@ import com.example.englishlearning.ui.theme.appDomain
 private const val TabGlyphIdleAlpha = 0.5f
 
 /**
- * 五栏底部导航。
+ * 四栏底部导航。
  *
  * 字形走批 1 定稿的共享 duotone 图标族（`AppIcon` 冻结路径 + [InlineIconBadge] 渲染），
  * 不再自绘画布：自绘分支既绕开图标台账，也拿不到按主题的填充层不透明度。
@@ -56,9 +56,9 @@ private const val TabGlyphIdleAlpha = 0.5f
  * 字形腿与标签腿分档不同（图形 vs 正文），所以选中标签的墨在浅套另取 `onMint`，不沿用 `deep`（见 `TabSlot`）；
  * 深浅两套的墨色与底色都经 `appColors()` / `appDomain()` 现取，本文件不留静态浅套读点。
  *
- * 2026-10-31 从四栏变五栏（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）：
- * 第四格「我的」只放个人进度，第五格「设置」承载全部调整入口——此前设置寄居在「我的」页下半屏，
- * 枚举名 `SETTINGS` 反而装着「我的」，名字与界面相反。
+ * 2026-11-02 回到四栏（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）：
+ * 上一版的第五格「设置」与「我的」并列是重复的——设置本来就属于「我的」。
+ * 现在「我的」是个人中心 hub，设置是它里面的子页；底导只画四个真正并列的目的地。
  *
  * 内容区高度**下限**保持 64dp 档（F5-03 Task 11 成果：大字号下可增高不裁字），
  * 再叠 [navigationBarsPadding]，保证三大金刚键/手势条不压住文字。
@@ -86,10 +86,9 @@ fun AppBottomBar(
 }
 
 /**
- * 五枚 tab 与图标台账定稿字形的对位（学习=合上的书、阅读=报面、AI=星芒、我的=人像、设置=齿轮）；
- * 「我的」这一格取 `Person`：它装档案 / 统计 / 学习记录，滑杆只说得清设置，说不清进度。
- * 「设置」这一格取 `Gear`：图标台账第 25 条原本就写着「底导『设置』tab 与设置域入口」，
- * 这次只是把被借用给「我的」四格的 `SETTINGS` 语义还给它（2026-10-31）。
+ * 四枚 tab 与图标台账定稿字形的对位（学习=合上的书、阅读=报面、AI=星芒、我的=人像）；
+ * 「我的」这一格取 `Person`：它装档案 / 统计 / 全部调整入口，滑杆只说得清设置，说不清进度。
+ * 设置不再占一格，齿轮只作为「我的」页头的快捷入口出现（`AppIcon.Gear` 仍在图标台账里）。
  * 台账出处与许可结论见 `components/AppIcons.kt` 文件头，枚名与几何不在这里复制。
  */
 private val AppTab.glyph: AppIcon
@@ -98,7 +97,6 @@ private val AppTab.glyph: AppIcon
         AppTab.READING -> AppIcon.Newspaper
         AppTab.AI -> AppIcon.Spark
         AppTab.PROFILE -> AppIcon.Person
-        AppTab.SETTINGS -> AppIcon.Gear
     }
 
 @Composable

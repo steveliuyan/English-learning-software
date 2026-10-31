@@ -43,7 +43,7 @@ import com.example.englishlearning.ui.theme.appDomain
  *    `colors.error` 一档墨说出来。以前它和导出、恢复同色同形，等于把不可撤销的操作伪装成普通入口。
  *  - **回执条排在危险区之前**：危险区必须是全屏最后一段，删除回执不许把「清空数据」那行顶到屏中间。
  *
- * 四枚行标题与副标题在本屏是**唯一真值**（`SettingsGroups` 只管设置页那一行「备份与恢复」的标题，
+ * 四枚行标题与副标题在本屏是**唯一真值**（`ProfileGroups` 只管「我的」hub 那一行「数据与备份」的标题，
  * `BackupEntryUnificationTest` 按这几句做文案取证），重排只动容器与顺序，不动一个字。
  *
  * 删除语义一行未动：本屏只发 request，级联预览 + 二次确认仍由宿主 `AppScreen` 的

@@ -188,6 +188,13 @@ fun AppScreen(
             var showLicenses by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 批 2 Task 22-B：独立「关于」页（原型 `sMeAbout`）。
             var showAbout by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 2026-11-02：设置回到「我的」里的子页（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
+            // 它不再是第五个一级 tab；齿轮、AI 配置兜底与「我的 → 设置」行都落到这一枚开关。
+            var showSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 决策 §4：「提醒与发音」「词书内容包」各作一级子页（参考没有这两件，本应用已实现，不能砍）。
+            // 前者是两行导航页（下推到既有的提醒屏与发音屏），后者自带两枚 SAF launcher 与选册对话框。
+            var showReminderSpeech by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            var showWordBookTransfer by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 批 1 Task 16：新建的「今日词单」二级层（原型 `learn-queue`）。路由照本文件的既有四件套——
             // 状态位 + overlayOpen 追加一项 + BackHandler + `else if` 挂载分支；主页只留那一条裸行入口。
@@ -202,7 +209,7 @@ fun AppScreen(
                 if (aiProfileViewModel != null) {
                     showAiProfiles = true
                 } else {
-                    selectedTab = AppTab.SETTINGS
+                    showSettings = true
                 }
             }
             // Task 22-B（R-22.1）：原 `showFavorites` 独立叠层路由已摘除，收藏改由合并页 MyWordsScreen 承载；
@@ -325,8 +332,6 @@ fun AppScreen(
             }
             val vocabularyMembership by vocabularyViewModel?.membership?.collectAsState() ?: remember { mutableStateOf<VocabularyMembership?>(null) }
             val vocabularyMasteryState by vocabularyViewModel?.mastery?.collectAsState() ?: remember { mutableStateOf<VocabularyMasteryState>(VocabularyMasteryState.Idle) }
-            var showWordBookExportPicker by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            var exportWordBookId by rememberSaveable(state.profile.id) { mutableStateOf<String?>(null) }
             // 阅读来源的二级层：导入页是显式导航；文章页由 readingTarget 驱动；词卡详情是
             // 阅读页之上的本地覆盖层（WordCardViewModel 的详情只服务学习流，不复用）。
             var showArticleImport by rememberSaveable(state.profile.id) { mutableStateOf(false) }
@@ -378,7 +383,6 @@ fun AppScreen(
             // 词路径的 activeProvider 恒为 Kokoro（PronunciationRouter.kt:54），故系统 Tts 下这里偏保守，
             // 属决策 §2 已登记的收窄口径，本任务不放宽。
             val pauseResumeSupported = speechState.selectedEngine != PronunciationEngine.SystemTts
-            val aiConfigured = aiProfiles?.items?.any { it.hasKey } == true
             val todayState by todayPlanViewModel.uiState.collectAsState()
             val wordQaUiState = wordQaViewModel?.uiState?.collectAsState()?.value ?: WordAiQaUiState.Idle
             val personalNoteSaveStatus = wordQaViewModel?.personalNoteSaveStatus?.collectAsState()?.value
@@ -404,7 +408,7 @@ fun AppScreen(
             LaunchedEffect(selectedTab, state.profile.id, todayReady?.isUnlocked) {
                 // 批 1 Task 6：我的页第三格统计是「文章数」，它读的就是这份阅读历史；
                 // 只在进阅读 tab 时取数会让那一格在没进过阅读 tab 前恒为 0（假数字）。
-                if (selectedTab == AppTab.READING || selectedTab == AppTab.SETTINGS) {
+                if (selectedTab == AppTab.READING || selectedTab == AppTab.PROFILE) {
                     readingAccessViewModel?.load(
                         profileId = state.profile.id,
                         isUnlocked = todayReady?.isUnlocked == true,
@@ -429,7 +433,7 @@ fun AppScreen(
             // 预加载：学习页与我的页一露面就要有这两个数字。keepReady 保证这次重载
             // 不把页面闪回 Loading、失败也保留上一份好快照（CheckInViewModelTest 钉着口径）。
             LaunchedEffect(selectedTab, state.profile.id) {
-                if (selectedTab == AppTab.LEARNING || selectedTab == AppTab.SETTINGS) {
+                if (selectedTab == AppTab.LEARNING || selectedTab == AppTab.PROFILE) {
                     checkInViewModel?.load(state.profile.id, keepReady = true)
                 }
             }
@@ -527,7 +531,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || showTodayWordList || showReviewQueue || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showSettings || showReminderSpeech || showWordBookTransfer || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBank ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null
@@ -647,6 +651,14 @@ fun AppScreen(
                 worksheetViewModel?.dismissPreview()
                 showWorksheetPreview = false
             }
+            // 2026-11-02：设置是「我的」里的子页。本行必须声明在它的子屏（发音 / 提醒 / 备份 hub /
+            // 关于 / AI 服务）**之前**——后声明者优先，子屏开着时返回键先关子屏，再回到设置首页。
+            BackHandler(enabled = showSettings) { showSettings = false }
+            // 决策 §4 的两枚新子页。`showReminderSpeech` 必须声明在它下推的发音屏与提醒屏**之前**
+            // （后声明者优先）：从导航页点进任一子屏后，返回键先关子屏、回到导航页，而不是整层退掉。
+            BackHandler(enabled = showReminderSpeech) { showReminderSpeech = false }
+            // 词书内容包的选册对话框住在子屏内部，宿主这枚开关只负责「返回键退整层」。
+            BackHandler(enabled = showWordBookTransfer) { showWordBookTransfer = false }
             // 这一层内部还有「列表 / 编辑」两态，编辑态会自己再声明一条更靠后的 BackHandler，
             // 因此从编辑页按返回键先关编辑页，而不是直接退掉整层。
             BackHandler(enabled = showSpeechSettings) { showSpeechSettings = false }
@@ -1679,7 +1691,7 @@ fun AppScreen(
                         if (aiProfileViewModel != null) {
                             showAiProfiles = true
                         } else {
-                            selectedTab = AppTab.SETTINGS
+                            showSettings = true
                         }
                     },
                     onOpenLearning = {
@@ -1916,8 +1928,38 @@ fun AppScreen(
                         }
                     }
                 }
+            } else if (showReminderSpeech) {
+                // 决策 §4：「提醒与发音」是一张二级导航页，两行各自下推到既有的提醒屏与发音屏
+                // （那两屏的挂载分支声明在本条之前，先真先赢，所以子屏开着时本层自然让位）。
+                // ViewModel 缺席（预览/测试夹具）时不假装能直达：与 AI 配置兜底同一口径。
+                ReminderSpeechScreen(
+                    speechEngineStatuses = speechState.engineStatuses(),
+                    onOpenReminderSettings = {
+                        reminderSettingsViewModel?.load()
+                        showReminderSettings = reminderSettingsViewModel != null
+                    },
+                    onOpenSpeechSettings = {
+                        speechSettingsViewModel?.load()
+                        showSpeechSettings = speechSettingsViewModel != null
+                    },
+                    onBack = { showReminderSpeech = false },
+                )
+            } else if (showWordBookTransfer) {
+                // 决策 §4：`.wbpack` 的导入/导出子页。两枚 SAF launcher 与选册对话框都住在子屏内部
+                // （owner 与消费屏同层，与 `BackupExportScreen` / `BackupRestoreScreen` 的分工一致），
+                // 宿主这一分支只负责路由；VM 为 null 时子屏自己把两行真禁用。
+                WordBookTransferScreen(
+                    onBack = { showWordBookTransfer = false },
+                    viewModel = wordBookTransferViewModel,
+                )
+            } else if (showSettings) {
+                // 2026-11-02：设置回到「我的」里的子页（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
+                // 上面所有设置子屏（发音 / 提醒 / 备份 hub / 关于 / AI 服务）都先真先赢，
+                // 所以本分支挂的是设置首页本身；返回键由声明更早的 `showSettings` BackHandler 接管。
+                // 词书内容包与提醒发音不再是这页的折叠行：它们是同级的两枚子页（上面两支）。
+                SettingsScreen(onBack = { showSettings = false })
             } else {
-                // 五个一级 tab 的根页面装在这里，底部导航只在这一层出现；上面所有分支都是
+                // 四个一级 tab 的根页面装在这里，底部导航只在这一层出现；上面所有分支都是
                 // 覆盖全屏的二级层，因此天然不会显示底导。
                 Scaffold(
                     containerColor = MintBackground,
@@ -1955,9 +1997,9 @@ fun AppScreen(
                                     showGlobalVocabularySearch = globalVocabularySearchViewModel != null
                                 },
                                 // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
-                                // 2026-10-31 起设置是独立的第五个一级 tab：齿轮直接落到那一栏，
-                                // 不再落到「我的」（用户点评的「齿轮去哪儿了」正源于此）。
-                                onOpenSettings = { selectedTab = AppTab.SETTINGS },
+                                // 2026-11-02 起设置是「我的」里的子页：齿轮直接打开设置子页，
+                                // 返回即回到原页；底导不再有第五格。
+                                onOpenSettings = { showSettings = true },
                                 // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
                                 // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
                                 streakDays = streakDays,
@@ -1972,12 +2014,12 @@ fun AppScreen(
                                 onOpenTodayArticle = { readingAccessViewModel?.openTodayArticle() },
                                 onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
                                 onOpenAiSettings = {
-                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置栏。
+                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置子页。
                                     aiProfileViewModel?.load()
                                     if (aiProfileViewModel != null) {
                                         showAiProfiles = true
                                     } else {
-                                        selectedTab = AppTab.SETTINGS
+                                        showSettings = true
                                     }
                                 },
                                 onOpenImport = { showArticleImport = true },
@@ -1988,10 +2030,6 @@ fun AppScreen(
                                 },
                             )
                             AppTab.AI -> AiLearningScreen(
-                                todayWordCount = todayReady?.newTarget,
-                                dueWordCount = todayReady?.dueTarget,
-                                // 读的是本机真实配置：至少有一套配置设了密钥才算「已配置」。
-                                aiConfigured = aiConfigured,
                                 onOpenFeature = {
                                     selectedFeatureKey = it.key
                                     // 每次进入功能页都清掉上一句的分析结果与上一张的生图状态，防止旧结果串屏。
@@ -1999,7 +2037,8 @@ fun AppScreen(
                                     if (it == AiFeature.PHOTO_TRANSLATION) photoTranslationViewModel?.reset()
                                     if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
                                 },
-                                onOpenWordList = { selectedTab = AppTab.LEARNING },
+                                // 参考 `sAiHome` 的页头配置按钮：配置页可用就直达，否则退回设置子页。
+                                onOpenAiProfiles = openAiProfilesOrSettings,
                             )
                             AppTab.PROFILE -> ProfileScreen(
                                 profileName = state.profile.displayName,
@@ -2008,127 +2047,38 @@ fun AppScreen(
                                 // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
                                 // 所以锁定态下这一格也是真数。
                                 articleCount = readingState.historyOrEmpty.size,
-                                onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
+                                // 决策 §2：「我的」= 功能入口中心，13 行逐行接线。
+                                // 词汇三行与「已学词」统计格都点名落哪一段：只赋 showWordBank 不赋段位
+                                // = 点「易错词」却看到词书段（同学习页复习行的既有判据）。
+                                onOpenWordBankSection = { section -> wordBankSection = section; showWordBank = true },
                                 onOpenCheckIn = { showCheckIn = true },
                                 onOpenReadingHistory = { showReadingHistory = true },
                                 onOpenLearningRecords = { showLearningRecords = true },
+                                onOpenPlan = { showSetup = true },
+                                onOpenWorksheet = {
+                                    worksheetViewModel?.load(state.profile.id)
+                                    showWorksheetSettings = worksheetViewModel != null
+                                },
+                                onOpenWordBookTransfer = { showWordBookTransfer = true },
+                                // 参考 `sAiHome` 页头配置按钮的同一规则：配置页可用就直达，否则退回设置子页。
+                                onOpenAiProfiles = openAiProfilesOrSettings,
+                                onOpenReminderSpeech = { showReminderSpeech = true },
+                                onOpenSettings = { showSettings = true },
+                                // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
+                                onOpenBackupHub = { showBackupHub = true },
+                                // 许可唯一入口在 关于 →「开源许可与隐私说明」：别处不再保留同落点的第二行。
+                                onOpenAbout = { showAbout = true },
+                                // 两枚行副标题取宿主真值：词书名来自今日计划，AI 摘要来自配置列表；
+                                // 拿不到时由屏侧给出「尚未…」的真话，不写死文案（假信息）。
+                                wordBookName = todayReady?.wordBookName,
+                                aiProfileSubtitle = aiProfiles?.let { ready ->
+                                    if (ready.items.isEmpty()) {
+                                        "尚未添加，点这里添加第一套 OpenAI 兼容服务"
+                                    } else {
+                                        "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                                    }
+                                },
                             )
-                            AppTab.SETTINGS -> {
-                                val context = androidx.compose.ui.platform.LocalContext.current
-                                val transferState = wordBookTransferViewModel?.uiState?.collectAsState()?.value
-                                // SAF 的导入/导出：文件位置由用户选，应用不申请任何存储权限。
-                                // `.wbpack` 是私有格式，MIME 用 */*（系统没有它的注册类型）。
-                                val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-                                    androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
-                                ) { uri -> uri?.let { wordBookTransferViewModel?.importFrom(it) } }
-                                val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-                                    androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
-                                ) { uri ->
-                                    val bookId = exportWordBookId
-                                    exportWordBookId = null
-                                    uri?.let { selectedUri ->
-                                        bookId?.let { wordBookTransferViewModel?.exportTo(selectedUri, it) }
-                                    }
-                                }
-                                LaunchedEffect(Unit) { wordBookTransferViewModel?.refresh() }
-                                if (showWordBookExportPicker) {
-                                    // 路 B（非破坏性选择）：容器交房内共享玻璃档，取消走共享 PillButton；
-                                    // 列表项是本枚自渲染的（tag 供 connected 逐项定位），原地保留不改口径。
-                                    GlassDialog(onDismiss = { showWordBookExportPicker = false }) {
-                                        Text(text = "选择要导出的词书", style = AppType.Headline, color = appColors().text1)
-                                        Column(
-                                            modifier = Modifier.padding(top = 12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                                        ) {
-                                            transferState?.books.orEmpty().forEach { bookId ->
-                                                Text(
-                                                    text = bookId,
-                                                    style = AppType.Body,
-                                                    color = appColors().text1,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable {
-                                                            exportWordBookId = bookId
-                                                            showWordBookExportPicker = false
-                                                            exportLauncher.launch("$bookId.wbpack")
-                                                        }
-                                                        .padding(vertical = 14.dp)
-                                                        .testTag("settings_export_book_$bookId"),
-                                                )
-                                            }
-                                        }
-                                        PillButton(
-                                            text = "取消",
-                                            onClick = { showWordBookExportPicker = false },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 16.dp),
-                                            style = PillStyle.Secondary,
-                                            domain = AppDomain.Settings,
-                                            testTag = "wordbook_export_cancel",
-                                        )
-                                    }
-                                }
-                                // 2026-10-31 用户拍板「结构性重排」：设置从「我的」页里独立出来，
-                                // 成为第五个一级 tab（`docs/decisions/2026-10-31-settings-as-fifth-tab.md`）。
-                                // 本分支挂的是完整设置页（页头「设置」+ 四组），我的页只留个人进度；
-                                // 旧写法把 `SettingsGroupsContent` 作为内容槽塞进 ProfileScreen，
-                                // 于是「设置」没有一个自己的首页——用户点评的重复入口正出自这里。
-                                SettingsScreen(
-                                    profileName = state.profile.displayName,
-                                    wordBookName = todayReady?.wordBookName,
-                                    onOpenSetup = { showSetup = true },
-                                    onOpenWorksheet = {
-                                        worksheetViewModel?.load(state.profile.id)
-                                        showWorksheetSettings = worksheetViewModel != null
-                                    },
-                                    onOpenAiProfiles = {
-                                        aiProfileViewModel?.load()
-                                        showAiProfiles = aiProfileViewModel != null
-                                    },
-                                    onOpenSpeechSettings = {
-                                        speechSettingsViewModel?.load()
-                                        showSpeechSettings = speechSettingsViewModel != null
-                                    },
-                                    onOpenReminderSettings = {
-                                        reminderSettingsViewModel?.load()
-                                        showReminderSettings = reminderSettingsViewModel != null
-                                    },
-                                    // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
-                                    // 2026-10-31 起这也是备份的唯一入口——关于页不再重复这一行。
-                                    onOpenBackupHub = { showBackupHub = true },
-                                    speechEngineStatuses = speechState.engineStatuses(),
-                                    aiProfileSubtitle = aiProfiles?.let { ready ->
-                                        if (ready.items.isEmpty()) {
-                                            "尚未添加，点这里添加第一套 OpenAI 兼容服务"
-                                        } else {
-                                            "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
-                                        }
-                                    },
-                                    onImportWordBook = {
-                                        wordBookTransferViewModel?.consumeMessage()
-                                        importLauncher.launch(arrayOf("*/*"))
-                                    },
-                                    onExportWordBook = {
-                                        val books = transferState?.books.orEmpty()
-                                        if (transferState?.canExport == true) {
-                                            wordBookTransferViewModel?.consumeMessage()
-                                            if (books.size == 1) {
-                                                exportWordBookId = books.single()
-                                                exportLauncher.launch("${books.single()}.wbpack")
-                                            } else {
-                                                showWordBookExportPicker = true
-                                            }
-                                        }
-                                    },
-                                    importedBookCount = transferState?.books?.size ?: 0,
-                                    transferBusy = transferState?.busy == true,
-                                    transferMessage = transferState?.message,
-                                    // 许可唯一入口已移到 关于 →「开源许可与隐私说明」（2026-10-31 去重）：
-                                    // 设置侧不再保留同落点的第二行，故这里不传 onOpenLicenses。
-                                    onOpenAbout = { showAbout = true },
-                                )
-                            }
                         }
                     }
                 }

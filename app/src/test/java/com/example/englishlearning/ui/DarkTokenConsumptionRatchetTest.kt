@@ -37,11 +37,12 @@ import kotlin.test.assertTrue
  *    `OnMintPrimary` 与 `DomainColors` 各域的 `deep`。这些是浅底取值，深底压深字直接不可读，
  *    必须改成 `appColors().x` / `appDomain(AppDomain.X).deep`。`theme/AppType.kt` 的顶层 `TextStyle`
  *    写死 `TextPrimary`/`TextSecondary` 正是这一族的真实债务——**批 3 Task 26 已迁净**（六档改成
- *    `@Composable` getter），本族在 seed 里只剩白胶囊那一处「容器不随主题」的对偶残留（见下）。
- *  - **主题不变白胶囊**：`AiLearningScreen` 头卡状态徽章的容器是 `Color.White.copy(alpha = 0.85f)`
- *    压在品牌渐变上（深浅两套都是亮面），前景只能保持两枚静态墨。它不属于蒙版 token 族（`GlassHighlight` /
- *    `Scrim`），所以不进 [ThemeInvariantMaskReadLedger]，只在 seed 行内写明理由并交由
- *    `AiBadgeContrastFixTest` 钉站点形状与两套复算。
+ *    `@Composable` getter），本族在 seed 里已无残留。
+ *  - **主题不变白胶囊（已随渐变头卡一并下线）**：`AiLearningScreen` 原先头卡状态徽章的容器是
+ *    `Color.White.copy(alpha = 0.85f)`，压在品牌渐变上（深浅两套都是亮面），前景只能保持两枚静态墨。
+ *    2026-11-02 用户裁定删掉渐变头卡、按参考改成普通 `AppScreenHeader` + 双列功能卡后，那个白胶囊
+ *    不存在了，本文件的 seed 行与登记理由一同摘除；`AiBadgeContrastFixTest` 里对应的站点形状腿与
+ *    两套复算也同批删除（不是放宽：站点本身没了，留着就是空转）。
  *
  * 五张表的分工（修复轮 1 的 C1，替代旧版「不设第三张永久豁免表」那句已被 a90f4fe 自身推翻的措辞；
  * 第五张由批 1 终审 F4 补）：
@@ -72,18 +73,13 @@ import kotlin.test.assertTrue
  * （[ThemeInvariantMaskReadLedger]、[ParameterDefaultStaticReadLedger]）承载其理由，本表仍是「还欠多少」的唯一权威。
  */
 internal val DarkTokenSeedAllowlist: Map<String, Int> = mapOf(
-    // ---- Task 26 Step 3 收口后的仅存两类（8 处）：蒙版族 6 + 主题不变白胶囊 2 ----
+    // ---- Task 26 Step 3 收口后仅剩蒙版族 5 处（主题不变白胶囊 2 处已随 AI 渐变头卡下线）----
     // 蒙版族（GlassHighlight / Scrim）：压在图片或玻璃面板上，深浅两套同值都合法，
     // 逐文件理由见 [ThemeInvariantMaskReadLedger]。
     "components/glass/GlassOverlay.kt" to 2,
     "components/glass/GlassDialog.kt" to 1,
     "SpeechSettingsScreen.kt" to 1,
     "components/IconBadge.kt" to 1,
-    // 白胶囊族（R-23.14）：`AiLearningScreen` 头卡状态徽章的容器是 `Color.White.copy(alpha = 0.85f)`，
-    // 压在品牌渐变上、深浅两套都是亮面，所以前景必须保持两枚**主题不变**的静态墨
-    // （`DomainColors.AiSpeech.deep` / `AppPalette.TextSecondary`）；迁成 themed 墨 =
-    // 深套亮墨压白（1.69:1 / 2.21:1，B1 第三站形状）。复算与站点钉法见 `AiBadgeContrastFixTest`。
-    "AiLearningScreen.kt" to 2,
 )
 
 /**

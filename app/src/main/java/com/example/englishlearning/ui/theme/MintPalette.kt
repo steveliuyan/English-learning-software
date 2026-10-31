@@ -20,11 +20,14 @@ import androidx.compose.ui.graphics.Color
  *
  * ## 四个 `AppleMint*` 品牌令牌：保持静态
  *
- * 三处**顶层** `Brush.linearGradient` 在组合期之外求值，读不了组合期 getter，按持有渐变的符号名指代：
- * `AiFeatureGradient`、`AiHeaderGradient`、`AppleMintGradient`（不写 `文件:行号`——行号随改动漂移，
- * 注释却看起来仍然权威；符号名可直接 grep）。把品牌令牌改成 `@Composable get()` 会让这三处
+ * 两处**顶层** `Brush.linearGradient` 在组合期之外求值，读不了组合期 getter，按持有渐变的符号名指代：
+ * `AiFeatureGradient`、`AppleMintGradient`（不写 `文件:行号`——行号随改动漂移，
+ * 注释却看起来仍然权威；符号名可直接 grep）。把品牌令牌改成 `@Composable get()` 会让这两处
  * 当场编译不过。另外按 spec §2.1「品牌渐变保持现状不动」与决策 2026-10-18 裁决 3，
  * 品牌渐变浅深两套同三段、模式不变（渐变上的文字统一取 `onBrand` #04241C），静态本身也是正确语义。
+ *
+ * （原先第三处 `AiHeaderGradient` 随 2026-11-02 用户裁定删掉 AI 助学页渐变头卡而消失：该页改普通
+ * `AppScreenHeader` + 双列 `AppCard`，不再铺品牌渐变。）
  *
  * ## 命名陷阱：`MintOutline` 读 `outlineSoft`，不是 `outline`
  *
@@ -73,7 +76,7 @@ internal val MintTextMuted: Color
 
 /**
  * 启动页 / 锁定页用的品牌渐变三段 + 浅色端点：保持静态 `Color(0x…)`，
- * 原因与三处顶层 `Brush.linearGradient` 站点见文件头。
+ * 原因与两处顶层 `Brush.linearGradient` 站点见文件头。
  */
 internal val AppleMintStart: Color = Color(0xFFA8F3C8)
 internal val AppleMintMiddle: Color = Color(0xFF5DDFB4)

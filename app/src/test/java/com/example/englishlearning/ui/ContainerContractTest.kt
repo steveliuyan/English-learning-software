@@ -38,8 +38,8 @@ class ContainerContractTest {
             "ArticleImportScreen.kt",
             // 查词（Task 5）：输入区一枚 `SoftCard`、历史行改裸行，零强卡。
             "GlobalVocabularySearchScreen.kt",
-            // 批 4：AI 链路七屏逐屏并入（本批按 Task 逐个加行）。AI 主页（Task 1）的 hero 是品牌渐变头卡，
-            // 不落 `StrongCard`——四张软卡分组 + 一枚裸行入口，强卡计数为 0。
+            // 批 4：AI 链路七屏逐屏并入（本批按 Task 逐个加行）。AI 主页在 2026-11-02 按参考重做后
+            // 不再有渐变头卡，整页是共享 `AppCard` 双列功能卡 + 一枚分组标题 + 页末提示——强卡计数为 0。
             "AiLearningScreen.kt",
             // 骨架页（Task 2）：进度分组一枚 `SoftCard`、两枚页级按钮、页末一句说明——零强卡、
             // 零 M3 `Card(`（旧 `SectionCard` 随本轮下线）。

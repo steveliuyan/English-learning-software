@@ -99,7 +99,11 @@ class GlassPanelInkPairingContractTest {
     private data class Panel(val file: String, val identity: String)
 
     private val expectedPanels = listOf(
-        Panel("AppScreen.kt", "选择要导出的词书"),
+        // 2026-11-02（决策 §4）：导出选册面板随整条 SAF 通路从宿主搬进「词书内容包」子页——
+        // 文件选择器的 owner 与消费屏同层。本族取样锚是字面 `GlassDialog(`，跟着搬家而不是删除：
+        // 少一行 = 那枚面板没人管墨色，多一行 = 对着已不存在的面板空转。重算：
+        // `grep -rn 'GlassDialog(' app/src/main/java/com/example/englishlearning/ui/{AppScreen,WordBookTransferScreen}.kt`
+        Panel("WordBookTransferScreen.kt", "选择要导出的词书"),
         Panel("AppScreen.kt", "发现已学过的单词"),
         // 批 3 Task 3：`ArticleReadingScreen.kt` 从玻璃面板族摘一行——覆盖词的居中 `GlassDialog`
         // 换成底部面板 `ModalBottomSheet(containerColor = appColors().surface)`，本族的取样锚

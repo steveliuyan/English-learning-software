@@ -5,34 +5,28 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 批 2 Task 22-A：「我的」根页（原型 `sMeHome`，`assets/app.js:1255-1282`）的源码侧契约。
+ * 「我的」根页页头与三格统计（原型 `sMeHome`，`assets/app.js:1255-1282`）的源码侧契约。
  *
  * 原型骨架：`head({plain:true, eyebrow:'我的', title:名字, sub:'连续打卡 N 天 · 累计学过 N 个词'})`
- * → 三格统计卡 → `section('我的词汇')` 三行 → `section('学习')` 三行 → `section('应用')` 五行。
+ * → 三格统计卡 → `section('我的词汇')` 三行 → `section('学习')` 行 → `section('应用')` 行。
+ * 台账、分组与逐行接线的判据住在 `ProfileHubLedgerTest` / `ProfilePageContractTest`；
+ * 本文件只管**页头那两句真话**和**三格统计的形状**——它们是这一页唯一不属于台账的东西。
  *
- * 本页已具备：`hero` 页头（一级 tab 无返回位）、唯一一枚强档卡装三格统计（三格各是深链）、
- * 学习记录行。设置四组九行自 2026-10-31 起搬去独立的设置栏，不再由宿主注入本页。本轮补一处、记两处偏离：
+ * 本轮（2026-11-02，`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）取代 Task 22-A 的第 2 条：
  *
- *  1. **副标题改成原型那句**「连续打卡 N 天 · 累计学过 N 个词」（`streakDays` / `learnedWordCount`
- *     都是本页形参）。旧的「API Key 只保存在本机加密区。」不是页头身份行——它属于隐私口径，
- *     已在设置页与备份说明里出现，挂在名字下面既不回答问题也不构成信息。
- *  2. 「我的词汇」三行（收藏 / 生词本 / 易错词）**不搬成本页的入口行**：本仓三者是**词库页的四格分段**
- *     （`WordBankScreen` 的 收藏 / 生词 / 错词），再在本页放三条同一落点的行就是同一条通路的第二份入口。
- *  3. 三格中间那格的原型标名是「掌握词数」，本页仍用「已学词」：本仓没有「掌握」这一档口径
- *     （`learnedWordCount` 是已学词数），改名会把「学过」说成「掌握」。
+ *  - 旧裁定说「我的词汇」三行不搬进本页，因为词库页四分段是唯一出口。用户拍板按参考重做后，
+ *    这三行**就是** hub 的第一组，但落点仍是那四分段——搬的是入口，不是第二份通路。
+ *    因此本文件的判据从「这些字不得出现」换成「这三行各自点名落在哪一段」：
+ *    绕开 `onOpenWordBankSection` 自己 `showWordBank = true` 才是回归。
  *
- * Task 22-M（#24 收口）补两处：
+ * 仍然成立、继续钉死的四条：
  *
- *  4. 原型第三格是「收藏」（`D.favorites`，点开进 `me-words/fav`），本页第三格仍是「文章」。
- *     收藏数在宿主侧读得到（`FavoritesUiState.Ready.words.size`），但它的出口就是词库页的
- *     收藏分段——Task 22-A 第 2 行已裁定那一段**是唯一出口**，再在本页放一枚同落点的数字格
- *     等于同一条通路开第二个入口。文章数没有这个重复问题：它指向阅读历史，且是真正的进度事实。
- *  5. 原型页头 `eyebrow: '我的'` **不搬**：一级 tab 的底部导航已经回答「在哪一页」，
- *     眉标在本仓留给会变的位置信息（今日学习页的计划日期），不重复 tab 名。
- *
- * 「应用」组的「关于与许可」不落在本页源码里，而是走 **设置页 →「外观与关于」组 → 关于** 这条通路
- * （2026-10-31 起设置独立为第五栏，本页不再内联设置内容）。本页再写一行就是同一落点的第二份入口；
- * 该接线的形状判据在 `ProfilePageContractTest`，行为判据在 connected `AppScreenTest`。
+ *  1. 副标题是原型那句「连续打卡 N 天 · 累计学过 N 个词」（`streakDays` / `learnedWordCount` 都是本页形参）；
+ *     「API Key 只保存在本机加密区」是隐私口径，不属于页头身份行。
+ *  2. 第一格标名是「已学词」而不是原型的「掌握词数」：本仓没有「掌握」这一档口径，改名会把「学过」说成「掌握」。
+ *  3. 第三格仍是「文章」而不是原型的「收藏」：收藏数的出口是词库页收藏分段，而 hub 第一组已经有一行通往它，
+ *     数字格再挂一枚同落点就是那条通路的第二个入口；文章数指向阅读历史，没有这个问题。
+ *  4. 页头不带 `eyebrow`：一级 tab 的页名由底部导航回答，眉标在本仓留给会变的位置信息。
  */
 class ProfilePageHomeContractTest {
 
@@ -51,7 +45,7 @@ class ProfilePageHomeContractTest {
         assertEquals(
             0,
             countMatches(screen, Regex("""API Key""")),
-            "页头副标题不再承担隐私口径：那属于设置页与备份说明（本页不重复）",
+            "页头副标题不再承担隐私口径：那属于设置子页与备份说明（本页不重复）",
         )
     }
 
@@ -69,11 +63,11 @@ class ProfilePageHomeContractTest {
     }
 
     /**
-     * 原型第三格是「收藏」，本页第三格是「文章」。这不是「读不到」——收藏数在 `FavoritesUiState.Ready`
-     * 里现算得到；不搬的理由是**落点重复**：收藏数的唯一出口是词库页收藏分段（Task 22-A 第 2 行），
-     * 而在三格上再挂一枚通向同一分段的数字，就是那条通路开第二个入口。
+     * 原型第三格是「收藏」，本页第三格是「文章」。这不是「读不到」——收藏数在宿主侧读得到；
+     * 不搬的理由是**落点重复**：hub 第一组已经有一行「收藏的词」通往词库收藏分段，
+     * 三格上再挂一枚同落点的数字就是那条通路开第二个入口。
      *
-     * 反向钉住：一旦有人照原型把第三格改成收藏，这条会红，逼他先回答「那条唯一出口的裁决还成不成立」。
+     * 反向钉住：一旦有人照原型把第三格改成收藏，这条会红，逼他先回答「第二入口还成不成立」。
      */
     @Test
     fun `the third stat cell stays the article fact instead of the prototype favorite count`() {
@@ -85,24 +79,32 @@ class ProfilePageHomeContractTest {
         )
         assertEquals(
             0,
-            countMatches(screen, Regex("""收藏""")),
-            "收藏不在本页出现：它的出口是词库页收藏分段（Task 22-A 第 2 行），三格不得成第二入口",
+            countMatches(screen, Regex("\"收藏\"")),
+            "统计格不得有一枚标签就叫「收藏」：它的入口是 hub 第一组那行「收藏的词」",
         )
         assertEquals(
             0,
             countMatches(screen, Regex("""eyebrow\s*=""")),
-            "原型 eyebrow「我的」不搬：一级 tab 的页名由底部导航回答，眉标留给会变的位置信息（Task 22-M 第 5 条）",
+            "原型 eyebrow「我的」不搬：一级 tab 的页名由底部导航回答，眉标留给会变的位置信息",
         )
     }
 
+    /**
+     * 词汇三行的落点必须**点名段位**：收藏 → Favorite、生词 → New、错词 → Wrong，
+     * 「词书」格与「词书」行 → Book。只赋 `showWordBank = true` 不赋段位＝点「易错词」看到词书段第一页。
+     */
     @Test
-    fun `the vocabulary group stays on the word bank page instead of duplicating entries`() {
-        listOf("收藏的词", "生词本", "易错词").forEach { token ->
-            assertEquals(
-                0,
-                countMatches(screen, Regex(Regex.escape(token))),
-                "「$token」是词库页四格分段的入口，不在「我的」再挂第二份",
+    fun `the vocabulary rows name their word bank section instead of landing on the default one`() {
+        listOf("WordBankSection.Favorite", "WordBankSection.New", "WordBankSection.Wrong", "WordBankSection.Book").forEach { section ->
+            assertTrue(
+                screen.contains(section),
+                "「$section」必须由本页的装配点点名（不点名就是落回默认段位的死接线）",
             )
         }
+        assertEquals(
+            0,
+            countMatches(screen, Regex("""showWordBank""")),
+            "本页不持有词库开关：段位与开关都在宿主那一层（决策 §2 的第 4 条纪律）",
+        )
     }
 }

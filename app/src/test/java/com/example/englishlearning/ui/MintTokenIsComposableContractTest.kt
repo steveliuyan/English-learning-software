@@ -59,13 +59,17 @@ class MintTokenIsComposableContractTest {
     )
 
     /**
-     * 组合期之外求值品牌渐变的三处顶层 `Brush.linearGradient` 的**持有符号名**。
+     * 组合期之外求值品牌渐变的两处顶层 `Brush.linearGradient` 的**持有符号名**。
      * KDoc 按符号名指代而非 `文件:行号`：行号随改动漂移、漂移后注释仍看似权威，符号名则可 grep 定位。
+     *
+     * 2026-11-02 用户裁定删掉 AI 助学页的渐变头卡后，第三处 `AiHeaderGradient` 不复存在
+     * （`AiLearningScreen` 改普通 `AppScreenHeader` + 双列 `AppCard`，不再铺品牌渐变），
+     * 本表随之收成两处——这不是放宽，站点本身已经没了，留着它只会让 KDoc 指向一枚不存在的符号。
      */
     private val brandGradientSiteSymbols: List<String> =
-        listOf("AiFeatureGradient", "AiHeaderGradient", "AppleMintGradient")
+        listOf("AiFeatureGradient", "AppleMintGradient")
 
-    /** [text] 是否把品牌渐变的三处站点按符号名点名（最后一个用例的断言本体，负片段要用它判红）。 */
+    /** [text] 是否把品牌渐变的两处站点按符号名点名（最后一个用例的断言本体，负片段要用它判红）。 */
     private fun brandGradientSitesNamed(text: String): Boolean =
         text.contains("Brush.linearGradient") && brandGradientSiteSymbols.all { text.contains(it) }
 
@@ -236,12 +240,12 @@ class MintTokenIsComposableContractTest {
             val block = declarationBlock(text, token)
             assertTrue(
                 staticShape(token, hex).matches(block),
-                "$token 必须保持静态 Color($hex)（三处顶层 Brush.linearGradient 需组合期外读取 + " +
+                "$token 必须保持静态 Color($hex)（两处顶层 Brush.linearGradient 需组合期外读取 + " +
                     "品牌渐变模式不变）；实际声明块：\n$block"
             )
             assertTrue(
                 !Regex("""@Composable""").containsMatchIn(block),
-                "$token 一旦被改成组合期 getter，三处顶层 Brush.linearGradient 会当场编译不过：\n$block"
+                "$token 一旦被改成组合期 getter，两处顶层 Brush.linearGradient 会当场编译不过：\n$block"
             )
         }
     }
@@ -309,7 +313,7 @@ class MintTokenIsComposableContractTest {
             // getter 后面再接东西（.copy）：不是「直接读该字段」
             "internal val MintPrimary: Color\n    @Composable\n    @ReadOnlyComposable\n    get() = LocalDomainColors.current.getValue(AppDomain.AiSpeech).base.copy(alpha = 0.5f)" to
                 (MINT_PRIMARY to domainAispeechBaseRead),
-            // 品牌令牌被改成组合期 getter：静态形状必须红（三处顶层 Brush 会炸）
+            // 品牌令牌被改成组合期 getter：静态形状必须红（两处顶层 Brush 会炸）
             "internal val AppleMintStart: Color\n    @Composable\n    @ReadOnlyComposable\n    get() = LocalAppColors.current.tint" to null,
         )
         negatives.forEach { (snippet, expect) ->
@@ -344,7 +348,7 @@ class MintTokenIsComposableContractTest {
     /**
      * 唯一直接断言注释文本的用例（Step 3 的交付物就是注释）：用未剥注释的原文，
      * 其余用例一律先过 stripComments。钉住必须留下的事实：中性令牌组合期读取与组合期之外站点
-     * 就地提读的作用域口径、`AppleMint*` 保持静态的品牌渐变理由（三处顶层 `Brush.linearGradient`
+     * 就地提读的作用域口径、`AppleMint*` 保持静态的品牌渐变理由（两处顶层 `Brush.linearGradient`
      * 的持有符号名——按符号名指代，不钉 `文件:行号`，行号会随改动漂移而注释看上去仍然权威）、
      * `MintOutline → outlineSoft` 命名陷阱与 `outline` 不建 Mint 别名的处置。
      * 本用例**不**钉「调用文件零改动」：Task 3 同时把组合期之外的读点提进了组合期，改了调用文件。
@@ -365,15 +369,15 @@ class MintTokenIsComposableContractTest {
             assertTrue(raw.contains(fact), "MintPalette.kt 的 KDoc 必须写明组合期作用域口径（Step 3）：$fact")
         }
 
-        // 品牌渐变保持静态的理由：三处顶层 Brush 站点必须按符号名逐个点名。
+        // 品牌渐变保持静态的理由：两处顶层 Brush 站点必须按符号名逐个点名。
         assertTrue(
             brandGradientSitesNamed(raw),
-            "KDoc 必须点出 Brush.linearGradient 与三个持有渐变的符号名 $brandGradientSiteSymbols；实际原文：\n$raw"
+            "KDoc 必须点出 Brush.linearGradient 与两个持有渐变的符号名 $brandGradientSiteSymbols；实际原文：\n$raw"
         )
         // 旧写法（只有 `文件:行号`、没有符号名）必须判红——证明上面的断言真的要求符号名。
         val oldFileLineProse =
-            "三处**顶层** `Brush.linearGradient` 在组合期之外求值：`ui/AiFeatureScreen.kt:47`、" +
-                "`ui/AiLearningScreen.kt:56`、`ui/AppScreen.kt:100`。"
+            "两处**顶层** `Brush.linearGradient` 在组合期之外求值：`ui/AiFeatureScreen.kt:47`、" +
+                "`ui/AppScreen.kt:100`。"
         assertTrue(
             !brandGradientSitesNamed(oldFileLineProse),
             "断言被 `文件:行号` 形式的旧写法满足了（说明它没在要求符号名）：$oldFileLineProse"

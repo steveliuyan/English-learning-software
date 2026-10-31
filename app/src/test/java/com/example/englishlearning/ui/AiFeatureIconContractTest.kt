@@ -100,23 +100,26 @@ class AiFeatureIconContractTest {
     // ---------- 2. 站点侧：列表行读功能自己的字形 ----------
 
     /**
-     * 「AI 学」主页那七行（`AiFeatureRow`）必须读 `feature.icon`。
+     * 主页那七张功能卡（`AiFeatureCard`）必须读 `feature.icon`。
      *
      * 反向那半（0 处 `AppIcon.Spark`）才是用户报的那枚缺陷本体：屏侧写死字面量时，
      * 目录里就算声明了七枚不同的字形也一行都不会变——这正是「图标全一样」能被改回去的缝。
+     *
+     * 2026-11-02 形状换版：列表行 `AiFeatureRow` 随参考页改成双列 `AiFeatureCard`，
+     * 判据对象与断言一字未放宽，只换锚点。
      */
     @Test
-    fun `the feature row draws the feature's own icon instead of the shared spark`() {
-        val row = bodyOf(learning, "private fun AiFeatureRow(")
-        assertTrue(row.isNotEmpty(), "取不到 `AiFeatureRow(` 本体（改名/搬家：本条失去对象）")
+    fun `the feature card draws the feature's own icon instead of the shared spark`() {
+        val card = bodyOf(learning, "private fun AiFeatureCard(")
+        assertTrue(card.isNotEmpty(), "取不到 `AiFeatureCard(` 本体（改名/搬家：本条失去对象）")
         assertTrue(
-            "InlineIconBadge(icon = feature.icon" in row,
-            "功能行的徽标必须读 `feature.icon`（目录是字形的唯一出处）：\n$row",
+            "InlineIconBadge(icon = feature.icon" in card,
+            "功能卡的徽标必须读 `feature.icon`（目录是字形的唯一出处）：\n$card",
         )
         assertEquals(
             0,
-            countMatches(row, Regex("""AppIcon\.Spark""")),
-            "功能行仍在写死 `AppIcon.Spark`：目录里的七枚字形一行也不会生效——用户报的「图标全都一样」就是这么长回来的",
+            countMatches(card, Regex("""AppIcon\.Spark""")),
+            "功能卡仍在写死 `AppIcon.Spark`：目录里的七枚字形一张卡也不会生效——用户报的「图标全都一样」就是这么长回来的",
         )
     }
 

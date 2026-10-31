@@ -20,9 +20,10 @@ import kotlin.test.assertTrue
  *  - Color.Transparent 容器 + 白字「不被判违规」只是匹配面结论，**不是对渐变的安全背书**：
  *    透明容器的实际底色来自 Modifier.background(brush/…) 或父级容器，源码正则无从计算对比度，
  *    因此「浅渐变 + 白字」（最坏 ≈1.29:1）在这里抓不住。仍走这条路子的站点
- *    （GlassButton 品牌渐变白字、AiLearningScreen 头卡白字标题/副标题）归 Task 12 的 connected 清单，
- *    用设备侧截图/取色取证；AiFeatureScreen 头部徽标已按裁决 #3 改取 on-brand 前景墨，
- *    亮度腿由 `AiBadgeContrastFixTest` 单独登记，不再属于本清单。
+ *    （GlassButton 品牌渐变白字）归 Task 12 的 connected 清单，用设备侧截图/取色取证；
+ *    AiLearningScreen 的渐变头卡与白字标题已在 2026-11-02 按参考重做时整块删除（纯 `appColors()` 页头），
+ *    不再属于本清单；AiFeatureScreen 头部徽标已按裁决 #3 改取 on-brand 前景墨，
+ *    亮度腿由 `AiBadgeContrastFixTest` 单独登记，也不属于本清单。
  *    本契约只保证「不因看不准而误伤」，不背书任何渐变组合。
  *  - 沿用禁令1 判定面：认 buttonColors 调用内的字面量形状。
  *  - 剥注释口径：批 1 终审 F6 起本类直接调共享夹具 `SourceRatchet.kt` 里那份**字符串感知**的

@@ -4,11 +4,8 @@ import androidx.compose.ui.graphics.toArgb
 import com.example.englishlearning.ui.theme.AppColorDark
 import com.example.englishlearning.ui.theme.AppColorLight
 import com.example.englishlearning.ui.theme.AppDomain
-import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppleMintEnd
-import com.example.englishlearning.ui.theme.AppleMintMiddle
 import com.example.englishlearning.ui.theme.AppleMintStart
-import com.example.englishlearning.ui.theme.DomainColors
 import com.example.englishlearning.ui.theme.DomainDark
 import com.example.englishlearning.ui.theme.DomainLight
 import java.io.File
@@ -223,96 +220,30 @@ class AiBadgeContrastFixTest {
     }
 
     /**
-     * 批 3 结转缺陷收口（`docs/superpowers/plans/2026-10-17-ui-redesign.md` 批 2 修复轮 I-3 末句：
-     * 「同屏另有存量缺陷 `AiLearningScreen.kt:156/161`（品牌渐变上白字）结转批 3」）：
-     * `AiLearningScreen` 品牌渐变头卡的两行文案必须改走 on-brand 墨，不许再是 `Color.White`。
+     * AI 两屏的静态令牌读点必须清零。
      *
-     * 现算（活 token，断言不抄 hex）：`onBrand` 压三段渐变 12.81 / 9.95 / 6.87:1 全过正文 4.5；
-     * 白字压最亮端 `AppleMintStart` 只有 1.29:1 —— Task 26 Step 4 的 360dp 真机截图里，
-     * 这两行（「AI 学」与副标题）是全站对比度最低的文字。白胶囊 `.background(Color.White…)`
-     * 是容器不是墨，本规则不得误伤它（容器主题化仍归 Task 27 的登记账）。
-     */
-    @Test
-    fun `the AI learning hero prints on brand ink instead of white on the mint gradient`() {
-        val source = stripComments(uiScreenSource("AiLearningScreen.kt"))
-        val headerScope = Regex("""private fun AiHeaderCard\([\s\S]*?\n\}""").find(source)?.value
-        assertTrue(headerScope != null, "抓不到 AiHeaderCard 的作用域（函数搬家/改名：本腿失去对象）")
-        val whiteInk = Regex("""color\s*=\s*Color\.White\b""")
-        assertEquals(
-            0,
-            whiteInk.findAll(headerScope!!).count(),
-            "品牌渐变头卡仍有 `color = Color.White` 的文案墨（批 2 I-3 结转债）：应改 `appColors().onBrand`",
-        )
-        assertEquals(
-            2,
-            Regex("""color\s*=\s*appColors\(\)\.onBrand\b""").findAll(headerScope).count(),
-            "头卡两行文案（「AI 助学」与副标题）必须都走 on-brand 墨；少一枚=还有白字，多一枚=墨挪到了别处",
-        )
-        // 反空转：规则要抓得到禁令本体，且不把白胶囊容器当墨。
-        assertTrue(
-            whiteInk.containsMatchIn("""Text("AI 助学", color = Color.White)"""),
-            "白字规则抓不到禁令本体（空转）",
-        )
-        assertFalse(
-            whiteInk.containsMatchIn(""".background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(50))"""),
-            "白胶囊容器被误判成墨：容器不是本条的判据对象",
-        )
-        val ink = AppColorLight.onBrand.toArgb()
-        listOf("起点" to AppleMintStart, "中点" to AppleMintMiddle, "终点" to AppleMintEnd).forEach { (label, stop) ->
-            val value = ratio(ink, stop.toArgb())
-            assertTrue(
-                value >= 4.5,
-                "on-brand 压渐变${label}只有 ${"%.2f".format(value)}:1（AA 正文下限 4.5:1）——结转修复的前提破了",
-            )
-        }
-        val whiteOnStart = ratio(0xFFFFFFFF.toInt(), AppleMintStart.toArgb())
-        assertTrue(
-            whiteOnStart < 4.5,
-            "白字压渐变起点已达 ${"%.2f".format(whiteOnStart)}:1——「结转批 3」的依据失实，先复核台账再撤本条",
-        )
-    }
-
-    /**
-     * AiFeatureScreen 的静态令牌读点必须清零；AiLearningScreen 只允许 R-23.14 登记的那**一行例外**。
-     *
-     * 批 3 原口径「两屏静态读点全零」是控制者派工块错误前提（深套取值必然不劣于浅套）的产物，修复轮改回
-     * 如实口径：白胶囊容器 `Color.White.copy(alpha = 0.85f)` 不随主题（且是 `RawColorLiteralRatchet` 的地盘），
-     * 前景单迁到 `appDomain(...).deep` / `colors.text2` 等于把亮墨钉死在白底上——已按 R-23.14 回退为
-     * 批前那两枚静态读点，容器主题化归 Task 26/27。本用例把例外钉到行、钉到枚数，并与棘轮 seed 交叉对齐
-     * （修一处忘另一处即红）；「AI 两屏其余墨色走组合期令牌族」由文件内 `Mint*` 组合期 getter 的
-     * 既有契约（`MintTokenIsComposableContractTest`）承重，本处不重复。
+     * 2026-11-02 用户裁定整块删掉渐变头卡与白胶囊后，`AiLearningScreen` 上那两枚登记例外
+     * （`DomainColors.AiSpeech.deep` / `AppPalette.TextSecondary`）随容器一起消失；两屏现在都只读
+     * `appColors()` / `appDomain(...)`。深套浮浅套值的旧债不再属于任何一屏。
      */
     @Test
     fun `the AI screens read tokens through the themed accessors only`() {
         val staticRead = Regex("""\b(?:AppPalette|DomainColors)\.[A-Za-z0-9_]+""")
-        val featureHits = staticRead.findAll(uiScreenSource("AiFeatureScreen.kt")).map { it.value }.toList()
-        assertTrue(
-            featureHits.isEmpty(),
-            "AiFeatureScreen.kt 仍有静态令牌读点 $featureHits（深色档会停在浅值）：应改 appColors() / appDomain(AppDomain.AiSpeech)",
-        )
-        val learningSource = uiScreenSource("AiLearningScreen.kt")
-        val learningHits: List<String> = staticRead.findAll(learningSource).map { it.value }.toList().sorted()
-        assertEquals(
-            // 读点记号止于第一段成员名（正则类不含点号）：`DomainColors.AiSpeech.deep` 命中记作 `DomainColors.AiSpeech`。
-            listOf("AppPalette.TextSecondary", "DomainColors.AiSpeech"),
-            learningHits,
-            "AiLearningScreen.kt 的静态读点必须恰是白胶囊前景那一行登记的两枚（R-23.14 回退形状）：实际 $learningHits。" +
-                "多出来=又长出静态墨；少了=seed 与注记漂移；换成 themed 墨=容器未随主题而前景单迁（B1 形状）",
-        )
-        assertTrue(
-            Regex("""color = if \(aiConfigured\) DomainColors\.AiSpeech\.deep else AppPalette\.TextSecondary,""")
-                .containsMatchIn(learningSource),
-            "登记的例外必须恰在头卡状态徽章那一行（`color = if (aiConfigured) …`），不许挪进别的行躲计数",
-        )
-        assertEquals(
-            2,
-            DarkTokenSeedAllowlist["AiLearningScreen.kt"],
-            "白胶囊前景的静态读点与 DarkTokenSeedAllowlist 的 seed 不同步（逐文件精确相等口径：修一处两张账同改）",
-        )
-        // 迁移的目标形状必须在真正没回退的那一侧成立，而不是「把静态读点删了、颜色也不给了」。
+        listOf("AiFeatureScreen.kt", "AiLearningScreen.kt").forEach { name ->
+            val hits = staticRead.findAll(uiScreenSource(name)).map { it.value }.toList()
+            assertTrue(
+                hits.isEmpty(),
+                "$name 仍有静态令牌读点 $hits（深色档会停在浅值）：应改 appColors() / appDomain(AppDomain.AiSpeech)",
+            )
+        }
+        // 迁移的目标形状必须成立，而不是「把静态读点删了、颜色也不给了」。
         assertTrue(
             uiScreenSource("AiFeatureScreen.kt").contains("appColors()"),
             "AiFeatureScreen.kt 迁移后必须经 appColors() 取墨（徽标前景、按钮与徽章的主题无关亮底墨三处）",
+        )
+        assertTrue(
+            uiScreenSource("AiLearningScreen.kt").contains("appColors()"),
+            "AiLearningScreen.kt 的卡片与文案必须经 appColors() 取墨，否则「零静态读点」只是丢给了默认主题",
         )
     }
 
@@ -332,9 +263,6 @@ class AiBadgeContrastFixTest {
     /** AiSpeech 实底容器（`MintPrimary`）在两套主题里的活值——两套皆亮，是 B1 的根因面。 */
     private val mintPrimaryLightBase = DomainLight.getValue(AppDomain.AiSpeech).base.toArgb()
     private val mintPrimaryDarkBase = DomainDark.getValue(AppDomain.AiSpeech).base.toArgb()
-
-    /** 白胶囊的复算底：与 §一 复算口径一致按不透明白算（`GlassButton.kt:70` 同一口径）。 */
-    private val pillWhite = 0xFFFFFFFF.toInt()
 
     /**
      * 墨 token → 两套活值。resolver 认不到的 token 判红而不是放行——新增墨必须先来这边配对，
@@ -519,48 +447,6 @@ class AiBadgeContrastFixTest {
                 "if (implemented) colors.onBrand else colors.text1",
             ).isEmpty(),
             "R-23.13′ 的 StatusPill 写法被判红——判据把修复本体当违规，方向反了",
-        )
-    }
-
-    /**
-     * R-23.14（白胶囊 = 回退，不硬迁）：容器 `Color.White.copy(alpha = 0.85f)` 是主题不变面，
-     * 前景必须保持登记的两枚静态墨；同时按 §一 复算口径压白复算两套同值的静态墨——
-     * 未配置档过正文 4.5 线；已配置档原先是**批前既有债**（`GlassButton.kt:70` 同口径原话），
-     * 按「≥3.0 且 <4.5」两向钉住。
-     * **2026-10-27 轻松档把这个债还清了**：浅套 AiSpeech `deep` 从旧值换成 #1A7A63，压白升到 5.24，
-     * 已过 4.5。按本用例自己写的规矩（「真修达正文线也要先撤台账再收本腿」），这条腿翻成正向
-     * 正文 4.5 下限，`docs/verification` 的 Task 23 节与 `GlassButton.kt` 的债句同时作废。
-     * 容器主题化本身归 Task 26/27（R-23.11 未授权本席迁容器）。
-     */
-    @Test
-    fun `the theme invariant white pill keeps its registered static foregrounds`() {
-        val learningSource = uiScreenSource("AiLearningScreen.kt")
-        assertTrue(
-            Regex("""Color\.White\.copy\(alpha = 0\.85f\)""").containsMatchIn(learningSource),
-            "白胶囊容器形状变了：本用例只钉「容器不随主题 ⇒ 前景不许单迁」这一对（R-23.14）；" +
-                "若 Task 26/27 已把容器主题化，须连着回退注记与本腿一起重算，不许只动一边",
-        )
-        val expression = Regex("""color = if \(aiConfigured\) ([^,\n]+),""").find(learningSource)?.groupValues?.get(1)?.trim()
-        assertTrue(expression != null, "抓不到头卡状态徽章的 aiConfigured 前景表达式（站点搬家？改名？本腿失去对象）")
-        assertFalse(
-            expression!!.contains("appDomain(") || expression.contains("colors."),
-            "白胶囊前景含单迁形实参（$expression）：容器深浅两套都是白底，themed 浅墨在深档就是亮墨压白（B1 第三站形状）",
-        )
-        assertEquals(
-            "DomainColors.AiSpeech.deep else AppPalette.TextSecondary",
-            expression,
-            "白胶囊前景必须恰为 R-23.14 回退形状（批前形状逐字）：实际 $expression",
-        )
-        val configuredRatio = ratio(DomainColors.AiSpeech.deep.toArgb(), pillWhite)
-        val neutralRatio = ratio(AppPalette.TextSecondary.toArgb(), pillWhite)
-        assertTrue(
-            neutralRatio >= 4.5,
-            "未配置档静态墨压白只有 ${"%.2f".format(neutralRatio)}:1（正文档下限 4.5:1）——这枚不是登记债，是真回归",
-        )
-        assertTrue(
-            configuredRatio >= 4.5,
-            "已配置档静态墨压白只有 ${"%.2f".format(configuredRatio)}:1——原登记为「批前既有债（≥3.0 且 <4.5）」，" +
-                "2026-10-27 轻松档换墨后应按正文 4.5 下限判；掉回 4.5 以下说明债又回来了，先修墨再谈台账",
         )
     }
 
