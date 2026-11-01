@@ -236,8 +236,8 @@ class BackupHubLayoutContractTest {
 
     @Test
     fun `the receipt notice is conditional and sits above the danger zone`() {
-        // 期望值变化（1 → 2），不是放宽：原型 `sMeData` 本页末有一条**常驻**安全提示条
-        // （「所有数据默认只在本机；卸载 App 会一并删除，请先导出备份。」），与条件回执**是两件事**；
+        // 期望值变化（1 → 2），不是放宽：原型 `sMeData`（`app.js:1421`）本页末有一条**常驻**安全提示条
+        // （措辞自 U-6 起取自 `notices/LocalDataNotice`，见下面第 ⑦ 组），与条件回执**是两件事**；
         // 两条都走共享 `InlineNotice`，没有第二套提示形状（该口径原句仍成立）。
         // 「回执只有一枚」的实质由下面两条断言守住：条件渲染是 `deleteAllLearningDataNotice?.let`，
         // 且第一枚 `InlineNotice(` 必须排在危险区之前——页尾那条在危险区之后，不影响这两条。
@@ -268,8 +268,11 @@ class BackupHubLayoutContractTest {
     @Test
     fun `the page closes with the local only notice and invents no storage numbers`() {
         assertTrue(
-            "所有数据默认只在本机；卸载 App 会一并删除，请先导出备份。" in source,
-            "原型 `app.js:1421` 的页尾提示条在本仓逐字成立（本地优先、无云同步、卸载即删），原样搬",
+            "text = LocalDataNotice.BackupHubWarning" in source,
+            "页尾那条常驻安全提示必须吃单一真源（U-6 收源，决策 2026-11-03 §8）：改前这屏自写一句，" +
+                "与学习记录、导出声明各说各话，还说漏了「清除数据 / 设备损坏」两件。" +
+                "句子本体由 `LocalDataNoticeSingleSourceTest` 逐字钉，本条只钉引用形状——" +
+                "这里不复述原句，否则改一次措辞要同时改两处",
         )
         // 原型顶部那张卡是 mock：本仓没有「本机占用空间」的读数，也没有「最近一次备份时间」的记录，
         // 两格整枚不画（用户 2026-10-29 拍板「读不到的那枚整枚不显示」）。

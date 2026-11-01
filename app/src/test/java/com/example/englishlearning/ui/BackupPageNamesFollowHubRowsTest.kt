@@ -17,9 +17,9 @@ import kotlin.test.assertTrue
  * 为什么这里连注释一起扫（与 [countMatches] 的剥注释口径相反）：改名类判据钉的是「这个名字还有没有人
  * 在写」，注释里的旧名是下一批会照抄的模板（同 [AiGuidanceMapNamingTest] 的口径）。
  *
- * 旧名只按**文件**归零，不做全仓扫：「导出备份」在别的屏里是动词短语
- * （`BackupHubScreen.kt` 的警告「…请先导出备份。」、`LearningRecordsScreen.kt` 的「…记得导出备份。」），
- * 那些句子讲的是动作不是页面名，把它们判成残留会逼下一批去改无关文案。
+ * 旧名只按**文件**归零，不做全仓扫：「导出备份」在别处是动词短语——那条警告的句子自 U-6 起住在
+ * `notices/LocalDataNotice.kt`（备份 hub 与学习记录两屏都从那里取句），讲的是动作不是页面名，
+ * 把它们判成残留会逼下一批去改无关文案。
  */
 class BackupPageNamesFollowHubRowsTest {
 
@@ -83,7 +83,7 @@ class BackupPageNamesFollowHubRowsTest {
             occurrences(page, STALE_EXPORT_TITLE),
             "旧页名「$STALE_EXPORT_TITLE」必须在 `BackupExportScreen.kt` 整文件归零（含注释）：" +
                 "它和 hub 行名「导出学习数据留档」是同一件事的两个名字，留着注释等于给下一批留旧模板。" +
-                "注意别的屏里「请先导出备份」那类是动词短语，不在本判据范围内",
+                "注意别处「导出备份是唯一的留档途径」那类是动词短语（在 `notices/LocalDataNotice.kt`），不在本判据范围内",
         )
         // 反空转：新名在同一份源里必须真的存在，否则上一条 ==0 会因为「整页被删空」而绿。
         assertTrue(

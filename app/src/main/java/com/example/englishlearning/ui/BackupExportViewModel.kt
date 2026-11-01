@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.backup.domain.BackupExportCoordinator
 import com.example.englishlearning.backup.domain.BackupExportFailure
 import com.example.englishlearning.backup.domain.BackupExportResult
+import com.example.englishlearning.notices.LocalDataNotice
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.ZoneOffset
@@ -139,11 +140,15 @@ class BackupExportViewModel @Inject constructor(
 /**
  * 面向用户的诚实声明：这是**数据留档包**（只能留档、不能换机恢复），并指向真实可用的认证导出出口；
  * 不含密钥。固定文案，供 UI 与测试共用。
+ *
+ * 末尾两句不在本文件手写：本机数据与卸载后果那条警告的**唯一措辞源**是 `notices/LocalDataNotice`
+ * （U-6 收源，改前这里与备份 hub、学习记录各写一套），完整政策的出口也只在这里指一次。
  */
 const val DEFAULT_DISCLOSURE =
     "本备份为数据留档包：只能用于留档，不能用于换机恢复；换机恢复请在「备份与恢复」中选择「认证导出」生成受保护备份。" +
         "包中不包含 API Key、Keystore 密钥、系统 TTS 数据或临时图片。" +
-        "卸载、清除数据或设备损坏前未导出的学习记录可能无法恢复；无账户、无云同步，请自行妥善保存备份文件。"
+        LocalDataNotice.ExportTail +
+        LocalDataNotice.PrivacyStatementsPointer
 
 private fun formatSummary(recordCount: Int, mediaCount: Int, uncompressedBytes: Long): String =
     "共 $recordCount 条记录 · $mediaCount 个音频文件 · 约 ${uncompressedBytes / 1024} KB（未压缩）"

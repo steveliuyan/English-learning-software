@@ -36,6 +36,7 @@ import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.learning.domain.DailyLearningHistory
+import com.example.englishlearning.notices.LocalDataNotice
 import com.example.englishlearning.ui.components.AppCard
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.InlineNotice
@@ -51,7 +52,8 @@ import com.example.englishlearning.ui.theme.appColors
  * 学习记录（原型 `#/me-records`，`assets/app.js:1304-1327`，`sMeRecords`）。
  *
  * 本批按原型补三件（批 2 Task 22-D 之一）：
- *  ① 页尾提示条「记录按天聚合，只保存在本机；卸载 App 前记得导出备份。」（原型 `:1323` 的 `notice(...,'info')`）；
+ *  ① 页尾提示条（原型 `:1323` 的 `notice(...,'info')`）：措辞来自 `notices/LocalDataNotice`，
+ *     本屏不自写中文警告（U-6 收源前本屏与备份 hub、导出声明各写一套，同一件事三种句子）；
  *  ② 「历史记录」页签每日行补「文章态」副案与右尾「N 词」，并挂 4dp 细进度条（原型 `.row` + `.meter-thin`）；
  *  ③ 「本周」七格刻度 + 两枚真统计（本周词数 / 打卡天数，`learningWeek` 派生）。
  *
@@ -143,10 +145,10 @@ fun LearningRecordsScreen(
                             }
                         }
                     }
-                    // 页尾提示条（原型 `:1323`）：本仓确实是「逐日聚合 + 只存本机」，逐字成立。
+                    // 页尾提示条（原型 `:1323`）：措辞取单一真源，与本屏之外的同类警告同句。
                     item(key = "notice") {
                         InlineNotice(
-                            text = "记录按天聚合，只保存在本机；卸载 App 前记得导出备份。",
+                            text = LocalDataNotice.LearningRecordsWarning,
                             kind = InlineNoticeKind.Info,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
                         )

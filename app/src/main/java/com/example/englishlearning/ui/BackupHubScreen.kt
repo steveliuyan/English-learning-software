@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.notices.LocalDataNotice
 import com.example.englishlearning.ui.components.AppGlyph
 import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
@@ -180,10 +181,12 @@ fun BackupHubScreen(
             )
         }
 
-        // 原型 `sMeData`（`app.js:1421`）的页尾提示条，逐字成立：本仓数据默认只在本机、
-        // 无云同步，卸载即随应用数据删除。危险区仍必须是全屏最后一段入口，提示条排在它之后不抢位置。
+        // 页尾常驻安全提示（原型 `sMeData` 的那一条）：措辞不在此处手写，
+        // 唯一来源是 `notices/LocalDataNotice.kt`——同一条警告此前在四屏写了四套，
+        // 且这里只说了「卸载」，漏掉清除数据与设备损坏（AGENTS.md 要求三件都说）。
+        // 危险区仍必须是全屏最后一段入口，提示条排在它之后不抢位置。
         InlineNotice(
-            text = "所有数据默认只在本机；卸载 App 会一并删除，请先导出备份。",
+            text = LocalDataNotice.BackupHubWarning,
             kind = InlineNoticeKind.Error,
         )
     }
