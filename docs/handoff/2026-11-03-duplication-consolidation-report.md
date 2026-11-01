@@ -86,9 +86,26 @@
   `MyWordsScreenTest` / `AppScreenTest`。`SettingsLicensesEntryTest` 那条按文字的反向钉换成新名，
   否则改名后旧名全站不存在、判据变**永真空转**。
 
+### 2.6 追补：§5-A 两句假话副标题已按拍板改掉（收口后同会话）
+
+收口问答里用户选「**改成核实过的说法**」，随即按 TDD 落地（RED 实测：闸红在「明天的词单…」现值 1，
+`expected 0 but was 1`；改后同批四枚 profile 闸绿）：
+
+- 生词行副标题 → **「提交「不认识」后自动加入」**。核实出处 `ui/WordCardViewModel.kt:216-217`：
+  反馈为 `Unknown` 时 `vocabulary.add(..., "Again", ...)`。
+- 错词行副标题 → **「标记「不认识」的词 · 答对即移出」**。核实出处
+  `core/storage/dao/InternalLearningStatsDao.kt:106-112`：只取「最近一次反馈 = `Again`」的行、
+  按 `COALESCE(MIN(nextReviewAt), 事件时间)` 升序 ⇒ 既不按答错次数排，也不需要答对两次。
+- 收藏行「不排进复习 · 只做手动回看」**不动**（同一段 KDoc 判它成立）。
+
+闸在 `WordListEntryNamesFollowBankSegmentsTest` 三条新腿：假话按整份 `ProfileScreen.kt`（含注释）归零、
+核实说法必须与该行 tag **同一行**（防说法漂到别处照样绿）、落点那三段同义句子仍在。
+JVM 读数因此从 2248 → **2251 条 / 0 失败**（306 类不变）；`emulator-5574` 复装新包后
+`ProfileScreenTest` **OK (6 tests)**；真机 `bf353dda` 同包复装。
+
 ## 3. 验证记录
 
-### 3.1 TDD 与 RED→GREEN 实况（四条值得记的）
+### 3.1 TDD 与 RED→GREEN 实况（五条值得记的）
 
 - U-12 首跑被**自己的新注释**判红：`ProfileScreen.kt` 的 U-12 说明里引用了许可入口那句原话，
   而改名类闸按整份源码扫（注释里复述也算命中）。改文档写法绕开原句，并在闸消息里把这条口径写明。
@@ -96,14 +113,18 @@
   换成按位置取窗口（`lastIndexOf("SoftCard {", noticeAt)`）。
 - U-8 的枚举解析正则最初写成三引号原始串，把测试文件自身解析搞坏；换成转义普通串后 RED 才成立。
 - `ProfileStatCell` 行窗口取法用 `(?m)^\s*` 会吞换行导致起点漂到空行，改 `(?m)^[ \t]*` 并要求「恰 3 行」防空转。
+- §5-A 落地时的 RED 里发现一条自己的坑：`Regex.escape(x)` 得到的是 `\Qx\E` **模式串**，
+  拿它当 `String.contains` 的参数永远不命中 ⇒ 「tag 与说法同一行」的计数恒 0、判据会**空转**。
+  按子串取就写普通字面量，按正则取才用 `Regex(Regex.escape(...))`（本仓夹具 `occurrences` 走后者）。
 
 ### 3.2 门禁（终局树重跑）
 
 - `:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin` **BUILD SUCCESSFUL**（2m45s，
   `compileDebugKotlin` 为 executed 非 UP-TO-DATE，即 `clickable` import 删除后确实重编过）。
   日志 `.git/qa-scratch/final-jvm-gate-2026-11-01.log`。
-- JVM 现值：**306 个测试类 / 2248 条 / 0 失败 / 0 跳过**（重算：`python` 汇总
-  `app/build/test-results/testDebugUnitTest/*.xml` 的 `tests/failures/errors/skipped`）。
+- JVM 现值：**306 个测试类 / 2248 条 / 0 失败 / 0 跳过**（§2.6 追补后为 **2251 条**，同一日志口径的
+  `.git/qa-scratch/subtitle-fix-jvm-gate.log`）。重算：`python` 汇总
+  `app/build/test-results/testDebugUnitTest/*.xml` 的 `tests/failures/errors/skipped`。
 - detekt/ktlint 按仓库口径**不作闸**（存量基线债 1500+，非本批引入）。
 
 ### 3.3 connected（只在 `emulator-5574`，`adb install -r` + `am instrument`）
@@ -137,13 +158,11 @@
 
 ## 5. 未完成 / 遗留问题
 
-- **等用户拍板（本批发现但按范围不动）**：「我的」hub 词汇三行里两句副标题是**错的**——
-  生词「明天的词单里排到前面」（新词顺序由 `NewWordOrdering` 决定，生词条目零参与）、
-  错词「按答错次数排序 · 答对两次移出」（实为按到期先后排、一次答对即移出）。
-  这两句正是 `MyWordsScreenContractTest` 判定不成立、合并页整句不写的那两句；
-  honest 替代在本仓已有成文出处（`MyWordsScreen.kt` 两段空态）。详见决策 §5-A。
-  默写纸范围「今天的易错词」**不是**同一概念（`BuildWorksheetContentUseCase` 的 `DIFFICULT_TODAY`
-  按当天反馈筛），保留原措辞。
+- ~~**等用户拍板**：hub 词汇三行里两句副标题是**错的**~~ —— **已拍板并改掉**（见 §2.6，同会话追补）：
+  生词行换成「提交「不认识」后自动加入」、错词行换成「标记「不认识」的词 · 答对即移出」，
+  两句的核实出处分别是 `WordCardViewModel.kt:216-217` 与 `InternalLearningStatsDao.kt:106-112`。
+  默写纸范围「今天的易错词」**仍保留**——按实测它是另一概念（`BuildWorksheetContentUseCase` 的
+  `DIFFICULT_TODAY` 筛当天 `Again`/`Hard` 的计划项），不是词库「错词」那一册。
 - **U-6**（「本机数据 / 卸载前导出」四屏四套措辞）登记为下一批首项——备份警告是用户做数据决策的依据，措辞得逐字校。
 - **U-9**（本周完成两套可视化）属版面重排，大字号下同屏可见性未取证，未动。
 - **U-13**（「提醒与发音」中转页）未动：拆它 = hub 台账 13→14 + connected `ReminderSpeechScreenTest` 4 条整条改测，
@@ -174,6 +193,8 @@
 - U-11 的方向 = **改落地页标题**（信 hub 那句「本屏是唯一真值」），不改 hub。
 - U-12 的方向 = **改行名为「关于」并保留两跳**，不直跳许可页、不下线关于页。
 - U-8 的方向 = **以词库分段短名为准**（收藏 / 生词 / 错词），双入口保留。
+- §5-A 两句错副标题 = 用户选 **「改成核实过的说法」**（否决「留现状」与「只删副标题」），
+  下一项整合用户选 **U-6**（否决「先推送」「先真机走查」「转 AI 缺口批」）。
 - U-10 的方向 = **留吸底那一枚**提交入口，页头只留返回。
 - 盘点表 §3 六条「该保留的重复」不动；§5-A 那两句错副标题**等用户点头**再改。
 - 不合 `main`、不推送，等「推送」；推送失败等用户开代理后再推。

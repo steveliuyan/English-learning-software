@@ -103,7 +103,7 @@
   （`MyWordsScreen.kt:159`）。以**分段 tab 的短名为准**（收藏 / 生词 / 错词），三处逐字对齐；
   入口本身按旧 D-6/D-7 裁定保留双入口。
 
-#### 5-A 实施时发现的两句假话副标题（本批未动，登记待拍板）
+#### 5-A 实施时发现的两句假话副标题（用户已拍板改掉，2026-11-01 落地）
 
 改名时逐字读到 hub 词汇三行的副标题，其中两句正是 `MyWordsScreenContractTest` 里那段「三句原型说明逐条核过生产逻辑」
 的 KDoc 判定**在本仓不成立**、因此合并页整句不写的那两句说法
@@ -114,11 +114,20 @@
 - 「错词」行：「按答错次数排序 · 答对两次移出」——错词按**到期先后**排，且**一次**答对即移出。
 
 同一句话在合并页被核过不成立、在 hub 却写给用户看，是比命名更硬的问题（说法本身就是错的），
-但修它改的是文案本体而不是重复项，超出本批「收名字」的范围，且两句 honest 替代在本仓已有成文出处
-（`MyWordsScreen.kt` 两段空态：生词「还没有生词，提交“不认识”后会自动加入。」、
-错词「…复习中标记「不认识」的词会出现在这里，重新答对后自动消失。」）。
-本批**登记不动**，等用户点头再按 TDD 改（改法：两枚副标题换成上面两句，`ProfileHubLedgerTest` 与
-`WordListEntryNamesFollowBankSegmentsTest` 同批加一句形状钉）。
+但修它改的是文案本体而不是重复项，所以本批先登记。**用户 2026-11-01 拍板「改成核实过的说法」**，随即按 TDD 落地：
+
+- 生词行副标题 → **「提交「不认识」后自动加入」**（生产核实：`WordCardViewModel.kt:216-217`，
+  反馈为 `Unknown` 时 `vocabulary.add(..., "Again", ...)`——这句是落点真空做的事）；
+- 错词行副标题 → **「标记「不认识」的词 · 答对即移出」**（生产核实：`core/storage/dao/InternalLearningStatsDao.kt:106-112`
+  只取「最近一次反馈 = Again」的行、按 `COALESCE(MIN(nextReviewAt), 事件时间)` 升序，
+  所以既不是按答错次数排、也不需要答对两次）；
+- 收藏行那句「不排进复习 · 只做手动回看」**不动**——同一段 KDoc 判它成立（计划生成只由词书内容与
+  `learning_events` 派生，收藏表零参与）。
+
+措辞取自合并页那两段空态，**一条事实不留两种口径**；闸在
+`WordListEntryNamesFollowBankSegmentsTest` 三条腿：两句假话按整份 `ProfileScreen.kt`（含注释）归零、
+核实说法必须与该行 tag **同一行**（否则说法漂到别处照样绿）、落点那三段同义句子仍在（`each_hub_claim_is_backed_by_the_landing_page_sentence`）。
+RED→GREEN 实测：改前该条红在「明天的词单…」现值 1（expected 0 but was 1），改后同批四枚 profile 闸绿。
 
 同源未动的一条：`ui/WorksheetSettingsScreen.kt` 的默写纸范围「今天的易错词」保留原措辞——
 它指的是**当天答错的计划项**（`learning/worksheet/BuildWorksheetContentUseCase.kt` 的

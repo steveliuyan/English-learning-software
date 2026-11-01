@@ -79,9 +79,15 @@ object ProfileGroups {
     // 分段是落点也是本仓这套词的术语源头，所以以它为准（入口本身按旧 D-6/D-7 裁定保留双入口，收的是名字不是路径）。
     // 旧名按本批口径在 `ui/` 整棵子树（含注释）归零：注释里的旧名就是下一批会照抄的模板。
     // 判据在 `WordListEntryNamesFollowBankSegmentsTest`：期望名从枚举体解析，分段改名时闸跟着走。
+    // §5-A（用户 2026-11-01 拍板「改成核实过的说法」）：下面两行的副标题原来抄的是原型说法，
+    // 而那两句在本仓被 `MyWordsScreenContractTest` 逐条核过**不成立**——新词顺序由 `NewWordOrdering`
+    // （词头三字母交错 + 内容哈希）决定、生词条目在计划生成里零参与；错词按下次到期时间升序排，
+    // 且最近一次反馈不再是 `Again` 就离开该册（一次答对即消失）。同一句在合并页不写、在 hub 却展示给用户，
+    // 比命名不一致更硬。现在两行各自只说落点真做的事，措辞取自合并页那两段空态——一条事实不留两种口径。
+    // 判据在同一枚闸（旧说法按整份文件含注释归零 + 说法必须与该行同一行 + 落点那句同义句子仍在）。
     val FavoriteWords = ProfileRow("收藏", "profile_open_favorite_words", AppIcon.Star, AppDomain.Review, "不排进复习 · 只做手动回看")
-    val NewWords = ProfileRow("生词", "profile_open_new_words", AppIcon.Bookmark, AppDomain.Learn, "明天的词单里排到前面")
-    val WrongWords = ProfileRow("错词", "profile_open_wrong_words", AppIcon.Warning, AppDomain.Review, "按答错次数排序 · 答对两次移出")
+    val NewWords = ProfileRow("生词", "profile_open_new_words", AppIcon.Bookmark, AppDomain.Learn, "提交「不认识」后自动加入")
+    val WrongWords = ProfileRow("错词", "profile_open_wrong_words", AppIcon.Warning, AppDomain.Review, "标记「不认识」的词 · 答对即移出")
     val LearningRecords = ProfileRow("学习记录", "profile_open_learning_records", AppIcon.Chart, AppDomain.Learn, "今日与按日的完成情况")
     val LearningPlan = ProfileRow("学习计划", "profile_open_plan", AppIcon.List, AppDomain.Learn, null, EntryIconTone.Gradient)
     val WordBook = ProfileRow("词书", "profile_open_word_book", AppIcon.Book, AppDomain.Library, null)

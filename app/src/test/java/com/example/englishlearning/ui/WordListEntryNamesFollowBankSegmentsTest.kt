@@ -38,6 +38,20 @@ class WordListEntryNamesFollowBankSegmentsTest {
 
         val staleHubNames = listOf("收藏的词", "生词本", "易错词")
 
+        /**
+         * §5-A（用户 2026-11-01 拍板「改成核实过的说法」）：hub 词汇三行的**副标题**也不许承诺落点不做的行为。
+         * 三句假话按整份 `ProfileScreen.kt`（含注释）归零——注释里留着等于给下一批留可抄的旧说法。
+         * 逐句的证伪出处在 `MyWordsScreenContractTest` 那段「三句原型说明逐条核过生产逻辑」的 KDoc。
+         */
+        val falseClaims = listOf("明天的词单里排到前面", "按答错次数排序", "答对两次")
+
+        /** 行 tag → hub 那行必须写的核实说法（取落点空态句的同一条事实，不换口径）。 */
+        val verifiedClaims = listOf(
+            "profile_open_favorite_words" to "不排进复习 · 只做手动回看",
+            "profile_open_new_words" to "提交「不认识」后自动加入",
+            "profile_open_wrong_words" to "标记「不认识」的词 · 答对即移出",
+        )
+
         val uiDir = File(UI_MAIN_SOURCE_PATH)
 
         fun read(name: String): String {
@@ -105,6 +119,68 @@ class WordListEntryNamesFollowBankSegmentsTest {
         assertTrue(
             page.contains("subtitle = \"$joined"),
             "合并页副标题的三段并列必须逐字取短名（「$joined」）：那一句是用户进页后第一次核对「我到的是不是那三个入口的合并页」",
+        )
+    }
+
+    @Test
+    fun theHubRowSubtitlesPromiseOnlyWhatTheLandingPagesDo() {
+        val hub = read("ProfileScreen.kt")
+        falseClaims.forEach { claim ->
+            assertEquals(
+                0,
+                occurrences(hub, claim),
+                "hub 不许把落点不做的行为写给用户看（残留「$claim」，现值 ${occurrences(hub, claim)}）：" +
+                    "同一句在合并页被逐条核过不成立、整句不写，在两行副标题里却留着——那比命名不一致更硬",
+            )
+        }
+        verifiedClaims.forEach { (rowTag, claim) ->
+            // 按「同一行里同时出现 tag 与说法」计数：只要求两处都存在会让说法漂到别的行/别的注释里照样绿。
+            assertEquals(
+                1,
+                hub.lines().count { rowTag in it && claim in it },
+                "行 $rowTag 的副标题必须恰一处带上核实过的说法「$claim」：行名对齐了但说法仍是旧的，用户读到的承诺没变",
+            )
+        }
+    }
+
+    @Test
+    fun each_hub_claim_is_backed_by_the_landing_page_sentence() {
+        // 三句说法不是新造的文案，而是落点页里已被逐条核过生产逻辑的那两句空态 + 收藏段说明句。
+        // 本条把两侧钉在一起：谁改了 hub 的说法却没同步落点（或反之）当场红，避免同一条事实两种口径。
+        val page = read("MyWordsScreen.kt")
+        listOf(
+            "只做手动回看" to "收藏段的说明句是本仓核过的说法",
+            "后会自动加入" to "生词段空态句核过：提交「不认识」确实写进 vocabulary_entries",
+            "重新答对后自动消失" to "错词段空态句核过：最近一次反馈不再是 Again 即离开该册",
+        ).forEach { (fragment, why) ->
+            assertTrue(
+                occurrences(page, fragment) >= 1,
+                "合并页必须仍写着「$fragment」（$why）：hub 那三行副标题的事实出处在这里，" +
+                    "落点把自己核过的说法删掉而 hub 还在引用，就是引用一句没人承重的话",
+            )
+        }
+    }
+
+    @Test
+    fun the_claim_gates_are_not_vacuous() {
+        val fixture = """
+            val NewWords = ProfileRow("生词", "profile_open_new_words", AppIcon.Bookmark, AppDomain.Learn, "明天的词单里排到前面")
+            val WrongWords = ProfileRow("错词", "profile_open_wrong_words", AppIcon.Warning, AppDomain.Review, "按答错次数排序 · 答对两次移出")
+        """.trimIndent()
+        listOf("明天的词单里排到前面", "按答错次数排序", "答对两次").forEach { claim ->
+            assertEquals(
+                1,
+                occurrences(fixture, claim),
+                "合成负片段被放行：假话说法「$claim」没被数出来，归零判据是空转",
+            )
+        }
+        val honestFixture = """
+            val NewWords = ProfileRow("生词", "profile_open_new_words", AppIcon.Bookmark, AppDomain.Learn, "提交「不认识」后自动加入")
+        """.trimIndent()
+        assertEquals(
+            1,
+            honestFixture.lines().count { "profile_open_new_words" in it && "提交「不认识」后自动加入" in it },
+            "合成正片段漏判：同一行里的「tag + 说法」形状没被认出，逐行取法的判据会抓不到回退",
         )
     }
 }
