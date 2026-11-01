@@ -30,4 +30,10 @@
 
 ## 不做
 
-U-6（备份警告措辞收源）、U-9（周视图版面）、U-13（拆「提醒与发音」中转页）、盘点表 §3 六条该保留的多入口。
+U-9（周视图版面）、U-13（拆「提醒与发音」中转页）、盘点表 §3 六条该保留的多入口。
+
+## 续做（收口批之后，用户 2026-11-01 选定的下一项）
+
+10. **U-6 备份警告措辞收源**：范围、四套原句、单一真源形状与判据见决策 §8——
+    先改本文档与决策（已完成），再写 `LocalDataNoticeSingleSourceTest`（RED），后落生产；
+    门禁仍走 `assembleDebug → testDebugUnitTest → compileDebugAndroidTestKotlin`，connected 只在 `emulator-5574` 复装。

@@ -134,12 +134,11 @@ RED→GREEN 实测：改前该条红在「明天的词单…」现值 1（expect
 `DIFFICULT_TODAY` 分支按当次反馈 `Again`/`Hard` 筛），不是词库「错词」那一册，
 属于另一个概念，换名反而把两个落点说成同一个。
 
-### 6. U-6 / U-9 本批只做「不再增加新的」，不做重排
+### 6. U-9 本批只做「不再增加新的」，不做重排（U-6 已另行拍板落地，见 §8）
 
-- **U-6**（「本机数据 / 卸载前导出」四屏四套措辞）：单一真源 `thirdPartyPrivacyStatements()` 已存在但只喂许可页，
-  其余三屏各写一套。收成一处纯函数涉及备份与记录两屏的文案契约与 connected 断言，
-  与 §1 的对话框族是同类工程但风险面不同（备份警告是用户做数据决策的依据，措辞得逐字校）。
-  本批**不动**，登记为下一批首项。
+- **U-6**（「本机数据 / 卸载前导出」四屏四套措辞）：收口批当时**不动**，登记为下一批首项——
+  理由是备份警告是用户做数据决策的依据，措辞得逐字校，不能和对话框族、改名族挤在同一次改动里顺手改。
+  用户 2026-11-01 选它作下一项，形状与判据写在 §8。
 - **U-9**（本周完成两套可视化）：属版面重排，且大字号下同屏可见性未取证（盘点表 §5），本批**不动**。
 
 ### 7. U-13（提醒与发音中转页）与 U-14（文档措辞）
@@ -149,6 +148,71 @@ RED→GREEN 实测：改前该条红在「明天的词单…」现值 1（expect
   混在一批会让 §1 的安全面收口被版面争议拖住。等用户在盘点表上单独拍板。
 - **U-14 做**：纯文档澄清，同本报告一起落——批 5 落的是**页头齿轮**，「暂不加」指**卡内额外入口**，
   两篇文档补限定语，防止下一任把「文档说不加、代码有齿轮」读成漂移而"修掉"一个设计。
+
+### 8. U-6 落地：「本机数据 / 卸载前导出」这条警告只留一处措辞（用户 2026-11-01 拍板为下一项）
+
+改前的四套说法（**改前**实测，重算：`grep -rn "卸载" app/src/main/java/com/example/englishlearning`）：
+
+| 落点 | 原句 |
+|---|---|
+| `notices/NoticesPrivacyStatement.kt` 第 1 条（喂许可页 `LicensesScreen`） | 「无账户：学习数据只保存在本机，不上传任何服务器。」 |
+| `ui/BackupHubScreen.kt` 页尾常驻提示条 | 「所有数据默认只在本机；卸载 App 会一并删除，请先导出备份。」 |
+| `ui/LearningRecordsScreen.kt` 页尾提示条 | 「记录按天聚合，只保存在本机；卸载 App 前记得导出备份。」 |
+| `ui/BackupExportViewModel.kt` 的 `DEFAULT_DISCLOSURE` 末句 | 「卸载、清除数据或设备损坏前未导出的学习记录可能无法恢复；无账户、无云同步，请自行妥善保存备份文件。」 |
+
+决定：
+
+- **新增唯一措辞源 `notices/LocalDataNotice.kt`**（`object` + `const val`，与 `thirdPartyPrivacyStatements()` 同目录、同纪律）：
+  三条事实各写成枚常量——「只保存在本机」「无账户、也不会自动上云」「卸载 App、清除数据或设备损坏会一并删除」，
+  再由它们拼出三屏各自的整句；`DEFAULT_DISCLOSURE` 末句换成拼出来的 `ExportTail` + 一枚指向许可页的出口句
+  （「完整隐私说明见「关于 → 开源许可与隐私说明」。」）。用 `+` 而不是字符串模板，`const val` 才成立。
+- **三屏不再自写中文警告**，只写 `text = LocalDataNotice.BackupHubWarning` 这类引用；
+  各屏仍只留一句短的，不复制许可页那五条全文。
+- **许可页那一句不动**：它是阶段 5 Spec 发布五要点的逐条对应，由 `NoticesPrivacyStatementTest` 按关键词钉，
+  属于「完整说明」那一头；本批把**警告族**收进一处并让它指回那一页，而不是把两处并成一处。
+- **措辞按 AGENTS.md 补全**：原 hub 那句只说「卸载 App」，AGENTS.md「本地优先」要求的是
+  「卸载、清除数据或设备损坏」三件都说；收源时统一到全列，顺带把这条漏项补上（不是换名，是把话说全）。
+  落地时又纠了一次：第一版事实写成「…会一并删除」，拼成整句读出来才发现「设备损坏」不是「删除」而是「取不回」，
+  改成 AGENTS.md 自己的口径「…后可能无法恢复」——**闸门钉的那枚事实串同批改**（GREEN 阶段的措辞纠偏，
+  不是先写代码后补测试：整条判据在实现前已 RED 过，理由见本节末的实施记录）。
+- **判据 `LocalDataNoticeSingleSourceTest`（6 条，两套口径分开写在各自消息里）**：
+  ① 单一真源存在，四枚事实各恰写一遍且声明就是事实本体（不许在同枚 `const` 里塞第二件事）；
+  ② 三枚整句必须由事实 `+` 拼出（写成整句字面量=第五套说法的温床），且各句拼进它该说的事实；
+  ③ 三屏各恰一处吃 `LocalDataNotice.<对应枚>`，导出声明另带一枚指向许可页的出口句；
+  ④ 三条旧整句在 `ui/` 子树**含注释**归零（旧句就是下一批的抄写模板）；
+  ⑤ 棘轮：`ui/` **剥注释后**没有任何字符串字面量再写「卸载」——`ui/theme/` 等处合法引用 AGENTS.md 原话
+  解释设计决定，那是引用不是措辞源，所以这一条必须剥注释，与 ④ 的含注释口径是**刻意相反**的两把尺；
+  ⑥ 反空转夹具：旧句、重复事实、引用枚名混用三种形状都必须被对应计数抓到。
+
+#### U-6 实施记录（2026-11-01）
+
+- 落地位置：`app/src/main/java/com/example/englishlearning/notices/LocalDataNotice.kt`
+  （四枚事实 + 三枚整句 + 一枚出口句，全部 `const val`，句子用 `+` 拼）。三屏与导出声明改吃引用后，
+  用户实际读到的三句分别是（重算：读 `LocalDataNotice.kt` 的声明行按 `+` 串联）：
+  hub 与学习记录各 60 字（只差主语），导出声明尾部 63 字 + 29 字出口句。
+- **RED 实况**：闸先写、先跑，6 条里 5 条红、1 条（反空转夹具）本就绿；红的理由各不相同——
+  源文件缺失 / 屏引用 `expected 1 but was 0` / 旧句 `expected 0 but was 1` /
+  棘轮点名三处违规（`BackupExportViewModel.kt`、`BackupHubScreen.kt`、`LearningRecordsScreen.kt` 各 1 处），
+  且**没有**点名 `ui/theme/` 那处合法引用，正好证明 ⑤ 的剥注释口径生效。
+- **同批改的字面量闸**：`BackupHubLayoutContractTest` 第 ⑦ 组由「整句逐字 pin」换成「引用形状 pin」，
+  其第 ⑥ 组注释里复述的旧句一并换掉（否则被本批 ④ 的口径判红）；
+  `BackupPageNamesFollowHubRowsTest` 两处注释里那句「别的屏写了什么」的举例改成指向单一真源的说法
+  ——它举的例子已经不在那两屏了，留着就是过期地图。
+- **门禁现值（本批终局）**：JVM `:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin`
+  BUILD SUCCESSFUL，**307 个测试类 / 2257 条 / 0 失败 / 0 跳过**（收口批的 306/2251 + 本批新增 1 类 6 条）。
+  connected 在 `emulator-5574` 走 `install -r` + `am instrument`：受影响的
+  `BackupEntryUnificationTest` + `LearningRecordsScreenTest` + `LicensesScreenTest` **OK (15 tests)**，
+  相邻的 `InlineNoticeTest` + `ProfileScreenTest` + `SettingsLicensesEntryTest` **OK (12 tests)**；
+  真机 `bf353dda` 仅 `install -r`（Success，`lastUpdateTime` 见报告）。
+- **同一趟盘点里发现、本批未动的一条**：`ui/ReadingFeedScreen.kt` 的来源说明那句写给用户看的是
+  「App 内的来源台账见「我的 · 开源许可与来源」」，而那一页在 U-5/U-12 已逐字改名「开源许可与隐私说明」
+  （`AboutScreen.kt` 的入口名与 `LicensesScreen.kt` 的页头同句），即**屏上那句指着一个不存在的入口名**。
+  重算：`grep -rn "开源许可与来源" app/src/main app/src/test`——除 `ReadingFeedScreen.kt` 那枚活文案外，
+  另有同文件两行注释也把旧页名当「既有页」在描述、`AboutScreen.kt` 与其契约测试的 KDoc 各写着
+  「『开源许可与来源』改名『开源许可与隐私说明』」这条 rename 记录（那两处是历史说明，合法）。
+  它属 U-5 那一族（同一页对外只留一个名字）的漏网实例，
+  但落点在本批没碰过的阅读流屏，且改的是文案本体，**登记待用户拍板**再按 TDD 动
+  （`ReadingFeedScreenContractTest` 只钉节标题与容器形状，没钉那句副文案，改起来是一处生产 + 两处注释）。
 
 ## 影响
 
@@ -167,7 +231,11 @@ RED→GREEN 实测：改前该条红在「明天的词单…」现值 1（expect
   `ProfileHubLedgerTest` / `ProfilePageContractTest` / `ProfilePageHomeContractTest` /
   `SettingsLicensesEntryTest` / `SettingsScreenTest`（U-12）；
   `OutboundConfirmDialogTest` / `ConfirmDestructiveWordingTest` + 新增族棘轮（U-1..U-3）。
-- **不动**：hub 台账行数（U-13）、备份警告措辞源（U-6）、周视图版面（U-9）、
+- **U-6 续批（2026-11-01 拍板后另一次改动）改生产**：新增 `notices/LocalDataNotice.kt`；
+  `BackupHubScreen.kt`、`LearningRecordsScreen.kt`（含其 KDoc 里那句原样引用）、`BackupExportViewModel.kt` 的
+  `DEFAULT_DISCLOSURE` 改吃单一真源。**改测试**：`BackupHubLayoutContractTest` 那条按整句 pin 的判据
+  换成 pin 引用形状（其 KDoc 与注释里复述的旧句同批换掉，否则被本批自己的口径判红）。
+- **不动**：hub 台账行数（U-13）、周视图版面（U-9）、
   盘点表 §3 六条「该保留的重复」。
 - **验收**：门禁仍是单测（detekt/ktlint 存量基线债 1500+，不作闸）；
   connected 只在 `emulator-5574` 走 `adb install -r` + `am instrument`，真机 `bf353dda` 仅手工试用复装。
