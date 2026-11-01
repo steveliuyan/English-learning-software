@@ -204,15 +204,26 @@ RED→GREEN 实测：改前该条红在「明天的词单…」现值 1（expect
   `BackupEntryUnificationTest` + `LearningRecordsScreenTest` + `LicensesScreenTest` **OK (15 tests)**，
   相邻的 `InlineNoticeTest` + `ProfileScreenTest` + `SettingsLicensesEntryTest` **OK (12 tests)**；
   真机 `bf353dda` 仅 `install -r`（Success，`lastUpdateTime` 见报告）。
-- **同一趟盘点里发现、本批未动的一条**：`ui/ReadingFeedScreen.kt` 的来源说明那句写给用户看的是
+- **同一趟盘点里发现的一条（当时登记未动，2026-11-01 用户拍板「现在修」后已落地）**：
+  `ui/ReadingFeedScreen.kt` 的来源说明那句写给用户看的是
   「App 内的来源台账见「我的 · 开源许可与来源」」，而那一页在 U-5/U-12 已逐字改名「开源许可与隐私说明」
   （`AboutScreen.kt` 的入口名与 `LicensesScreen.kt` 的页头同句），即**屏上那句指着一个不存在的入口名**。
-  重算：`grep -rn "开源许可与来源" app/src/main app/src/test`——除 `ReadingFeedScreen.kt` 那枚活文案外，
+  改前实测：`grep -rn "开源许可与来源" app/src/main app/src/test`——除 `ReadingFeedScreen.kt` 那枚活文案外，
   另有同文件两行注释也把旧页名当「既有页」在描述、`AboutScreen.kt` 与其契约测试的 KDoc 各写着
   「『开源许可与来源』改名『开源许可与隐私说明』」这条 rename 记录（那两处是历史说明，合法）。
-  它属 U-5 那一族（同一页对外只留一个名字）的漏网实例，
-  但落点在本批没碰过的阅读流屏，且改的是文案本体，**登记待用户拍板**再按 TDD 动
-  （`ReadingFeedScreenContractTest` 只钉节标题与容器形状，没钉那句副文案，改起来是一处生产 + 两处注释）。
+  它属 U-5 那一族（同一页对外只留一个名字）的漏网实例，但落点在本批没碰过的阅读流屏。
+
+  **修复口径（§8 的延伸，不是新决策）**：句子换成「App 内的来源台账见「我的 → 关于 → 开源许可与隐私说明」」
+  ——路径写到实际落地的那一跳（关于是中间层，U-12 裁定两跳保留），不再用省略中间层的「我的 · X」写法；
+  同文件两行注释同步改掉旧名（**含注释归零**口径：旧名留在注释里就是下一批的抄写模板，
+  rename 历史由决策文档承载，不在生产注释里复读）。判据放进 `ReadingFeedScreenContractTest` 两条：
+  ① 死页名在本屏整份源码（含注释）归零，且来源说明**恰一处**逐字引用「我的 → 关于 → 」+ 许可页现名——
+  现名不写死、从 `LicensesScreen` 页头现读现比，下次谁再改名这条会红着提醒两处以一致的方式改；
+  ② 反空转：许可页 `AppScreenHeader(` 恰一处（多枚时「取第一枚」会静默抽错）、抽名正则对合成页头形状
+  真取得出、合成 stale 句必被计到。**活名那条腿的 RED 被归零断言先红遮蔽**，实施时以「改生产为同义变体
+  （「我的 · 」写法）→ 该腿独红 → 还原」的变异复跑补上了咬合证据。
+  两处 KDoc（`ReadingFeedScreen.kt` 文件头、契约测试头）里的原型引用同步改述为「原型用旧名、本屏按现名」。
+  JVM 门禁 **307 类 / 2259 条 / 0 失败**（U-6 收口的 307/2257 + 本条新增 2）；connected 见工作报告。
 
 ## 影响
 
