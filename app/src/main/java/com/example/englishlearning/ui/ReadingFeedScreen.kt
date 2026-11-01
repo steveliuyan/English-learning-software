@@ -69,7 +69,9 @@ import java.time.ZoneId
  * ## 批 2 Task 21-A：补上原型「来源说明」那一节
  *
  * 原型 `sReadFeed`（`app.js:779-795`）在列表尾部还有 `section('来源说明', .card-quiet)`。本轮把它补上，
- * 但只写本仓读得到的那件事：来源名 + 「按其来源许可仅供学习使用」+ 指向既有的「开源许可与来源」页。
+ * 但只写本仓读得到的那件事：来源名 + 「按其来源许可仅供学习使用」+ 指向许可页。原型里那一句用的是许可页
+ * 旧名（改名经过见 `docs/decisions/2026-11-03-duplication-consolidation.md`），本屏按**现名**引用：
+ * 判据不写死页名，而是从 `LicensesScreen` 的页头现读现比，下次再改名会当场红。
  * 三处不搬：① 条目副案的 `section · length · words 词`（`FeedItem` 没有这三枚字段，改数据形状撞
  * 「数据层零改动」、按摘要长度糊字数就是编造）；② `.meta`「正文不含广告」（读不到来源页，无法证实）；
  * ③ 「VOA … 公共领域」写死（来源可配置，换来源即假话）。判据见 `ReadingFeedScreenContractTest`。
@@ -129,7 +131,8 @@ fun ReadingFeedScreen(
                         )
                     }
                     // 原型 `section('来源说明', .card-quiet)`（`app.js:792-794`）：只写本仓读得到的
-                    // 那一件事——来源名与它自己的许可口径，并把来源台账指向既有的「开源许可与来源」页。
+                    // 那一件事——来源名与它自己的许可口径，并把来源台账指向许可页（页名按 `LicensesScreen`
+                    // 页头的现名引用，判据见 `ReadingFeedScreenContractTest`）。
                     // 不写死 VOA / 「公共领域」（来源是可配置的），也不断言「正文不含广告」（读不到来源页）。
                     item {
                         Column(
@@ -145,7 +148,7 @@ fun ReadingFeedScreen(
                             ) {
                                 Text(
                                     text = "本屏文章来自 ${feed.sourceDisplayName}，" +
-                                        "按其来源许可仅供学习使用；App 内的来源台账见「我的 · 开源许可与来源」。",
+                                        "按其来源许可仅供学习使用；App 内的来源台账见「我的 → 关于 → 开源许可与隐私说明」。",
                                     style = AppType.Caption,
                                     color = colors.text3,
                                 )
