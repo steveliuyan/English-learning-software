@@ -623,10 +623,15 @@ class AppScreenTest {
         val fixture = speechFixture()
         composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
         createProfile()
-        openReminderSpeechPage()
-        composeRule.onNodeWithTag("reminder_speech_open_speech").performScrollTo()
+        // U-13（决策 2026-11-03 §9）：中转页退役，「语音朗读」行在 hub 上自带供应商真值。
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_open_speech").performScrollTo()
         composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
-        // 导航页与设置子页都不许出现引擎状态明细行与「待接入」厂商占位行（明细只在发音屏）。
+        composeRule.onNodeWithTag("profile_open_speech").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("speech_settings_screen").assertExists()
+        // hub 与设置子页都不许出现引擎状态明细行与「待接入」厂商占位行（明细只在发音屏）。
         composeRule.onNodeWithTag("settings_speech_openai").assertDoesNotExist()
         composeRule.onNodeWithTag("settings_speech_mimo").assertDoesNotExist()
         composeRule.onNodeWithTag("settings_speech_zipvoice").assertDoesNotExist()
@@ -688,10 +693,8 @@ class AppScreenTest {
         composeRule.onNodeWithText("可用").assertExists()
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
-        // 入口在「提醒与发音」导航页（2026-11-02 决策 §4：发音屏的上一次不再是设置子页），
-        // 返回键落到导航页，而不是整层退回 hub。
-        composeRule.onNodeWithTag("reminder_speech_screen").assertExists()
-        composeRule.onNodeWithTag("profile_screen").assertDoesNotExist()
+        // U-13（决策 2026-11-03 §9）：中转页退役，返回键从发音屏整层退回「我的」hub。
+        composeRule.onNodeWithTag("profile_screen").assertExists()
     }
 
     @Test
@@ -699,21 +702,18 @@ class AppScreenTest {
         val fixture = speechFixture()
         composeRule.setContent { readyAppScreen(fixture.speech, fixture.ai) }
         createProfile()
-        openReminderSpeechPage()
-        composeRule.onNodeWithTag("reminder_speech_open_speech").performScrollTo()
-        composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
-        // AI 服务行在 hub（导航页只有提醒 + 发音两行），所以这里回 hub 再点它。
-        systemBackToTheHub()
+        // 建完档落在学习 tab；AI 服务行在「我的」hub，先切过去再点（U-13 后中转页退役，无需回退中转层）。
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_open_ai_profiles").performScrollTo().performClick()
         composeRule.onNodeWithTag("ai_profiles_screen").assertExists()
         fixture.keys.clear()
         pressSystemBack()
         composeRule.onNodeWithTag("profile_screen").assertExists()
-        // 一级页与导航页都不再有引擎状态明细行；刷新语义下沉到发音屏——AI 服务页改完 Key
+        // hub 与设置子页都不再有引擎状态明细行；刷新语义下沉到发音屏——AI 服务页改完 Key
         // 返回后再进发音设置，状态必须是新鲜的。
         composeRule.onNodeWithTag("settings_speech_openai").assertDoesNotExist()
-        openReminderSpeechPage()
-        composeRule.onNodeWithTag("reminder_speech_open_speech").performScrollTo().performClick()
+        openSpeechSettingsPage()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
         // 引擎行详情是「配置名 · 密钥状态」格式；Key 被删后必须立刻反映。
         composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
@@ -738,10 +738,10 @@ class AppScreenTest {
         composeRule.onNodeWithTag("speech_engine_status_mimo", useUnmergedTree = true).assertTextEquals("测试语音 · 缺少密钥")
         composeRule.onNodeWithTag("speech_bound_profile_mimo", useUnmergedTree = true).assertExists()
         pressSystemBack()
-        // 后声明先赢：返回键只关发音屏，落回「提醒与发音」导航页，不许整层退回 hub。
-        composeRule.onNodeWithTag("reminder_speech_screen").assertExists()
-        composeRule.onNodeWithTag("profile_screen").assertDoesNotExist()
-        composeRule.onNodeWithTag("reminder_speech_open_speech").performScrollTo()
+        // U-13（决策 2026-11-03 §9）：中转页退役，返回键从发音屏整层退回 hub；
+        // 「语音朗读」行在 hub 上直接报当前供应商（真值随行搬进台账装配点）。
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("profile_open_speech").performScrollTo()
         composeRule.onNodeWithText("当前供应商：小米 MiMo").assertExists()
     }
 
@@ -2636,34 +2636,14 @@ class AppScreenTest {
 
     private fun todayPlanViewModel(): TodayPlanViewModel = TodayPlanViewModel({ TodayPlanResult.MissingLearningSetup }, FakeLearningProfileRepository())
 
-    /**
-     * 驱动到「提醒与发音」导航页（决策 §4 新增的那一层）：「我的」栏 → hub 的「提醒与发音」行 → 导航页在场。
-     *
-     * 这一层 2026-11-02 才有：之前发音行直接住在设置页里，本类那批语音用例点 `settings_open_speech`
-     * 一站就到。现在多一站，驱动集中在这里，六条用例不必各抄一遍导航。
-     */
-    private fun openReminderSpeechPage() {
+    /** 一站直达发音屏（U-13 起「语音朗读」行就住在 hub 上，决策 2026-11-03 §9）。 */
+    private fun openSpeechSettingsPage() {
         composeRule.onNodeWithTag("app_tab_profile").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_screen").assertExists()
-        composeRule.onNodeWithTag("profile_open_reminder_speech").performScrollTo().performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("reminder_speech_screen").assertExists()
-    }
-
-    /** 再下一层：导航页的「语音朗读」行 → 发音屏（引擎状态与语速接线都在这一屏验）。 */
-    private fun openSpeechSettingsPage() {
-        openReminderSpeechPage()
-        composeRule.onNodeWithTag("reminder_speech_open_speech").performScrollTo().performClick()
+        composeRule.onNodeWithTag("profile_open_speech").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("speech_settings_screen").assertExists()
-    }
-
-    /** 从导航页按真实系统返回回 hub：后声明先赢，那枚 `BackHandler` 只该关导航页这一层。 */
-    private fun systemBackToTheHub() {
-        pressSystemBack()
-        composeRule.onNodeWithTag("profile_screen").assertExists()
-        composeRule.onNodeWithTag("reminder_speech_screen").assertDoesNotExist()
     }
 
     @Test

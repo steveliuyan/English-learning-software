@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -13,7 +14,8 @@ import kotlin.test.assertTrue
  * 同一句「每天最多一次，系统可能稍有延迟」在提醒屏出现三处
  * ——`ReminderSettingsScreen.kt` 的 `viewModel == null` 降级分支页头副标题、正常分支页头副标题、
  * 卡内 `reminder_inexact_notice`，
- * 导航页 `ReminderSpeechScreen.kt` 的副标题又复读第四遍（「…（非精确、每天最多一次）」）。
+ * 导航层（U-13 前是中转页 `ReminderSpeechScreen.kt` 的副标题，决策 §9 拆解后是 hub「学习提醒」行）
+ * 又复读第四遍（「…（非精确、每天最多一次）」）。
  * 四处互相独立，改一处就剩下三处旧话；AGENTS.md 的口径是「非精确提醒允许延迟**并在设置中说明**」，
  * 要的是说明存在，不是说明出现四次。权威那一处留在卡内（紧挨开关本身，用户正是在决定要不要开它时读到）。
  *
@@ -29,7 +31,10 @@ import kotlin.test.assertTrue
 class ReminderRuleOnceContractTest {
 
     private val reminder: String by lazy { uiScreenSource("ReminderSettingsScreen.kt") }
-    private val hub: String by lazy { uiScreenSource("ReminderSpeechScreen.kt") }
+
+    // U-13（决策 §9）：「提醒与发音」中转页退役，「学习提醒」行搬进 hub 台账——
+    // 「导航层不复读调度上限」的判据跟着落点走，现读 `ProfileScreen.kt`（剥注释，同本文件其余口径）。
+    private val hub: String by lazy { File("src/main/java/com/example/englishlearning/ui/ProfileScreen.kt").readText().let(::stripComments) }
 
     @Test
     fun the_inexact_rule_is_stated_once_on_the_reminder_screen() {

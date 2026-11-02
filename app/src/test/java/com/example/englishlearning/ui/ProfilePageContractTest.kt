@@ -61,12 +61,12 @@ class ProfilePageContractTest {
 
     /**
      * hub 台账是**唯一真值**（沿用「台账不是第二套真值」的纪律）：
-     * 三组 13 行的标题/图标/域色/testTag 只写在 [ProfileGroups] 一处，渲染侧按 tag 取。
+     * 三组 14 行的标题/图标/域色/testTag 只写在 [ProfileGroups] 一处，渲染侧按 tag 取。
      */
     @Test
     fun `the hub renders every ledger row through one assembly point`() {
         val rows = ProfileGroups.all.flatMap { it.rows }
-        assertEquals(13, rows.size, "台账必须恰 13 行（决策 §2：3 + 5 + 5）")
+        assertEquals(14, rows.size, "台账必须恰 14 行（决策 §9：3 + 6 + 5）")
         rows.forEach { row ->
             assertEquals(
                 1,
@@ -120,7 +120,7 @@ class ProfilePageContractTest {
         assertEquals(0, countMatches(profile, Regex("""Color\(0x""")), "我的页不得出现裸 hex")
     }
 
-    /** 三组行必须**逐行接线**：13 个 tag 各有一次 `onClick`，一组行只接一半就是点不动的死行。 */
+    /** 三组行必须**逐行接线**：14 个 tag 各有一次 `onClick`，一组行只接一半就是点不动的死行。 */
     @Test
     fun `every hub row is wired in the host`() {
         val profileStation = host.substringAfter("AppTab.PROFILE -> ProfileScreen(")
@@ -133,7 +133,8 @@ class ProfilePageContractTest {
             "onOpenWorksheet = {",
             "onOpenWordBookTransfer = { showWordBookTransfer = true }",
             "onOpenAiProfiles = openAiProfilesOrSettings",
-            "onOpenReminderSpeech = { showReminderSpeech = true }",
+            "onOpenReminderSettings = {",
+            "onOpenSpeechSettings = {",
             "onOpenSettings = { showSettings = true }",
             "onOpenBackupHub = { showBackupHub = true }",
             "onOpenAbout = { showAbout = true }",
@@ -167,7 +168,7 @@ class ProfilePageContractTest {
      */
     @Test
     fun `each subpage flag is mounted exactly once and with a real body`() {
-        listOf("showReminderSpeech", "showWordBookTransfer", "showSettings").forEach { flag ->
+        listOf("showWordBookTransfer", "showSettings").forEach { flag ->
             assertEquals(
                 1,
                 countMatches(host, Regex("""else if \($flag\) \{""")),

@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.language.domain.PronunciationEngine
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
@@ -454,4 +455,44 @@ private fun EngineRow(
             )
         }
     }
+}
+
+/**
+ * 发音引擎的配置状态摘要（原住 `SettingsScreen.kt`，2026-11-02 随发音行搬出；U-13 起住在这里）。
+ *
+ * U-13（决策 2026-11-03 §9）把「发音行副标题真值」的导航层消费者换成 hub「语音朗读」行，
+ * 这份派生随搬家幸存到真值消费者之一的本屏——另一名消费者是 `AppScreen.kt` 装配点的
+ * `speechEngineSubtitle`。同包移动，调用点无需改 import。
+ */
+data class SpeechEngineStatuses(
+    val miMo: String = "未配置",
+    val openAi: String = "未配置",
+    val zipVoice: String = "未下载",
+    val currentProvider: String = "系统 TTS",
+)
+
+fun SpeechSettingsUiState.engineStatuses(): SpeechEngineStatuses {
+    // 状态按协议匹配的候选派生：OpenAI 槽位只认 OPENAI_COMPATIBLE，MiMo 槽位只认
+    // XIAOMI_MIMO。把通用 Profile 算进 MiMo、或把 MiMo 预设算进 OpenAI，都会把
+    // 「根本发不出正确请求的绑定」误报成已配置。
+    fun status(profileId: String?, kind: AiProviderKind): String {
+        val kindCandidates = candidates.filter { it.providerKind == kind }
+        return when {
+            profileId == null && kindCandidates.any { it.status == SpeechProfileStatus.Available } -> "可选配置 · 未绑定"
+            profileId == null -> "未配置"
+            kindCandidates.firstOrNull { it.profileId == profileId }?.status == SpeechProfileStatus.Available -> "已配置"
+            kindCandidates.any { it.profileId == profileId } -> "缺少密钥"
+            else -> "绑定失效"
+        }
+    }
+    val openAiStatus = status(openAiProfileId, AiProviderKind.OPENAI_COMPATIBLE)
+    val miMoStatus = status(miMoProfileId, AiProviderKind.XIAOMI_MIMO)
+    return SpeechEngineStatuses(
+        openAi = openAiStatus,
+        miMo = if (selectedEngine == PronunciationEngine.MiMo) "当前供应商 · $miMoStatus" else miMoStatus,
+        currentProvider = when (selectedEngine) {
+            PronunciationEngine.SystemTts -> "系统 TTS"
+            PronunciationEngine.MiMo -> "小米 MiMo"
+        },
+    )
 }

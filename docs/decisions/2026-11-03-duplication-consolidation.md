@@ -143,9 +143,7 @@ RED→GREEN 实测：改前该条红在「明天的词单…」现值 1（expect
 
 ### 7. U-13（提醒与发音中转页）与 U-14（文档措辞）
 
-- **U-13 不做**：拆它 = hub 台账 13→14（`ProfileHubLedgerTest` 恰 13 行要同步）+ connected
-  `ReminderSpeechScreenTest` 4 条整条改测。这是结构重排，与本批「文案与组件收口」不是同一种改动，
-  混在一批会让 §1 的安全面收口被版面争议拖住。等用户在盘点表上单独拍板。
+- **U-13 收口批不动**（原裁定：结构重排不与文案收口混批），**2026-11-02 用户拍板拆解落地，口径见 §9**。
 - **U-14 做**：纯文档澄清，同本报告一起落——批 5 落的是**页头齿轮**，「暂不加」指**卡内额外入口**，
   两篇文档补限定语，防止下一任把「文档说不加、代码有齿轮」读成漂移而"修掉"一个设计。
 
@@ -276,3 +274,72 @@ RED→GREEN 实测：改前该条红在「明天的词单…」现值 1（expect
   （`.git/qa-scratch/connected-overlay-fontscale2.log`），证伪"本批改坏了它"。
   本批改到的 5 个 connected 类在按名字定位的改名腿上全过
   （AppScreenTest 64 / MyWordsScreenTest 17 / ProfileScreenTest 6 / SettingsLicensesEntryTest 3 / SettingsScreenTest 5）。
+
+## 9. U-13 落地：拆「提醒与发音」纯中转页，hub 直达两子屏（用户 2026-11-02 拍板）
+
+改前的导航形状（**改前**实测，重算：`grep -n "ReminderSpeech\|reminder_speech" app/src/main`）：
+hub 一行「提醒与发音」（`ProfileScreen.kt:97`，tag `profile_open_reminder_speech`）→
+`ReminderSpeechScreen.kt`（页头 + 两枚 `EntryRow`，本层不读仓库、不写状态）→
+`ReminderSettingsScreen` / `SpeechSettingsScreen`。用户到提醒设置要点两跳、到发音设置要点两跳，
+中转层唯一承重的信息是发音行副标题那句「当前供应商：X」。
+
+决定：
+
+- **hub 拆一行成两行直达**：「提醒与发音」行退役。「学习提醒」（tag `profile_open_reminder`，
+  副标题「只在当天没完成计划时提醒 · 默认关闭」，副标题真值与 U-7 同源）进**学习组**——
+  提醒本来就是学习安排的一部分；「语音朗读」（tag `profile_open_speech`，副标题「当前供应商：X」，
+  吃 `speechState.engineStatuses().currentProvider`）进**应用组**挨着「AI 服务」——
+  发音走 MiMo 时依赖那里配的密钥，两行是近邻。台账 **13 → 14 行**，组行数 3/5/5 → 3/6/5。
+  两行副标题沿用中转页上已校过的句子（U-7 裁定过「导航页那行只说何时提醒 + 默认关闭」，
+  拆解后这两句话各自落到 hub 行上，规则仍只讲一遍）。
+- **`SpeechEngineStatuses` + `engineStatuses()` 搬家**：它们不是中转页的私产——
+  发音屏摘要（`SpeechSettingsScreen.kt:134`）与 hub「语音朗读」行副标题都要吃这一份真值。
+  从 `ReminderSpeechScreen.kt` 搬到 `SpeechSettingsScreen.kt`（既有消费点，同包移动零 import 改动），
+  KDoc 的「原住 SettingsScreen」沿革补一句去向。
+- **中转页整页退役**：`ReminderSpeechScreen.kt` 删除；`AppScreen.kt` 的 `showReminderSpeech` 状态、
+  BackHandler、挂载分支与 `ProfileScreen` 的 `onOpenReminderSpeech` 接线拆除，
+  两枚 hub 行直连 `showReminderSettings` / `showSpeechSettings`（VM 缺席兜底口径照抄 AI 配置那枚）。
+- **判据（同批改的闸 + 新增闸）**：
+  - `ProfileHubLedgerTest`：13 行清单改 14 行（行名、tag、组行数 3/6/5 全部逐字同步）；
+  - `ProfilePageContractTest`：`onOpenReminderSpeech` 接线行换成两枚新行的直连接线；
+  - `ReminderRuleOnceContractTest`：`hub` 腿现读的文件从 `ReminderSpeechScreen.kt` 换成
+    `ProfileScreen.kt`——「导航页不复读调度上限」的判据**语义不变**（现在钉的是 hub 行副标题），
+    「两条屏侧事实必须留着」同理；
+  - 新增 `ReminderSpeechTransitRemovedTest`：`ReminderSpeechScreen.kt` 文件不存在、
+    `reminder_speech` 家族 tag（`reminder_speech_screen` / `reminder_speech_open_*`）与
+    `onOpenReminderSpeech` / `showReminderSpeech` 在 main 全树归零、
+    「提醒与发音」这个页名在 main 剥注释后归零（设置页那句「都在「我的」里」的说明句同批换名）；
+  - connected：`ReminderSpeechScreenTest`（4 条）删除，**它的承重不丢**——
+    ① 两行各归各的子屏（少接一环 = 死行）由 `ProfileScreenTest` 两条新用例从 hub 直达两子屏承重；
+    ② 发音行副标题报真实当前供应商 → 挪进 `SpeechSettingsScreenTest`（真值源同屏）；
+    ③ 「待接入」厂商名不回潮 → 与 ② 同文件承重。大字号档（`fontScale = 2f`）那一条随中转页退役，
+    hub 行的字号护栏由 `AppScreenOverlayContainerTest` 家族的既有双字号档覆盖；
+  - `AppScreenTest` 里 7 处经中转页的跳转链（`profile_open_reminder_speech` → `reminder_speech_open_*`）
+    全部改直跳。
+- **口径申明**：这不是「删功能」——两屏本体、两套 ViewModel、权限时序一字未动；
+  退役的只是那层既不读仓库也不写状态的纯导航壳。盘点表 §3 的保留清单不受影响。
+
+#### U-13 实施记录（2026-11-02）
+
+- **RED 实况**：先写判据先跑——新闸 `ReminderSpeechTransitRemovedTest` 4 条里 3 红
+  （文件在场 / 页名散在 / 真值派生还住中转页），反空转夹具本就绿；
+  台账 13→14、宿主接线、hub 腿改址三条旧闸各自红在预期行。反空转夹具第一版把
+  `onOpenReminderSpeech` 期望写 1（旧形状里参数定义 + lambda 引用天然 2 处），
+  改判据的错判据同批修掉，不放宽。
+- **判据搬家**：`ProfileHubLedgerTest` 的「两行导航页」整条删除（它的存在前提没了），
+  「宿主四处站点」收窄到词书内容包一枚；`ReminderRuleOnceContractTest` 的 hub 腿
+  从 `uiScreenSource("ReminderSpeechScreen.kt")` 改成现读 `ProfileScreen.kt` 剥注释——
+  「导航层不复读调度上限」语义不变。
+- **connected 侧同批改**：`ReminderSpeechScreenTest` 4 条整删，承重按 §9 分配落地
+  （`ProfileScreenTest` 行清单改两枚新 tag 直达；供应商真值两条归 `AppScreenTest`）；
+  `AppScreenTest` 删中转页驱动 `openReminderSpeechPage` 及零调用的 `systemBackToTheHub`。
+- **GREEN 期自查出的两处测试侧错改**（隔离复跑定位，均非生产缺陷）：
+  ① 删驱动时残留一环——某用例在建档后（学习 tab）直接点 hub 行，少了切 tab 一步，
+     且更早一版误留了「无覆盖层时按系统返回」的调用（直接把 Activity 退了）；
+  ② 旧版「回 hub 再点」的用例里那枚回退动作在 U-13 后无覆盖层可退，同因失活。
+  两条均在 `emulator-5554` 隔离复跑 OK 后并入全量复跑。
+- **门禁现值（本批终局树，`.git/qa-scratch/final-jvm-gate-2026-11-02-u13.log`）**：
+  `assembleDebug` + `testDebugUnitTest` + `compileDebugAndroidTestKotlin` BUILD SUCCESSFUL，
+  **308 类 / 2262 条 / 0 失败 0 跳过**（收口基线 307/2259：+1 新闸类 4 条，删旧中转页闸 1 条）。
+  connected 四类 `ProfileScreenTest` + `AppScreenTest` + `SettingsScreenTest` + `SettingsLicensesEntryTest`
+  **OK (78 tests)**；真机 `bf353dda` `install -r` Success（`lastUpdateTime` 见报告）。

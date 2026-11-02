@@ -88,7 +88,7 @@ fun SettingsScreen(
         SectionHeading(text = "外观", modifier = Modifier.testTag("settings_group_appearance"))
         ThemeModeRow(mode = themeMode, onSelect = { AppThemePreferences.write(context, it) })
         InlineNotice(
-            text = "这一页只放全局开关。提醒与发音、计划、词书、备份与许可都在「我的」里，不在这里重复出现。",
+            text = "这一页只放全局开关。学习提醒、语音朗读、计划、词书、备份与许可都在「我的」里，不在这里重复出现。",
             kind = InlineNoticeKind.Info,
         )
     }

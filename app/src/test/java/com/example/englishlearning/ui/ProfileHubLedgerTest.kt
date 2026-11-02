@@ -67,13 +67,13 @@ class ProfileHubLedgerTest {
     }
 
     /**
-     * hub 台账（决策 §2）：**恰 3 组、恰 13 行**，行标题、tag、组标题逐字钉死。
+     * hub 台账（决策 §2 + §9）：**恰 3 组、恰 14 行**，行标题、tag、组标题逐字钉死。
      *
-     * 13 = 我的词汇 3（参考原样）+ 学习 5（参考 3 + 本应用已有的默写纸 / 词书内容包）
-     * + 应用 5（参考原样）。批计划里写的「15 行」是拍板前的粗估，以决策 §2 的逐条清单为准。
+     * 14 = 我的词汇 3（参考原样）+ 学习 6（原 5 + U-13 拆出的「学习提醒」）
+     * + 应用 5（原 5，「提醒与发音」拆出后「语音朗读」留在本组挨着「AI 服务」）。
      */
     @Test
-    fun `profile hub ledger is exactly three groups and thirteen rows`() {
+    fun `profile hub ledger is exactly three groups and fourteen rows`() {
         assertEquals(3, ProfileGroups.all.size, "我的页必须恰 3 组，实为 ${ProfileGroups.all.size} 组")
         assertEquals(
             listOf("我的词汇", "学习", "应用"),
@@ -81,34 +81,34 @@ class ProfileHubLedgerTest {
             "三个分组标题按参考 `sMeHome` 钉死",
         )
         assertEquals(
-            listOf(3, 5, 5),
+            listOf(3, 6, 5),
             ProfileGroups.all.map { it.rows.size },
-            "组内行数按决策 §2 钉死：我的词汇 3 / 学习 5 / 应用 5",
+            "组内行数按决策 §9 钉死：我的词汇 3 / 学习 6 / 应用 5",
         )
         val rows = ProfileGroups.all.flatMap { it.rows }
-        assertEquals(13, rows.size, "一级行必须恰 13 条，实为 ${rows.size} 条")
+        assertEquals(14, rows.size, "一级行必须恰 14 条，实为 ${rows.size} 条")
         assertEquals(
             listOf(
                 // U-8（决策 2026-11-03 §5）：词汇三行改取词库分段短名；U-12 同批把末行改「关于」。
                 // 行名的**跨屏对齐**由 `WordListEntryNamesFollowBankSegmentsTest` / `AboutRowNameIsJustAboutTest`
                 // 从各自权威源推导，这里只钉台账本体——两套口径别混。
                 "收藏", "生词", "错词",
-                "学习记录", "学习计划", "词书", "生成默写纸", "词书内容包",
-                "AI 服务", "提醒与发音", "设置", "数据与备份", "关于",
+                "学习记录", "学习计划", "词书", "学习提醒", "生成默写纸", "词书内容包",
+                "AI 服务", "语音朗读", "设置", "数据与备份", "关于",
             ),
             rows.map { it.title },
-            "十三行标题按参考与决策 §2 钉死（U-8 / U-12 之后取分段短名与「关于」）",
+            "十四行标题按参考与决策 §9 钉死（U-8 / U-12 / U-13 之后：分段短名、「关于」、中转页拆两行）",
         )
         assertEquals(
             listOf(
                 "profile_open_favorite_words", "profile_open_new_words", "profile_open_wrong_words",
                 "profile_open_learning_records", "profile_open_plan", "profile_open_word_book",
-                "profile_open_worksheet", "profile_open_word_book_transfer",
-                "profile_open_ai_profiles", "profile_open_reminder_speech", "profile_open_settings",
+                "profile_open_reminder", "profile_open_worksheet", "profile_open_word_book_transfer",
+                "profile_open_ai_profiles", "profile_open_speech", "profile_open_settings",
                 "profile_open_backup", "profile_open_about",
             ),
             rows.map { it.tag },
-            "十三枚行 tag 是 connected 判据的身份证，逐字钉死",
+            "十四枚行 tag 是 connected 判据的身份证，逐字钉死",
         )
         val tags = rows.map { it.tag } + ProfileGroups.all.map { it.tag }
         assertEquals(tags.size, tags.toSet().size, "组与行的 testTag 不得重复：$tags")
@@ -141,39 +141,8 @@ class ProfileHubLedgerTest {
             "设置是子页：必须由页头返回位回到「我的」",
         )
         assertTrue(
-            src.contains("这一页只放全局开关。提醒与发音、计划、词书、备份与许可都在「我的」里，不在这里重复出现。"),
-            "设置子页必须逐字带上参考的说明（`sMeSettings` 页末 notice）——它现在是真话，不是免责声明",
-        )
-    }
-
-    /**
-     * 「提醒与发音」是一张二级导航页（决策 §4）：两行分别进既有的学习提醒页与语音朗读页，
-     * 不重写两屏本体。
-     */
-    @Test
-    fun `reminder and speech hub is a two row navigation page`() {
-        val src = stripComments(uiScreenSource("ReminderSpeechScreen.kt"))
-        assertEquals(
-            1,
-            countMatches(src, Regex("""(^|[^A-Za-z0-9_])AppScreenHeader\(""")),
-            "提醒与发音页必须复用共享页头（返回位只此一处）",
-        )
-        listOf("reminder_speech_open_reminder", "reminder_speech_open_speech").forEach { tag ->
-            assertEquals(
-                1,
-                countMatches(src, Regex(Regex.escape("\"$tag\""))),
-                "$tag 必须恰一处（connected 按它定位两行）",
-            )
-        }
-        assertTrue("onOpenReminderSettings" in src && "onOpenSpeechSettings" in src, "两行必须各自接出回调")
-        assertTrue(
-            countMatches(src, Regex("""\bEntryRow\(""")) == 2,
-            "两行都必须走共享 EntryRow（自搓行会撞组件份数棘轮）",
-        )
-        assertEquals(
-            0,
-            countMatches(src, Regex("""Mint[A-Z]\w*""")),
-            "新屏不得读 Mint* 静态 token",
+            src.contains("这一页只放全局开关。学习提醒、语音朗读、计划、词书、备份与许可都在「我的」里，不在这里重复出现。"),
+            "设置子页必须带上参考的说明（`sMeSettings` 页末 notice，U-13 后行名随 hub 台账同步）——它现在是真话，不是免责声明",
         )
     }
 
@@ -234,18 +203,13 @@ class ProfileHubLedgerTest {
         )
     }
 
-    /** 两枚新子页与设置子页在宿主里各有状态 / 覆盖判定 / 返回 / 挂载四处站点。 */
+    /** 词书内容包子页与设置子页在宿主里各有状态 / 覆盖判定 / 返回 / 挂载四处站点（U-13 后中转页不再有）。 */
     @Test
-    fun `host wires the two new subpages through every station`() {
+    fun `host wires the remaining subpages through every station`() {
         val host = stripComments(uiScreenSource("AppScreen.kt"))
         val overlay = host.substringAfter("val overlayOpen =").substringBefore("BackHandler(")
-        assertTrue(overlay.contains("showReminderSpeech"), "overlayOpen 链必须挂上 showReminderSpeech")
         assertTrue(overlay.contains("showWordBookTransfer"), "overlayOpen 链必须挂上 showWordBookTransfer")
         listOf(
-            """var showReminderSpeech by rememberSaveable""" to "提醒与发音状态位",
-            """BackHandler\(enabled = showReminderSpeech\) \{ showReminderSpeech = false \}""" to "提醒与发音 BackHandler",
-            """\} else if \(showReminderSpeech\) \{""" to "提醒与发音挂载分支",
-            """onOpenReminderSpeech = \{ showReminderSpeech = true \}""" to "我的 hub 入口接线",
             """var showWordBookTransfer by rememberSaveable""" to "词书内容包状态位",
             """BackHandler\(enabled = showWordBookTransfer\) \{ showWordBookTransfer = false \}""" to "词书内容包 BackHandler",
             """\} else if \(showWordBookTransfer\) \{""" to "词书内容包挂载分支",

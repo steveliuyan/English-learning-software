@@ -43,9 +43,9 @@ import org.junit.runner.RunWith
 /**
  * 「设置」**子页** connected 回归（决策 §3，2026-11-02）。
  *
- * 这一屏从「4 组 9 行的设置根页」缩成「外观一段 + 一句范围说明」：原九行分发到「我的」hub 的 13 行
- * （行为判据在 `ProfileScreenTest` / `ProfileHubLedgerTest`），发音与提醒两行先经
- * 「我的 → 提醒与发音」导航页（`ReminderSpeechScreenTest`），词书内容包整条 SAF 通路搬进
+ * 这一屏从「4 组 9 行的设置根页」缩成「外观一段 + 一句范围说明」：原九行分发到「我的」hub 的 14 行
+ * （行为判据在 `ProfileScreenTest` / `ProfileHubLedgerTest`；U-13 后提醒与发音两行直连各自子屏），
+ * 词书内容包整条 SAF 通路搬进
  * 独立子页（可达性与禁用态由 `AppScreenOverlayContainerTest` 的路 B 腿在宿主层承重）。
  * 本文件因此只管三件事：
  *
@@ -111,7 +111,7 @@ class SettingsScreenTest {
                 .assertIsDisplayed()
                 .assertHasClickAction()
         }
-        // 页末说明按参考逐字：这一句现在是真话（提醒与发音、计划、词书、备份与许可都在「我的」里）。
+        // 页末说明按参考逐字（U-13 后行名随 hub 台账同步）：这一句现在是真话（学习提醒、语音朗读、计划、词书、备份与许可都在「我的」里）。
         composeRule.onNodeWithText(SCOPE_NOTICE).performScrollTo().assertIsDisplayed()
 
         // 页头返回位：`AppScreenHeader` 的固定 `contentDescription = "返回"`（全站同一枚，无专属 tag）。
@@ -157,10 +157,10 @@ class SettingsScreenTest {
         ).forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
-        listOf("提醒与发音", "词书内容包", "关于", "数据与备份", "学习计划").forEach { title ->
+        listOf("学习提醒", "语音朗读", "词书内容包", "关于", "数据与备份", "学习计划").forEach { title ->
             composeRule.onNodeWithText(title).assertDoesNotExist()
         }
-        // 发音摘要随发音行搬到「提醒与发音」导航页（`ReminderSpeechScreenTest` 承重），这里不该有它。
+        // 发音摘要的真值在 hub「语音朗读」行与发音屏（U-13），这里不该有它。
         composeRule.onNodeWithText("当前供应商：系统 TTS").assertDoesNotExist()
     }
 
@@ -273,7 +273,7 @@ private val ThemeMode.segmentLabelForTest: String
 
 /** 页末范围说明（参考 `sMeSettings` 的 notice，与 `SettingsPrototypeAlignmentContractTest` 同一逐字判据）。 */
 private const val SCOPE_NOTICE =
-    "这一页只放全局开关。提醒与发音、计划、词书、备份与许可都在「我的」里，不在这里重复出现。"
+    "这一页只放全局开关。学习提醒、语音朗读、计划、词书、备份与许可都在「我的」里，不在这里重复出现。"
 
 /**
  * 现盘可点节点数：页头返回位 1 + 主题三档 3 = 4。

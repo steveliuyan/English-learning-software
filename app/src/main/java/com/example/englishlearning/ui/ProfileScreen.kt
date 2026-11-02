@@ -91,10 +91,15 @@ object ProfileGroups {
     val LearningRecords = ProfileRow("学习记录", "profile_open_learning_records", AppIcon.Chart, AppDomain.Learn, "今日与按日的完成情况")
     val LearningPlan = ProfileRow("学习计划", "profile_open_plan", AppIcon.List, AppDomain.Learn, null, EntryIconTone.Gradient)
     val WordBook = ProfileRow("词书", "profile_open_word_book", AppIcon.Book, AppDomain.Library, null)
+    // U-13（决策 2026-11-03 §9）：「提醒与发音」中转页退役，两行直达各自子屏。提醒是学习安排的一部分，
+    // 「学习提醒」进学习组；副标题沿用 U-7 校过的说法（只说何时提醒 + 默认关闭，调度上限归提醒屏卡内那句）。
+    val Reminder = ProfileRow("学习提醒", "profile_open_reminder", AppIcon.Bell, AppDomain.Settings, "只在当天没完成计划时提醒 · 默认关闭")
     val Worksheet = ProfileRow("生成默写纸", "profile_open_worksheet", AppIcon.Document, AppDomain.Learn, "选中译英或英译中，预览后导出可打印 PDF")
     val WordBookTransfer = ProfileRow("词书内容包", "profile_open_word_book_transfer", AppIcon.Upload, AppDomain.Library, "导入 / 导出 .wbpack · 全离线")
     val AiProfiles = ProfileRow("AI 服务", "profile_open_ai_profiles", AppIcon.Spark, AppDomain.AiSpeech, "添加多套 OpenAI 兼容服务，管理 Endpoint、模型与密钥", EntryIconTone.Gradient)
-    val ReminderSpeech = ProfileRow("提醒与发音", "profile_open_reminder_speech", AppIcon.Bell, AppDomain.Settings, "提醒时间 · 系统 TTS 与 AI 发音")
+    // 「语音朗读」挨着「AI 服务」：发音走小米 MiMo 时依赖那里配的密钥，两行是近邻。
+    // 副标题「当前供应商：X」是读得到的真值，由装配点从 `speechEngineSubtitle` 现取（同「学习计划」的词书名）。
+    val Speech = ProfileRow("语音朗读", "profile_open_speech", AppIcon.Speaker, AppDomain.AiSpeech, null)
     val Settings = ProfileRow("设置", "profile_open_settings", AppIcon.Gear, AppDomain.Settings, "外观（跟随系统 / 浅色 / 深色）")
     val Backup = ProfileRow("数据与备份", "profile_open_backup", AppIcon.Shield, AppDomain.Settings, "导出本机文件、换机恢复与清空学习数据")
     // U-12（决策 2026-11-03 §5）：行名从旧的那枚「关于＋许可」并列名收窄成「关于」，与它打开的页同名。
@@ -105,8 +110,8 @@ object ProfileGroups {
 
     val all: List<ProfileGroup> = listOf(
         ProfileGroup("我的词汇", "profile_group_vocabulary", listOf(FavoriteWords, NewWords, WrongWords)),
-        ProfileGroup("学习", "profile_group_learning", listOf(LearningRecords, LearningPlan, WordBook, Worksheet, WordBookTransfer)),
-        ProfileGroup("应用", "profile_group_application", listOf(AiProfiles, ReminderSpeech, Settings, Backup, About)),
+        ProfileGroup("学习", "profile_group_learning", listOf(LearningRecords, LearningPlan, WordBook, Reminder, Worksheet, WordBookTransfer)),
+        ProfileGroup("应用", "profile_group_application", listOf(AiProfiles, Speech, Settings, Backup, About)),
     )
 }
 
@@ -142,12 +147,14 @@ fun ProfileScreen(
     onOpenWorksheet: () -> Unit,
     onOpenWordBookTransfer: () -> Unit,
     onOpenAiProfiles: () -> Unit,
-    onOpenReminderSpeech: () -> Unit,
+    onOpenReminderSettings: () -> Unit,
+    onOpenSpeechSettings: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenBackupHub: () -> Unit,
     onOpenAbout: () -> Unit,
     wordBookName: String? = null,
     aiProfileSubtitle: String? = null,
+    speechEngineSubtitle: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
@@ -190,10 +197,12 @@ fun ProfileScreen(
                         onOpenWorksheet = onOpenWorksheet,
                         onOpenWordBookTransfer = onOpenWordBookTransfer,
                         onOpenAiProfiles = onOpenAiProfiles,
-                        onOpenReminderSpeech = onOpenReminderSpeech,
+                        onOpenReminderSettings = onOpenReminderSettings,
+                        onOpenSpeechSettings = onOpenSpeechSettings,
                         onOpenSettings = onOpenSettings,
                         onOpenBackupHub = onOpenBackupHub,
                         onOpenAbout = onOpenAbout,
+                        speechEngineSubtitle = speechEngineSubtitle,
                     )
                 }
             }
@@ -215,13 +224,15 @@ private fun ProfileLedgerEntry(
     topDivider: Boolean,
     wordBookName: String?,
     aiProfileSubtitle: String?,
+    speechEngineSubtitle: String?,
     onOpenWordBankSection: (WordBankSection) -> Unit,
     onOpenLearningRecords: () -> Unit,
     onOpenPlan: () -> Unit,
     onOpenWorksheet: () -> Unit,
     onOpenWordBookTransfer: () -> Unit,
     onOpenAiProfiles: () -> Unit,
-    onOpenReminderSpeech: () -> Unit,
+    onOpenReminderSettings: () -> Unit,
+    onOpenSpeechSettings: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenBackupHub: () -> Unit,
     onOpenAbout: () -> Unit,
@@ -233,10 +244,11 @@ private fun ProfileLedgerEntry(
         ProfileGroups.LearningRecords -> onOpenLearningRecords
         ProfileGroups.LearningPlan -> onOpenPlan
         ProfileGroups.WordBook -> { -> onOpenWordBankSection(WordBankSection.Book) }
+        ProfileGroups.Reminder -> onOpenReminderSettings
         ProfileGroups.Worksheet -> onOpenWorksheet
         ProfileGroups.WordBookTransfer -> onOpenWordBookTransfer
         ProfileGroups.AiProfiles -> onOpenAiProfiles
-        ProfileGroups.ReminderSpeech -> onOpenReminderSpeech
+        ProfileGroups.Speech -> onOpenSpeechSettings
         ProfileGroups.Settings -> onOpenSettings
         ProfileGroups.Backup -> onOpenBackupHub
         ProfileGroups.About -> onOpenAbout
@@ -246,6 +258,9 @@ private fun ProfileLedgerEntry(
         ProfileGroups.LearningPlan -> wordBookName?.let { "$it · 换词书与每日目标" } ?: "尚未选择词书 · 去选一本"
         ProfileGroups.WordBook -> wordBookName?.let { "$it · 学习中" } ?: "尚未选择词书"
         ProfileGroups.AiProfiles -> aiProfileSubtitle ?: row.subtitle
+        // U-13：发音行的「当前供应商」是读得到的真值（同「学习计划」的词书名口径），
+        // 宿主没读到状态时退回台账那枚 null 行——不拿空串或写死的供应商名糊过去。
+        ProfileGroups.Speech -> speechEngineSubtitle
         else -> row.subtitle
     }
     EntryRow(

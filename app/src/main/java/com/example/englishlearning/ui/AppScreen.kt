@@ -190,9 +190,9 @@ fun AppScreen(
             // 2026-11-02：设置回到「我的」里的子页（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
             // 它不再是第五个一级 tab；齿轮、AI 配置兜底与「我的 → 设置」行都落到这一枚开关。
             var showSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            // 决策 §4：「提醒与发音」「词书内容包」各作一级子页（参考没有这两件，本应用已实现，不能砍）。
-            // 前者是两行导航页（下推到既有的提醒屏与发音屏），后者自带两枚 SAF launcher 与选册对话框。
-            var showReminderSpeech by rememberSaveable(state.profile.id) { mutableStateOf(false) }
+            // 决策 §4：「词书内容包」作一级子页（参考没有这件，本应用已实现，不能砍），
+            // 自带两枚 SAF launcher 与选册对话框。
+            // U-13（决策 2026-11-03 §9）：原「提醒与发音」中转子页退役，hub 两行直达既有提醒屏与发音屏。
             var showWordBookTransfer by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             var showCheckIn by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 批 1 Task 16：新建的「今日词单」二级层（原型 `learn-queue`）。路由照本文件的既有四件套——
@@ -556,7 +556,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || showTodayWordList || showReviewQueue || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showSettings || showReminderSpeech || showWordBookTransfer || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showSettings || showWordBookTransfer || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBank ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null
@@ -679,9 +679,7 @@ fun AppScreen(
             // 2026-11-02：设置是「我的」里的子页。本行必须声明在它的子屏（发音 / 提醒 / 备份 hub /
             // 关于 / AI 服务）**之前**——后声明者优先，子屏开着时返回键先关子屏，再回到设置首页。
             BackHandler(enabled = showSettings) { showSettings = false }
-            // 决策 §4 的两枚新子页。`showReminderSpeech` 必须声明在它下推的发音屏与提醒屏**之前**
-            // （后声明者优先）：从导航页点进任一子屏后，返回键先关子屏、回到导航页，而不是整层退掉。
-            BackHandler(enabled = showReminderSpeech) { showReminderSpeech = false }
+            // 词书内容包子页的开关（U-13 起「提醒与发音」不再有独立子层）。
             // 词书内容包的选册对话框住在子屏内部，宿主这枚开关只负责「返回键退整层」。
             BackHandler(enabled = showWordBookTransfer) { showWordBookTransfer = false }
             // 这一层内部还有「列表 / 编辑」两态，编辑态会自己再声明一条更靠后的 BackHandler，
@@ -1952,22 +1950,6 @@ fun AppScreen(
                         }
                     }
                 }
-            } else if (showReminderSpeech) {
-                // 决策 §4：「提醒与发音」是一张二级导航页，两行各自下推到既有的提醒屏与发音屏
-                // （那两屏的挂载分支声明在本条之前，先真先赢，所以子屏开着时本层自然让位）。
-                // ViewModel 缺席（预览/测试夹具）时不假装能直达：与 AI 配置兜底同一口径。
-                ReminderSpeechScreen(
-                    speechEngineStatuses = speechState.engineStatuses(),
-                    onOpenReminderSettings = {
-                        reminderSettingsViewModel?.load()
-                        showReminderSettings = reminderSettingsViewModel != null
-                    },
-                    onOpenSpeechSettings = {
-                        speechSettingsViewModel?.load()
-                        showSpeechSettings = speechSettingsViewModel != null
-                    },
-                    onBack = { showReminderSpeech = false },
-                )
             } else if (showWordBookTransfer) {
                 // 决策 §4：`.wbpack` 的导入/导出子页。两枚 SAF launcher 与选册对话框都住在子屏内部
                 // （owner 与消费屏同层，与 `BackupExportScreen` / `BackupRestoreScreen` 的分工一致），
@@ -2088,7 +2070,16 @@ fun AppScreen(
                                 onOpenWordBookTransfer = { showWordBookTransfer = true },
                                 // 参考 `sAiHome` 页头配置按钮的同一规则：配置页可用就直达，否则退回设置子页。
                                 onOpenAiProfiles = openAiProfilesOrSettings,
-                                onOpenReminderSpeech = { showReminderSpeech = true },
+                                // U-13（决策 2026-11-03 §9）：中转页退役，两行直连既有子屏。
+                                // VM 缺席（预览/测试夹具）时不假装能直达：与 AI 配置兜底同一口径。
+                                onOpenReminderSettings = {
+                                    reminderSettingsViewModel?.load()
+                                    showReminderSettings = reminderSettingsViewModel != null
+                                },
+                                onOpenSpeechSettings = {
+                                    speechSettingsViewModel?.load()
+                                    showSpeechSettings = speechSettingsViewModel != null
+                                },
                                 onOpenSettings = { showSettings = true },
                                 // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
                                 onOpenBackupHub = { showBackupHub = true },
@@ -2104,6 +2095,8 @@ fun AppScreen(
                                         "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
                                     }
                                 },
+                                // 「语音朗读」行的供应商真值（原住「提醒与发音」导航页，U-13 随行搬进 hub）。
+                                speechEngineSubtitle = "当前供应商：${speechState.engineStatuses().currentProvider}",
                             )
                         }
                     }
