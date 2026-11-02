@@ -118,8 +118,10 @@ class LearningRecordsScreenTest {
     }
 
     /**
-     * 原型对齐（`sMeRecords`，`assets/app.js:1304-1327`）：「本周」七格刻度 + 两枚真统计只在
+     * 原型对齐（`sMeRecords`，`assets/app.js:1304-1327`）：「本周」两枚真统计只在
      * 有 7 天详展数据时渲染；原型的「19 分 · 日均用时」本仓没有采集，整枚不画。
+     * 原型那组七格刻度按 U-9 退役（周视图归打卡屏一处，决策 2026-11-03 §10），
+     * 归零判据住 `LearningRecordsWeekContractTest`，这里不再钉它的存在。
      *
      * 周区块住「历史记录」页签（详展统计按既有契约惰性加载，首屏不预取），所以这里直接给
      * `selectedTab = HISTORY` + 一份 `historyStats` + 基准日，验证渲染侧真把三块画出来。

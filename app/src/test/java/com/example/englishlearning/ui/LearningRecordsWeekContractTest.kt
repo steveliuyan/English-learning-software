@@ -9,7 +9,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * 原型对齐（`sMeRecords`，`assets/app.js:1304-1327`）：「本周」七格刻度 + 三格统计 + 每日进度条。
+ * 原型对齐（`sMeRecords`，`assets/app.js:1304-1327`）：「本周」两枚统计 + 每日进度条。
+ * 原型那组七格刻度本仓曾照搬过，U-9 裁定退役（周视图归打卡屏一处，决策 2026-11-03 §10），
+ * 本文件因此同时钉「刻度不在本屏长回来」。
  *
  * 两半判据：
  *  ① **纯函数**（[learningWeek]）：周窗口固定周一到周日、单日状态 `完成 / 部分 / 空`、本周词数只加
@@ -126,7 +128,7 @@ class LearningRecordsWeekContractTest {
     }
 
     @Test
-    fun `the week strip and the two real stats are drawn, the mocked duration is not`() {
+    fun `the week heading and the two real stats are drawn, the mocked duration is not`() {
         assertTrue("\"本周\"" in source, "原型 section('本周') 的分组标题要在（SectionHeading 的 text 参数）")
         assertTrue("/ 7 天" in source, "分组标题右侧的「x / 7 天」必须由 doneDays 派生（原型 :1308 的第三参）")
         listOf("本周词数", "打卡天数").forEach { label ->
@@ -143,6 +145,28 @@ class LearningRecordsWeekContractTest {
         }
         assertEquals(1, countMatches(source, Regex("""\bLinearProgressIndicator\(""")), "每日记录行的进度条用 M3 `LinearProgressIndicator(`（恰 1 处，4dp 细条 = 原型 .meter-thin）")
         assertTrue("learning_records_day_meter_" in source, "每日行的进度条要有动态锚（按日期）")
+    }
+
+    /**
+     * U-9（决策 2026-11-03 §10，用户 2026-11-02 拍板）：「本周完成情况」画了两套——
+     * 打卡屏的 7 根柱（`check_in_week_chart`，有 `CheckInScreenTest` 钉着）与学习记录屏的
+     * 七格刻度（`WeekTicks`）。信息完全同义（哪几天完成了），fontScale 2.0 下两屏都可见，
+     * 留两份是冗余。裁定：**周视图归打卡屏一处**；学习记录屏删七格刻度，保留
+     * 「本周 · x / 7 天」标题与两格数值（「本周词数」「打卡天数」）——数值语义不因删刻度而丢。
+     */
+    @Test
+    fun `the week tick strip retires from the records screen, the week chart lives in check-in only`() {
+        assertEquals(
+            0,
+            countMatches(source, Regex("""\bWeekTicks\(""")),
+            "U-9：七格刻度（`WeekTicks(`）在学习记录屏归零——周视图归打卡屏一处（决策 §10）；" +
+                "刻度只贡献「哪几天完成了」，与打卡屏柱状图同义",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex("""WeekDayState\.(Done|Partial|None)""")),
+            "U-9：刻度退役后，单日状态枚举的取用也随行退场（屏内不应再有第二处消费）",
+        )
     }
 
     @Test

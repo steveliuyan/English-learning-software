@@ -346,3 +346,58 @@ hub 一行「提醒与发音」（`ProfileScreen.kt:97`，tag `profile_open_remi
   **308 类 / 2262 条 / 0 失败 0 跳过**（收口基线 307/2259：+1 新闸类 4 条，删旧中转页闸 1 条）。
   connected 四类 `ProfileScreenTest` + `AppScreenTest` + `SettingsScreenTest` + `SettingsLicensesEntryTest`
   **OK (78 tests)**；真机 `bf353dda` `install -r` Success（`lastUpdateTime` 见报告）。
+
+## 10. U-9 落地：周视图归打卡屏一处，学习记录屏留数值（用户 2026-11-02 拍板为下一项）
+
+**裁定**：照盘点表 U-9 的建议处置原样落地——
+- 学习记录屏「本周」区块：**删七格刻度**（`WeekTicks` 调用与整个私有 Composable），
+  **保留**分组标题「本周 · x / 7 天」与统计卡两格数值（「本周词数」「打卡天数」）——
+  「x / 7 天」里本来就含打卡天数，数值语义不因删刻度而丢。
+- 周视图归打卡屏一处：`check_in_week_chart`（7 根柱 + 内容描述）不与本批改动。
+
+**fontScale 2.0 取证（补盘点表 §5 的待核口径，模拟器 1080×1920 实测截图
+`.git/qa-scratch/u9-fs2-records-history.png`）**：2.0 大字下学习记录屏的
+七格刻度 + 「一/二/…/日」标签 + 统计卡仍同屏可见，**但**周刻度只贡献
+「哪几天完成了」这一层信息，与柱状图完全同义——删了不丢信息，留两份才是冗余。
+
+**判据闸（本批新增/改判）**：
+- 新闸（`LearningRecordsWeekContractTest` 内）：`WeekTicks(` 在 `LearningRecordsScreen.kt`
+  剥注释后 = 0；`"learning_records_week"` 与 `"learning_records_stats"` 锚保留；
+  「本周词数」「打卡天数」两标签恰 1 处（原闸不动，继续承重）。
+- 旧闸改判：`the week strip and the two real stats are drawn, the mocked duration is not`
+  改名与改判据——「strip」已退役，闸只钉两格数值与锚。
+- 反空转夹具：新闸写成先红后绿（RED 期 `WeekTicks(` 现 2 处：定义 + 调用）。
+
+**明确不做**：打卡屏不动（`check_in_week_chart` 有自己的 connected 闸
+`CheckInScreenTest`）；`WeekTick`/`WeekDayState` 类型与 `LearningRecordsWeek.kt`
+纯函数保留——打卡屏外的月历/派生仍在用 `ticks` 计数（`doneDays` 派生链未拆）。
+
+#### U-9 实施记录（2026-11-02）
+
+- **RED 实况**：新判据先跑即红（`.git/qa-scratch/u9-red.log` 第 49-52 行：
+  `LearningRecordsWeekContractTest > the week tick strip retires…` FAILED，9 条里 1 红）。
+  改前的现值可复算：`git show HEAD:app/src/main/java/com/example/englishlearning/ui/LearningRecordsScreen.kt`
+  里 `WeekTicks(` 恰 **2** 处（定义 + 调用）、`WeekDayState.` **3** 处（Done/Partial/None 分支）；
+  改后两条腿均为 **0**。
+- **生产侧**：`LearningRecordsScreen.kt` 删 `WeekTicks` 调用与整个私有 Composable（净 **+8 / −58** 行，
+  `git diff --numstat HEAD -- <该文件>` 可复算），
+  随行的三枚 import（`border` / `RoundedCornerShape` / `TextAlign`）一并摘掉；
+  `WeekSection` 只留 `SectionHeading("本周", "${week.doneDays} / 7 天")` + 两格 `StatCell`。
+- **注释同批改**（闸剥注释、抓不到它们，但过时的说明句本身就是漂移）：本屏文件头「补三件」
+  的第 ③ 件、`WeekSection` 的 KDoc、`LearningRecordsWeekContractTest` 文件头、
+  connected `LearningRecordsScreenTest` 那条用例的 KDoc——四处原样写着「七格刻度」，
+  现均改为「刻度按 U-9 退役、周视图归打卡屏」并点名本节。
+- **旧闸改名**：`the week strip and the two real stats are drawn…` → `the week heading and the two real stats are drawn…`
+  （判据体未变，只把已退役的「strip」从名字里摘掉，避免下任以为还要钉刻度）。
+- **门禁现值（本批终局树，`.git/qa-scratch/u9-final-gate-2.log`）**：
+  `assembleDebug` + `testDebugUnitTest` + `compileDebugAndroidTestKotlin` BUILD SUCCESSFUL，
+  **308 类 / 2263 条 / 0 失败 0 错误 0 跳过**（U-13 收口基线 308/2262：+1 条即本批新判据，
+  无删无跳）。重算命令：`python .git/qa-scratch/tally.py <out.txt>`（读 `app/build/test-results/testDebugUnitTest/*.xml`）。
+- **connected（`emulator-5554`，`install -r`）**：`LearningRecordsScreenTest` + `CheckInScreenTest`
+  **OK (13 tests)**（`.git/qa-scratch/u9-connected-final.log`）——打卡屏那 7 根柱的闸继续承重，本批未动。
+- **真机 `bf353dda` 走查**（`install -r` Success，`lastUpdateTime=2026-11-02 14:31:39`）：
+  ① 「我的 → 学习记录 → 历史记录」= 「本周 · 0 / 7 天」+「本周词数 0」「打卡天数 0」两格，
+  **七格刻度不再出现**（`.git/qa-scratch/u9-device-history.png`）；
+  ② 「我的」页头「连续天数」格 → 打卡与连续 → 「本周学习」周一…周日 7 根柱**仍在**
+  （`.git/qa-scratch/u9-device-checkin-week.png`）——「周视图归一处」两侧都留了图证。
+  注：真机装的是 14:31 那枚（删刻度之后），此后本批只有注释与测试改名，UI 未变，故未复装复走。

@@ -1,7 +1,6 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Tab
@@ -30,7 +28,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.LearningHistoryGroup
 import com.example.englishlearning.learning.LearningRecord
@@ -55,7 +52,8 @@ import com.example.englishlearning.ui.theme.appColors
  *  ① 页尾提示条（原型 `:1323` 的 `notice(...,'info')`）：措辞来自 `notices/LocalDataNotice`，
  *     本屏不自写中文警告（U-6 收源前本屏与备份 hub、导出声明各写一套，同一件事三种句子）；
  *  ② 「历史记录」页签每日行补「文章态」副案与右尾「N 词」，并挂 4dp 细进度条（原型 `.row` + `.meter-thin`）；
- *  ③ 「本周」七格刻度 + 两枚真统计（本周词数 / 打卡天数，`learningWeek` 派生）。
+ *  ③ 「本周」两枚真统计（本周词数 / 打卡天数，`learningWeek` 派生）——批 2 当时还配了一组七格刻度，
+ *     U-9 已把它退役（周视图归打卡屏一处，决策 2026-11-03 §10）。
  *
  * **原型的第三格「19 分 · 日均用时」整枚不画**：本仓没有任何「单轮用时 / 日累计时长」的采集，
  * 写出来就是编造指标（用户 2026-10-29 拍板「读不到的那枚整枚不显示」，见计划 Task 18 台账同口径）。
@@ -159,14 +157,18 @@ fun LearningRecordsScreen(
     }
 }
 
-// ---------- 「本周」区块（原型 `.ticks` + `.stat`） ----------
+// ---------- 「本周」区块（U-9：七格刻度退役归打卡屏，只留「x / 7 天」+ 两格数值） ----------
 
 /**
- * 本周小结：共享分组标题（左「本周」、右「N / 7 天」）+ 七格刻度 + 两枚真统计。
+ * 本周小结：共享分组标题（左「本周」、右「N / 7 天」）+ 两枚真统计。
  *
  * 两枚统计都来自 `learningWeek` 的派生值，渲染侧不再各数一遍：
  *  - 「本周词数」= 本窗口内 `newDone + dueDone` 之和；
  *  - 「打卡天数」= 本周「完成」格数（与标题右侧「N / 7 天」的分子同源）。
+ *
+ * 批 2 这里还画一组七格刻度（`WeekTicks`），U-9 裁定退役（决策 2026-11-03 §10）：
+ * 它与打卡屏的 7 根柱同义（只说「哪几天完成了」），周视图归打卡屏一处；
+ * 本屏留数值，`learningWeek` 的派生链不动。
  */
 @Composable
 private fun WeekSection(week: LearningWeek) {
@@ -178,62 +180,10 @@ private fun WeekSection(week: LearningWeek) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         SectionHeading(text = "本周", trailing = "${week.doneDays} / 7 天")
-        WeekTicks(week.ticks)
         AppCard(modifier = Modifier.testTag("learning_records_stats")) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 StatCell(value = "${week.wordCount}", label = "本周词数", modifier = Modifier.weight(1f))
                 StatCell(value = "${week.doneDays}", label = "打卡天数", modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-/** 七格刻度（原型 `.ticks` / `.tick`：22dp 高、2dp 圆角、5dp 缝；今天那格描边）。 */
-@Composable
-private fun WeekTicks(ticks: List<WeekTick>) {
-    val colors = appColors()
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            ticks.forEach { tick ->
-                val fill = when (tick.state) {
-                    WeekDayState.Done -> colors.brandDeep
-                    WeekDayState.Partial -> colors.brandDeep.copy(alpha = 0.42f)
-                    WeekDayState.None -> colors.text1.copy(alpha = 0.09f)
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(22.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(fill)
-                        .then(
-                            if (tick.isToday) {
-                                Modifier.border(1.5.dp, colors.brandDeep, RoundedCornerShape(2.dp))
-                            } else {
-                                Modifier
-                            },
-                        ),
-                )
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            ticks.forEach { tick ->
-                Text(
-                    text = tick.label,
-                    style = AppType.Caption,
-                    color = colors.text3,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
             }
         }
     }
