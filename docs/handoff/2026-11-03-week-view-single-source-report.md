@@ -45,9 +45,18 @@
 
 - 分支 `stage-5-ui-r2-learning-path`（UI 重设计轮，**不合 main**）。
 - 本批代码、决策与本报告同批入库（报告不写自身哈希，`git log --oneline` 从尾部看即得）。
-  上一枚提交是 `e786da3`（U-14 文档限定语）。**未推送**（推送等用户说「推送」；届时若失败按约定等代理打开再推）。
-  领先枚数不写死在本报告里（它会随本批自身提交漂移），重算：
-  `git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD`。
+  上一枚提交是 `e786da3`（U-14 文档限定语）。
+- **已推送并核验（2026-11-03，用户令「推送并开发下一步」）**：推送时本地 HEAD = `9ef962e`，
+  `git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path` 两次都返回
+  `9ef962ecca1b666c97d4b0bcbb91fc24bced62ed`（与 `git rev-parse HEAD` 逐字一致），
+  `git fetch` 后 `git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD` = **0**。
+  核验命令即上面两条，任何时候可重跑。
+- **怪癖（下任必踩，先记）**：那枚 push 的**输出是红的但包已收**——
+  `error: RPC failed; curl 56 schannel: server closed abruptly (missing close_notify)`
+  + `send-pack: unexpected disconnect`，末行还印了误导性的 `Everything up-to-date`，退出码 1。
+  实际远端已更新，只是**本地 remote-tracking ref 没跟着走**（`git status -sb` 仍显示 ahead 31）。
+  ⇒ 判推送成败**只认 `ls-remote` 对哈希**，别认 push 的退出码或 `status -sb`；
+  补一次 `git fetch origin <branch>` 让 ahead 归零即可。同一条 schannel 瞬断也让紧随的 fetch 失败过一次，重试即通。
 - 工作区在提交后应只剩 `.git/qa-scratch/` 下的取证文件（该目录不入库）。
 
 ## 5. 未完成 / 遗留问题
