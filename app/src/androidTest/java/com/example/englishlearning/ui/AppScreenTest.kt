@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.core.error.AppError
+import com.example.englishlearning.ai.AiConnectionProbe
 import com.example.englishlearning.ai.AiPreferenceRepository
 import com.example.englishlearning.ai.DefaultImageProfileResult
 import com.example.englishlearning.ai.DefaultImageProfileResolver
@@ -2410,7 +2411,10 @@ class AppScreenTest {
             AiProfileSettingsViewModel(profiles, secrets, AiProfileIdFactory { "new-id" }, object : AiPreferenceRepository {
                 override suspend fun get() = Result.success(AiPreference())
                 override suspend fun save(preference: AiPreference) = Result.success(Unit)
-            }),
+            }, AiConnectionProbe(object : AiHttpTransport {
+                override suspend fun send(request: AiHttpRequest): com.example.englishlearning.ai.net.AiHttpResult =
+                    error("Speech fixture must not perform a connection probe")
+            })),
             keys,
         ).also { it.keys += "mimo" }
     }

@@ -58,7 +58,7 @@ class AiRequestPolicyTest {
     fun everyImageCallAsksEvenWhenTheSameHostWasConfirmedForText() {
         listOf(null, "api.example.com").forEach { confirmedTextHost ->
             val requirement = requiredConfirmation(
-                profile = profile(capabilities = setOf(AiCapability.Text, AiCapability.Vision)),
+                profile = profile(capabilities = setOf(AiCapability.Text, AiCapability.ImageGeneration)),
                 payloadKind = AiPayloadKind.Image,
                 confirmedTextHost = confirmedTextHost,
             ).getOrThrow()

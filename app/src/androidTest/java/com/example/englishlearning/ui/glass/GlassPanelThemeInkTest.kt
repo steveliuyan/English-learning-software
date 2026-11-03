@@ -168,10 +168,12 @@ class GlassPanelThemeInkTest {
     fun the_dark_capability_toggle_container_follows_the_theme_instead_of_the_static_surface() {
         setEditor(ThemeMode.Dark, capabilities = setOf(AiCapability.Text, AiCapability.Speech))
         // 与同文件 ③ 的写法一致：2× 字号下这一族芯片会滚出视口，取样前先滚到它，避免把页底像素当成档底。
+        // 「读图」开关 2026-11-04 退役后，这一族只剩三枚芯片；未选中档的取样锚换到 `_image`
+        // （本用例的 capabilities 只有 Text 与 Speech，Image 与旧 Vision 一样是未选中档，形状不变）。
         // 取样窗口（行左内边距 3dp..9dp）与四条断言逐字未改。
-        scrollToTag("ai_profile_capability_vision")
+        scrollToTag("ai_profile_capability_image")
         val selectedFill = modeOf(bandInsideTag("ai_profile_capability_text", 3f, 6f))
-        val unselectedFill = modeOf(bandInsideTag("ai_profile_capability_vision", 3f, 6f))
+        val unselectedFill = modeOf(bandInsideTag("ai_profile_capability_image", 3f, 6f))
         assertGlassIs(
             "CapabilityToggle 未选中档底（深）",
             unselectedFill,
@@ -363,6 +365,12 @@ class GlassPanelThemeInkTest {
                     onRequestDeleteProfile = {},
                     onRequestDeleteKey = {},
                     onBack = {},
+                    // 这一族用例取的是编辑页各容器的**像素底色**，不点按钮：连接探活的回线给空实现，
+                    // 断掉的是「取样时会不会出网」，不是「按钮有没有接线」（接线判据在
+                    // `AiProfileLayoutContractTest` ③′ 与 `AiProfileSettingsScreenTest`）。
+                    // 确认框同理：`editor.connection` 在本夹具里是 `Idle`，`AiProfileSettingsScreen` 根本不画它。
+                    onTestConnection = {},
+                    onConfirmOutbound = {},
                 )
             }
         }

@@ -44,6 +44,20 @@ class AiChatRequestBuilderTest {
         assertTrue(AiChatRequestBuilder.joinEndpoint("https://api.test/v1#f").isFailure)
     }
 
+    /**
+     * 探活路径与对话路径共用同一份 base 校验（决策 `docs/decisions/2026-11-04-…-connection-test.md` §3）：
+     * 「路径由应用决定」这条规则只许有一个出处，所以 `/models` 的拒绝面必须与 `/chat/completions` 逐项同形。
+     */
+    @Test
+    fun appendsTheModelsPathToTheSameValidatedBase() {
+        assertEquals("https://api.test/v1/models", AiChatRequestBuilder.modelsUrl("https://api.test/v1").getOrThrow())
+        assertEquals("https://api.test/v1/models", AiChatRequestBuilder.modelsUrl("https://api.test/v1/").getOrThrow())
+        assertTrue(AiChatRequestBuilder.modelsUrl("https://api.test/v1?x=1").isFailure)
+        assertTrue(AiChatRequestBuilder.modelsUrl("https://api.test/v1#f").isFailure)
+        assertTrue(AiChatRequestBuilder.modelsUrl("http://api.test/v1").isFailure)
+        assertTrue(AiChatRequestBuilder.modelsUrl("https://192.168.1.9/v1").isFailure)
+    }
+
     @Test
     fun sendsExactlyTwoHeadersAndNothingElse() {
         val request = AiChatRequestBuilder.build(profile, profile.advancedParameters, prompt, "sk-secret".toCharArray()).getOrThrow()

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiVoiceCatalog
 import com.example.englishlearning.ui.components.AppIcon
@@ -41,6 +42,7 @@ import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.GlassOverlay
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -81,6 +83,8 @@ fun AiProfileSettingsScreen(
     onCloseEditor: () -> Unit,
     onRequestDeleteProfile: (String) -> Unit,
     onRequestDeleteKey: (String) -> Unit,
+    onTestConnection: () -> Unit,
+    onConfirmOutbound: (Boolean) -> Unit,
     onBack: () -> Unit,
     onSetDefaultTextProfile: (String) -> Unit = {},
     onSetDefaultImageProfile: (String) -> Unit = {},
@@ -95,6 +99,8 @@ fun AiProfileSettingsScreen(
             onClose = onCloseEditor,
             onRequestDeleteProfile = onRequestDeleteProfile,
             onRequestDeleteKey = onRequestDeleteKey,
+            onTestConnection = onTestConnection,
+            onConfirmOutbound = onConfirmOutbound,
         )
     } else {
         AiProfileList(
@@ -277,6 +283,8 @@ private fun AiProfileEditor(
     onClose: () -> Unit,
     onRequestDeleteProfile: (String) -> Unit,
     onRequestDeleteKey: (String) -> Unit,
+    onTestConnection: () -> Unit,
+    onConfirmOutbound: (Boolean) -> Unit,
 ) {
     val draft = state.draft
     var voiceOverlayVisible by rememberSaveable { mutableStateOf(false) }
@@ -341,24 +349,19 @@ private fun AiProfileEditor(
                         onValueChange = { onDraftChange(draft.copy(model = it)) },
                     )
                     Text("能力", style = AppType.Title, color = appColors().text1)
-                    // 四枚能力开关逐枚点名（不遍历 `AiCapability.entries`）：tag 是 connected 侧像素取样带与
-                    // 手势锚（`GlassPanelThemeInkTest` 读 `ai_profile_capability_text` / `_vision`），
+                    // 三枚能力开关逐枚点名（不遍历 `AiCapability.entries`）：tag 是 connected 侧像素取样带与
+                    // 手势锚（`GlassPanelThemeInkTest` 读 `ai_profile_capability_text` / `_image`），
                     // 由枚举名插值出来时字面在源码里不存在，契约与连通测试都取不到锚点。
+                    // 「读图」开关 2026-11-04 退役：全仓没有任何请求构造读 `AiCapability.Vision`，
+                    // 开关点下去改的是一个没人读的标志位（判据 `AiVisionToggleRetirementTest`）。
+                    // 枚名本身**保留**——老配置可能已把它写进库，删掉会让整张 Profile 表读失败，
+                    // 所以下面的 `capabilitiesLabel` 仍为它保留中文名。
                     CapabilityToggle(
                         capability = AiCapability.Text,
                         tag = "ai_profile_capability_text",
                         selected = AiCapability.Text in draft.capabilities,
                         onToggle = { enabled ->
                             val next = if (enabled) draft.capabilities + AiCapability.Text else draft.capabilities - AiCapability.Text
-                            onDraftChange(draft.copy(capabilities = next))
-                        },
-                    )
-                    CapabilityToggle(
-                        capability = AiCapability.Vision,
-                        tag = "ai_profile_capability_vision",
-                        selected = AiCapability.Vision in draft.capabilities,
-                        onToggle = { enabled ->
-                            val next = if (enabled) draft.capabilities + AiCapability.Vision else draft.capabilities - AiCapability.Vision
                             onDraftChange(draft.copy(capabilities = next))
                         },
                     )
@@ -450,6 +453,32 @@ private fun AiProfileEditor(
                         masked = true,
                         onValueChange = { onDraftChange(draft.copy(pendingKey = it)) },
                     )
+                    // 连接探活：向 {endpoint}/models 发一次最小 GET，只验「地址通不通、密钥认不认」。
+                    // 它会真的出网，且第一次对某个域名必须先过域名披露确认（`OutboundConfirmDialog`）；
+                    // 结果文案全部来自常量（`AiConnectionOutcome`），Endpoint 与密钥不可能顺着它外流。
+                    PillButton(
+                        text = if (state.connection == AiConnectionUiState.Testing) "测试中…" else "测试连接",
+                        onClick = onTestConnection,
+                        enabled = state.connection != AiConnectionUiState.Testing && !state.saving,
+                        style = PillStyle.Secondary,
+                        domain = AppDomain.AiSpeech,
+                        testTag = "ai_profile_connection_test",
+                        contentDescription = "测试这台服务的连通性",
+                    )
+                    val connectionStatus = when (val connection = state.connection) {
+                        is AiConnectionUiState.Reported -> connection.outcome.message
+                        AiConnectionUiState.Testing -> "正在测试这台服务的连通性…"
+                        // 待确认那一环由确认框说，表单里再复述一句只会让人以为已经出过网。
+                        AiConnectionUiState.Idle, is AiConnectionUiState.AwaitingConfirmation -> null
+                    }
+                    connectionStatus?.let {
+                        Text(
+                            text = it,
+                            style = AppType.Footnote,
+                            color = appColors().text2,
+                            modifier = Modifier.testTag("ai_profile_connection_result"),
+                        )
+                    }
                     if (state.hasStoredKey && state.profileId != null) {
                         // 批 4 Task 3：清除密钥是不可撤销动作，屏内不再直接执行——只把请求发给宿主确认框。
                         PillButton(
@@ -464,10 +493,12 @@ private fun AiProfileEditor(
                 }
 
                 // ---- 第 4 组：原型有、V1 协议不放行的选项（裁决 B：画出来、禁用、标「暂未接入」）----
-                // 原型的编辑页还有流式返回、音色细化、生图参数与「连接测试」四段；它们要么超出
-                // V1 高级参数白名单（`temperature/top_p/max_tokens/timeout_seconds` 与受控模板），
-                // 要么需要本仓还没有的探活端点。既不能照搬成真控件（会让用户以为可调），
-                // 也不能整块消失（原型的版面是产品承诺的形状）——所以逐项画出来、真的禁用、统一标注。
+                // 原型的编辑页还有流式返回、音色细化、生图参数三段超出 V1 高级参数白名单
+                // （`temperature/top_p/max_tokens/timeout_seconds` 与受控模板），既不能照搬成真控件
+                // （会让用户以为可调），也不能整块消失（原型的版面是产品承诺的形状）——
+                // 所以逐项画出来、真的禁用、统一标注。
+                // 原型第四段「连接测试」已于 2026-11-04 做成真探活，搬进第 3 组密钥区，占位行随之删除；
+                // 它不许长回来：同一屏出现两个连接入口、其中一个还写着「暂未接入」，用户只会更糊涂。
                 SoftCard(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -496,12 +527,6 @@ private fun AiProfileEditor(
                         title = "生图参数",
                         subtitle = "画面比例、风格预设、张数与参考图",
                         tag = "ai_profile_unsupported_image",
-                    )
-                    UnsupportedOption(
-                        icon = AppIcon.Info,
-                        title = "连接测试",
-                        subtitle = "发一次探活请求验证地址与密钥；V1 还没有探活端点",
-                        tag = "ai_profile_unsupported_connection_test",
                     )
                 }
 
@@ -586,6 +611,23 @@ private fun AiProfileEditor(
                 )
             }
         }
+
+        // 出站确认：探活带密钥出网，第一次对某个域名必须先让用户看见域名。
+        // 走全仓唯一的共享件（`OutboundConfirmDialog`），本屏只追加一句业务说明、不改写正文配方。
+        // 「取消」与「点蒙层」都算拒绝：答复必须是 false，不给任何默认放行。
+        val pendingOutboundHost = (state.connection as? AiConnectionUiState.AwaitingConfirmation)?.host
+        if (pendingOutboundHost != null) {
+            OutboundConfirmDialog(
+                endpointHost = pendingOutboundHost,
+                payloadKind = AiPayloadKind.Text,
+                onConfirm = { onConfirmOutbound(true) },
+                onDismiss = { onConfirmOutbound(false) },
+                note = "连接测试只发一次模型列表查询，不带词书、文章或任何学习内容。",
+                bodyTestTag = "ai_profile_outbound_confirmation_text",
+                confirmTestTag = "ai_profile_confirm_outbound",
+                dismissTestTag = "ai_profile_decline_outbound",
+            )
+        }
     }
 }
 
@@ -597,7 +639,7 @@ private fun AiProfileEditor(
  * 必填形参，这里给空体：禁用态下它永远不会被调用（不是守卫，是形状要求）。
  * `showChevron = false`：chevron 是「点得进去」的暗示，禁用行不画。
  *
- * 四枚行共用一处实现，不要在调用点逐枚手搓：一处改动（例如将来接通后放开某项）只改这里。
+ * 三枚行共用一处实现，不要在调用点逐枚手搓：一处改动（例如将来接通后放开某项）只改这里。
  */
 @Composable
 private fun UnsupportedOption(

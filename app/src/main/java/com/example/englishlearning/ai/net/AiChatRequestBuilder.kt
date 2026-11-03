@@ -24,7 +24,21 @@ object AiChatRequestBuilder {
      * Endpoint 指向 `{base}/chat/completions`。base 不允许带 query 或 fragment：
      * 请求路径必须完全由本应用决定，用户配置里出现的 `?x=1` 更可能是配置错误或注入尝试。
      */
-    fun joinEndpoint(endpoint: String): Result<String> {
+    fun joinEndpoint(endpoint: String): Result<String> = baseEndpoint(endpoint).map { "$it/chat/completions" }
+
+    /**
+     * 连接探活用的模型清单端点：`{base}/models`。
+     *
+     * 与 [joinEndpoint] 共用同一份 base 校验，**这是刻意的唯一出处**——「HTTPS 公网 + 拒 userInfo +
+     * 拒 query/fragment + 尾部斜杠归一」这套规则一旦被第二条路径复制两份，就会出现
+     * 「对话能通、探活能绕」或反过来这种只在一侧生效的漂移（`TtsRequestBuilder` 与
+     * `ImageGenerationRequestBuilder` 各自的 `joinEndpoint` 是既有重复，登记在同一份决策的结转里，
+     * 本批不动它们）。
+     */
+    fun modelsUrl(endpoint: String): Result<String> = baseEndpoint(endpoint).map { "$it/models" }
+
+    /** 校验 + 归一：返回不带尾斜杠、不带 query/fragment 的 base；不合法即失败。 */
+    private fun baseEndpoint(endpoint: String): Result<String> {
         validateEndpoint(endpoint).getOrElse { return Result.failure(it) }
         val uri = runCatching { java.net.URI(endpoint) }.getOrElse {
             return Result.failure(AppErrorException(AppError.InvalidAiConfiguration))
@@ -32,7 +46,7 @@ object AiChatRequestBuilder {
         if (uri.query != null || uri.fragment != null) {
             return Result.failure(AppErrorException(AppError.InvalidAiConfiguration))
         }
-        return Result.success("${endpoint.trimEnd('/')}/chat/completions")
+        return Result.success(endpoint.trimEnd('/'))
     }
 
     fun build(

@@ -350,6 +350,11 @@ class ThemeModeSwitchTest {
                     onRequestDeleteProfile = {},
                     onRequestDeleteKey = {},
                     onBack = {},
+                    // 连接探活两枚回线：这一条用例只看**列表页裸行**在深色下的墨色（editor = null），
+                    // 编辑页永不渲染，也就没有按钮可点、没有确认框可答——空实现是「本用例不触发」，
+                    // 不是放行。真正走这两枚回路的是 `AiProfileSettingsScreenTest`。
+                    onTestConnection = {},
+                    onConfirmOutbound = {},
                 )
             }
         }

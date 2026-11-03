@@ -30,6 +30,9 @@ class AiProfileLayoutContractTest {
 
     private val editorBody: String by lazy { bodyOf(source, "private fun AiProfileEditor(") }
 
+    /** 编辑页私组件的形参表：③′ 用它钉「回调是显式收进来的，不是闭包捕获的」。 */
+    private val editorParams: String by lazy { paramsOf(source, "private fun AiProfileEditor(") }
+
     // ---------- ① 两个页头 ----------
 
     @Test
@@ -107,6 +110,13 @@ class AiProfileLayoutContractTest {
 
     // ---------- ③ 13 个控件守恒 + 组归属 ----------
 
+    /**
+     * 13 这个数字自 2026-11-04 起换了成员但没换总量（决策
+     * `docs/decisions/2026-11-04-ai-profile-vision-and-connection-test.md` §5）：
+     * 「读图」假开关下线（−1），「测试连接」真按钮上位（+1）。
+     * 两枚 `ai_profile_connection_*` tag 里只有 `_test` 是可写控件，`_result` 是状态文本锚，
+     * 所以它进下面那条单独的锚在册断言，不进 13 的名单。
+     */
     @Test
     fun `the thirteen controls keep their tags and land in the agreed group`() {
         val groups = softCardBodies(editorBody)
@@ -117,7 +127,6 @@ class AiProfileLayoutContractTest {
             "ai_profile_endpoint",
             "ai_profile_model",
             "ai_profile_capability_text",
-            "ai_profile_capability_vision",
             "ai_profile_capability_speech",
             "ai_profile_capability_image",
         )
@@ -128,10 +137,11 @@ class AiProfileLayoutContractTest {
             "ai_profile_max_tokens",
             "ai_profile_timeout_seconds",
             "ai_profile_key_input",
+            "ai_profile_connection_test",
         )
 
         serviceAndModel.forEach { tag ->
-            assertTrue(tag in groups[0], "「$tag」必须留在第一组（服务与模型 + 四枚能力开关），tag 一字不动")
+            assertTrue(tag in groups[0], "「$tag」必须留在第一组（服务与模型 + 三枚能力开关），tag 一字不动")
         }
         voice.forEach { tag ->
             assertTrue(tag in groups[1], "「$tag」必须单独成第二组（语音角色只在 Speech 能力开启时出现）")
@@ -139,16 +149,20 @@ class AiProfileLayoutContractTest {
         advancedAndKey.forEach { tag ->
             assertTrue(tag in groups[2], "「$tag」必须留在第三组（高级与密钥），tag 一字不动")
         }
-        // 第 4 枚是新增的禁用组：它只装四枚「未接入」行，13 个可写控件一个都不许混进来
+        // 第 4 枚是新增的禁用组：它只装三枚「未接入」行，13 个可写控件一个都不许混进来
         // （混进来意味着「把真控件挪进禁用卡」——用户就再也调不了它们）。
         listOf(
             "ai_profile_unsupported_stream",
             "ai_profile_unsupported_voice",
             "ai_profile_unsupported_image",
-            "ai_profile_unsupported_connection_test",
         ).forEach { tag ->
             assertTrue(tag in groups[3], "「$tag」必须落在第 4 枚「未接入的选项」卡里")
         }
+        assertTrue(
+            "ai_profile_unsupported_connection_test" !in groups[3],
+            "「连接测试」已经做成真探活，占位行必须随之下线：留在禁用卡里就是同时给用户两个入口、" +
+                "其中一个还写着「暂未接入」",
+        )
         (serviceAndModel + voice + advancedAndKey).forEach { tag ->
             assertTrue(
                 tag !in groups[3],
@@ -164,6 +178,16 @@ class AiProfileLayoutContractTest {
                 "控件 tag「$tag」必须恰出现一处：重排只搬容器，不许改名、也不许复制出第二个入口",
             )
         }
+        // 状态文本锚：connected 侧靠它点名读结果文案，也恰一处。
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("\"ai_profile_connection_result\""))),
+            "探活结果锚「ai_profile_connection_result」必须恰一处：多一处就是多挂了一份状态",
+        )
+        assertTrue(
+            "ai_profile_connection_result" in groups[2],
+            "结果文案必须紧跟在「测试连接」按钮所在的第三组里：状态离触发它的控件太远，读的人对不上号",
+        )
 
         // 第二组挂在能力开关上：`ai_profile_voice` 所在的 SoftCard 必须被 `AiCapability.Speech in` 守着。
         assertTrue(
@@ -175,6 +199,93 @@ class AiProfileLayoutContractTest {
         assertTrue(
             speechGuard >= 0 && voiceCard > speechGuard,
             "语音组的 `SoftCard(` 必须排在 `AiCapability.Speech in` 条件之后（条件守卫整枚软卡）",
+        )
+    }
+
+    // ---------- ③′ 连接探活的接线（真按钮不许长成死按钮）----------
+
+    /**
+     * 「测试连接」从占位行变成真探活之后，最怕的退化不是它不漂亮，而是**点了没反应**：
+     * 一条没有回线的按钮和当初那枚没人读的「读图」开关是同一种病。所以这里把整条回路逐环点名：
+     * 入口形参 → 编辑页形参 → 点击回调 → VM 方法，外加确认框这一道出站闸门。
+     */
+    @Test
+    fun `the connection test is wired end to end and cannot become a dead button`() {
+        assertEquals(
+            2,
+            countMatches(source, Regex(Regex.escape("onTestConnection: () -> Unit"))),
+            "`onTestConnection` 只许出现在两处形参上（入口屏 + 编辑页私组件）：多一处 = 又开了一条旁路入口，" +
+                "少一处 = 某一环根本收不到它。两处都不许带默认值——给了 `= {}` 就等于允许宿主忘记接线",
+        )
+        assertEquals(
+            1,
+            countMatches(editorParams, Regex(Regex.escape("onTestConnection: () -> Unit"))),
+            "编辑页私有组件也要显式收这一枚回调：靠闭包捕获外层参数会让判据看不到接线" +
+                "（判据取的是形参表 `paramsOf`，函数体里本来就没有形参）",
+        )
+        assertEquals(
+            1,
+            countMatches(editorParams, Regex(Regex.escape("onConfirmOutbound: (Boolean) -> Unit"))),
+            "编辑页私有组件同样要显式收出站确认答复",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex("""on(Test|ConfirmOutbound)\w*: \([^)]*\) -> Unit =""")),
+            "两枚新回调都不许给默认实现：`= {}` 让漏接线从编译错误退化成「按钮点了没反应」，" +
+                "那正是当初那枚没人读的「读图」开关得过的病",
+        )
+        assertEquals(
+            2,
+            countMatches(source, Regex(Regex.escape("onConfirmOutbound: (Boolean) -> Unit"))),
+            "出站确认答复同样只许在入口与编辑页两处形参上各出现一次",
+        )
+        assertEquals(
+            1,
+            countMatches(editorBody, Regex(Regex.escape("onClick = onTestConnection"))),
+            "「测试连接」按钮的 `onClick` 必须直连回调，不许中间再搓一层",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("onTestConnection = onTestConnection"))),
+            "入口必须把它原样递给编辑页；断在这一环，按钮就只在列表页好看",
+        )
+        // 出站确认：确认框是唯一的域名披露出口，屏侧只许调共享件、只许调一次。
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("OutboundConfirmDialog("))),
+            "出站确认必须走共享 `OutboundConfirmDialog(`（全仓唯一配方），且本屏恰一处",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("onConfirmOutbound(true)"))),
+            "确认按钮要能把确认答复送回 VM",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("onConfirmOutbound(false)"))),
+            "取消答复也必须送回 VM：只挂 onDismiss 不表态，就等于让用户点「取消」也能放行",
+        )
+        // 宿主侧：AppScreen 必须把两环都接到 VM，否则上面所有断言都能在一条断链上绿。
+        // 数的是**本屏那一次调用**（`aiProfileViewModel?.X(`），不是 `onConfirmOutbound =` 这个词——
+        // 后者是全仓出站确认的共用形参名（查词问答 / 长难句 / 拍照翻译 / 阅读首页各挂一处），
+        // 按整文件名会把别屏的合法接线判成违规（本轮实测：整文件 6 处）。
+        val appScreen = uiScreenSource("AppScreen.kt")
+        assertEquals(
+            1,
+            countMatches(appScreen, Regex(Regex.escape("onTestConnection ="))),
+            "`AppScreen` 必须把 onTestConnection 接到 `AiProfileSettingsViewModel.testConnection()`" +
+                "（这一枚形参名全仓只此一处，所以可以直接按名数）",
+        )
+        assertEquals(
+            1,
+            countMatches(appScreen, Regex(Regex.escape("aiProfileViewModel?.testConnection()"))),
+            "AI 服务页的连接入口必须恰一处落在 `testConnection()`：0 = 按钮是死的，2 = 又多开一条入口",
+        )
+        assertEquals(
+            1,
+            countMatches(appScreen, Regex(Regex.escape("aiProfileViewModel?.confirmOutbound("))),
+            "AI 服务页的出站确认答复必须恰一处送回本屏 VM：别屏的 `confirmOutbound` 接线由各自契约守，" +
+                "这里只认 `aiProfileViewModel` 这一个目标",
         )
     }
 
@@ -323,6 +434,30 @@ class AiProfileLayoutContractTest {
         if (open < 0) return ""
         val close = braceEnd(text, open)
         return if (close < 0) "" else text.substring(open + 1, close)
+    }
+
+    /**
+     * 取 `fun X(` 的**形参表**（签名左括号到配对右括号之间的文本，源已剥注释）；取不到返回空串。
+     *
+     * 与 [bodyOf] 分开是必须的：`bodyOf` 从函数体的 `{` 起裁，形参天然不在里面。拿形参去 body 里数，
+     * 判据会在「接线其实正确」的源上恒红——本轮实测踩过一次（`onTestConnection` 形参断在 body 上得 0）。
+     */
+    private fun paramsOf(text: String, signature: String): String {
+        val start = text.indexOf(signature)
+        if (start < 0) return ""
+        val open = text.indexOf('(', start)
+        if (open < 0) return ""
+        var depth = 0
+        for (i in open until text.length) {
+            when (text[i]) {
+                '(' -> depth++
+                ')' -> {
+                    depth--
+                    if (depth == 0) return text.substring(open + 1, i)
+                }
+            }
+        }
+        return ""
     }
 
     /** 按出现顺序取每枚 `SoftCard(` 的花括号体（尾部 lambda 体），取不到的跳过。 */

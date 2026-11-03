@@ -9,16 +9,17 @@ import kotlin.test.assertTrue
  * U-1 + U-2 + U-3（决策 `docs/decisions/2026-11-03-duplication-consolidation.md` §1）：
  * 出站确认的**对话框、措辞与策略**各只留一份权威。
  *
- * 这一族的现状（本轮实测）：共享件 `ui/components/OutboundConfirmDialog.kt` 只有阅读首页一处在调
- * （`ReadingAccessScreen.kt:351`），另外四屏各画一份同名私写对话框，标题逐字相同、正文各写各的——
- * `SentenceAnalysisScreen.kt:255` 那一份就漏了「并可能产生费用」。
+ * 决策前那一批的实测快照（历史，不再是现状；行号随 consolidation 已失效，别按行号找）：共享件
+ * `ui/components/OutboundConfirmDialog.kt` 只有阅读首页一处在调，另外四屏各画一份同名私写对话框，
+ * 标题逐字相同、正文各写各的——`SentenceAnalysisScreen.kt` 那一份就漏了「并可能产生费用」。
  * 措辞漂移在这条线上不是文案问题：AGENTS.md 要求「首次调用第三方 Endpoint 前展示域名并确认」，
  * 正文里少了费用告知，用户在一次真实计费调用前就少读了一句。四份实现 = 四次要人肉对齐的机会。
+ * 今天的调用点用这条命令重算：`grep -rn "OutboundConfirmDialog(" app/src/main/java --include=*.kt`。
  *
  * 判据都是**跨文件计数**，钉的是「这句文案由谁**写进代码**」：
  *  1. 标题「确认发送请求」全 main 恰一处，且就在共享件里；
  *  2. 正文配方「与该服务的密钥将发送给」全 main 只许出现在共享件（`outboundConfirmBody` 的文本/图片两格）；
- *  3. 四屏各自**恰调一次** `OutboundConfirmDialog(`——0 = 那屏的出站确认整族消失（安全面退化），
+ *  3. 每屏各自**恰调一次** `OutboundConfirmDialog(`——0 = 那屏的出站确认整族消失（安全面退化），
  *     2 = 又长出第二份；
  *  4. 屏侧不许再有私写的出站确认 composable（`fun OutboundConfirmationDialog` / `fun ConfirmationDialog`）；
  *  5. U-3：UI 侧第二份枚举 `enum class PayloadKind` 与零调用的 `mustAskEveryTime` 归零，
@@ -43,12 +44,21 @@ class OutboundDialogFamilyTest {
         const val BODY_RECIPE = "与该服务的密钥将发送给"
         const val COMPONENT = "ui/components/OutboundConfirmDialog.kt"
 
-        /** 需要并入共享件的私写屏（本轮 grep 实测）。 */
+        /**
+         * 必须经共享件画出站确认的宿主屏。
+         *
+         * 前四枚是 `2026-11-03-duplication-consolidation.md` §1 实测到的私写屏；第五枚
+         * `AiProfileSettingsScreen.kt` 由 2026-11-04 的连接测试探活新增（决策同目录
+         * `2026-11-04-ai-profile-vision-and-connection-test.md` §5）：带 Key 的 `GET /models` 对一个新域名的
+         * 第一次出站同样是「把文本和密钥发给第三方」，AGENTS.md 那句约束不区分「真请求」和「探活」。
+         * 复算：`grep -rn "OutboundConfirmDialog(" app/src/main/java --include=*.kt`。
+         */
         val privateScreens = listOf(
             "SentenceAnalysisScreen.kt",
             "PhotoTranslationScreen.kt",
             "WordAiQaScreen.kt",
             "ImageStudioScreen.kt",
+            "AiProfileSettingsScreen.kt",
         )
 
         val appMain = File(APP_MAIN_SOURCE_PATH)

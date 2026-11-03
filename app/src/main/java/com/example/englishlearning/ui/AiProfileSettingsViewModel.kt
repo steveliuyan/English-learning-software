@@ -2,10 +2,12 @@ package com.example.englishlearning.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.englishlearning.ai.AiConnectionProbe
 import com.example.englishlearning.ai.AiPreferenceRepository
 import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.ConnectionProbeResult
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiCapability
 import com.example.englishlearning.ai.domain.AiPreference
@@ -16,6 +18,7 @@ import com.example.englishlearning.ai.domain.validateEndpoint
 import com.example.englishlearning.ai.validateRequestParameters
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -40,6 +43,41 @@ data class AiProfileListItem(
     val isDefaultImageProfile: Boolean = false,
     val canBeDefaultImageProfile: Boolean = false,
 )
+
+/**
+ * 「测试连接」的结论。每条都是常量文案，不含 Endpoint、模型名、响应体或密钥——
+ * 沿用 `ai/AiFailure.kt` 那条泄露防线：这一屏的结果直接显示在界面上，能进截图，
+ * 一旦允许自由文本流进来，用户填的私网地址或 Key 片段就可能跟着外流。
+ *
+ * 三态不许互相顶替（决策 `docs/decisions/2026-11-04-ai-profile-vision-and-connection-test.md` §3）：
+ * 「太慢」「连不上」「对方活着但答不上来」对应三个不同的处置动作。
+ */
+enum class AiConnectionOutcome(val message: String) {
+    Reachable("连接成功：这台服务可达，密钥也被接受。"),
+    Unauthorized("鉴权失败：这台服务不接受当前密钥，请检查 API Key。"),
+    Timeout("超时：这台服务在你设定的秒数内没有回应，可稍后重试或调大超时秒数。"),
+    NetworkUnavailable("连不上：域名解析失败或网络不通，请检查网络与 Endpoint 域名。"),
+    ServiceError("服务异常：地址可达但这台服务没有返回可用结果，可能不支持模型列表接口。"),
+    MissingKey("这套配置还没有可测试的密钥：请先填写 API Key。"),
+    ConfigurationInvalid("配置还不完整：请先填好 Endpoint 和必填项，再测试连接。"),
+}
+
+/**
+ * 编辑页上「测试连接」这一块的状态。
+ *
+ * [AwaitingConfirmation] 只带确认所需的 host（域名披露是 AGENTS.md 的硬要求，必须显示给用户看）；
+ * 其余成员一律无字段，界面渲染时不可能捡到敏感值。
+ */
+sealed interface AiConnectionUiState {
+    data object Idle : AiConnectionUiState
+
+    data object Testing : AiConnectionUiState
+
+    /** 该域名本次会话还没确认过：界面据此弹共享出站确认框，拒绝即零出站。 */
+    data class AwaitingConfirmation(val host: String) : AiConnectionUiState
+
+    data class Reported(val outcome: AiConnectionOutcome) : AiConnectionUiState
+}
 
 /**
  * 表单错误。每条都是常量文案，不含用户填进去的原文——Endpoint 本身就可能是敏感信息片段，
@@ -93,6 +131,11 @@ data class AiProfileEditorUiState(
     val saving: Boolean = false,
     val fieldError: AiProfileFieldError? = null,
     val message: String? = null,
+    /**
+     * 「测试连接」的结果。随草稿作废：用户一改输入，上一轮的「可达」就变成对新配置的假证词，
+     * 与 [fieldError] / [message] 走同一条清除路径（见 [updateDraft]）。
+     */
+    val connection: AiConnectionUiState = AiConnectionUiState.Idle,
 )
 
 /**
@@ -107,6 +150,7 @@ class AiProfileSettingsViewModel @Inject constructor(
     private val secrets: AiProfileSecretUseCase,
     private val ids: AiProfileIdFactory,
     private val preferences: AiPreferenceRepository,
+    private val connectionProbe: AiConnectionProbe,
 ) : ViewModel() {
     private val _listState = MutableStateFlow<AiProfileListUiState>(AiProfileListUiState.Loading)
     val listState: StateFlow<AiProfileListUiState> = _listState
@@ -114,12 +158,18 @@ class AiProfileSettingsViewModel @Inject constructor(
     private val _editor = MutableStateFlow<AiProfileEditorUiState?>(null)
     val editor: StateFlow<AiProfileEditorUiState?> = _editor
 
+    /** 本次编辑会话里已确认过出站的域名（Text 档，与其余 AI 功能同一口径：换域名一定重新问）。 */
+    private var confirmedConnectionHost: String? = null
+    private var connectionJob: Job? = null
+
     fun load() {
         _listState.value = AiProfileListUiState.Loading
         viewModelScope.launch { refresh() }
     }
 
     fun startCreate() {
+        connectionJob?.cancel()
+        confirmedConnectionHost = null
         _editor.value = AiProfileEditorUiState(
             profileId = null,
             draft = AiProfileDraft(),
@@ -128,6 +178,9 @@ class AiProfileSettingsViewModel @Inject constructor(
     }
 
     fun startEdit(profileId: String) {
+        // 每次进入编辑都是一次新的出站会话：上一轮对某个域名的确认不许顺延到这一轮。
+        connectionJob?.cancel()
+        confirmedConnectionHost = null
         viewModelScope.launch {
             val found = profiles.find(profileId).getOrNull() ?: return@launch
             _editor.value = AiProfileEditorUiState(
@@ -142,11 +195,102 @@ class AiProfileSettingsViewModel @Inject constructor(
     fun updateDraft(draft: AiProfileDraft) {
         val current = _editor.value ?: return
         // 用户一动输入，上一次的报错就该消失，否则会一直挂着一个已经修好的错误。
-        _editor.value = current.copy(draft = draft, fieldError = null, message = null)
+        // 连接探活的结果同理，而且更危险：改了 Endpoint 还挂着上一轮的「可达」就是假证词，
+        // 所以连同在飞的那次请求一起作废。
+        connectionJob?.cancel()
+        _editor.value = current.copy(draft = draft, fieldError = null, message = null, connection = AiConnectionUiState.Idle)
     }
 
     fun closeEditor() {
+        // 退出编辑页必须掐掉在飞的探活：它带着密钥，不该在后台继续跑。
+        connectionJob?.cancel()
+        connectionJob = null
+        confirmedConnectionHost = null
         _editor.value = null
+    }
+
+    /**
+     * 「测试连接」：按 OpenAI 兼容惯例向 `{endpoint}/models` 发一次最小 `GET`。
+     *
+     * 测的是**屏幕上当前的草稿**，不是库里那份旧配置——用户填完 Key 的第一件事就是想知道
+     * 这套新组合通不通，此时读库里的旧值等于答非所问。
+     *
+     * 顺序是安全要求，不是风格：先用既有 [check] 过一遍表单（不合法就零出站，探活不是绕过校验的后门），
+     * 再解析密钥，最后才轮到 [AiConnectionProbe]——而探活自己还会在字节出网吧子上停一次域名确认。
+     */
+    fun testConnection() = startConnectionProbe()
+
+    /** 出站确认框的答复；拒绝即回到 [AiConnectionUiState.Idle]，一字节都没出去。 */
+    fun confirmOutbound(confirmed: Boolean) {
+        val current = _editor.value ?: return
+        val pending = current.connection as? AiConnectionUiState.AwaitingConfirmation ?: return
+        if (!confirmed) {
+            _editor.value = current.copy(connection = AiConnectionUiState.Idle)
+            return
+        }
+        // 只记本次会话、且按域名记：换 Endpoint 一定重新问（AiOutboundConfirmation 的既有口径）。
+        confirmedConnectionHost = pending.host
+        startConnectionProbe()
+    }
+
+    private fun startConnectionProbe() {
+        val current = _editor.value ?: return
+        val check = check(current.draft, current.providerKind)
+        if (check is DraftCheck.Invalid) {
+            setConnection(AiConnectionUiState.Reported(AiConnectionOutcome.ConfigurationInvalid))
+            return
+        }
+        val parameters = (check as DraftCheck.Valid).parameters
+        val profile = current.draft.toProfile(
+            current.profileId ?: PROBE_DRAFT_ID,
+            parameters,
+            current.providerKind,
+        )
+        val apiKey = resolveProbeKey(current.draft, profile, current.profileId) ?: run {
+            setConnection(AiConnectionUiState.Reported(AiConnectionOutcome.MissingKey))
+            return
+        }
+        // 先给界面一个「测试中」，再把网络放进协程：探活最坏等满 timeout_seconds，
+        // 期间界面必须照常可编辑（AGENTS.md：核心路径不得阻塞 UI）。
+        setConnection(AiConnectionUiState.Testing)
+        connectionJob?.cancel()
+        connectionJob = viewModelScope.launch {
+            val result = connectionProbe.probe(profile, apiKey, confirmedConnectionHost)
+            // 一枚 `when` 打尽：探活的每种诚实分类都要对应一句能指导下一步的界面文案，
+            // 「超时」「连不上」「服务答不上来」不许折叠成同一个。
+            when (result) {
+                is ConnectionProbeResult.NeedsConfirmation ->
+                    setConnection(AiConnectionUiState.AwaitingConfirmation(result.host))
+                ConnectionProbeResult.Reachable -> report(AiConnectionOutcome.Reachable)
+                ConnectionProbeResult.Unauthorized -> report(AiConnectionOutcome.Unauthorized)
+                ConnectionProbeResult.Timeout -> report(AiConnectionOutcome.Timeout)
+                ConnectionProbeResult.NetworkUnavailable -> report(AiConnectionOutcome.NetworkUnavailable)
+                ConnectionProbeResult.ServiceError -> report(AiConnectionOutcome.ServiceError)
+                ConnectionProbeResult.ConfigurationInvalid -> report(AiConnectionOutcome.ConfigurationInvalid)
+            }
+        }
+    }
+
+    private fun report(outcome: AiConnectionOutcome) = setConnection(AiConnectionUiState.Reported(outcome))
+
+    /**
+     * 探活用的密钥：草稿里刚填的优先，其次才是这份配置已存的——新建时库里没有，也不该去猜隔壁的槽。
+     * 两条都拿不到就返回 `null`，由调用方报 [AiConnectionOutcome.MissingKey]，绝不发匿名请求。
+     */
+    private fun resolveProbeKey(
+        draft: AiProfileDraft,
+        profile: AiProfile,
+        profileId: String?,
+    ): CharArray? {
+        if (draft.pendingKey.isNotEmpty()) return draft.pendingKey.toCharArray()
+        // 没有 profileId = 还没落库的新配置，它的密钥槽不存在；读安全存储只会读到别人的。
+        if (profileId == null) return null
+        return secrets.loadKey(profile).getOrNull()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun setConnection(state: AiConnectionUiState) {
+        val current = _editor.value ?: return
+        _editor.value = current.copy(connection = state)
     }
 
     fun save() {
@@ -397,5 +541,12 @@ class AiProfileSettingsViewModel @Inject constructor(
         const val KEY_FAILED_MESSAGE = "配置已保存，但密钥没能写入安全存储。"
         const val DEFAULT_PROFILE_INVALID_MESSAGE = "这套配置需要文本能力和已保存的密钥，才能设为文章默认。"
         const val DEFAULT_IMAGE_PROFILE_INVALID_MESSAGE = "这套配置需要生图能力和已保存的密钥，才能设为生图默认。"
+
+        /**
+         * 探活用的是**草稿**，可能还没落库、没有 profileId；[AiProfile] 又要求非空 id。
+         * 这里给一个不可能与真实槽撞名的占位：探活只读 endpoint 与 timeout_seconds，
+         * 永远不会拿它去碰安全存储（密钥由 [resolveProbeKey] 单独解析后直接传入）。
+         */
+        const val PROBE_DRAFT_ID = "unsaved-draft"
     }
 }

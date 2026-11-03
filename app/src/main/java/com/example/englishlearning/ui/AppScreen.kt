@@ -1422,6 +1422,8 @@ fun AppScreen(
                     onCloseEditor = { aiProfileViewModel?.closeEditor() },
                     onRequestDeleteProfile = { pendingAiProfileDelete = it },
                     onRequestDeleteKey = { pendingAiProfileKeyClear = it },
+                    onTestConnection = { aiProfileViewModel?.testConnection() },
+                    onConfirmOutbound = { confirmed -> aiProfileViewModel?.confirmOutbound(confirmed) },
                     onSetDefaultTextProfile = { aiProfileViewModel?.setDefaultTextProfile(it) },
                     onSetDefaultImageProfile = { aiProfileViewModel?.setDefaultImageProfile(it) },
                     onBack = {

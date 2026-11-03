@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -44,6 +45,8 @@ class AiProfileSettingsScreenTest {
         onCloseEditor: () -> Unit = {},
         onRequestDeleteProfile: (String) -> Unit = {},
         onRequestDeleteKey: (String) -> Unit = {},
+        onTestConnection: () -> Unit = {},
+        onConfirmOutbound: (Boolean) -> Unit = {},
         onSetDefaultTextProfile: (String) -> Unit = {},
         onSetDefaultImageProfile: (String) -> Unit = {},
         onBack: () -> Unit = {},
@@ -59,6 +62,8 @@ class AiProfileSettingsScreenTest {
                 onCloseEditor = onCloseEditor,
                 onRequestDeleteProfile = onRequestDeleteProfile,
                 onRequestDeleteKey = onRequestDeleteKey,
+                onTestConnection = onTestConnection,
+                onConfirmOutbound = onConfirmOutbound,
                 onSetDefaultTextProfile = onSetDefaultTextProfile,
                 onSetDefaultImageProfile = onSetDefaultImageProfile,
                 onBack = onBack,
@@ -253,17 +258,75 @@ class AiProfileSettingsScreenTest {
                 onCloseEditor = {},
                 onRequestDeleteProfile = {},
                 onRequestDeleteKey = {},
+                onTestConnection = {},
+                onConfirmOutbound = {},
                 onBack = {},
             )
         }
 
-        composeRule.onNodeWithTag("ai_profile_capability_vision").performScrollTo().performClick()
+        composeRule.onNodeWithTag("ai_profile_capability_image").performScrollTo().performClick()
         composeRule.waitForIdle()
-        assertEquals(setOf(AiCapability.Text, AiCapability.Vision), captured?.capabilities)
+        assertEquals(setOf(AiCapability.Text, AiCapability.ImageGeneration), captured?.capabilities)
 
         composeRule.onNodeWithTag("ai_profile_capability_text").performScrollTo().performClick()
         composeRule.waitForIdle()
-        assertEquals(setOf(AiCapability.Vision), captured?.capabilities)
+        assertEquals(setOf(AiCapability.ImageGeneration), captured?.capabilities)
+    }
+
+    @Test fun editor_connection_test_reports_its_callback() {
+        var probes = 0
+        setScreen(editor = editorState(), onTestConnection = { probes++ })
+
+        composeRule.onNodeWithTag("ai_profile_connection_test").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("「测试连接」必须是真入口：点了不发请求的按钮就是上一枚「读图」开关的病", 1, probes)
+    }
+
+    @Test fun editor_connection_result_is_read_from_the_state_and_never_echoes_the_key() {
+        setScreen(editor = editorState(connection = AiConnectionUiState.Reported(AiConnectionOutcome.Unauthorized)))
+
+        composeRule.onNodeWithTag("ai_profile_connection_result").performScrollTo()
+            .assert(showingText(AiConnectionOutcome.Unauthorized.message))
+        // 结果文案是常量：这一屏拿不到 Key，也就无处可漏——整屏都不该出现 `Bearer` 字样。
+        assertEquals(
+            "界面上出现了带鉴权头的原文，等于把密钥摆进截图",
+            0,
+            composeRule.onAllNodesWithText("Bearer", substring = true).fetchSemanticsNodes().size,
+        )
+    }
+
+    /**
+     * 待确认态：确认框必须把**域名**摆在正文里（AGENTS.md 的「展示域名并确认」），点「确认」把同意答复回给 VM。
+     *
+     * 拆成两枚用例而不是在一枚里 `setScreen` 两次：`ComposeTestRule` 一回合一内容，第二次 `setContent`
+     * 直接抛 `has already set content`（本轮 connected 实测踩过）。确认与拒绝各占一局，失败时也能一眼看出断的是哪一环。
+     */
+    @Test fun editor_outbound_confirmation_shows_the_domain_and_answers_yes() {
+        var answer: Boolean? = null
+        setScreen(
+            editor = editorState(connection = AiConnectionUiState.AwaitingConfirmation("api.example.com")),
+            onConfirmOutbound = { answer = it },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_outbound_confirmation_text")
+            .assert(showingText("api.example.com"))
+        composeRule.onNodeWithTag("ai_profile_confirm_outbound").performClick()
+        composeRule.waitForIdle()
+        assertEquals("确认按钮必须把「同意出站」答复回给 VM，否则探活永远停在待确认", true, answer)
+    }
+
+    /** 拒绝这一半：取消必须是明确的 `false`，不能留成「没答复」让 VM 猜。 */
+    @Test fun editor_outbound_confirmation_answers_no_on_dismiss() {
+        var answer: Boolean? = null
+        setScreen(
+            editor = editorState(connection = AiConnectionUiState.AwaitingConfirmation("api.example.com")),
+            onConfirmOutbound = { answer = it },
+        )
+
+        composeRule.onNodeWithTag("ai_profile_decline_outbound").performClick()
+        composeRule.waitForIdle()
+        assertEquals("取消必须是明确的拒绝，而不是「没答复」", false, answer)
     }
 
     @Test fun editor_surfaces_the_field_error_verbatim() {
@@ -412,6 +475,7 @@ class AiProfileSettingsScreenTest {
         fieldError: AiProfileFieldError? = null,
         capabilities: Set<AiCapability> = setOf(AiCapability.Text),
         voice: String = "",
+        connection: AiConnectionUiState = AiConnectionUiState.Idle,
     ) = AiProfileEditorUiState(
         profileId = profileId,
         draft = AiProfileDraft(
@@ -425,6 +489,7 @@ class AiProfileSettingsScreenTest {
         ),
         hasStoredKey = hasStoredKey,
         fieldError = fieldError,
+        connection = connection,
     )
 
     /**
@@ -436,6 +501,16 @@ class AiProfileSettingsScreenTest {
     private fun isEmptyInput() = SemanticsMatcher("输入框的值为空") { node ->
         val value = node.config.getOrNull(SemanticsProperties.EditableText)
         value == null || value.text.isEmpty()
+    }
+
+    /**
+     * 「这个节点的可见文本里含 needle」。文本节点在 Compose 语义树里是 `List<TextLayoutInput>`，
+     * 而共享出站确认框的正文是「配方 + 本屏追加说明」拼出来的一整段，逐字 `assertTextEquals`
+     * 会把断言绑死在整段措辞上；域名披露判据只关心**域名逐字出现在正文里**（AGENTS.md 的要求就是这个），
+     * 所以按子句点名为准。
+     */
+    private fun showingText(needle: String) = SemanticsMatcher("文本含「$needle」") { node ->
+        node.config.getOrNull(SemanticsProperties.Text)?.any { needle in it.text } == true
     }
 
     private fun profile(id: String, name: String, endpoint: String = "https://api.example.com/v1") = AiProfile(

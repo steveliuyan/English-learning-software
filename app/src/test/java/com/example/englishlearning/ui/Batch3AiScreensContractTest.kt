@@ -224,9 +224,13 @@ class Batch3AiScreensContractTest {
      * 裁决 B（`docs/decisions/2026-10-29-ui-prototype-token-alignment.md` §已知冲突）：
      * 原型的流式 / 语音 / 生图参数**超出 V1 请求协议白名单**，既不能照搬成真控件，也不能整块消失——
      * 「画完整版面，未接入控件禁用并标注「暂未接入」」。落地形状：
-     *  - 第四枚软卡「未接入的选项」，四枚 `EntryRow(enabled = false)`，尾部值统一「暂未接入」；
+     *  - 第四枚软卡「未接入的选项」，三枚 `EntryRow(enabled = false)`，尾部值统一「暂未接入」；
      *  - 禁用走共享件的 `enabled = false`（不挂 `clickable` + `disabled()` 语义），不是「能点却不作为」；
      *  - 四枚既有参数（temperature / top_p / max_tokens / timeout）仍是真控件，不并入这张卡。
+     *
+     * 「连接测试」原来也在这张卡里占位，2026-11-04 起做成了真探活（决策
+     * `docs/decisions/2026-11-04-ai-profile-vision-and-connection-test.md` §3），所以这张卡只剩三枚，
+     * 而占位 tag 必须**消失**——留着它就是给用户一个写着「暂未接入」的假入口。
      */
     @Test
     fun `the ai profile editor draws the unsupported options disabled and labelled`() {
@@ -242,7 +246,6 @@ class Batch3AiScreensContractTest {
             "ai_profile_unsupported_stream",
             "ai_profile_unsupported_voice",
             "ai_profile_unsupported_image",
-            "ai_profile_unsupported_connection_test",
         ).forEach { tag ->
             assertEquals(
                 1,
@@ -251,9 +254,19 @@ class Batch3AiScreensContractTest {
             )
         }
         assertEquals(
-            4,
+            0,
+            countMatches(profiles, Regex(Regex.escape("ai_profile_unsupported_connection_test"))),
+            "占位行「暂未接入的连接测试」必须随真探活一起下线，否则同一屏有两个互相矛盾的连接入口",
+        )
+        assertEquals(
+            1,
+            countMatches(profiles, Regex(Regex.escape("\"ai_profile_connection_test\""))),
+            "真探活按钮必须恰一处（`ai_profile_connection_test`）",
+        )
+        assertEquals(
+            3,
             countMatches(editor, Regex("""\bUnsupportedOption\(""")),
-            "四枚未接入控件必须都走同一个禁用行配方（`UnsupportedOption(`）：屏侧不逐枚手搓",
+            "三枚未接入控件必须都走同一个禁用行配方（`UnsupportedOption(`）：屏侧不逐枚手搓",
         )
         val helper = bodyOf(profiles, "private fun UnsupportedOption(")
         assertTrue(helper.isNotEmpty(), "取不到 `UnsupportedOption(` 本体：禁用配方失去了唯一出处")

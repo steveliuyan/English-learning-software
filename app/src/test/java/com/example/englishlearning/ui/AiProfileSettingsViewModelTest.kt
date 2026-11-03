@@ -1,9 +1,14 @@
 package com.example.englishlearning.ui
 
+import com.example.englishlearning.ai.AiConnectionProbe
 import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.AiPreferenceRepository
+import com.example.englishlearning.ai.net.AiHttpRequest
+import com.example.englishlearning.ai.net.AiHttpResponse
+import com.example.englishlearning.ai.net.AiHttpResult
+import com.example.englishlearning.ai.net.AiHttpTransport
 import com.example.englishlearning.ai.domain.AiAdvancedParameters
 import com.example.englishlearning.ai.domain.AiPreference
 import com.example.englishlearning.ai.domain.AiCapability
@@ -13,11 +18,15 @@ import com.example.englishlearning.core.error.AppError
 import com.example.englishlearning.core.security.SecretReference
 import com.example.englishlearning.core.security.SecretStore
 import com.example.englishlearning.core.storage.AppErrorException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -564,10 +573,326 @@ class AiProfileSettingsViewModelTest {
             it.startsWith("secret-delete:")
     }
 
+    // ---------- 连接探活（决策 2026-11-04 §3-§4）----------
+
+    @Test
+    fun testConnectionStopsAtDomainConfirmationBeforeAnyByteLeaves() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+
+        assertEquals(
+            AiConnectionUiState.AwaitingConfirmation("api.example.com"),
+            viewModel.editor.value?.connection,
+            "编辑页的探活必须和其他 AI 功能走同一条域名披露闸门：状态里只带 host，不带密钥",
+        )
+        assertEquals(0, transport.requests.size, "确认之前零出站——这是 AGENTS.md 的硬约束，不是提示文案")
+    }
+
+    @Test
+    fun confirmingTheHostSendsOneMinimalGetAndReportsReachable() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+        viewModel.testConnection()
+        advanceUntilIdle()
+
+        viewModel.confirmOutbound(true)
+        advanceUntilIdle()
+
+        assertEquals(AiConnectionUiState.Reported(AiConnectionOutcome.Reachable), viewModel.editor.value?.connection)
+        val request = transport.requests.single()
+        assertEquals("https://api.example.com/v1/models", request.url)
+        assertEquals("GET", request.method)
+        assertEquals("", request.body, "探活只问「通不通」，不许带任何内容或模型名——带了就产生计费")
+        assertEquals(setOf("Authorization"), request.headers.keys)
+    }
+
+    @Test
+    fun refusingTheConfirmationLeavesTheEditorIdleAndStillSendsNothing() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+        viewModel.testConnection()
+        advanceUntilIdle()
+
+        viewModel.confirmOutbound(false)
+
+        assertEquals(AiConnectionUiState.Idle, viewModel.editor.value?.connection)
+        assertEquals(0, transport.requests.size)
+    }
+
+    @Test
+    fun anIncompleteDraftIsCalledOutAsConfigurationInvalidWithoutGoingOut() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft().copy(model = ""))
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+
+        assertEquals(AiConnectionUiState.Reported(AiConnectionOutcome.ConfigurationInvalid), viewModel.editor.value?.connection)
+        assertEquals(0, transport.requests.size, "草稿过不了既有校验就不许出网：探活不是绕过表单校验的后门")
+    }
+
+    @Test
+    fun aDraftWithNoKeyAnywhereSaysSoInsteadOfGoingOut() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft().copy(pendingKey = ""))
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+
+        assertEquals(AiConnectionUiState.Reported(AiConnectionOutcome.MissingKey), viewModel.editor.value?.connection)
+        assertEquals(0, transport.requests.size)
+        assertFalse(
+            ops.any { it.startsWith("secret-read:") },
+            "新建配置没有 profileId，连该读哪个密钥槽都不知道，不许去碰安全存储",
+        )
+    }
+
+    @Test
+    fun theProbeUsesTheDraftKeyBeforeTheStoredOne() = runTest(dispatcher) {
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p1").alias] = "sk-stored"
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(repository(initial = listOf(profile("p1"))), transport = transport)
+        viewModel.startEdit("p1")
+        advanceUntilIdle()
+        viewModel.updateDraft(viewModel.editor.value!!.draft.copy(pendingKey = "sk-typed-now"))
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        advanceUntilIdle()
+
+        assertEquals(
+            "Bearer sk-typed-now",
+            transport.requests.single().headers["Authorization"],
+            "「先测通再保存」是探活的主要用途：刚填进去还没保存的 Key 必须比库里的旧 Key 优先",
+        )
+    }
+
+    @Test
+    fun theProbeFallsBackToTheStoredKeyWhenTheDraftLeavesItEmpty() = runTest(dispatcher) {
+        secrets.entries[AiProfileSecretUseCase.referenceFor("p1").alias] = "sk-stored"
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(repository(initial = listOf(profile("p1"))), transport = transport)
+        viewModel.startEdit("p1")
+        advanceUntilIdle()
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        advanceUntilIdle()
+
+        assertEquals("Bearer sk-stored", transport.requests.single().headers["Authorization"])
+        assertTrue(
+            ops.any { it == "secret-read:${AiProfileSecretUseCase.referenceFor("p1").alias}" },
+            "编辑已存配置时草稿不回显密钥，取不到草稿密钥就要取这份 Profile 自己的密钥槽",
+        )
+    }
+
+    @Test
+    fun theConnectionStateCarriesNoSlotThatCouldHoldTheKey() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        advanceUntilIdle()
+
+        val reported = viewModel.editor.value!!.connection.toString()
+        assertFalse(
+            reported.contains("sk-test-key"),
+            "探活状态只能是无字段常量（沿用 AiFailure 那条泄露防线）：$reported",
+        )
+        assertEquals(
+            AiConnectionUiState.Reported(AiConnectionOutcome.Reachable),
+            viewModel.editor.value!!.connection,
+        )
+    }
+
+    @Test
+    fun timeoutAndNetworkFailureStayApartInWhatTheUserIsTold() = runTest(dispatcher) {
+        val timeoutTransport = FakeProbeTransport(result = AiHttpResult.TimedOut)
+        val timeoutViewModel = viewModel(transport = timeoutTransport)
+        timeoutViewModel.startCreate()
+        timeoutViewModel.updateDraft(validDraft())
+        timeoutViewModel.testConnection()
+        advanceUntilIdle()
+        timeoutViewModel.confirmOutbound(true)
+        advanceUntilIdle()
+        assertEquals(
+            AiConnectionUiState.Reported(AiConnectionOutcome.Timeout),
+            timeoutViewModel.editor.value!!.connection,
+        )
+
+        val offlineTransport = FakeProbeTransport(result = AiHttpResult.NetworkUnavailable)
+        val offlineViewModel = viewModel(transport = offlineTransport)
+        offlineViewModel.startCreate()
+        offlineViewModel.updateDraft(validDraft())
+        offlineViewModel.testConnection()
+        advanceUntilIdle()
+        offlineViewModel.confirmOutbound(true)
+        advanceUntilIdle()
+        assertEquals(
+            AiConnectionUiState.Reported(AiConnectionOutcome.NetworkUnavailable),
+            offlineViewModel.editor.value!!.connection,
+            "「太慢」和「压根连不上」是两个处置动作；折叠成一条就等于把用户支到错误的排查方向",
+        )
+    }
+
+    @Test
+    fun aRejectedKeyIsReportedAsAuthFailureNotAsBrokenNetwork() = runTest(dispatcher) {
+        val transport = FakeProbeTransport(result = AiHttpResult.Responded(AiHttpResponse(401, """{"error":"bad key"}""")))
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        advanceUntilIdle()
+
+        assertEquals(AiConnectionUiState.Reported(AiConnectionOutcome.Unauthorized), viewModel.editor.value!!.connection)
+        val message = (viewModel.editor.value!!.connection as AiConnectionUiState.Reported).outcome.message
+        assertFalse(message.contains("bad key"), "响应体原文不许流到界面：$message")
+        assertFalse(message.contains("api.example.com"), "界面文案只能是常量：$message")
+    }
+
+    @Test
+    fun editingTheDraftClearsAStaleConnectionReport() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        advanceUntilIdle()
+        assertEquals(AiConnectionUiState.Reported(AiConnectionOutcome.Reachable), viewModel.editor.value!!.connection)
+        val probesSoFar = transport.requests.size
+
+        viewModel.updateDraft(validDraft().copy(endpoint = "https://other.test/v1"))
+
+        assertEquals(
+            AiConnectionUiState.Idle,
+            viewModel.editor.value!!.connection,
+            "Endpoint 一改，「可达」就是假证词：结果必须随输入一起作废，和 fieldError 同一族处理",
+        )
+        assertEquals(
+            probesSoFar,
+            transport.requests.size,
+            "作废是清状态，不是补一发新请求：编辑不许自己触发出站",
+        )
+    }
+
+    @Test
+    fun aLateAnswerCannotResurrectAReportForAStaleDraft() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val transport = FakeProbeTransport(release = gate)
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        runCurrent()
+        assertEquals(AiConnectionUiState.Testing, viewModel.editor.value!!.connection)
+
+        // 等待期间用户改了 Endpoint：这一轮的答案说的是旧地址。
+        viewModel.updateDraft(validDraft().copy(endpoint = "https://other.test/v1"))
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(
+            AiConnectionUiState.Idle,
+            viewModel.editor.value!!.connection,
+            "迟到的答案不许落到新草稿上：那等于拿旧 Endpoint 的「可达」给新配置背书",
+        )
+    }
+
+    @Test
+    fun closingTheEditorCancelsAnInFlightProbe() = runTest(dispatcher) {
+        val transport = FakeProbeTransport(ops = ops, hang = true)
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        runCurrent()
+
+        viewModel.closeEditor()
+        advanceUntilIdle()
+
+        assertTrue(
+            ops.contains("transport-cancelled"),
+            "退出编辑页要真的掐掉在飞的请求（不得阻塞 UI 的反面就是别让它挂在后台）",
+        )
+    }
+
+    @Test
+    fun startingAnotherProbeCancelsTheOneInFlight() = runTest(dispatcher) {
+        val transport = FakeProbeTransport(ops = ops, hang = true)
+        val viewModel = viewModel(transport = transport)
+        viewModel.startCreate()
+        viewModel.updateDraft(validDraft())
+        viewModel.testConnection()
+        advanceUntilIdle()
+        viewModel.confirmOutbound(true)
+        runCurrent()
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            ops.count { it == "transport-cancelled" },
+            "连点两次不许攒出两条并发探活：同一份草稿同时只允许一个在飞的诊断请求",
+        )
+        assertEquals(
+            AiConnectionUiState.Testing,
+            viewModel.editor.value?.connection,
+            "同一域名本轮已确认过，第二次点下去直接重探（Text 档按域名记一次，与其余 AI 功能同口径），" +
+                "但状态必须回到「测试中」，不许挂着上一轮被掐掉的中间态",
+        )
+    }
+
+    @Test
+    fun testConnectionWithoutAnOpenEditorDoesNothing() = runTest(dispatcher) {
+        val transport = FakeProbeTransport()
+        val viewModel = viewModel(transport = transport)
+
+        viewModel.testConnection()
+        advanceUntilIdle()
+
+        assertNull(viewModel.editor.value)
+        assertEquals(0, transport.requests.size)
+    }
+
     private fun viewModel(
         repository: AiProfileRepository = repository(),
         ids: AiProfileIdFactory = AiProfileIdFactory { "ai-test-${ops.count { it.startsWith("profile-save:") } + 1}" },
-    ) = AiProfileSettingsViewModel(repository, AiProfileSecretUseCase(secrets), ids, preferences)
+        transport: AiHttpTransport = FakeProbeTransport(),
+    ) = AiProfileSettingsViewModel(
+        repository,
+        AiProfileSecretUseCase(secrets),
+        ids,
+        preferences,
+        AiConnectionProbe(transport),
+    )
 
     private fun repository(
         initial: List<AiProfile> = emptyList(),
@@ -645,6 +970,39 @@ private class FakeAiProfileRepository(
         ops += "profile-delete:$profileId"
         stored.remove(profileId)
         return Result.success(Unit)
+    }
+}
+
+private class FakeProbeTransport(
+    private val ops: MutableList<String>? = null,
+    var result: AiHttpResult = AiHttpResult.Responded(AiHttpResponse(200, """{"data":[]}""")),
+    var hang: Boolean = false,
+    var release: CompletableDeferred<Unit>? = null,
+) : AiHttpTransport {
+    val requests = mutableListOf<AiHttpRequest>()
+
+    override suspend fun send(request: AiHttpRequest): AiHttpResult {
+        requests += request
+        if (hang) {
+            // 「在飞」的可观察证据只有取消：把 CancellationException 记进 ops 再原样抛回去，
+            // 这样「退出编辑页/重连必须掐掉旧请求」这类断言不用去偷看协程内部。
+            try {
+                awaitCancellation()
+            } catch (cancellation: CancellationException) {
+                ops?.add("transport-cancelled")
+                throw cancellation
+            }
+        }
+        // 可控闸门：让「答案什么时候回来」由用例决定，才能演出「等待期间用户改了输入」这一场。
+        release?.let { gate ->
+            try {
+                gate.await()
+            } catch (cancellation: CancellationException) {
+                ops?.add("transport-cancelled")
+                throw cancellation
+            }
+        }
+        return result
     }
 }
 
