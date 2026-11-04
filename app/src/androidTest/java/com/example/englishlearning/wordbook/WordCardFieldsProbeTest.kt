@@ -33,6 +33,8 @@ import org.junit.runner.RunWith
  *
  * 严格性：任何字段超限或结构不合规，**整词拒绝**并记录原因，不写半份数据
  * （与 `SentenceAnalysisParser` 等既有解析器的纪律一致）。
+ *
+ * **门禁里默认跳过**（见 `OperatorToolGate`）：它是打包阶段的批量出网工具，不是运行时断言；只有显式 `-e operatorTool true` 才执行。跳过 ≠ 通过——本轮零执行必须在报告里写清。
  */
 @RunWith(AndroidJUnit4::class)
 class WordCardFieldsProbeTest {
@@ -42,6 +44,7 @@ class WordCardFieldsProbeTest {
 
     @Test
     fun draftsTheExtendedCardFieldsForFiveWords() {
+        assumeOperatorToolRequested("WordCardFieldsProbeTest")
         val outputDirectory = java.io.File(context.getExternalFilesDir(null), "wordcard-probe").apply { mkdirs() }
         val report = java.io.File(outputDirectory, "wordcard-probe.tsv")
         val rawLog = java.io.File(outputDirectory, "wordcard-probe.jsonl")

@@ -31,6 +31,8 @@ import org.junit.runner.RunWith
  * - **不碰真库**：把用户库三个文件复制成 `probe-english-learning.db` 再打开，只读配置；
  * - **密钥不出进程**：密钥经 `AndroidKeyStoreSecretStore` 读出后只进 `Authorization` 头，
  *   `finally` 清零，报告里不含任何密钥痕迹。
+ *
+ * **门禁里默认跳过**（见 `OperatorToolGate`）：它是打包阶段的批量出网工具，不是运行时断言；只有显式 `-e operatorTool true` 才执行。跳过 ≠ 通过——本轮零执行必须在报告里写清。
  */
 @RunWith(AndroidJUnit4::class)
 class WordMeaningProbeTest {
@@ -40,6 +42,7 @@ class WordMeaningProbeTest {
 
     @Test
     fun draftsMeaningsForTenWordsUsingTheConfiguredTextService() {
+        assumeOperatorToolRequested("WordMeaningProbeTest")
         val outputDirectory = java.io.File(context.getExternalFilesDir(null), "meaning-probe").apply { mkdirs() }
         val report = java.io.File(outputDirectory, "meaning-probe.tsv")
 

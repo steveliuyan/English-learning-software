@@ -63,6 +63,8 @@ import org.junit.runner.RunWith
  * - **不碰真库**（复制成 `probe-english-learning.db` 再读）；
  * - **密钥不出进程**（只进 Authorization 头，`finally` 清零，产物无密钥痕迹）；
  * - **可中断续跑**：每完成一项立即落盘（`cards.jsonl` / `manifest.jsonl`），重跑跳过已完成项。
+ *
+ * **门禁里默认跳过**（见 `OperatorToolGate`）：它是打包阶段的批量出网工具，不是运行时断言；只有显式 `-e operatorTool true` 才执行。跳过 ≠ 通过——本轮零执行必须在报告里写清。
  */
 @RunWith(AndroidJUnit4::class)
 class WordBookPackTest {
@@ -86,6 +88,7 @@ class WordBookPackTest {
      */
     @Test
     fun reassemblesBookJsonFromAlreadyPackedCards() {
+        assumeOperatorToolRequested("WordBookPackTest")
         prepareDirectories()
         val cards = readCards()
         val manifest = readManifest()
@@ -110,6 +113,7 @@ class WordBookPackTest {
 
     @Test
     fun packsTheFirstHundredWordsWithExtendedCardFieldsAndImages() {
+        assumeOperatorToolRequested("WordBookPackTest")
         prepareDirectories()
 
         val database = openProbeCopyOfUserDatabase()
