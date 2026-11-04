@@ -18,6 +18,8 @@
 - 创建本地 Profile、词书元数据、单词、学习事件、进度、今日计划、文章、媒体和 AI Profile 的 schema 与迁移机制。
 - API Key 仅写入 Keystore 支撑的 SecretStore；Room 仅保存不可逆的 key alias/reference。
 - 建立日志脱敏规则：Authorization、API Key、图片二进制、备份明文、密码和私钥不得记录。
+- 网络信任基线必须由 `android:networkSecurityConfig` 显式声明，不得只靠平台默认：base-config 只列系统信任锚并禁明文流量，
+  用户/企业安装的根证书与自签名证书在正式包一律拒；`debug-overrides` 放开用户 CA 只对 debuggable 构建生效，供设备抓包取证。
 - SQLCipher 是否启用由基准测试与密钥生命周期设计决定；未决定前不得将数据库裸文件作为备份格式。
 
 ### F0-03 可替换服务边界
@@ -46,6 +48,7 @@
 - AC0-03：任一 UI ViewModel 不能直接引用 HTTP 客户端、SecretStore 或 Room DAO。
 - AC0-04：媒体文件被删除或哈希不一致时，资源读取返回“不可用/可重建”，不导致应用崩溃。
 - AC0-05：第三方台账中每一项都具备许可证、用途和数据流字段；缺字段时发布检查失败。
+- AC0-06：正式包的传输信任面被配置钉死：`AndroidManifest` 挂 `android:networkSecurityConfig`，其 base-config 的信任锚只有系统根且禁明文；用户根证书只允许出现在 `debug-overrides` 内（仅 debuggable 构建生效），release 不得继承该开口。
 
 ## 不在本阶段实现
 
