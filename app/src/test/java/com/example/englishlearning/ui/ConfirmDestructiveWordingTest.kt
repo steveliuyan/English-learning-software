@@ -82,7 +82,7 @@ class ConfirmDestructiveWordingTest {
      *
      * 原来这里用 UI 侧的 `mustAskEveryTime(kind, rememberedForHost)` 四格全钉。那枚函数在生产代码里
      * **零调用**——显隐实际由域层 `ai/AiOutboundConfirmation.kt` 的 `requiredConfirmation(profile, kind,
-     * confirmedTextHost)` 决定，于是同一规则有两份权威：一份被测试钉得很牢，一份没人调。
+     * confirmedTextHosts)` 决定，于是同一规则有两份权威：一份被测试钉得很牢，一份没人调。
      * 四格真值表已经在 `ai/AiRequestPolicyTest` 逐格钉住（首问 / 同域名复用 / 换域名重新问 /
      * Image 即使已记住仍 `Required`），删掉这份 UI 侧副本不减少任何覆盖，
      * 少一份权威才是这次整合要的东西。

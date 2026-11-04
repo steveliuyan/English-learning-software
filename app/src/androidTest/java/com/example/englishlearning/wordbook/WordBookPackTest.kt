@@ -306,7 +306,7 @@ class WordBookPackTest {
                 defaultTextProfile = DefaultTextProfileResolver { DefaultTextProfileResult.Selected(textProfile) },
                 secrets = secrets,
                 transport = textTransport,
-            ).generate(subject = subject, confirmedTextHost = textHost)
+            ).generate(subject = subject, confirmedTextHosts = setOf(textHost))
         ) {
             is DrawingPromptResult.Draft -> result.prompt
             else -> return null

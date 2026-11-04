@@ -76,7 +76,7 @@ class DrawingPromptUseCaseTest {
     fun noDefaultProfileIsNotConfiguredWithoutAnyNetworkCall() = runTest {
         val (useCase, transport, _) = useCase(resolverResult = DefaultTextProfileResult.NoSelection)
 
-        val result = useCase.generate("苹果", confirmedTextHost = null)
+        val result = useCase.generate("苹果", confirmedTextHosts = emptySet())
 
         assertEquals(DrawingPromptResult.NotConfigured(ImageStudioNotConfiguredReason.NoDefaultProfile), result)
         assertEquals(0, transport.requests.size)
@@ -86,7 +86,7 @@ class DrawingPromptUseCaseTest {
     fun unavailableProfileIsNotConfigured() = runTest {
         val (useCase, transport, _) = useCase(resolverResult = DefaultTextProfileResult.Unavailable)
 
-        val result = useCase.generate("苹果", confirmedTextHost = null)
+        val result = useCase.generate("苹果", confirmedTextHosts = emptySet())
 
         assertEquals(
             DrawingPromptResult.NotConfigured(ImageStudioNotConfiguredReason.DefaultProfileUnavailable),
@@ -99,7 +99,7 @@ class DrawingPromptUseCaseTest {
     fun missingKeyIsNotConfigured() = runTest {
         val (useCase, transport, _) = useCase(hasKey = false)
 
-        val result = useCase.generate("苹果", confirmedTextHost = null)
+        val result = useCase.generate("苹果", confirmedTextHosts = emptySet())
 
         assertEquals(
             DrawingPromptResult.NotConfigured(ImageStudioNotConfiguredReason.DefaultProfileUnavailable),
@@ -112,7 +112,7 @@ class DrawingPromptUseCaseTest {
     fun firstAskNeedsConfirmationBeforeAnyByteLeaves() = runTest {
         val (useCase, transport, _) = useCase()
 
-        val result = useCase.generate("苹果", confirmedTextHost = null)
+        val result = useCase.generate("苹果", confirmedTextHosts = emptySet())
 
         assertEquals(DrawingPromptResult.NeedsConfirmation("api.example.com", AiPayloadKind.Text), result)
         assertEquals(0, transport.requests.size)
@@ -122,7 +122,7 @@ class DrawingPromptUseCaseTest {
     fun confirmedHostSendsControlledPromptAndReturnsDraft() = runTest {
         val (useCase, transport, _) = useCase()
 
-        val result = useCase.generate("苹果", confirmedTextHost = "api.example.com")
+        val result = useCase.generate("苹果", confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(DrawingPromptResult.Draft("a watercolor painting of an apple"), result)
         assertEquals(1, transport.requests.size)
@@ -141,7 +141,7 @@ class DrawingPromptUseCaseTest {
         }
         val (useCase, _, _) = useCase(transport = transport)
 
-        val result = useCase.generate("苹果", confirmedTextHost = "api.example.com")
+        val result = useCase.generate("苹果", confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(DrawingPromptResult.Draft("a watercolor apple"), result)
     }
@@ -156,7 +156,7 @@ class DrawingPromptUseCaseTest {
         val (blankCase, _, _) = useCase(transport = blankTransport)
         assertEquals(
             DrawingPromptResult.Failed(AiFailure.InvalidResponse),
-            blankCase.generate("苹果", confirmedTextHost = "api.example.com"),
+            blankCase.generate("苹果", confirmedTextHosts = setOf("api.example.com")),
         )
 
         val overlongTransport = RecordingTransport().apply {
@@ -167,7 +167,7 @@ class DrawingPromptUseCaseTest {
         val (overlongCase, _, _) = useCase(transport = overlongTransport)
         assertEquals(
             DrawingPromptResult.Failed(AiFailure.InvalidResponse),
-            overlongCase.generate("苹果", confirmedTextHost = "api.example.com"),
+            overlongCase.generate("苹果", confirmedTextHosts = setOf("api.example.com")),
         )
     }
 
@@ -179,21 +179,21 @@ class DrawingPromptUseCaseTest {
         val (unauthorizedCase, _, _) = useCase(transport = unauthorizedTransport)
         assertEquals(
             DrawingPromptResult.Failed(AiFailure.Unauthorized),
-            unauthorizedCase.generate("苹果", confirmedTextHost = "api.example.com"),
+            unauthorizedCase.generate("苹果", confirmedTextHosts = setOf("api.example.com")),
         )
 
         val networkTransport = RecordingTransport().apply { result = AiHttpResult.NetworkUnavailable }
         val (networkCase, _, _) = useCase(transport = networkTransport)
         assertEquals(
             DrawingPromptResult.Failed(AiFailure.NetworkUnavailable),
-            networkCase.generate("苹果", confirmedTextHost = "api.example.com"),
+            networkCase.generate("苹果", confirmedTextHosts = setOf("api.example.com")),
         )
 
         val timeoutTransport = RecordingTransport().apply { result = AiHttpResult.TimedOut }
         val (timeoutCase, _, _) = useCase(transport = timeoutTransport)
         assertEquals(
             DrawingPromptResult.Failed(AiFailure.Timeout),
-            timeoutCase.generate("苹果", confirmedTextHost = "api.example.com"),
+            timeoutCase.generate("苹果", confirmedTextHosts = setOf("api.example.com")),
         )
     }
 
@@ -203,7 +203,7 @@ class DrawingPromptUseCaseTest {
         val (useCase, _, _) = useCase(transport = transport)
 
         assertFailsWith<CancellationException> {
-            useCase.generate("苹果", confirmedTextHost = "api.example.com")
+            useCase.generate("苹果", confirmedTextHosts = setOf("api.example.com"))
         }
     }
 
@@ -211,7 +211,7 @@ class DrawingPromptUseCaseTest {
     fun keyIsZeroedAfterTheFlowEnds() = runTest {
         val (useCase, _, secretStore) = useCase()
 
-        useCase.generate("苹果", confirmedTextHost = "api.example.com")
+        useCase.generate("苹果", confirmedTextHosts = setOf("api.example.com"))
 
         assertTrue(secretStore.lastRead!!.all { it == '\u0000' })
     }
@@ -220,9 +220,9 @@ class DrawingPromptUseCaseTest {
     fun blankOrOverlongSubjectIsAProgrammingError() = runTest {
         val (useCase, transport, _) = useCase()
 
-        assertFailsWith<IllegalArgumentException> { useCase.generate("   ", confirmedTextHost = "api.example.com") }
+        assertFailsWith<IllegalArgumentException> { useCase.generate("   ", confirmedTextHosts = setOf("api.example.com")) }
         assertFailsWith<IllegalArgumentException> {
-            useCase.generate("a".repeat(DrawingPromptPolicy.maxSubjectLength + 1), confirmedTextHost = "api.example.com")
+            useCase.generate("a".repeat(DrawingPromptPolicy.maxSubjectLength + 1), confirmedTextHosts = setOf("api.example.com"))
         }
         assertEquals(0, transport.requests.size)
     }

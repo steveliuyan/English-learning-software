@@ -193,7 +193,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.repository.stored += existingArticle(version = 1)
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = null)
+        val result = harness.useCase.generate(request(), confirmedTextHosts = emptySet())
 
         val reused = result as GenerateArticleResult.Reused
         assertEquals(1, reused.article.version)
@@ -205,7 +205,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         val generated = result as GenerateArticleResult.Generated
         assertEquals(1, generated.article.version)
@@ -222,7 +222,7 @@ class GenerateArticleUseCaseTest {
         harness.repository.stored += existingArticle(version = 1)
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test", regenerate = true)
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"), regenerate = true)
 
         val generated = result as GenerateArticleResult.Generated
         assertEquals(2, generated.article.version)
@@ -236,7 +236,7 @@ class GenerateArticleUseCaseTest {
     fun asksForConfirmationBeforeTheFirstTextCallToAHost() = runTest {
         val harness = Harness()
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = null)
+        val result = harness.useCase.generate(request(), confirmedTextHosts = emptySet())
 
         val needs = result as GenerateArticleResult.NeedsConfirmation
         assertEquals("api.test", needs.host)
@@ -249,7 +249,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertTrue(result is GenerateArticleResult.Generated)
         assertEquals(1, harness.transport.callCount)
@@ -259,7 +259,7 @@ class GenerateArticleUseCaseTest {
     fun asksAgainWhenTheEndpointHostChanged() = runTest {
         val harness = Harness(profiles = listOf(defaultProfile(endpoint = "https://b.test/v1")))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "a.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("a.test"))
 
         val needs = result as GenerateArticleResult.NeedsConfirmation
         assertEquals("b.test", needs.host)
@@ -270,7 +270,7 @@ class GenerateArticleUseCaseTest {
     fun reportsNotConfiguredWhenNoDefaultProfileIsSelected() = runTest {
         val harness = Harness(selected = DefaultTextProfileResult.NoSelection)
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoDefaultProfile), result)
         assertEquals(0, harness.transport.callCount)
@@ -280,7 +280,7 @@ class GenerateArticleUseCaseTest {
     fun reportsNotConfiguredWhenTheSelectedProfileIsUnavailable() = runTest {
         val harness = Harness(selected = DefaultTextProfileResult.Unavailable)
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, harness.transport.callCount)
@@ -303,7 +303,7 @@ class GenerateArticleUseCaseTest {
         )
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "second.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("second.test"))
 
         assertTrue(result is GenerateArticleResult.Generated, "must use the selected profile, got $result")
         assertEquals(1, harness.transport.callCount)
@@ -314,7 +314,7 @@ class GenerateArticleUseCaseTest {
     fun reportsNoDefaultAndSendsNoRequest() = runTest {
         val harness = Harness(selected = DefaultTextProfileResult.NoSelection)
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.NoDefaultProfile), result)
         assertEquals(0, harness.transport.callCount)
@@ -324,7 +324,7 @@ class GenerateArticleUseCaseTest {
     fun doesNotFallBackToAnotherKeyedProfileWhenDefaultIsUnavailable() = runTest {
         val harness = Harness(selected = DefaultTextProfileResult.Unavailable)
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.NotConfigured(NotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, harness.transport.callCount)
@@ -335,7 +335,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness(selected = DefaultTextProfileResult.NoSelection)
         harness.repository.stored += existingArticle(version = 1)
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = null)
+        val result = harness.useCase.generate(request(), confirmedTextHosts = emptySet())
 
         assertTrue(result is GenerateArticleResult.Reused)
         assertEquals(0, harness.transport.callCount)
@@ -346,7 +346,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(401, "{\"error\":\"denied\"}"))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.Failed(AiFailure.Unauthorized), result)
         assertTrue(harness.repository.stored.isEmpty()) // 失败不得写入伪造文章
@@ -357,7 +357,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(429, "{\"error\":\"slow down\"}"))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.Failed(AiFailure.RateLimited), result)
         assertTrue(harness.repository.stored.isEmpty())
@@ -368,7 +368,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.TimedOut
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.Failed(AiFailure.Timeout), result)
         assertTrue(harness.repository.stored.isEmpty())
@@ -379,7 +379,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.NetworkUnavailable
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.Failed(AiFailure.NetworkUnavailable), result)
         assertTrue(harness.repository.stored.isEmpty())
@@ -390,7 +390,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, "this is not json at all"))
 
-        val result = harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.Failed(AiFailure.InvalidResponse), result)
         assertTrue(harness.repository.stored.isEmpty())
@@ -401,7 +401,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Cancelled
 
-        assertFailsWith<CancellationException> { harness.useCase.generate(request(), confirmedTextHost = "api.test") }
+        assertFailsWith<CancellationException> { harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test")) }
         assertTrue(harness.repository.stored.isEmpty())
     }
 
@@ -419,7 +419,7 @@ class GenerateArticleUseCaseTest {
         )
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        val result = useCase.generate(request(), confirmedTextHost = "api.test")
+        val result = useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals(GenerateArticleResult.StorageFailed, result)
     }
@@ -429,7 +429,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         val article = harness.repository.stored.single()
         val texts = listOf(
@@ -447,7 +447,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         val body = harness.transport.lastRequest!!.body
         assertTrue(body.contains("apple"), "prompt must carry the target lemma apple")
@@ -460,7 +460,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        harness.useCase.generate(request(excluded = listOf("river")), confirmedTextHost = "api.test")
+        harness.useCase.generate(request(excluded = listOf("river")), confirmedTextHosts = setOf("api.test"))
 
         val body = harness.transport.lastRequest!!.body
         assertTrue(body.contains("river"), "prompt must carry the excluded lemmas from the previous article")
@@ -471,7 +471,7 @@ class GenerateArticleUseCaseTest {
         val harness = Harness()
         harness.transport.responses += AiHttpResult.Responded(com.example.englishlearning.ai.net.AiHttpResponse(200, chatBody(validContent)))
 
-        harness.useCase.generate(request(), confirmedTextHost = "api.test")
+        harness.useCase.generate(request(), confirmedTextHosts = setOf("api.test"))
 
         val article = harness.repository.stored.single()
         val source = article.source as ArticleSource.AiGenerated

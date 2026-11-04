@@ -45,12 +45,11 @@ enum class AiFeature(
         icon = AppIcon.Newspaper,
         title = "词文串学",
         summary = "根据今日所学单词，匹配一篇外刊短文",
-        status = "未实现：文章生成需要先接通 AI 网关，且需要你配置一个可用的模型。",
+        status = "未实现：AI 网关、文章生成与质量校验都已上线，缺的是本页入口——把今日所学单词交给那条链路并显示结果。",
         implemented = false,
         dependencies = listOf(
-            "AI 网关：网络客户端与 INTERNET 权限",
-            "AI 配置页：填写 Endpoint、模型与 API Key",
-            "文章生成与校验：结构、长度、目标词覆盖校验",
+            "入口接线：从「AI 助学」跳到词文串学页、并把今日计划的词带进去（本页尚未接通）",
+            "出题适配：现有生成链路按活动词书出题，这里要改成按「今日所学单词」挑词",
         ),
     ),
     CLOZE(
@@ -59,12 +58,11 @@ enum class AiFeature(
         icon = AppIcon.List,
         title = "AI 短文填词",
         summary = "AI 生成短文，选词填空做练习",
-        status = "未实现：出题与判分都依赖 AI 网关，尚未开发。",
+        status = "未实现：出题与判分逻辑尚未开发（AI 网关与 AI 配置页已上线）。",
         implemented = false,
         dependencies = listOf(
-            "AI 网关：网络客户端与 INTERNET 权限",
-            "题目生成：把今日词编入短文并挖空",
-            "判分与错词回收：把答错的词送回复习队列",
+            "题目生成：把今日词编入短文并挖空（尚未开发）",
+            "判分与错词回收：答错的词送回复习队列（尚未开发；错词数据源已在复习模块可用）",
         ),
     ),
     LISTENING(
@@ -73,12 +71,11 @@ enum class AiFeature(
         icon = AppIcon.Speaker,
         title = "单词随身听",
         summary = "听写听讲，把词听进耳朵里",
-        status = "未实现：需要音频播放与缓存策略，尚未开发。",
+        status = "未实现：播放与音频缓存链路都已可用，缺的是听写交互与本页接线。",
         implemented = false,
         dependencies = listOf(
-            "发音播放：系统 TTS 优先，需处理英语离线语音包缺失",
-            "听写模式：按今日词表顺序播放并等待输入",
-            "音频缓存：仅在接入云端语音时才需要",
+            "听写模式：按今日词表顺序播放并等待输入（尚未开发）",
+            "播放链路复用：系统 TTS、端侧合成与音频缓存已在查词/阅读可用，需要接进本页",
         ),
     ),
     COACH(
@@ -87,12 +84,11 @@ enum class AiFeature(
         icon = AppIcon.Mic,
         title = "单词串讲",
         summary = "今日词与常错词逐个讲解，可以追问",
-        status = "未实现：讲解与追问需要 AI 网关与多轮对话支持，尚未开发。",
+        status = "未实现：多轮对话尚未开发（AI 网关、配置页与错词数据都已上线）。",
         implemented = false,
         dependencies = listOf(
-            "AI 网关：网络客户端与 INTERNET 权限",
-            "错词数据：从复习事件里挑出高频遗忘的词",
-            "多轮对话：保留上下文并限制每次请求的输入量",
+            "多轮对话：保留上下文并限制每次请求的输入量（尚未开发；单轮问答已在查词页可用）",
+            "串讲编排：把今日词与高频遗忘词排成讲次（错词数据源已在复习模块可用）",
         ),
     ),
     SENTENCE_ANALYSIS(
@@ -105,7 +101,7 @@ enum class AiFeature(
         implemented = true,
         dependencies = listOf(
             "默认文本 AI 服务：在设置里选好一套带密钥的模型",
-            "出站确认：按域名确认一次，与文章生成同语义",
+            "出站确认：按域名确认一次，与查词问答共享同一份会话内台账；换域名或重启应用后重新询问",
         ),
     ),
     PHOTO_TRANSLATION(

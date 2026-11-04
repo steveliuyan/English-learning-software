@@ -1893,6 +1893,7 @@ class AppScreenTest {
             notes,
             WordNoteIdFactory { "note-1" },
             FixedClockProvider(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC),
+            com.example.englishlearning.ai.AiOutboundGrantStore(),
         )
     }
 
@@ -1948,6 +1949,7 @@ class AppScreenTest {
         })
         return SentenceAnalysisViewModel(
             SentenceAnalysisUseCase(DefaultTextProfileResolver { selection }, secrets, transport),
+            com.example.englishlearning.ai.AiOutboundGrantStore(),
         )
     }
 

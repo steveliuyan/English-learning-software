@@ -76,7 +76,7 @@
 |---|---|---|
 | URL | 复用 `AiChatRequestBuilder` 的 base 校验（HTTPS 公网 + 拒 userInfo/query/fragment + 拒环回/私网），路径改为 `/models` | 同一套规则只留一个出处，避免 `chat/completions` 与 `models` 两套拼接漂移；AGENTS.md「Endpoint 先过 AiEndpointPolicy」 |
 | 方法 | `GET`，body 必须为空 | `ai/net/AiHttpTransport.kt:6` 声明只支持 POST/GET；`UrlConnectionAiHttpTransport.kt:36` 对带 body 的 GET 直接 `check` 失败 |
-| Header | 只有 `Authorization: Bearer <key>` | 白名单落实：GET 无 body，`Content-Type` 属于多余声明；两枚头也不给（`AiRequestPolicy` 的「拒绝任意 Header」口径） |
+| Header | 只有 `Authorization` 一枚头（Bearer 方案，密钥随请求即用即清） | 白名单落实：GET 无 body，`Content-Type` 属于多余声明；两枚头也不给（`AiRequestPolicy` 的「拒绝任意 Header」口径） |
 | 超时 | 取该 Profile/草稿的 `timeout_seconds` | 用户设定就是这条链路的等待上限；`UrlConnectionAiHttpTransport.kt:30-31` 用它设 connect/read 超时 |
 | 出站确认 | 带 Key 出站前先过 `requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHost)` | AGENTS.md「首次调用第三方 Endpoint 前展示域名及『文本/图片和 Key 将发送给该服务』的确认」；确认未给 ⇒ **零字节出站** |
 | 不阻塞 UI | `viewModelScope` 异步 + `testing` 态禁用按钮 | AGENTS.md「核心路径不得阻塞 UI；网络请求可取消、超时并映射为可行动错误」 |

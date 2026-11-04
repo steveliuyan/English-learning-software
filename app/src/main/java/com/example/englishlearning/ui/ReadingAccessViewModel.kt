@@ -134,7 +134,7 @@ class ReadingAccessViewModel @Inject constructor(
     }
 
     fun generate(regenerate: Boolean = false) {
-        runGeneration(regenerate, confirmedTextHost = null)
+        runGeneration(regenerate, confirmedTextHosts = emptySet())
     }
 
     fun confirmOutbound(confirmed: Boolean) {
@@ -143,7 +143,7 @@ class ReadingAccessViewModel @Inject constructor(
             setGeneration(GenerationUiState.Idle)
             return
         }
-        runGeneration(regenerate = pendingRegenerate, confirmedTextHost = host)
+        runGeneration(regenerate = pendingRegenerate, confirmedTextHosts = setOf(host))
     }
 
     // ---------- 粘贴导入 ----------
@@ -243,7 +243,7 @@ class ReadingAccessViewModel @Inject constructor(
 
     // ---------- 内部 ----------
 
-    private fun runGeneration(regenerate: Boolean, confirmedTextHost: String?) {
+    private fun runGeneration(regenerate: Boolean, confirmedTextHosts: Set<String>) {
         val id = profileId ?: return
         pendingRegenerate = regenerate
         viewModelScope.launch {
@@ -266,7 +266,7 @@ class ReadingAccessViewModel @Inject constructor(
                     // 换一篇时把已覆盖的词交给模型避开；确认重放沿用同一份，保证两次请求一致。
                     excludedLemmas = if (regenerate) ready.todayArticle?.coveredLemmas.orEmpty() else emptyList(),
                 )
-                when (val result = generateArticles.generate(request, confirmedTextHost, regenerate)) {
+                when (val result = generateArticles.generate(request, confirmedTextHosts, regenerate)) {
                     is GenerateArticleResult.Reused -> openGenerated(result.article, targetCards)
                     is GenerateArticleResult.Generated -> openGenerated(result.article, targetCards)
                     is GenerateArticleResult.NeedsConfirmation ->

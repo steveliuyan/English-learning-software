@@ -70,7 +70,7 @@ class WordQaUseCaseTest {
     fun noDefaultProfileIsNotConfiguredWithoutAnyNetworkCall() = runTest {
         val (useCase, transport) = useCase(resolverResult = DefaultTextProfileResult.NoSelection)
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = null)
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = emptySet())
 
         assertEquals(WordQaResult.NotConfigured(WordQaNotConfiguredReason.NoDefaultProfile), result)
         assertEquals(0, transport.requests.size)
@@ -80,7 +80,7 @@ class WordQaUseCaseTest {
     fun unavailableProfileIsNotConfigured() = runTest {
         val (useCase, transport) = useCase(resolverResult = DefaultTextProfileResult.Unavailable)
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = null)
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = emptySet())
 
         assertEquals(WordQaResult.NotConfigured(WordQaNotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, transport.requests.size)
@@ -90,7 +90,7 @@ class WordQaUseCaseTest {
     fun missingKeyIsNotConfigured() = runTest {
         val (useCase, transport) = useCase(hasKey = false)
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = null)
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = emptySet())
 
         assertEquals(WordQaResult.NotConfigured(WordQaNotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, transport.requests.size)
@@ -100,7 +100,7 @@ class WordQaUseCaseTest {
     fun firstAskNeedsConfirmationBeforeAnyByteLeaves() = runTest {
         val (useCase, transport) = useCase()
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = null)
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = emptySet())
 
         assertEquals(WordQaResult.NeedsConfirmation("api.example.com", AiPayloadKind.Text), result)
         assertEquals(0, transport.requests.size)
@@ -110,7 +110,7 @@ class WordQaUseCaseTest {
     fun confirmedHostSendsRequestAndReturnsTheAnswer() = runTest {
         val (useCase, transport) = useCase()
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = "api.example.com")
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(WordQaResult.Answered("造句回答"), result)
         assertEquals(1, transport.requests.size)
@@ -125,7 +125,7 @@ class WordQaUseCaseTest {
         val transport = RecordingTransport().apply { result = AiHttpResult.NetworkUnavailable }
         val (useCase, _) = useCase(transport = transport)
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = "api.example.com")
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(WordQaResult.Failed(AiFailure.NetworkUnavailable), result)
     }
@@ -135,7 +135,7 @@ class WordQaUseCaseTest {
         val transport = RecordingTransport().apply { result = AiHttpResult.Responded(AiHttpResponse(401, "{}")) }
         val (useCase, _) = useCase(transport = transport)
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = "api.example.com")
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(WordQaResult.Failed(AiFailure.Unauthorized), result)
     }
@@ -147,7 +147,7 @@ class WordQaUseCaseTest {
         }
         val (useCase, _) = useCase(transport = transport)
 
-        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = "api.example.com")
+        val result = useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(WordQaResult.Failed(AiFailure.InvalidResponse), result)
     }
@@ -172,7 +172,7 @@ class WordQaUseCaseTest {
             transport = transport,
         )
 
-        useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHost = "api.example.com")
+        useCase.ask(WordQaRequest(WordQaKind.Sentence, "apple"), confirmedTextHosts = setOf("api.example.com"))
 
         assertTrue(captured != null && captured!!.all { it == '\u0000' }, "请求结束后 Key 缓冲必须清零")
     }
@@ -182,7 +182,7 @@ class WordQaUseCaseTest {
         val (useCase, transport) = useCase()
 
         try {
-            useCase.ask(WordQaRequest(WordQaKind.Sentence, "  "), confirmedTextHost = null)
+            useCase.ask(WordQaRequest(WordQaKind.Sentence, "  "), confirmedTextHosts = emptySet())
             fail("空白词必须在入口被拒绝")
         } catch (expected: IllegalArgumentException) {
             // 编程契约：词来自词卡数据，不该出现空白

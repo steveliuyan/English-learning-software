@@ -43,7 +43,7 @@ class WordQaUseCase(
     private val secrets: AiProfileSecretUseCase,
     private val transport: AiHttpTransport,
 ) {
-    suspend fun ask(request: WordQaRequest, confirmedTextHost: String?): WordQaResult {
+    suspend fun ask(request: WordQaRequest, confirmedTextHosts: Set<String>): WordQaResult {
         val lemma = request.lemma.trim()
         require(lemma.isNotEmpty()) { "lemma" } // 编程契约：词来自词卡数据
 
@@ -66,7 +66,7 @@ class WordQaUseCase(
 
         try {
             // 出站确认在任何字节发出去之前。Endpoint 不合法时连「要确认哪个域名」都答不出。
-            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHost)
+            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHosts)
                 .getOrElse { return WordQaResult.NotConfigured(WordQaNotConfiguredReason.InvalidEndpoint) }
             when (confirmation) {
                 is ConfirmationRequirement.Required ->

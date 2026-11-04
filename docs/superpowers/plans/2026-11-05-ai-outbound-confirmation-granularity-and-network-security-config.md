@@ -96,3 +96,15 @@ GREEN：改文案。
 `PhotoTranslationUseCaseTest`、`DrawingPromptUseCaseTest`、`AiFeatureTest`、`OutboundDialogFamilyTest`、
 `ConfirmDestructiveWordingTest`、四份 VM 测试、`AppScreen` 族 connected 测试、manifest 相关契约测试（宿主矩阵）。
 新增文件会动「组件份数/文件数」类棘轮——先跑门禁看红名单，再逐条给理由，不放宽判据。
+
+## 执行记录（2026-11-05 收口）
+
+T1～T7 全部按本计划落地；逐条改动清单、RED→GREEN 原始日志、connected 末行原文、
+真机拉起与 logcat 核验、以及两处必须记下的偏差（`AppScreenTest` 首趟 1 条 flake、
+`WordBookPackTest` 两条设备前置条件红且红在被改行之前的行号）均登记在
+`docs/handoff/2026-11-05-ai-outbound-granularity-and-network-baseline-report.md`，此处不复制数字以免漂移。
+
+计划外的一处必要修正：`scripts/secret-scan.sh` 在分支上早已红——命中的是
+`docs/decisions/2026-11-04-ai-profile-vision-and-connection-test.md` 表格里的
+「`Authorization` 头 + Bearer 方案 + 尖括号占位密钥」那串字面样例（随 `301f6b3` 入库）。按仓库口径行内豁免只留给确需样例的测试文件，
+故改写该句而非加豁免；重扫 rc=0。

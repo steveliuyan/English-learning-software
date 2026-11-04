@@ -155,7 +155,7 @@ fun SentenceAnalysisScreen(
                 payloadKind = AiPayloadKind.Text,
                 onConfirm = { onConfirmOutbound(true) },
                 onDismiss = { onConfirmOutbound(false) },
-                note = "发送的是你输入的这句英文。",
+                note = "发送的是你输入的这句英文。同一个域名本次使用期间只确认一次；换域名或重启应用后会重新询问。",
                 bodyTestTag = "sentence_analysis_outbound_confirmation_text",
                 confirmTestTag = "sentence_analysis_confirm_outbound",
                 dismissTestTag = "sentence_analysis_decline_outbound",

@@ -160,7 +160,7 @@ class OfflineCorePathsInstrumentedTest {
             clock = { now },
         )
 
-        val result = useCase.generate(generationRequest(), confirmedTextHost = "api.test")
+        val result = useCase.generate(generationRequest(), confirmedTextHosts = setOf("api.test"))
 
         assertEquals("不可达必须映射为终态 Failed(NetworkUnavailable)", GenerateArticleResult.Failed(AiFailure.NetworkUnavailable), result)
         assertEquals("失败分支正式文章表零写入（不损坏版本、不留幽灵文章）", emptyList<Article>(), articles.findHistory(SeedData.PROFILE_ID).getOrThrow())

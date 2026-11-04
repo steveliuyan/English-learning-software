@@ -43,7 +43,7 @@ class DrawingPromptUseCase(
     private val secrets: AiProfileSecretUseCase,
     private val transport: AiHttpTransport,
 ) {
-    suspend fun generate(subject: String, confirmedTextHost: String?): DrawingPromptResult {
+    suspend fun generate(subject: String, confirmedTextHosts: Set<String>): DrawingPromptResult {
         // 编程契约：空白/超长主题在出站前即拒绝（输入框有长度约束）。
         val promptPolicy = DrawingPromptPolicy.build(subject)
 
@@ -65,7 +65,7 @@ class DrawingPromptUseCase(
         }
 
         try {
-            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHost)
+            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHosts)
                 .getOrElse { return DrawingPromptResult.NotConfigured(ImageStudioNotConfiguredReason.InvalidEndpoint) }
             when (confirmation) {
                 is ConfirmationRequirement.Required ->
@@ -151,8 +151,8 @@ class ImageGenerationUseCase(
         }
 
         try {
-            // 图片每次都要明确确认；confirmedTextHost 恒为 null，文本域名的旧确认不能顶替。
-            val confirmation = requiredConfirmation(profile, AiPayloadKind.Image, confirmedTextHost = null)
+            // 图片每次都要明确确认；已确认过的文本域名集合一律按空集处理，旧确认不能顶替。
+            val confirmation = requiredConfirmation(profile, AiPayloadKind.Image, confirmedTextHosts = emptySet())
                 .getOrElse { return ImageGenerationResult.NotConfigured(ImageStudioNotConfiguredReason.InvalidEndpoint) }
                 .resolvedBy(answer)
             when (confirmation) {

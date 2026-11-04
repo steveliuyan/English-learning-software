@@ -11,6 +11,7 @@ import com.example.englishlearning.ai.DefaultTextProfileSelector
 import com.example.englishlearning.ai.AiProfileIdFactory
 import com.example.englishlearning.ai.AiProfileRepository
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.AiOutboundGrantStore
 import com.example.englishlearning.ai.RoomAiPreferenceRepository
 import com.example.englishlearning.ai.RoomAiProfileRepository
 import com.example.englishlearning.ai.net.AiHttpTransport
@@ -267,6 +268,12 @@ object AppModule {
     @Provides @Singleton fun provideAiHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AiHttpTransport = UrlConnectionAiHttpTransport(dispatcher)
     /** 连接探活（`GET {base}/models`）：与生成类调用共用同一份 transport，因此共用不跟随重定向与响应体上限两道防线。 */
     @Provides @Singleton fun provideAiConnectionProbe(transport: AiHttpTransport): com.example.englishlearning.ai.AiConnectionProbe = com.example.englishlearning.ai.AiConnectionProbe(transport)
+    /**
+     * 会话级文本出站确认台账（决策 2026-11-05 D-2）：`@Singleton` 是「查词问答与长难句分析共用一份」
+     * 这句话的唯一落地点——漏了它，Hilt 会按注入点各造一份，两屏互相看不见对方的确认，
+     * 而 JVM 侧的构造注入测试照样绿。该契约钉在 `AiOutboundGrantStoreTest` 的 DI 源码用例里。
+     */
+    @Provides @Singleton fun provideAiOutboundGrantStore(): AiOutboundGrantStore = AiOutboundGrantStore()
     /** 生图响应（1024×1024 b64）可达 ~14MB，文本传输的 512KB 上限会把它整条路堵死。 */
     @Provides @Singleton @Named("imageAi") fun provideImageAiHttpTransport(@Named("io") dispatcher: CoroutineDispatcher): AiHttpTransport = UrlConnectionAiHttpTransport(dispatcher, maxResponseBytes = 16 * 1024 * 1024)
     @Provides @Singleton fun provideDrawingPromptUseCase(defaultTextProfile: DefaultTextProfileResolver, secrets: AiProfileSecretUseCase, transport: AiHttpTransport): com.example.englishlearning.imagegen.DrawingPromptUseCase = com.example.englishlearning.imagegen.DrawingPromptUseCase(defaultTextProfile, secrets, transport)

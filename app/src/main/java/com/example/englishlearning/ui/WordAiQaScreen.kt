@@ -131,7 +131,7 @@ fun WordAiQaScreen(
                 payloadKind = AiPayloadKind.Text,
                 onConfirm = { onConfirmOutbound(true) },
                 onDismiss = { onConfirmOutbound(false) },
-                note = "发送的是你正在问的那个词与你的问题。",
+                note = "发送的是你正在问的那个词与你的问题。同一个域名本次使用期间只确认一次；换域名或重启应用后会重新询问。",
                 bodyTestTag = "word_qa_outbound_confirmation_text",
                 confirmTestTag = "word_qa_confirm_outbound",
                 dismissTestTag = "word_qa_decline_outbound",

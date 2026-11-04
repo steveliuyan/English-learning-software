@@ -1,6 +1,7 @@
 package com.example.englishlearning.ui
 
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiOutboundGrantStore
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.DefaultTextProfileResult
 import com.example.englishlearning.ai.DefaultTextProfileResolver
@@ -78,13 +79,14 @@ class SentenceAnalysisViewModelTest {
     private fun viewModel(
         transport: RecordingTransport = RecordingTransport(),
         resolver: DefaultTextProfileResult = DefaultTextProfileResult.Selected(profile),
+        grants: AiOutboundGrantStore = AiOutboundGrantStore(),
     ): Pair<SentenceAnalysisViewModel, RecordingTransport> {
         val useCase = SentenceAnalysisUseCase(
             defaultTextProfile = DefaultTextProfileResolver { resolver },
             secrets = AiProfileSecretUseCase(FakeSecretStore()),
             transport = transport,
         )
-        return SentenceAnalysisViewModel(analyze = useCase) to transport
+        return SentenceAnalysisViewModel(analyze = useCase, outboundGrants = grants) to transport
     }
 
     @Test

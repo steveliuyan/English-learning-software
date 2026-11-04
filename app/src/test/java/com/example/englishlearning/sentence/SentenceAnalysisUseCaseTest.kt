@@ -72,7 +72,7 @@ class SentenceAnalysisUseCaseTest {
     fun noDefaultProfileIsNotConfiguredWithoutAnyNetworkCall() = runTest {
         val (useCase, transport) = useCase(resolverResult = DefaultTextProfileResult.NoSelection)
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = null)
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(SentenceAnalysisResult.NotConfigured(SentenceAnalysisNotConfiguredReason.NoDefaultProfile), result)
         assertEquals(0, transport.requests.size)
@@ -82,7 +82,7 @@ class SentenceAnalysisUseCaseTest {
     fun unavailableProfileIsNotConfigured() = runTest {
         val (useCase, transport) = useCase(resolverResult = DefaultTextProfileResult.Unavailable)
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = null)
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(SentenceAnalysisResult.NotConfigured(SentenceAnalysisNotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, transport.requests.size)
@@ -92,7 +92,7 @@ class SentenceAnalysisUseCaseTest {
     fun missingKeyIsNotConfigured() = runTest {
         val (useCase, transport) = useCase(hasKey = false)
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = null)
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(SentenceAnalysisResult.NotConfigured(SentenceAnalysisNotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, transport.requests.size)
@@ -102,7 +102,7 @@ class SentenceAnalysisUseCaseTest {
     fun firstAskNeedsConfirmationBeforeAnyByteLeaves() = runTest {
         val (useCase, transport) = useCase()
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = null)
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(SentenceAnalysisResult.NeedsConfirmation("api.example.com", AiPayloadKind.Text), result)
         assertEquals(0, transport.requests.size)
@@ -117,7 +117,7 @@ class SentenceAnalysisUseCaseTest {
         }
         val (useCase, _) = useCase(transport = transport)
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = "api.example.com")
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
 
         val segments = (result as SentenceAnalysisResult.Analyzed).segments
         assertEquals(2, segments.size)
@@ -135,7 +135,7 @@ class SentenceAnalysisUseCaseTest {
         val transport = RecordingTransport().apply { result = AiHttpResult.NetworkUnavailable }
         val (useCase, _) = useCase(transport = transport)
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = "api.example.com")
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(SentenceAnalysisResult.Failed(AiFailure.NetworkUnavailable), result)
     }
@@ -145,7 +145,7 @@ class SentenceAnalysisUseCaseTest {
         val transport = RecordingTransport().apply { result = AiHttpResult.Responded(AiHttpResponse(401, "{}")) }
         val (useCase, _) = useCase(transport = transport)
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = "api.example.com")
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(SentenceAnalysisResult.Failed(AiFailure.Unauthorized), result)
     }
@@ -157,7 +157,7 @@ class SentenceAnalysisUseCaseTest {
         }
         val (useCase, _) = useCase(transport = transport)
 
-        val result = useCase.analyze("Birds fly.", confirmedTextHost = "api.example.com")
+        val result = useCase.analyze("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
 
         assertEquals(SentenceAnalysisResult.Failed(AiFailure.InvalidResponse), result)
     }
@@ -182,7 +182,7 @@ class SentenceAnalysisUseCaseTest {
             transport = transport,
         )
 
-        useCase.analyze("Birds fly.", confirmedTextHost = "api.example.com")
+        useCase.analyze("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
 
         assertTrue(captured != null && captured!!.all { it == '\u0000' }, "请求结束后 Key 缓冲必须清零")
     }
@@ -192,7 +192,7 @@ class SentenceAnalysisUseCaseTest {
         val (useCase, transport) = useCase()
 
         try {
-            useCase.analyze("   ", confirmedTextHost = null)
+            useCase.analyze("   ", confirmedTextHosts = emptySet())
             fail("空白句子必须在入口被拒绝")
         } catch (expected: IllegalArgumentException) {
             // 编程契约：句子来自输入框的长度约束，不该出现空白

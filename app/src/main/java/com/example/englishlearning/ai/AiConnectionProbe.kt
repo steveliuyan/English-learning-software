@@ -64,7 +64,10 @@ class AiConnectionProbe(
         // 必须响亮失败，而不是静默发一枚 `Bearer ` 空头出去。
         require(apiKey.isNotEmpty()) { "apiKey" }
         return try {
-            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHost)
+            // 这里刻意收成**单个域名**而不是会话台账那份集合：用户点「确认」时看到的说明是
+            // 「连接测试只发一次模型列表查询，不带词书、文章或任何学习内容」，那是一次**窄授权**，
+            // 不该顺带豁免后续带学习内容的真实请求，反之亦然（决策 2026-11-05 D-2）。
+            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, setOfNotNull(confirmedTextHost))
                 .getOrElse { return ConnectionProbeResult.ConfigurationInvalid }
             when (confirmation) {
                 is ConfirmationRequirement.Required ->

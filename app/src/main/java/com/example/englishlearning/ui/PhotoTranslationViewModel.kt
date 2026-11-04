@@ -162,7 +162,7 @@ class PhotoTranslationViewModel @Inject constructor(
     fun onTranslateTapped() {
         val text = _uiState.value.ocrText?.trim().orEmpty()
         if (text.isEmpty() || _uiState.value.busy) return
-        runTranslation(text, confirmedTextHost = null)
+        runTranslation(text, confirmedTextHosts = emptySet())
     }
 
     fun onConfirmationResult(
@@ -178,7 +178,7 @@ class PhotoTranslationViewModel @Inject constructor(
             _uiState.update { it.copy(pendingConfirmationHost = null) }
             return
         }
-        runTranslation(text, confirmedTextHost = host)
+        runTranslation(text, confirmedTextHosts = setOf(host))
     }
 
     fun reset() {
@@ -343,13 +343,13 @@ class PhotoTranslationViewModel @Inject constructor(
 
     private fun runTranslation(
         text: String,
-        confirmedTextHost: String?,
+        confirmedTextHosts: Set<String>,
     ) {
         translateJob?.cancel()
         translateJob =
             viewModelScope.launch {
                 try {
-                    when (val result = translate.translate(text, confirmedTextHost)) {
+                    when (val result = translate.translate(text, confirmedTextHosts)) {
                         is PhotoTranslationResult.Translated ->
                             _uiState.update {
                                 it.copy(

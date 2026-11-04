@@ -25,7 +25,7 @@ class AiRequestPolicyTest {
         val requirement = requiredConfirmation(
             profile = profile(),
             payloadKind = AiPayloadKind.Text,
-            confirmedTextHost = null,
+            confirmedTextHosts = emptySet(),
         ).getOrThrow()
 
         assertEquals(ConfirmationRequirement.Required("api.example.com", AiPayloadKind.Text), requirement)
@@ -36,7 +36,20 @@ class AiRequestPolicyTest {
         val requirement = requiredConfirmation(
             profile = profile(),
             payloadKind = AiPayloadKind.Text,
-            confirmedTextHost = "api.example.com",
+            confirmedTextHosts = setOf("api.example.com"),
+        ).getOrThrow()
+
+        assertEquals(ConfirmationRequirement.Satisfied("api.example.com", AiPayloadKind.Text), requirement)
+    }
+
+    @Test
+    fun aSetCarryingSeveralConfirmedHostsStillMatchesTheOneInUse() {
+        // 「按域名一次」的台账是一份**集合**（查词问答与长难句分析共享同一份，一天里可以确认过多个域名），
+        // 判定只看当前 endpoint 的 host 在不在里面——集合里有别的域，不等于豁免这一次。
+        val requirement = requiredConfirmation(
+            profile = profile(),
+            payloadKind = AiPayloadKind.Text,
+            confirmedTextHosts = setOf("other.example.com", "api.example.com"),
         ).getOrThrow()
 
         assertEquals(ConfirmationRequirement.Satisfied("api.example.com", AiPayloadKind.Text), requirement)
@@ -48,7 +61,7 @@ class AiRequestPolicyTest {
         val requirement = requiredConfirmation(
             profile = profile(endpoint = "https://other.example.com/v1"),
             payloadKind = AiPayloadKind.Text,
-            confirmedTextHost = "api.example.com",
+            confirmedTextHosts = setOf("api.example.com"),
         ).getOrThrow()
 
         assertEquals(ConfirmationRequirement.Required("other.example.com", AiPayloadKind.Text), requirement)
@@ -56,11 +69,11 @@ class AiRequestPolicyTest {
 
     @Test
     fun everyImageCallAsksEvenWhenTheSameHostWasConfirmedForText() {
-        listOf(null, "api.example.com").forEach { confirmedTextHost ->
+        listOf(emptySet(), setOf("api.example.com")).forEach { confirmedTextHosts ->
             val requirement = requiredConfirmation(
                 profile = profile(capabilities = setOf(AiCapability.Text, AiCapability.ImageGeneration)),
                 payloadKind = AiPayloadKind.Image,
-                confirmedTextHost = confirmedTextHost,
+                confirmedTextHosts = confirmedTextHosts,
             ).getOrThrow()
 
             assertEquals(
@@ -76,7 +89,7 @@ class AiRequestPolicyTest {
             val result = requiredConfirmation(
                 profile = profile(endpoint = endpoint),
                 payloadKind = AiPayloadKind.Text,
-                confirmedTextHost = null,
+                confirmedTextHosts = emptySet(),
             )
 
             assertTrue(result.isFailure, "Endpoint「$endpoint」不合法，不能给出可确认的目标")

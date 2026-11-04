@@ -53,7 +53,7 @@ class PhotoTranslationUseCase(
 ) {
     suspend fun translate(
         text: String,
-        confirmedTextHost: String?,
+        confirmedTextHosts: Set<String>,
     ): PhotoTranslationResult {
         val trimmed = text.trim()
         require(trimmed.isNotEmpty()) { "text" }
@@ -80,7 +80,7 @@ class PhotoTranslationUseCase(
 
         try {
             val confirmation =
-                requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHost)
+                requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHosts)
                     .getOrElse { return PhotoTranslationResult.NotConfigured(PhotoTranslationNotConfiguredReason.InvalidEndpoint) }
             when (confirmation) {
                 is ConfirmationRequirement.Required ->

@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import com.example.englishlearning.ai.AiOutboundGrantStore
 import com.example.englishlearning.ai.AiProfileSecretUseCase
 import com.example.englishlearning.ai.DefaultTextProfileResult
 import com.example.englishlearning.ai.DefaultTextProfileResolver
@@ -100,6 +101,7 @@ class WordAiQaViewModelTest {
         notes: RecordingNotes = RecordingNotes(),
         resolver: DefaultTextProfileResult = DefaultTextProfileResult.Selected(profile),
         idFactory: WordNoteIdFactory = WordNoteIdFactory { "note-1" },
+        grants: AiOutboundGrantStore = AiOutboundGrantStore(),
     ): Triple<WordAiQaViewModel, RecordingTransport, RecordingNotes> {
         val useCase = WordQaUseCase(
             defaultTextProfile = DefaultTextProfileResolver { resolver },
@@ -111,6 +113,7 @@ class WordAiQaViewModelTest {
             notes = notes,
             noteIds = idFactory,
             clock = com.example.englishlearning.core.time.FixedClockProvider(Instant.ofEpochMilli(1234L), java.time.ZoneOffset.UTC),
+            outboundGrants = grants,
         )
         return Triple(viewModel, transport, notes)
     }

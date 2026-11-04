@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiOutboundGrantStore
 import com.example.englishlearning.core.time.ClockProvider
 import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.wordqa.WordAiNoteRepository
@@ -39,7 +40,8 @@ sealed interface WordAiQaUiState {
         val saveFailed: Boolean = false,
     ) : WordAiQaUiState
 
-    /** 出站确认：与文章生成共用同一条安全约束，确认前零字节出网；[host] 是确认目标。 */
+    /** 出站确认：确认前零字节出网；[host] 是确认目标。本屏与长难句分析共享一份会话内域名台账
+     *  （决策 2026-11-05 D-1：这两屏按域名确认一次；文章生成、拍照翻译、生图出图仍逐次确认）。 */
     data class NeedsOutboundConfirmation(val host: String) : WordAiQaUiState
 
     data class NotConfigured(val reason: WordQaNotConfiguredReason) : WordAiQaUiState
@@ -59,6 +61,9 @@ fun interface WordNoteIdFactory {
 /**
  * 词上下文 AI 问答状态机。换问法必须重置旧回答——不允许把 A 问法的答案
  * 存成 B 问法的笔记；确认重放沿用同一请求与同一 host（与阅读生成同型）。
+ *
+ * [outboundGrants] 是与长难句分析共享的会话内域名台账（决策 2026-11-05 D-1）；
+ * [reset] 清的是「上一问的显示状态」，不清台账——清了就等于回到逐次确认。
  */
 @HiltViewModel
 class WordAiQaViewModel @Inject constructor(
@@ -66,6 +71,7 @@ class WordAiQaViewModel @Inject constructor(
     private val notes: WordAiNoteRepository,
     private val noteIds: WordNoteIdFactory,
     private val clock: ClockProvider,
+    private val outboundGrants: AiOutboundGrantStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<WordAiQaUiState>(WordAiQaUiState.Idle)
     val uiState: StateFlow<WordAiQaUiState> = _uiState
@@ -158,7 +164,7 @@ class WordAiQaViewModel @Inject constructor(
         pendingRequest = request
         lastAnswer = null
         _uiState.value = WordAiQaUiState.Asking
-        runAsk(request, confirmedTextHost = null)
+        runAsk(request, confirmedTextHosts = outboundGrants.confirmedHosts())
     }
 
     fun confirmOutbound(confirmed: Boolean) {
@@ -173,7 +179,9 @@ class WordAiQaViewModel @Inject constructor(
             return
         }
         _uiState.value = WordAiQaUiState.Asking
-        runAsk(request, confirmedTextHost = pending.host)
+        // 记账点与长难句同一口径：用户点「确认」即授权这个域名，不等请求成功。
+        outboundGrants.confirm(pending.host)
+        runAsk(request, confirmedTextHosts = setOf(pending.host))
     }
 
     /** 只在 Answered 态有效；把当前问答按其真实 kind/lemma 落为一条笔记。 */
@@ -207,10 +215,10 @@ class WordAiQaViewModel @Inject constructor(
         }
     }
 
-    private fun runAsk(request: WordQaRequest, confirmedTextHost: String?) {
+    private fun runAsk(request: WordQaRequest, confirmedTextHosts: Set<String>) {
         viewModelScope.launch {
             try {
-                when (val result = ask.ask(request, confirmedTextHost)) {
+                when (val result = ask.ask(request, confirmedTextHosts)) {
                     is WordQaResult.Answered -> {
                         lastAnswer = request.kind to result.answer
                         _uiState.value = WordAiQaUiState.Answered(request.kind, result.answer)

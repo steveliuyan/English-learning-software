@@ -134,7 +134,7 @@ class ImageStudioViewModel @Inject constructor(
     private fun runPrompt(subject: String, confirmedTextHost: String?) {
         viewModelScope.launch {
             try {
-                when (val result = drawPrompt.generate(subject, confirmedTextHost)) {
+                when (val result = drawPrompt.generate(subject, setOfNotNull(confirmedTextHost))) {
                     is DrawingPromptResult.Draft -> {
                         pendingPrompt = result.prompt
                         _uiState.value = ImageStudioUiState.PromptReady(result.prompt)

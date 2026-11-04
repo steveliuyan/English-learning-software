@@ -72,7 +72,7 @@ class PhotoTranslationUseCaseTest {
     fun noDefaultProfileIsNotConfiguredWithoutAnyNetworkCall() = runTest {
         val (useCase, transport) = useCase(resolverResult = DefaultTextProfileResult.NoSelection)
 
-        val result = useCase.translate("Birds fly.", confirmedTextHost = null)
+        val result = useCase.translate("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(PhotoTranslationResult.NotConfigured(PhotoTranslationNotConfiguredReason.NoDefaultProfile), result)
         assertEquals(0, transport.requests.size)
@@ -82,7 +82,7 @@ class PhotoTranslationUseCaseTest {
     fun missingKeyIsNotConfiguredWithoutAnyNetworkCall() = runTest {
         val (useCase, transport) = useCase(hasKey = false)
 
-        val result = useCase.translate("Birds fly.", confirmedTextHost = null)
+        val result = useCase.translate("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(PhotoTranslationResult.NotConfigured(PhotoTranslationNotConfiguredReason.DefaultProfileUnavailable), result)
         assertEquals(0, transport.requests.size)
@@ -92,7 +92,7 @@ class PhotoTranslationUseCaseTest {
     fun firstCallDemandsConfirmationBeforeAnyByteLeaves() = runTest {
         val (useCase, transport) = useCase()
 
-        val result = useCase.translate("Birds fly.", confirmedTextHost = null)
+        val result = useCase.translate("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(PhotoTranslationResult.NeedsConfirmation("api.example.com", AiPayloadKind.Text), result)
         assertEquals(0, transport.requests.size)
@@ -102,8 +102,8 @@ class PhotoTranslationUseCaseTest {
     fun confirmationIsNeverRememberedAcrossCalls() = runTest {
         val (useCase, transport) = useCase()
 
-        useCase.translate("Birds fly.", confirmedTextHost = "api.example.com")
-        val again = useCase.translate("Birds fly.", confirmedTextHost = null)
+        useCase.translate("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
+        val again = useCase.translate("Birds fly.", confirmedTextHosts = emptySet())
 
         assertEquals(1, transport.requests.size)
         assertIs(PhotoTranslationResult.NeedsConfirmation::class, again)
@@ -113,7 +113,7 @@ class PhotoTranslationUseCaseTest {
     fun confirmedHostProducesTranslationOfSourceAndTargetOnly() = runTest {
         val (useCase, _) = useCase()
 
-        val result = useCase.translate("Birds fly.", confirmedTextHost = "api.example.com")
+        val result = useCase.translate("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
 
         assertTrue(result is PhotoTranslationResult.Translated)
         val translated = result as PhotoTranslationResult.Translated
@@ -130,11 +130,11 @@ class PhotoTranslationUseCaseTest {
 
         assertEquals(
             PhotoTranslationResult.Failed(AiFailure.NetworkUnavailable),
-            useCaseA.translate("Birds fly.", confirmedTextHost = "api.example.com"),
+            useCaseA.translate("Birds fly.", confirmedTextHosts = setOf("api.example.com")),
         )
         assertEquals(
             PhotoTranslationResult.Failed(AiFailure.Timeout),
-            useCaseB.translate("Birds fly.", confirmedTextHost = "api.example.com"),
+            useCaseB.translate("Birds fly.", confirmedTextHosts = setOf("api.example.com")),
         )
     }
 
@@ -144,7 +144,7 @@ class PhotoTranslationUseCaseTest {
         val (useCase, _) = useCase(transport = cancelled)
 
         assertFailsWith<CancellationException> {
-            useCase.translate("Birds fly.", confirmedTextHost = "api.example.com")
+            useCase.translate("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
         }
     }
 
@@ -155,7 +155,7 @@ class PhotoTranslationUseCaseTest {
             val transport = RecordingTransport().apply { result = AiHttpResult.Responded(AiHttpResponse(200, body)) }
             val (useCase, _) = useCase(transport = transport)
 
-            val result = useCase.translate("Birds fly.", confirmedTextHost = "api.example.com")
+            val result = useCase.translate("Birds fly.", confirmedTextHosts = setOf("api.example.com"))
 
             assertEquals(PhotoTranslationResult.Failed(AiFailure.InvalidResponse), result, "content=${content.take(30)}")
         }
@@ -169,7 +169,7 @@ class PhotoTranslationUseCaseTest {
 
             assertEquals(
                 PhotoTranslationResult.Failed(failure),
-                useCase.translate("Birds fly.", confirmedTextHost = "api.example.com"),
+                useCase.translate("Birds fly.", confirmedTextHosts = setOf("api.example.com")),
                 "status=$status",
             )
         }
@@ -180,7 +180,7 @@ class PhotoTranslationUseCaseTest {
         val (useCase, transport) = useCase()
 
         assertFailsWith<IllegalArgumentException> {
-            useCase.translate("a".repeat(PhotoTranslationPromptPolicy.maxTextLength + 1), confirmedTextHost = "api.example.com")
+            useCase.translate("a".repeat(PhotoTranslationPromptPolicy.maxTextLength + 1), confirmedTextHosts = setOf("api.example.com"))
         }
         assertEquals(0, transport.requests.size)
     }

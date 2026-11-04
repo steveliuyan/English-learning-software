@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络信任基线（决策 docs/decisions/2026-11-05-ai-outbound-confirmation-granularity-and-network-security-config.md D-3；
+  验收 AC0-06）。
+
+  **这枚文件不是新防线。** targetSdk 36 下「禁明文 + 只信系统根」本就是平台默认，本文件不改变 release 包
+  任何一条实际出站行为。它买到的三样东西全是防回归：
+    ① AGENTS.md「仅支持 HTTPS 公网 Endpoint」从此有一份机器可判的文件，而不是只写在文档里；
+    ② 调试抓包有受控的开口（debug-overrides 只对 debuggable 包生效），不必为了 Charles 能抓而放开 release；
+    ③ 未来任何人「顺手加一行 cleartextTrafficPermitted="true"」或加一个 per-domain 例外，都会先让
+       NetworkSecurityConfigContractTest 变红。
+
+  与域层的分工：AiEndpointPolicy 在**构造 URL 时**拒 HTTP / file: / content: / 环回 / 私网，
+  本文件在**平台网络栈**上拒明文与非系统信任链。两道是不同层，不是重复：前者挡的是 AI 配置里
+  用户手填的 endpoint，后者挡的是整只 App 里所有 OkHttp/HttpURLConnection 出站（含 OCR 模型下载、
+  音频缓存拉取）。
+
+  判据形态（缺 base-config、用户根越出 debug-overrides、出现 domain-config 等）逐条钉在
+  app/src/test/java/com/example/englishlearning/core/security/NetworkSecurityConfigContractTest.kt。
+-->
+<network-security-config>
+    <!-- 全站基线：明文一律拒绝，证书链只认系统预置根。
+         两条都「显式写出来」而不是依赖默认值——默认值会随 targetSdk 升档而变，
+         而这一屏声明的是本仓库的承诺，不是某个平台版本的当前行为。 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- 只对 debuggable 包生效的调试豁免：额外接受用户安装的根 CA（抓包工具那条链）。
+         为什么需要它：F3-03 真机走查报告 §3 C 组记过，AC3-04 的「内容级」TLS 取证当时未达成，
+         卡在应用侧不信任用户根这一半前提上；补上这一半，后续抓包才谈得上可复现。
+         为什么可以放心留着：release 包不 debuggable，这段整块不参与校验；
+         「用户根出现在 base-config」与「Manifest/build.gradle 把 debuggable 打开」两条
+         都有独立判据守着，见本文件顶部的契约测试。 -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

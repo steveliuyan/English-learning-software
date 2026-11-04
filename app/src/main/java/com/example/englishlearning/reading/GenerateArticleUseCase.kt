@@ -70,7 +70,7 @@ class GenerateArticleUseCase(
 
     suspend fun generate(
         request: ArticleGenerationRequest,
-        confirmedTextHost: String?,
+        confirmedTextHosts: Set<String>,
         regenerate: Boolean = false,
     ): GenerateArticleResult {
         if (!regenerate) {
@@ -97,7 +97,7 @@ class GenerateArticleUseCase(
 
         try {
             // 出站确认在任何字节发出去之前。Endpoint 不合法时连「要确认哪个域名」都答不出。
-            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHost)
+            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHosts)
                 .getOrElse { return GenerateArticleResult.NotConfigured(NotConfiguredReason.InvalidEndpoint) }
             when (confirmation) {
                 is ConfirmationRequirement.Required ->

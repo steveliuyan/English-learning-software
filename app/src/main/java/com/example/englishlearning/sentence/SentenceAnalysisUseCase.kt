@@ -43,7 +43,7 @@ class SentenceAnalysisUseCase(
     private val secrets: AiProfileSecretUseCase,
     private val transport: AiHttpTransport,
 ) {
-    suspend fun analyze(sentence: String, confirmedTextHost: String?): SentenceAnalysisResult {
+    suspend fun analyze(sentence: String, confirmedTextHosts: Set<String>): SentenceAnalysisResult {
         require(sentence.trim().isNotEmpty()) { "sentence" } // 编程契约：输入框有长度约束
 
         val profile = when (val selected = defaultTextProfile.select()) {
@@ -65,7 +65,7 @@ class SentenceAnalysisUseCase(
 
         try {
             // 出站确认在任何字节发出去之前。Endpoint 不合法时连「要确认哪个域名」都答不出。
-            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHost)
+            val confirmation = requiredConfirmation(profile, AiPayloadKind.Text, confirmedTextHosts)
                 .getOrElse { return SentenceAnalysisResult.NotConfigured(SentenceAnalysisNotConfiguredReason.InvalidEndpoint) }
             when (confirmation) {
                 is ConfirmationRequirement.Required ->
