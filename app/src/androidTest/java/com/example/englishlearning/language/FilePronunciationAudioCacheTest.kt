@@ -10,6 +10,7 @@ import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,7 +38,10 @@ class FilePronunciationAudioCacheTest {
         val id = key.cacheId()
         File(cacheRoot, "$id.wav").delete()
         File(cacheRoot, "$id.sha256").delete()
+        File(cacheRoot, "$id.json").delete()
         File(cacheRoot, "$id.tmp").delete()
+        File(cacheRoot, "$id.wav.tmp").delete()
+        File(cacheRoot, "$id.json.tmp").delete()
     }
 
     @Test
@@ -53,20 +57,25 @@ class FilePronunciationAudioCacheTest {
     fun modifiedAudioIsRejectedAndRemoved() = runTest {
         val bytes = byteArrayOf(1, 2, 3)
         FilePronunciationAudioCache(context).put(key, bytes)
-        File(cacheRoot, "${key.cacheId()}.wav").appendBytes(byteArrayOf(9))
+        val audio = File(cacheRoot, "${key.cacheId()}.wav")
+        val ledger = File(cacheRoot, "${key.cacheId()}.json")
+        assertTrue("完整性台账必须与音频同批落盘", ledger.isFile)
+        audio.appendBytes(byteArrayOf(9))
 
         assertNull(FilePronunciationAudioCache(context).get(key))
-        assertFalse(File(cacheRoot, "${key.cacheId()}.wav").exists())
-        assertFalse(File(cacheRoot, "${key.cacheId()}.sha256").exists())
+        assertFalse("拒绝播放必须连带清掉坏音频", audio.exists())
+        assertFalse("坏音频的台账也不许留下", ledger.exists())
     }
 
     @Test
-    fun modifiedChecksumIsRejectedAndRemoved() = runTest {
+    fun tamperedLedgerIsRejectedAndRemoved() = runTest {
         FilePronunciationAudioCache(context).put(key, byteArrayOf(4, 5, 6))
-        File(cacheRoot, "${key.cacheId()}.sha256").writeText("not-a-sha256")
+        val audio = File(cacheRoot, "${key.cacheId()}.wav")
+        val ledger = File(cacheRoot, "${key.cacheId()}.json")
+        ledger.writeText("""{"schemaVersion":1,"sha256":"not-a-sha256"}""")
 
-        assertNull(FilePronunciationAudioCache(context).get(key))
-        assertFalse(File(cacheRoot, "${key.cacheId()}.wav").exists())
-        assertFalse(File(cacheRoot, "${key.cacheId()}.sha256").exists())
+        assertNull("台账被改写即无法证明完整性，必须按未命中处理", FilePronunciationAudioCache(context).get(key))
+        assertFalse("无有效台账的孤儿 WAV 必须清掉，让它可被重新生成", audio.exists())
+        assertFalse(ledger.exists())
     }
 }

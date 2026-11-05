@@ -217,6 +217,8 @@ object AppModule {
         player,
         com.example.englishlearning.language.infrastructure.FileSynthesizedAudioCache(
             java.io.File(context.filesDir, "kokoro-audio-cache"),
+            // 来源台账显式注入：字面量必须与 KokoroAndroidEngine 的资产常量一致（决策 D-5 的防漂移闸）。
+            provenance = com.example.englishlearning.language.domain.SynthesizedAudioProvenance.KokoroOnDevice,
         ),
     )
 
