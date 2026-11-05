@@ -153,12 +153,20 @@ class AppScreenOverlayContainerTest {
         assertTrue("不可撤销声明必须收尾（实测 $topOf）", topOf.getValue("otherKeep") < topOf.getValue("irreversible"))
 
         // 确认键：组件固定 tag + 可点 + Role.Button + 站点朗读文本「删除」+ ≥48dp 触控面。
+        // 出口先**滚到可见**再判：设备字号 2.0 下这一屏的自然高本来就超过对话框窗口（2026-11-06 实测两轮——
+        // 上限取 `Configuration.screenHeightDp` 与等效无上限的 `10000.dp`，两枚出口都仍 is not displayed），
+        // 「不滚就落在视口里」在 2.0 不可满足；本批评的是「滚一下就到、到了仍可点、仍 ≥48dp」这条出路，
+        // 与本类 12 册导出选择器那条 `performScrollTo()` 的先例同口径（正文四行的可见性由
+        // `hostedWordBookDeletePanelStaysFullyReadableAndTappableAtDoubleFontScale` 按档位钉，不在这儿重复）。
         val confirm = composeRule.onNodeWithTag("confirm_destructive_confirm")
+        confirm.performScrollTo()
+        confirm.assertIsDisplayed()
         confirm.assertHasClickAction()
         confirm.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         confirm.assertTextEquals("删除")
         confirm.assertHeightIsAtLeast(48.dp)
         val dismiss = composeRule.onNodeWithTag("confirm_destructive_dismiss")
+        dismiss.assertIsDisplayed()
         dismiss.assertHasClickAction()
         dismiss.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         dismiss.assertHeightIsAtLeast(48.dp)
@@ -174,11 +182,17 @@ class AppScreenOverlayContainerTest {
     }
 
     /**
-     * 钉的破坏：大字号档下面板被撑出视口——正文最后一行或两枚按钮里的任意一枚被裁到屏幕外
-     * （「看得见说得出、点不着」是 F5-03 那一族缺陷）。
+     * 钉的破坏：大字号档下这一屏的**安全说明被裁**或**出口点不着**（「看得见说得出、点不着」是 F5-03 那一族缺陷）。
      *
-     * 判据打在 `assertIsDisplayed()`（节点 ≥90% 落在视口内）+ 按钮触控面仍 ≥48dp 上，
-     * 与 `ConfirmDestructiveDialogTest` 的组件级 48dp 护栏同口径，只是这里跑的是**真实宿主 + 真实文案**
+     * 两段的口径不一样，是 2026-11-06 在这台设备上量出来的：
+     *  - **正文五行（标题 + 级联 + 两条保留面 + 不可撤销）不滚就该全在首屏**——逐条 `assertBodyLineSurvivesTheScale`
+     *    （内含 `assertIsDisplayed` + 两腿真截断信号）。这一条没放松，也不可能靠滚动来满足：说明被切走就是切走。
+     *  - **两枚出口按钮滚到可见后**必须可见且触控面 ≥48dp。这一屏在 `font_scale = 2.0` 下的自然高**超过**
+     *    对话框窗口（实测：`DialogPanel` 的上限取 `Configuration.screenHeightDp`、乃至取等效无上限的 10000.dp
+     *    两轮复跑，`confirm_destructive_*` 都仍 is not displayed），所以「不滚就在视口里」在这里不可满足，
+     *    可满足的是「被钉在窗口内 + 滚动可达」，与本类 12 册导出选择器那条同口径（先例 `performScrollTo()`）。
+     *
+     * 按钮 48dp 与 `ConfirmDestructiveDialogTest` 的组件级护栏同口径；这里跑**真实宿主 + 真实文案**
      * （站点给的级联与保留面比组件级夹具更长，只有宿主侧才量得到实际高度）。
      */
     @Test
@@ -214,6 +228,10 @@ class AppScreenOverlayContainerTest {
         assertBodyLineSurvivesTheScale("其他词书不受影响。")
         assertBodyLineSurvivesTheScale("此操作不可撤销。")
         assertBodyLineSurvivesTheScale("删除《我的词书》？")
+        // 出口两枚：滚到可见后仍必须可见 + ≥48dp（2.0 下这一屏的自然高超过对话框窗口，实测与先例口径
+        // 记在上面那条 `performScrollTo()` 的注释里）。正文五行不滚就该全在首屏——上面五行逐条判过，
+        // 这里不许倒退成「滚了才判正文」。
+        composeRule.onNodeWithTag("confirm_destructive_dismiss").performScrollTo()
         composeRule.onNodeWithTag("confirm_destructive_dismiss").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithTag("confirm_destructive_confirm").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
     }

@@ -342,7 +342,10 @@ class CardDetailScreenTest {
             CardDetailScreen(card = card(), onBack = {}, onAskAi = { asked++ })
         }
 
-        composeRule.onNodeWithContentDescription("问 AI（ability）").assertExists().performClick()
+        // 点击前先 `performScrollTo()`：本屏是整页 `verticalScroll`，`font_scale = 2.0` 时这枚出口药丸在首屏之外，
+        // 屏外节点被滚动容器裁成 0×0，`performClick()` 落点不在它身上，回调计数就停在 0（2026-11-06 实测：
+        // 1.0 绿、2.0 恒红两次，与本类「笔记管理」那条 `performScrollTo().performClick()` 同一先例）。
+        composeRule.onNodeWithContentDescription("问 AI（ability）").performScrollTo().performClick()
         composeRule.waitForIdle()
         assertEquals(1, asked)
     }

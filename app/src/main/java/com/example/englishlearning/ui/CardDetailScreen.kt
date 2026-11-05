@@ -735,7 +735,7 @@ private fun PersonalNotesDialog(
 ) {
     DialogPanel(onDismissRequest = onDismiss) {
         Text("管理笔记", style = AppType.Title, color = appColors().text1)
-        // 面板本体已带 560.dp 高度上限 + 竖向滚动（见 `DialogPanel`），这里不再套第二层 `verticalScroll`：
+        // 面板本体已带「窗口可用高」上限 + 竖向滚动（见 `DialogPanel`），这里不再套第二层 `verticalScroll`：
         // 嵌套滚动只有外层生效，笔记条数一多内层就是个哑修饰，还会让「滚到底才看得见关闭」重新变成运气。
         Column(
             modifier = Modifier.padding(top = 12.dp),

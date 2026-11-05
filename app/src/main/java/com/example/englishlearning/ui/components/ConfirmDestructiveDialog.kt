@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.englishlearning.ui.theme.AppColorSet
@@ -46,12 +48,14 @@ import com.example.englishlearning.ui.theme.appColors
  * 已登记的偏离（不是随手替换）：面板**不复用** `glass/GlassDialog.kt`。本组件立项时那一份的容器底是
  * `AppPalette.GlassFill`（静态浅套近不透明白），深色模式下 `appColors()` 取的墨压在它上面会读不出来；
  * 而在本组件里改用静态墨又会新增 `DarkTokenConsumptionRatchetTest` 的未登记静态读点。
- * 故这里按同一几何（外层 24dp 横向留白 + 内层 24dp padding + hero 档圆角 + 560.dp 高度上限与竖向滚动）自建面板，
+ * 故这里按同一几何（外层 24dp 横向留白 + 内层 24dp padding + hero 档圆角 + 上限→滚动→边距那条兜底链）自建面板，
  * 底色改走 `appColors().surface`，两套主题各自成立。
  * `GlassDialog` 当时留给既有屏继续用；批 2 终审修复席 A 已把它的容器底迁到 `appColors().surfaceGlass`，
  * 所以「不能复用」的原始理由已经消失。本批仍不合并两族面板：那会把两枚确认框从实底卡面换成半透明玻璃 +
  * 窗口模糊，属于换外观而不是排印统一，且 `GlassDialog` 的公开签名被 `GlassPanelInkPairingContractTest`
- * 逐字冻结（要接它得先动那条契约）。2026-11-05 复核：两族的面板几何与滚动兜底现已逐字同形。
+ * 逐字冻结（要接它得先动那条契约）。2026-11-05 复核：两族的面板几何与滚动兜底现已逐字同形；
+ * 2026-11-06 两族的**上限口径分家**（玻璃框留固定 560.dp，确认框改窗口可用高），差异与理由见 [DialogPanel] 的
+ * 「高度上限」那段——本文件不再有第二处 560 需要与 `GlassDialog` 对齐。
  */
 
 /**
@@ -141,12 +145,33 @@ fun destructiveDialogBody(
  * （浅套近不透明白，本组件立项时它是 `GlassDialog` 的容器底）；批 2 终审修复席 A 之后 `GlassDialog` 已改读
  * `appColors().surfaceGlass`，本面板继续走不透明 `surface` 不变，两套主题各自成立（见文件头登记的偏离）。
  *
- * **高度上限 + 竖向滚动（2026-11-05 弹窗排印统一批补）**：链序 `heightIn(max = 560.dp)` → `verticalScroll` →
- * `padding(24.dp)`，与 `glass/GlassDialog.kt` 逐字同形（上限 → 滚动 → 边距：边距放进滚动内容里才不吞首尾行）。
- * 补这一条的原因是本面板原先**没有**上限：`ConfirmDestructiveDialog` 的级联行数由调用方逐字给（清空学习记录
- * 那一档实测两三行，但批 2/3 各屏接自己的确认请求态后行数不可控），设备字号 2.0 下面板长过窗口时，
- * 底部那两枚按钮被顶出屏幕且滚不回来——模态窗口里唯一的出路消失。560.dp 取 `GlassDialog` 已验证过的同一档：
- * 两枚短对话框在一屏内可见，不需要滚动，既有的 connected 零滚动断言据此继续成立。
+ * **高度上限 + 竖向滚动（2026-11-05 弹窗排印统一批补；2026-11-06 上限口径按设备实测改过）**：链序
+ * `heightIn(max = 窗口给这一列的可用高)` → `verticalScroll` → `padding(24.dp)`，边距放进滚动内容里才不吞首尾行
+ * （与 `glass/GlassDialog.kt` 同一条链序；**上限口径不同**，理由在下四段）。
+ * 补这一条的原因是本面板原先**没有竖向出路**：`ConfirmDestructiveDialog` 的级联行数由调用方逐字给（清空学习记录
+ * 那一档实测两三行，但批 2/3 各屏接自己的确认请求态后行数不可控），内容长过窗口时底部那枚出口按钮
+ * 被顶到窗口外且滚不回来——模态窗口里唯一的出路消失。
+ *
+ * 上限**不取固定一档**：560.dp 是 `GlassDialog` 那枚**列表框**的尺度（载可滚动的册列表，短内容本来也用不满），
+ * 本面板载的是「级联条数 + 保留面 + 不可撤销 + 两枚出口」的安全说明，行数随调用方长。首版照抄 560 之后，
+ * 既有 connected 护栏当场红两条（`AppScreenOverlayContainerTest` 在设备 `font_scale = 2.0` 报
+ * 「此操作不可撤销。」is not displayed）——固定一档会把本来就还在窗口内的正文行切掉。
+ *
+ * 第二版取 `LocalConfiguration.screenHeightDp`，同一条护栏的红点从正文**挪到出口按钮**
+ * （`confirm_destructive_dismiss` is not displayed）。设备实测（临时探针，tag `QA-PANEL`，`emulator-5554`
+ * 1080×1920 @ 420dpi、`font_scale = 2.0`）：`Configuration.screenHeightDp` = 659dp、物理屏 = 731.4dp，
+ * 而**等效无上限**（`heightIn(max = 10000.dp)`）时那枚载 40 行级联的面板实测 **659.05dp、顶边 0**，
+ * 内容自然高 3592dp——即 `verticalScroll` 本来就把视口收在窗口给的约束高上，`Configuration` 那一档
+ * 与它只差取整。所以「按宿主配置猜一个数」既不诚实也没有更好的性质；上限该**直接问窗口**。
+ *
+ * 终版因此用 [androidx.compose.foundation.layout.BoxWithConstraints] 的 `maxHeight`：
+ * 这扇对话框窗给面板的约束上界，换屏、换朝向、换系统栏高度都自动跟着走，不靠任何换算常数。
+ * 放得下的对话框不受约束（不新增滚动）；放不下的视口 = 窗口、超出部分靠滚动——这正是本批要修的出路本身。
+ * 宿主侧断言口径随之改成与 `GlassDialog` 那族同一形状：正文首屏逐条可见，出口**滚到可见**后仍可点、
+ * 仍 ≥48dp（先例见 `AppScreenOverlayContainerTest` 的 12 册导出选择器那条）。
+ *
+ * 不留「85% 窗口高」那类余量：余量只会让自然高落在 `0.85×H..H` 之间的对话框**凭空多一次滚动**，
+ * 而窗口本来就装得下它。面板在窗口内居中，只有内容真的溢出时才铺满上下沿（实测顶边 0）——那时滚动是唯一出路。
  *
  * [onDismissRequest] 由调用方给（返回键 / 点 scrim 都走它），面板本身不决定「取消意味着什么」。
  *
@@ -162,19 +187,21 @@ internal fun DialogPanel(
     val set = appColors()
     val shape = MaterialTheme.shapes.large
     Dialog(onDismissRequest = onDismissRequest) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
             contentAlignment = Alignment.Center,
         ) {
+            // 窗口给这一列的可用高 = 对话框自己的约束上界（不是屏幕全高，也不是宿主去掉系统栏的那档）。
+            val panelMaxHeight: Dp = maxHeight
             Column(
                 modifier = modifier
                     .fillMaxWidth()
                     .clip(shape)
                     .background(set.surface)
                     .border(1.dp, set.outlineSoft, shape)
-                    .heightIn(max = 560.dp)
+                    .heightIn(max = panelMaxHeight)
                     .verticalScroll(rememberScrollState())
                     .semantics { testTag = DIALOG_PANEL_TAG }
                     .padding(24.dp),
