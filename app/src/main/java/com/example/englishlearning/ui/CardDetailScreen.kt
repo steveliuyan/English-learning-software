@@ -58,6 +58,9 @@ import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.ui.components.AppGlyph
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.DialogButton
+import com.example.englishlearning.ui.components.DialogButtonRole
+import com.example.englishlearning.ui.components.DialogPanel
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SoftCard
@@ -730,54 +733,59 @@ private fun PersonalNotesDialog(
     saveStatus: PersonalNoteSaveStatus,
     onDismiss: () -> Unit,
 ) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("管理笔记", style = AppType.Title) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (notes.isEmpty()) {
-                    Text(
-                        text = "还没有笔记。可以记下记忆方法、易错点或例句。",
-                        style = AppType.Body,
-                        color = appColors().text2,
-                        modifier = Modifier.testTag("card_detail_notes_empty"),
-                    )
-                }
-                notes.forEach { note ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("card_detail_note_${note.noteId}"),
-                    ) {
-                        Text(note.answer, style = AppType.Body)
-                        onDelete?.let { remove ->
-                            TextButton(
-                                onClick = { remove(note.noteId) },
-                                modifier = Modifier
-                                    .testTag("card_detail_note_delete_${note.noteId}")
-                                    .semantics { contentDescription = "删除这条笔记" },
-                            ) {
-                                // Task 26 Step 3：这是**破坏性动作标签**（不是错误提示行），取值与 `colorScheme.error`
-                                // 逐字同值（`MintGlassTheme.kt: error = set.error`），改读主题访问器只为止住族 2 读点。
-                                Text("删除", color = appColors().error)
-                            }
+    DialogPanel(onDismissRequest = onDismiss) {
+        Text("管理笔记", style = AppType.Title, color = appColors().text1)
+        // 面板本体已带 560.dp 高度上限 + 竖向滚动（见 `DialogPanel`），这里不再套第二层 `verticalScroll`：
+        // 嵌套滚动只有外层生效，笔记条数一多内层就是个哑修饰，还会让「滚到底才看得见关闭」重新变成运气。
+        Column(
+            modifier = Modifier.padding(top = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (notes.isEmpty()) {
+                Text(
+                    text = "还没有笔记。可以记下记忆方法、易错点或例句。",
+                    style = AppType.Body,
+                    color = appColors().text2,
+                    modifier = Modifier.testTag("card_detail_notes_empty"),
+                )
+            }
+            notes.forEach { note ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("card_detail_note_${note.noteId}"),
+                ) {
+                    Text(note.answer, style = AppType.Body)
+                    onDelete?.let { remove ->
+                        TextButton(
+                            onClick = { remove(note.noteId) },
+                            modifier = Modifier
+                                .testTag("card_detail_note_delete_${note.noteId}")
+                                .semantics { contentDescription = "删除这条笔记" },
+                        ) {
+                            // Task 26 Step 3：这是**破坏性动作标签**（不是错误提示行），取值与 `colorScheme.error`
+                            // 逐字同值（`MintGlassTheme.kt: error = set.error`），改读主题访问器只为止住族 2 读点。
+                            Text("删除", color = appColors().error)
                         }
                     }
                 }
-                onSave?.let { save ->
-                    PersonalNoteEditor(onSave = save, saveStatus = saveStatus)
-                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("card_detail_notes_dialog_close")) {
-                Text("关闭", fontWeight = FontWeight.Bold)
+            onSave?.let { save ->
+                PersonalNoteEditor(onSave = save, saveStatus = saveStatus)
             }
-        },
-    )
+        }
+        // 出口键走共享 `DialogButton`（原先是手搓 `TextButton` + `FontWeight.Bold`：字号不吃六档、
+        // 触控面靠 padding 凑，与另外两枚对话框的出口读起来不是同一档）。tag 逐字不变，connected 照旧定位。
+        DialogButton(
+            role = DialogButtonRole.Dismiss,
+            label = "关闭",
+            onClick = onDismiss,
+            tag = "card_detail_notes_dialog_close",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+        )
+    }
 }
 
 /**

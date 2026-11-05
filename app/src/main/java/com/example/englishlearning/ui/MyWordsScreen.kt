@@ -377,7 +377,7 @@ fun MyWordsScreen(
         ) {
             Text(
                 text = masteryTitle,
-                style = AppType.Headline,
+                style = AppType.Title,
                 color = colors.text1,
             )
             Text(

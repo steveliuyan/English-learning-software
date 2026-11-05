@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,11 +43,15 @@ import com.example.englishlearning.ui.theme.appColors
  * [OutboundConfirmDialog] 复用：spec §3 数的是九个共享组件，对话框面板不算第十个组件，
  * 另起一份文件会撞 Task 12 的组件份数棘轮；同一份 `DialogPanel` 也保证两枚对话框不会各长一套卡面配方。
  *
- * 已登记的偏离（不是随手替换）：面板**不复用** `glass/GlassDialog.kt`。那一份的容器底是
+ * 已登记的偏离（不是随手替换）：面板**不复用** `glass/GlassDialog.kt`。本组件立项时那一份的容器底是
  * `AppPalette.GlassFill`（静态浅套近不透明白），深色模式下 `appColors()` 取的墨压在它上面会读不出来；
  * 而在本组件里改用静态墨又会新增 `DarkTokenConsumptionRatchetTest` 的未登记静态读点。
- * 故这里按同一几何（外层 24dp 横向留白 + 内层 24dp padding + hero 档圆角）自建面板，
- * 底色改走 `appColors().surface`，两套主题各自成立；`GlassDialog` 留给既有屏继续用，批 3 逐屏收口。
+ * 故这里按同一几何（外层 24dp 横向留白 + 内层 24dp padding + hero 档圆角 + 560.dp 高度上限与竖向滚动）自建面板，
+ * 底色改走 `appColors().surface`，两套主题各自成立。
+ * `GlassDialog` 当时留给既有屏继续用；批 2 终审修复席 A 已把它的容器底迁到 `appColors().surfaceGlass`，
+ * 所以「不能复用」的原始理由已经消失。本批仍不合并两族面板：那会把两枚确认框从实底卡面换成半透明玻璃 +
+ * 窗口模糊，属于换外观而不是排印统一，且 `GlassDialog` 的公开签名被 `GlassPanelInkPairingContractTest`
+ * 逐字冻结（要接它得先动那条契约）。2026-11-05 复核：两族的面板几何与滚动兜底现已逐字同形。
  */
 
 /**
@@ -74,7 +80,7 @@ data class DialogButtonInk(
  *
  * **裁决 R-11.1（作废任务书 Step 3 原稿）**：破坏性确认档取 `set.error` 容器 + `set.surface` 前景。
  * 原稿写的是「`errorFill` 填充 + 白字、按大字/图形 3:1 口径放行」，实算不成立：浅套白字压 `errorFill`
- * 不足正文 4.5，深套白字压 `errorFill` 连非文本 3:1 都不过；而 17sp ≈ 12.75pt 够不到 WCAG 大字豁免线
+ * 不足正文 4.5，深套白字压 `errorFill` 连非文本 3:1 都不过；而按钮标签 15sp ≈ 11.25pt 够不到 WCAG 大字豁免线
  * （14pt bold / 18pt regular），所以「按大字享受 3:1」的前提根本不存在——**本表与本文件一律不宣称大字豁免**，
  * 三档都按正文 4.5 判。比值不抄在这里（抄了会随 token 取值漂移），由
  * `ConfirmDestructiveInkTest` 当场按相对亮度复算，并把被拒候选（白字压两套 `errorFill`）永久钉成不合格。
@@ -101,6 +107,12 @@ fun dialogButtonInk(role: DialogButtonRole, set: AppColorSet): DialogButtonInk =
 private const val IRREVERSIBLE_LINE = "此操作不可撤销。"
 
 /**
+ * 面板节点锚（connected 侧量面板自身的高度上限与滚动动作用；见 [DialogPanel] 的说明）。
+ * 内部构件没有屏级 testTag 惯例可借，故只给这一枚常量，命名与屏侧 `*_dialog_*` 同族。
+ */
+internal const val DIALOG_PANEL_TAG = "dialog_panel"
+
+/**
  * 破坏性确认正文的**唯一**措辞配方：级联行 → 保留面 → 不可撤销声明。
  *
  * 三件事齐备且顺序固定，这是本函数的全部职责：
@@ -125,9 +137,21 @@ fun destructiveDialogBody(
  *
  * 圆角走 `MaterialTheme.shapes.large`（装配点 = `AppShape.Dialog` 的 24dp，spec §2.3 的 hero 档），
  * **不读 `AppShape.Dialog` 本体**：新组件一律走装配档，与 `InlineNotice` 不读 `AppShape.Card` 同一口径。
- * 底色走 `appColors().surface` 而不是玻璃填充——深色模式下玻璃填充是静态浅值（见文件头登记的偏离）。
+ * 底色走 `appColors().surface` 而不是玻璃填充——这句里的「玻璃填充」指**静态常量** `AppPalette.GlassFill`
+ * （浅套近不透明白，本组件立项时它是 `GlassDialog` 的容器底）；批 2 终审修复席 A 之后 `GlassDialog` 已改读
+ * `appColors().surfaceGlass`，本面板继续走不透明 `surface` 不变，两套主题各自成立（见文件头登记的偏离）。
+ *
+ * **高度上限 + 竖向滚动（2026-11-05 弹窗排印统一批补）**：链序 `heightIn(max = 560.dp)` → `verticalScroll` →
+ * `padding(24.dp)`，与 `glass/GlassDialog.kt` 逐字同形（上限 → 滚动 → 边距：边距放进滚动内容里才不吞首尾行）。
+ * 补这一条的原因是本面板原先**没有**上限：`ConfirmDestructiveDialog` 的级联行数由调用方逐字给（清空学习记录
+ * 那一档实测两三行，但批 2/3 各屏接自己的确认请求态后行数不可控），设备字号 2.0 下面板长过窗口时，
+ * 底部那两枚按钮被顶出屏幕且滚不回来——模态窗口里唯一的出路消失。560.dp 取 `GlassDialog` 已验证过的同一档：
+ * 两枚短对话框在一屏内可见，不需要滚动，既有的 connected 零滚动断言据此继续成立。
  *
  * [onDismissRequest] 由调用方给（返回键 / 点 scrim 都走它），面板本身不决定「取消意味着什么」。
+ *
+ * 面板节点带 [DIALOG_PANEL_TAG]：上限与滚动是**面板**的性质，connected 侧要量的是面板自身的高度与滚动动作
+ * （量标题或按钮只能证明「这行在树上」，证不了「长内容时出路还在」），判据见 `DialogTypographyEvidenceTest`。
  */
 @Composable
 internal fun DialogPanel(
@@ -150,6 +174,9 @@ internal fun DialogPanel(
                     .clip(shape)
                     .background(set.surface)
                     .border(1.dp, set.outlineSoft, shape)
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState())
+                    .semantics { testTag = DIALOG_PANEL_TAG }
                     .padding(24.dp),
                 content = content,
             )
@@ -173,7 +200,9 @@ internal fun DialogPanel(
  * `testTag` 与可点语义并到同一枚节点（`mergeDescendants = true`）：标签在父、click 在子的写法会让
  * `onNodeWithTag(…).performClick()` 打在没有 click action 的节点上（`InlineNotice` 动作槽同一处置）。
  *
- * 排印取 [AppType.Title]（17sp SemiBold，稿面按钮档）。**不宣称大字豁免**：17sp ≈ 12.75pt 够不到
+ * 排印取 [AppType.ButtonLabel]（15sp/600，与全站唯一主按钮 `PillButton` 同一档；原先本处读 `AppType.Title`
+ * 的 17sp 是**第二套按钮字号**，同一屏里药片与对话框按钮并排时读起来不像同一档）。
+ * **不宣称大字豁免**：15sp ≈ 11.25pt 够不到
  * WCAG 的 14pt bold / 18pt regular 线，所以三档墨色一律按正文 4.5 判（见 [dialogButtonInk] 的 KDoc）。
  */
 @Composable
@@ -196,7 +225,7 @@ internal fun DialogButton(
             .semantics(mergeDescendants = true) { testTag = tag },
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = label, style = AppType.Title, color = ink.label)
+        Text(text = label, style = AppType.ButtonLabel, color = ink.label)
     }
 }
 
@@ -209,6 +238,9 @@ internal fun DialogButton(
  * [cascadeLines] / [keepLines] 由调用方逐字给（组件不猜条数、不猜保留面），[irreversible] 默认 `true`
  * ——默认值取「更严格的那一档」是刻意的：忘记传就是明说不可撤销，而不是悄悄少说一句安全信息。
  * [confirmLabel] 也留给调用方（「删除词书」「清空记录」各说各的动作），只有正文措辞收进纯函数。
+ *
+ * 排印按 2026-11-05 弹窗排印统一批的三档口径：标题 [AppType.Title]、正文 [AppType.Body]（原先是 `Footnote`
+ * 13sp——多行安全说明用最小档读起来费力，且与三枚玻璃面板里的 `Body` 不一致）、出口按钮 [AppType.ButtonLabel]。
  *
  * 两枚按钮的标签是 `confirm_destructive_confirm` / `confirm_destructive_dismiss`：
  * 批 2/3 各屏与 Task 12 的份数棘轮都按这两个 tag 定位（与 `EntryRow` 的 `entry_row_icon`、
@@ -236,7 +268,7 @@ fun ConfirmDestructiveDialog(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             body.forEach { line ->
-                Text(text = line, style = AppType.Footnote, color = set.text2)
+                Text(text = line, style = AppType.Body, color = set.text1)
             }
         }
         Row(

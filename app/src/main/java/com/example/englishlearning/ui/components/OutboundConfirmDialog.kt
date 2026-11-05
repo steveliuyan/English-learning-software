@@ -71,6 +71,11 @@ fun outboundConfirmBody(endpointHost: String, payloadKind: AiPayloadKind): Strin
  * 整枚对话框恰两个可点节点，正文与面板都不是触控目标；正文与配方、追加说明合并成**一个** Text 节点，
  * 因为各屏的 `*_outbound_confirmation_text` 锚在 connected 里按文本断言（`assertTextContains`），
  * 拆成两段会让点名的那一半找不到。
+ *
+ * 排印按 2026-11-05 弹窗排印统一批的三档口径（标题 `Title` / 正文 `Body` / 按钮 `ButtonLabel`）：
+ * 正文原先是 `AppType.Footnote` + `text2`（13sp 次要墨）。这枚框说的是「密钥与内容要发给谁、会不会产生费用」，
+ * 是全 App 最需要被读清楚的一段话，不该用最小最淡的那一档；[DialogPanel] 现在也有高度上限 + 滚动，
+ * 图片档那句「每次都要确认」叠上屏侧 [note] 后变长也不会把两枚按钮顶出屏幕。
  */
 @Composable
 fun OutboundConfirmDialog(
@@ -89,8 +94,8 @@ fun OutboundConfirmDialog(
         Text(text = "确认发送请求", style = AppType.Title, color = set.text1)
         Text(
             text = body,
-            style = AppType.Footnote,
-            color = set.text2,
+            style = AppType.Body,
+            color = set.text1,
             modifier = Modifier
                 .padding(top = 12.dp)
                 .semantics { testTag = bodyTestTag ?: "outbound_confirm_body" },

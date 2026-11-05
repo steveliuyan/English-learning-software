@@ -140,7 +140,7 @@ fun WordBookTransferScreen(
             // 路 B（非破坏性选择）：容器交房内共享玻璃档，取消走共享 PillButton；
             // 列表项是本枚自渲染的（tag 供 connected 逐项定位），口径与搬离宿主前逐字一致。
             GlassDialog(onDismiss = { showExportPicker = false }) {
-                Text(text = "选择要导出的词书", style = AppType.Headline, color = appColors().text1)
+                Text(text = "选择要导出的词书", style = AppType.Title, color = appColors().text1)
                 Column(
                     modifier = Modifier.padding(top = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),

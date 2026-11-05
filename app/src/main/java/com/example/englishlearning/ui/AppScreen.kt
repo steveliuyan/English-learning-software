@@ -2444,7 +2444,7 @@ internal fun LearningSetupScreen(
     state.pendingMigration?.let { preview ->
         // 路 B（非破坏、二选一）：容器交共享玻璃档，两枚动作走共享 PillButton（不手搓裸按钮）。
         GlassDialog(onDismiss = { viewModel.resolveMigration(profileId, apply = false) }) {
-            Text(text = "发现已学过的单词", style = AppType.Headline, color = appColors().text1)
+            Text(text = "发现已学过的单词", style = AppType.Title, color = appColors().text1)
             Text(
                 text = "目标词书里有 ${preview.candidates.size} 个单词你之前已经学过，要把它们标记为已学习吗？原词书的学习记录会原样保留。",
                 modifier = Modifier

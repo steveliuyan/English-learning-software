@@ -141,9 +141,13 @@ class OutboundDialogFamilyTest {
             countMatches(component, Regex("""AppType\.Title""")),
             "出站确认框的标题必须恰一处显式排印档（0 = 标题回退默认字，2 = 组件里长出第二种标题形状）",
         )
+        // 2026-11-05 弹窗排印统一（决策 `docs/decisions/2026-11-05-dialog-typography-and-wordbook-token-cleanup.md` §1–2）：
+        // 正文档从 `AppType.Footnote` 改锚 `AppType.Body`。阈值仍是「恰一枚」，没放松——
+        // 这条钉的是「正文必须有显式档」，不是「正文必须是 13sp」；档名换了不改判据强度，
+        // 少一枚 = 正文退回 Material 默认字，多一枚 = 组件里又开始分屏排版式。
         assertEquals(
             1,
-            countMatches(component, Regex("""AppType\.Footnote""")),
+            countMatches(component, Regex("""AppType\.Body""")),
             "出站确认框的正文（含各屏追加的那句 note）必须恰一处显式排印档（0 = 正文回退默认字，2 = 分屏写排版）",
         )
     }

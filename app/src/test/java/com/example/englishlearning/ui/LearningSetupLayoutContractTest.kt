@@ -221,6 +221,15 @@ class LearningSetupLayoutContractTest {
      *
      * 节数钉死为 5：选择词书 / 每日新增 / 复习上限 / 评分之后怎么走 / 搜索历史。
      * 多一节 = 把原型没有的东西塞回来；少一节 = 某一节的眉标又被手搓成了 `Title`。
+     *
+     * **取样范围（2026-11-05 弹窗排印统一后收窄，决策 §1）**：本禁令只管**可滚表单正文**，
+     * 不管同窗口里的模态框标题。`LearningSetupScreen` 的窗口里住着两枚对话框
+     * （删除档案的 `ConfirmDestructiveDialog` + 切书迁移提示的 `GlassDialog`），
+     * 按新口径它们的标题统一是 `AppType.Title` —— 那是「对话框标题」，不是「第二套分组排印」，
+     * 两者形态不同源（眉标 12sp 大写 + 注，标题 17sp/650），把它算进来是判据串味。
+     * 切点 `val colors = appColors()` 是本屏表单段的起点，也在两枚模态之后（本窗恰好一枚，多一枚即切点搬家）；
+     * 锚点按**不含换行**的字面量取（仓库源码是 CRLF，把 `\n` 写进锚点会在换行符口径上假红），
+     * 且找不到时 `substringAfter` 会退回整窗（= 旧口径），所以下面额外钉一次「切点存在且唯一」防契约空转。
      */
     @Test
     fun `every group heading is the shared eyebrow heading and the count is the prototype's`() {
@@ -229,10 +238,26 @@ class LearningSetupLayoutContractTest {
             countMatches(setup, Regex(Regex.escape("SectionHeading("))),
             "本屏必须恰五节眉标：选择词书 / 每日新增 / 复习上限 / 评分之后怎么走 / 搜索历史",
         )
+        val formAnchor = "val colors = appColors()"
+        assertEquals(
+            1,
+            countMatches(setup, Regex(Regex.escape(formAnchor))),
+            "表单段切点 `$formAnchor` 必须恰一枚（0 = 锚点搬家、禁令悄悄退回全窗口取样；2 = 切点歧义，本判据拒绝猜测）",
+        )
+        val formBody = setup.substringAfter(formAnchor)
         assertEquals(
             0,
+            countMatches(formBody, Regex(Regex.escape("AppType.Title"))),
+            "组标题一律交 `SectionHeading`：表单正文里手搓 `AppType.Title` 就是第二套分组排印",
+        )
+        assertEquals(
+            1,
             countMatches(setup, Regex(Regex.escape("AppType.Title"))),
-            "组标题一律交 `SectionHeading`：屏侧手搓 `AppType.Title` 就是第二套分组排印",
+            "本窗口只许一枚 `AppType.Title`，且必须是切书迁移框的标题（多一枚 = 正文里又手搓了标题）",
+        )
+        assertTrue(
+            """text = "发现已学过的单词", style = AppType.Title""" in setup,
+            "那唯一一枚 `AppType.Title` 必须逐字挂在切书迁移框标题上（不钉这行，上一枚阈值就成了「随便哪儿的一枚」）",
         )
         listOf("\"选择词书\"", "\"每日新增\"", "\"复习上限\"", "\"评分之后怎么走\"", "\"搜索历史\"").forEach { label ->
             assertTrue(label in setup, "本节标题必须逐字出现：$label")

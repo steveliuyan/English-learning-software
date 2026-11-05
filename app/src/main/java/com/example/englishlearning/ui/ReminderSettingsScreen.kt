@@ -235,9 +235,13 @@ fun ReminderSettingsScreen(
             initialMinute = state.time.minute,
             is24Hour = true,
         )
+        // 这枚保持 Material3 `AlertDialog`，不接共享 `DialogPanel`：面板里的 TimePicker 表盘要靠自身高度
+        // 摆位，而 `DialogPanel` 的 560.dp 上限 + 竖向滚动会与拖拽指针的高度约束打架（2026-11-05 排印统一批裁决）。
+        // 只把标题对齐到弹窗三档口径（标题 Title / 正文 Body / 按钮 ButtonLabel）：原先读 AppType.Body 是 15sp，
+        // 与下方「修改」入口那枚同值的 Title 不一致，标题与行内文案读起来分不出轻重。
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = { Text(text = "提醒时间", style = AppType.Body, color = colors.text1) },
+            title = { Text(text = "提醒时间", style = AppType.Title, color = colors.text1) },
             text = { TimePicker(state = pickerState) },
             confirmButton = {
                 PillButton(
