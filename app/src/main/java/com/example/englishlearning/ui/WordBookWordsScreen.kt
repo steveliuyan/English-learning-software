@@ -37,21 +37,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
 import com.example.englishlearning.ui.components.WordRow
+import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
-import com.example.englishlearning.ui.theme.MintBackground
-import com.example.englishlearning.ui.theme.MintOutline
-import com.example.englishlearning.ui.theme.MintPrimary
-import com.example.englishlearning.ui.theme.MintPrimaryDark
-import com.example.englishlearning.ui.theme.MintSurface
-import com.example.englishlearning.ui.theme.MintTextMuted
-import com.example.englishlearning.ui.theme.MintTint
+import com.example.englishlearning.ui.theme.appDomain
 
 /**
  * 词书单词浏览页（D2）：字母分组 + 顶部横向可滚的 A–Z 快速索引（Task 21 起为 48dp 芯片条）。
@@ -60,6 +54,17 @@ import com.example.englishlearning.ui.theme.MintTint
  * 批 1 Task 5 起本屏还是词库页 `WordBankScreen` 的「词书段」：那种用法下由壳提供页头与四分段，
  * 本屏只出「筛选 chip + 字母栏 + 词行」，故 [showHeader] 可关（默认 true，既有挂载点与 connected 夹具不动）。
  * 两枚新形参都追加在末尾且有默认值，调用处不需要改。
+ *
+ * 2026-11-05 弹窗与查词域排版收口批：本屏是 UI 重设计轮最后一屏仍在读 `Mint*` 桥接令牌与手搓字号的地方。
+ * 先说清事实，避免后人误判严重度：**`Mint*` 不是静态浅套值**，`theme/MintPalette.kt` 里它们是
+ * `@Composable @ReadOnlyComposable` getter，内部逐条读 `LocalAppColors` / `LocalDomainColors`
+ * （`MintPrimaryDark` = `text1`、`MintTextMuted` = `text2`、`MintOutline` = `outlineSoft`、
+ * `MintPrimary` = `AppDomain.AiSpeech.base`），所以深色档此前**并没有拿到浅值**，本屏不是暗色缺陷现场。
+ * 迁移的收益是两条：① 全站排印/取墨只剩 `appColors()` / `appDomain()` / `AppType` 一条读法，
+ * 桥接令牌可以在后续批次整批下线；② 三处手搓字号（页头两枚默认 15sp、字母分组头 16.sp、索引芯片 17.sp/13.sp）
+ * 换进六档，分组头与当前字母随之拿到档自带的字重与行高，动态字体档下缩放行为与全站一致。
+ * 取值逐字不变（Title=17sp、Footnote=13sp 与原先的 `.sp` 数相同），connected 侧
+ * `WordBookWordsScreenTest` 那两条「当前字母更大」「当前字母颜色区别于普通字母」的判据因此继续成立。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -99,9 +104,10 @@ fun WordBookWordsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MintBackground)
+            .background(appColors().background)
             .testTag("wordbook_words_screen"),
     ) {
+        val colors = appColors()
         if (showHeader) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 Text(
@@ -112,14 +118,14 @@ fun WordBookWordsScreen(
                         .padding(8.dp)
                         .testTag("wordbook_words_back")
                         .semantics { contentDescription = "返回" },
-                    color = MintPrimaryDark,
-                    fontWeight = FontWeight.Bold,
+                    style = AppType.Title,
+                    color = colors.text1,
                 )
                 Text(
                     text = "词书单词",
                     modifier = Modifier.padding(start = 12.dp, top = 8.dp),
-                    color = MintPrimaryDark,
-                    fontWeight = FontWeight.Bold,
+                    style = AppType.Title,
+                    color = colors.text1,
                 )
             }
         }
@@ -150,8 +156,8 @@ fun WordBookWordsScreen(
                         .testTag("wordbook_words_loading"),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    CircularProgressIndicator(color = MintPrimary)
-                    Text("正在读取词书单词…", color = MintTextMuted)
+                    CircularProgressIndicator(color = appDomain(AppDomain.AiSpeech).base)
+                    Text("正在读取词书单词…", style = AppType.Body, color = colors.text2)
                 }
                 state.error != null -> Column(
                     modifier = Modifier
@@ -160,13 +166,13 @@ fun WordBookWordsScreen(
                         .testTag("wordbook_words_unavailable"),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text(state.error, color = MintPrimaryDark)
+                    Text(state.error, style = AppType.Body, color = colors.text1)
                     Button(
                         onClick = onRetry,
                         modifier = Modifier
                             .testTag("wordbook_words_retry")
                             .semantics { contentDescription = "重试读取词书单词" },
-                        colors = ButtonDefaults.buttonColors(containerColor = MintPrimary, contentColor = appColors().onBrand),
+                        colors = ButtonDefaults.buttonColors(containerColor = appDomain(AppDomain.AiSpeech).base, contentColor = colors.onBrand),
                     ) { Text("重试") }
                 }
                 else -> LazyColumn(
@@ -217,22 +223,23 @@ private fun WordBookWordsFilterBar(state: WordBookWordsUiState, onFilter: (WordB
 
 @Composable
 private fun WordBookWordsLetterHeader(letter: String) {
+    val colors = appColors()
     Text(
         text = letter,
         modifier = Modifier
             .fillMaxWidth()
-            .background(MintBackground)
+            .background(colors.background)
             .padding(vertical = 4.dp)
             .testTag("wordbook_words_letter_$letter")
             .semantics { contentDescription = "字母 $letter" },
-        color = MintPrimaryDark,
-        fontWeight = FontWeight.Bold,
-        fontSize = 16.sp,
+        style = AppType.Title,
+        color = colors.text1,
     )
 }
 
 @Composable
 private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) -> Unit) {
+    val colors = appColors()
     val safeId = row.cardId.substringAfterLast(':').replace(Regex("[^A-Za-z0-9一-龥_-]"), "_")
     val enabled = row.canOpenDetail
     Card(
@@ -240,8 +247,8 @@ private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) ->
             .fillMaxWidth()
             .then(if (enabled) Modifier.clickable(onClick = { onOpenRow(row) }) else Modifier)
             .testTag("wordbook_words_row_$safeId"),
-        colors = CardDefaults.cardColors(containerColor = if (enabled) MintSurface else MintTint.copy(alpha = 0.55f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) MintOutline else MintOutline.copy(alpha = 0.65f)),
+        colors = CardDefaults.cardColors(containerColor = if (enabled) colors.surface else colors.tint.copy(alpha = 0.55f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (enabled) colors.outlineSoft else colors.outlineSoft.copy(alpha = 0.65f)),
     ) {
         // Task 20-B（计划 Step 4）：卡内那枚私有 `Column` + 四枚 `Text` 换成共享 [WordRow]。
         // 卡面归调用方（本屏的 enabled/disabled 底色与描边、testTag、可点面都原样保留），行本体只管版式；
@@ -279,7 +286,8 @@ private fun WordBookWordsEmpty() {
             .padding(vertical = 16.dp)
             .testTag("wordbook_words_empty")
             .semantics { contentDescription = text },
-        color = MintTextMuted,
+        style = AppType.Body,
+        color = appColors().text2,
     )
 }
 
@@ -301,6 +309,8 @@ private fun WordBookWordsAlphabetRail(
     onLetter: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = appColors()
+    val accent = appDomain(AppDomain.AiSpeech).base
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -328,7 +338,8 @@ private fun WordBookWordsAlphabetRail(
                         // 48dp 下限钉在**这枚带 clickable 的节点自身**（AC-R-04 要的是可点区，不是视觉高度）；
                         // 用下限而不是 `size`，动态字体下芯片随字号只增不减。`spacedBy(2.dp)` 保证相邻命中区不相交，
                         // 旧压缩槽「命中区落在整槽内并覆盖槽心」那套代偿护栏因此退役。
-                        // 颜色只读既有薄荷令牌，本函数不新增裸 hex / `AppPalette.` / `DomainColors.` 静态读点。
+                        // 颜色取主题档（`appColors()` / `appDomain(AiSpeech).base`），不新增裸 hex、
+                        // `AppPalette.` 或 `DomainColors.` 静态读点。
                         .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                         .clickable(onClick = { onLetter(letterText) })
                         .testTag("wordbook_words_rail_$letterText"),
@@ -342,12 +353,14 @@ private fun WordBookWordsAlphabetRail(
                         // 而 connected 侧要读字形取值时用 `useUnmergedTree = true` 取本节点。
                         modifier = Modifier.semantics { contentDescription = "导航字母 $letterText" },
                         color = when {
-                            active -> MintPrimary
-                            available -> MintPrimaryDark
-                            else -> MintTextMuted.copy(alpha = 0.45f)
+                            active -> accent
+                            available -> colors.text1
+                            else -> colors.text2.copy(alpha = 0.45f)
                         },
-                        fontSize = if (active) 17.sp else 13.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        // 17sp / 13sp 的手搓值换成六档同值档（Title 17sp/650、Footnote 13sp/Normal）：
+                        // 原先的 `FontWeight.Bold` / `Normal` 由档自带，connected 侧「当前字母更大」
+                        // 与 `activeLetterUsesADifferentColor` 读的都是 `layoutInput.style`，取值关系逐字保留。
+                        style = if (active) AppType.Title else AppType.Footnote,
                         maxLines = 1,
                     )
                 }

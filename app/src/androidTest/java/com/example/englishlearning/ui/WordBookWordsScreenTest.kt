@@ -56,7 +56,21 @@ class WordBookWordsScreenTest {
      */
     private val dpConversionTolerance = 0.05.dp
 
-    /** D2 验收：词书单词页按字母分组，组头可见、行可见。 */
+    /**
+     * D2 验收：词书单词页按字母分组，组头与行**可达**。
+     *
+     * 「可达」而不是「不滚就看得见」。2026-11-05 弹窗排印统一批把分组头从手搓 `16.sp` 换成
+     * `AppType.Title`（17sp/650、行高 27sp），`font_scale = 2.0` 那轮实测最后一组 `#` 被挤出视口
+     * （三枚组头各长 ≈9dp；取证 `.git/qa-scratch/connected-wordbook-2.0.log`）——大字号下正文要滚
+     * 是正常版面行为，不是缺陷；原判据把「视口内」当契约，才让它成了字号档的人质。
+     *
+     * 走法沿用本类既有先例（`scrollingToHashGroupClearsAlphabetHighlight`）：正文是 `LazyColumn`，
+     * **只组合视口内的项**，对还没组合出来的 tag 调 `performScrollTo()` 会当场抛「找不到节点」
+     * （2.0 档实测，`.git/qa-scratch/connected-wordbook-2.0b.log`），所以视口外的项按**下标**滚过去。
+     * 下标表（本夹具：A 组两行、B 组一行、`#` 组一行）：
+     * `0=组头A / 1=avocado / 2=apple / 3=组头B / 4=banana / 5=组头# / 6=苹果`。
+     * 顶部区仍按「不滚就该看见」判，档位没放松。
+     */
     @Test
     fun letterGroupsRenderWithStickyHeadersAndRows() {
         composeRule.setContent {
@@ -72,12 +86,16 @@ class WordBookWordsScreenTest {
                 onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
             )
         }
+        val list = composeRule.onNode(hasScrollToIndexAction())
         composeRule.onNodeWithTag("wordbook_words_screen").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_letter_A").assertIsDisplayed()
-        composeRule.onNodeWithTag("wordbook_words_letter_B").assertIsDisplayed()
-        composeRule.onNodeWithTag("wordbook_words_letter_#").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_row_apple").assertIsDisplayed()
+        list.performScrollToIndex(3)
+        composeRule.onNodeWithTag("wordbook_words_letter_B").assertIsDisplayed()
         composeRule.onNodeWithTag("wordbook_words_row_banana").assertIsDisplayed()
+        list.performScrollToIndex(5)
+        composeRule.onNodeWithTag("wordbook_words_letter_#").assertIsDisplayed()
+        list.performScrollToIndex(6)
         composeRule.onNodeWithTag("wordbook_words_row_苹果").assertIsDisplayed()
     }
 
