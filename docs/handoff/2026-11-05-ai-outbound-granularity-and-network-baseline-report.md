@@ -147,7 +147,8 @@ detekt/ktlint 按仓库口径不作闸（存量基线债 1500+，非本批引入
 - ~~AI 音频缓存补「大小/来源/创建时间/关联实体」~~ **本项已于同日收口**，且当初定性也定轻了：那不是缺字段，
   端侧 `FileSynthesizedAudioCache` 是**替换一字节仍能播**的 fail-open（本批 RED 原文见新报告 §3）。
   处置、决策与证据见 `docs/decisions/2026-11-05-ai-audio-cache-integrity-ledger.md` 与
-  `docs/handoff/2026-11-05-ai-audio-cache-ledger-report.md`；「关联实体」本轮只做到内容类别级，主键接线仍结转。
+  `docs/handoff/2026-11-05-ai-audio-cache-ledger-report.md`；~~「关联实体」本轮只做到内容类别级，主键接线仍结转~~
+  **同日第二批已升到主键级**（见 `docs/decisions/2026-11-05-pronunciation-entity-ref-threading.md`）。
 - `WordBookPackTest` 那两条设备前置条件缺口：~~要么配服务要么长期接受编译级证据，需用户裁决~~ **本项已在本报告写完后当日收口，且当初定性定错了**——那三个 `wordbook/` 类（打包器与两个质量探针）的 KDoc 自证是「真机 run、逐词发真实付费请求、产数据供人工核」的**操作者工具**，不是门禁用例；现已改为默认显式跳过（`-e operatorTool true` 才跑）并加了契约闸。处置记录与取证末行见 `docs/handoff/2026-11-05-batch2-verification-gaps-todo.md` 待办 2，勿再按本条原文的 A/B 选项行动。
 - `AiOutboundGrantStore` 记的是「点了确认」而不是「请求成功」：确认成功后立刻失败的请求仍保住该域名的授权。
   取舍已写进代码注释与测试，但这是产品口径，若用户要「失败即收回」需要另行裁决。

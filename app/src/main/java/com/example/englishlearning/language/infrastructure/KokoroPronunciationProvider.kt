@@ -2,6 +2,7 @@ package com.example.englishlearning.language.infrastructure
 
 import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationCapability
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
 import kotlinx.coroutines.CancellationException
@@ -28,7 +29,7 @@ class KokoroPronunciationProvider(
         if (text.isBlank()) return PronunciationResult.Unavailable("blank text")
 
         // 等上一请求取消清理完成，再检查共享引擎是否需要重新准备。
-        return requestMutex.withLock { speakPrepared(text, accent, forceRegenerate = false, rate = 1.0f) }
+        return requestMutex.withLock { speakPrepared(text, accent, forceRegenerate = false, rate = 1.0f, entity = null) }
     }
 
     override suspend fun speak(
@@ -43,9 +44,18 @@ class KokoroPronunciationProvider(
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
         rate: Float,
+    ): PronunciationResult = speak(text, accent, forceRegenerate, rate, null)
+
+    /** 带关联实体的发声（决策 D-7）：entity 只随台账落盘，不进缓存键、不进推理输入。 */
+    override suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        rate: Float,
+        entity: PronunciationEntityRef?,
     ): PronunciationResult {
         if (text.isBlank()) return PronunciationResult.Unavailable("blank text")
-        return requestMutex.withLock { speakPrepared(text, accent, forceRegenerate, rate) }
+        return requestMutex.withLock { speakPrepared(text, accent, forceRegenerate, rate, entity) }
     }
 
     private suspend fun speakPrepared(
@@ -53,6 +63,7 @@ class KokoroPronunciationProvider(
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
         rate: Float,
+        entity: PronunciationEntityRef?,
     ): PronunciationResult {
         return try {
             if (!forceRegenerate) {
@@ -64,7 +75,7 @@ class KokoroPronunciationProvider(
             }
             if (!engine.isReady()) return PronunciationResult.Unavailable("Kokoro engine unavailable")
             val audio = engine.synthesize(text, accent).getOrElse { throw it }
-            playAndCache(text, accent, audio, rate)
+            playAndCache(text, accent, audio, rate, entity)
         } catch (cancelled: CancellationException) {
             // 引擎由应用级 DI 共享；单次请求取消不能永久关闭它。
             // 合成阶段由引擎释放当前 runtime，播放阶段由 player 释放当前播放器。
@@ -80,11 +91,12 @@ class KokoroPronunciationProvider(
         accent: PronunciationAccent,
         audio: ByteArray,
         rate: Float,
+        entity: PronunciationEntityRef?,
     ): PronunciationResult {
         try {
             if (audio.isEmpty()) return PronunciationResult.Failed()
             // 缓存是旁路：写失败不打断本次播放，也不改变结果。
-            runCatching { audioCache?.write(text, accent, audio) }
+            runCatching { audioCache?.write(text, accent, audio, entity) }
             val played = player.play(audio, "wav", rate) is AudioPlaybackResult.Played
             return if (played) PronunciationResult.Played else PronunciationResult.Failed()
         } finally {

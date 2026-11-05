@@ -5,6 +5,7 @@ import com.example.englishlearning.language.domain.PronunciationAudioCache
 import com.example.englishlearning.language.domain.PronunciationAudioMetadata
 import com.example.englishlearning.language.domain.PronunciationCacheKey
 import com.example.englishlearning.language.domain.PronunciationContentKind
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import java.io.File
 
 /**
@@ -44,7 +45,11 @@ class FilePronunciationAudioCache internal constructor(
         }
     }
 
-    override suspend fun put(key: PronunciationCacheKey, bytes: ByteArray) {
+    override suspend fun put(
+        key: PronunciationCacheKey,
+        bytes: ByteArray,
+        entity: PronunciationEntityRef?,
+    ) {
         require(bytes.isNotEmpty())
         val cacheId = key.cacheId()
         val audio = File(root, "$cacheId.wav")
@@ -59,6 +64,7 @@ class FilePronunciationAudioCache internal constructor(
             text = key.text,
             createdAtEpochMillis = clock(),
             requestVersion = key.requestVersion,
+            entity = entity,
         )
         val temporaryAudio = File(root, "$cacheId.wav.tmp")
         val temporaryLedger = File(root, "$cacheId.json.tmp")

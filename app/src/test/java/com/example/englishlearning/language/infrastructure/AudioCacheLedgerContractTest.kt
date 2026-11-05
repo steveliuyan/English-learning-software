@@ -3,6 +3,7 @@ package com.example.englishlearning.language.infrastructure
 import com.example.englishlearning.ui.APP_MAIN_SOURCE_PATH
 import com.example.englishlearning.ui.stripComments
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
@@ -125,6 +126,70 @@ class AudioCacheLedgerContractTest {
         )
     }
 
+    /**
+     * 决策 D-10：接口默认实现会**静默丢弃** entity，所以调用点必须显式写。
+     * 这条判据把「每个发音调用点都交代了关联实体」钉在源码上——否则接线会在某次重构里悄悄退化回纯文本。
+     */
+    @Test
+    fun everyAppScreenSpeakCallSiteNamesItsEntity() {
+        val screen = strippedOf("ui/AppScreen.kt")
+        val arguments = callArguments(screen)
+
+        assertTrue(
+            arguments.isNotEmpty(),
+            "在 ui/AppScreen.kt 里解析不出任何发音调用点：识别面失效，本契约不能作为证据（调用写法变了就先修本闸）",
+        )
+        val offenders = arguments.filterNot { it.contains("entity =") }
+        assertTrue(
+            offenders.isEmpty(),
+            "${arguments.size} 处发音调用点里有 ${offenders.size} 处没给关联实体：" +
+                offenders.joinToString("; ") { it.replace(Regex("\\s+"), " ").trim() } +
+                "——台账的「关联实体」将回退成只知道类别、答不出是哪张卡（决策 D-7）",
+        )
+    }
+
+    @Test
+    fun theCallSiteJudgeFlagsAnArgumentWithoutEntity() {
+        val withEntity = """
+            val result = pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, entity = wordCardRef(card.cardId))
+        """.trimIndent()
+        val withoutEntity = """
+            val result = pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American)
+        """.trimIndent()
+
+        assertEquals(1, callArguments(withEntity).size, "解析面连一处调用点都没认出：判据将空转")
+        assertTrue(callArguments(withEntity).single().contains("entity ="), "合规调用点被漏判")
+        assertTrue(
+            callArguments(withoutEntity).filterNot { it.contains("entity =") }.isNotEmpty(),
+            "漏传 entity 的调用点没被抓到：上一条对真实文件的绿不能作为证据",
+        )
+    }
+
+    /** 抽出每个 `pronunciationProvider?.speakWord(`/`speakSentence(` 调用的实参文本（按括号配对，注释已先剥）。 */
+    private fun callArguments(source: String): List<String> {
+        val arguments = mutableListOf<String>()
+        SPEAK_CALL_PATTERN.findAll(source).forEach { match ->
+            val open = source.lastIndexOf('(', match.range.last)
+            var depth = 0
+            var index = open
+            while (index < source.length) {
+                when (source[index]) {
+                    '(' -> depth++
+                    ')' -> {
+                        depth--
+                        if (depth == 0) {
+                            arguments += source.substring(open + 1, index)
+                            return@forEach
+                        }
+                    }
+                }
+                index++
+            }
+            error("ui/AppScreen.kt 有一处发音调用点括号不配对，判据无法给出结论：位置 $open")
+        }
+        return arguments
+    }
+
     /** 主源码里的音频缓存**实现**（不是持有缓存字段的消费者）：文件 → 去注释后的正文。 */
     private fun audioCacheImplementations(): Map<String, String> =
         File(mainSourceDir(), "language/infrastructure")
@@ -156,6 +221,9 @@ class AudioCacheLedgerContractTest {
     private fun readFile(file: File): String = file.readText(Charsets.UTF_8)
 
     private companion object {
+        /** 屏层发音入口：只认这个写法，别的（如 ViewModel 里的试听）不在本闸覆盖面。 */
+        val SPEAK_CALL_PATTERN = Regex("""pronunciationProvider\s*\?\s*\.\s*speak(?:Word|Sentence)\s*\(""")
+
         /**
          * 实现面（不是持有缓存字段的消费者）：超类型位上出现两个缓存接口之一，
          * 后面紧跟 `{`（`val cache: SynthesizedAudioCache? = null` 这种成员声明不算）。

@@ -50,10 +50,11 @@ class PronunciationRouter(
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
         rate: Float,
+        entity: PronunciationEntityRef?,
     ): PronunciationResult {
         activeProvider = kokoroProvider
         // 语速以持久化偏好为准（词路径外部默认调用不带 rate）：这里补一次偏好读取（任务书口径）。
-        return kokoroProvider.speak(word, accent, forceRegenerate, savedPreference().speechRate)
+        return kokoroProvider.speak(word, accent, forceRegenerate, savedPreference().speechRate, entity)
     }
 
     suspend fun speakWord(word: String, accent: PronunciationAccent): PronunciationResult =
@@ -63,24 +64,26 @@ class PronunciationRouter(
         sentence: String,
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
-    ): PronunciationResult = routeSentence(sentence, accent, forceRegenerate)
+        entity: PronunciationEntityRef?,
+    ): PronunciationResult = routeSentence(sentence, accent, forceRegenerate, entity)
 
     suspend fun speakSentence(sentence: String): PronunciationResult =
-        routeSentence(sentence, PronunciationAccent.American, false)
+        routeSentence(sentence, PronunciationAccent.American, false, null)
 
     suspend fun speakSentence(sentence: String, accent: PronunciationAccent): PronunciationResult =
-        routeSentence(sentence, accent, false)
+        routeSentence(sentence, accent, false, null)
 
     private suspend fun routeSentence(
         sentence: String,
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
+        entity: PronunciationEntityRef?,
     ): PronunciationResult {
         val preference = savedPreference()
         return when (preference.selectedEngine) {
             PronunciationEngine.SystemTts -> {
                 activeProvider = systemProvider
-                systemProvider.speak(sentence, accent, false, preference.speechRate)
+                systemProvider.speak(sentence, accent, false, preference.speechRate, entity)
             }
             PronunciationEngine.MiMo -> speakMiMoOrSystem(
                 sentence = sentence,
@@ -88,6 +91,7 @@ class PronunciationRouter(
                 forceRegenerate = forceRegenerate,
                 profileId = preference.miMoProfileId,
                 rate = preference.speechRate,
+                entity = entity,
             )
         }
     }
@@ -109,6 +113,7 @@ class PronunciationRouter(
         forceRegenerate: Boolean,
         profileId: String?,
         rate: Float,
+        entity: PronunciationEntityRef?,
     ): PronunciationResult {
         val remote = if (profileId == null) {
             PronunciationResult.Unavailable("Missing speech profile")
@@ -117,7 +122,7 @@ class PronunciationRouter(
                 // 工厂实例必须先落到局部 val：播控要知道真正出声的是哪一个 provider。
                 val remoteProvider = miMoFactory.create(profileId)
                 activeProvider = remoteProvider
-                remoteProvider.speak(sentence, accent, forceRegenerate, rate)
+                remoteProvider.speak(sentence, accent, forceRegenerate, rate, entity)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -127,7 +132,7 @@ class PronunciationRouter(
         if (remote == PronunciationResult.Played) return remote
         // 远程没出声就一定由系统 TTS 出声：控制权必须跟着改，否则暂停/停止会打到悬空的 MiMo 实例。
         activeProvider = systemProvider
-        return systemProvider.speak(sentence, accent, false, rate)
+        return systemProvider.speak(sentence, accent, false, rate, entity)
     }
 
     override fun pausePlayback(): Boolean = activeProvider?.pausePlayback() ?: false

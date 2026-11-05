@@ -26,6 +26,7 @@ class PronunciationAudioMetadataTest {
         kind: PronunciationContentKind = PronunciationContentKind.Word,
         text: String = "hello",
         createdAt: Long = 1_760_000_000_000L,
+        entity: PronunciationEntityRef? = PronunciationEntityRef.wordCard("card-42"),
     ) = PronunciationAudioMetadata.of(
         bytes = audio,
         providerId = providerId,
@@ -35,6 +36,7 @@ class PronunciationAudioMetadataTest {
         contentKind = kind,
         text = text,
         createdAtEpochMillis = createdAt,
+        entity = entity,
     )
 
     @Test
@@ -49,6 +51,8 @@ class PronunciationAudioMetadataTest {
         assertEquals("af_heart.npy", entry.voice)
         assertEquals("American", entry.accent)
         assertEquals("Word", entry.contentKind, "关联实体的内容类别")
+        assertEquals("WordCard", entry.entityKind, "关联实体的来源屏")
+        assertEquals("card-42", entry.entityId, "关联实体的主键")
         assertEquals("hello", entry.text)
         assertEquals(PronunciationCacheKey.REQUEST_VERSION, entry.requestVersion)
     }
@@ -74,6 +78,10 @@ class PronunciationAudioMetadataTest {
         assertNull(PronunciationAudioMetadata.fromJson(blankSource), "来源空白不可信")
         val badDigest = ledger().toJson().replaceFirst(hex(bytes), "not-a-sha256")
         assertNull(PronunciationAudioMetadata.fromJson(badDigest), "摘要形状不对就不可信")
+        val bogusKind = ledger().toJson().replaceFirst("\"entityKind\":\"WordCard\"", "\"entityKind\":\"MagicCard\"")
+        assertNull(PronunciationAudioMetadata.fromJson(bogusKind), "不认识的实体类别说明台账没人维护了，按不可信处理（决策 D-9）")
+        val blankId = ledger().toJson().replaceFirst("\"entityId\":\"card-42\"", "\"entityId\":\"  \"")
+        assertNull(PronunciationAudioMetadata.fromJson(blankId), "实体主键要么有值要么是 null，空白串不算")
     }
 
     @Test
@@ -116,6 +124,29 @@ class PronunciationAudioMetadataTest {
             "口音没登记音色时必须炸出来，不许悄悄写一个假来源进台账",
         )
     }
+
+    @Test
+    fun aLedgerThatNamesTheCardBehindItIsReadable() {
+        // 决策 D-7：台账得能回答「这段音频是哪张卡触发生成的」。
+        // 本用例刻意用字面 JSON 写，不借构造函数——它测的就是「盘上这条记录认不认识这两枚键」。
+        val namingACard = legacyLedgerJson().removeSuffix("}") + ""","entityKind":"WordCard","entityId":"card-42"}"""
+
+        val entry = PronunciationAudioMetadata.fromJson(namingACard)
+
+        assertNotNull(entry, "记了主键的台账读不回来：说明 entityKind/entityId 这两枚键根本不存在")
+        assertTrue(entry.matches(bytes), "带实体的台账照样要用摘要与大小守门")
+    }
+
+    @Test
+    fun aLedgerWrittenBeforeThisBatchIsStillTrusted() {
+        // 决策 D-12：上一版台账缺实体字段但字节可信；判它作废=把整座缓存打回重新合成/重新出网。
+        assertNotNull(PronunciationAudioMetadata.fromJson(legacyLedgerJson()), "旧台账不许因缺实体字段而作废")
+    }
+
+    private fun legacyLedgerJson(): String =
+        """{"schemaVersion":1,"sha256":"${hex(bytes)}","byteSize":5,"createdAtEpochMillis":1760000000000,""" +
+            """"providerId":"KOKORO_ON_DEVICE","model":"m","voice":"af_heart.npy","accent":"American",""" +
+            """"requestVersion":1,"contentKind":"Word","text":"hello"}"""
 
     private fun hex(value: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(value).joinToString("") { "%02x".format(it) }

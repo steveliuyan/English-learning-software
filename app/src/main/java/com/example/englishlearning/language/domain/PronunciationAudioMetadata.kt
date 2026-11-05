@@ -4,7 +4,7 @@ import java.security.MessageDigest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** 缓存音频对应的内容类别——「关联实体」本轮能做到的最诚实的一层（决策 D-3）。 */
+/** 缓存音频对应的内容类别；主键级的关联见 [PronunciationEntityRef]（决策 2026-11-05 D-7）。 */
 enum class PronunciationContentKind {
     Word,
     Sentence,
@@ -16,7 +16,7 @@ enum class PronunciationContentKind {
  * 摘要或大小任一不符就按未命中处理并删除两份文件，让上层重新生成。
  *
  * 字段面是刻意收窄的：只有来源标识（providerId / model / voice）、口音、请求版本、内容类别、
- * 朗读文本与时钟。Endpoint URL 与 API Key 在本类型里**没有对应字段**——
+ * 朗读文本、关联实体（kind + 可空主键）与时钟。Endpoint URL 与 API Key 在本类型里**没有对应字段**——
  * 缓存层拿不到 `AiProfile`，也就结构上写不出那两样东西（AGENTS.md 红线）。
  */
 @Serializable
@@ -32,6 +32,11 @@ data class PronunciationAudioMetadata(
     val requestVersion: Int = PronunciationCacheKey.REQUEST_VERSION,
     val contentKind: String,
     val text: String,
+    // 关联实体的主键级那一半（决策 D-7）：kind 恒有值，id 可空。
+    // 两枚都带默认值是**故意的**（决策 D-12）：上一版台账没有这两枚键，判它们缺失=不可信，
+    // 等于把整座缓存打回重新合成——MiMo 那条路径每次都是真花钱的付费请求，而完整性并没有因此提升。
+    val entityKind: String = PronunciationEntityKind.Unattached.name,
+    val entityId: String? = null,
 ) {
 
     /** 大小与内容摘要**两枚都要**对上才可播放。 */
@@ -58,6 +63,7 @@ data class PronunciationAudioMetadata(
             text: String,
             createdAtEpochMillis: Long,
             requestVersion: Int = PronunciationCacheKey.REQUEST_VERSION,
+            entity: PronunciationEntityRef? = null,
         ): PronunciationAudioMetadata = PronunciationAudioMetadata(
             sha256 = sha256Hex(bytes),
             byteSize = bytes.size.toLong(),
@@ -69,6 +75,8 @@ data class PronunciationAudioMetadata(
             requestVersion = requestVersion,
             contentKind = contentKind.name,
             text = text,
+            entityKind = entity?.kind?.name ?: PronunciationEntityKind.Unattached.name,
+            entityId = entity?.idOrNull,
         )
 
         /** 畸形、缺字段、未知 schemaVersion、字段值不可信——一律 null，由调用方按未命中处理。 */
@@ -91,7 +99,10 @@ data class PronunciationAudioMetadata(
             voice.isNotBlank() &&
             accent.isNotBlank() &&
             contentKind.isNotBlank() &&
-            text.isNotBlank()
+            text.isNotBlank() &&
+            // 实体类别必须是认识的那一枚：手写歪了的 kind 说明台账已经没人维护了，按不可信处理（决策 D-9）。
+            PronunciationEntityKind.values().any { it.name == entityKind } &&
+            (entityId == null || entityId.isNotBlank())
 }
 
 /**

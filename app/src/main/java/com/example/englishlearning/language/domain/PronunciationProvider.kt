@@ -18,19 +18,24 @@ interface PronunciationProvider {
     /**
      * 单词发音（F3-02 四控之速：`rate` 为播放侧变速倍率，决策 §2）。
      * 三参版与四参版在 Kotlin 里默认值签名冲突，按任务书裁决合并为单一声明，调用点零改动。
+     *
+     * [entity] 是「这段音频从哪张卡来」，只为写台账而存在（决策 2026-11-05 D-7）；
+     * 它**不进缓存键**，所以命中与否、复用与否都跟以前一样。
      */
     suspend fun speakWord(
         text: String,
         accent: PronunciationAccent = PronunciationAccent.American,
         forceRegenerate: Boolean = false,
         rate: Float = 1.0f,
-    ): PronunciationResult = speak(text, accent, forceRegenerate, rate)
+        entity: PronunciationEntityRef? = null,
+    ): PronunciationResult = speak(text, accent, forceRegenerate, rate, entity)
 
     suspend fun speakSentence(
         text: String,
         accent: PronunciationAccent = PronunciationAccent.American,
         forceRegenerate: Boolean = false,
-    ): PronunciationResult = speak(text, accent, forceRegenerate)
+        entity: PronunciationEntityRef? = null,
+    ): PronunciationResult = speak(text, accent, forceRegenerate, 1.0f, entity)
 
     suspend fun speak(text: String, accent: PronunciationAccent): PronunciationResult = speak(text)
 
@@ -47,6 +52,20 @@ interface PronunciationProvider {
         forceRegenerate: Boolean,
         rate: Float,
     ): PronunciationResult = speak(text, accent, forceRegenerate)
+
+    /**
+     * 带关联实体的发声：只有**会写音频缓存**的 provider（端侧 Kokoro、云端 MiMo）需要覆盖它。
+     * 默认实现丢掉 entity 委托四参版（决策 D-10）——系统 TTS 按 AGENTS.md 不产出可缓存音频，
+     * 让它陪跑一次签名改动毫无收益。代价是「provider 忘了覆盖 ⇒ 实体静默丢失」，
+     * 由 `AudioCacheLedgerContractTest` 的调用点判据兜住。
+     */
+    suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        rate: Float,
+        entity: PronunciationEntityRef?,
+    ): PronunciationResult = speak(text, accent, forceRegenerate, rate)
 }
 
 sealed interface PronunciationResult {

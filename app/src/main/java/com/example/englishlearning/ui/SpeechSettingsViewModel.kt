@@ -10,6 +10,7 @@ import com.example.englishlearning.ai.domain.AiProfile
 import com.example.englishlearning.ai.domain.AiProviderKind
 import com.example.englishlearning.language.SpeechPreferenceRepository
 import com.example.englishlearning.language.domain.PronunciationEngine
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
 import com.example.englishlearning.language.domain.SpeechPreference
@@ -203,7 +204,8 @@ class SpeechSettingsViewModel @Inject constructor(
         }
         _state.value = _state.value.copy(previewMessage = null)
         val result = try {
-            pronunciation.speak(text)
+            // 走语义入口而不是兼容入口：试听也得向台账交代自己是谁（决策 D-10 的覆盖面）。
+            pronunciation.speakSentence(text, entity = PronunciationEntityRef.Preview)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

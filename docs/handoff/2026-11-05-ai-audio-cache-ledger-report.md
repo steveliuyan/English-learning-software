@@ -84,8 +84,11 @@ GRADLE=$(find "$HOME/.gradle/wrapper/dists/gradle-8.13-bin" -name gradle.bat)   
 
 ## 5. 未完成 / 遗留问题
 
-- **关联实体只到内容类别级**（`Word`/`Sentence` + 文本）。主键级（wordBookId + wordId / articleId）
-  要改 `PronunciationProvider` 接口与 `ui/AppScreen.kt` 十几处调用点，独立批次；决策 D-3 已写明，矩阵也没吹。
+- ~~**关联实体只到内容类别级**（`Word`/`Sentence` + 文本）。主键级（wordBookId + wordId / articleId）
+  要改 `PronunciationProvider` 接口与 `ui/AppScreen.kt` 十几处调用点，独立批次；决策 D-3 已写明，矩阵也没吹。~~
+  **本项已于同日第二批收口**：16 处调用点全部显式带实体，词卡 `cardId` / 文章 `articleId` / 拍照记录 id
+  落进台账，接口只扩了两个方法签名（其余 35 处 `override` 靠默认实现免改）。见
+  `docs/decisions/2026-11-05-pronunciation-entity-ref-threading.md` 与本目录同日实体接线报告。
 - **真机侧「替换 filesDir 里的 WAV 后不播」未验**：需要 run-as 或 root 注入，本批以 JVM 临时目录用例为主证据。
   归设备走查攒批。
 - **备份语义零改动**（决策 D-4 选 sidecar 而非 Room 的代价就是它不进备份）：

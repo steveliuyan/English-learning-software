@@ -28,8 +28,10 @@
 - 用户可下载安装经许可核验的 sherpa-onnx/Piper 英语模型；下载前展示大小、模型许可、存储需求，支持删除模型。
 - 用户配置的 TalkifyTTS 或其他 AI TTS 仅在 Profile 声明语音能力且用户主动选择时使用。
 - AI 音频缓存键为规范化文本、语音参数与模型版本；保存 SHA-256、大小、来源、创建时间与关联实体。哈希不一致时拒绝播放/导出并允许重新生成。
-  本条需求未改动；落盘形状与「关联实体」的实现层级见 `docs/decisions/2026-11-05-ai-audio-cache-integrity-ledger.md`
-  （sidecar 台账 + 读侧必查，关联实体本轮只到内容类别级，主键级接线结转）。
+  本条需求未改动；落盘形状见 `docs/decisions/2026-11-05-ai-audio-cache-integrity-ledger.md`
+  （sidecar 台账 + 读侧必查）；「关联实体」的实现层级已升到主键级，口径与取舍见
+  `docs/decisions/2026-11-05-pronunciation-entity-ref-threading.md`（记「哪张卡/哪篇文章触发了这次合成」，
+  实体不进缓存键；无主键的入口如实记 `Unattached`，禁止用词目当主键）。
 - 系统 TTS 不产生、保存或导出音频文件。
 
 ### F3-03 拍照 OCR 与翻译

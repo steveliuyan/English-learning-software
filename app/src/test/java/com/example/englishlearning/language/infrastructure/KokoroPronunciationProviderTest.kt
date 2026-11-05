@@ -2,6 +2,7 @@ package com.example.englishlearning.language.infrastructure
 
 import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationCapability
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import com.example.englishlearning.language.domain.PronunciationResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -311,6 +312,36 @@ class KokoroPronunciationProviderTest {
     }
 
     @Test
+    fun `the card that triggered synthesis is the one the cache is told about`() = runTest {
+        val engine = RecordingKokoroEngine(audio = byteArrayOf(4, 5))
+        val cache = FakeSynthAudioCache()
+        val provider = KokoroPronunciationProvider(engine, RecordingAudioPlayer(), cache)
+
+        provider.speakWord("hello", PronunciationAccent.American, entity = PronunciationEntityRef.wordCard("card-42"))
+        provider.speakWord("hello", PronunciationAccent.American, entity = PronunciationEntityRef.wordCard("card-99"))
+
+        // 决策 D-8：实体只进台账、不进缓存键——换一张卡念同一个词不该重跑一次推理。
+        assertEquals(listOf("hello"), engine.texts, "第二张卡应当命中缓存，而不是重新合成")
+        assertEquals(
+            listOf<PronunciationEntityRef?>(PronunciationEntityRef.wordCard("card-42")),
+            cache.entities,
+            "复用同一段音频不许改写台账：它记的是触发生成的那一张卡",
+        )
+    }
+
+    @Test
+    fun `a speak that brings no entity still plays`() = runTest {
+        val engine = RecordingKokoroEngine(audio = byteArrayOf(4, 5))
+        val cache = FakeSynthAudioCache()
+        val provider = KokoroPronunciationProvider(engine, RecordingAudioPlayer(), cache)
+
+        assertEquals(PronunciationResult.Played, provider.speakWord("hello"))
+
+        assertEquals(1, cache.entities.size, "无实体的调用照样要落一条台账")
+        assertEquals(null, cache.entities.single(), "调用方没交代实体时不许凭空造一个（决策 D-9）")
+    }
+
+    @Test
     fun `cache is keyed by accent`() = runTest {
         val engine = RecordingKokoroEngine(audio = byteArrayOf(1, 2))
         val cache = FakeSynthAudioCache()
@@ -350,6 +381,9 @@ class KokoroPronunciationProviderTest {
 
     private class FakeSynthAudioCache : SynthesizedAudioCache {
         val stored = mutableMapOf<Pair<String, PronunciationAccent>, ByteArray>()
+
+        /** 每次写入时交来的关联实体（决策 D-7 的转发链在这里可见）。 */
+        val entities = mutableListOf<PronunciationEntityRef?>()
         var throwOnRead = false
 
         override suspend fun read(text: String, accent: PronunciationAccent): ByteArray? {
@@ -357,7 +391,13 @@ class KokoroPronunciationProviderTest {
             return stored[text to accent]?.copyOf()
         }
 
-        override suspend fun write(text: String, accent: PronunciationAccent, wav: ByteArray) {
+        override suspend fun write(
+            text: String,
+            accent: PronunciationAccent,
+            wav: ByteArray,
+            entity: PronunciationEntityRef?,
+        ) {
+            entities += entity
             stored[text to accent] = wav.copyOf()
         }
     }

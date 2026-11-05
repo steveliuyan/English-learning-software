@@ -1,6 +1,7 @@
 package com.example.englishlearning.language.infrastructure
 
 import com.example.englishlearning.language.domain.PronunciationAccent
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -129,9 +130,33 @@ class FileSynthesizedAudioCacheTest {
             "accent",
             "contentKind",
             "text",
+            "entityKind",
+            "entityId",
         ).forEach { field ->
             assertTrue(ledger.contains("\"$field\""), "台账缺 Spec 03 要求的字段 \"$field\"：$ledger")
         }
+    }
+
+    @Test
+    fun `the ledger names the card behind the audio`(@TempDir dir: File) = runTest {
+        val cache = FileSynthesizedAudioCache(dir)
+
+        cache.write("hello", PronunciationAccent.American, byteArrayOf(1, 2, 3), entity = PronunciationEntityRef.wordCard("card-42"))
+
+        val ledger = ledgers(dir).single().readText()
+        assertTrue(ledger.contains("\"entityKind\":\"WordCard\""), "台账答不出「哪张卡」：关联实体还停在类别级（决策 D-7）：$ledger")
+        assertTrue(ledger.contains("\"entityId\":\"card-42\""), "台账没落主键：$ledger")
+    }
+
+    @Test
+    fun `an unattributed write says unattached instead of faking an id`(@TempDir dir: File) = runTest {
+        val cache = FileSynthesizedAudioCache(dir)
+
+        cache.write("hello", PronunciationAccent.American, byteArrayOf(1, 2, 3))
+
+        val ledger = ledgers(dir).single().readText()
+        assertTrue(ledger.contains("\"entityKind\":\"Unattached\""), "没交代实体的写入必须明说：$ledger")
+        assertFalse(ledger.contains("\"entityId\":\"\""), "空串看起来像「有值但被截断」，比 null 更坏（决策 D-9）：$ledger")
     }
 
     @Test

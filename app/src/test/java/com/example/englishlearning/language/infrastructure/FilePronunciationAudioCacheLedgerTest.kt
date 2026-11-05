@@ -2,6 +2,7 @@ package com.example.englishlearning.language.infrastructure
 
 import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationCacheKey
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -64,6 +65,8 @@ class FilePronunciationAudioCacheLedgerTest {
             "requestVersion",
             "contentKind",
             "text",
+            "entityKind",
+            "entityId",
         ).forEach { field ->
             assertTrue(ledger.contains("\"$field\""), "台账缺 Spec 03 要求的字段 \"$field\"：$ledger")
         }
@@ -72,6 +75,25 @@ class FilePronunciationAudioCacheLedgerTest {
         assertTrue(ledger.contains("mimo-v2.5"), "台账没记模型版本：$ledger")
         assertTrue(ledger.contains("en_female_1"), "台账没记音色：$ledger")
         assertTrue(ledger.contains("British"), "台账没记口音：$ledger")
+    }
+
+    @Test
+    fun `the ledger names the article behind a sentence`(@TempDir dir: File) = runTest {
+        FilePronunciationAudioCache(dir).put(key, byteArrayOf(1, 2, 3), entity = PronunciationEntityRef.article("art-7"))
+
+        val ledger = ledgers(dir).single().readText()
+        assertTrue(ledger.contains("\"entityKind\":\"Article\""), "台账答不出「哪篇文章」：关联实体还停在类别级（决策 D-7）：$ledger")
+        assertTrue(ledger.contains("\"entityId\":\"art-7\""), "台账没落主键：$ledger")
+    }
+
+    @Test
+    fun `an unsaved photo sentence records its kind and an honestly absent id`(@TempDir dir: File) = runTest {
+        // 拍照翻译的句子在保存之前没有主键：kind 照记，id 必须是 null，不能拿文本冒充（决策 D-9）。
+        FilePronunciationAudioCache(dir).put(key, byteArrayOf(1, 2, 3), entity = PronunciationEntityRef.photoTranslation(null))
+
+        val ledger = ledgers(dir).single().readText()
+        assertTrue(ledger.contains("\"entityKind\":\"PhotoTranslation\""), "未保存也要记清来源屏：$ledger")
+        assertTrue(ledger.contains("\"entityId\":null"), "没主键就写 null：$ledger")
     }
 
     @Test

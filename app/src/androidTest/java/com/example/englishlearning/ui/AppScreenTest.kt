@@ -117,6 +117,7 @@ import com.example.englishlearning.wordqa.WordAiNoteRepository
 import com.example.englishlearning.wordqa.WordQaUseCase
 import com.example.englishlearning.sentence.SentenceAnalysisUseCase
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -979,6 +980,14 @@ class AppScreenTest {
         composeRule.waitUntil(timeoutMillis = 5_000) { provider.spokenTexts.size == 2 }
 
         assertEquals(listOf("ability", "ability"), provider.spokenTexts)
+        // 决策 D-7 的端到端证据：词卡路径交给发音链的不只是文本，还有这张卡的主键。
+        // 源码闸（AudioCacheLedgerContractTest）只能证明「写了 entity =」，这条证明「真传到了」。
+        assertEquals("两次发音都该带上关联实体", 2, provider.entityCalls.size)
+        provider.entityCalls.forEach { ref ->
+            assertEquals("词卡路径的实体类别必须是 WordCard：$ref",
+                com.example.englishlearning.language.domain.PronunciationEntityKind.WordCard, ref?.kind)
+            assertTrue("词卡主键不许在屏层丢掉：$ref", !ref?.id.isNullOrBlank())
+        }
         composeRule.onNodeWithTag("word_card_pronunciation_message").assertExists()
         composeRule.onNodeWithText("发音已播放。").assertExists()
     }
@@ -2300,6 +2309,9 @@ class AppScreenTest {
         val sentenceCalls = mutableListOf<Triple<String, com.example.englishlearning.language.domain.PronunciationAccent, Boolean>>()
         val legacyCalls = mutableListOf<String>()
 
+        /** 屏层有没有把关联实体交到发音链上——台账的「关联实体」主键级那一半靠这里取证（决策 D-7）。 */
+        val entityCalls = mutableListOf<com.example.englishlearning.language.domain.PronunciationEntityRef?>()
+
         override fun capabilities() = setOf(PronunciationCapability.RemoteAudio)
 
         override suspend fun speak(text: String): PronunciationResult {
@@ -2312,9 +2324,11 @@ class AppScreenTest {
             accent: com.example.englishlearning.language.domain.PronunciationAccent,
             forceRegenerate: Boolean,
             rate: Float,
+            entity: com.example.englishlearning.language.domain.PronunciationEntityRef?,
         ): PronunciationResult {
             spokenTexts += text
             wordCalls += Triple(text, accent, forceRegenerate)
+            entityCalls += entity
             return result
         }
 
@@ -2322,8 +2336,10 @@ class AppScreenTest {
             text: String,
             accent: com.example.englishlearning.language.domain.PronunciationAccent,
             forceRegenerate: Boolean,
+            entity: com.example.englishlearning.language.domain.PronunciationEntityRef?,
         ): PronunciationResult {
             sentenceCalls += Triple(text, accent, forceRegenerate)
+            entityCalls += entity
             return result
         }
     }

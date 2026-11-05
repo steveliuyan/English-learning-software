@@ -3,6 +3,7 @@ package com.example.englishlearning.language.infrastructure
 import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationAudioMetadata
 import com.example.englishlearning.language.domain.PronunciationContentKind
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import com.example.englishlearning.language.domain.SynthesizedAudioProvenance
 import java.io.File
 import java.security.MessageDigest
@@ -20,7 +21,11 @@ import kotlinx.coroutines.withContext
 interface SynthesizedAudioCache {
     suspend fun read(text: String, accent: PronunciationAccent): ByteArray?
 
-    suspend fun write(text: String, accent: PronunciationAccent, wav: ByteArray)
+    /**
+     * [entity] 是触发这次生成的实体（词卡主键等），只写进台账、**不进缓存键**（决策 D-8）。
+     * 缺省按 `Unattached` 落盘，好让"调用方没交代"在台账里看得出来，而不是与某个具体屏混同。
+     */
+    suspend fun write(text: String, accent: PronunciationAccent, wav: ByteArray, entity: PronunciationEntityRef? = null)
 }
 
 /**
@@ -68,7 +73,12 @@ class FileSynthesizedAudioCache(
             }.getOrNull()
         }
 
-    override suspend fun write(text: String, accent: PronunciationAccent, wav: ByteArray) {
+    override suspend fun write(
+        text: String,
+        accent: PronunciationAccent,
+        wav: ByteArray,
+        entity: PronunciationEntityRef?,
+    ) {
         if (wav.isEmpty()) return
         withContext(Dispatchers.IO) {
             runCatching {
@@ -84,6 +94,7 @@ class FileSynthesizedAudioCache(
                     contentKind = PronunciationContentKind.Word,
                     text = text,
                     createdAtEpochMillis = clock(),
+                    entity = entity,
                 )
                 val temporaryAudio = temporaryFile(audio)
                 val temporaryLedger = temporaryFile(ledger)

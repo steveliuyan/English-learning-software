@@ -10,6 +10,7 @@ import com.example.englishlearning.ai.net.MiMoTtsRequestBuilder
 import com.example.englishlearning.ai.net.MiMoTtsResponseParser
 import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationCapability
+import com.example.englishlearning.language.domain.PronunciationEntityRef
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
 import kotlinx.coroutines.CancellationException
@@ -48,6 +49,23 @@ class MiMoPronunciationProvider(
         accent: PronunciationAccent,
         forceRegenerate: Boolean,
         rate: Float,
+    ): PronunciationResult = speakWithEntity(text, accent, forceRegenerate, rate, null)
+
+    /** 带关联实体的发声（决策 D-7）：entity 只随台账落盘，不进请求体、不进缓存键。 */
+    override suspend fun speak(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        rate: Float,
+        entity: PronunciationEntityRef?,
+    ): PronunciationResult = speakWithEntity(text, accent, forceRegenerate, rate, entity)
+
+    private suspend fun speakWithEntity(
+        text: String,
+        accent: PronunciationAccent,
+        forceRegenerate: Boolean,
+        rate: Float,
+        entity: PronunciationEntityRef?,
     ): PronunciationResult {
         if (text.isBlank()) return PronunciationResult.Unavailable("blank text")
         val profile = profiles.find(profileId).getOrNull() ?: return PronunciationResult.Unavailable("profile unavailable")
@@ -99,7 +117,7 @@ class MiMoPronunciationProvider(
                     if (wav == null || wav.isEmpty()) {
                         PronunciationResult.Failed()
                     } else if (player.play(wav, MiMoTtsRequestBuilder.AUDIO_FORMAT, rate) is AudioPlaybackResult.Played) {
-                        cache?.put(cacheKey, wav)
+                        cache?.put(cacheKey, wav, entity)
                         PronunciationResult.Played
                     } else {
                         PronunciationResult.Failed()

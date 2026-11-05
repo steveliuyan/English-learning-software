@@ -101,6 +101,7 @@ class KokoroPronunciationProviderControlsTest {
             text: String,
             accent: com.example.englishlearning.language.domain.PronunciationAccent,
             wav: ByteArray,
+            entity: com.example.englishlearning.language.domain.PronunciationEntityRef?,
         ) = Unit
     }
 }
