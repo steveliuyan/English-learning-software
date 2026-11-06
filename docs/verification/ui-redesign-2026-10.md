@@ -1312,3 +1312,58 @@ adb -s <serial> shell am instrument -w -e package com.example.englishlearning.ui
   主 CTA 又只在「没全完成」时才走 `onStartLearning`。改用宽松档 `v1-relaxed` 的计划夹具
   （`planUnlockedWithPendingReview()`：`apple-id` 已学 → 文章解锁；复习位留一枚没做过的 → CTA 落「开始复习」，仍走同一条 `onStartLearning`）。
 - **同轮**：`:app:testDebugUnitTest` 1819 用例 0 失败（`app/build/test-results/testDebugUnitTest` 248 个 XML 现算）、`:app:assembleDebug` 成功。
+
+## 2026-11-06 批 A 动效基建：系统减弱动效的实测行为与口径
+
+判据文档：`docs/decisions/2026-11-06-motion-foundation-and-system-reduced-motion.md`；计划：`docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md`。
+
+**为什么这条证据必须落在本表而不是只留在决策文档**：批 A 的结论是「不需要写降级开关，需要删掉自研缩放」。
+「不需要」这三字如果没有读数支撑，下一棒就会把它当成偷懒或当成可再议。
+
+### 读数（emulator-5554，一次性探针，探针源码不入库）
+
+宿主＝`ActivityScenario.launch(ComponentActivity)` + `ComposeView.setContent`（真 WindowRecomposer、真 Choreographer）。
+观察窗 2500ms。第一版用 `createComposeRule()` **量废过**：Compose 测试环境替换了帧时钟，`waitForIdle()` 1ms 返回、
+宿主只重组 1 次、循环值恒 `0.0`，量到的是测试替身。这条教训本身就是判据的一部分——**循环动画不能用 compose test rule 取证**。
+
+| 规格 | `animator_duration_scale = 1`（内对照） | `= 0` |
+|---|---|---|
+| 有限 `animateFloatAsState(0f→1f, tween(600))` | 150 次重组、37 个不同值（缓动过程可见） | 3 次重组、`[0.0, 0.0, 1.0]`：无中间值，首帧即落目标 |
+| 循环 `rememberInfiniteTransition` + `infiniteRepeatable(tween(600), Restart)` | 150 次重组、148 个不同值，2.5s 跑约 4 个周期 | 3 次重组、`[0.0, 1.0, 1.0]`：落**一个周期末尾值**后不再要帧 |
+
+logcat 原文（tag `MOTION-PROBE`，同时留了一份在 `.git/qa-scratch/motion-probe-readings-1106.md`）：
+
+```
+scale=1.0 r=150 loop n=150 distinct=148 first3=[0.0, 0.0, 0.0072131087] last3=[0.01742519, 0.033031102, 0.05527458] | finite n=150 distinct=37 first3=[0.0, 0.0, 0.0] last3=[1.0, 1.0, 1.0]
+scale=0.0 r=3 loop n=3 distinct=2 first3=[0.0, 1.0, 1.0] last3=[0.0, 1.0, 1.0] | finite n=3 distinct=2 first3=[0.0, 0.0, 1.0] last3=[0.0, 0.0, 1.0]
+```
+
+字节码同向印证（`animation-core` 1.10.0，`javap -c SuspendAnimationKt`）：`doAnimationFrameWithScale` 在
+`durationScale == 0f` 时把 `timeForPercent` 直接取成 `animation.durationNanos`，否则按
+`(frameTimeNanos - startTimeNanos) / durationScale` 换算；`ui-android` 的 `WindowRecomposer_androidKt` 读字面量
+`animator_duration_scale` 并装 `MotionDurationScaleImpl`。**⇒ 平台自己缩放在先，我们再乘一次就是双重缩放（0.5 变 0.25）。**
+
+### 由读数推出的两条在册约束（批 C/D 必须消费，不是一次性结论）
+
+1. **循环动画不需要运行时开关**（`scale=0` 已经停帧，不空转、不耗电），但它停下的那一格是**周期末尾值**而不是中性初值
+   ⇒ 批 C 每条 shimmer 规格要把静态外观当设计对象，并各配一张 `animator_duration_scale=0` 的截图。
+2. **退场不得再借入场曲线**：`fadeIn(`/`scaleIn(` 用 `EasingOut`，`fadeOut(`/`scaleOut(` 用 `EasingIn`，
+   由 `MotionSpecContractTest` 行级钉住；裸 `AppMotion.Easing` 别名与两枚时长换算入口一并删除，
+   `PrototypeTokenContractTest` 的别名断言同向翻转为禁令。
+
+### 现算口径（别引用写死的数）
+
+```bash
+grep -rn "AppMotion\.Easing\b" --include=*.kt app/src/main | wc -l                                    # 期望 0
+grep -rlP "(?<![A-Za-z0-9_])tween\(" --include=*.kt app/src/main/java/com/example/englishlearning/ui | wc -l
+#   ↑ 现算 7，其中 `theme/AppMotion.kt` 只是 KDoc 里提了 `tween(600)`；判据口径是剥注释后的 6 个宿主
+#     （AppSwitch / GlassButton / GlassOverlay / PlanBar / SegmentedControl / SpeechSettingsScreen），
+#     用 `grep -l "tween("` 会把 `Duration.between(` 也算进来（WordCardViewModel），别拿它当覆盖面。
+grep -c "scale\|Scale" app/src/main/java/com/example/englishlearning/ui/theme/AppMotion.kt            # 注释里允许，剥注释后须为 0
+adb -s emulator-5554 shell settings get global animator_duration_scale                                # 应为 null（已复原为默认 1.0）
+```
+
+### 待用户目视（新增，非本批可判）
+
+- 浮层（`GlassOverlay`）关闭时的收拢观感：本批把退场缓动从 `cubic-bezier(.2,.7,.3,1)` 改为 `cubic-bezier(.4,0,.8,.3)`，
+  是**行为变化**，只由 JVM 形状闸与代码评审保证「按口径写」，观感是否更合适只有人眼能判。
