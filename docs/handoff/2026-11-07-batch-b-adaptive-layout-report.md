@@ -101,7 +101,7 @@ connected 断言的竖屏前提按受支持形态逐类处置、手机横屏按�
 
 ## 4. Git 状态
 
-分支 `stage-5-ui-r2-learning-path`，不合 main（用户令）。批 B 按功能域分五枚提交，前四枚：
+分支 `stage-5-ui-r2-learning-path`，不合 main（用户令）。批 B 按功能域提交：
 
 | 提交 | 内容 |
 |---|---|
@@ -109,13 +109,13 @@ connected 断言的竖屏前提按受支持形态逐类处置、手机横屏按�
 | `489c14a` | 自适应版面：`AppWindowLayout` 令牌 / `AppSideNav` / 720dp 内容列 / 宽档 hero 降级 + 契约测试 |
 | `991866a` | 方向策略：`AppOrientationPolicy` + `values`/`values-sw600dp` 资源限定 + 两枚 Activity 接线 + 契约测试 |
 | `96bf2c6` | connected 取证：`AppAdaptiveLayoutTest` 8 枚 + 三处判据去竖屏几何依赖 |
-| 第五枚 | 本报告（哈希不进本文，用下面命令现算远端 tip） |
+| `3b7d59b` 起 | 本报告 + 之后的报告补记若干枚（枚数不写死，用下面命令现算） |
 
 上一批（批 A）远端 tip 起点：`827ebca`。`.git/qa-scratch/` 与 `.superpowers/sdd/` 全部 gitignored，截图与 log 不入库。
 推送与核验（未 `ls-remote` 对上哈希不得宣称已备份）：
 
 ```bash
-git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD   # 推送前=4，推完=0
+git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD   # 推完应为 0；非 0 = 备份未成立
 git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path
 git rev-parse HEAD                                              # 两者哈希须一致
 ```
@@ -123,7 +123,7 @@ git rev-parse HEAD                                              # 两者哈希�
 **本批未推送成功（异地备份未成立，收工时的实际状态）**：两次 `git push` 都回
 `Failed to connect to github.com port 443 via 127.0.0.1`，`netstat | grep -c ':3067'` = 0 ——
 git 全局代理 `http://127.0.0.1:3067` 指向的客户端当时没在监听，直连 443 也不通。
-本批提交（上表五枚 + 这条补记所在的一枚）**全部留在本地分支上**，未做任何破坏性处置；
+本批提交（上表全部行）**全部留在本地分支上**，未做任何破坏性处置；
 本地领先枚数现算 `git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD`，别引用本文写死的数。
 **代理恢复后重推并逐字核验哈希，才算备份完成。**
 
