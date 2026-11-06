@@ -120,8 +120,16 @@ git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path
 git rev-parse HEAD                                              # 两者哈希须一致
 ```
 
+**本批未推送成功（异地备份未成立，收工时的实际状态）**：两次 `git push` 都回
+`Failed to connect to github.com port 443 via 127.0.0.1`，`netstat | grep -c ':3067'` = 0 ——
+git 全局代理 `http://127.0.0.1:3067` 指向的客户端当时没在监听，直连 443 也不通。
+五枚提交（`8ff3469` `489c14a` `991866a` `96bf2c6` + 本报告）全部留在本地分支上，
+未做任何破坏性处置。**代理恢复后重推并逐字核验哈希，才算备份完成。**
+
 ## 5. 未完成 / 遗留
 
+- **本批 GitHub 异地备份未完成**：代理端口 `127.0.0.1:3067` 无监听（见 §4），五枚提交只在本地。
+  下一任接手第一件事就是 `push` + `ls-remote` 核对，未核对前不得宣称已备份。
 - **真折叠屏内屏铰链形态未做设备验证**：本批改的是跨过 600dp 阈值的代码路径（重建后版面与数据），
   铰链传感与厂商分屏策略仍无法用现有 AVD 取证。
 - **宽窗口性能基线未重采**：`docs/verification/perf-baseline-2026-10.md` 现记为「该形态无基线」，
