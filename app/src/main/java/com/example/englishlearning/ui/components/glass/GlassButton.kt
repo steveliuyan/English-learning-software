@@ -31,7 +31,7 @@ fun Modifier.pressableScale(
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
-        animationSpec = tween(AppMotion.Fast, easing = AppMotion.Easing),
+        animationSpec = tween(AppMotion.Fast, easing = AppMotion.EasingOut),
         label = "pressScale",
     )
     return this.graphicsLayer { scaleX = scale; scaleY = scale }

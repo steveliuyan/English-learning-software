@@ -347,10 +347,13 @@ class PrototypeTokenContractTest {
         ).forEach { line ->
             assertTrue(motionText.contains(line), "AppMotion 缺原型动效钉值：$line")
         }
-        // 旧调用点仍写 AppMotion.Easing：保留别名，且必须指向入场缓动，不得另立第三条曲线。
+        // 批 A 口径翻转：迁移期别名 `AppMotion.Easing` 已退役——它当时的唯一作用是把旧读点接到入场缓动，
+        // 代价是退场也借了入场曲线（GlassOverlay 的 fadeOut/scaleOut 就是这一形）。现在 7 个旧读点全部写明
+        // EasingOut / EasingIn，别名留着就是让那条旧账重新长出来的门。禁一切 `val Easing = …`。
         assertTrue(
-            Regex("""val\s+Easing\s*=\s*EasingOut""").containsMatchIn(motionText),
-            "AppMotion.Easing 必须保留为 EasingOut 的别名（旧读点还有引用；另立曲线就是第三条缓动）",
+            !Regex("""\bval\s+Easing\s*=""").containsMatchIn(motionText),
+            "AppMotion 不得再有裸 Easing 别名（入场/退场必须分写 EasingOut / EasingIn）；" +
+                "换算入口 `durationMs` / `animatorDurationScale` 同批删除，由 MotionSpecContractTest 钉住",
         )
     }
 

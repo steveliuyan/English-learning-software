@@ -163,7 +163,7 @@ fun SpeechSettingsScreen(
                             style = PillStyle.Secondary,
                             testTag = "speech_toggle_candidates",
                         )
-                        Column(modifier = Modifier.animateContentSize(tween(AppMotion.Normal, easing = AppMotion.Easing))) {
+                        Column(modifier = Modifier.animateContentSize(tween(AppMotion.Normal, easing = AppMotion.EasingOut))) {
                             if (candidatesExpanded) {
                                 val boundProfileId = when (state.selectedEngine) {
                                     PronunciationEngine.MiMo -> state.miMoProfileId
@@ -429,7 +429,7 @@ private fun EngineRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(tween(AppMotion.Normal, easing = AppMotion.Easing))
+            .animateContentSize(tween(AppMotion.Normal, easing = AppMotion.EasingOut))
             .pressableScale(interaction)
             .clickable(interactionSource = interaction, indication = null) { onSelect(engine, boundProfileId) }
             .padding(vertical = 10.dp)

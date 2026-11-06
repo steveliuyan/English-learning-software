@@ -57,10 +57,10 @@ fun BoxScope.GlassOverlay(
     val panelInteraction = remember { MutableInteractionSource() }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(AppMotion.Normal, easing = AppMotion.Easing)) +
-            scaleIn(tween(AppMotion.Normal, easing = AppMotion.Easing), initialScale = 0.92f),
-        exit = fadeOut(tween(AppMotion.Normal, easing = AppMotion.Easing)) +
-            scaleOut(tween(AppMotion.Normal, easing = AppMotion.Easing), targetScale = 0.92f),
+        enter = fadeIn(tween(AppMotion.Normal, easing = AppMotion.EasingOut)) +
+            scaleIn(tween(AppMotion.Normal, easing = AppMotion.EasingOut), initialScale = 0.92f),
+        exit = fadeOut(tween(AppMotion.Normal, easing = AppMotion.EasingIn)) +
+            scaleOut(tween(AppMotion.Normal, easing = AppMotion.EasingIn), targetScale = 0.92f),
         modifier = Modifier.align(Alignment.Center),
     ) {
         Box(
