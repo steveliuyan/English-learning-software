@@ -263,11 +263,15 @@ fun CardDetailScreen(
                             color = colors.text1,
                         ),
                     )
-                    Text(
-                        text = phrase.meaningZh,
-                        style = AppType.Caption.copy(color = colors.text3),
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
+                    // 自镜像搭配（英文串与中文串逐字相同）在包解析处已归一为 null：
+                    // 只讲得出一个字段就只讲一个字段，不把同一串字念两遍。
+                    phrase.meaningZh?.let { meaning ->
+                        Text(
+                            text = meaning,
+                            style = AppType.Caption.copy(color = colors.text3),
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
             }
         }

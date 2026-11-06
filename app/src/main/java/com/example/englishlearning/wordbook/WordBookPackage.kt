@@ -131,6 +131,11 @@ object WordBookPackageParser {
             validateCard(book.id, card)
             if (!seenIds.add(card.cardId)) throw reject(WordBookPackageRejection.InvalidCard)
             val senses = card.senses.map { WordSense(it.pos, it.meaningZh) }
+            // 占位文本不是学习内容：例句、搭配与近义条目在**进入 domain 之前**归一（决策
+            // `docs/decisions/2026-11-06-placeholder-text-is-not-learning-content.md`）。
+            // 这里是内置册与导入册的唯一出口，界面因此不需要各自认串。
+            val example = WordBookContentPlaceholders.exampleOrNull(card.example)
+            val exampleZh = example?.let { WordBookContentPlaceholders.exampleOrNull(card.exampleZh) }
             val imagePath = card.image?.let { reference ->
                 val entry = manifestByFile[reference.file] ?: throw reject(WordBookPackageRejection.OrphanImage)
                 if (entry.sha256 != reference.sha256) throw reject(WordBookPackageRejection.ImageHashMismatch)
@@ -144,12 +149,22 @@ object WordBookPackageParser {
                 ipa = card.ipa,
                 partOfSpeech = senses.first().partOfSpeech,
                 meaningZh = senses.first().meaningZh,
-                example = card.example,
+                example = example,
                 senses = senses,
-                exampleZh = card.exampleZh,
+                exampleZh = exampleZh,
                 derived = card.derived.map { DerivedWord(it.lemma, it.pos, it.meaningZh) },
-                phrases = card.phrases.map { PhraseEntry(it.text, it.meaningZh) },
-                synonyms = card.synonyms.map { RelatedWord(it.lemma, it.pos, it.meaningZh) },
+                // 「—」整串是数据源的「此项无内容」记号：这种条目不是搭配也不是近义，
+                // 留下只会让详情页画出一节只有一行破折号的「常用搭配」（屏侧的空列表闸在下方）。
+                phrases = card.phrases.mapNotNull { phrase ->
+                    WordBookContentPlaceholders.entryOrNull(phrase.text)?.let { text ->
+                        PhraseEntry(text, WordBookContentPlaceholders.phraseMeaningOrNull(text, phrase.meaningZh))
+                    }
+                },
+                synonyms = card.synonyms.mapNotNull { synonym ->
+                    WordBookContentPlaceholders.entryOrNull(synonym.lemma)?.let { lemma ->
+                        RelatedWord(lemma, synonym.pos, synonym.meaningZh)
+                    }
+                },
                 imagePath = imagePath,
                 rank = card.rank,
             )

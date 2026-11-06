@@ -21,6 +21,10 @@ object WordBookPackageFixture {
         val rank: Int,
         val senses: List<Pair<String, String>> = listOf("n." to "示例释义"),
         val example: String = "An example sentence for $lemma.",
+        // 默认值保持既有形状；传 null 才能验「没有译文」这一支（占位例句归一后译文也必须消失）。
+        val exampleZh: String? = "例句译文",
+        val phrases: List<Pair<String, String>> = listOf("a phrase" to "短语"),
+        val synonyms: List<Pair<String, String>> = listOf("synonym" to "近义"),
         val imageBytes: ByteArray? = "image-bytes-$lemma".toByteArray(),
     )
 
@@ -57,12 +61,19 @@ object WordBookPackageFixture {
             val senses = card.senses.joinToString(",") { (pos, meaning) ->
                 """{"pos":"$pos","meaningZh":"$meaning"}"""
             }
+            val phrases = card.phrases.joinToString(",") { (text, meaning) ->
+                """{"text":"$text","meaningZh":"$meaning"}"""
+            }
+            val synonyms = card.synonyms.joinToString(",") { (lemma, meaning) ->
+                """{"lemma":"$lemma","pos":"n.","meaningZh":"$meaning"}"""
+            }
+            val exampleZh = card.exampleZh?.let { "\"$it\"" } ?: "null"
             """
             {"cardId":"$BOOK_ID:${card.lemma}","lemma":"${card.lemma}","rank":${card.rank},"ipa":"test-ipa",
-             "senses":[$senses],"example":"${card.example}","exampleZh":"例句译文",
+             "senses":[$senses],"example":"${card.example}","exampleZh":$exampleZh,
              "derived":[{"lemma":"derived","pos":"n.","meaningZh":"派生"}],
-             "phrases":[{"text":"a phrase","meaningZh":"短语"}],
-             "synonyms":[{"lemma":"synonym","pos":"n.","meaningZh":"近义"}]${imageJson?.let { ",\"image\":$it" }.orEmpty()}}
+             "phrases":[$phrases],
+             "synonyms":[$synonyms]${imageJson?.let { ",\"image\":$it" }.orEmpty()}}
             """.trimIndent().replace("\n", "")
         }
         extraManifestEntries.forEach { name ->

@@ -17,11 +17,18 @@ data class DerivedWord(
     val meaningZh: String,
 )
 
-/** 常见关联短语（如 surf the Internet）。 */
+/**
+ * 常见关联短语（如 surf the Internet）。
+ *
+ * [meaningZh] 可空：随包十册的搭配里 98.7% 是「英文串 = 中文串」的自镜像
+ * （`a lot 许多 / a lot 许多`、`非常 / 非常`），那不是释义，是同一串字抄了两遍。
+ * 包解析处把这种条目归一为 `null`（见 `WordBookContentPlaceholders`），
+ * 渲染侧只讲得出一个字段时就只讲一个字段——条目本身不删。
+ */
 @Serializable
 data class PhraseEntry(
     val text: String,
-    val meaningZh: String,
+    val meaningZh: String? = null,
 )
 
 /** 近义词（如 surf → breaker）。 */
