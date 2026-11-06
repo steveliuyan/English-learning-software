@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.ScreenUnavailable
 import com.example.englishlearning.ui.theme.MintGlassTheme
@@ -63,7 +64,11 @@ class AppScreenHeaderTest {
     }
 
     /**
-     * 钉的破坏：页头改版把标题压成单行（裁切或省略号），以及标题超出两行容量后 `Clip` 静默丢字。
+     * 钉的破坏：页头改版把标题压成单行**且丢字**（裁切或省略号），以及标题超出两行容量后 `Clip` 静默丢字。
+     * 批 B-3 §10.4 起「丢字」由 `getLineEnd(末行) == 文本长度` 直接钉（形态无关）；
+     * 「必须长出第二行」改成**只在可用宽装不下一行时**才要求——宽窗里单行装得下是正确渲染，
+     * 原判据会把平板形窗口（实测 1080dp）的合法版面判红；改动理由与读数见本方法体内注释与决策 §10.5。
+
      * 末条断言读 `TextLayoutResult`，钉的就是这两个形态（「两行换行 vs 单行裁切/省略」与「超容量丢字」）；
      * `>= 48.dp` 那条只钉塌宽（标题列被压成 0 宽的反例形态）；保留的 `> 24.dp` 只能当「不是 0 高」的哨兵，
      * **不得称它为裁切判定**——同 style 同 fontScale 的两处节点高实测 41.90dp（页头标题）与
@@ -79,16 +84,43 @@ class AppScreenHeaderTest {
         val title = composeRule.onNodeWithText("学习记录与复习统计（长标题用）")
         title.assertExists()                                   // 语义节点存在（Clip 与 Ellipsis 都不改语义，此条不足以判裁切）
         val box = title.getUnclippedBoundsInRoot()
+        val headerBox = composeRule.onNodeWithTag("app_screen_header").getUnclippedBoundsInRoot()
         assertTrue("fontScale=2.0 下标题不得塌成 0 宽，实际=$box", box.right - box.left >= 48.dp)
         assertTrue("两行标题应真的长出高度，实际=$box", box.bottom - box.top > 24.dp)
         val layouts = mutableListOf<TextLayoutResult>()
         title.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
-        assertTrue(
-            "标题必须真的换到两行且无字形裁切：lineCount=${layout.lineCount} " +
-                "overflow=${layout.hasVisualOverflow} size=${layout.size}",
-            layout.lineCount >= 2 && !layout.hasVisualOverflow,
+        // 批 B-3 §10.4 形态限定判据（2026-11-07 设备复审）：
+        //  - **裁切护栏在任何窗口形态都保留**：末行必须排到文本末尾（`getLineEnd` 真截断信号，
+        //    与 `AppScreenOverlayContainerTest.assertBodyLineSurvivesTheScale` 同口径），行数不得超 `maxLines`。
+        //  - **「必须长出第二行」只在窗口窄到确实装不下一行时才要求**：宽窗（sw ≥ 600dp 的平板形窗口，
+        //    实测 1080dp）里这串 15 字标题单行实宽 430.5dp « 标题列可用宽 1022dp，
+        //    **单行是正确渲染**，此时要求两行会把合法版面判红（截图见决策 §10.5）。
+        //  - `hasVisualOverflow` 降级为**多行档专用**护栏：宽窗单行实测恒为 `true`
+        //    （对照组 `fontScale = 1.0` 同样 `lineCount=1 overflow=true`，而截图证明字一个没少），
+        //    它是单行 CJK 文本在这套 density 覆盖下的读数假阳性、不是裁切证据；
+        //    两行档（紧凑形态）实测为 `false`，原判据强度原样保留。
+        assertEquals(
+            "标题必须整段被布局（末行没到文本末尾 = 有字没画出来）：" +
+                "lineCount=${layout.lineCount} overflow=${layout.hasVisualOverflow} size=${layout.size}",
+            "学习记录与复习统计（长标题用）".length,
+            layout.getLineEnd(layout.lineCount - 1),
         )
+        assertTrue("标题行数不得超过 maxLines=2：lineCount=${layout.lineCount}", layout.lineCount <= 2)
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val layoutWidthDp = with(Density(density, fontScale = 1f)) { layout.size.width.toDp() }
+        val availableWidthDp = headerBox.right - box.left            // 标题列可用宽 = 页头右沿 − 标题左沿
+        if (layoutWidthDp >= availableWidthDp - 1.dp) {
+            assertTrue(
+                "一行装不下时必须长出第二行：lineCount=${layout.lineCount} " +
+                    "layoutWidth=$layoutWidthDp available=$availableWidthDp",
+                layout.lineCount >= 2,
+            )
+            assertTrue(
+                "两行档不得有视觉裁切：lineCount=${layout.lineCount} overflow=${layout.hasVisualOverflow}",
+                !layout.hasVisualOverflow,
+            )
+        }
     }
 
     /**

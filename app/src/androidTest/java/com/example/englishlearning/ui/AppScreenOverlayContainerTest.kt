@@ -55,6 +55,7 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -197,6 +198,7 @@ class AppScreenOverlayContainerTest {
      */
     @Test
     fun hostedWordBookDeletePanelStaysFullyReadableAndTappableAtDoubleFontScale() {
+        requireDeviceDoubleFontScale()
         val repository = RecordingProfileRepository()
         val previews = RecordingDeletionPreview(WordBookDeletionPreview(entryCount = 3, keptEventCount = 10, keptArticleCount = 2))
         composeRule.setContent {
@@ -220,7 +222,7 @@ class AppScreenOverlayContainerTest {
             composeRule.onAllNodesWithText("将删除这册导入词书的词卡文件与词条 3 条。").fetchSemanticsNodes().isNotEmpty()
         }
         // 哨兵先行：证 scale 2.0 真的落进对话框窗口，护栏不在 scale 1.0 下空转（见 assertScaleTookEffect KDoc）。
-        assertScaleTookEffect("其他词书不受影响。", expectMinHeightPx = 60)
+        assertScaleTookEffect("其他词书不受影响。", expectMinHeightDp = 26)
         assertBodyLineSurvivesTheScale("将删除这册导入词书的词卡文件与词条 3 条。")
         assertBodyLineSurvivesTheScale(
             "学习历史与文章保留：该册学习记录 10 条、文章 2 篇仍可翻阅（复习状态与生词笔记同保留）。",
@@ -289,6 +291,7 @@ class AppScreenOverlayContainerTest {
      */
     @Test
     fun hostedWordBookExportPickerStaysFullyReadableAtDoubleFontScale() {
+        requireDeviceDoubleFontScale()
         val books = prepareImportedWordBookDirectories("overlay-pack-a", "overlay-pack-b")
         try {
             val repository = RecordingProfileRepository()
@@ -307,7 +310,7 @@ class AppScreenOverlayContainerTest {
             createProfileAndOpenTransferPage()
             openExportPicker()
             // 哨兵先行：Headline 标题 scale 1.0 行高 73px、scale 2.0 折两行 ≥150px，取 100 为界。
-            assertScaleTookEffect("选择要导出的词书", expectMinHeightPx = 100)
+            assertScaleTookEffect("选择要导出的词书", expectMinHeightDp = 32)
             assertBodyLineSurvivesTheScale("选择要导出的词书")
             composeRule.onNodeWithTag("word_book_export_pick_overlay-pack-a").assertIsDisplayed()
             composeRule.onNodeWithTag("word_book_export_pick_overlay-pack-b").assertIsDisplayed()
@@ -331,6 +334,7 @@ class AppScreenOverlayContainerTest {
      */
     @Test
     fun hostedWordBookExportPickerKeepsTheCancelPillReachableWhenDozensOfBooksOverflowAtDoubleFontScale() {
+        requireDeviceDoubleFontScale()
         val bookIds = (1..12).map { index -> "overlay-pack-%02d".format(index) }
         val books = prepareImportedWordBookDirectories(*bookIds.toTypedArray())
         try {
@@ -350,7 +354,7 @@ class AppScreenOverlayContainerTest {
             createProfileAndOpenTransferPage()
             openExportPicker()
             // 哨兵先行：设备字号没真的到 2.0 就当场红，护栏不许退化成 scale 1.0 复读。
-            assertScaleTookEffect("选择要导出的词书", expectMinHeightPx = 100)
+            assertScaleTookEffect("选择要导出的词书", expectMinHeightDp = 32)
             // 十二册逐项在树（只证存在，绝不点击）；首册必须落在面板首屏内。
             bookIds.forEach { bookId -> composeRule.onNodeWithTag("word_book_export_pick_$bookId").assertExists() }
             composeRule.onNodeWithTag("word_book_export_pick_${bookIds.first()}").assertIsDisplayed()
@@ -583,19 +587,56 @@ class AppScreenOverlayContainerTest {
      * 的亚像素假阳性刺穿截断判据）。判据取**行高**而不是折行：实测同一枚 Footnote 行
      * scale 1.0 = 40px、scale 2.0 = 77px，而「其他词书不受影响。」在 scale 2.0 下 585px
      * 恰可容进内容宽 588px、**单行并不折**——用「必折行」当哨兵会把合法渲染判红。
-     * 因此 [expectMinHeightPx] 按档位取 scale-1 与 scale-2 行高之间的阈值：设备字号没到 2.0 就当场红，
+     * 因此 [expectMinHeightDp] 按档位取 scale-1 与 scale-2 行高之间的阈值（**dp 口径**，
+     * 2026-11-07 批 B-3 改：原 60px / 100px 是 420dpi 手机竖屏上的读数，同一枚文本在平板形窗口
+     * （`wm size 2560x1600` + `wm density 320`）里 px 值更小、dp 值不变，裸 px 阈值会把
+     * 「scale 真的生效」判成没生效；改 dp 后两形态共用一条阈值——Footnote 26dp 夹在
+     * scale1 的 21.3/22.0dp 与 scale2 的 29.3/37.5dp 之间，标题 32dp 夹在 24.4/24.5dp 与
+     * 38/42dp 之间，两侧都留 ≥4dp 余量）：设备字号没到 2.0 就当场红，
      * 护栏不许退化成「scale 1.0 复读」的假绿。
      * 运行前置：`adb -s emulator-5574 shell settings put system font_scale 2.0`（跑完必须回 `1.0`）。
      */
-    private fun assertScaleTookEffect(sample: String, expectMinHeightPx: Int) {
+    /**
+     * 设备前置闸（批 B-3 §10.4，2026-11-07）：本组三枚大字号护栏判的是**对话框窗口**里的排印，
+     * 而 `Dialog` 窗口的 `LocalDensity` 取自窗口自身上下文——调用方 `LocalDensity provides fontScale = 2f`
+     * 对窗口内不生效（见 [assertScaleTookEffect] KDoc 的 17B 收口席实测）。于是这三枚的可执行前提是
+     * **设备 `font_scale` 真的置到 2.0**：
+     *
+     * ```
+     * adb -s emulator-5554 shell settings put system font_scale 2.0   # 跑完必须回 1.0
+     * ```
+     *
+     * 处置口径（决策 §10.4）：设备不在 2.0 档时**如实跳过**而不是红——红会把「设备前置没做」
+     * 和「大字号排印真回归」混成一类，前置跑法与逐形态读数见
+     * `docs/decisions/2026-11-06-adaptive-window-layout.md` §10.4。跳过不等于放宽判据：
+     * 一旦设备在 2.0 档，[assertScaleTookEffect] 与逐行裁切判据照旧全数生效。
+     */
+    private fun requireDeviceDoubleFontScale() {
+        val deviceFontScale = InstrumentationRegistry.getInstrumentation().targetContext
+            .resources.configuration.fontScale
+        assumeTrue(
+            "设备 font_scale=${'$'}deviceFontScale，本组护栏的前提不成立（需 2.0 档，" +
+                "跑法：adb shell settings put system font_scale 2.0，验完回 1.0）——跳过，不是判绿",
+            deviceFontScale >= 1.99f,
+        )
+    }
+
+    private fun assertScaleTookEffect(sample: String, expectMinHeightDp: Int) {
         val layouts = mutableListOf<TextLayoutResult>()
         composeRule.onNodeWithText(sample)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
+        // 阈值按 **dp** 而不是裸 px：同一枚文本行高在两种窗口形态下 px 不同、dp 相同
+        // （批 B-3 实测：Footnote 样本 scale 1.0 = 56px/2.625 = 21.3dp（手机竖屏 420dpi）
+        // 与 44px/2.0 = 22.0dp（平板形 320dpi）；标题样本 64px→24.4dp 与 49px→24.5dp）。
+        // 沿用本类既有的 `displayMetrics.density` 换算腿，把阈值折成当前形态的 px 再比。
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val thresholdPx = with(Density(density, fontScale = 1f)) { expectMinHeightDp.dp.toPx() }
         assertTrue(
-            "fontScale=2.0 未落进对话框窗口（「$sample」行高应 ≥${expectMinHeightPx}px，实测 size=${layout.size}）：" +
+            "fontScale=2.0 未落进对话框窗口（「$sample」行高应 ≥${expectMinHeightDp}dp = ${thresholdPx}px，" +
+                "实测 size=${layout.size} density=$density）：" +
                 "connected 侧需先把设备 font_scale 置 2.0，护栏不许在 scale 1.0 下空转",
-            layout.size.height >= expectMinHeightPx,
+            layout.size.height >= thresholdPx,
         )
     }
 

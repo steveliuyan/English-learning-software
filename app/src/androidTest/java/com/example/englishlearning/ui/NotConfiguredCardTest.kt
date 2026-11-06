@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.notConfiguredStatusLine
 import com.example.englishlearning.ui.theme.MintGlassTheme
@@ -130,6 +131,8 @@ class NotConfiguredCardTest {
      *
      * 与 `EntryRow` 的标题/副标题**相反**口径（那边是提示性内容、允许省略号），
      * 所以这里 `hasVisualOverflow == false` 才是期望结果。判定方向由本条钉住，
+     * 批 B-3 §10.4 起「被裁掉」改由 `getLineEnd(末行) == 文本长度` 直接钉（形态无关），
+     * 「必须换行」降级为**只在窗口装不下一行时**才追加的要求（宽窗单行是合法渲染，见决策 §10.5）。
      * 源码腿（`maxLines` 0 处）在 `NotConfiguredCardContractTest`。
      */
     @Test
@@ -158,7 +161,29 @@ class NotConfiguredCardTest {
                     "overflow=${layout.hasVisualOverflow} width=${layout.didOverflowWidth}",
                 !layout.hasVisualOverflow,
             )
-            assertTrue("长文案应当真的换行（不给 maxLines）：「$text」lineCount=${layout.lineCount}", layout.lineCount >= 2)
+            // 真截断信号（形态无关）：末行必须排到文本末尾——被加 maxLines 而裁掉时当场红。
+            assertEquals(
+                "文案必须整段被布局（末行没到文本末尾 = 有字没画出来）：「$text」" +
+                    "lineCount=${layout.lineCount} overflow=${layout.hasVisualOverflow} width=${layout.didOverflowWidth}",
+                text.length,
+                layout.getLineEnd(layout.lineCount - 1),
+            )
+            // 批 B-3 §10.4 形态限定：「必须长出第二行」只在窗口窄到确实装不下一行时才要求。
+            // 紧凑形态（411dp）里这两串都顶到卡片可用宽、必须换行；宽窗（sw ≥ 600dp，实测 1080dp）
+            // 里状态句单行实宽 ~800dp 装得下，单行是正确渲染（读数与截图见决策 §10.5）。
+            // 64dp 是「窗口宽 − 卡片两侧留白」的保守容差：真正的裁切证据由上面 `getLineEnd` 钉，
+            // 本条只在「明显顶到边界」时追加换行要求，不承担截断判定。
+            val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+            val layoutWidthDp = with(Density(density, fontScale = 1f)) { layout.size.width.toDp() }
+            val windowWidthDp = InstrumentationRegistry.getInstrumentation().targetContext
+                .resources.configuration.screenWidthDp.dp
+            if (layoutWidthDp >= windowWidthDp - 64.dp) {
+                assertTrue(
+                    "一行装不下时必须真的换行（不给 maxLines）：「$text」lineCount=${layout.lineCount} " +
+                        "layoutWidth=$layoutWidthDp window=$windowWidthDp",
+                    layout.lineCount >= 2,
+                )
+            }
         }
     }
 }
