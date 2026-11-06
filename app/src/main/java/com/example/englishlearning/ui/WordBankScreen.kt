@@ -35,16 +35,33 @@ enum class WordBankSection(val label: String, val tag: String) {
     Favorite("收藏", "word_bank_segment_favorite"),
 }
 
+/** 「读不到条数」在分段格上的记号（em dash）。见 [wordBankSegmentLabel]。 */
+internal const val WordBankCountUnavailableMark: String = "—"
+
 /**
  * 一格分段标签：**词书格永不带数字**（词书段没有对应的词表 UiState，条数无从谈起），
  * 其余三格在宿主读得到条数时补「 段名 N」。
  *
- * [count] 为 `null` 的语义是「读不到」（Loading / 不可用），此时回落到裸段名——
- * 摆一个 0 会把「还没读出来」读成「确实是空的」；`0` 只在 `Ready` 且空册时才是真条数。
+ * [count] 为 `null` 的语义是「读不到」（Loading / 不可用），此时补一枚 em dash 而不是回落成裸段名：
+ * 裸段名是**词书格按设计的形状**，让「还没读出来 / 读不出来」借用同一个形状，就等于在同一排四格里
+ * 用两种含义画同一种脸——2026-11-06 设备实测正是这一形（进页落在收藏段时 `生词 0 / 错词 / 收藏 0`，
+ * 那枚没有数字的格看着既像空册又像设计如此）。摆 0 同样不许：`0` 只在 `Ready` 且空册时才是真条数。
  */
 internal fun wordBankSegmentLabel(section: WordBankSection, count: Int?): String = when (section) {
     WordBankSection.Book -> section.label
-    else -> if (count == null) section.label else "${section.label} $count"
+    else -> if (count == null) "${section.label} $WordBankCountUnavailableMark" else "${section.label} $count"
+}
+
+/**
+ * 同一格的读屏文本：把视觉记号「—」翻成一句人话。
+ *
+ * 单独一函数而不是复用 [wordBankSegmentLabel]：`contentDescription` 逐字念出标签，
+ * TalkBack 会把 em dash 念成「破折号」或干脆吞掉，两种都不回答问题；而这条判据的既有口径是
+ * 「标签构造只有一处调用点」，两函数各写各的分支才不动那条计数。
+ */
+internal fun wordBankSegmentDescription(section: WordBankSection, count: Int?): String = when (section) {
+    WordBankSection.Book -> section.label
+    else -> if (count == null) "${section.label}，条数未读到" else "${section.label} $count"
 }
 
 /**
@@ -121,15 +138,13 @@ fun WordBankScreen(
         ) {
             WordBankSection.entries.forEach { cell ->
                 val selected = cell == section
-                val label = wordBankSegmentLabel(
-                    cell,
-                    when (cell) {
-                        WordBankSection.Book -> null
-                        WordBankSection.New -> newCount
-                        WordBankSection.Wrong -> wrongCount
-                        WordBankSection.Favorite -> favoriteCount
-                    },
-                )
+                val cellCount = when (cell) {
+                    WordBankSection.Book -> null
+                    WordBankSection.New -> newCount
+                    WordBankSection.Wrong -> wrongCount
+                    WordBankSection.Favorite -> favoriteCount
+                }
+                val label = wordBankSegmentLabel(cell, cellCount)
                 Text(
                     text = label,
                     modifier = Modifier
@@ -140,7 +155,7 @@ fun WordBankScreen(
                         .clickable(role = Role.Tab) { onSelectSection(cell) }
                         .testTag(cell.tag)
                         .semantics {
-                            contentDescription = label
+                            contentDescription = wordBankSegmentDescription(cell, cellCount)
                             role = Role.Tab
                             stateDescription = if (selected) "已选中" else "未选中"
                         }

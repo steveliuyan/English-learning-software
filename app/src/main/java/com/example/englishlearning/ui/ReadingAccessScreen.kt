@@ -160,6 +160,15 @@ fun ReadingAccessScreen(
     var generationParamsExpanded by remember { mutableStateOf(false) }
     // 「换一篇」的二次确认态同理：它只决定对话框画不画，生成动作仍由宿主转给 ViewModel。
     var regenerateConfirm by remember { mutableStateOf(false) }
+    // 副标题只许指认**此刻屏幕上真存在**的位置。后半句把用户送去「下方『生成前参数』」，
+    // 而那枚开关与它的偏好卡只在 `ReadyContent` 里画：锁定态连生成入口都没有（四枚类型按钮
+    // 正是因此被撤），Loading / Unavailable 连卡都还没落。三种状态下画整句，就是让页头
+    // 指一个不在场的位置——2026-11-06 走查抓到的这条属于「文案说谎」，不是排版不好看。
+    val headerSubtitle = if (state is ReadingAccessUiState.Ready) {
+        "文章由今日学过的词生成；长度与题材在下方「生成前参数」里设置。"
+    } else {
+        "文章由今日学过的词生成。"
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -175,12 +184,13 @@ fun ReadingAccessScreen(
         // 副标题取原型 `head()` 的 `sub`（`app.js:706`），末句按本仓落点改写：原型写「可以在设置里固定」，
         // 但本仓的类型与长度不在「设置」屏，而在本屏下方那张「生成前参数」展开卡（`ReadingPreference`）。
         // 前半句「文章由今日学过的词生成」成立：生成请求的 `targetCards` 就是今日计划里已完成的词卡。
+        // 末句只在 Ready 分支出现（`headerSubtitle`）：那枚开关与偏好卡只由 `ReadyContent` 画。
         // 原型同一处的 `eyebrow`（`planDate · type`）**不搬**：本仓日期眉标由今日学习页的计划快照
         // （`localDateLabel`）提供，是唯一日期口径；阅读屏只有注入的 `todayLocalDate`，屏内再格式化一份
         // 就是第二套日期样式，而一级 tab 也不重复「今天是哪天」。
         AppScreenHeader(
             title = "每日阅读",
-            subtitle = "文章由今日学过的词生成；长度与题材在下方「生成前参数」里设置。",
+            subtitle = headerSubtitle,
             hero = true,
             badge = { EntryIconBadge(icon = AppIcon.Newspaper, domain = AppDomain.Reading) },
             action = if (state is ReadingAccessUiState.Ready && state.todayArticle != null) {

@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -346,24 +347,8 @@ fun WordCardScreen(
                             )
                         } else {
                             // Recall-first (F1-03): the meaning is only exposed by an explicit action.
-                            // 浅底表单式按钮：揭晓不是这一屏的主操作（主操作是底部三档评分），
-                            // 用实心域色会把拇指从评分条吸走。
-                            Button(
-                                onClick = onReveal,
-                                enabled = !state.submitting,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 52.dp)
-                                    .testTag("word_card_reveal")
-                                    .semantics { contentDescription = "显示释义" },
-                                shape = AppShape.Button,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.tint,
-                                    contentColor = colors.onMint,
-                                    disabledContainerColor = colors.tint2,
-                                    disabledContentColor = colors.text3,
-                                ),
-                            ) { Text("显示释义", style = AppType.Label, fontWeight = FontWeight.Bold) }
+                            // 组件本体抽在文件末尾的 `RevealMeaningButton`：形状与理由都归它自己那一段。
+                            RevealMeaningButton(onReveal = onReveal, enabled = !state.submitting)
                         }
                         // F3-02 播控组：只在 Playing / Paused 窗口呈现（决策 §2）。
                         // 重播 = 再点上面那个喇叭（系统 TTS 走 QUEUE_FLUSH 天然打断，音频路径重走播放）。
@@ -775,5 +760,58 @@ internal class WordCardExitStopGuard(private val onStop: () -> Unit) {
         if (stopped) return
         stopped = true
         onStop()
+    }
+}
+
+/**
+ * 回忆态那枚「显示释义」（F1-03：释义必须由一次明确动作揭开）。
+ *
+ * 浅底表单式按钮：揭晓不是这一屏的主操作（主操作是底部三档评分），用实心域色会把拇指从评分条吸走。
+ *
+ * 但**容器不能继续用 `colors.tint`**：这张卡本身就是 `SoftCard`，而 `SoftCard` 的底色正是 `colors.tint`
+ * （明档 `0xFFE8F2EA`、暗档 `0xFF1C2A24`）——同色填充等于把按钮画隐形，2026-11-06 截图实测只剩一行
+ * 浮着的「显示释义」，回忆→揭晓这一步的关键动作看着不像可点（F1-03 的流程从这里断掉）。
+ * 改 `surface` 底 + `outlineSoft` 描边：描边是给暗档准备的，那里 `surface`(`0xFF161F1A`) 比 `tint` 更暗，
+ * 只靠明度差 separation 不够。
+ *
+ * 为什么是一枚独立的顶层组件而不是 `WordCardScreen` 里的一段：容器墨配对判据
+ * （`ContainerInkPairingContractTest`）按**顶层函数段**取样——「这一段画了随主题换套的中性容器，
+ * 段内所有 `AppType` 前景就必须各自有墨」。按钮塞在大屏函数里时，那一整屏十几处与本次无关的排印点
+ * 会一起被判红；判据的粒度本来就是「一个组件自己画容器 + 画前景的范围」，把它抽成组件才是配对形状。
+ */
+@Composable
+private fun RevealMeaningButton(
+    onReveal: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = appColors()
+    Button(
+        onClick = onReveal,
+        enabled = enabled,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .testTag("word_card_reveal")
+            .semantics { contentDescription = "显示释义" },
+        shape = AppShape.Button,
+        border = BorderStroke(1.dp, colors.outlineSoft),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colors.surface,
+            contentColor = colors.onMint,
+            disabledContainerColor = colors.tint2,
+            disabledContentColor = colors.text3,
+        ),
+    ) {
+        // 墨必须显式取容器给的 `LocalContentColor`：`AppType` 各档自带一份墨（Label 档 = `text2`），
+        // 只写 `style = AppType.Label` 时那枚 `contentColor` 根本到不了字面。取 current 而不是写死
+        // `onMint`，是为了让禁用态（`disabledContentColor = text3`）仍由 Button 逐档给，
+        // 不在这里复制第二份状态判断。
+        Text(
+            "显示释义",
+            style = AppType.Label,
+            color = LocalContentColor.current,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }

@@ -118,8 +118,12 @@ class WordBankScreenContractTest {
      * 词书格**永远不带数字**——它没有对应的词表 UiState，数字无从谈起。
      *
      * 计数是纯显示层：宿主从三段**已有**的 UiState 现算，形参默认 `null`。`null` 的语义是
-     * 「读不到」（Loading / Unavailable），此时必须回落到裸段名——摆一个 0 会把「还没读出来」
-     * 读成「确实是空的」，这是本条的主要反向面。`0` 只有在 `Ready` 且空册时才是真条数。
+     * 「读不到」（Loading / Unavailable），此时补一枚 em dash 记号而不是回落成裸段名。
+     * 两个反向面都要挡：
+     *  - 摆一个 0 会把「还没读出来」读成「确实是空的」（本条原有的主要反向面）；
+     *  - 画成裸段名会和词书格**按设计的无数字**同形——2026-11-06 设备实测进页落在收藏段时
+     *    `生词 0 / 错词 / 收藏 0`，那枚格看着既像空册又像设计如此，用户无法分辨。
+     * `0` 只有在 `Ready` 且空册时才是真条数。
      */
     @Test
     fun `segment labels carry counts only when the host can read them`() {
@@ -139,9 +143,9 @@ class WordBankScreenContractTest {
         )
         listOf(WordBankSection.New, WordBankSection.Wrong, WordBankSection.Favorite).forEach { section ->
             assertEquals(
-                section.label,
+                "${section.label} $WordBankCountUnavailableMark",
                 wordBankSegmentLabel(section, null),
-                "${section.name} 段读不到条数时必须回落到裸段名（不许用 0 冒充）",
+                "${section.name} 段读不到条数时必须带未读到记号（既不许用 0 冒充，也不许画成词书格那种按设计的裸段名）",
             )
         }
         // 三枚形参各恰一处、默认 null：默认值不是 0，壳在没人喂数时不带数字。

@@ -140,7 +140,8 @@ class WordBankScreenTest {
      *
      * 三条腿：
      *  ① 读到条数的两格显示「段名 + 空格 + N」；
-     *  ② 读不到（`null`）的那一格显示**裸段名**——不是「错词 0」：0 是「Ready 且空册」才有资格说的数；
+     *  ② 读不到（`null`）的那一格显示「段名 + 空格 + 未读到记号」——不是「错词 0」（0 是「Ready 且空册」
+     *    才有资格说的数），也不是裸段名（裸段名是词书格**按设计**的形状，两种含义不能共用一张脸）；
      *  ③ 词书格不带数字，且 `Ready` 空册的 0 也如实显示（本夹具把收藏格喂 0 证这一半）。
      * 一次 `setContent` 同时喂三种形态（3 / null / 0），是本仓「一个方法一次组合」的口径。
      */
@@ -164,7 +165,7 @@ class WordBankScreenTest {
             }
         }
         composeRule.onNodeWithTag("word_bank_segment_new").assertTextEquals("生词 3")
-        composeRule.onNodeWithTag("word_bank_segment_wrong").assertTextEquals("错词")
+        composeRule.onNodeWithTag("word_bank_segment_wrong").assertTextEquals("错词 $WordBankCountUnavailableMark")
         composeRule.onNodeWithTag("word_bank_segment_favorite").assertTextEquals("收藏 0")
         composeRule.onNodeWithTag("word_bank_segment_book").assertTextEquals("词书")
         composeRule.onNodeWithText("错词 0").assertDoesNotExist()

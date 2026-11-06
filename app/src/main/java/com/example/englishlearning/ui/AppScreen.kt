@@ -406,6 +406,18 @@ fun AppScreen(
                     WordBankSection.Favorite -> favoritesViewModel?.load(state.profile.id)
                 }
             }
+            // 2026-11-06 设备实测：进页只点名当前那一段，其余两段停在 Loading ⇒ 分段格画成没有数字，
+            // 而「没有数字」正是词书格按设计的形状，四格里出现两种含义同一张脸（落在收藏段时看到
+            // `生词 0 / 错词 / 收藏 0`）。进页把三段各预读一次，格子的计数口径当场一致。
+            // 这与 m-2（修复轮 1）不冲突：那条修的是**页内重试**一次拉三册，把已经显示好的另外两段
+            // 打回 Loading 造成闪烁；这里只在页面刚立起来、还没有任何计数可闪的时候跑一次。
+            // 切段仍走上面那条按段刷新，本 effect 的键不含 `wordBankSection`。
+            LaunchedEffect(showWordBank, state.profile.id) {
+                if (!showWordBank) return@LaunchedEffect
+                vocabularyViewModel?.load(state.profile.id)
+                wrongWordsViewModel?.load(state.profile.id)
+                favoritesViewModel?.load(state.profile.id)
+            }
             // 阅读/学习/我的三个 tab 都要这份取数：阅读 tab 是页面本体，我的页第三格统计读它的历史，
             // 学习页的「今日文章」直达判据读它的 `todayArticle`（D-5，决策 2026-11-03 §2）。
             // 今日计划未就绪时按「未解锁 + 说明原因」处理，不假装已解锁。
