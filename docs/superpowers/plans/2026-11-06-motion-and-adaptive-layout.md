@@ -18,10 +18,10 @@
 
 1. `docs/specs/00-foundation-and-architecture.md` 的平台支持口径目前只写「适配小屏、动态字体、深色模式和 TalkBack 基础导航」（§范围，第 42 行附近），没有横屏、平板、折叠屏。批 B 开工前把它补成三档窗口类别的支持矩阵（compact / medium / wide 各自的版面承诺），并写清不做的事（不做桌面多窗口专属排版、不做横屏下的第二套导航语义）。
 2. `docs/specs/05-release-quality-and-compliance.md` 的无障碍与性能验收口径按同一矩阵改写；`docs/verification/perf-baseline-2026-10.md` 的阈值全部在竖屏模拟器采得，宽窗口必须重采或如实标注「竖屏阈值不适用」，不得沿用。
-3. 现网 `AndroidManifest.xml` **没有** `screenOrientation` 也没 `configChanges` ⇒ 应用本来就在转，只是没做版面。2026-10-31 的三条裁决（`docs/decisions/2026-10-31-ui-review-three-rulings.md`）记下过 29 枚横屏假红（节点被裁成 `Rect(0,0,0,0)`），当时的处置是**把设备锁竖屏**——那是环境规避，不是产品修复，批 B 要把它还清。
-4. connected 断言的竖屏前提要逐类解除：`asserter` 里按 y 坐标排序、按 `bounds.height` 断言可见性、`performScrollTo()` 依赖单列滚动的用例，都要改成「按当前窗口类别分支」或改用语义锚点。判据：`adb -s emulator-5554 shell settings put global animator_duration_scale` 复原为默认后，横竖各跑一遍同一批 connected 类，两侧末行都留 `OK (n tests)` 原文。
+3. 现网 `AndroidManifest.xml` **没有** `screenOrientation` 也没 `configChanges` ⇒ 应用本来就在转，只是没做版面。2026-10-31 的三条裁决（`docs/decisions/2026-10-31-ui-review-three-rulings.md`）记下过 29 枚横屏假红（节点被裁成 `Rect(0,0,0,0)`），当时的处置是**把设备锁竖屏**——那是环境规避，不是产品修复，批 B 要把它还清。**还清方式（决策 §10.2 定稿）**：不是给手机横屏重写判据，而是把「手机形窗口锁竖屏」做成产品侧的方向策略（`values` / `values-sw600dp` 的 `allow_landscape_layout` + `AppOrientationPolicy` 运行时取 `requestedOrientation`），大屏才开放自适应；Manifest 里仍然不写 `screenOrientation`，口径唯一落点在资源限定符。
+4. connected 断言的竖屏前提要逐类解除——**范围自 §10.4 起收窄**：只处理与窗口形态无关的那一类（设备 `font_scale` 前置），形态相关的两档取证改成「手机竖屏（Compact）+ 平板形窗口（Wide）」两档，手机横屏那 32 枚红随形态退场、不逐条改造。判据：`adb -s emulator-5554 shell settings put global animator_duration_scale` 复原为默认后，两档各跑同一批 connected 类，两侧末行都留 `OK (n tests)` 原文；大字号三条另按「设备 `font_scale` 实际值」`assumeTrue` 声明前置，并在 2.0 档各补一次取证跑（读数表见决策 §10.4）。
 
-**版面**：`WindowSizeClass` 三档——compact 保持底栏四栏；medium（横屏手机/小折叠）主内容两栏（列表 + 详情或阅读 + 词条）；wide（平板）侧边 `NavigationRail` 替代底栏，页头 hero 降级为普通页头。骨架落在 `AppScreen.kt` 的 tab 宿主层，各屏只声明「能在多宽的面板里活下来」，不在每屏复制分支。
+**版面**：`WindowSizeClass` 三档——compact 保持底栏四栏；medium（平板竖屏、折叠屏内屏）主内容两栏（列表 + 详情或阅读 + 词条）；wide（平板横屏、折叠屏展开态）侧边 `NavigationRail` 替代底栏，页头 hero 降级为普通页头。骨架落在 `AppScreen.kt` 的 tab 宿主层，各屏只声明「能在多宽的面板里活下来」，不在每屏复制分支。**进入 medium / wide 的前置是 `smallestScreenWidthDp ≥ 600`**：手机横屏（实测 `w731dp h339dp`，宽度够 medium、高度只有竖屏的 45%）不再作为版面形态开放，见决策 §10。
 
 ## 批 C：预加载特效（骨架铺全站 + shimmer + 真预取）
 
