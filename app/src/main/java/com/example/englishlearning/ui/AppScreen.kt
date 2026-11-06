@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
@@ -2000,139 +2002,170 @@ fun AppScreen(
                 // 词书内容包与提醒发音不再是这页的折叠行：它们是同级的两枚子页（上面两支）。
                 SettingsScreen(onBack = { showSettings = false })
             } else {
-                // 四个一级 tab 的根页面装在这里，底部导航只在这一层出现；上面所有分支都是
-                // 覆盖全屏的二级层，因此天然不会显示底导。
-                Scaffold(
-                    containerColor = MintBackground,
-                    bottomBar = { AppBottomBar(selected = selectedTab, onSelect = { selectedTab = it }) },
-                ) { contentPadding ->
-                    Box(Modifier.fillMaxSize().padding(contentPadding)) {
-                        when (selectedTab) {
-                            AppTab.LEARNING -> TodayPlanScreen(
-                                state = todayState,
-                                onRetry = { todayPlanViewModel.load(state.profile.id) },
-                                onOpenSetup = { showSetup = true },
-                                onStartLearning = {
-                                    wordCardViewModel.load(state.profile.id)
-                                    showLearning = true
-                                },
-                                // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
-                                // 全屏页，避免出现「底导之上再压一层」的混乱层级。
-                                // D-5：落点由 [openTodayArticleFromLearningPage] 按真值判——今天有文章就直开，
-                                // 没文章/没解锁才切到阅读 tab 交代原因。
-                                onOpenReading = openTodayArticleFromLearningPage,
-                                // 批 1 Task 4/5 + Task 16/17：学习页的四条裸行，目的地分别是今日词单 / 复习队列 /
-                                // 今日文章 / 本机词库。词库那条打开通路必须**同时**点名段位：只赋 showWordBank 不赋段位 =
-                                // 从复习行落到词书段（用户点的是复习，看到的是列表第一页）。
-                                onOpenWordList = { showTodayWordList = true },
-                                onOpenReviewQueue = { showReviewQueue = true },
-                                onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
-                                // 批 1 Task 19：「复习生词本」那枚终点（`onReviewWords` → 词库生词段）随原型
-                                // `sLearnEmpty`（`assets/app.js:501-518`）下线——那一屏只画两枚出口，而它的两枚
-                                // 走下面的既有通路（onOpenSetup / onOpenReading）。生词段的出口是词库页自己的
-                                // 分段控件（`WordBankScreen` 的四格 tab），不留第二条绕过 tab 的暗线。
-                                onOpenSearch = {
-                                    // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
-                                    // 「浏览词书」——那属于词书管理语义，不是「查一个词」。
-                                    // 传空串即落在「最近搜索」。
-                                    globalVocabularySearchViewModel?.setProfile(state.profile.id)
-                                    globalVocabularySearchViewModel?.openSearch("")
-                                    showGlobalVocabularySearch = globalVocabularySearchViewModel != null
-                                },
-                                // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
-                                // 2026-11-02 起设置是「我的」里的子页：齿轮直接打开设置子页，
-                                // 返回即回到原页；底导不再有第五格。
-                                onOpenSettings = { showSettings = true },
-                                // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
-                                // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
-                                streakDays = streakDays,
-                                todayArticleRead = todayArticleRead,
-                            )
-                            AppTab.READING -> ReadingAccessScreen(
-                                state = readingState,
-                                onSelectType = { readingAccessViewModel?.selectType(it) },
-                                onOpenHistory = { showReadingHistory = true },
-                                onGenerate = { readingAccessViewModel?.generate() },
-                                onRegenerate = { readingAccessViewModel?.generate(regenerate = true) },
-                                onOpenTodayArticle = { readingAccessViewModel?.openTodayArticle() },
-                                onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
-                                onOpenAiSettings = {
-                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置子页。
-                                    aiProfileViewModel?.load()
-                                    if (aiProfileViewModel != null) {
-                                        showAiProfiles = true
-                                    } else {
-                                        showSettings = true
+                // 四个一级 tab 的根页面装在这里；上面所有分支都是覆盖全屏的二级层，因此天然不显示导航。
+                //
+                // 批 B（决策 `docs/decisions/2026-11-06-adaptive-window-layout.md`）：窗口类别**只在宿主这一层判定一次**，
+                // 判定源是内容区实测宽度（[BoxWithConstraints.maxWidth]），不是屏幕密度换算出来的假值；结果经
+                // [LocalAppWindowLayout] 下发给页头（hero 降级）与内容列（宽度上限）。各业务屏自己**不读**类别——
+                // 版面分支收在这一层，避免每个屏各自长出一套横屏版面（`AppWindowLayoutContractTest` 按读点白名单钉死）。
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val windowLayout = AppWindowLayoutPolicy.classify(maxWidth)
+                    val usesSideNavigation = AppWindowLayoutPolicy.usesSideNavigation(windowLayout)
+                    CompositionLocalProvider(LocalAppWindowLayout provides windowLayout) {
+                        Scaffold(
+                            containerColor = MintBackground,
+                            // 窄窗（手机竖屏）仍是底部四栏；中/宽窗改由内容区里的侧边导航栏承担同一套导航语义。
+                            bottomBar = {
+                                if (!usesSideNavigation) {
+                                    AppBottomBar(selected = selectedTab, onSelect = { selectedTab = it })
+                                }
+                            },
+                        ) { contentPadding ->
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                if (usesSideNavigation) {
+                                    AppSideNav(selected = selectedTab, onSelect = { selectedTab = it })
+                                }
+                                // 内容列：侧栏那一格之外剩余空间内居中，并按类别收成上限宽度内的单列，
+                                // 免得平板上正文行在 1200dp 里横向拉成一条带。
+                                Box(
+                                    modifier = Modifier.weight(1f).padding(contentPadding),
+                                    contentAlignment = Alignment.TopCenter,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .widthIn(max = AppWindowLayoutPolicy.contentMaxWidth(windowLayout))
+                                            .fillMaxSize(),
+                                    ) {
+                                        when (selectedTab) {
+                                            AppTab.LEARNING -> TodayPlanScreen(
+                                                state = todayState,
+                                                onRetry = { todayPlanViewModel.load(state.profile.id) },
+                                                onOpenSetup = { showSetup = true },
+                                                onStartLearning = {
+                                                    wordCardViewModel.load(state.profile.id)
+                                                    showLearning = true
+                                                },
+                                                // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
+                                                // 全屏页，避免出现「底导之上再压一层」的混乱层级。
+                                                // D-5：落点由 [openTodayArticleFromLearningPage] 按真值判——今天有文章就直开，
+                                                // 没文章/没解锁才切到阅读 tab 交代原因。
+                                                onOpenReading = openTodayArticleFromLearningPage,
+                                                // 批 1 Task 4/5 + Task 16/17：学习页的四条裸行，目的地分别是今日词单 / 复习队列 /
+                                                // 今日文章 / 本机词库。词库那条打开通路必须**同时**点名段位：只赋 showWordBank 不赋段位 =
+                                                // 从复习行落到词书段（用户点的是复习，看到的是列表第一页）。
+                                                onOpenWordList = { showTodayWordList = true },
+                                                onOpenReviewQueue = { showReviewQueue = true },
+                                                onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
+                                                // 批 1 Task 19：「复习生词本」那枚终点（`onReviewWords` → 词库生词段）随原型
+                                                // `sLearnEmpty`（`assets/app.js:501-518`）下线——那一屏只画两枚出口，而它的两枚
+                                                // 走下面的既有通路（onOpenSetup / onOpenReading）。生词段的出口是词库页自己的
+                                                // 分段控件（`WordBankScreen` 的四格 tab），不留第二条绕过 tab 的暗线。
+                                                onOpenSearch = {
+                                                    // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
+                                                    // 「浏览词书」——那属于词书管理语义，不是「查一个词」。
+                                                    // 传空串即落在「最近搜索」。
+                                                    globalVocabularySearchViewModel?.setProfile(state.profile.id)
+                                                    globalVocabularySearchViewModel?.openSearch("")
+                                                    showGlobalVocabularySearch = globalVocabularySearchViewModel != null
+                                                },
+                                                // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
+                                                // 2026-11-02 起设置是「我的」里的子页：齿轮直接打开设置子页，
+                                                // 返回即回到原页；底导不再有第五格。
+                                                onOpenSettings = { showSettings = true },
+                                                // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
+                                                // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
+                                                streakDays = streakDays,
+                                                todayArticleRead = todayArticleRead,
+                                            )
+                                            AppTab.READING -> ReadingAccessScreen(
+                                                state = readingState,
+                                                onSelectType = { readingAccessViewModel?.selectType(it) },
+                                                onOpenHistory = { showReadingHistory = true },
+                                                onGenerate = { readingAccessViewModel?.generate() },
+                                                onRegenerate = { readingAccessViewModel?.generate(regenerate = true) },
+                                                onOpenTodayArticle = { readingAccessViewModel?.openTodayArticle() },
+                                                onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
+                                                onOpenAiSettings = {
+                                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置子页。
+                                                    aiProfileViewModel?.load()
+                                                    if (aiProfileViewModel != null) {
+                                                        showAiProfiles = true
+                                                    } else {
+                                                        showSettings = true
+                                                    }
+                                                },
+                                                onOpenImport = { showArticleImport = true },
+                                                // 主页这一枚只负责导航：进二级层的同时触发一次取列表（取源本体仍归 ViewModel）。
+                                                onOpenFeed = {
+                                                    showReadingFeed = true
+                                                    readingAccessViewModel?.openFeed()
+                                                },
+                                            )
+                                            AppTab.AI -> AiLearningScreen(
+                                                onOpenFeature = {
+                                                    selectedFeatureKey = it.key
+                                                    // 每次进入功能页都清掉上一句的分析结果与上一张的生图状态，防止旧结果串屏。
+                                                    if (it == AiFeature.SENTENCE_ANALYSIS) sentenceAnalysisViewModel?.reset()
+                                                    if (it == AiFeature.PHOTO_TRANSLATION) photoTranslationViewModel?.reset()
+                                                    if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
+                                                },
+                                                // 参考 `sAiHome` 的页头配置按钮：配置页可用就直达，否则退回设置子页。
+                                                onOpenAiProfiles = openAiProfilesOrSettings,
+                                            )
+                                            AppTab.PROFILE -> ProfileScreen(
+                                                profileName = state.profile.displayName,
+                                                streakDays = streakDays,
+                                                learnedWordCount = learnedWordCount,
+                                                // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
+                                                // 所以锁定态下这一格也是真数。
+                                                articleCount = readingState.historyOrEmpty.size,
+                                                // 决策 §2：「我的」= 功能入口中心，13 行逐行接线。
+                                                // 词汇三行与「已学词」统计格都点名落哪一段：只赋 showWordBank 不赋段位
+                                                // = 点「错词」却看到词书段（同学习页复习行的既有判据）。行名取分段短名（U-8，决策 2026-11-03 §5）。
+                                                onOpenWordBankSection = { section -> wordBankSection = section; showWordBank = true },
+                                                onOpenCheckIn = { showCheckIn = true },
+                                                onOpenReadingHistory = { showReadingHistory = true },
+                                                onOpenLearningRecords = { showLearningRecords = true },
+                                                onOpenPlan = { showSetup = true },
+                                                onOpenWorksheet = {
+                                                    worksheetViewModel?.load(state.profile.id)
+                                                    showWorksheetSettings = worksheetViewModel != null
+                                                },
+                                                onOpenWordBookTransfer = { showWordBookTransfer = true },
+                                                // 参考 `sAiHome` 页头配置按钮的同一规则：配置页可用就直达，否则退回设置子页。
+                                                onOpenAiProfiles = openAiProfilesOrSettings,
+                                                // U-13（决策 2026-11-03 §9）：中转页退役，两行直连既有子屏。
+                                                // VM 缺席（预览/测试夹具）时不假装能直达：与 AI 配置兜底同一口径。
+                                                onOpenReminderSettings = {
+                                                    reminderSettingsViewModel?.load()
+                                                    showReminderSettings = reminderSettingsViewModel != null
+                                                },
+                                                onOpenSpeechSettings = {
+                                                    speechSettingsViewModel?.load()
+                                                    showSpeechSettings = speechSettingsViewModel != null
+                                                },
+                                                onOpenSettings = { showSettings = true },
+                                                // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
+                                                onOpenBackupHub = { showBackupHub = true },
+                                                // 许可唯一入口在 关于 →「开源许可与隐私说明」：别处不再保留同落点的第二行。
+                                                onOpenAbout = { showAbout = true },
+                                                // 两枚行副标题取宿主真值：词书名来自今日计划，AI 摘要来自配置列表；
+                                                // 拿不到时由屏侧给出「尚未…」的真话，不写死文案（假信息）。
+                                                wordBookName = todayReady?.wordBookName,
+                                                aiProfileSubtitle = aiProfiles?.let { ready ->
+                                                    if (ready.items.isEmpty()) {
+                                                        "尚未添加，点这里添加第一套 OpenAI 兼容服务"
+                                                    } else {
+                                                        "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                                                    }
+                                                },
+                                                // 「语音朗读」行的供应商真值（原住「提醒与发音」导航页，U-13 随行搬进 hub）。
+                                                speechEngineSubtitle = "当前供应商：${speechState.engineStatuses().currentProvider}",
+                                            )
+                                        }
                                     }
-                                },
-                                onOpenImport = { showArticleImport = true },
-                                // 主页这一枚只负责导航：进二级层的同时触发一次取列表（取源本体仍归 ViewModel）。
-                                onOpenFeed = {
-                                    showReadingFeed = true
-                                    readingAccessViewModel?.openFeed()
-                                },
-                            )
-                            AppTab.AI -> AiLearningScreen(
-                                onOpenFeature = {
-                                    selectedFeatureKey = it.key
-                                    // 每次进入功能页都清掉上一句的分析结果与上一张的生图状态，防止旧结果串屏。
-                                    if (it == AiFeature.SENTENCE_ANALYSIS) sentenceAnalysisViewModel?.reset()
-                                    if (it == AiFeature.PHOTO_TRANSLATION) photoTranslationViewModel?.reset()
-                                    if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
-                                },
-                                // 参考 `sAiHome` 的页头配置按钮：配置页可用就直达，否则退回设置子页。
-                                onOpenAiProfiles = openAiProfilesOrSettings,
-                            )
-                            AppTab.PROFILE -> ProfileScreen(
-                                profileName = state.profile.displayName,
-                                streakDays = streakDays,
-                                learnedWordCount = learnedWordCount,
-                                // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
-                                // 所以锁定态下这一格也是真数。
-                                articleCount = readingState.historyOrEmpty.size,
-                                // 决策 §2：「我的」= 功能入口中心，13 行逐行接线。
-                                // 词汇三行与「已学词」统计格都点名落哪一段：只赋 showWordBank 不赋段位
-                                // = 点「错词」却看到词书段（同学习页复习行的既有判据）。行名取分段短名（U-8，决策 2026-11-03 §5）。
-                                onOpenWordBankSection = { section -> wordBankSection = section; showWordBank = true },
-                                onOpenCheckIn = { showCheckIn = true },
-                                onOpenReadingHistory = { showReadingHistory = true },
-                                onOpenLearningRecords = { showLearningRecords = true },
-                                onOpenPlan = { showSetup = true },
-                                onOpenWorksheet = {
-                                    worksheetViewModel?.load(state.profile.id)
-                                    showWorksheetSettings = worksheetViewModel != null
-                                },
-                                onOpenWordBookTransfer = { showWordBookTransfer = true },
-                                // 参考 `sAiHome` 页头配置按钮的同一规则：配置页可用就直达，否则退回设置子页。
-                                onOpenAiProfiles = openAiProfilesOrSettings,
-                                // U-13（决策 2026-11-03 §9）：中转页退役，两行直连既有子屏。
-                                // VM 缺席（预览/测试夹具）时不假装能直达：与 AI 配置兜底同一口径。
-                                onOpenReminderSettings = {
-                                    reminderSettingsViewModel?.load()
-                                    showReminderSettings = reminderSettingsViewModel != null
-                                },
-                                onOpenSpeechSettings = {
-                                    speechSettingsViewModel?.load()
-                                    showSpeechSettings = speechSettingsViewModel != null
-                                },
-                                onOpenSettings = { showSettings = true },
-                                // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
-                                onOpenBackupHub = { showBackupHub = true },
-                                // 许可唯一入口在 关于 →「开源许可与隐私说明」：别处不再保留同落点的第二行。
-                                onOpenAbout = { showAbout = true },
-                                // 两枚行副标题取宿主真值：词书名来自今日计划，AI 摘要来自配置列表；
-                                // 拿不到时由屏侧给出「尚未…」的真话，不写死文案（假信息）。
-                                wordBookName = todayReady?.wordBookName,
-                                aiProfileSubtitle = aiProfiles?.let { ready ->
-                                    if (ready.items.isEmpty()) {
-                                        "尚未添加，点这里添加第一套 OpenAI 兼容服务"
-                                    } else {
-                                        "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
-                                    }
-                                },
-                                // 「语音朗读」行的供应商真值（原住「提醒与发音」导航页，U-13 随行搬进 hub）。
-                                speechEngineSubtitle = "当前供应商：${speechState.engineStatuses().currentProvider}",
-                            )
+                                }
+                            }
                         }
                     }
                 }

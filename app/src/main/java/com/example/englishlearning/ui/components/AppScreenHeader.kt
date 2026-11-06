@@ -21,6 +21,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.AppWindowLayoutPolicy
+import com.example.englishlearning.ui.currentAppWindowLayout
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
@@ -68,10 +70,14 @@ import com.example.englishlearning.ui.theme.appColors
  * `hero = false`（默认，二级页）标题取 `AppType.Title` 17sp——返回位 + 17sp 标题是「进到里面去了」的口径，
  * 与全站 `.page-sub` 那套紧凑页头一致，也是 `AppScreenHeaderTest` 大字号两条判据的现行参照。
  *
- * `hero = true`（一级页 / tab 根页）标题取 `AppType.Headline` 28sp，`eyebrow` 是标题上沿的一行
+ * `hero = true`（一级页 / tab 根页）标题取 `AppType.Headline` 24sp，`eyebrow` 是标题上沿的一行
  * `Label` 小字（日期 / 计数这类「此刻在哪」的定位信息），`badge` 是标题右侧一枚 40dp 入口容器
  * （`EntryIconBadge`，域色只出现在那枚位图里）。一级页没有返回位，靠「大标题 + 徽标 + 眉标」把
  * 层级讲清楚；二级页不传 `hero`，几何一字不动，因此大字号判据不受影响。
+ *
+ * 批 B（2026-11-06，Spec 00 窗口类别矩阵）：`hero` 在**宽窗（≥840dp）降级**为 `Title`——24sp 封面字在
+ * 侧栏 + 720dp 内容列里会把页头拉成海报，层级读起来反而不像「四个并列目的地之一」。降级判定读宿主
+ * 下发的 [AppWindowLayout]，本组件不自量宽度。
  *
  * `badge` 与 `action` 都在尾部，且**不加 clickable**：本组件只摆内容，可点与否交给调用方
  * （一级页的首页用例按「可点节点闭合集合」逐枚数可点目标，页头擅自包一层 clickable 会当场数多）。
@@ -88,6 +94,10 @@ fun AppScreenHeader(
     badge: @Composable (() -> Unit)? = null,
 ) {
     val colors = appColors()
+    // 批 B：宽窗（≥840dp）里 hero 大标题降为常规 Title（Spec 00 窗口类别矩阵第三行）。
+    // 类别只由 tab 宿主判定一次并经 [AppWindowLayout] 下发，本组件只消费；
+    // 宿主缺席（组件级用例、预览夹具）时 [currentAppWindowLayout] 回落系统配置宽度，不抛不空转。
+    val useHeroTitle = hero && !AppWindowLayoutPolicy.downgradesHeroHeader(currentAppWindowLayout())
     Row(
         modifier = modifier
             .testTag("app_screen_header")
@@ -130,7 +140,7 @@ fun AppScreenHeader(
             }
             Text(
                 text = title,
-                style = if (hero) AppType.Headline else AppType.Title,
+                style = if (useHeroTitle) AppType.Headline else AppType.Title,
                 color = colors.text1,
                 maxLines = 2,
                 overflow = TextOverflow.Clip,

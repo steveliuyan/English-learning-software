@@ -174,6 +174,21 @@ class AccessibilityStateSemanticsContractTest {
         )
     }
 
+    /**
+     * 批 B（2026-11-06，决策 `2026-11-06-adaptive-window-layout.md` §5）：中等/宽窗里承担导航的是
+     * `AppSideNav.SideNavSlot`，判据与底栏**同一条规则**（`tabSlotOffenders`）——
+     * 「换摆法不换语义」这条口径在无障碍侧必须也有站点，否则宽窗里整套导航只剩视觉选中态可辨认。
+     * 形状级同形由 `AppWindowLayoutContractTest` 逐枚锚点比对，本席钉的是语义声明在场。
+     */
+    @Test
+    fun `side nav tabs have the same role and selected state as the bottom bar`() {
+        assertSite(
+            "AppSideNav.kt",
+            listOf("fun SideNavSlot(", "contentDescription = tab.contentDescription"),
+            ::tabSlotOffenders,
+        )
+    }
+
     @Test
     fun `learning records tabs declare tab role`() {
         assertSite(

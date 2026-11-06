@@ -119,7 +119,7 @@ class AppBottomBarContractTest {
     private val tabBadgeAnchor = "InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech"
     private val tabBackdropAnchor = "backdrop = selected"
     private val tabIdleAlphaAnchor = "Modifier.alpha(TabGlyphIdleAlpha)"
-    private val tabIdleAlphaPin = "private const val TabGlyphIdleAlpha = 0.5f"
+    private val tabIdleAlphaPin = "internal const val TabGlyphIdleAlpha = 0.5f"
     private val bareGlyphAnchor = "AppGlyph("
     private val glyphLayerAnchor = "AppGlyphLayer"
 
@@ -213,7 +213,8 @@ class AppBottomBarContractTest {
         assertEquals(
             1,
             count(bar, tabIdleAlphaPin),
-            "未选中档的半透明度必须具名成 `private const val TabGlyphIdleAlpha = 0.5f`：散写 0.5f 会与别的 alpha 混成一团，也没法在设备侧复算",
+            "未选中档的半透明度必须具名成 `internal const val TabGlyphIdleAlpha = 0.5f`（批 B 起侧边导航栏同读这一枚，故 internal）：" +
+                "散写 0.5f 会与别的 alpha 混成一团，也没法在设备侧复算",
         )
         assertEquals(
             0,

@@ -41,8 +41,11 @@ import com.example.englishlearning.ui.theme.appDomain
  * 具名而非散写 `0.5f`：这是「两档同一枚插画」这条判据的第二处差别（第一处是药片底有无），
  * 设备侧按它复算淡出（`AppBottomBarTest`），散写会与同文件其它 alpha 混成一团，
  * 也无从在测试里指名道姓地引用。
+ *
+ * 2026-11-06 批 B 起改 `internal`：侧栏 [AppSideNav] 读同一枚档位，两枚导航的未选中淡出必须是同一个数，
+ * 否则「换摆法不换语义」在这条腿上就断了（配套锚见 `AppWindowLayoutContractTest` 的跨文件比对）。
  */
-private const val TabGlyphIdleAlpha = 0.5f
+internal const val TabGlyphIdleAlpha = 0.5f
 
 /**
  * 四栏底部导航。
@@ -90,8 +93,11 @@ fun AppBottomBar(
  * 「我的」这一格取 `Person`：它装档案 / 统计 / 全部调整入口，滑杆只说得清设置，说不清进度。
  * 设置不再占一格，齿轮只作为「我的」页头的快捷入口出现（`AppIcon.Gear` 仍在图标台账里）。
  * 台账出处与许可结论见 `components/AppIcons.kt` 文件头，枚名与几何不在这里复制。
+ *
+ * 2026-11-06 批 B 起改 `internal` 并由 [AppSideNav] 共读：目的地→字形是**导航族**的表，不是底栏的私产；
+ * 表本体仍留在本文件（`AppBottomBarContractTest` 按「四枚 glyph 各恰一处」扫这份文件，搬家会撞那条锚）。
  */
-private val AppTab.glyph: AppIcon
+internal val AppTab.glyph: AppIcon
     get() = when (this) {
         AppTab.LEARNING -> AppIcon.Book
         AppTab.READING -> AppIcon.Newspaper
