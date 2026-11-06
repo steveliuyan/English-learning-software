@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.AppOrientationPolicy
 import com.example.englishlearning.MainActivity
 import com.example.englishlearning.R
 import com.example.englishlearning.ui.theme.AppleMintEnd
@@ -31,6 +32,9 @@ class BrandLaunchActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // 批 B §10：与 MainActivity 同一道方向闸。闪屏页自己也要锁——它是用户真正看到的第一枚窗口，
+        // 漏掉就等于「启动那 1.2 秒允许转到 339dp 高的手机横屏，进主页再被扳回来」。
+        AppOrientationPolicy.applyTo(this)
         setContent {
             // Task 26 Step 3（AC-R-02）：三段品牌渐变改引主题静态源，取值逐字未变
             // （`AppleMintStart/Middle/End`，与 `ui/` 内三处顶层 Brush 同源）。

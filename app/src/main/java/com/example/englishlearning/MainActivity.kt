@@ -46,6 +46,8 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // 批 B §10：手机形窗口（sw < 600dp）锁竖屏，大屏才允许横屏自适应。见 AppOrientationPolicy。
+        AppOrientationPolicy.applyTo(this)
         setContent {
             // 唯一装配点：LocalAppColors / LocalDomainColors / LocalIsDark 与 MaterialTheme 都在这里注入。
             // themeMode 由 rememberAppThemeMode() 从显示偏好回读（prefs 而非 Room，不进备份包）：

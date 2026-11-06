@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  批 B（决策 `docs/decisions/2026-11-06-adaptive-window-layout.md` §10，用户 2026-11-07 裁定）：
+  横屏自适应只在**大屏**（sw ≥ 600dp 的平板/折叠内屏）开放；手机形窗口（sw < 600dp，
+  含手机横屏——它的 sw 就是那个 339dp 的短边）锁竖屏。
+
+  这条限定按 `smallestScreenWidthDp` 匹配，**与当前旋转无关**：手机转横屏时 sw 仍取短边，
+  所以「手机横屏」这一形态从入口就被关掉，而不是靠运行时猜方向。
+  默认档（本文件）= 不开放横屏；`values-sw600dp/config.xml` = 开放。
+
+  为什么不是 manifest 里写死 `screenOrientation`：`android:screenOrientation` 不接受资源引用，
+  做不到「按屏幕形大小分档」。落地方式是 `AppOrientationPolicy.applyTo` 在 Activity `onCreate`
+  里读这枚 bool 再设 `requestedOrientation`。
+-->
+<resources>
+    <bool name="allow_landscape_layout">false</bool>
+</resources>
