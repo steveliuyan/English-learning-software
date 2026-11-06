@@ -155,6 +155,42 @@ class GlobalVocabularySearchViewModelTest {
         assertEquals(listOf("new"), state.results.map { it.result.lemma })
     }
 
+    /**
+     * 「没搜过」不是「搜不到」。
+     *
+     * 今日学习页那枚常驻查词条走 `openSearch("")`（`AppScreen.kt:2027`），空查询按设计不落真实搜索、
+     * 只列最近搜索；新用户一条历史都没有时，旧实现把这种局面映射成 `Empty`，
+     * 于是界面在用户一个字还没输入时就报「未找到匹配词卡」——一句假失败。
+     * 现在落 `Idle`，界面呈现的是那句输入引导。
+     */
+    @Test
+    fun an_untouched_search_page_never_claims_nothing_was_found() = runTest(dispatcher) {
+        val history = ObservableHistory(entries = emptyList())
+        val vm = viewModel(history = history)
+        vm.setProfile("p1")
+        vm.openSearch("")
+        advanceUntilIdle()
+
+        assertEquals(GlobalVocabularySearchUiState.Idle, vm.uiState.value, "空历史不是零结果：还没搜过就不该报「未找到」")
+        assertEquals(0, history.recordCalls, "空查询不得写历史")
+    }
+
+    @Test
+    fun clearing_history_lands_on_the_same_honest_empty_of_a_page_as_fresh_entry() = runTest(dispatcher) {
+        val history = ObservableHistory(entries = listOf(history("p1", "one", 1)))
+        val vm = viewModel(history = history)
+        vm.setProfile("p1")
+        vm.search()
+        advanceUntilIdle()
+
+        vm.requestClearHistory()
+        advanceUntilIdle()
+        vm.clearHistory()
+        advanceUntilIdle()
+
+        assertEquals(GlobalVocabularySearchUiState.Idle, vm.uiState.value, "清空后既没有查询词也没有历史：该回到引导，而不是报「未找到」")
+    }
+
     @Test
     fun profile_switch_clears_old_state_and_history_isolated() = runTest(dispatcher) {
         val history = ObservableHistory(entries = listOf(history("p1", "old", 2)))
@@ -188,7 +224,8 @@ class GlobalVocabularySearchViewModelTest {
         history.clearFailure = false
         vm.clearHistory()
         advanceUntilIdle()
-        assertEquals(GlobalVocabularySearchUiState.Empty, vm.uiState.value)
+        // 原断言是 `Empty`：清空之后既没有查询词也没有历史，报「未找到匹配词卡」是一句假失败。
+        assertEquals(GlobalVocabularySearchUiState.Idle, vm.uiState.value)
         assertEquals(listOf("p1", "p1"), history.clearProfiles)
         assertEquals(listOf("two"), history.remainingFor("p2").map { it.normalizedQuery })
     }
@@ -234,7 +271,8 @@ class GlobalVocabularySearchViewModelTest {
 
         assertNull(vm.pendingClear.value)
         assertEquals(listOf("p1"), history.clearProfiles)
-        assertEquals(GlobalVocabularySearchUiState.Empty, vm.uiState.value)
+        // 同上：清空成功后是「还没搜过」的引导面，不是「搜不到」。
+        assertEquals(GlobalVocabularySearchUiState.Idle, vm.uiState.value)
     }
 
     /**

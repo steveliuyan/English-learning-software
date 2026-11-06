@@ -231,7 +231,8 @@ class GlobalVocabularySearchViewModel @Inject constructor(
                 is RepositoryResult.Success -> {
                     if (expected != generation) return@launch
                     lastHistory = emptyList()
-                    _uiState.value = GlobalVocabularySearchUiState.Empty
+                    // 清空之后与全新进入同一张脸：没有查询词、也没有历史 ⇒ 引导，不是「未找到」。
+                    _uiState.value = GlobalVocabularySearchUiState.Idle
                 }
                 is RepositoryResult.Failure -> {
                     if (expected != generation) return@launch
@@ -266,7 +267,13 @@ class GlobalVocabularySearchViewModel @Inject constructor(
         }
     }
 
-    /** 只列「最近搜索」：没有查询词，也就没有需要回源的词卡。 */
+    /**
+     * 只列「最近搜索」：没有查询词，也就没有需要回源的词卡。
+     *
+     * 一条历史都没有时落 `Idle`（输入引导），不落 `Empty`：`Empty` 的意思是「搜了，没搜到」，
+     * 而今日学习页那枚常驻查词条走的是 `openSearch("")`——用户一个字还没输入，
+     * 报「未找到匹配词卡」就是一句假失败（2026-11-06 截图实测）。
+     */
     private suspend fun showHistory(id: String, requestGeneration: Long) {
         when (val history = withContext(io) { historyRepository.list(id, HISTORY_LIMIT) }) {
             is RepositoryResult.Failure -> _uiState.value = GlobalVocabularySearchUiState.Failure
@@ -274,7 +281,7 @@ class GlobalVocabularySearchViewModel @Inject constructor(
                 if (requestGeneration != generation) return
                 lastHistory = history.value
                 _uiState.value =
-                    if (lastHistory.isEmpty()) GlobalVocabularySearchUiState.Empty else ready(lastHistory, emptyList())
+                    if (lastHistory.isEmpty()) GlobalVocabularySearchUiState.Idle else ready(lastHistory, emptyList())
             }
         }
     }
