@@ -29,6 +29,7 @@ import com.example.englishlearning.ui.components.EntryIconBadge
 import com.example.englishlearning.ui.components.EntryIconTone
 import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.SectionHeading
+import com.example.englishlearning.ui.components.SkeletonBar
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.StrongCard
 import com.example.englishlearning.ui.theme.AppDomain
@@ -127,8 +128,15 @@ object ProfileGroups {
  * 因此本页**不**再内联设置内容（同屏两枚页头 + 两个滚动容器是旧形态），也**不**持有 SAF 与密钥读写。
  *
  * 数字与摘要只读宿主传进来的真值：本页不读仓库（口径同 `TodayPlanScreen`）。
+ *
+ * **三枚统计允许「还没读到」（批 C-2，Spec 05 F5-05）**：`streakDays` / `learnedWordCount` / `articleCount`
+ * 是可空的，`null` = 快照还没回来，屏侧画占位格、页头副标题只拼**读到的那几枚**。宿主旧写法是
+ * `checkInReady?.streakDays ?: 0`，首帧就念成「连续打卡 0 天 · 累计学过 0 个词」——那是把「还没读到」
+ * 说成「一个都没学」，与 2026-11-06 占位诚实化批同一条禁令，只是从文案换到了数字。
+ * `Unavailable` 不在这一档：那一态是读到了「读不到」，0 与真数同为已表态的值，沿用既有口径不打回占位。
  * `ProfileHubLedgerTest` / `ProfilePageContractTest` 钉台账与接线，
- * connected `ProfileScreenTest` + `AppScreenTest` 钉「点了真的去哪」。
+ * connected `ProfileScreenTest` + `AppScreenTest` 钉「点了真的去哪」，
+ * 首帧这三枚的 pending 形状由 `PrimaryTabSkeletonContractTest` 钉。
  *
  * @param wordBookName 活动词书名；`null` = 还没选词书。学习计划与词书两行的副标题据此表态。
  * @param aiProfileSubtitle 宿主读出的 AI 配置摘要；`null` 时落台账里的引导文案。
@@ -136,9 +144,9 @@ object ProfileGroups {
 @Composable
 fun ProfileScreen(
     profileName: String,
-    streakDays: Int,
-    learnedWordCount: Int,
-    articleCount: Int,
+    streakDays: Int?,
+    learnedWordCount: Int?,
+    articleCount: Int?,
     onOpenWordBankSection: (WordBankSection) -> Unit,
     onOpenCheckIn: () -> Unit,
     onOpenReadingHistory: () -> Unit,
@@ -158,6 +166,13 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
+    // 页头副标题只拼**读到的那几枚**（批 C-2 / F5-05）：两枚都没读到时整行不出现，
+    // 而不是「连续打卡 0 天 · 累计学过 0 个词」。学习页的同一行早就按这个口径写
+    // （没有连续记录时不摆「连续 0 天」），本批把「还没读到」与「读了且是 0」分开表达。
+    val headerFacts = listOfNotNull(
+        streakDays?.let { "连续打卡 $it 天" },
+        learnedWordCount?.let { "累计学过 $it 个词" },
+    )
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -171,15 +186,15 @@ fun ProfileScreen(
         AppScreenHeader(
             title = profileName,
             // 原型 `.head-sub`（`app.js:1257`）：「连续打卡 N 天 · 累计学过 N 个词」——两枚都是本页收到的真值。
-            subtitle = "连续打卡 $streakDays 天 · 累计学过 $learnedWordCount 个词",
+            subtitle = headerFacts.joinToString(" · ").takeIf { it.isNotEmpty() },
             hero = true,
             badge = { EntryIconBadge(icon = AppIcon.Person, domain = AppDomain.Settings) },
         )
         StrongCard(modifier = Modifier.testTag("profile_stats")) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ProfileStatCell("已学词", learnedWordCount.toString(), "profile_stat_learned", { onOpenWordBankSection(WordBankSection.Book) }, Modifier.weight(1f))
-                ProfileStatCell("连续天数", streakDays.toString(), "profile_stat_streak", onOpenCheckIn, Modifier.weight(1f))
-                ProfileStatCell("文章", articleCount.toString(), "profile_stat_articles", onOpenReadingHistory, Modifier.weight(1f))
+                ProfileStatCell("已学词", learnedWordCount?.toString(), "profile_stat_learned", { onOpenWordBankSection(WordBankSection.Book) }, Modifier.weight(1f))
+                ProfileStatCell("连续天数", streakDays?.toString(), "profile_stat_streak", onOpenCheckIn, Modifier.weight(1f))
+                ProfileStatCell("文章", articleCount?.toString(), "profile_stat_articles", onOpenReadingHistory, Modifier.weight(1f))
             }
         }
         ProfileGroups.all.forEach { group ->
@@ -286,11 +301,15 @@ private fun ProfileLedgerEntry(
  * 墨色取容器内容色 `LocalContentColor.current`（2026-10-31 用户评审 ②）：这一格只住在 [StrongCard] 里，
  * 而强档卡的底与墨是**分套**的（浅套 `tint2` 底 + `text1` 墨、深套 `strongSurface` 底 + `onStrong` 墨）。
  * 写死 `onStrong`（`#E9F2EC`）在浅套就是浅薄荷底上的近白字，实测不可读；取容器内容色则两套自动到位。
+ *
+ * [value] 为 `null` = 那一枚还没读到（批 C-2 / F5-05）：数字位与标签位换成两条 [SkeletonBar]，
+ * 读屏念「标签，正在统计」而不是「标签，当前 null」。格子外壳与命中区不变，回填只是把两条灰条
+ * 换成真数——这一格的可点面**保留**，因为它通向的页面本来就是那份数据的权威落点。
  */
 @Composable
 private fun ProfileStatCell(
     label: String,
-    value: String,
+    value: String?,
     tag: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -302,11 +321,17 @@ private fun ProfileStatCell(
             .heightIn(min = 72.dp)
             .padding(vertical = 10.dp, horizontal = 6.dp)
             .testTag(tag)
-            .semantics { contentDescription = "$label，当前 $value" },
+            .semantics { contentDescription = value?.let { "$label，当前 $it" } ?: "$label，正在统计" },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(value, style = AppType.Headline, color = LocalContentColor.current)
-        Text(label, style = AppType.Footnote, color = LocalContentColor.current.copy(alpha = 0.72f))
+        if (value == null) {
+            // 两条宽度照真格的视觉重量：Headline 那档数字短、Footnote 那档标签略长。
+            SkeletonBar(fraction = 0.46f, height = 20.dp)
+            SkeletonBar(fraction = 0.62f, height = 10.dp)
+        } else {
+            Text(value, style = AppType.Headline, color = LocalContentColor.current)
+            Text(label, style = AppType.Footnote, color = LocalContentColor.current.copy(alpha = 0.72f))
+        }
     }
 }

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +36,8 @@ import com.example.englishlearning.ui.components.EmptyState
 import com.example.englishlearning.ui.components.InlineIconBadge
 import com.example.englishlearning.ui.components.PlanProgressBar
 import com.example.englishlearning.ui.components.SectionHeading
+import com.example.englishlearning.ui.components.SkeletonCard
+import com.example.englishlearning.ui.components.SkeletonList
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.Sticker
 import com.example.englishlearning.ui.components.StrongCard
@@ -46,7 +47,6 @@ import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
-import com.example.englishlearning.ui.theme.appDomain
 
 /**
  * 学习页（2026-10-25 版式重做 §3.2）：**搜索 / 强档卡 / 今日词单 / 今日文章 / 词库** 五段。
@@ -207,11 +207,21 @@ fun TodayPlanScreen(
         SearchBox(onClick = onOpenSearch)
         when (state) {
             TodayPlanUiState.Loading -> {
-                CircularProgressIndicator(
-                    color = appDomain(AppDomain.AiSpeech).deep,
-                    modifier = Modifier.size(48.dp).testTag("today_plan_loading"),
+                // 批 C-2（Spec 05 F5-05 / 决策 2026-11-07 决定 3）：首帧不再画 48dp 转圈 + 一句
+                // 「正在准备今日计划…」，改画与未学完那一档**同形状**的骨架——一张强卡位（眉标 + 计数 +
+                // 图例 + 一对按钮那一块）加「接下来」的四行。进行中语义由形状承担，
+                // 文案位留给真值：骨架里写「还剩 0 个词」就是 F1-01 那枚假数字换了个承载。
+                // 高度取档不逐像素复刻：`SkeletonCard` 只承诺横向起点对齐，真卡带进度条时会长高（族口径）。
+                SkeletonCard(
+                    modifier = Modifier.testTag("today_plan_loading"),
+                    bars = 4,
+                    minHeight = 148.dp,
                 )
-                Text("正在准备今日计划…", style = AppType.Footnote, color = colors.text2)
+                SkeletonList(
+                    rows = TODAY_PLAN_NEXT_ROWS,
+                    rowHeight = 48.dp,
+                    tagPrefix = "today_plan_row_skeleton_",
+                )
             }
             TodayPlanUiState.MissingSetup -> {
                 Text(
@@ -576,3 +586,17 @@ private fun SettingsAction(onClick: () -> Unit) {
         }
     }
 }
+
+/**
+ * 「接下来」那一组的行数（批 C-2 骨架读它）。
+ *
+ * 为什么是常量而不是字面量：骨架行数必须跟着真实行组走——未学完那一支的「接下来」软卡里现在是四条裸行
+ * （今日词单 / 复习队列 / 今日文章 / 词书），将来长一行就是五条。写成字面量时两处各数一遍，
+ * 回填会顶偏滚动位置而没人会想起改骨架（与选词书屏 `WORD_BOOK_PLACEHOLDER_ROWS` 同一口径）。
+ *
+ * 写法与取值各有一枚判据，都在 `PrimaryTabSkeletonContractTest`：前者是
+ * `skeleton row counts read this screen constant and keep the stable tags`（调用点不许出现数字），
+ * 后者是 `skeleton row constants equal the real row counts on their screen`（常量的值必须等于本屏真实行数；
+ * 把这里改成 5 即实测红一枚，变异探针已回滚）。
+ */
+private const val TODAY_PLAN_NEXT_ROWS = 4

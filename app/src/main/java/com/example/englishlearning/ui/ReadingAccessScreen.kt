@@ -44,6 +44,8 @@ import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.QuietCard
 import com.example.englishlearning.ui.components.SectionHeading
+import com.example.englishlearning.ui.components.SkeletonCard
+import com.example.englishlearning.ui.components.SkeletonList
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
@@ -210,7 +212,23 @@ fun ReadingAccessScreen(
             },
         )
         when (state) {
-            ReadingAccessUiState.Loading -> Text("正在读取本地阅读状态…", style = AppType.Footnote, color = colors.text2)
+            ReadingAccessUiState.Loading -> {
+                // 批 C-2（Spec 05 F5-05 / 决策 2026-11-07 决定 3）：旧形状是一行
+                // `Text("正在读取本地阅读状态…")`——只有进度句、没有版面，回填时整屏从一句话长成
+                // 「今日文章卡 + 解锁卡 + 更多三行 + 本周卡」。现在首帧画同形状骨架：文章卡位一块
+                // （眉标 / 标题 / 说明 / meta / CTA 那一块的档）加「更多」那一组的三行。
+                // 本周阅读那一块不铺：它是一行统计文本，回填时不长形状，铺了反而多一块没人认领的灰盒。
+                SkeletonCard(
+                    modifier = Modifier.testTag("reading_access_loading"),
+                    bars = 4,
+                    minHeight = 168.dp,
+                )
+                SkeletonList(
+                    rows = READING_MORE_ROWS,
+                    rowHeight = 48.dp,
+                    tagPrefix = "reading_row_skeleton_",
+                )
+            }
             ReadingAccessUiState.Unavailable -> Text("本地阅读状态暂时无法读取", style = AppType.Footnote, color = colors.text2)
             is ReadingAccessUiState.Locked -> {
                 AccessCard("文章尚未解锁", state.reason, "reading_access_locked_reason")
@@ -618,3 +636,13 @@ private val com.example.englishlearning.reading.domain.ArticleLengthTier.label: 
         com.example.englishlearning.reading.domain.ArticleLengthTier.STANDARD -> "标准"
         com.example.englishlearning.reading.domain.ArticleLengthTier.LONG -> "长篇"
     }
+
+/**
+ * 「更多」那一组的行数（批 C-2 骨架读它）。
+ *
+ * 与学习页 `TODAY_PLAN_NEXT_ROWS` 同一口径：骨架行数必须跟着真实行组走，
+ * `ReadyContent` 里那一组现在是三枚裸行（外刊选读 / 粘贴导入 / 阅读历史），长一行就是四行——
+ * 写成字面量时两处各数一遍，回填会顶偏滚动位置而没人会想起改骨架。
+ * 写法与取值两枚判据同在 `PrimaryTabSkeletonContractTest`（值必须等于本屏真实行数）。
+ */
+private const val READING_MORE_ROWS = 3

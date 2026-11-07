@@ -446,8 +446,15 @@ fun AppScreen(
             // 免得某一页自己再 `as? Ready` 一遍、兜底值各写各的。
             val checkInReady = checkInState as? CheckInUiState.Ready
             val streakDays = checkInReady?.streakDays ?: 0
-            val learnedWordCount = checkInReady?.learnedWordCount ?: 0
             val todayArticleRead = (checkInReady?.today?.completedReadingCount ?: 0) > 0
+            // 批 C-2（Spec 05 F5-05）：我的页那三格统计在**快照还没回来**时传 `null`，屏侧画占位格。
+            // 上面那两枚 `?: 0` 只留给学习页的副标题判据（那里 0 = 「没有连续记录」，整行不出现，
+            // 说的是同一件事的另一面），我的页要的却是「还不知道」与「确实是 0」的区分：
+            // 首帧念「累计学过 0 个词」就是把「还没读到」说成「一个都没学」。
+            // `Unavailable` 不在这一档——那一态是读到了「读不到」，沿用既有表态口径，本批不扩。
+            val profileStreakDays: Int? = if (checkInState is CheckInUiState.Loading) null else checkInReady?.streakDays ?: 0
+            val profileLearnedWordCount: Int? = if (checkInState is CheckInUiState.Loading) null else checkInReady?.learnedWordCount ?: 0
+            val profileArticleCount: Int? = if (readingState is ReadingAccessUiState.Loading) null else readingState.historyOrEmpty.size
             // 预加载：学习页与我的页一露面就要有这两个数字。keepReady 保证这次重载
             // 不把页面闪回 Loading、失败也保留上一份好快照（CheckInViewModelTest 钉着口径）。
             LaunchedEffect(selectedTab, state.profile.id) {
@@ -2114,11 +2121,11 @@ fun AppScreen(
                                             )
                                             AppTab.PROFILE -> ProfileScreen(
                                                 profileName = state.profile.displayName,
-                                                streakDays = streakDays,
-                                                learnedWordCount = learnedWordCount,
+                                                streakDays = profileStreakDays,
+                                                learnedWordCount = profileLearnedWordCount,
                                                 // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
-                                                // 所以锁定态下这一格也是真数。
-                                                articleCount = readingState.historyOrEmpty.size,
+                                                // 所以锁定态下这一格也是真数；只有 `Loading` 传 null 画占位格。
+                                                articleCount = profileArticleCount,
                                                 // 决策 §2：「我的」= 功能入口中心，13 行逐行接线。
                                                 // 词汇三行与「已学词」统计格都点名落哪一段：只赋 showWordBank 不赋段位
                                                 // = 点「错词」却看到词书段（同学习页复习行的既有判据）。行名取分段短名（U-8，决策 2026-11-03 §5）。
