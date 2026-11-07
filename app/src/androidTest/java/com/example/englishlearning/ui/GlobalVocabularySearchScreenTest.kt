@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.SearchVocabularyResult
 import com.example.englishlearning.learning.VocabularySearchHistory
@@ -391,6 +393,43 @@ class GlobalVocabularySearchScreenTest {
         composeRule.onNodeWithContentDescription("返回上一层").assertDoesNotExist()
         composeRule.onNodeWithText("返回首页", substring = true).assertDoesNotExist()
         composeRule.onNodeWithContentDescription("返回首页").assertDoesNotExist()
+    }
+
+    /**
+     * F5-05 / 批 C-3（分类 1「等数据」）：查词首帧必须是**结果行那一族的形状**。
+     *
+     * 旧形状是 `GlobalSearchProgress("正在查询本地词库…")`：一枚 48dp 转圈 + 一句进行中文案，
+     * 回填时整列结果行是在那块空白里长出来的——版面跳变，不是渐进加载。
+     * 现在这一帧画 [GLOBAL_SEARCH_PLACEHOLDER_ROWS] 条 96dp 行（镜像 `GlobalSearchResultRow` 的线序与行高），
+     * 零文案、零数字，转圈随那一支退役（`GlobalSearchProgress` 只剩 `ClearingHistory` 那条动作进行中的豁免）。
+     *
+     * 行数上界也要判：常量改了、骨架多铺一行，回填时就会顶偏滚动位置；
+     * 首行高度下限判的是「骨架不比真行矮」（F5-05 唯一判据是像不像，矮一行就不像）。
+     */
+    @Test
+    fun loadingDrawsResultShapedSkeletonWithoutCaptionOrSpinner() {
+        composeRule.setContent {
+            GlobalVocabularySearchScreen(
+                state = GlobalVocabularySearchUiState.Loading,
+                query = "ability",
+                onQueryChange = {},
+                onSubmit = {},
+                onRetry = {},
+                onClearHistory = {},
+                onOpenHistory = {},
+                onSelect = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("global_search_loading").assertExists()
+        composeRule.onNodeWithTag("global_search_row_skeleton_0").assertExists()
+        composeRule.onNodeWithTag("global_search_row_skeleton_${GLOBAL_SEARCH_PLACEHOLDER_ROWS - 1}").assertExists()
+        composeRule.onNodeWithTag("global_search_row_skeleton_$GLOBAL_SEARCH_PLACEHOLDER_ROWS").assertDoesNotExist()
+        // 进行中文案位留给真值：骨架不解释自己是什么，回填的「找到 N 个结果」才是那句话。
+        composeRule.onNodeWithText("正在查询本地词库", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("找到", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("global_search_row_skeleton_0").assertHeightIsAtLeast(96.dp)
     }
 
     private fun result(bookId: String, bookName: String, lemma: String, meaning: String, count: Int) =

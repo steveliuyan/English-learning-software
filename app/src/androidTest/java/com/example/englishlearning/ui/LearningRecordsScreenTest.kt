@@ -46,6 +46,34 @@ class LearningRecordsScreenTest {
         composeRule.onNodeWithText("全部单词").assertDoesNotExist()
     }
 
+    /**
+     * 批 C-3（Spec 05 F5-05 / 决策 2026-11-07 决定 3 第一类「等数据」）：读盘首帧从
+     * 「48dp 转圈 + 一句正在读取」换成与真行同形状的骨架。四个判据分别是：
+     * 锚还在（既有的 connected/JVM 判据都读它）、占位行真的逐行落地且不许多一行、
+     * 旧那句进行中文案离场、行框不矮于真行档 `WordRow` 的 48dp（否则回填时列表整体长高、滚动位置顶偏）。
+     *
+     * 行数读生产常量 `LEARNING_RECORDS_PLACEHOLDER_ROWS`，不在测试里另抄一个 6——与选词书屏
+     * `WordbookPickerHeaderTest` 同一口径（判据读真值，不靠巧合对齐）。
+     */
+    @Test
+    fun loadingRendersRowShapedSkeletonInsteadOfASpinner() {
+        composeRule.setContent {
+            LearningRecordsScreen(
+                state = LearningRecordsUiState(loading = setOf(LearningRecordsTab.TODAY)),
+                onBack = {},
+                onSelectTab = {},
+                onRetry = {},
+                onOpenRecord = {},
+            )
+        }
+        composeRule.onNodeWithTag("learning_records_loading").assertExists()
+        composeRule.onNodeWithTag("learning_records_row_skeleton_0").assertExists()
+        composeRule.onNodeWithTag("learning_records_row_skeleton_${LEARNING_RECORDS_PLACEHOLDER_ROWS - 1}").assertExists()
+        composeRule.onNodeWithTag("learning_records_row_skeleton_$LEARNING_RECORDS_PLACEHOLDER_ROWS").assertDoesNotExist()
+        composeRule.onNodeWithText("正在读取学习记录", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("learning_records_row_skeleton_0").assertHeightIsAtLeast(48.dp)
+    }
+
     @Test
     fun missingRecordIsVisibleButNotClickable() {
         val row = LearningRecord.missing("book:parent", CardFeedback.Fuzzy, Instant.EPOCH, LocalDate.of(2026, 9, 30), "plan-1")

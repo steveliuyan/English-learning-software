@@ -332,23 +332,32 @@ class PrimaryTabSkeletonContractTest {
 }
 
 /**
- * 批 C-2 之后的全仓转圈台账（8 个文件、9 处）。条目形状与 [violations] 的返回一致：
+ * 批 C 进行中的全仓转圈台账。条目形状与 [violations] 的返回一致：
  * 「文件名: 折叠空白后的源码行」。C-3（本地读盘子页）与 C-4（网络/AI 等待屏）逐屏收口时**只能删行**；
  * 想加一行必须先在该屏的分支判据里补骨架，否则本闸判红。
  *
  * 两枚 `BackupPairingExportScreen.kt` 是同一条折叠行的两次命中（配对页两态各一枚），
  * [violations] 刻意不做 distinct，台账因此按多重集比对而不是集合比对。
+ *
+ * 剩下的站点不是「还没排到」，而是**已判定不该换骨架**的那两类（决策 2026-11-07 决定 3 的三分类）：
+ * 「动作进行中」——接下来落地的是回执而不是这个形状的内容，画骨架等于预告一个不会以那个形状落地的东西，
+ * 所以保留活动指示 + 真话文案；「网络 / AI 等待」——归 C-4 的进行中语义。逐行理由写在行尾。
  */
 private val SPINNER_LEDGER = listOf(
+    // 动作进行中：配对码生成/等待扫码，接下来落的是配对回执，不是这一屏的形状。
     "BackupPairingExportScreen.kt: CircularProgressIndicator(color = settingsPalette.deep)",
     "BackupPairingExportScreen.kt: CircularProgressIndicator(color = settingsPalette.deep)",
+    // 动作进行中：恢复校验/写入，等待的是「成功或回滚」这两句回执。
     "BackupRestoreScreen.kt: CircularProgressIndicator(color = appDomain(AppDomain.Settings).deep)",
+    // 动作进行中：`GlobalSearchProgress` 一支两用（Loading 查本地词库 / ClearingHistory 清空历史）。
+    // 清空历史等的是回执，保留转圈；同屏 Loading 那一支属「等数据」，C-3 收它时把它拆出骨架，
+    // 这一行因此**留在台账里**——删行的判据是「这处转圈的调用面只剩动作进行中」。
     "GlobalVocabularySearchScreen.kt: CircularProgressIndicator(color = colors.text2)",
-    "LearningRecordsScreen.kt: CircularProgressIndicator(color = colors.brandDeep)",
-    "VocabularyRelearnScreen.kt: CircularProgressIndicator(color = appDomain(AppDomain.Learn).base)",
-    "WordBookWordsScreen.kt: CircularProgressIndicator(color = appDomain(AppDomain.AiSpeech).base)",
-    "WordCardScreen.kt: CircularProgressIndicator(",
+    // 动作进行中：`rendering` 生成 PDF 预览（判据是「正在生成 / 还没有页面」），等待的是页面图与落盘回执，
+    // 骨架预告不了「第 N 页长什么样」。
     "WorksheetPreviewScreen.kt: CircularProgressIndicator(color = colors.strongSurface)",
+    // C-3 已收三屏（生词复习 / 词书单词 / 词卡流，均为「等数据」→ 骨架），台账按「一条一屏」逐屏删行；
+    // 剩余的 `GlobalVocabularySearchScreen` / `Backup*` / `WorksheetPreview` 四行是**已判定不该换骨架**的豁免站点。
 )
 
 /**

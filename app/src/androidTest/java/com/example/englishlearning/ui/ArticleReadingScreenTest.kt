@@ -3,6 +3,7 @@ package com.example.englishlearning.ui
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.reading.domain.Article
@@ -577,5 +579,44 @@ class ArticleReadingScreenTest {
 
         composeRule.onNodeWithTag("article_english").performClick()
         org.junit.Assert.assertTrue(opened.isEmpty())
+    }
+
+    /**
+     * F5-05 / 批 C-3（分类 1「等本地库读盘」）：文章还没读出来时，页头之下要有**正文那一列的形状**。
+     *
+     * 旧形状是一句裸的 `Text("正在加载…")`：既没有形状（回填时标题、meta、模式行、整段正文一起从空白里长出来），
+     * 又把「在等什么」当成唯一信息给用户——这一屏等的只是本地 Room，不是网络。
+     * 现在首帧是 标题条 + meta 条 + 来源条 + 三枚模式块 + 6 条正文行（`SkeletonBar` 逐条镜像，
+     * 刻意不套 `SkeletonCard`：真版面没有卡壳，多一层壳就是「不像」）。
+     *
+     * 三条"不许出现"是同一枚约束的三面：Task 9 评审 I-2 要求空态不得组合出消息文字与播控行，
+     * 批 C-3 换骨架后照样成立（骨架零文案、零控件、零假数字——词数与版本号一条都不画）。
+     */
+    @Test
+    fun loadingDrawsArticleShapedSkeletonWithoutCaptionsOrSpeechControls() {
+        composeRule.setContent {
+            ArticleReadingScreen(
+                state = null,
+                onBack = {},
+                onOpenCard = {},
+                onModeChange = {},
+                onToggleTranslation = {},
+                onOpenDictionaryPlaceholder = {},
+                onOpenPronunciationPlaceholder = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("article_reading_loading").assertExists()
+        composeRule.onNodeWithText("正在加载", substring = true).assertDoesNotExist()
+        // 真内容的节点一个都不许提前组合：回填时它们是"落进形状里"，不是"挤开一个占位块"。
+        composeRule.onNodeWithTag("article_title").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_meta").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_english").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_translation").assertDoesNotExist()
+        // 空态早退那条硬约束（I-2）：消息文字与播控组不属于这一帧。
+        composeRule.onNodeWithTag("article_pronunciation_message").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_status_live_region").assertDoesNotExist()
+        // 骨架列要真的立起来：一屏正文的形状（标题 + meta + 模式行 + 6 行）不该低于 200dp。
+        composeRule.onNodeWithTag("article_reading_loading").assertHeightIsAtLeast(200.dp)
     }
 }

@@ -415,4 +415,26 @@ class WordCardScreenTest {
             assertTrue("$tag 在 fontScale=2.0 下被横向裁出卡片：节点=$bounds 屏幕根=$root", bounds.left >= root.left && bounds.right <= root.right)
         }
     }
+
+    /**
+     * F5-05 / 批 C-3（分类 1「等数据」）：词卡流首帧画的是**这一屏的两件真实形状**——
+     * 内容强卡（`SoftCard` contentPadding 18：词头 Display + 若干说明行）与底部三枚等宽动作按钮
+     * （`weight(1f)` + `spacedBy(10.dp)` + `heightIn(min = 54.dp)`），不再是 48dp 转圈加一句进行中文案。
+     *
+     * 「第 N / M 张」与进度条**刻意不镜像**：那两个是计数与进度，首帧一个都不该有（F1-01 假数字同源），
+     * 所以这里同时判「真内容的节点一个都不提前组合」——回填是落进形状里，不是挤开占位块。
+     * 尺寸阈值与上面那条大字号用例无关：骨架不含任何文字，字号缩放不改它的下限（`minHeight = 180.dp` 是形状自己给的）。
+     */
+    @Test
+    fun loadingDrawsCardAndThreeActionShapesWithoutCaptionsOrCounters() {
+        composeRule.setContent { WordCardScreen(state = WordCardUiState.Loading) }
+
+        composeRule.onNodeWithTag("word_card_loading").assertExists()
+        composeRule.onNodeWithText("正在", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("第", substring = true).assertDoesNotExist()
+        listOf("word_card_lemma", "word_card_ipa", "word_card_progress", "word_card_reveal").forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertDoesNotExist()
+        }
+        composeRule.onNodeWithTag("word_card_loading").assertHeightIsAtLeast(180.dp)
+    }
 }

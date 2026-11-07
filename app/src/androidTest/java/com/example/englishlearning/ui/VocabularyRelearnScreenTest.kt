@@ -97,4 +97,36 @@ class VocabularyRelearnScreenTest {
         composeRule.onNodeWithTag("relearn_done_back").performClick()
         assertEquals(1, backs)
     }
+
+    /**
+     * F5-05 / 批 C-3（分类 1「等数据」）：生词复习的首帧要有**这一屏的真实形状**。
+     *
+     * 旧形状是 48dp 转圈 + 一句进行中文案：回填时长出一张生词卡 + 底部三档评分条，是版面跳变。
+     * 现在镜像的是三件——计数行位置（不画数字，`第 N / M 个` 两个数首帧都不可能知道）、生词卡、吸底三档条。
+     * `Idle` 与 `Loading` 同用这一支：两者对用户的承诺相同（词表还没读出来，形状先给）。
+     *
+     * 两枚状态**各一个测试方法**：同一 Compose 测试里两次 `setContent` 真机必崩（QA 怪癖表既有条目），
+     * 所以不写循环。判据逐字相同，走同一个 [assertLoadingDrawsCardShapedSkeleton]。
+     */
+    @Test
+    fun loadingDrawsCardShapedSkeletonWithoutNumbers() {
+        assertLoadingDrawsCardShapedSkeleton(VocabularyRelearnUiState.Loading)
+    }
+
+    @Test
+    fun idleDrawsCardShapedSkeletonWithoutNumbers() {
+        assertLoadingDrawsCardShapedSkeleton(VocabularyRelearnUiState.Idle)
+    }
+
+    private fun assertLoadingDrawsCardShapedSkeleton(state: VocabularyRelearnUiState) {
+        composeRule.setContent {
+            VocabularyRelearnScreen(state = state, onSubmit = {}, onBack = {})
+        }
+
+        composeRule.onNodeWithTag("relearn_loading").assertExists()
+        composeRule.onNodeWithText("正在", substring = true).assertDoesNotExist()
+        // 假数字禁令（F1-01 同源）：计数与「本次完成 N 个」都不属于这一帧。
+        composeRule.onNodeWithText("第", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("relearn_feedback_bar").assertDoesNotExist()
+    }
 }

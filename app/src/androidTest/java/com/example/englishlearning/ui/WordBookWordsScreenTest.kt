@@ -633,6 +633,35 @@ class WordBookWordsScreenTest {
         )
     }
 
+    /**
+     * F5-05 / 批 C-3（分类 1「等数据」）：词书单词首帧要镜像**带壳卡行**那一族。
+     *
+     * 真实行是 `Card(surface + 1dp outlineSoft 描边)` 里套 `WordRow(padding 16/12)`、行缝 `spacedBy(10.dp)`，
+     * 所以骨架走族里的 `framed = true` 档（壳、内边距、缝由族给），并且 `leading = false`——
+     * `WordRow` 没有前导图标（词头在左列、状态词在右列），多画一枚圆点就是「形状不像」。
+     *
+     * 三件"不许出现"各判一件事：行尾上界判行数常量没被改大（多一行回填就顶偏滚动位置）、
+     * 进行中文案判骨架零文案、`wordbook_words_rail` 判「字母索引条是有数据才挂的导航件」
+     * （`!state.loading` 那一判，见屏内 Task 21 注释），骨架不许替它预告一排芯片。
+     */
+    @Test
+    fun loadingDrawsFramedCardRowsWithoutRailCaptionOrSpinner() {
+        composeRule.setContent {
+            WordBookWordsScreen(
+                state = WordBookWordsUiState(loading = true),
+                onBack = {}, onFilter = {}, onRetry = {}, onOpenWord = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("wordbook_words_loading").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_skeleton_0").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_skeleton_${WORD_BOOK_WORDS_PLACEHOLDER_ROWS - 1}").assertExists()
+        composeRule.onNodeWithTag("wordbook_words_row_skeleton_$WORD_BOOK_WORDS_PLACEHOLDER_ROWS").assertDoesNotExist()
+        composeRule.onNodeWithText("正在读取词书单词", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("wordbook_words_rail").assertDoesNotExist()
+        composeRule.onNodeWithTag("wordbook_words_row_skeleton_0").assertHeightIsAtLeast(48.dp)
+    }
+
     /** F1 夹具：禁用行——`card == null` 且 `canOpenDetail == false`（与释义槽按构造互斥的前提见 JVM 锚）。 */
     private fun disabledWord(cardId: String, lemma: String): WordBookRecord =
         WordBookRecord(
