@@ -71,6 +71,46 @@ grep -c "" app/src/main/java/com/example/englishlearning/ui/AiLearningScreen.kt 
 grep -n "delay(1200)\|provideDatabase" app/src/main/java/com/example/englishlearning/launch/BrandLaunchActivity.kt app/src/main/java/com/example/englishlearning/di/AppModule.kt
 ```
 
+### 2.6 C-4 开工实测：五处等待臂里有四处只是一句裸文案，第五处连文案都没有
+
+判据是逐屏读源码得到的，不是从 §2.3 那份清单推的（那份数的是转圈，这五处**一处转圈都没有**）。
+重算命令与结果同段给出。
+
+- **四处裸文案**（形状 = 一行 `Text`，无活动指示、无取消、无「在请求谁」）：
+  `WordAiQaScreen.kt:120` `Asking -> Text("正在询问…")`、`SentenceAnalysisScreen.kt:137` `Analyzing -> Text("正在分析…")`、
+  `ImageStudioScreen.kt:152` `DraftingPrompt -> Text("正在生成画面描述…")`、`ImageStudioScreen.kt:190` `GeneratingImage -> Text("正在生成图片…")`、
+  `ReadingAccessScreen.kt:362` `Generating -> Text("正在生成…")`——五枚臂、四枚屏（生图两臂），文案各写各的，
+  「正在生成…」那种甚至说不出在生成什么。
+- **第五处连文案都没有**：`PhotoTranslationScreen` 的 AI 翻译阶段在 UI 上**不可见**。
+  屏侧唯一的等待位是 `if (state.busy) Text("正在本机识别…")`，而 `busy` 只在采集/识别路径被写 `true`
+  （`PhotoTranslationViewModel.kt:97`，写 `false` 的四处在 `:124/:134/:142/:151`），`runTranslation` 从不碰它。
+  于是点「翻译」之后：界面没有任何回执，而 `photo_translation_translate_button` 的 `enabled = !state.busy && …`
+  仍为真——再点一次会走进 `runTranslation` 的第一行 `translateJob?.cancel()`，**把在飞的那次换掉重发**。
+- **等待中的任务无人持有**：`WordAiQaViewModel` / `SentenceAnalysisViewModel` / `ImageStudioViewModel` /
+  `ReadingAccessViewModel` 四个 VM 里 `viewModelScope.launch` 共 15 处、`private var *Job` **0 处**
+  （只有 `PhotoTranslationViewModel` 持 `captureJob / translateJob / modelJob / historyJob`）。
+  没有 Job 句柄 = 取消无处可发：这一批要的「可取消」不是改文案能改出来的，必须先把在飞的那次攥在手里。
+- **文章生成会双份出站**：`ReadingAccessViewModel.kt:249` `runGeneration` 每次 `launch` 一个**新**协程、
+  不 cancel 旧句柄（因为它没有句柄），而 `ReadingAccessScreen.kt:343` 的 `PrimaryCtaButton("生成今天的文章"…)`
+  压根没有 `enabled` 形参（该私有组件 `:497` 的签名里就没有这一档）。等待期间按钮可点、每次点都真发一次
+  AI 文章请求——按 `docs/specs/02` 的计费口径这是重复付费，不是刷新。
+- **超时这一条不用新造**：`AiRequestPolicy` 把 profile 的 `timeout_seconds`（5–120）交给传输层，
+  超时落 `AiHttpResult.TimedOut → AiFailure.Timeout → AiFailureUiText.Timeout("等待超时，稍后再试。")`。
+  所以 C-4 的进行中面**不许**再自己声明一个倒计时或预估时长（那会是第二个时长权威，且必然是假承诺）。
+- **「取消即零出站」这句既有规格的确切射程**（`docs/specs/02` AC2-11）：它管的是**未确认时不发送**与探活
+  「退出编辑页取消在飞请求」，不是「取消能把已发出的字节收回」。因此进行中文案里的取消只许陈述
+  「不再等待这次结果」，不许陈述「不会发送」——后者对已出站的请求是假话。
+
+```bash
+# §2.6 五处等待臂现状（期望 5 行，全为 Text）
+grep -nE "WordAiQaUiState\.Asking ->|SentenceAnalysisUiState\.Analyzing ->|ImageStudioUiState\.(DraftingPrompt|GeneratingImage) ->|GenerationUiState\.Generating ->" \
+  app/src/main/java/com/example/englishlearning/ui/{WordAiQaScreen,SentenceAnalysisScreen,ImageStudioScreen,ReadingAccessScreen}.kt
+# 四个 VM 零 Job 句柄（期望 0）
+grep -rn "private var .*Job" app/src/main/java/com/example/englishlearning/ui/{WordAiQa,SentenceAnalysis,ImageStudio,ReadingAccess}ViewModel.kt
+# 拍照翻译的 busy 只由识别路径写（写 true 恰 1 处）
+grep -n "busy = true" app/src/main/java/com/example/englishlearning/ui/PhotoTranslationViewModel.kt
+```
+
 ## 3. 决定
 
 ### 决定 1：全站骨架收口成一族，落在 `ui/components/Skeleton.kt`，旧私有骨架迁入且锚不动
@@ -134,6 +174,33 @@ grep -n "delay(1200)\|provideDatabase" app/src/main/java/com/example/englishlear
 - C-4 网络 / AI 等待屏（文章生成、AI 问答、拍照翻译、生图、句法分析）：**不许长得像已有结果**。这一类的等待语义与骨架不同——骨架承诺「马上出现的是这个形状的内容」，而 AI 生成失败率高、时长不可知，画骨架会变成「假内容」，与 `2026-11-06-placeholder-text-is-not-learning-content` 同源。所以 C-4 的交付是**进行中语义**：明确「正在向 AI 请求今日文章（可取消）」+ 不定量的活动指示 + 取消入口，绝不画成「已有 N 条」的假快照，也绝不预生成占位文本。
 - C-1 是这些的基建与契约闸；C-5 是真预取；C-6 是门禁 + 截图册 + connected + 报告。
 
+#### C-4 交付口径（2026-11-07 开工实测后补写；实测见 §2.6）
+
+1. **进行中语义只有一处落点**：新增 `ui/components/RequestInProgress.kt`，四件东西一次给齐——
+   不定量活动指示 + 「正在向谁请求什么」这句 message（由调用方给，因为请求对象每屏不同）+
+   **必须显式传入的 `onCancel`（不留默认空实现：默认空 = 画一枚按了没反应的取消键，那正是本批要消灭的假象）** +
+   一句全仓唯一的取消陈述「取消只是不再等待这次结果，请求可能已经发出」。
+   那句为什么收在组件里而不是五屏各写：同一条 `SentenceAnalysisScreen` 的 U-1 注释已经给过教训——
+   「四份私写就是这种漏字的来历」，五份「取消后不会发送」必然有一份写成假话。
+2. **取消必须是真取消**：五个 VM 各持在飞 Job（`WordAiQa.askJob` / `SentenceAnalysis.analysisJob` /
+   `ImageStudio.promptJob`+`imageJob` / `ReadingAccess.generationJob` / `PhotoTranslation.translateJob` 已有），
+   `cancel…()` 做三件事：`job?.cancel()` → 句柄置空 → 状态回 `Idle`（阅读屏回 `Ready` 且 `generation = Idle`，
+   不能把已读到的今日文章一起清掉）。回 `Idle` 而不是新增 `Cancelled` 态：用户主动取消不是失败，
+   `docs/specs/02:30` 那条「取消」列的是**请求结果**分类，屏侧把它落成失败卡反而是在吓唬人；
+   `ReadingAccessViewModel` 现有的 `catch (CancellationException) → Idle` 注释已经是这个口径。
+3. **等待期间不许长出第二次出站**：这一条是本批唯一的**缺陷修复**，不是美化。
+   `runGeneration` 先 `generationJob?.cancel()` 再 launch（与 `runTranslation` 既有写法对齐），
+   同时 `PrimaryCtaButton` 补 `enabled` 形参、`Generating` 时禁用；
+   拍照翻译补 `state.translating`，让翻译在飞时既有可见的进行中面、又不再让按钮把请求换掉重发。
+4. **不画骨架、不画进度百分比、不画预估时长**：骨架承诺形状（本批五处承诺不了：落地的是整屏替换或回执）；
+   进度条承诺已知总量（`ProgressRing` / `LinearProgressIndicator(progress=…)` 都是确定性档，禁用于此类）；
+   时长已有唯一权威在 `AiRequestPolicy.timeoutSeconds`，进行中文案再写一个数就是第二权威。
+5. **台账口径随之内改一处**（`PrimaryTabSkeletonContractTest.SPINNER_LEDGER`）：活动指示收进组件后，
+   `ui/components/RequestInProgress.kt` 会成为台账里**新增的一行**。台账的规则从「只能变短」改成
+   「**屏侧只减；组件层这一枚是 C-4 进行中族的唯一落点，计数必须恰为 1**」，并新增一条闸：
+   五枚等待臂内不得自己出现 `CircularProgressIndicator(`——绕过组件正是要防的那件事。
+   这不是放宽：改动前全仓 5 行台账 + 0 处进行中族，改动后 5 行 + 1 行且那 1 行只许有一枚。
+
 ### 决定 4：真预取只做两件本地的事，且必须复用既有装载点与既有形状
 
 1. **闪屏窗口预热本地盘**：新增 `core/storage/StartupLocalDataWarmer`（形状照抄 `StartupPronunciationWarmer`：`suspend fun warm()`、`runCatching`、失败静默、返回值只给日志用不上 UI），由 `EnglishLearningApplication` 用现成的 `warmUpScope` 在 `onCreate` 启动。它做的事只有一件：请求 `AppDatabase` 单例，从而把 `DatabaseStartup.open(context)`（建库 + 迁移）从「闪屏之后」挪进那 1.2 秒。**不得**在此处读取学习数据并塞进任何 VM 状态（那会造出第二套数据权威），也不得预跑备份/导出等重 IO。
@@ -146,7 +213,20 @@ grep -n "delay(1200)\|provideDatabase" app/src/main/java/com/example/englishlear
 - 骨架族唯一性：`ui/components/Skeleton.kt` 之外不得再出现 `SkeletonRow(`/`SkeletonBar(` 定义；`AppScreen` 里 `wordbook_row_skeleton_` 仍恰好 1 处、`WORD_BOOK_PLACEHOLDER_ROWS` 仍被读（改造既有 `LearningSetupLayoutContractTest`，不得先放宽）。
 - shimmer 定格结构：光带渐变的**首末相位同值**（静息），即「相位=1 时的 alpha/偏移 == 相位=0」这一条要能被纯函数测出——把渐变 stops 的计算抽成可测函数，不依赖动画时钟。
 - 禁裸 hex / 禁时长换算入口：`ShimmerSpecContractTest` 扫生产骨架与 shimmer 源文件，`Color(0x`、`Color(` 十六进制字面量、`animatorDurationScale`、`durationMs` 出现次数为 0。
-- 等待屏分类：AI/网络等待屏必须含「进行中」语义锚（可取消 + 说明在请求谁），且不得出现「已生成/已有 N 篇」字样的占位；本地读盘屏不得留裸转圈（调用点计数只减不增，改判据前先跑 §2.5 重算）。
+- 等待屏分类（C-3 半条已在批 C-3 落地，C-4 半条本批落地）：
+  - **本地读盘屏不得留裸转圈**（调用点计数只减不增，改判据前先跑 §2.5 重算）；
+  - **AI/网络等待臂**（`WordAiQaScreen.Asking` / `SentenceAnalysisScreen.Analyzing` / `ImageStudioScreen.DraftingPrompt`
+    与 `GeneratingImage` / `ReadingAccessScreen.Generating` / `PhotoTranslationScreen` 翻译在飞）五屏六臂必须调用
+    `RequestInProgress(` 且**显式给 `onCancel`**，臂内不得出现 `Skeleton`/`CircularProgressIndicator(`/`ProgressRing(`/
+    百分比；不得出现「已生成 N 篇 / 已有 N 条」字样的占位（`2026-11-06` 占位诚实化同源）；
+  - **取消族唯一落点**：`ui/components/RequestInProgress.kt` 内 `CircularProgressIndicator(` 恰 1 处，
+    除此之外全仓 `ui/` 的转圈站点必须与台账逐行相等（台账新增那一行是本批预先声明的，不是漂移）；
+  - **宿主真的接线**：`AppScreen.kt` 里五枚取消各自指向对应 VM 的 `cancel…()`，缺一即红
+    （屏侧给了默认空实现也算红——见上第 1 条）；
+  - **取消不是失败**：VM 单测钉「取消后回 `Idle`、迟到的响应不回写、取消之后不再有第二次出站」，
+    用挂起的假 transport 量，不用文案断言替代。
+  只能靠设备量的那半条：进行中面的观感与读屏顺序归 §4 末的截图册；「真的停了」在 connected 侧只能验
+  「取消后节点消失 + 回调恰好转发一次」，字节层面的停止归 JVM 假传输。
 - 预取零出站：`StartupLocalDataWarmer` 只做开库，单测用假 provider 断言它不触网；tab 预读清单与既有装载点逐条对账（新增出站装载点即红）。
 
 只能靠设备/截图、**不假装单测覆盖**的：
@@ -157,5 +237,7 @@ grep -n "delay(1200)\|provideDatabase" app/src/main/java/com/example/englishlear
 ## 5. 影响
 
 - 正面：全站第一帧不再是空白或转圈；关闭系统动画的用户看到设计内静态骨架；`scale=0` 不需要应用侧降级分支；选词书一屏的两枚既有闸保持绿；`ListSkeleton` 死代码与其假文档一并清掉。
+- 正面（C-4）：五处 AI 等待从「一行裸文案（或干脆没有文案）」变成说清请求对象 + 活动指示 + 可取消的一件组件；文章生成的重复点击不再产生第二次真实计费出站；拍照翻译的翻译阶段第一次变得可见；取消语义那句全仓只有一份，不会再在五屏里各写各的（其中一份必然写成「取消后不会发送」那种假话）。
 - 成本与风险：骨架是**新增 UI 面**，每铺一屏就多一处要维护的形状（真卡改版时骨架要跟）；契约测试按本仓惯例是「剥注释数锚点」的字符串闸，源码重构时容易假红，缓解是每条锚附一句「为什么是这条锚」的 KDoc（沿用批 B 的做法）。预取动的是启动路径，风险是开库提前带来的启动竞争（与 Kokoro 预热同时在 `Dispatchers.Default`），处置是**先只做开库**、其余按 C-6 的耗时读数决定要不要收缩。
+- 成本与风险（C-4）：台账那一句规则被改了一次口径（屏侧只减 + 组件层恰一枚），这是本批**唯一一次放宽式改动**，收紧它的是新增的「臂内不许自己画指示器」那条闸；两者都要在 `SPINNER_LEDGER` 的头注释里同处更新，否则下一任只看到台账变长一行会当成漂移。VM 侧新增 Job 句柄的第二处风险是取消与出站确认台账的相互作用：域名授权是在「点确认」那一刻记的（`WordAiQaViewModel:183` / `SentenceAnalysisViewModel:74` 同口径），取消在飞请求**不回收**那笔授权——这与「取消不是失败」一致，但必须在 VM 用例里显式钉住，不然将来有人会为了「取消后重新问一次」把授权撤销掉。
 - 明确不做：不引入任何新的网络/AI 出站；不做「预生成今日文章」；不做骨架的逐像素版式复刻（承诺横向起点对齐，纵向不承诺——沿用 `Skeleton.kt` 既有取舍）；不给骨架加文案或假数字；不在 AI 等待屏画假内容。

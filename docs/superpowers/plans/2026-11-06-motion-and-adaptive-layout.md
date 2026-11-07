@@ -37,6 +37,12 @@
   分类与逐条豁免理由见决策册决定 3 第 2 类与 `docs/specs/05` F5-05 新增那条；`GlobalVocabularySearchScreen` 只换 `Loading` 那一支，`ClearingHistory` 保留指示。
   转圈台账因此 9 行 → 5 行（剩四文件五处全部为豁免站点）。
 - C-4 网络/AI 等待屏：文章生成、AI 问答、拍照翻译、生图、句法分析改成进行中语义（说清在请求谁 + 可取消 + 超时），禁止假结果骨架与占位内容。
+  开工实测把「超时」那一件改判：`timeout_seconds` 早已在 `AiRequestPolicy` → `AiFailure.Timeout` 有唯一映射与真话文案，
+  等待面再写一个数就是第二时长权威，所以本条的「超时」= **不自立时长口径**，而不是加倒计时。
+  实测另发现两处不是美化的缺陷（`docs/decisions/2026-11-07-loading-skeleton-shimmer-prefetch.md` §2.6）：
+  拍照翻译的 AI 翻译阶段在 UI 上完全不可见（`busy` 只由识别路径写），而按钮照旧可点、再点即 `translateJob?.cancel()` 重发；
+  文章生成的 CTA 在 `Generating` 时不禁用且 `runGeneration` 不持旧句柄 = **一次点击一次真实计费的两份请求**。
+  四 VM 零 Job 句柄（只有拍照翻译持 Job），所以「可取消」必须先在 VM 层把在飞的那次攥住，屏侧才有东西可取消。
 - C-5 真预取：`StartupLocalDataWarmer`（形状照抄 `StartupPronunciationWarmer`，只做开库，把 `DatabaseStartup.open` 挪进闪屏那 1.2 秒）+ tab 预读只补本地装载点；零出站探针与装载点对账是硬判据。
 - C-6 收口：三连门禁 + 双形态 connected + `scale=0` / `scale=1` 截图册 + 首帧耗时读数 + 按 `REPORT-TEMPLATE` 报告 + 分功能域提交、推送请示。
 
