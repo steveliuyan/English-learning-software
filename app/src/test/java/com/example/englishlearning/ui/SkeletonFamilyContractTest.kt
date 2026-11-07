@@ -149,11 +149,13 @@ class SkeletonFamilyContractTest {
             "时长换算入口未被命中（批 A 已删、本批不得接回）：${found.joinToString()}",
         )
         // 合成双边之二：合规形状必须放行，注释里的字面量不得算 offender。
+        // 合规那一边按批 C-7 的口径写（墨走 `SkeletonInk.fill`）：本文件钉的是「屏侧不许自己画骨架」，
+        // 举例若还停留在 `outlineSoft.copy(alpha = 0.22f)`，读的人会以为那是当前合规写法。
         val compliant = """
             // 反例存档：绝不在骨架里写 Color(0xFFEDEDED) 或 AppMotion.durationMs(...)，也绝不写 Text。
             @Composable
             fun SkeletonRow(row: Int, shape: Shape) {
-                Box(Modifier.background(appColors().outlineSoft.copy(alpha = 0.22f), shape))
+                Box(Modifier.background(SkeletonInk.fill(appColors()), shape))
             }
         """.trimIndent()
         assertTrue(

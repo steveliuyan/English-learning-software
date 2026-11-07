@@ -37,7 +37,7 @@ class ShimmerSpecContractTest {
         val stripped = stripComments(source)
         val found = mutableListOf<String>()
         rawColorLiteral.findAll(stripped).forEach {
-            found += "$fileName: 裸 hex ${it.value}——光带取色只许走 appColors() 族（tint / outlineSoft）"
+            found += "$fileName: 裸 hex ${it.value}——光带取色与混合模式只许走 SkeletonInk（band / bandBlend），色档不许写在用法点"
         }
         listOf("durationMs", "animatorDurationScale").forEach { helper ->
             val hits = stripped.lines().count { it.contains(helper) }
@@ -79,13 +79,28 @@ class ShimmerSpecContractTest {
 
     @Test
     fun `production shimmer and skeleton sources carry no offenders today`() {
-        listOf("Shimmer.kt", "Skeleton.kt").forEach { name ->
+        productionSkeletonSources.forEach { name ->
             assertTrue(offenders(name, uiComponentSource(name)).isEmpty(), "$name 有 shimmer 规格违例")
         }
         // 覆盖面锚点：光带真正被骨架用上才算铺面，只有规格文件等于没接。
         assertTrue(
             countMatches(uiComponentSource("Skeleton.kt"), Regex("""skeletonShimmer\(""")) >= 1,
             "Skeleton.kt 里没有任何 `skeletonShimmer(` 调用：规格齐了但骨架没接上微光，等于批 C-1 只做了一半。",
+        )
+    }
+
+    /**
+     * 批 C-7 把色档与混合模式收进了 `SkeletonInk.kt` 这一枚**新生产文件**。禁令族必须跟着把扫面扩到它，
+     * 否则「色档不许写在用法点」会变成一句空话：唯一落点恰好落在扫描名单之外，
+     * 谁都能在里头补一枚 `Color(0xFF…) ` 或一次 `if (isDark)` 分支而没有任何判据变红。
+     * 这一条判据自己也是防漂移的：把文件名从名单里摘掉就红。
+     */
+    @Test
+    fun `the colour tier file is inside the offender scan`() {
+        assertTrue(
+            "SkeletonInk.kt" in productionSkeletonSources,
+            "色档唯一落点 `SkeletonInk.kt` 不在禁令族的扫描名单里（现名单：$productionSkeletonSources）——" +
+                "批 C-7 把取色收拢过去，扫面却没跟过去，等于把色档挪到了判据管不到的地方。",
         )
     }
 
@@ -188,4 +203,10 @@ class ShimmerSpecContractTest {
             )
         }
     }
+
+    /**
+     * 禁令族的扫面对象。`SkeletonInk.kt` 是批 C-7 才出现的色档唯一落点，
+     * 名单与 `the colour tier file is inside the offender scan` 一起构成「新文件必须进扫面」这条闸。
+     */
+    private val productionSkeletonSources = listOf("Shimmer.kt", "Skeleton.kt", "SkeletonInk.kt")
 }
