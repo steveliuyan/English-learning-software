@@ -51,8 +51,18 @@ object ShimmerSpec {
     /** 出画余量：首末相位让**整条带**（含两端渐隐）都在画面外，定格才不留一条亮边。 */
     const val offscreenMargin: Float = 0.06f
 
-    /** 峰值不透明度：光泽是修饰，压得比骨架本体（`outlineSoft` 0.22f）还亮就成了主角。 */
-    const val peakAlpha: Float = 0.16f
+    /**
+     * 峰值不透明度：**0.6f**（批 C-7 与「光带比骨架条亮 ≥16 级」这条判据一起定的）。
+     *
+     * 0.16f 是批 C-1 的取舍，当时的前提是「骨架本体是 `outlineSoft@0.22`，光泽压过它就成主角」——
+     * 前提已经变了：骨架条现在是 `outline` 满值，而光带走 `SkeletonInk.bandBlend` 的 **Screen 提亮**，
+     * 它的作用对象是那条灰绿条而不是整张页。逐通道算下来 0.16f 只能抬 5–6 级（实机取样测到 ≤3 级，读不出来），
+     * 0.6f 实机密拍峰值浅档抬 18–19 级、深档 19–20 级，与卡壳档同强。0.55f 也过线（算式 17/18 级），留作目视嫌抢眼时的回落档。
+     * 区间而不是定值：单帧抬升量取决于截屏落在周期哪一格（本函数就是正弦半波 × 峰值），短促采样欠峰，
+     * 口径见 `SkeletonInk.band` 的说明与 `docs/verification/ui-redesign-2026-10.md` §批 C-7。
+     * 判据落点：`SkeletonVisibilityContrastTest.band lifts the bar instead of painting it darker in both themes`。
+     */
+    const val peakAlpha: Float = 0.6f
 
     /**
      * 相位 [0,1] → 光带中心相对节点宽度的位置。
@@ -83,7 +93,9 @@ object ShimmerSpec {
  *    也**不许**在这里读 `animator_duration_scale` 或做任何时长换算（批 A R1）。
  *  - 只画在 `drawBehind` 里：光带是绘制层的修饰，不新增内容节点，因此不新增任何会被 TalkBack
  *    念出来的东西，也不参与布局。
- *  - 取色只走 `appColors().tint`，禁裸 hex；深浅两档同一份算式，不需要按主题分支。
+ *  - 取色与混合模式只走 [SkeletonInk]（band 取色 + bandBlend 提亮），禁裸 hex、禁在使用点自己挑色；
+ *    深浅两档同一份算式，不需要按主题分支（「比骨架条亮」这件事由 Screen 保证，而不是由某一枚更亮的 token 保证——
+ *    两套 palette 里并不存在那样的中性 token）。
  *
  * 调用方负责裁剪（骨架色块应 `.clip(shape)` 后再上微光），本扩展自己不做 clipping——
  * 圆角档由被画对象决定，写死在这里就没法跟着真卡的形状走。
@@ -106,7 +118,7 @@ fun Modifier.skeletonShimmer(): Modifier {
         ),
         label = "skeletonShimmerPhase",
     )
-    val highlight = appColors().tint
+    val highlight = SkeletonInk.band(appColors())
     return drawBehind {
         val alpha = ShimmerSpec.alphaAt(phase)
         if (alpha <= 0f) return@drawBehind
@@ -118,6 +130,7 @@ fun Modifier.skeletonShimmer(): Modifier {
                 start = Offset(center - halfBand, 0f),
                 end = Offset(center + halfBand, size.height),
             ),
+            blendMode = SkeletonInk.bandBlend,
         )
     }
 }

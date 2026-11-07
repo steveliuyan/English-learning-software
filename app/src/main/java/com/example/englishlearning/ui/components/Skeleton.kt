@@ -70,7 +70,7 @@ fun SkeletonBar(
             .fillMaxWidth(fraction)
             .height(height)
             .clip(shape)
-            .background(appColors().outlineSoft.copy(alpha = 0.22f), shape)
+            .background(SkeletonInk.fill(appColors()), shape)
             .skeletonShimmer(),
     )
 }
@@ -116,7 +116,7 @@ fun SkeletonRow(
                 modifier = Modifier
                     .size(markSize)
                     .clip(CircleShape)
-                    .background(colors.outlineSoft.copy(alpha = 0.30f), CircleShape)
+                    .background(SkeletonInk.fill(colors), CircleShape)
                     .skeletonShimmer(),
             )
         }
