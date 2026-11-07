@@ -139,8 +139,12 @@ fs100 唯一一条 `Apps list 47x16px` 是系统抽屉，不是应用控件。
     + `docs/handoff/2026-11-08-qa-round3-report.md`（新，本文件）
 - **生产码零改动**：`git status --porcelain app/src/main` 为空；变异探针的两处 Edit 已逐条反向撤销并核验。
 - 证据一律在忽略区 `.git/qa-scratch/qa3/`（105 PNG + dump + 27 份日志 + 走查脚本），不入库。
-- 推送：本轮两枚提交后本地领先远端 2 枚（重算：`git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD`），
-  **待用户点头再推**（沿用逐批请示口径）。
+- 推送：用户点头后已推 `origin/stage-5-ui-r2-learning-path`（`7dde8b1..2626bc3`，走全局代理
+  `http://127.0.0.1:3067` + `-c credential.interactive=false`，`push_exit=0`）。
+  **异地备份已核验**：`git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path`
+  = `2626bc3c8f368f1464b2e11644829bee6f70183c` = `git rev-parse HEAD`，`ahead` 归零。
+  本文件这枚「§4 补记推送核验值」是收口后的第三枚 docs 提交（沿批 C-7 同款做法），
+  其自身哈希以 `git log --oneline -1` 现算为准。
 
 ## 5. 未完成 / 遗留问题（对任务书逐条应答）
 
@@ -238,3 +242,5 @@ fs100 唯一一条 `Apps list 47x16px` 是系统抽屉，不是应用控件。
 3. 沿用既有口径：分支不合 `main`；推送逐批请示；真机只手工试用（里程碑 `adb install -r`），
    instrumented 只在模拟器；证据与截图不入库；破坏性 git/设备动作先取得确认；
    变异探针撤销禁用 `git checkout --`（会抹掉在途未提交改动）。
+4. 本轮提交推送：用户选项「现在推这 2 枚（推荐）」（2026-11-08），据此推 `3b02445` + `2626bc3`
+   并补记本条核验值；未获点头前不合 `main`。
