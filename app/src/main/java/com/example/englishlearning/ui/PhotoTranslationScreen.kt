@@ -68,6 +68,7 @@ import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
+import com.example.englishlearning.ui.components.RequestInProgress
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
@@ -111,6 +112,11 @@ fun PhotoTranslationScreen(
     onOcrTextEdited: (String) -> Unit,
     onTranslate: () -> Unit,
     onConfirmOutbound: (Boolean) -> Unit,
+    /**
+     * 取消正在等待的翻译（批 C-4）。显式接线、不给默认空实现：默认 `{}` 等于允许宿主漏接而
+     * 界面照旧画出一枚按了没反应的取消键。取消只收回等待，识别出的文本留在编辑框里可改可重试。
+     */
+    onCancelTranslate: () -> Unit,
     onRefreshModelStatus: () -> Unit,
     onInstallModel: () -> Unit,
     onUninstallModel: () -> Unit,
@@ -313,7 +319,8 @@ fun PhotoTranslationScreen(
                 onClick = onTranslate,
                 modifier = Modifier.fillMaxWidth(),
                 style = PillStyle.Primary,
-                enabled = !state.busy && state.ocrText.isNotBlank(),
+                // translating 也在闸内：翻译在飞时再点一次不是「再要一次翻译」，是重发一次付费出站。
+                enabled = !state.busy && !state.translating && state.ocrText.isNotBlank(),
                 testTag = "photo_translation_translate_button",
                 contentDescription = "翻译文本",
             )
@@ -322,6 +329,17 @@ fun PhotoTranslationScreen(
                 style = AppType.Footnote,
                 color = colors.text2,
                 modifier = Modifier.testTag("photo_translation_cost_hint"),
+            )
+        }
+
+        // 批 C-4：翻译在飞时的进行中面。旧形状这里什么都没有——`busy` 只由识别路径写，
+        // 于是按钮照旧可点、界面零回执，再点一次就是掐掉上一发重付一次。
+        if (state.translating) {
+            RequestInProgress(
+                message = "正在向你配置的 AI 服务翻译这段文字",
+                onCancel = onCancelTranslate,
+                statusTestTag = "photo_translation_translating",
+                cancelTestTag = "photo_translation_cancel_translate",
             )
         }
 

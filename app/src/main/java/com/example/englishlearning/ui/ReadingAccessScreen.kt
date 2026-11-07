@@ -43,6 +43,7 @@ import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
 import com.example.englishlearning.ui.components.QuietCard
+import com.example.englishlearning.ui.components.RequestInProgress
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SkeletonCard
 import com.example.englishlearning.ui.components.SkeletonList
@@ -144,6 +145,11 @@ fun ReadingAccessScreen(
     onRegenerate: () -> Unit = {},
     onOpenTodayArticle: () -> Unit = {},
     onConfirmOutbound: (Boolean) -> Unit = {},
+    /**
+     * 取消正在等待的生成（批 C-4）。显式接线、不给默认空实现：默认 `{}` 等于允许宿主漏接而
+     * 界面照旧画出一枚按了没反应的取消键——那正是本批要消灭的假象（判据 `AiWaitInProgressContractTest`）。
+     */
+    onCancelGeneration: () -> Unit,
     onOpenAiSettings: () -> Unit = {},
     onOpenImport: () -> Unit = {},
     onOpenFeed: () -> Unit = {},
@@ -204,6 +210,8 @@ fun ReadingAccessScreen(
                         onClick = { regenerateConfirm = true },
                         style = PillStyle.Text,
                         domain = AppDomain.Reading,
+                        // 生成在飞时「换一篇」同样要禁用——它点下去就是第二次付费出站（批 C-4 第二道防线在 VM）。
+                        enabled = state.generation != GenerationUiState.Generating,
                         testTag = "reading_regenerate",
                     )
                 }
@@ -253,6 +261,7 @@ fun ReadingAccessScreen(
                 onGenerate = onGenerate,
                 onOpenTodayArticle = onOpenTodayArticle,
                 onConfirmOutbound = onConfirmOutbound,
+                onCancelGeneration = onCancelGeneration,
                 onOpenAiSettings = onOpenAiSettings,
                 onOpenImport = onOpenImport,
                 onOpenFeed = onOpenFeed,
@@ -285,11 +294,16 @@ private fun ReadyContent(
     onGenerate: () -> Unit,
     onOpenTodayArticle: () -> Unit,
     onConfirmOutbound: (Boolean) -> Unit,
+    onCancelGeneration: () -> Unit,
     onOpenAiSettings: () -> Unit,
     onOpenImport: () -> Unit,
     onOpenFeed: () -> Unit,
 ) {
     val colors = appColors()
+    // 生成在飞时两枚「再要一篇」的入口（无当篇时的生成 CTA、页头「换一篇」）都要禁用：
+    // 屏侧禁用是第一道防线，VM 侧「旧的先取消、只许一发在飞」是第二道（批 C-4）。
+    val generating = state.generation == GenerationUiState.Generating
+
     // —— 主任务区（裁决⑤ 第一件 + §3.4）：紧跟页头，第一屏不滚动即可点。
     // 主 CTA 恰一枚：无当日文章时这一格是「生成今天的文章」，已有当日文章时同一位置换成「阅读今天的文章」。
     // 「换一篇」已搬进页头 action，`reading_source_ai` 与 `reading_regenerate` 因此永不并列。
@@ -340,7 +354,7 @@ private fun ReadyContent(
         }
     } else {
         Text("今天还没有生成文章", style = AppType.Title, color = colors.text1)
-        PrimaryCtaButton("生成今天的文章", "reading_source_ai", "用 AI 生成今天的文章", onGenerate)
+        PrimaryCtaButton("生成今天的文章", "reading_source_ai", "用 AI 生成今天的文章", onGenerate, enabled = !generating)
     }
     Text(
         "每次生成都会真实调用你配置的 AI 服务并可能产生费用",
@@ -359,11 +373,11 @@ private fun ReadyContent(
     )
 
     when (val generation = state.generation) {
-        GenerationUiState.Generating -> Text(
-            "正在生成…",
-            style = AppType.Footnote,
-            color = colors.text2,
-            modifier = Modifier.testTag("generation_status"),
+        GenerationUiState.Generating -> RequestInProgress(
+            message = "正在向你配置的 AI 服务生成今天的文章",
+            onCancel = onCancelGeneration,
+            statusTestTag = "generation_status",
+            cancelTestTag = "generation_cancel",
         )
         GenerationUiState.StorageFailed -> Box(Modifier.testTag("generation_storage_failed")) {
             // Task 26 Step 3：错误行收口到共享 `InlineNotice`；标签留在外层（组件的 `inline_notice_error`
@@ -494,13 +508,20 @@ private fun ReadyContent(
  * 也能在源码里按站点数点出来。
  */
 @Composable
-private fun PrimaryCtaButton(title: String, tag: String, description: String, onClick: () -> Unit) {
+private fun PrimaryCtaButton(
+    title: String,
+    tag: String,
+    description: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
     PillButton(
         text = title,
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         style = PillStyle.Primary,
         domain = AppDomain.AiSpeech,
+        enabled = enabled,
         testTag = tag,
         contentDescription = description,
     )

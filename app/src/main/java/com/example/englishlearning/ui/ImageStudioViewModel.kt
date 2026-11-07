@@ -15,6 +15,7 @@ import com.example.englishlearning.imagegen.ImageStudioNotConfiguredReason
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -67,6 +68,13 @@ class ImageStudioViewModel @Inject constructor(
     private var pendingSubject: String? = null
     private var pendingPrompt: String? = null
     private var confirmedTextHost: String? = null
+
+    /**
+     * 两枚在飞协程各持一份句柄（批 C-4）：文本起草与图片生成是两次独立出站，
+     * 「取消」必须知道自己停的是哪一发——同一时刻两发同时在飞的话，界面显示的哪一张由竞态决定。
+     */
+    private var promptJob: Job? = null
+    private var imageJob: Job? = null
 
     fun generatePrompt(subject: String) {
         pendingSubject = subject
@@ -124,7 +132,39 @@ class ImageStudioViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 取消正在等待的那一发（批 C-4）。落点按**用户手里已经有什么**分档
+     * （决策 2026-11-07 §3 决定 3 第 2 条的例外）：
+     *
+     *  - 起草描述在飞 → 回 `Idle`：此刻用户只说过一个主题词，没有已付费的东西可保留。
+     *  - 生成图片在飞 → 回 `PromptReady(那份描述)`：描述是一次已付费的文本出站换来的结果，
+     *    取消一张没等到的图不该把它一起销毁，否则想再出图就得再付一次文本调用。
+     *
+     * 只停在飞的两种状态下有事可做；确认框、结果态按取消是空操作（那时根本没有在飞的请求）。
+     */
+    fun cancelGeneration() {
+        when (_uiState.value) {
+            ImageStudioUiState.DraftingPrompt -> {
+                promptJob?.cancel()
+                promptJob = null
+                _uiState.value = ImageStudioUiState.Idle
+            }
+
+            ImageStudioUiState.GeneratingImage -> {
+                imageJob?.cancel()
+                imageJob = null
+                _uiState.value = pendingPrompt?.let { ImageStudioUiState.PromptReady(it) } ?: ImageStudioUiState.Idle
+            }
+
+            else -> Unit
+        }
+    }
+
     fun reset() {
+        promptJob?.cancel()
+        imageJob?.cancel()
+        promptJob = null
+        imageJob = null
         pendingSubject = null
         pendingPrompt = null
         confirmedTextHost = null
@@ -132,7 +172,8 @@ class ImageStudioViewModel @Inject constructor(
     }
 
     private fun runPrompt(subject: String, confirmedTextHost: String?) {
-        viewModelScope.launch {
+        promptJob?.cancel()
+        promptJob = viewModelScope.launch {
             try {
                 when (val result = drawPrompt.generate(subject, setOfNotNull(confirmedTextHost))) {
                     is DrawingPromptResult.Draft -> {
@@ -154,7 +195,8 @@ class ImageStudioViewModel @Inject constructor(
     }
 
     private fun runImage(prompt: String, answer: AiOutboundConfirmation?) {
-        viewModelScope.launch {
+        imageJob?.cancel()
+        imageJob = viewModelScope.launch {
             try {
                 when (val result = generateImage.generate(prompt, answer)) {
                     is ImageGenerationResult.Generated -> persist(result)

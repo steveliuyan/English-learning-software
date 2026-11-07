@@ -44,6 +44,12 @@ sealed interface PhotoTranslationFailureCategory {
 
 data class PhotoTranslationUiState(
     val busy: Boolean = false,
+    /**
+     * AI 翻译是否在飞（批 C-4）。此前只有 [busy]，而 `busy` 只由识别路径写 `true`——
+     * 翻译在飞时界面零回执、翻译按钮照旧可点，再点一次就是「掐掉上一发 + 再付一次费」。
+     * 识别与翻译是两件事，所以是两个字段，不用一个 `busy` 混装（AC3-04 同一口径）。
+     */
+    val translating: Boolean = false,
     /** 识别后的可编辑文本；翻译失败后依然保留（AC3-06）。 */
     val ocrText: String? = null,
     val lowConfidenceLineIndices: Set<Int> = emptySet(),
@@ -91,10 +97,15 @@ class PhotoTranslationViewModel @Inject constructor(
         bytes: ByteArray,
     ) {
         captureJob?.cancel()
+        // 换一张图 = 上一张的一切作废：文本、译文、以及**还在飞的那一发翻译**。旧写法只清了显示结果，
+        // 请求照旧飞完并把上一张的译文写回新图界面（批 C-4 补这条，与 translating 同一个面）。
+        translateJob?.cancel()
+        translateJob = null
         captureBytes = bytes.copyOf()
         _uiState.update {
             it.copy(
                 busy = true,
+                translating = false,
                 ocrText = null,
                 lowConfidenceLineIndices = emptySet(),
                 engine = null,
@@ -161,7 +172,9 @@ class PhotoTranslationViewModel @Inject constructor(
 
     fun onTranslateTapped() {
         val text = _uiState.value.ocrText?.trim().orEmpty()
-        if (text.isEmpty() || _uiState.value.busy) return
+        // translating 也在闸内：在飞时再点一次不是「再要一次翻译」，是 translateJob?.cancel() 后重发，
+        // 用户按两下付两次钱、界面显示哪一句由竞态决定（屏侧禁用是第一道防线，这里是第二道）。
+        if (text.isEmpty() || _uiState.value.busy || _uiState.value.translating) return
         runTranslation(text, confirmedTextHosts = emptySet())
     }
 
@@ -178,7 +191,22 @@ class PhotoTranslationViewModel @Inject constructor(
             _uiState.update { it.copy(pendingConfirmationHost = null) }
             return
         }
+        // 确认框在点下去那一刻就收起：它问的是「发不发」，答案已经给出，继续压着会把下面的
+        // 进行中面挡在框后面，用户看不到「正在等」这件事（批 C-4 的进行中语义要有地方画）。
+        _uiState.update { it.copy(pendingConfirmationHost = null) }
         runTranslation(text, confirmedTextHosts = setOf(host))
+    }
+
+    /**
+     * 取消正在等待的翻译（批 C-4）：不再等这一发，但**识别出的文本原样留着**可改可重试
+     * （决策 2026-11-07 §3 决定 3 第 2 条——落点取决于用户手里已经有什么；本机识别的文本没花过钱，
+     * 却是用户校对过的手上物，销毁它等于让用户重拍一张）。
+     */
+    fun cancelTranslate() {
+        if (!_uiState.value.translating) return
+        translateJob?.cancel()
+        translateJob = null
+        _uiState.update { it.copy(translating = false, pendingConfirmationHost = null) }
     }
 
     fun reset() {
@@ -346,6 +374,8 @@ class PhotoTranslationViewModel @Inject constructor(
         confirmedTextHosts: Set<String>,
     ) {
         translateJob?.cancel()
+        // 同步置 translating 即互斥：第二发还没进得来（onTranslateTapped 的闸），进来了也先被上面那行顶掉。
+        _uiState.update { it.copy(translating = true) }
         translateJob =
             viewModelScope.launch {
                 try {
@@ -353,16 +383,24 @@ class PhotoTranslationViewModel @Inject constructor(
                         is PhotoTranslationResult.Translated ->
                             _uiState.update {
                                 it.copy(
+                                    translating = false,
                                     translation = result.source to result.target,
                                     translationIssue = null,
                                     pendingConfirmationHost = null,
                                 )
                             }
                         is PhotoTranslationResult.NeedsConfirmation ->
-                            _uiState.update { it.copy(pendingConfirmationHost = result.host, translationIssue = null) }
+                            _uiState.update {
+                                it.copy(
+                                    translating = false,
+                                    pendingConfirmationHost = result.host,
+                                    translationIssue = null,
+                                )
+                            }
                         is PhotoTranslationResult.Failed ->
                             _uiState.update {
                                 it.copy(
+                                    translating = false,
                                     translationIssue = PhotoTranslationFailureCategory.Ai(result.failure),
                                     translation = null,
                                     pendingConfirmationHost = null,
@@ -371,6 +409,7 @@ class PhotoTranslationViewModel @Inject constructor(
                         is PhotoTranslationResult.NotConfigured ->
                             _uiState.update {
                                 it.copy(
+                                    translating = false,
                                     translationIssue = PhotoTranslationFailureCategory.NotConfigured(result.reason),
                                     translation = null,
                                     pendingConfirmationHost = null,
@@ -378,9 +417,11 @@ class PhotoTranslationViewModel @Inject constructor(
                             }
                     }
                 } catch (cancellation: CancellationException) {
+                    // cancelTranslate() 已经把 translating 收回 false；被下一发顶掉时那一发的臂自己会写，
+                    // 这里都不许再补一笔——补了就是「新请求还在飞、界面却说不飞」。
                     throw cancellation
                 } catch (_: Throwable) {
-                    _uiState.update { it.copy(pendingConfirmationHost = null) }
+                    _uiState.update { it.copy(translating = false, pendingConfirmationHost = null) }
                 }
             }
     }

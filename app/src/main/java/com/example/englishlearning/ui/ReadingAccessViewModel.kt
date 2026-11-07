@@ -34,6 +34,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -108,6 +109,14 @@ class ReadingAccessViewModel @Inject constructor(
     /** 出站确认后重放生成时要带上「是不是换一篇」，否则确认会把重放变回复用。 */
     private var pendingRegenerate = false
 
+    /**
+     * 当前在飞的生成协程（批 C-4）。
+     *
+     * 「可取消」不是文案能改出来的：屏侧那枚取消键要落到真正持有出站请求的 `Job` 上，
+     * 否则按下去只把界面收回来，钱照旧花、结果照旧回来并把界面推走（决策 2026-11-07 §3 决定 3）。
+     */
+    private var generationJob: Job? = null
+
     fun load(profileId: String, isUnlocked: Boolean, unlockReason: String) {
         this.profileId = profileId
         _uiState.value = ReadingAccessUiState.Loading
@@ -144,6 +153,20 @@ class ReadingAccessViewModel @Inject constructor(
             return
         }
         runGeneration(regenerate = pendingRegenerate, confirmedTextHosts = setOf(host))
+    }
+
+    /**
+     * 取消正在等待的生成（批 C-4）：停掉在飞协程、回到 `Ready` 的 `Idle`。
+     *
+     * 落点是 `Ready` 而不是清空整屏：这一屏的 `Idle` 里装着用户**已经读到的今日文章**，
+     * 取消一次等待不该替他销毁已有的东西（决策 2026-11-07 §3 决定 3 第 2 条的点名例外）。
+     * 只在进行中才有事可取消：其余状态下按取消等于什么都没发生，不写状态也不报错。
+     */
+    fun cancelGeneration() {
+        if (generationState() != GenerationUiState.Generating) return
+        generationJob?.cancel()
+        generationJob = null
+        setGeneration(GenerationUiState.Idle)
     }
 
     // ---------- 粘贴导入 ----------
@@ -246,7 +269,10 @@ class ReadingAccessViewModel @Inject constructor(
     private fun runGeneration(regenerate: Boolean, confirmedTextHosts: Set<String>) {
         val id = profileId ?: return
         pendingRegenerate = regenerate
-        viewModelScope.launch {
+        // 同一时刻只许一发在飞：第二发进来先把上一发停掉，否则两发都落地，用户付两次钱、
+        // 界面显示哪一篇由竞态决定（屏侧禁用按钮是第一道防线，这里是第二道）。
+        generationJob?.cancel()
+        generationJob = viewModelScope.launch {
             setGeneration(GenerationUiState.Generating)
             try {
                 val ready = _uiState.value as? ReadingAccessUiState.Ready ?: return@launch
@@ -278,7 +304,10 @@ class ReadingAccessViewModel @Inject constructor(
                 }
             } catch (e: CancellationException) {
                 // 用户取消不是失败：回到 Idle 让按钮恢复，取消本身继续传播。
-                setGeneration(GenerationUiState.Idle)
+                // 但只有「现在在飞的还是我」才写这一笔——被第二次点击顶掉时，新一发已经把状态
+                // 推向 Generating/NeedsConfirmation，旧臂在这里补一句 Idle 就会把正在等待的面抹掉；
+                // 而 cancelGeneration() 自己已经把状态收回 Idle 了，不需要这一笔。
+                if (generationJob === coroutineContext[Job]) setGeneration(GenerationUiState.Idle)
                 throw e
             }
         }

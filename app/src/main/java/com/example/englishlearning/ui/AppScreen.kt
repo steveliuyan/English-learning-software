@@ -1666,6 +1666,7 @@ fun AppScreen(
                     onOcrTextEdited = { text -> photoTranslationViewModel?.onOcrTextEdited(text) },
                     onTranslate = { photoTranslationViewModel?.onTranslateTapped() },
                     onConfirmOutbound = { confirmed -> photoTranslationViewModel?.onConfirmationResult(confirmed) },
+                    onCancelTranslate = { photoTranslationViewModel?.cancelTranslate() },
                     onRefreshModelStatus = { photoTranslationViewModel?.refreshModelStatus() },
                     onInstallModel = { photoTranslationViewModel?.installModel() },
                     onUninstallModel = { photoTranslationViewModel?.uninstallModel() },
@@ -1735,6 +1736,7 @@ fun AppScreen(
                     // 描述可编辑（批 4 Task 6）：屏内改过的那一句从这里进 VM，出站用它而不是模型原稿。
                     onGenerateImage = { prompt -> imageStudioViewModel?.generateImage(prompt) },
                     onConfirm = { imageStudioViewModel?.confirm(it) },
+                    onCancelGeneration = { imageStudioViewModel?.cancelGeneration() },
                     onBack = { selectedFeatureKey = null },
                     onOpenAiSettings = {
                         selectedFeatureKey = null
@@ -2095,6 +2097,7 @@ fun AppScreen(
                                                 onRegenerate = { readingAccessViewModel?.generate(regenerate = true) },
                                                 onOpenTodayArticle = { readingAccessViewModel?.openTodayArticle() },
                                                 onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
+                                                onCancelGeneration = { readingAccessViewModel?.cancelGeneration() },
                                                 onOpenAiSettings = {
                                                     // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置子页。
                                                     aiProfileViewModel?.load()

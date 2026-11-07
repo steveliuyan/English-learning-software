@@ -36,6 +36,7 @@ import com.example.englishlearning.imagegen.ImageStudioNotConfiguredReason
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
+import com.example.englishlearning.ui.components.RequestInProgress
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -74,6 +75,11 @@ fun ImageStudioScreen(
     onGeneratePrompt: (String) -> Unit,
     onGenerateImage: (String) -> Unit,
     onConfirm: (Boolean) -> Unit,
+    /**
+     * 取消正在等待的那一发（批 C-4）。显式接线、不给默认空实现——屏侧两臂（起草描述 / 生成图片）
+     * 共用这一个出口，VM 按当前状态决定停哪一发、落在哪一档。
+     */
+    onCancelGeneration: () -> Unit,
     onBack: () -> Unit,
     onOpenAiSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -149,11 +155,11 @@ fun ImageStudioScreen(
                         style = AppType.Footnote,
                         color = colors.text2,
                     )
-                    ImageStudioUiState.DraftingPrompt -> Text(
-                        text = "正在生成画面描述…",
-                        style = AppType.Footnote,
-                        color = colors.text2,
-                        modifier = Modifier.testTag("image_studio_drafting"),
+                    ImageStudioUiState.DraftingPrompt -> RequestInProgress(
+                        message = "正在向你配置的 AI 服务生成画面描述",
+                        onCancel = onCancelGeneration,
+                        statusTestTag = "image_studio_drafting",
+                        cancelTestTag = "image_studio_cancel_drafting",
                     )
                     is ImageStudioUiState.PromptReady -> {
                         // 原型 `sAiImage`：`section('英文提示词', card-quiet)`——提示词自成一节，
@@ -187,11 +193,11 @@ fun ImageStudioScreen(
                         confirmTestTag = "image_studio_confirm_outbound",
                         dismissTestTag = "image_studio_decline_outbound",
                     )
-                    ImageStudioUiState.GeneratingImage -> Text(
-                        text = "正在生成图片…",
-                        style = AppType.Footnote,
-                        color = colors.text2,
-                        modifier = Modifier.testTag("image_studio_generating"),
+                    ImageStudioUiState.GeneratingImage -> RequestInProgress(
+                        message = "正在向你配置的 AI 服务生成图片",
+                        onCancel = onCancelGeneration,
+                        statusTestTag = "image_studio_generating",
+                        cancelTestTag = "image_studio_cancel_image",
                     )
                     is ImageStudioUiState.ImageReady -> {
                         // 原型 `sAiImage` 的 `section('生成结果', 4:3 占位框)`：出图后结果自成一节。
