@@ -1,5 +1,8 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -39,7 +42,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Idle,
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = { backed++ }, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = { backed++ }, onOpenAiSettings = {},
             )
         }
 
@@ -60,7 +63,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Idle,
-                onGeneratePrompt = { subject = it }, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = { subject = it }, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -75,7 +78,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Idle,
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -94,7 +97,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.PromptReady("a watercolor apple"),
-                onGeneratePrompt = {}, onGenerateImage = { generated++ }, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = { generated++ }, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -119,7 +122,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.PromptReady("a watercolor apple"),
-                onGeneratePrompt = {}, onGenerateImage = { reported = it }, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = { reported = it }, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -133,13 +136,85 @@ class ImageStudioScreenTest {
         assertEquals("a hand edited watercolor apple", reported)
     }
 
+    /**
+     * 批 C-4（起草描述那一臂）：在飞时吸底那枚键必须禁用，且取消键**按得到、恰好转发一次**，
+     * 状态翻回 `Idle` 后整个进行中面收起。
+     *
+     * 禁用是这里唯一能连测量到的防线：点下去旧形状会直接再发一次文本请求（掐掉在飞那一发 + 再付一次费）。
+     * 「请求真的停了」与「取消落在 `Idle`」归 JVM 侧 `ImageStudioViewModelTest` 的挂起假 transport 用例。
+     */
+    @Test
+    fun draftingDescriptionCancelForwardsOnceAndTheFaceClosesOnIdle() {
+        var cancelled = 0
+        lateinit var hostState: MutableState<ImageStudioUiState>
+        composeRule.setContent {
+            hostState = remember { mutableStateOf<ImageStudioUiState>(ImageStudioUiState.DraftingPrompt) }
+            ImageStudioScreen(
+                state = hostState.value,
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {},
+                onCancelGeneration = {
+                    cancelled += 1
+                    hostState.value = ImageStudioUiState.Idle
+                },
+                onBack = {}, onOpenAiSettings = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("image_studio_drafting").assertExists()
+        composeRule.onNodeWithTag("image_studio_generate_prompt").assertIsNotEnabled()
+        composeRule.onNodeWithTag("image_studio_cancel_drafting").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, cancelled)
+        composeRule.onNodeWithTag("image_studio_cancel_drafting").assertDoesNotExist()
+        composeRule.onNodeWithTag("image_studio_drafting").assertDoesNotExist()
+    }
+
+    /**
+     * 批 C-4（生成图片那一臂）：取消同样恰好转发一次，面收起后**那句已付费的描述回到编辑框**。
+     *
+     * 落点本身（`GeneratingImage` 取消 → `PromptReady(那份描述)`）由 VM 决定并归 JVM 用例；
+     * 这条量的是屏侧的两件事：在飞时键禁用（按张计费的请求不能被第二发顶掉），以及状态翻回
+     * `PromptReady` 时描述真的重新出现在 `image_studio_prompt` 上——描述是一次已付费的文本出站
+     * 换来的结果，取消图片不该把它一起抹掉。
+     */
+    @Test
+    fun generatingImageCancelForwardsOnceAndKeepsThePaidDescription() {
+        var cancelled = 0
+        lateinit var hostState: MutableState<ImageStudioUiState>
+        composeRule.setContent {
+            hostState = remember {
+                mutableStateOf<ImageStudioUiState>(ImageStudioUiState.GeneratingImage)
+            }
+            ImageStudioScreen(
+                state = hostState.value,
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {},
+                onCancelGeneration = {
+                    cancelled += 1
+                    hostState.value = ImageStudioUiState.PromptReady("a watercolor apple")
+                },
+                onBack = {}, onOpenAiSettings = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("image_studio_generating").assertExists()
+        composeRule.onNodeWithTag("image_studio_generate_prompt").assertIsNotEnabled()
+        composeRule.onNodeWithTag("image_studio_cancel_image").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, cancelled)
+        composeRule.onNodeWithTag("image_studio_cancel_image").assertDoesNotExist()
+        composeRule.onNodeWithTag("image_studio_generating").assertDoesNotExist()
+        composeRule.onNodeWithTag("image_studio_prompt")
+            .performScrollTo()
+            .assertTextContains("a watercolor apple", substring = true)
+    }
+
     @Test
     fun textConfirmationDialogNamesTheHostAndDeclineReportsFalse() {
         var answer: Boolean? = null
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.AwaitingConfirmation("api.example.com", ImageStudioConfirmationStage.Prompt),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = { answer = it }, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = { answer = it }, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -155,7 +230,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.AwaitingConfirmation("image.example.com", ImageStudioConfirmationStage.Image),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -169,7 +244,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.DraftingPrompt,
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
         composeRule.onNodeWithTag("image_studio_drafting").assertExists()
@@ -188,7 +263,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.ImageReady(cacheFile.absolutePath),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -200,7 +275,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.ImageReady("/does/not/exist.png"),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -212,7 +287,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.NotConfigured(ImageStudioNotConfiguredReason.NoDefaultProfile),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
         composeRule.onNodeWithTag("image_studio_not_configured")
@@ -224,7 +299,7 @@ class ImageStudioScreenTest {
         composeRule.setContent {
             ImageStudioScreen(
                 state = ImageStudioUiState.Failed(AiFailure.InvalidResponse),
-                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onBack = {}, onOpenAiSettings = {},
+                onGeneratePrompt = {}, onGenerateImage = {}, onConfirm = {}, onCancelGeneration = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
         composeRule.onNodeWithTag("image_studio_failure")

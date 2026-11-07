@@ -7,8 +7,12 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.englishlearning.reading.domain.ArticleLengthTier
+import com.example.englishlearning.reading.domain.ArticleType
+import com.example.englishlearning.reading.domain.ReadingPreference
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -78,6 +82,127 @@ class RequestInProgressEvidenceTest {
             statement = composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true),
         )
         saveScreenshot("sentence-analysis-analyzing", "sentence_analysis_screen")
+    }
+
+    @Test
+    fun today_article_generation_face_shows_the_three_parts_in_reading_order() {
+        composeRule.setContent {
+            ReadingAccessScreen(
+                state = ReadingAccessUiState.Ready(
+                    preference = ReadingPreference("p1", ArticleType.SCIENCE, ArticleLengthTier.LONG),
+                    history = emptyList(),
+                    generation = GenerationUiState.Generating,
+                ),
+                onSelectType = {},
+                onOpenHistory = {},
+                onCancelGeneration = {},
+            )
+        }
+
+        assertReadingOrder(
+            label = "今日文章生成",
+            status = composeRule.onNodeWithTag("generation_status").also {
+                composeRule.onNodeWithText("正在向你配置的 AI 服务生成今天的文章").assertExists()
+            },
+            cancel = composeRule.onNodeWithTag("generation_cancel").performScrollTo(),
+            statement = composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true),
+        )
+        saveScreenshot("reading-generating", "reading_access_screen")
+    }
+
+    /**
+     * 生图的两臂各自取证：起草描述与生成图片是**两次不同的出站、两种不同的费用**（文本按次、
+     * 图片按张，可能数十倍），所以两句状态文案必须分别在树上出现——一条臂抄了另一条的文案，
+     * 用户在等的就是那一种费用，却看见这一种说法。
+     */
+    @Test
+    fun image_prompt_drafting_face_shows_the_three_parts_in_reading_order() {
+        composeRule.setContent {
+            ImageStudioScreen(
+                state = ImageStudioUiState.DraftingPrompt,
+                onGeneratePrompt = {},
+                onGenerateImage = {},
+                onConfirm = {},
+                onCancelGeneration = {},
+                onBack = {},
+                onOpenAiSettings = {},
+            )
+        }
+
+        assertReadingOrder(
+            label = "生图起草描述",
+            status = composeRule.onNodeWithTag("image_studio_drafting").also {
+                composeRule.onNodeWithText("正在向你配置的 AI 服务生成画面描述").assertExists()
+            },
+            cancel = composeRule.onNodeWithTag("image_studio_cancel_drafting").performScrollTo(),
+            statement = composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true),
+        )
+        saveScreenshot("image-studio-drafting", "image_studio_screen")
+    }
+
+    @Test
+    fun image_generation_face_shows_the_three_parts_in_reading_order() {
+        composeRule.setContent {
+            ImageStudioScreen(
+                state = ImageStudioUiState.GeneratingImage,
+                onGeneratePrompt = {},
+                onGenerateImage = {},
+                onConfirm = {},
+                onCancelGeneration = {},
+                onBack = {},
+                onOpenAiSettings = {},
+            )
+        }
+
+        assertReadingOrder(
+            label = "生图生成图片",
+            status = composeRule.onNodeWithTag("image_studio_generating").also {
+                composeRule.onNodeWithText("正在向你配置的 AI 服务生成图片").assertExists()
+                // 等待面上方那句通用费用提示（`image_studio_cost_hint`）必须在场。
+                // 按张计费那一句（`image_studio_image_cost_hint`）**不在**：它长在 `PromptReady` 的
+                // 描述编辑器里，出站确认框承担决策那一刻的告知——本用例不假装它还在，
+                // 也不为它改屏（那不属于 C-4c 的口径，见工作报告遗留项）。
+                composeRule.onNodeWithTag("image_studio_cost_hint").assertExists()
+                composeRule.onNodeWithTag("image_studio_image_cost_hint").assertDoesNotExist()
+            },
+            cancel = composeRule.onNodeWithTag("image_studio_cancel_image").performScrollTo(),
+            statement = composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true),
+        )
+        saveScreenshot("image-studio-generating", "image_studio_screen")
+    }
+
+    @Test
+    fun photo_translation_face_shows_the_three_parts_in_reading_order() {
+        composeRule.setContent {
+            PhotoTranslationScreen(
+                state = PhotoTranslationUiState(translating = true, ocrText = "Birds fly."),
+                onImageBytes = {},
+                onOcrTextEdited = {},
+                onTranslate = {},
+                onConfirmOutbound = {},
+                onCancelTranslate = {},
+                onRefreshModelStatus = {},
+                onInstallModel = {},
+                onUninstallModel = {},
+                onOpenDictionary = {},
+                speakMessage = null,
+                onSpeak = {},
+                onSave = {},
+                onRequestDeleteSaved = {},
+                onBack = {},
+                onOpenAiSettings = {},
+            )
+        }
+
+        assertReadingOrder(
+            label = "拍照翻译",
+            status = composeRule.onNodeWithTag("photo_translation_translating").also {
+                composeRule.onNodeWithText("正在向你配置的 AI 服务翻译这段文字").assertExists()
+            },
+            cancel = composeRule.onNodeWithTag("photo_translation_cancel_translate").performScrollTo(),
+            statement = composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true),
+        )
+        saveScreenshot("photo-translation-translating", "photo_translation_screen")
     }
 
     /** 三件齐 + 自上而下：状态句 < 取消键 < 取消陈述。 */

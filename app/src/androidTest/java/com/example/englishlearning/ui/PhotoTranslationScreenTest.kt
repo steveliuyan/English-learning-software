@@ -4,6 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -43,6 +46,7 @@ class PhotoTranslationScreenTest {
         speakMessage: String? = null,
         onTranslate: () -> Unit = {},
         onConfirmOutbound: (Boolean) -> Unit = {},
+        onCancelTranslate: () -> Unit = {},
         onSave: () -> Unit = {},
         onRequestDeleteSaved: (String) -> Unit = {},
         onOpenDictionary: (String) -> Unit = {},
@@ -57,6 +61,7 @@ class PhotoTranslationScreenTest {
                 onOcrTextEdited = {},
                 onTranslate = onTranslate,
                 onConfirmOutbound = onConfirmOutbound,
+                onCancelTranslate = onCancelTranslate,
                 onRefreshModelStatus = {},
                 onInstallModel = {},
                 onUninstallModel = {},
@@ -183,6 +188,7 @@ class PhotoTranslationScreenTest {
                     decisions += it
                     state = state.copy(pendingConfirmationHost = null)
                 },
+                onCancelTranslate = {},
                 onRefreshModelStatus = {},
                 onInstallModel = {},
                 onUninstallModel = {},
@@ -209,6 +215,58 @@ class PhotoTranslationScreenTest {
         composeRule.onNodeWithTag("photo_translation_confirm_outbound").performClick()
         composeRule.waitForIdle()
         assertEquals(listOf(false, true), decisions)
+    }
+
+    /**
+     * 批 C-4：翻译在飞时的三件事——**进行中面看得见**、**翻译按钮禁用**（旧形状按第二下就是
+     * 「掐掉上一发 + 再付一次费」）、**取消键恰好转发一次且面随之收起**。
+     *
+     * 取消后识别出的文本必须还留在编辑框里可改可重试（那条落点归 VM：`cancelTranslate` 只收回等待，
+     * 不动 `ocrText`；这里量的是「屏不再把它藏起来」）。
+     */
+    @Test fun translating_shows_the_face_disables_the_button_and_cancel_forwards_once() {
+        var cancelled = 0
+        var state by mutableStateOf(
+            PhotoTranslationUiState(translating = true, ocrText = "Birds fly."),
+        )
+        composeRule.setContent {
+            PhotoTranslationScreen(
+                state = state,
+                onImageBytes = {},
+                onOcrTextEdited = {},
+                onTranslate = {},
+                onConfirmOutbound = {},
+                onCancelTranslate = {
+                    cancelled += 1
+                    state = state.copy(translating = false)
+                },
+                onRefreshModelStatus = {},
+                onInstallModel = {},
+                onUninstallModel = {},
+                onOpenDictionary = {},
+                speakMessage = null,
+                onSpeak = {},
+                onSave = {},
+                onRequestDeleteSaved = {},
+                onBack = {},
+                onOpenAiSettings = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("photo_translation_translating").performScrollTo().assertExists()
+        composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true).performScrollTo().assertExists()
+        composeRule.onNodeWithTag("photo_translation_translate_button").assertIsNotEnabled()
+
+        composeRule.onNodeWithTag("photo_translation_cancel_translate").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, cancelled)
+        composeRule.onNodeWithTag("photo_translation_cancel_translate").assertDoesNotExist()
+        composeRule.onNodeWithTag("photo_translation_translating").assertDoesNotExist()
+        // 识别出的字不许被这一次取消带走：它没花一分钱，改一改还能重试。
+        composeRule.onNodeWithTag("photo_translation_text_editor")
+            .performScrollTo()
+            .assertTextContains("Birds fly.", substring = true)
+        composeRule.onNodeWithTag("photo_translation_translate_button").assertIsEnabled()
     }
 
     /**

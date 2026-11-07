@@ -1,7 +1,12 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
@@ -41,6 +46,7 @@ class ReadingAccessScreenTest {
                 state = ReadingAccessUiState.Loading,
                 onSelectType = {},
                 onOpenHistory = {},
+                onCancelGeneration = {},
             )
         }
         composeRule.onNodeWithTag("reading_access_screen").assertExists()
@@ -58,6 +64,7 @@ class ReadingAccessScreenTest {
                 state = ReadingAccessUiState.Locked("还差 2 个新词、1 个复习词"),
                 onSelectType = {},
                 onOpenHistory = {},
+                onCancelGeneration = {},
             )
         }
 
@@ -83,6 +90,7 @@ class ReadingAccessScreenTest {
                 state = ReadingAccessUiState.Locked("还差 2 个新词、1 个复习词", listOf(historyArticle())),
                 onSelectType = {},
                 onOpenHistory = {},
+                onCancelGeneration = {},
             )
         }
 
@@ -101,6 +109,7 @@ class ReadingAccessScreenTest {
                 ),
                 onSelectType = { selected = it },
                 onOpenHistory = { historyOpened++ },
+                onCancelGeneration = {},
             )
         }
 
@@ -332,6 +341,67 @@ class ReadingAccessScreenTest {
         composeRule.onNodeWithTag("reading_open_today").assertDoesNotExist()
     }
 
+    /**
+     * 批 C-4：生成在飞时那一枚「生成今天的文章」必须**禁用**。
+     *
+     * 旧形状只有一行裸文案，按钮照旧可点——点下去是「掐掉上一发 + 再付一次费」，而用户在
+     * 那一发上已经等了几秒。屏侧禁用是第一道防线，VM 侧「旧的先取消、只许一发在飞」是第二道
+     * （`ReadingAccessViewModelTest` 用挂起假 transport 量），两道各归各处，这里只钉看得见的这道。
+     */
+    @Test
+    fun generatingDisablesTheGenerationCtaAndShowsTheInProgressFace() {
+        composeRule.setContent { readyScreen(generation = GenerationUiState.Generating) }
+
+        composeRule.onNodeWithTag("generation_status").performScrollTo().assertExists()
+        composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true).performScrollTo().assertExists()
+        composeRule.onNodeWithTag("reading_source_ai").assertIsNotEnabled()
+    }
+
+    /**
+     * 取消键的 connected 射程只有两件事：**按得到、回调恰好转发一次**，以及取消后整个进行中面消失、
+     * 生成入口重新可用。「请求真的停了」量不到字节，归 JVM 侧挂起假 transport 的用例；
+     * 宿主把取消接到持有 `Job` 的那个 VM 上，归 `AiWaitInProgressContractTest` 的 `AppScreen` 锚点。
+     *
+     * 落点必须是 `Idle` 而不是清空整屏：取消生成不该把今天那篇文章一起抹掉（决策 2026-11-07 C-4 段的
+     * 落点例外），所以这里用「已生成过当日文章」那一支的版面复核——键没了，文章卡还在。
+     */
+    @Test
+    fun generatingCancelForwardsExactlyOnceAndDisappearsWithTheFace() {
+        var cancelled = 0
+        lateinit var hostState: MutableState<ReadingAccessUiState>
+        composeRule.setContent {
+            hostState = remember {
+                mutableStateOf<ReadingAccessUiState>(
+                    ReadingAccessUiState.Ready(
+                        preference = ReadingPreference("p1", ArticleType.STORY, null),
+                        history = emptyList(),
+                        todayArticle = todayArticle(),
+                        generation = GenerationUiState.Generating,
+                    )
+                )
+            }
+            ReadingAccessScreen(
+                state = hostState.value,
+                onSelectType = {},
+                onOpenHistory = {},
+                onCancelGeneration = {
+                    cancelled += 1
+                    hostState.value = (hostState.value as ReadingAccessUiState.Ready)
+                        .copy(generation = GenerationUiState.Idle)
+                },
+            )
+        }
+
+        composeRule.onNodeWithTag("generation_cancel").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, cancelled)
+        composeRule.onNodeWithTag("generation_cancel").assertDoesNotExist()
+        composeRule.onNodeWithTag("generation_status").assertDoesNotExist()
+        // 今天的文章没被这一次取消带走。
+        composeRule.onNodeWithTag("reading_today_article").assertExists()
+        composeRule.onNodeWithTag("reading_regenerate").assertIsEnabled()
+    }
+
     @Test
     fun typeChoicesAndPreferenceOnlyAppearAfterTheGenerationParamsToggle() {
         // 裁决⑤ 第三件：类型与长度偏好不再常驻主页，随「生成前参数」这一次动作出现。
@@ -344,6 +414,7 @@ class ReadingAccessScreenTest {
                 ),
                 onSelectType = { selected = it },
                 onOpenHistory = {},
+                onCancelGeneration = {},
             )
         }
         composeRule.onNodeWithTag("reading_preference").assertDoesNotExist()
@@ -377,6 +448,7 @@ class ReadingAccessScreenTest {
         onRegenerate: () -> Unit = {},
         onOpenTodayArticle: () -> Unit = {},
         onConfirmOutbound: (Boolean) -> Unit = {},
+        onCancelGeneration: () -> Unit = {},
         onOpenAiSettings: () -> Unit = {},
         onOpenFeed: () -> Unit = {},
     ) = ReadingAccessScreen(
@@ -393,6 +465,7 @@ class ReadingAccessScreenTest {
         onRegenerate = onRegenerate,
         onOpenTodayArticle = onOpenTodayArticle,
         onConfirmOutbound = onConfirmOutbound,
+        onCancelGeneration = onCancelGeneration,
         onOpenAiSettings = onOpenAiSettings,
         onOpenFeed = onOpenFeed,
     )
