@@ -1415,3 +1415,75 @@ adb -s emulator-5554 shell settings get global animator_duration_scale          
 - C-4b 结转两问：① 进行中卡里的「取消」是 `PillStyle.Secondary` 白底胶囊，落在浅绿卡面上像一枚浮起的方块；
   ② 活动指示 `18.dp`/`2.dp` 在静帧截图里只读出一小段弧（动帧正常）。本批四张图同样如此，五屏一致 ⇒ 若要改是改组件，不是改某一屏。
 - 批 C 骨架/shimmer 与批 B 自适应的既列四项（见上文各节）仍未销。
+
+## 2026-11-07 批 C-5：闪屏窗口预热开库的实测对照（`emulator-5554`，API 30）
+
+门禁（`--rerun-tasks --no-daemon --no-build-cache`，`BUILD SUCCESSFUL in 4m 2s`）：
+`suites=331 tests=2460 skipped=0 failures=0 errors=0` = 批 C-4c 基线 329 类 / 2449 条 + 本批两枚新类 11 条，0 失败 0 跳过。
+
+决策册决定 4 第 1 条把「Room 建库 + 首次打开」从 MainActivity 的关键路径挪进 `BrandLaunchActivity` 的 1.2 秒闪屏窗口。
+这一条**只能实测**，源码正则判不了「有没有真的落在窗口内」，所以本节的证据是设备读数，不是闸。
+原始读数（**不入库**，`.git/qa-scratch/c5/before.txt`、`.git/qa-scratch/c5/after.txt`，取样脚本 `measure.sh`）：
+每轮 `am force-stop` → `logcat -c` → `am start -W .launch.BrandLaunchActivity` → 停 7 秒抓 `Displayed` 与临时桩 `C5Timing`；
+两侧各先跑一轮丢弃（装包后首轮含 dexopt，读数虚高：实测 2241 / 5685 ms），再取四轮。
+
+| 侧 | `am start -W` TotalTime（四轮） | 开库耗时 / 所在线程 | 开库时刻 vs 闪屏出帧 | `Displayed .MainActivity`（四轮） |
+|---|---|---|---|---|
+| 预热未接线 | 2048 / 2011 / 1978 / 2183 | 51 / 45 / 50 / 48 ms，`main` | 闪屏出帧**之后**约 1.3 秒 | 798 / 732 / 747 / 837 ms |
+| 预热已接线 | 2121 / 2050 / 2039 / 2033 | 75 / 96 / 93 / 84 ms，`DefaultDispatcher-worker-2` | 闪屏出帧**之前**约 0.9 秒 | 854 / 716 / 719 / 748 ms |
+
+三条读得出来的结论：
+
+- **位置变了（本批的主张）**：接线后四轮里，开库的时间戳都早于 `Displayed .launch.BrandLaunchActivity`，
+  即开库在闪屏那一帧画出来之前就跑完了；未接线时它排在闪屏出帧之后约 1.3 秒、MainActivity 出帧之前，线程名是 `main`。
+  这就是「闪屏那 1.2 秒确实有事做」的直接证据。
+- **只开一次**：每轮进程里 `C5Timing` 恰一行 ⇒ 预热与 MainActivity 用的是同一枚 `@Singleton`，
+  预取没有把建库变成两次（Dagger 的 `Provider` 是惰性的，`.get()` 之后主图再取即复用）。
+- **耗时本身变长了，且这是预期**：45–51 ms → 75–96 ms。开库挪到了启动最挤的那一段，与闪屏组合、Kokoro 预热抢同一批核；
+  决策 §5 点名的竞争面就是这个，处置也照原文执行——磁盘 IO 落 `Dispatchers.IO`，不再与 Kokoro 同挤 `Dispatchers.Default`。
+  代价写在账上：**换到的是主线程不再被这几十毫秒堵住，不是这几十毫秒消失**。
+
+读数边界（按决策册 §4「本批不承诺具体毫秒数」的口径登记，不许外推）：
+
+- `Displayed .MainActivity` 中位数 739.5 ms → 733.5 ms，差 6 ms，**落在噪声里**（未接线区间 732–837、接线区间 716–854 大面积重叠）。
+  被搬走的只是那 45–51 ms 的主线程开库，MainActivity 其余的出帧成本（Hilt 图、Compose 首帧、骨架组合）本批一概没碰，
+  所以「首帧快了 45 ms」这种说法没有读数支持，也不许写进任何交付文案。
+- 未测一项：「首帧 → 今日计划可读」这段骨架时长的前后差。要量它得在 `TodayPlanViewModel` 的 `Ready` 落点再插一枚临时桩，
+  本批没有为一条读数再走一轮双构建；已挂进下面的待目视清单。
+- 临时桩（`AppModule.provideDatabase` 里那两行 `Log.i`）**不入提交**：测完当场用反向 Edit 摘掉，
+  并以 `git diff --stat` 复核工作区只剩 `EnglishLearningApplication.kt` 一处改动。教训沿用批 C-4c——
+  为测量改生产码可以，但必须自己摘干净并留下复核命令。
+
+### connected 侧（预热跑在每一次进程启动里，必须重跑启动相关类）
+
+`StartupLocalDataWarmer` 挂在 `Application.onCreate`，instrumented 进程同样会执行它（`createComposeRule()` 用的就是真 Application），
+所以本批不是「只加了一枚没人跑的类」。`emulator-5554`、`adb install -r` 两枚 APK、`am instrument` 单跑：
+
+- `com.example.englishlearning.ui.AppScreenTest`：首趟 `Tests run: 64, Failures: 1`，红在
+  `startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan`（`waitUntil` 5 秒超时，AppScreenTest.kt:2813）；
+  单跑 `OK (1 test)`、整类复跑 `OK (64 tests)`。**这是本仓在册最久的一枚 flake**，至少六份文档记过同一方法同一形状
+  （最早 `2026-10-15-stage-5-sp-b-performance-and-reliability-report.md` 用 `git stash` 回退到分支基线重构建重跑、
+  同名同批用例照样红），本批既没改实现也没放宽判据。
+- `com.example.englishlearning.ui.RecoveryScreenTest`：`OK (5 tests)`。选它是因为预热与恢复屏读同一枚启动探针，
+  预取把开库提前到后台之后，`NeedsRecovery` 那一臂必须仍然只在真失败时出现。
+- `com.example.englishlearning.core.storage.MigrationFailureRecoveryTest`：`OK (1 test)`。
+  它自己造一枚「来自未来版本」的库文件走失败路径，用来确认预热在后台真开了一次生产库之后，
+  开库失败面的行为照旧（文件不删、原因短句）。
+
+三条连读的意义：预热挂在 `Application.onCreate`，instrumented 进程也会跑它（`createComposeRule()` 用的就是真 Application），
+所以「进程启动多了一次磁盘 IO」这件事对全部 connected 用例都成立；两枚启动相关类复跑全绿 + 唯一一枚红落在
+在册 flake 上，说明本批没有把启动竞争带进 UI 断言。
+
+### 一条取样纪律（本棒差点误报）
+
+门禁还在跑时就去数 `app/build/test-results/testDebugUnitTest/*.xml`，会读到**上一趟定向跑留下的旧账**：
+本棒中途读到 `StartupPrefetchLoadPointContractTest` 是 `4 tests / 1 failure`，那实际是变异探针那一趟的产物
+（探针当时真的往 `AppScreen` 里插了一枚未登记的 `wordCardViewModel.load`），等 `BUILD SUCCESSFUL` 之后重算就是
+331 类 / 2460 条 / 0 失败。这是上文 Seat D M-4 那条「陈旧 XML 会让五元组失真」的**另一面**：
+那条讲的是虚高，这里虚的是**失败数**。做法不变——统计只在整条门禁命令回码之后做，本棒未删结果目录（无并发读者也无需删，
+计数与预期逐位对上即背书）。重算命令沿用本节那条 `grep -h -o 'tests="…"'`。
+
+### 待用户目视（在 C-4c 累计清单之上追加）
+
+- 冷启动进今日页：闪屏结束后那一屏骨架停留是否比预期短、有没有出现「骨架闪一下就变成内容」的更难看形状。
+  读数只能说主线程不再堵那几十毫秒，说不了人眼看着是否更顺。
