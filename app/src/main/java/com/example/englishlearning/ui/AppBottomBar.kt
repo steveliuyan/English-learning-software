@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -18,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -25,6 +28,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.InlineIconBadge
@@ -46,6 +50,31 @@ import com.example.englishlearning.ui.theme.appDomain
  * 否则「换摆法不换语义」在这条腿上就断了（配套锚见 `AppWindowLayoutContractTest` 的跨文件比对）。
  */
 internal const val TabGlyphIdleAlpha = 0.5f
+
+/**
+ * 底栏每一格在**顶档**上下留出的余量（QA3 A2.7）。
+ *
+ * 存在的理由只有一个：顶档（fontScale 3.0）下栏高恰好等于最高那一格的内容高，不留余量时药片上沿就压在
+ * 栏沿 hairline 上、文案第二行压在栏底（设备取色 1442 = hairline，图证
+ * `.git/qa-scratch/a2-fix/after-fs300-02-aihub.png`），观感与「画到栏外」无法区分。
+ */
+private val TabSlotVerticalBreathing = 6.dp
+
+/**
+ * 顶档降级阈值下的上下余量：`> 2f` 才留，1.0/2.0 档留 0。
+ *
+ * 为什么不能三档一律给 6dp（2026-11-08 设备实测，`after-fs100-bar.png` / `after-fs200-bar.png`）：
+ *  - 1.0 档内容自然高 58.5dp，被 [heightIn] 的 64dp 下限兜住、居中后上下各余 2.75dp；给了 6+6 就变成
+ *    70.5dp——**默认档凭空长高 6.5dp**，而这一档是用户已经目视定稿的观感；
+ *  - 2.0 档（AC-R-07 钉住的验收档）四枚标签全是单行（设备 dump 四格标签同沿 `y=1687`），
+ *    本来就没有折行格，顶对齐与居中完全同形，加余量只会把栏从 68.7dp 顶到 80.7dp。
+ * 只有 `> 2f` 才出现「一格两行、其余一行」的形状，余量与顶对齐才既是必要又不伤已定稿的档。
+ *
+ * 阈值取严格大于 2f 而不是 `>= 2f`：与 `wordCardPinsRevealAction` / `aiFeatureGridColumns` 同一条口径
+ * ——2.0 是钉住的验收档，形状不得被顶档整改带走。
+ */
+internal fun bottomBarSlotVerticalBreathing(fontScale: Float): Dp =
+    if (fontScale > 2f) TabSlotVerticalBreathing else 0.dp
 
 /**
  * 四栏底部导航。
@@ -74,15 +103,29 @@ fun AppBottomBar(
 ) {
     Column(modifier = modifier.fillMaxWidth().background(MintSurface)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(MintOutline))
+        // QA3 A2.7（用户 2026-11-08 拍板「全部都做」）：顶档（fontScale 3.0）下「AI 助学」这枚标签折成两行，
+        // 旧形里这一格自然高 134.1dp、其余三格 86.1dp，四格在默认 `CenterVertically` 里各占一段
+        // （设备实测 AI 格 `[540,1442][810,1794]`、其余 `[*,1505][*,1731]`），读起来就是「图标浮到别人之上、
+        // 文案第二行掉到别人之下」。修法取走查册给的两种里的「格高随字号」，不取「标签截断」——
+        // `AI 助学` 截成 `AI …` 是把目的地名字改没，比栏长高 12dp 严重。
+        //
+        // 两条腿缺一不可，各自钉住一条判据（`AppBottomBarTest.slotsStayInsideTheBar*`）：
+        //  ① `IntrinsicSize.Max` + 每格 `fillMaxHeight`（见 `TabSlot`）让四格同一条矩形、同一块可点区；
+        //  ② 每格内部改为**顶对齐**并按档留出上下余量：四枚字形因此落在同一条横线上（①只保证矩形等高，
+        //     等高矩形里各自居中仍会把两行标签那格的图标顶到别人之上——这正是 2026-11-08 第一版整改漏掉的那半）。
+        // 余量只在 `> 2f` 给出，1.0/2.0 档一像素都不动，理由与实测量见 [bottomBarSlotVerticalBreathing]。
+        val breathing = bottomBarSlotVerticalBreathing(LocalDensity.current.fontScale)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .heightIn(min = 64.dp),
+                .height(IntrinsicSize.Max)
+                .heightIn(min = 64.dp)
+                .padding(bottom = breathing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppTab.entries.forEach { tab ->
-                TabSlot(tab = tab, selected = tab == selected, onSelect = onSelect)
+                TabSlot(tab = tab, selected = tab == selected, onSelect = onSelect, breathing = breathing)
             }
         }
     }
@@ -106,7 +149,12 @@ internal val AppTab.glyph: AppIcon
     }
 
 @Composable
-private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) -> Unit) {
+private fun RowScope.TabSlot(
+    tab: AppTab,
+    selected: Boolean,
+    onSelect: (AppTab) -> Unit,
+    breathing: Dp,
+) {
     val tint = if (selected) appDomain(AppDomain.AiSpeech).deep else appColors().text2
     // 选中态是三条腿，墨不是一枚通吃：
     //  - 字形腿走 `InlineIconBadge`（tint 药片底 + 域 `deep` 描边），非文本图形档；
@@ -119,9 +167,22 @@ private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) 
     // 图形腿两档共用同一枚插画：只看「带不带药片底」（徽标内由 backdrop 收口）与「压不压半透明」。
     // 半透明用 if 直接给 Modifier，而不是 `.alpha(if (...) 1f else ...)`：选中档不额外套一层无用的图层。
     val glyphModifier = if (selected) Modifier else Modifier.alpha(TabGlyphIdleAlpha)
+    // 顶对齐之后，字形与栏沿之间必须自己留出余量，否则两行标签那一格会把药片顶到栏沿 hairline 上，
+    // 看着像画到栏外（2026-11-08 设备图证 `after-fs300-02-aihub.png` 取色：药片上沿 1442 = hairline）。
+    // 药片自己带 tag：`IllustratedIconTag` 落在里面那枚 26dp 位图上，量不到 30dp 药片的真实外沿，
+    // 而「浮出栏沿」判的正是外沿（`AppBottomBarTest` 的第三条判据按药片上沿比四格）。
+    // 整枚 modifier 提到局部变量，是为了让下面的调用回到一行：`AppBottomBarContractTest` 的实参级锚
+    // `InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech` 按「剥注释后整行子串」计数，
+    // 参数换行排版会让这枚锚判 0（2026-11-08 踩实过一次）。
+    val glyphBadgeModifier =
+        glyphModifier.padding(top = breathing).testTag("app_tab_glyph_${tab.name.lowercase()}")
     Column(
         modifier = Modifier
             .weight(1f)
+            // QA3 A2.7：整格拉满行高（行高由最高的那一格定，见 `AppBottomBar` 里的 `IntrinsicSize.Max`），
+            // 四格因此等高、可点区也等宽等高；格内改**顶对齐**（下面的 `spacedBy(..., Alignment.Top)`），
+            // 让四枚字形落在同一条横线上——居中会把两行标签那一格的图标顶到别人之上（第一版整改漏掉的那半）。
+            .fillMaxHeight()
             .heightIn(min = 64.dp)
             .testTag("app_tab_${tab.name.lowercase()}")
             .clickable { onSelect(tab) }
@@ -130,16 +191,15 @@ private fun RowScope.TabSlot(tab: AppTab, selected: Boolean, onSelect: (AppTab) 
                 role = Role.Tab
                 stateDescription = if (selected) "已选中" else "未选中"
             },
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.Top),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech, modifier = glyphModifier, backdrop = selected)
+        InlineIconBadge(icon = tab.glyph, domain = AppDomain.AiSpeech, modifier = glyphBadgeModifier, backdrop = selected)
         Text(
             text = tab.label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             color = labelInk,
-            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }

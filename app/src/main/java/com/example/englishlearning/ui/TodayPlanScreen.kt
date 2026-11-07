@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -308,6 +309,9 @@ fun TodayPlanScreen(
                     val totalDone = newDone + dueDone
                     val totalTarget = state.totalTasks
                     val remaining = (totalTarget - totalDone).coerceAtLeast(0)
+                    // QA3 A2.1：顶档（> 2.0）把「还剩 N 个词」搬到计数那一列下面，理由与实测量见
+                    // [todayPlanRemainingMovesBelowCount]；1.0 / 2.0 两档的版面一字未动。
+                    val stackedHeader = todayPlanRemainingMovesBelowCount(LocalDensity.current.fontScale)
                     val ctaLabel: String
                     val ctaAction: () -> Unit
                     when {
@@ -337,6 +341,9 @@ fun TodayPlanScreen(
                                         "今日计划",
                                         style = AppType.Eyebrow,
                                         color = LocalContentColor.current.copy(alpha = 0.74f),
+                                        // QA3 A2.1 量点：眉标这一枚在顶档是最先被挤成两行的字，
+                                        // 「计数行有没有被挤」以它是否还是单行为判据（`TodayPlanScreenTest`）。
+                                        modifier = Modifier.testTag("today_plan_eyebrow"),
                                     )
                                     Row(verticalAlignment = Alignment.Bottom) {
                                         Text(
@@ -349,17 +356,21 @@ fun TodayPlanScreen(
                                             " / $totalTarget 个词",
                                             style = AppType.Footnote,
                                             color = LocalContentColor.current.copy(alpha = 0.74f),
-                                            modifier = Modifier.padding(start = 2.dp, bottom = 6.dp),
+                                            // 同上：顶档旧形里这一枚在 264px 的窄列里折成三行，
+                                            // 大数字因此被顶出首屏（走查册记的是「0 看不见」）。
+                                            modifier = Modifier
+                                                .padding(start = 2.dp, bottom = 6.dp)
+                                                .testTag("today_plan_total_target"),
                                         )
                                     }
+                                    // QA3 A2.1：顶档把「还剩 N 个词」从行尾搬到计数下面（判档见
+                                    // [todayPlanRemainingMovesBelowCount]）。它在这一档不参与权重，
+                                    // 会把左边那一列压到只剩 264px——眉标折两行、注脚折三行、
+                                    // 唯一的大数字被顶出首屏。搬下来之后整列拿到卡内整幅宽度，四枚字各自单行。
+                                    if (stackedHeader) PlanRemainingCount(remaining)
                                 }
-                                Text(
-                                    "还剩 $remaining 个词",
-                                    style = AppType.Footnote,
-                                    color = LocalContentColor.current.copy(alpha = 0.74f),
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(top = 4.dp).testTag("today_plan_remaining"),
-                                )
+                                // 钉档以内维持原型 `.plan-head` 的一行两栏（左计数、右余量），一像素都不动。
+                                if (!stackedHeader) PlanRemainingCount(remaining)
                             }
                             // 原型 `.plan-bar`：两段段宽 = 目标份额、段内填充 = 完成比（见 `PlanBar.kt`）。
                             PlanProgressBar(
@@ -557,6 +568,38 @@ private fun PlanLegendKey(label: String, done: Int, target: Int, swatch: Color, 
         )
     }
 }
+
+/**
+ * 「还剩 N 个词」这一枚注脚（原型 `.plan-head` 行尾那一句）。
+ *
+ * 顶档要把它从行尾搬到计数下面（QA3 A2.1，见 [todayPlanRemainingMovesBelowCount]），落点由调用方按档选；
+ * 抽成函数是为了让这一枚 `Text(` 与它的 `today_plan_remaining` 标签**在全屏只有一处**——
+ * 两个分支各写一份会让 `TodayPlanNumberAuthorityTest` 的标签枚举与窗口取样器看到重复站点。
+ */
+@Composable
+private fun PlanRemainingCount(remaining: Int) {
+    Text(
+        text = "还剩 $remaining 个词",
+        style = AppType.Footnote,
+        color = LocalContentColor.current.copy(alpha = 0.74f),
+        maxLines = 1,
+        modifier = Modifier.padding(top = 4.dp).testTag("today_plan_remaining"),
+    )
+}
+
+/**
+ * 顶档是否把「还剩 N 个词」搬到计数列下面（QA3 A2.1，用户 2026-11-08 拍板「全部都做」）。
+ *
+ * 旧形只有一种版面：行尾那一句**不参与权重**，于是它要多宽拿多宽，剩下的才给左列。
+ * 设备 3.0 实测（`.git/qa-scratch/qa3/fs300-a-today.xml`）它一人吃掉 572px，左列只剩 264px
+ * ——眉标「今日计划」折两行 `[106,1019][370,1255]`、注脚「 / 23 个词」折三行 `[250,1255][370,1439]`，
+ * 而整屏唯一的大数字被挤到首屏之外，节点树里查无此点（`uiautomator` 的 bounds 是父容器可视交集，
+ * 被裁掉的点永远「不越界」，所以自动判据全绿、人眼才看到）。走查册记的是「0 看不见」，根因是**挤**。
+ *
+ * 阈值与 `wordCardPinsRevealAction` / `aiFeatureGridColumns` / `bottomBarSlotVerticalBreathing` 同一条口径：
+ * 严格大于 2f。2.0 是 AC-R-07 钉住的验收档，那一档四枚字全单行、行尾余量与左列互不侵犯，形状不得被顶档带走。
+ */
+internal fun todayPlanRemainingMovesBelowCount(fontScale: Float): Boolean = fontScale > 2f
 
 /**
  * 页头行尾的齿轮动作（原型 `.icon-btn`：40dp、透明底、药丸形、`ink` 墨）。

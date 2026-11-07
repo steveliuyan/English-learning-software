@@ -146,10 +146,18 @@ fun AppScreenHeader(
                 overflow = TextOverflow.Clip,
             )
             if (subtitle != null) {
+                // QA3 A2.6①：副标题腿原先没有行数上限，是页头唯一能长成整段散文的一腿——
+                // 顶档 3.0 下 AI 助学页那句 31 字说明排 4 行 645px，首屏几乎只剩页头。
+                // 上限取 3 而不是 2：那句在 2.0（AC-R-07 钉住的验收档）恰好 3 行，压到 2 就是
+                // 为顶档好看而让钉档丢字。代价：超过 3 行的文案在末行走省略号，语义文本仍是整句
+                // （TalkBack 读得到）；钉档不丢字由 `AiLearningScreenTest
+                // .headerSubtitleKeepsEveryWordAtThePinnedFontTier` 守着，本组件不再往下压。
                 Text(
                     text = subtitle,
                     style = AppType.Footnote,
                     color = colors.text2,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }

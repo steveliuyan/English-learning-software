@@ -1,13 +1,19 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -15,8 +21,14 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ui.components.IllustratedIconTag
+import com.example.englishlearning.ui.theme.MintGlassTheme
+import com.example.englishlearning.ui.theme.ThemeMode
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -199,6 +211,104 @@ class AppBottomBarTest {
                 .onNodeWithTag("app_tab_${tab.name.lowercase()}", useUnmergedTree = true)
                 .fetchSemanticsNode().config[SemanticsProperties.StateDescription]
             assertEquals("点过 $tab 之后它必须自己念出已选中", "已选中", stateOf)
+        }
+    }
+
+    /**
+     * QA3 A2.7（用户 2026-11-08 拍板「全部都做」）：字体大小顶档 3.0 下，四枚格子必须**仍装在栏这一条里**，
+     * 并且四格同高同沿。
+     *
+     * 旧形实测（走查册 §A2.7，图证 `fs300-ai-01-hub.png`）：「AI 助学」格 bounds
+     * `[540,1442][810,1794]`（352px）而其余三格 `[*,1505][*,1731]`（226px）——同一排四格不同高，
+     * 折行那一格的图标顶到其余三格之上、文案第二行落到其余三格之下，读起来像「画到栏外压住页面内容」。
+     * `uiautomator` 的 bounds 是与父容器的可视交集，看不见真裁切，所以这条护栏必须在 Compose 侧量**未裁剪**矩形。
+     *
+     * 三条判据（对「格高怎么来的」中立：格高随字号、标签按档收成一行、内在量取短了，各有一种红样）：
+     *  ① 四格**上沿**必须一致——中心对齐的那一格长过其余时，上沿必然不齐（旧形实测 AI 格 1442、其余 1505）；
+     *  ② 每格的药片与标签必须整个落在本格矩形内——行高若被取短（`IntrinsicSize.Max` 的内在量小于真实内容高），
+     *     图标就从格顶之上浮出、压住页面内容；
+     *  ③ 四枚药片必须落在**同一条横线**上——这一条才对应眼睛看到的对齐；只有 ①② 时，格内各自居中仍会让
+     *     两行标签那一格的图标顶到别人头上（2026-11-08 第一版整改正是这样过了 ①②，设备取色 AI 药片 1442、其余 1515）。
+     * 0.5dp 的容差只用来吃掉亚像素取整，不用来放行真越界（旧形上下沿差 13dp、字形线差 24dp）。
+     *
+     * 2026-11-08 踩过的坑，写死在这里：**必须套 [MintGlassTheme]**。不套主题时 `labelSmall` 走 M3 默认排印，
+     * 套上主题才走 `appTypography()`；同一份顶档栏，不套主题量到格高 130.286dp、套上主题 134.095dp
+     * （= 设备 352px÷2.625，与 dump 对上）。差 4dp 看着不大，但这条护栏量的正是「内容高 vs 行高」的余量，
+     * 用错的排印量出来的绿不代表设备——第一轮这条判据在设备上仍有观感差却报 OK，根因就在这里。
+     */
+    @Test
+    fun slotsStayInsideTheBarAtTopFontScale() {
+        assertSlotsStayInsideTheBar(width = null)
+    }
+
+    /**
+     * A2.7 的小屏一侧：320dp 是 Spec 05 钉住的最小走查宽度（`docs/verification/visual-walkthrough-2026-11-08.md`
+     * 的 320dp 组），这一档每格只有 80dp 宽，「AI 助学」在顶档折成两行时比整机宽度更容易顶出栏沿。
+     * 与上一条分成两个方法而不是在同一方法里两次 `setContent`：同一 Compose 测试内二次 `setContent`
+     * 在设备侧必崩（QA 手册 §2 记过），拆开发才跑得动。
+     */
+    @Test
+    fun slotsStayInsideTheBarAtTopFontScaleOnNarrowScreen() {
+        assertSlotsStayInsideTheBar(width = 320.dp)
+    }
+
+    private fun assertSlotsStayInsideTheBar(width: Dp?) {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                MintGlassTheme(themeMode = ThemeMode.Light) {
+                    if (width == null) {
+                        AppBottomBar(selected = AppTab.AI, onSelect = {})
+                    } else {
+                        Box(modifier = Modifier.width(width)) {
+                            AppBottomBar(selected = AppTab.AI, onSelect = {})
+                        }
+                    }
+                }
+            }
+        }
+
+        val boxes = AppTab.entries.associateWith { tab ->
+            composeRule.onNodeWithTag("app_tab_${tab.name.lowercase()}", useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        }
+        val reference = boxes.getValue(AppTab.LEARNING)
+        AppTab.entries.forEach { tab ->
+            val box = boxes.getValue(tab)
+            assertTrue(
+                "fontScale=3.0（宽度=${width ?: "整幅"}）下「${tab.label}」格与「${AppTab.LEARNING.label}」格上沿不齐：" +
+                    "本格=$box 基准=$reference ——上沿不齐说明这一格是被中心对齐顶出栏沿的那一格（A2.2/A2.7 同一根因）",
+                abs(box.top.value - reference.top.value) < 0.5f,
+            )
+        }
+        val glyphBoxes = AppTab.entries.associateWith { tab ->
+            composeRule.onNodeWithTag("app_tab_glyph_${tab.name.lowercase()}", useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        }
+        AppTab.entries.forEach { tab ->
+            val slotBox = boxes.getValue(tab)
+            val glyphBox = glyphBoxes.getValue(tab)
+            val labelBox = composeRule.onNodeWithText(tab.label, useUnmergedTree = true).getUnclippedBoundsInRoot()
+            assertTrue(
+                "fontScale=3.0（宽度=${width ?: "整幅"}）下「${tab.label}」格的内容画出格外：" +
+                    "药片越顶 ${slotBox.top.value - glyphBox.top.value}dp、" +
+                    "标签越底 ${labelBox.bottom.value - slotBox.bottom.value}dp（格=$slotBox 药片=$glyphBox 标签=$labelBox）" +
+                    "——行高取短了，图标会浮到栏沿之上压住页面内容",
+                glyphBox.top.value >= slotBox.top.value - 0.5f && labelBox.bottom.value <= slotBox.bottom.value + 0.5f,
+            )
+        }
+        // ③ 四枚药片必须落在同一条横线上——这一条才是用户眼睛看到的「对齐」。
+        // ①只保证四格的**矩形**等高：矩形等高、格内各自居中时，两行标签那一格的图标仍会被顶到别人之上
+        // （2026-11-08 第一版整改正是只有 ① 没有 ③，四格同为 352px 却各排各的：AI 药片上沿 1442、其余 1515）。
+        val glyphReference = glyphBoxes.getValue(AppTab.LEARNING)
+        AppTab.entries.forEach { tab ->
+            val glyphBox = glyphBoxes.getValue(tab)
+            assertTrue(
+                "fontScale=3.0（宽度=${width ?: "整幅"}）下「${tab.label}」的字形与「${AppTab.LEARNING.label}」不在同一条横线：" +
+                    "本格药片=$glyphBox 基准=$glyphReference（上沿差 ${glyphBox.top.value - glyphReference.top.value}dp）" +
+                    "——格高一致但格内居中，长标签那一格照样把图标顶到别人头上",
+                abs(glyphBox.top.value - glyphReference.top.value) < 0.5f,
+            )
         }
     }
 }

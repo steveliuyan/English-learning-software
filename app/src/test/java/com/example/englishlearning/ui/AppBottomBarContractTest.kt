@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.ui.unit.dp
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -277,6 +278,38 @@ class AppBottomBarContractTest {
         assertEquals(0, count(bar, "AppPalette."), "底导不得残留 AppPalette 静态读点：改 appColors()/appDomain()")
         val body = extractFunctionBody(bar, tabSlotSignature)
         assertEquals(1, count(body, themedInkAnchor), "TabSlot 选中/未选中墨色必须按主题取：选中 deep、未选中 text2，恰一处")
+    }
+
+    // ---------- 用例：顶档余量按档给出（QA3 A2.7） ----------
+
+    /**
+     * `bottomBarSlotVerticalBreathing` 是底栏余量的**唯一**判断点，档位口径与
+     * `wordCardPinsRevealAction` / `aiFeatureGridColumns` 同族：2.0 是 AC-R-07 钉住的验收档，
+     * 只有严格超过它才降级。
+     *
+     * 为什么要单独钉 1.0/2.0 这两档给 0：设备实测（2026-11-08，`after-fs100-bar.png` /
+     * `after-fs200-bar.png`）1.0 档内容自然高 58.5dp 由 64dp 下限兜住、2.0 档四枚标签全单行 68.7dp，
+     * 一律给 6dp 会把这两档分别顶到 70.5dp / 80.7dp——把已经目视定稿的观感凭空改高。
+     * 计数锚防的是第二种复发：判断点在屏侧又散写一遍 `LocalDensity.current.fontScale > 2f`。
+     */
+    @Test
+    fun `vertical breathing is given only above the pinned font scale tier`() {
+        assertEquals(0.dp, bottomBarSlotVerticalBreathing(1f), "1.0 默认档栏高是已定稿观感，余量必须为 0")
+        assertEquals(0.dp, bottomBarSlotVerticalBreathing(2f), "2.0 是 AC-R-07 钉住的验收档，四枚标签全单行，没有需要垫开的折行格")
+        assertEquals(6.dp, bottomBarSlotVerticalBreathing(2.5f), "超过钉档就要留出上下余量")
+        assertEquals(6.dp, bottomBarSlotVerticalBreathing(3f), "Android 字体大小顶档 3.0 必须留出余量，否则药片压在栏沿 hairline 上")
+
+        val bar = appBottomBarSource()
+        assertEquals(
+            2,
+            count(bar, "bottomBarSlotVerticalBreathing("),
+            "`bottomBarSlotVerticalBreathing(` 必须恰两处（定义 + 屏侧唯一消费点）：多出来的每一处都是第二套余量判断",
+        )
+        assertEquals(
+            1,
+            count(bar, "fontScale > 2f"),
+            "余量档位判断只许活在 bottomBarSlotVerticalBreathing 的定义里（恰一处），屏侧不许再散写一遍 `fontScale > 2f`",
+        )
     }
 
     // ---------- 用例：四枚 duotone 字形映射 ----------

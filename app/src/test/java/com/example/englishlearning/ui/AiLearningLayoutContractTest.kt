@@ -100,13 +100,19 @@ class AiLearningLayoutContractTest {
     fun `the implemented features form a two column card grid`() {
         assertEquals(
             1,
-            countMatches(source, Regex(Regex.escape("chunked(2)"))),
-            "功能卡必须按 `chunked(2)` 分双列：参考 `grid-template-columns:1fr 1fr`，单列会退回复古长列表",
+            countMatches(source, Regex(Regex.escape("chunked(columns)"))),
+            "功能卡的分列必须由 `columns` 这一枚局部量给出（QA3 A2.6② 起列数是字号档的函数）：" +
+                "写死 `chunked(2)` 就是让顶档继续按 1.0 档定尺，列数判据见下面那条纯函数用例",
+        )
+        assertEquals(
+            2,
+            countMatches(source, Regex(Regex.escape("aiFeatureGridColumns("))),
+            "`aiFeatureGridColumns(` 必须恰两处（定义 + 屏侧唯一消费点）：多出来的每一处都是第二套列数判断",
         )
         assertEquals(
             1,
             countMatches(source, Regex(Regex.escape("Spacer(Modifier.weight(1f))"))),
-            "奇数张时末行必须补一枚等宽占位，否则最后一张卡会撑满整行（参考 CSS grid 不会这样）",
+            "末行不满列时必须补等宽占位，否则最后一张卡会撑满整行（参考 CSS grid 不会这样）",
         )
         assertEquals(
             1,
@@ -141,6 +147,22 @@ class AiLearningLayoutContractTest {
             "featureStatusBadge(feature.implemented)" in source,
             "状态词必须来自共享 `featureStatusBadge`，屏侧不另写一套可用/未上线措辞",
         )
+    }
+
+    /**
+     * 列数判据（QA3 A2.6②）：走查册实测顶档 3.0 下每张卡在半宽列里排到约 714dp 高、徽标被推出可视区，
+     * 「双列」这一形状只在 1.0/2.0 档成立。
+     *
+     * 判档口径沿用批 B 的「阈值严格大于钉档」：`2f` 是 AC-R-07 钉住的验收档，那一档的形状是设计稿口径，
+     * 不能因为「顺手上探」把双列改单列；只有**超过**钉档才降级。抽成 `internal` 纯函数是为了让这条
+     * 算术在 JVM 侧逐档点名（connected 那侧只能验「顶档确实上下堆叠」，验不出 2.0 不许动）。
+     */
+    @Test
+    fun `the card grid falls back to one column only above the pinned font tier`() {
+        assertEquals(2, aiFeatureGridColumns(1f), "1.0 档是设计稿口径：双列")
+        assertEquals(2, aiFeatureGridColumns(2f), "2.0 是 AC-R-07 钉住的验收档，形状不得被顶档整改带走")
+        assertEquals(1, aiFeatureGridColumns(2.5f), "超过钉档就必须单列，让每张卡拿到整幅宽度")
+        assertEquals(1, aiFeatureGridColumns(3f), "Android 字体大小顶档 3.0 必须单列")
     }
 
     @Test

@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -99,18 +100,22 @@ fun AiLearningScreen(
 }
 
 /**
- * 双列功能卡（参考 `grid-template-columns:1fr 1fr`）。
+ * 功能卡网格（参考 `grid-template-columns:1fr 1fr`）。
  *
  * 行高按 `IntrinsicSize.Min` 拉齐：参考里同一行的两张卡等高，单靠 `weight` 只能等宽，
- * 说明长短不一时右卡会比左卡矮一截。奇数张时末行补一枚等宽 `Spacer`，否则最后一张会撑满整行。
+ * 说明长短不一时右卡会比左卡矮一截。末行不满列时逐格补等宽 `Spacer`，否则最后一张会撑满整行。
+ *
+ * 列数不是常量（QA3 A2.6②）：走查册实测顶档 3.0 下每张卡在半宽列里排到约 714dp 高、状态徽标被推出可视区，
+ * 「双列」这一形状只在钉档以内成立，超过就退回单列让每张卡拿到整幅宽度。判档收在 [aiFeatureGridColumns]。
  */
 @Composable
 private fun AiFeatureGrid(
     features: List<AiFeature>,
     onOpenFeature: ((AiFeature) -> Unit)?,
 ) {
+    val columns = aiFeatureGridColumns(LocalDensity.current.fontScale)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        features.chunked(2).forEach { rowFeatures ->
+        features.chunked(columns).forEach { rowFeatures ->
             Row(
                 modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -122,13 +127,26 @@ private fun AiFeatureGrid(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
-                if (rowFeatures.size == 1) {
-                    Spacer(Modifier.weight(1f))
+                if (rowFeatures.size < columns) {
+                    repeat(columns - rowFeatures.size) {
+                        Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * 顶档字号降级：功能卡列数 = 字号档的函数。
+ *
+ * 阈值取严格大于 `2f`，不是「≥2.5 才降」——`2.0` 是 AC-R-07 钉住的验收档，那一档的双列形状是设计稿口径，
+ * 已经在 [AiLearningScreenTest] 里逐列点名；把它一起改掉就等于用顶档整改偷走了钉档的形状。
+ * 口径与批 B 的 `AppWindowLayoutPolicy.downgradesHeroHeader` 同源：**超过**钉档才降级。
+ *
+ * 抽成 `internal` 纯函数是为了让这四档算术能在 JVM 侧点名（connected 只能证「顶档确实上下堆叠」，证不出 2.0 不许动）。
+ */
+internal fun aiFeatureGridColumns(fontScale: Float): Int = if (fontScale > 2f) 1 else 2
 
 /**
  * 单张功能卡：字形 + 标题 + 一句说明（可点档再加状态徽章）。

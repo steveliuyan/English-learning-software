@@ -1,7 +1,10 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
@@ -14,6 +17,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.ui.theme.AppColorDark
 import com.example.englishlearning.ui.theme.MintGlassTheme
@@ -178,5 +184,102 @@ class AiLearningScreenTest {
             AppColorDark.background.toArgb(),
             screen.getPixel(0, 0),
         )
+    }
+
+    /**
+     * QA3 A2.6①（用户 2026-11-08 拍板「全部都做」）：字体大小顶档 3.0 下，页头副标题不得吃掉首屏。
+     *
+     * 实测（走查册 §A2.6，图证 `fs300-ai-01-hub.png`）：那一句说明在 3.0 排成 4 行、645px，
+     * 首屏几乎只剩标题区——本页**可滚**（根 `ScrollView [0,63][1080,1439]`），所以不是 A2.5 那种流程断裂，
+     * 但页头按 1.0 档定尺、随字号线性长高，把唯一主操作推到了两三屏之外。
+     *
+     * 判据取「行数」这个可解释量，不拿像素门限说话：共享页头的标题腿已经钉死 `maxLines = 2`
+     * （`AppScreenHeaderTest` 两条大字号用例），副标题腿原先完全不设上限，是页头唯一会长成整段散文的一腿。
+     *
+     * **上限为什么是 3 而不是 2**：这句说明在 2.0 恰好排 3 行，而 2.0 是 UI 重设计 spec 钉住的
+     * 组件大字号验收档（AC-R-07）——上限压到 2 就是为了让顶档好看而让钉档开始丢字，方向反了。
+     * 钉档不丢字由下面那条 `headerSubtitleKeepsEveryWordAtThePinnedFontTier` 当场守着，
+     * 本条只管顶档别再无限长高。代价如实登记：3.0 下第 4 行收进省略号，整句仍由语义文本供出
+     * （TalkBack 读得到；`Clip` 与 `Ellipsis` 都不改语义）。
+     */
+    @Test
+    fun headerSubtitleStaysWithinThreeLinesAtTopFontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                AiLearningScreen(onOpenFeature = {}, onOpenAiProfiles = {})
+            }
+        }
+
+        val layout = subtitleLayoutAtHeader()
+        assertTrue(
+            "fontScale=3.0 下页头副标题排成 ${layout.lineCount} 行（首屏被说明文字吃掉，A2.6①）：" +
+                "行数上限 3，末行止于 ${layout.getLineEnd(layout.lineCount - 1)}/${AI_HUB_SUBTITLE.length}",
+            layout.lineCount <= 3,
+        )
+    }
+
+    /**
+     * QA3 A2.6① 的另一半：把上限引进共享页头之后，**钉档 2.0 一个字都不许丢**。
+     *
+     * 判据不是行数而是「最后一行是否排到了句尾」：`getLineEnd(lineCount - 1) == text.length`
+     * 只有整句都进了版面才成立，一旦 `maxLines` 触发省略号截断，末行下标就停在中间。
+     * 这条是本轮改动的反向护栏——它不许下一棒为了「顶档更好看」把上限再往下压。
+     */
+    @Test
+    fun headerSubtitleKeepsEveryWordAtThePinnedFontTier() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 2f)) {
+                AiLearningScreen(onOpenFeature = {}, onOpenAiProfiles = {})
+            }
+        }
+
+        val layout = subtitleLayoutAtHeader()
+        val lastLineEnd = layout.getLineEnd(layout.lineCount - 1)
+        assertEquals(
+            "fontScale=2.0（AC-R-07 钉档）副标题必须整句排完，丢字即上限压过头了：实际 ${layout.lineCount} 行，" +
+                "末行止于 $lastLineEnd/${AI_HUB_SUBTITLE.length}",
+            AI_HUB_SUBTITLE.length,
+            lastLineEnd,
+        )
+    }
+
+    /** 取页头那句说明的 `TextLayoutResult`（语义动作，不读绘制像素；两档共用同一条取法）。 */
+    private fun subtitleLayoutAtHeader(): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule.onNodeWithText(AI_HUB_SUBTITLE)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
+    }
+
+    /**
+     * QA3 A2.6②③（同一条根因：卡片与分段头按 1.0 档定尺）：顶档下功能卡必须改成单列。
+     *
+     * 双列在 3.0 的实测形状：每格只剩约 180dp，「长难句分析」折成两行、未接通卡的状态徽标被推出卡片可视区
+     * （要走查册里那张 `fs300-ai-03-hub-scrolled.png` 才看得到），「还在打磨」分段标题被视口下沿切半行。
+     * 顶档唯一不破版的形状是单列——判据按**排出来的实际位置**量，源码侧 `chunked(2)` 数不出来
+     * （同一条理由见上面 `the_feature_cards_are_laid_out_in_two_columns` 的注释）。
+     */
+    @Test
+    fun featureCardsFallBackToOneColumnAtTopFontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                AiLearningScreen(onOpenFeature = {}, onOpenAiProfiles = {})
+            }
+        }
+
+        val first = composeRule.onNodeWithTag("ai_feature_${implemented[0].key}").getUnclippedBoundsInRoot()
+        val second = composeRule.onNodeWithTag("ai_feature_${implemented[1].key}").getUnclippedBoundsInRoot()
+        assertTrue(
+            "fontScale=3.0 下前两张功能卡必须上下堆叠（单列）：第二张 top=$second.top 未落到第一张 bottom=${first.bottom} 之下",
+            second.top > first.bottom,
+        )
+    }
+
+    private companion object {
+        /** 页头那句说明的原文，逐字取自 [AiLearningScreen]；文案改动时本常量必须跟着改，不许靠模糊匹配蒙过。 */
+        const val AI_HUB_SUBTITLE = "每个功能都先做本机能做的部分，再把必要的文字交给已配置的服务。"
     }
 }

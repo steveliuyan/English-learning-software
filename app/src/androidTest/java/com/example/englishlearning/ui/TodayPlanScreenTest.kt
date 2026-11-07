@@ -1,7 +1,9 @@
 package com.example.englishlearning.ui
 
 import android.graphics.Color as AndroidColor
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
@@ -20,10 +22,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.englishlearning.learning.WordBookProgress
 import com.example.englishlearning.ui.components.IllustratedIconTag
+import com.example.englishlearning.ui.theme.MintGlassTheme
+import com.example.englishlearning.ui.theme.ThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -130,6 +135,42 @@ class TodayPlanScreenTest {
             .performClick()
         composeRule.waitForIdle()
         assertEquals(1, started)
+    }
+
+    /**
+     * QA3 A2.1（用户 2026-11-08 拍板「全部都做」）：顶档（fontScale 3.0）今日计划计数行四枚字各自必须单行。
+     *
+     * 旧形把「还剩 N 个词」放在同一行右侧、**不参与权重**，顶档它一人吃掉 572px，左边那枚 `weight(1f)`
+     * 的列只剩 264px——设备 dump `.git/qa-scratch/qa3/fs300-a-today.xml`：眉标 `[106,1019][370,1255]`（两行）、
+     * 注脚 `[250,1255][370,1439]`（三行），而唯一的大数字「0」整枚被父容器裁到节点树里查无此点。
+     * 走查册记的是「0 看不见」，根因是**挤**不是**裁**：字还是那些字，只是被排到了首屏之外。
+     *
+     * 判据取 `TextLayoutResult.lineCount`，不取渲染高度也不取 `uiautomator` 的 bounds——后者是节点与父容器的
+     * **可视交集**，被裁掉的点永远「不越界」（走查册「判据盲区」那条，本轮 A2.3/A2.6③/A2.7 三次撞上）。
+     * 四枚逐一点名：少钉一枚，那一枚自己的折行就没人管。
+     */
+    @Test fun summaryCountRowStaysSingleLineAtTopFontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                MintGlassTheme(themeMode = ThemeMode.Light) {
+                    TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5))
+                }
+            }
+        }
+        listOf(
+            "today_plan_eyebrow" to "眉标「今日计划」",
+            "today_plan_total_progress" to "唯一的大数字（今日完成数）",
+            "today_plan_total_target" to "注脚「 / N 个词」",
+            "today_plan_remaining" to "「还剩 N 个词」",
+        ).forEach { (tag, label) ->
+            val lines = lineCountOf(tag)
+            assertTrue(
+                "fontScale=3.0 下今日计划计数行的$label（$tag）排成 $lines 行（期望 1 行）：" +
+                    "同一行里不参与权重的「还剩 N 个词」把左边那一列挤窄了，大数字随之被顶出首屏（QA3 A2.1）",
+                lines == 1,
+            )
+        }
     }
 
     /** 页头行尾的齿轮（原型 `.icon-btn` + `data-to="me-settings"`）：可点、带无障碍名、落到「我的」。 */
@@ -647,6 +688,26 @@ class TodayPlanScreenTest {
             "$persistentSearchTag 的行高 ${searchBounds.height}px 低于 48dp 触控下限（${minTouchPx}px）",
             searchBounds.height >= minTouchPx,
         )
+    }
+
+    /**
+     * 某枚 `Text` 实际排了几行——顶档折行判据（[summaryCountRowStaysSingleLineAtTopFontScale]）的唯一读数。
+     *
+     * 走 `SemanticsActions.GetTextLayoutResult` 直接读排版结果：它不受父容器裁剪影响，
+     * 所以「节点被裁到 bounds 之外」这种 `uiautomator` 盲区在这里不存在。
+     * 与 [resolvedFontSizeSp] 同源，但**不做 `performScrollTo()`**——顶档旧形里大数字本来就掉在首屏之外，
+     * 滚一下再量会把「挤出去」这件事本身抹掉，判据要的就是它待在自己该在的位置上排成几行。
+     */
+    private fun lineCountOf(tag: String): Int {
+        val results = mutableListOf<TextLayoutResult>()
+        composeRule.onNodeWithTag(tag)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        assertEquals(
+            "$tag 的 GetTextLayoutResult 产出 ${results.size} 份布局（期望恰 1 份），取不到排版行数",
+            1,
+            results.size,
+        )
+        return results.single().lineCount
     }
 
     /**
