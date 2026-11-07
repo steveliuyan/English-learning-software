@@ -1,10 +1,12 @@
 package com.example.englishlearning.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -83,6 +85,13 @@ fun SkeletonBar(
  *     「骨架与真实行同形状」那条 connected 判据会自己骗自己（`WordbookPickerHeaderTest` 的行高用例）。
  *  2. **顶部分隔线归调用方**（[topDivider]）：原型 `.pick:first-child { border-top: 0 }`，只有首行不画线，
  *     线宽与线色和真行逐字相同（`outlineSoft` 1dp），回填时那道缝由真行的线承接，列表总高度不跳。
+ *  3. **行首圆点可关**（[leading]，批 C-3 加）：默认那一枚对应 `PickRow` 的前导图标；而 `WordRow` 那一族
+ *     真实行**没有前导图标**（词头在左列、状态词在右列），照抄时多画一枚圆点就是「形状不像」——
+ *     F5-05 唯一的判据就是像不像，所以这不是装饰开关而是**镜像能力**（`LocalSubpageSkeletonContractTest`
+ *     钉「族里恰两枚 `leading: Boolean`、且确有屏传 `leading = false`」，防止参数长出来没人用）。
+ *  4. **行壳可换**（[framed]，批 C-3 加）：默认那一档是「通栏行 + 发丝线」，对应选词书与学习记录；
+ *     `WordBookWordsScreen` 那一族的真实行是 `Card(surface + 1dp 描边)` 里套 `WordRow`、行间距 10dp 缝。
+ *     [framed] 走那一档：壳、内边距（16/12）与缝都由本组件按真实形状给，屏侧不再自己包卡。
  */
 @Composable
 fun SkeletonRow(
@@ -90,6 +99,8 @@ fun SkeletonRow(
     rowHeight: Dp,
     modifier: Modifier = Modifier,
     tag: String? = null,
+    leading: Boolean = true,
+    framed: Boolean = false,
     markSize: Dp = 22.dp,
     titleFraction: Float = 0.42f,
     titleHeight: Dp = 12.dp,
@@ -97,27 +108,55 @@ fun SkeletonRow(
     subtitleHeight: Dp = 10.dp,
 ) {
     val colors = appColors()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(hairlineTop(if (topDivider) colors.outlineSoft else null, startIndent = 0.dp))
-            .then(if (tag != null) Modifier.testTag(tag) else Modifier)
-            .heightIn(min = rowHeight)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(markSize)
-                .clip(CircleShape)
-                .background(colors.outlineSoft.copy(alpha = 0.30f), CircleShape)
-                .skeletonShimmer(),
-        )
+    // 两档外壳共用同一份内容：槽位顺序（标记 + 左列两条）、行内缝（12dp，与 `WordRow` 逐字相同）
+    // 与 shimmer 都只有一份；分成两个分支体各写一遍，就是族里长出第二种「行内版式」。
+    val bars: @Composable RowScope.() -> Unit = {
+        if (leading) {
+            Box(
+                modifier = Modifier
+                    .size(markSize)
+                    .clip(CircleShape)
+                    .background(colors.outlineSoft.copy(alpha = 0.30f), CircleShape)
+                    .skeletonShimmer(),
+            )
+        }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SkeletonBar(fraction = titleFraction, height = titleHeight)
             SkeletonBar(fraction = subtitleFraction, height = subtitleHeight)
         }
+    }
+    if (framed) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .then(if (tag != null) Modifier.testTag(tag) else Modifier),
+            shape = AppShape.Card,
+            border = BorderStroke(1.dp, colors.outlineSoft),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = rowHeight)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                content = bars,
+            )
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                // 线画在 padding 外侧：`hairlineTop` 自带 `padding(top = 1.dp)` 让出那道缝，最小行高不被 1dp 吃掉。
+                .then(hairlineTop(if (topDivider) colors.outlineSoft else null, startIndent = 0.dp))
+                .then(if (tag != null) Modifier.testTag(tag) else Modifier)
+                .heightIn(min = rowHeight)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            content = bars,
+        )
     }
 }
 
@@ -128,6 +167,12 @@ fun SkeletonRow(
  * 骨架行数与真实列表的可视行数对不上时，回填会顶偏滚动位置，而那条判据读的是常量而不是字面量。
  * [tagPrefix] 由调用方给（例：`wordbook_placeholder` 风格的 `wordbook_row_skeleton_`），tag 落在这里
  * 而不是内部写死，是为了让屏侧的 testTag 锚点仍然只出现在那一屏的源码里一份。
+ *
+ * [titleFraction] / [subtitleFraction] 是「这一屏的真行有多宽」的镜像口：默认档抄自选词书行
+ * （书名 + 副行），词表类行（词头短、释义行宽）要按那一屏的形状给档，否则回填时文字列宽整列跳。
+ * [leading] / [framed] 透传给每一行（见 [SkeletonRow] 第 3、4 条）：无前导图标的那一族行传 `leading = false`，
+ * 带壳的卡行传 `framed = true`——此时行间距换成 10dp 缝、发丝线退役，照的正是 `LazyColumn(spacedBy 10.dp)`
+ * 里那种 `Card` 行的真实缝档。
  */
 @Composable
 fun SkeletonList(
@@ -135,16 +180,23 @@ fun SkeletonList(
     rowHeight: Dp,
     tagPrefix: String,
     modifier: Modifier = Modifier,
+    leading: Boolean = true,
+    framed: Boolean = false,
     markSize: Dp = 22.dp,
     titleFraction: Float = 0.42f,
     subtitleFraction: Float = 0.24f,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = if (framed) Arrangement.spacedBy(10.dp) else Arrangement.spacedBy(0.dp),
+    ) {
         repeat(rows) { index ->
             SkeletonRow(
                 tag = "$tagPrefix$index",
-                topDivider = index > 0,
+                topDivider = !framed && index > 0,
                 rowHeight = rowHeight,
+                leading = leading,
+                framed = framed,
                 markSize = markSize,
                 titleFraction = titleFraction,
                 subtitleFraction = subtitleFraction,

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -40,6 +39,7 @@ import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeAction
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SectionHeading
+import com.example.englishlearning.ui.components.SkeletonList
 import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
@@ -205,20 +205,46 @@ private fun StatCell(value: String, label: String, modifier: Modifier = Modifier
 
 // ---------- 加载 / 错误 / 空态 ----------
 
+/**
+ * 首帧（批 C-3；决策 2026-11-07 决定 3 的第一类「等数据」）。
+ *
+ * 旧形状是 48dp 转圈 + 一句「正在读取学习记录…」——手里还没有数据时先给一句话，
+ * 回填时那一句话整块长成一条条 `WordRow`，是版面跳变而不是渐进加载。现在首帧画同形状骨架：
+ * 无前导图标（[SkeletonList] 的 `leading = false`——`WordRow` 的真实行没有前导图标，词头在左列、
+ * 三档反馈词在右列），行档取真行的 `heightIn(min = 48.dp)`，宽度档按真行左列通栏那一族（词头短、释义宽）。
+ * 进行中语义由形状承担：这里不许出现文案，「0 条记录」与「正在读取」都不是首帧该念的东西。
+ *
+ * 稳定锚 `learning_records_loading` 挂在容器上：connected 侧与既有 JVM 契约都读它，换实现时不能丢。
+ */
 @Composable
 private fun LoadingState() {
-    val colors = appColors()
-    Column(
+    SkeletonList(
+        rows = LEARNING_RECORDS_PLACEHOLDER_ROWS,
+        rowHeight = 48.dp,
+        tagPrefix = "learning_records_row_skeleton_",
+        leading = false,
+        titleFraction = 0.34f,
+        subtitleFraction = 0.68f,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
             .testTag("learning_records_loading"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        CircularProgressIndicator(color = colors.brandDeep)
-        Text("正在读取学习记录…", style = AppType.Footnote, color = colors.text2)
-    }
+    )
 }
+
+/**
+ * 首帧骨架的行数（批 C-3）。
+ *
+ * 取值口径与选词书屏 `WORD_BOOK_PLACEHOLDER_ROWS` 是同一句话：够填满列表那一屏，又不至于真实列表到位后
+ * 滚动位置大幅跳动。算术：真行档 `heightIn(min = 48.dp)` + 骨架族上下各 12dp 内边距 ≈ 每行 72dp；
+ * 小屏减去页头、页签与 `contentPadding` 还剩约 500dp，6 行刚好铺满而不溢出（铺过头会让空列表长出滚动条，
+ * 而骨架没有可点面，滚动一块空区是负体验）。
+ *
+ * **为什么这里没有 C-2 那条「值必须等于真实行数」的判据**：C-2 那两屏的行组是版面常量（「接下来」四行、
+ * 「更多」三行，写在源码里可数）；本屏的行数是数据量（今日已学 N 条），首帧根本不知道 N。所以本屏钉的是
+ * **写法**（骨架行数读常量、不许写字面量）而不是**取值相等**，判据在 `LocalSubpageSkeletonContractTest`。
+ */
+internal const val LEARNING_RECORDS_PLACEHOLDER_ROWS = 6
 
 @Composable
 private fun ErrorState(message: String, onRetry: () -> Unit) {

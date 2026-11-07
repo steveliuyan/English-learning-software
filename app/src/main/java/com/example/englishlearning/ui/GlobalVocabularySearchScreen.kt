@@ -37,6 +37,7 @@ import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
+import com.example.englishlearning.ui.components.SkeletonList
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.theme.AppDomain
@@ -170,7 +171,7 @@ fun GlobalVocabularySearchScreen(
             }
             when (state) {
                 GlobalVocabularySearchUiState.Idle -> GlobalSearchHint()
-                GlobalVocabularySearchUiState.Loading -> GlobalSearchProgress("正在查询本地词库…")
+                GlobalVocabularySearchUiState.Loading -> GlobalSearchSkeleton()
                 GlobalVocabularySearchUiState.ClearingHistory -> GlobalSearchProgress("正在清空历史…")
                 GlobalVocabularySearchUiState.Failure -> GlobalSearchFailure(onRetry = onRetry)
                 GlobalVocabularySearchUiState.Empty -> GlobalSearchEmpty()
@@ -220,6 +221,46 @@ private fun GlobalSearchHint() {
     )
 }
 
+/**
+ * 查词首帧（批 C-3）：`Loading` 这一支等的是**本地词条索引**读盘，不是网络，也不是用户按下去的动作——
+ * 首帧该有真实形状。回填落的就是下面那串 [GlobalSearchResultRow]，所以这里镜像它的行：
+ *
+ *  - **行高 96dp**：真行是 `padding(vertical = 12)`（24dp）+ 最多四行文字（`Title` 词头 + `Footnote` 音标
+ *    同一行、`Body` 释义、`Footnote` 来源、可选 `Footnote` 搜索次数，行缝 2dp）。四行齐了约 104dp，
+ *    缺音标/次数约 88dp，取中位 96dp。骨架族一行只画两条横（形状只有一份实现，不为这一屏长第三种行内版式），
+ *    纵向的总高由 `rowHeight` 承接——这是刻意取舍，回填时条的位置对、总高不跳。
+ *  - **`leading = false`**：真行左列直接是词头，**没有前导图标**，行尾那枚 chevron 是 `AppGlyphLayer.StrokeOnly`
+ *    的装饰，不是状态点；画一枚圆点就是「形状不像」（F5-05 唯一判据）。
+ *  - **宽度档 0.28 / 0.66**：词头 + 音标只占左列前段，释义行接近通栏——照抄真行墨迹宽，回填时文字列宽不整列跳。
+ *  - **3 行**：状态区在页头 + 输入卡 + 主 CTA 之下，约 300–420dp；3×96dp 刚好铺满可见区又不出滚动条
+ *    （数据量型列表首帧不知道有几条，所以只钉「读本屏常量」的写法，见 `LocalSubpageSkeletonContractTest`）。
+ */
+@Composable
+private fun GlobalSearchSkeleton() {
+    SkeletonList(
+        rows = GLOBAL_SEARCH_PLACEHOLDER_ROWS,
+        rowHeight = 96.dp,
+        tagPrefix = "global_search_row_skeleton_",
+        leading = false,
+        titleFraction = 0.28f,
+        subtitleFraction = 0.66f,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("global_search_loading"),
+    )
+}
+
+/** 查词首帧的占位行数；与 [GlobalSearchSkeleton] 的行高一起构成「填满可见区、不铺出滚动条」的算术。 */
+internal const val GLOBAL_SEARCH_PLACEHOLDER_ROWS = 3
+
+/**
+ * 动作进行中的一支（批 C-3 分类 2）：`ClearingHistory` 接下来落的是「历史已清空」这个回执，
+ * 不是一串会按骨架形状回填的内容——画骨架就是预告一个不会以那个形状落地的东西。
+ * 因此保留活动指示 + 真话文案，并在 `PrimaryTabSkeletonContractTest.SPINNER_LEDGER` 里按这条理由豁免。
+ *
+ * 同一段代码原先还兼任 `Loading`（「正在查询本地词库…」）：那一支是等数据，随批 C-3 换成 [GlobalSearchSkeleton]，
+ * 这里只剩「正在清空历史…」一种语义，函数名里的 `Progress` 从此名实相符。
+ */
 @Composable
 private fun GlobalSearchProgress(text: String) {
     val colors = appColors()

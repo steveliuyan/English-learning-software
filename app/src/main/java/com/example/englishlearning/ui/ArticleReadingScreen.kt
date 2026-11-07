@@ -61,6 +61,7 @@ import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.components.SkeletonBar
 import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
@@ -186,14 +187,10 @@ fun ArticleReadingScreen(
             },
         )
         // F3-02 整篇朗读的状态文字与播控组**必须**位于空态早退之后（Task 9 评审 I-2）：
-        // 空态（「正在加载…」）不得组合出消息文字与播控行。
+        // 空态（文章还没从本地库里读出来）不得组合出消息文字与播控行——批 C-3 把它从一句
+        // 「正在加载…」换成同形状骨架之后，这条约束照样成立：骨架零文案、零控件。
         if (current == null) {
-            Text(
-                text = "正在加载…",
-                style = AppType.Body,
-                color = colors.text2,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            )
+            ArticleReadingSkeleton()
         } else {
             // F3-01B：进文覆盖词面板——每篇文章首次打开自动展开一次。coveredLemmas 是文章自带的
             // 落库字段，面板是纯呈现：开关状态按 articleId 记忆，切换文章重新展开。
@@ -332,6 +329,58 @@ fun ArticleReadingScreen(
                     lemmas = current.article.coveredLemmas,
                     onDismiss = { coverageOpen = false },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 文章首帧（批 C-3 分类 1：等本地库读盘）。
+ *
+ * 这一屏的真实版面**没有卡壳**——页头之后是一列裸排内容（标题 → meta → 来源块 → 模式行 → 正文 → 译文），
+ * 所以这里用 `SkeletonBar` 逐条镜像，**不用** `SkeletonCard`：套一层 `Card` 就是在预告一个不会以那个形状
+ * 落地的壳，回填时整列会被"壳边"顶偏（F5-05 判的是像不像，不是有没有东西）。
+ *
+ * 四档形状抄自真版面：
+ *  - **标题 0.72 / 26dp**：`AppType.ArticleTitle` 那一行（真标题常占三分之二到四分之三行宽）；
+ *  - **meta 0.34 / 来源 0.46，各 12dp**：`AppType.Meta` 那一条 `约 N 词 · 第 M 版` 与来源块那一行；
+ *  - **模式行 3 块 × 32dp**：真身是三枚 `FilterChip`，缝 10dp、块数 3 与那一排的高度都对，
+ *    只是不预告哪一枚被选中——选中态是状态，不是形状；
+ *  - **正文 6 条 0.98…0.62**：`HighlightedEnglish` 是随文换行的整段，首帧不知道几行——6 条约等于
+ *    一屏可见正文行，最后一行短（段落收尾），回填后靠滚动继续，不预铺满整篇（那会铺出一屏假满）。
+ *
+ * 词数与版本号是**数字**，一条都不画（F1-01 / 2026-11-06 占位诚实化同源）；
+ * 播控行、`article_pronunciation_message` 也不组合（Task 9 评审 I-2 那条约束照旧由空态早退承担）。
+ */
+@Composable
+private fun ArticleReadingSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(top = 10.dp, bottom = 24.dp)
+            .testTag("article_reading_loading"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SkeletonBar(fraction = 0.72f, height = 26.dp)
+            SkeletonBar(fraction = 0.34f, height = 12.dp)
+            SkeletonBar(fraction = 0.46f, height = 12.dp)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // 模式行是真三枚等分 `FilterChip`（族里没有"芯片"档），用 `weight(1f)` + 近满宽度承接三块：
+            // 缝（10dp）、块数（3）与那一排的高度（32dp）都对，只是不预告哪一枚被选中——选中态是状态，不是形状。
+            repeat(3) {
+                SkeletonBar(
+                    fraction = 0.98f,
+                    height = 32.dp,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            listOf(0.98f, 0.92f, 0.96f, 0.90f, 0.94f, 0.62f).forEach { fraction ->
+                SkeletonBar(fraction = fraction, height = 13.dp)
             }
         }
     }

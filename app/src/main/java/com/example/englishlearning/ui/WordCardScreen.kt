@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
@@ -54,6 +53,8 @@ import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.components.SkeletonCard
+import com.example.englishlearning.ui.components.SkeletonStatGrid
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.SpeakerButton
 import com.example.englishlearning.ui.components.SpeakerState
@@ -121,11 +122,21 @@ fun WordCardScreen(
     ) {
         when (state) {
             WordCardUiState.Loading -> WordCardStateBody {
-                CircularProgressIndicator(
-                    color = learn.base,
-                    modifier = Modifier.size(48.dp).testTag("word_card_loading"),
+                // 批 C-3（Spec 05 F5-05 / 决策 2026-11-07 决定 3 第一类「等数据」）：
+                // 旧首帧是 48dp 转圈 + 一句「正在准备今天的词卡…」，回填时那一句话整块长成
+                // 「一张词卡 + 底部三档评分」。这里镜像的是那**两块**的真实形状：
+                //  ① 词卡：`SoftCard(contentPadding = 18.dp)` 里 ① 词头（`AppType.Display`，一行 ~52dp）
+                //     ② 音标 + 词性 ③ 喇叭药片那一行 ④ 释义/例句若干行 —— 取 `bars = 4`、下限 180dp；
+                //  ② 评分条：三枚 `weight(1f)` 等宽按钮、`spacedBy(10.dp)`、`heightIn(min = 54.dp)`，
+                //     每枚两行（档位名 + 副注）——正是 `SkeletonStatGrid` 那一族形状，格数与行高取真值。
+                // 顶栏那句「第 N / M 张」与进度条**不铺**：它们是计数，首帧写出来就是 F1-01 那枚假数字；
+                // 让位给形状本身（族口径：只承诺横向起点对齐与档位，不逐像素复刻总高）。
+                SkeletonCard(
+                    modifier = Modifier.testTag("word_card_loading"),
+                    bars = 4,
+                    minHeight = 180.dp,
                 )
-                Text("正在准备今天的词卡…", style = AppType.Body)
+                SkeletonStatGrid(cells = 3, rowHeight = 54.dp)
             }
 
             WordCardUiState.MissingSetup -> WordCardStateBody {

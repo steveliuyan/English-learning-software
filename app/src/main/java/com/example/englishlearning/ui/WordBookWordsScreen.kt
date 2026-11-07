@@ -25,7 +25,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.example.englishlearning.learning.WordBookRecord
 import com.example.englishlearning.learning.WordBookRecordStatus
+import com.example.englishlearning.ui.components.SkeletonList
 import com.example.englishlearning.ui.components.WordRow
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
@@ -149,16 +149,28 @@ fun WordBookWordsScreen(
         }
         Box(Modifier.fillMaxSize()) {
             when {
-                state.loading -> Column(
+                state.loading -> SkeletonList(
+                    // 批 C-3（Spec 05 F5-05 / 决策 2026-11-07 决定 3 第一类「等数据」）：
+                    // 旧首帧是 48dp 转圈 + 一句「正在读取词书单词…」。真实列表那一族是
+                    // `Card(surface + 1dp outlineSoft 描边)` 里套 `WordRow(padding 16/12)`、
+                    // 行与行 `spacedBy(10.dp)`（`WordBookWordsRow`），所以这里走族里的**卡行档**
+                    // （`framed = true`：壳、内边距、缝都由族按真实形状给），并且
+                    // `leading = false`——`WordRow` 没有前导图标，词头在左列、状态词在右列。
+                    // 宽度档按真实行：词头（`AppType.Body` 一个英文词）短、释义行（「释义：…」）宽。
+                    // 字母索引条与页尾不铺：前者是有数据才挂的导航件（`!state.loading` 那一判），
+                    // 后者是回执位，都不是「行」的形状。
+                    rows = WORD_BOOK_WORDS_PLACEHOLDER_ROWS,
+                    rowHeight = 48.dp,
+                    tagPrefix = "wordbook_words_row_skeleton_",
+                    leading = false,
+                    framed = true,
+                    titleFraction = 0.30f,
+                    subtitleFraction = 0.62f,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 32.dp)
+                        .padding(horizontal = 20.dp, vertical = 6.dp)
                         .testTag("wordbook_words_loading"),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    CircularProgressIndicator(color = appDomain(AppDomain.AiSpeech).base)
-                    Text("正在读取词书单词…", style = AppType.Body, color = colors.text2)
-                }
+                )
                 state.error != null -> Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -236,6 +248,19 @@ private fun WordBookWordsLetterHeader(letter: String) {
         color = colors.text1,
     )
 }
+
+/**
+ * 首帧骨架的占位行数（批 C-3）。
+ *
+ * 算术：真实行 = `Card` 包 `WordRow`，行内容 `heightIn(min = 48.dp)` + 上下各 12dp ≈ 72dp（描边 +2dp），
+ * 行缝 10dp → 每行占位约 84dp；小屏扣掉页头、筛选条与 `contentPadding` 后列表区约 420–500dp，
+ * 取 5 行（420dp）填满可视区而不溢出。骨架没有可点面，铺过头会让首屏多一条无内容的滚动带。
+ *
+ * 与 C-2 那两枚常量的差别（`TODAY_PLAN_NEXT_ROWS` / `READING_MORE_ROWS` 的值必须等于源码里可数的
+ * `BareRow(` 数）：本屏真实条数是数据量（这本词书有多少词），首帧无从可数，所以
+ * `LocalSubpageSkeletonContractTest` 对本屏只钉**写法**（骨架行数读这枚常量、不写字面量），不钉相等。
+ */
+internal const val WORD_BOOK_WORDS_PLACEHOLDER_ROWS = 5
 
 @Composable
 private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) -> Unit) {

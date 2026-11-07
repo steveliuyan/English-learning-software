@@ -13,11 +13,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -27,6 +25,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.CardFeedback
 import com.example.englishlearning.ui.components.AppScreenHeader
+import com.example.englishlearning.ui.components.SkeletonBar
+import com.example.englishlearning.ui.components.SkeletonCard
+import com.example.englishlearning.ui.components.SkeletonStatGrid
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.theme.AppDomain
@@ -95,18 +96,25 @@ private fun RelearnBody(
     val colors = appColors()
     when (state) {
         VocabularyRelearnUiState.Idle, VocabularyRelearnUiState.Loading -> Column(
+            // 批 C-3（Spec 05 F5-05 / 决策 2026-11-07 决定 3 第一类「等数据」）：旧首帧是
+            // 48dp 转圈 + 一句「正在准备生词…」。这一屏回填后落的是「计数行 + 一张生词卡 + 吸底三档」，
+            // 所以三档形状各给一块，且顺序与真实版面逐字相同：
+            //  ① 计数行 `第 N / M 个`（Footnote 一行）——位置给、数字不给：写「第 0 / 0 个」就是 F1-01
+            //     那枚假数字换了个承载，所以这里是一条 0.24f 的短横；
+            //  ② 生词卡：`SoftCard(contentPadding = 20.dp)` 里词头（Display）+ 音标 + 释义 → `bars = 3`，
+            //     下限 170dp 取那一档真实高度；
+            //  ③ 吸底三档评分条（Ready 才挂，但它是这一帧之后必然长出来的那一块）：三枚 `weight(1f)`
+            //     等宽按钮、单行、`spacedBy(8.dp)` → `SkeletonStatGrid(cells = 3)`，48dp 触控下限同档。
+            // 外层那一条 `verticalScroll` 与 `padding(horizontal = 20.dp)` 由宿主那一支给，本分支不再自铺，
+            // 否则骨架比真卡多缩一进（旧转圈那版的 `padding(vertical = 40.dp)` 同理随转圈退役）。
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .testTag("relearn_loading"),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            CircularProgressIndicator(color = appDomain(AppDomain.Learn).base)
-            Text(
-                text = "正在准备生词…",
-                style = AppType.Footnote,
-                color = colors.text2,
-            )
+            SkeletonBar(fraction = 0.24f, height = 10.dp)
+            SkeletonCard(bars = 3, minHeight = 170.dp)
+            SkeletonStatGrid(cells = 3, rowHeight = 48.dp)
         }
 
         VocabularyRelearnUiState.Unavailable -> Column(
