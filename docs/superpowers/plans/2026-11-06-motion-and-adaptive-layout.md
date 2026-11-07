@@ -25,7 +25,16 @@
 
 ## 批 C：预加载特效（骨架铺全站 + shimmer + 真预取）
 
-依赖批 A 的 §3.4：循环动画在 `scale=0` 下定格在**周期末尾值**，所以每条 shimmer 规格要把静态外观当设计对象，并各配一张 `animator_duration_scale=0` 的截图。骨架目前只在少数页有，批 C 铺到全部一级页与三枚慢加载子页；`shimmer` 用 `Modifier.drawBehind` + 渐变偏移，禁裸 hex（走 `appColors().tint` 族）。真预取只扩已有 `LaunchedEffect` 装载点（词库四段已做），不得为了「预取」引入新的网络或 AI 出站。
+**前置（先改文档再动代码，AGENTS.md 硬要求）**：`docs/decisions/2026-11-07-loading-skeleton-shimmer-prefetch.md`（四条决定 + 现状证据 + 验证边界）与 `docs/specs/05` 的 F5-05 / AC5-06 已落盘。用户 2026-11-07 三项拍板：铺面＝全站都铺；`scale=0` 定格值＝末尾即静息骨架、无光泽；预取深度＝闪屏窗口 + tab 预读，硬约束「只用本地、不为预取新增任何网络或 AI 出站」。
+
+依赖批 A 的 §3.4：循环动画在 `scale=0` 下定格在**周期末尾值**，所以 shimmer 的末尾相位必须设计成静息外观（决定 2），并各配一张 `animator_duration_scale=0` 的截图。骨架现状（批 C 开工实测）：真骨架只有 `AppScreen` 私有 `WordBookRowSkeleton` 一处，`ui/components/Skeleton.kt` 的 `ListSkeleton` 是零引用死代码且 KDoc 里「connected 判据依赖 `wordbook_placeholder_`」为假；等待指示器 10 文件 15 处；`AiLearningScreen` 与 `ProfileScreen` 连 Loading 分支都没有。
+
+- C-1 基建：`Skeleton.kt` 重写为骨架族（`SkeletonBar`/`SkeletonRow`/`SkeletonList`/`SkeletonCard`/`SkeletonStatGrid`），`Shimmer.kt` 落 `drawBehind` + 相位渐变（末尾=静息），`AppScreen` 私有骨架迁入且 `wordbook_row_skeleton_` / `WORD_BOOK_PLACEHOLDER_ROWS` 两枚既有闸不动；契约闸 `SkeletonFamilyContractTest` + `ShimmerSpecContractTest`（唯一性、定格=静息的纯函数判据、禁裸 hex、禁时长换算入口、骨架零 `Text`）。
+- C-2 一级页：`TodayPlanScreen` / `ReadingAccessScreen` 换骨架；`AiLearningScreen` / `ProfileScreen` 先补 Loading 分支再铺（补的是「本地读盘中」，不新增状态机语义）。
+- C-3 本地读盘子页：今日计划词卡流、查词、学习记录、词书单词、生词复习、试卷预览、备份本地校验段——转圈换同形状骨架，等待指示器调用点计数只减不增。
+- C-4 网络/AI 等待屏：文章生成、AI 问答、拍照翻译、生图、句法分析改成进行中语义（说清在请求谁 + 可取消 + 超时），禁止假结果骨架与占位内容。
+- C-5 真预取：`StartupLocalDataWarmer`（形状照抄 `StartupPronunciationWarmer`，只做开库，把 `DatabaseStartup.open` 挪进闪屏那 1.2 秒）+ tab 预读只补本地装载点；零出站探针与装载点对账是硬判据。
+- C-6 收口：三连门禁 + 双形态 connected + `scale=0` / `scale=1` 截图册 + 首帧耗时读数 + 按 `REPORT-TEMPLATE` 报告 + 分功能域提交、推送请示。
 
 ## 批 D：页面转场动效
 
