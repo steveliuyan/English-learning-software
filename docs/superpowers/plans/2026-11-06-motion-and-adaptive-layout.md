@@ -45,6 +45,12 @@
   四 VM 零 Job 句柄（只有拍照翻译持 Job），所以「可取消」必须先在 VM 层把在飞的那次攥住，屏侧才有东西可取消。
 - C-5 真预取：`StartupLocalDataWarmer`（形状照抄 `StartupPronunciationWarmer`，只做开库，把 `DatabaseStartup.open` 挪进闪屏那 1.2 秒）+ tab 预读只补本地装载点；零出站探针与装载点对账是硬判据。
 - C-6 收口：三连门禁 + 双形态 connected + `scale=0` / `scale=1` 截图册 + 首帧耗时读数 + 按 `REPORT-TEMPLATE` 报告 + 分功能域提交、推送请示。
+- **C-7 色档整改（C-6 收口后按用户裁决「提到可见档」新增）**：骨架填充从 `outlineSoft.copy(alpha = 0.22f)` 提到可见档，
+  光带改为**比骨架条亮**（机制走提亮混合，不新增 palette token、不按主题分支）；
+  判据先在 JVM 侧落 `SkeletonVisibilityContrastTest`（相对页底/卡面/骨架条三向 ≥16 个通道级，16 = C-6 实测唯一看得见的卡壳档），
+  拿到 RED 再改实现；随后**深浅两档各重拍一次截图册**（`scale=0` 定格全同 + `scale=1` 光带在扫 + 像素取样读数），
+  并复核既有 ≥3:1 图标对比度套件与 `ShimmerSpecContractTest` 的取色口径未被连带放宽。
+  口径落 `docs/decisions/2026-11-07-loading-skeleton-shimmer-prefetch.md` §6，读数落 `docs/verification/ui-redesign-2026-10.md` 批 C-7 那节。
 
 ## 批 D：页面转场动效
 

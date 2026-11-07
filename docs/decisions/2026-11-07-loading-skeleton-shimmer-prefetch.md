@@ -220,6 +220,9 @@ grep -n "busy = true" app/src/main/java/com/example/englishlearning/ui/PhotoTran
 - 骨架族唯一性：`ui/components/Skeleton.kt` 之外不得再出现 `SkeletonRow(`/`SkeletonBar(` 定义；`AppScreen` 里 `wordbook_row_skeleton_` 仍恰好 1 处、`WORD_BOOK_PLACEHOLDER_ROWS` 仍被读（改造既有 `LearningSetupLayoutContractTest`，不得先放宽）。
 - shimmer 定格结构：光带渐变的**首末相位同值**（静息），即「相位=1 时的 alpha/偏移 == 相位=0」这一条要能被纯函数测出——把渐变 stops 的计算抽成可测函数，不依赖动画时钟。
 - 禁裸 hex / 禁时长换算入口：`ShimmerSpecContractTest` 扫生产骨架与 shimmer 源文件，`Color(0x`、`Color(` 十六进制字面量、`animatorDurationScale`、`durationMs` 出现次数为 0。
+  **扫面对象随落点一起动**（C-7 补的闸）：色档收进 `SkeletonInk.kt` 之后，禁令族必须把它列进扫描名单，
+  否则「色档不许写在用法点」会变成一句空话——唯一落点恰好落在名单外，谁都能在里头补一枚裸 hex 或一次 `if (isDark)` 而没有任何判据变红。
+  落点 `ShimmerSpecContractTest.the colour tier file is inside the offender scan`（名单少一行即红）。
 - 等待屏分类（C-3 半条已在批 C-3 落地，C-4 半条本批落地）：
   - **本地读盘屏不得留裸转圈**（调用点计数只减不增，改判据前先跑 §2.5 重算）；
   - **AI/网络等待臂**（`WordAiQaScreen.Asking` / `SentenceAnalysisScreen.Analyzing` / `ImageStudioScreen.DraftingPrompt`
@@ -270,3 +273,68 @@ grep -n "busy = true" app/src/main/java/com/example/englishlearning/ui/PhotoTran
 - 成本与风险：骨架是**新增 UI 面**，每铺一屏就多一处要维护的形状（真卡改版时骨架要跟）；契约测试按本仓惯例是「剥注释数锚点」的字符串闸，源码重构时容易假红，缓解是每条锚附一句「为什么是这条锚」的 KDoc（沿用批 B 的做法）。预取动的是启动路径，风险是开库提前带来的启动竞争（与 Kokoro 预热同时在 `Dispatchers.Default`），处置是**先只做开库**、其余按 C-6 的耗时读数决定要不要收缩。
 - 成本与风险（C-4）：台账那一句规则被改了一次口径（屏侧只减 + 组件层恰一枚），这是本批**唯一一次放宽式改动**，收紧它的是新增的「臂内不许自己画指示器」那条闸；两者都要在 `SPINNER_LEDGER` 的头注释里同处更新，否则下一任只看到台账变长一行会当成漂移。VM 侧新增 Job 句柄的第二处风险是取消与出站确认台账的相互作用：域名授权是在「点确认」那一刻记的（`WordAiQaViewModel:183` / `SentenceAnalysisViewModel:74` 同口径），取消在飞请求**不回收**那笔授权——这与「取消不是失败」一致，但必须在 VM 用例里显式钉住，不然将来有人会为了「取消后重新问一次」把授权撤销掉。
 - 明确不做：不引入任何新的网络/AI 出站；不做「预生成今日文章」；不做骨架的逐像素版式复刻（承诺横向起点对齐，纵向不承诺——沿用 `Skeleton.kt` 既有取舍）；不给骨架加文案或假数字；不在 AI 等待屏画假内容。
+
+## 6. C-7 色档整改（2026-11-07，接 §4 末那条待裁决）
+
+**背景**：C-6 把批 C 的结构判据跑满（门禁 2460 全绿、connected 四格全绿、`scale=0` 定格逐字节等于静息骨架、
+`scale=1` 连拍证明光带确实在扫），但实机像素取样测到骨架条相对容器只差 1–5 个通道级、光带 ≤3 级，
+四档里三档读作空白页——**感知判据不过**。用户裁决「提到可见档」，并选「批 D 页面转场」为 C 收口后的下一批，
+所以色档整改排在批 D 之前，本批编号 C-7。
+
+**候选与取舍**（下表数字是**按 token 算式现算**的，不是实机读数；实机重拍读数见 `docs/verification/ui-redesign-2026-10.md` 批 C-7 那节）：
+
+| 路线 | 做法 | 判死理由 |
+|---|---|---|
+| A（采纳） | 现有 token + **提亮混合**：填充 `outline` 满值、光带仍取 `tint` 但用 `BlendMode.Screen`、`peakAlpha` 0.16 → 0.6 | — |
+| B（否） | 新增一枚 `skeletonBand` token（浅白 / 深亮灰） | 数学最直白，但 `AppColorSet` 加字段要动 `PrototypeTokenContractTest` 那条「原型 token 表恰好 28 枚」的闸，而原型 CSS 里没有这枚 token——等于给台账开一个本仓自造的口子 |
+| C（否） | 只把 `peakAlpha` 提到 0.5 以上，不改机制 | `SrcOver` 的方向由底色与取色的相对明暗决定：浅色卡面上 `tint` 压白必然画暗，深色档 `tint #1C2A24` 比骨架条 `#2A3931` 还暗，两档方向相反，只提 alpha 治不好 |
+
+**决定与理由**：
+
+1. **骨架填充 = `outline` 满值**。按 WCAG 亮度算它压浅色页底只有 1.159:1，**远够不上仓里那条 ≥3:1**——
+   那条尺子的适用面是「图标 / 非文本信息载体」（`docs/design/visual-style-guide.md` §对比度口径，判据实现是
+   `IconBadgeContrastContractTest`），骨架不承担信息，硬凑 3:1 只能画成深灰块，与设计语言冲突。
+   于是本批改用一条**经验锚**：C-6 实机取样里唯一被眼睛认出的是卡壳档（`surface` 压页底，差 16 级 / 1.110:1），
+   骨架条与光带至少要做到同强，即**最大通道差 ≥16 级**。这条不是标准，是「不再退回读作空白」的下限；
+   观感强弱与是否过曝仍归截图册目视。
+2. **光带靠机制而不是取色达成「比骨架条亮」**。两套 palette 里不存在「比 `outline` 更亮的中性 token」
+   （浅档要往白走、深档要往亮灰走，方向天然相反），所以不选色、不改表，改用 `Screen`：
+   提亮混合的性质是**结果只可能比底色亮**，因此深浅两档同一份算式成立，也就不需要 `if (isDark)` 分支
+   （C-1 那条「不按时序拆档、不按主题分支」的口径继续成立）。
+   `peakAlpha = 0.6f` 是按这条判据反推的：0.16 只能抬 5–6 级，0.6 抬 19/20 级（浅/深），0.55 也过线（17/18），
+   目视嫌抢眼就回落 0.55。
+3. **色档落点收拢成 `SkeletonInk`**（`ui/components/SkeletonInk.kt`：`fill` / `band` / `bandBlend` 三枚成员）。
+   原来两处内联写法（`Skeleton.kt` 的条与点、`Shimmer.kt` 的光带）各自挑色，JVM 侧就无法对「渲染后差几级」建模——
+   C-6 那条判据只能事后靠像素取样发现，本批把它提前成单测的唯一原因就是这个。
+   锚点闸：使用点不得再出现 `outlineSoft.copy(` 这类骨架填充，`Shimmer.kt` 必须走 `SkeletonInk.band(` + `bandBlend`。
+4. **判据先红后绿**（TDD）：`SkeletonVisibilityContrastTest` 六条 = 浅档条 / 深档条 / 两档光带 / 机制必须是提亮 /
+   **反空转（C-6 那两个旧写法必须被同一条阈值判死）** / 唯一落点锚。先按现值（`outlineSoft@0.22` + `SrcOver`）跑出
+   4 条红，再改实现转绿；发红的消息里带算式与两边读数，不只报「不达标」。
+5. **深色档从此进入截图册**：C-6 的深色只有算式核对（1.048:1），本轮按 `cmd uimode night yes` 翻系统深色重拍
+   7 枚规格 × 两档 scale，取证宿主的 `MintGlassTheme` 默认 `ThemeMode.System`，所以翻系统即翻 `AppColorDark`，
+   零改生产码。
+
+**C-7 实测回写（2026-11-07 收口时；逐规格读数在 `docs/verification/ui-redesign-2026-10.md` §批 C-7）**：
+
+- 实机像素与算式同向：**浅档骨架条渲染出 `#DDE5DD`（= `outline` 满值），相对页底 20 级 / 相对卡面 34 级；深档 `#2A3931`，33 / 26**。
+  光带密拍峰值浅档 18–19、深档 19–20，方向在两档都是提亮；`scale=0` 的 12 帧在两套主题、七枚规格上各落成同一枚 md5
+  （「关动画 = 静息骨架、零光泽」在深色档第一次拿到实机证据）。全部规格过 ≥16 级线。
+- **窄条规格在 12 帧短促采样下曾报 14 / 11 级，是抽样欠峰而不是渲染差异**：`alphaAt` 本身是正弦半波，单帧抬升取决于截屏落在周期哪一格，
+  `screencap` 自身 0.15–0.3 秒使短促连拍覆盖不全；同一规格改密拍 26 帧后 `card` / `stat-grid` 都升到 19。
+  所以读数记的是**区间上限**（组件上限），取样四坑已写进验证文档并落进 `analyze.py` 的护栏。
+- 判据自身也红过一次，且红在判据不在实现：两条 fill 腿最初比的是「token vs 它自己的渲染结果」，
+  而 `fill` 取的是满值（alpha=1），这个差**结构上恒等于 0**，于是必红。改判成「合成后的落色 vs 容器本色」后绿。
+  这一条写进 `SkeletonVisibilityContrastTest.visibility()` 的 KDoc，防止下一个人再按「token vs 落点」写一遍。
+- 门禁复跑：332 类 / 2467 条全绿 = 批 C-6 基线 331 / 2460 + 本批 1 类 / 7 条，0 失败 0 跳过；
+  既有 `IconBadgeContrastContractTest`（≥3:1 图标尺子）与 `ShimmerSpecContractTest` 未连带放宽，后者另按 TDD 补了上面那条扫面闸。
+
+**影响**：
+
+- 正面：全站首帧在实机上第一次真的看得见；「改回不可见档」从「要等一轮截图册才发现」变成「JVM 当场红」；
+  色档只有一处可改，深浅两档同强由同一份算式保证。
+- 成本与风险：`Screen` 是**与当前图层已画像素混合**，若哪天把骨架放进带 `graphicsLayer` 的容器（玻璃、模糊、抬升），
+  混合底会变成图层底而不是页底，这一条 JVM 判据管不到，只能靠截图册复核（本批已按深浅两档各拍一册）；
+  骨架条变实灰后「骨架 vs 真内容」的形状差更明显，真卡改版时骨架要跟得更紧（§5 既有条款不变）。
+- 明确不做：不动发丝线与 `framed` 行壳的 `outlineSoft`（那是与真实行逐字相同的镜像件，F5-05 判据就是像不像）；
+  不新增 palette token；不引入 `if (isDark)` 分支；不改 `ShimmerSpec` 的周期、行程与首末相位归零语义
+  （`scale=0` 定格 = 静息骨架这条设计目标必须原样成立）。

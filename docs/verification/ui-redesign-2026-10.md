@@ -1661,3 +1661,165 @@ bash .git/qa-scratch/c6/firstframe.sh   # 读数落 .git/qa-scratch/c6/firstfram
   → 同上，随批 C-7 的「光带比容器亮」改法一并消解。
 - 深色档的骨架对比度只有算式核对（1.048:1），本轮未拍深色截图册；若色档改了，深浅两档都要重拍。
 
+## 2026-11-07 批 C-7：骨架与 shimmer 色档整改到可见档（`emulator-5554`，API 30）
+
+一句话结论：**骨架条现在实机看得见**（浅色档相对页底 20 级 / 相对卡面 34 级，深色档 33 / 26，C-6 是 1 / 4 / 5 / 3），
+**光带在两套主题里都变成提亮**（浅 18–19 级、深 19–20 级；C-6 在浅色白卡上是画暗 3 级）。
+口径与理由见 `docs/decisions/2026-11-07-loading-skeleton-shimmer-prefetch.md` §6；用户裁决「提到可见档」落在 C-6 一节末尾。
+
+### 判据先红（TDD 记录）
+
+`SkeletonVisibilityContrastTest` 先落地即红——红在色档不够，不是红在写错判据：
+
+```bash
+# 红：4/6 失败（17:15）→ .git/qa-scratch/c7/red.log
+"$GRADLE" :app:testDebugUnitTest --tests 'com.example.englishlearning.ui.SkeletonVisibilityContrastTest' \
+  --offline --no-daemon --rerun-tasks        # GRADLE 发现方式见 docs/handoff 环境口径
+```
+
+```
+SkeletonVisibilityContrastTest > bar fill reads against both containers in light theme() FAILED          :71
+SkeletonVisibilityContrastTest > bar fill reads against both containers in dark theme() FAILED           :86
+SkeletonVisibilityContrastTest > band lifts the bar instead of painting it darker in both themes() FAILED :102
+SkeletonVisibilityContrastTest > band mechanism is a lightening blend not a theme branch() FAILED        :114
+6 tests completed, 4 failed
+```
+
+改完后**第一次全量门禁反而红了两条**（`.git/qa-scratch/c7/gate.log`，`2466 tests completed, 2 failed`）。
+那两条红是判据自身的错，不是实现的错，值得单独记一笔：
+
+> 腿里的比较写成了「`SkeletonInk.fill` 这枚 token」vs「它 SrcOver 到容器后的落点」。
+> `fill` 现在取 `outline` **满值**（alpha=1），一个不透明色与它自己的渲染结果**结构上恒等于 0 级**，
+> 于是两条 fill 腿必红——而实机截图明明看得见那块灰绿条。**观感量是「合成后的落色 vs 容器本色」**，
+> 这条口径修正在 `SkeletonVisibilityContrastTest.visibility()` 的 KDoc 里，不在这里重复。
+
+### 算式档（token → 落色 → 通道差 / WCAG 比）
+
+纯 PIL 算术，无 numpy；复算：`PYTHONIOENCODING=utf-8 python .git/qa-scratch/c7/calc.py`
+
+| 档 | 落色 | 相对页底 | 相对卡面 | 方向 |
+|---|---|---|---|---|
+| 浅 C-6 旧档 `outlineSoft@0.22` | `#F0F4EF` / `#FBFCFB` | 1 级 / 1.002:1 | 4 级 / 1.028:1 | — |
+| **浅 C-7 `outline` 满值** | `#DDE5DD` | **20 级 / 1.159:1** | **34 级 / 1.286:1** | 画暗（骨架本就该暗于页） |
+| 浅 光带 `Screen tint` @0.16（C-1 峰值） | `#E2E9E2` | — | 相对条 +5 级 | 提亮 |
+| 浅 光带 @0.55（回落档） | `#EEF3EE` | — | 相对条 +17 级 / 1.145:1 | 提亮 |
+| **浅 光带 @0.6（现值）** | `#F0F4F0` | — | **相对条 +19 级 / 1.158:1** | 提亮 |
+| 浅 C-6 旧组合 `tint@0.16 SrcOver` 压旧条 | `#F8FAF8` | — | 3 级 | **画暗**（用户已裁决不可接受） |
+| 深 C-6 旧档 | `#141D18` / `#182219` | 5 级 / 1.048:1 | 3 级 / 1.032:1 | — |
+| **深 C-7 `outline` 满值** | `#2A3931` | **33 级 / 1.486:1** | **26 级 / 1.388:1** | 提亮（深档骨架亮于页） |
+| **深 光带 @0.6** | `#384D42` | — | **相对条 +20 级 / 1.336:1** | 提亮 |
+
+判据用的是**最大单通道差 ≥16 级**这条经验锚（16 = C-6 实机唯一看得见的那档卡壳 `surface` vs 页底），
+不是 WCAG 3:1——3:1 是给图标/非文本信息载体定的尺子（`IconBadgeContrastContractTest`），
+骨架不承担信息，且 pastel token 里没有任何一枚够得着 3:1（`outline` 满值只有 1.159:1）。
+
+### 实机像素读数（两套主题各重拍一册，7 枚规格 × `scale=0` 定格 + `scale=1` 扫光）
+
+复算：`PYTHONIOENCODING=utf-8 python .git/qa-scratch/c7/analyze.py light|dark`；重拍见下面「取样四坑」。
+
+浅色档（页底 `#F1F4EF` / 卡面 `#FFFFFF`）：
+
+| 规格 | `s0` 几种 | 条色 | 条 vs 页 | 条 vs 卡 | 带峰值色 | 带 vs 条 | 过线 |
+|---|---|---|---|---|---|---|---|
+| bar | 1 | `#DDE5DD` | 20 | 34 | `#F0F4F0` | 19 | 是 |
+| card | 1 | `#DDE5DD` | 20 | 34 | `#EFF4F0` | 19 | 是 |
+| row-flat-48 | 1 | `#DDE5DD` | 20 | 34 | `#EFF4F0` | 19 | 是 |
+| row-flat-96 | 1 | `#DDE5DD` | 20 | 34 | `#EFF3EF` | 18 | 是 |
+| row-framed | 1 | `#DDE5DD` | 20 | 34 | `#EFF4F0` | 19 | 是 |
+| row-leading | 1 | `#DDE5DD` | 20 | 34 | `#EFF4F0` | 19 | 是 |
+| stat-grid | 1 | `#DDE5DD` | 20 | 34 | `#EFF4F0` | 19 | 是 |
+
+深色档（页底 `#101814` / 卡面 `#161F1A`，`cmd uimode night yes` 触发，生产零改动——`MintGlassTheme` 默认 `ThemeMode.System`）：
+
+| 规格 | `s0` 几种 | 条色 | 条 vs 页 | 条 vs 卡 | 带峰值色 | 带 vs 条 | 过线 |
+|---|---|---|---|---|---|---|---|
+| bar | 1 | `#2A3931` | 33 | 26 | `#374C42` | 19 | 是 |
+| card | 1 | `#2A3931` | 33 | 26 | `#374C42` | 19 | 是 |
+| row-flat-48 | 1 | `#2A3931` | 33 | 26 | `#384D42` | 20 | 是 |
+| row-flat-96 | 1 | `#2A3931` | 33 | 26 | `#374C42` | 19 | 是 |
+| row-framed | 1 | `#2A3931` | 33 | 26 | `#384C42` | 19 | 是 |
+| row-leading | 1 | `#2A3931` | 33 | 26 | `#384C42` | 19 | 是 |
+| stat-grid | 1 | `#2A3931` | 33 | 26 | `#384D42` | 20 | 是 |
+
+- **`s0 几种 = 1`**：`scale=0` 的 12 帧全部落成同一枚 md5，即「关动画 = 静息骨架、零光泽」这条口径在两套主题、七枚规格上都成立（C-1 的 R1 判据的实机侧印证）。
+- **条色恰为 token 落色**：浅档渲染出 `#DDE5DD` = `AppColorLight.outline`，深档 `#2A3931` = `AppColorDark.outline`，与算式逐通道相同 ⇒ `SkeletonInk.fill` 取满值、没有中间 alpha 把色洗淡。
+- 发丝线 / 描边仍走 `outlineSoft`（`Skeleton.kt` 未改），所以「条明显深于线」的形状层级还在。
+
+### 取样四坑（本轮踩全了，`analyze.py` 逐条写了护栏）
+
+1. **短促采样欠峰**：`alphaAt(phase) = sin(phase·π) · peakAlpha` 且渐变峰值同时在扫，单帧抬升量取决于落在周期哪一格。
+   `screencap` 自身 0.15–0.3 秒，12 帧 @0.2s 的节拍覆盖不全：`card` / `stat-grid` 一度只报 14 / 11 级，
+   看着像「窄条规格不达标」。密拍 26 帧（`burst_dense.sh`，帧间不 sleep）后两枚都到 19 ⇒ **是抽样，不是渲染**。
+   本脚本把 `*-dense` 目录并进同一规格一起看，读的是区间上限（组件上限）。
+2. **burst 第 1 帧是上一窗口的画面**：不按页底色 `(500,1600)` 过滤，`scale=0` 侧会拿别处的 `#FAFAFA` 当基准，
+   测出「条 = `#FAFAFA`、差 11 级」的假读数。`scale=0` 与 `scale=1` 两侧都要过滤。
+3. **骨架条众数要同时排除页底与卡面**：带卡壳的三枚规格里白卡像素远多于骨架条，只排页底会把 `surface` 当成条，
+   读出「条 vs 卡面 = 0 级」。
+4. **光带峰值只在「静息态确为骨架条」的像素上取，且只计提亮方向**：整帧差异带的极值会落到抗锯齿边、描边与别的形状上
+   （实测把 `stat-grid` 报成「条色 = `#DDE5DD`、带 vs 条 17 级」而那条像素其实是页底边缘）。
+   基准取 `scale=0` 静态帧，不是相邻帧。
+   另：早期版本问「哪个容器像素占多数」，答案永远是页底（`row-framed` 页 367422 vs 卡 77184），这一列没有信息量；
+   现在的过线判据是 `min(条vs页, 条vs卡) ≥ 16`。
+
+```bash
+bash .git/qa-scratch/c7/shoot.sh light 0      # 12 帧 @0.2s，scale=0 定格册
+bash .git/qa-scratch/c7/shoot.sh light 1      # scale=1 扫光册
+bash .git/qa-scratch/c7/burst_dense.sh dark card stat-grid   # FRAMES=26 密拍补峰
+```
+
+两条脚本都自带 `cmd uimode night yes|no` 与 `settings put global animator_duration_scale`，
+改完 scale 后 `force-stop`（全局设置不影响已在跑的进程），并按 logcat `QA-C6` 的 `spec=<id> scale=… holdStart`
+对齐取证窗口（`HOLD_MILLIS = 6_000L`）。取证类 `SkeletonShimmerEvidenceTest` 的 7 枚方法与 id 对应：
+`bar` / `row-leading` / `row-flat-96` / `row-flat-48` / `row-framed` / `card` / `stat-grid`。
+
+### 门禁与既有判据的连带复核
+
+- 三元组门禁（`assembleDebug` / `assembleDebugAndroidTest` / `testDebugUnitTest` / `compileDebugAndroidTestKotlin` / `verifyThirdPartyNotices`，`--offline --no-daemon --no-build-cache --rerun-tasks`）：
+  `BUILD SUCCESSFUL in 4m 49s`，`GATE_EXIT=0`，**332 类 / 2467 条全绿 = 基线 331 类 / 2460 条 + 1 类（`SkeletonVisibilityContrastTest`）+ 7 条（该类 6 条 + `ShimmerSpecContractTest` 新增那条扫面闸 1 条），0 失败 0 跳过**
+  （`.git/qa-scratch/c7/gate3.log`；五元组现算：`grep -h -o 'tests="[0-9]*"' app/build/test-results/testDebugUnitTest/TEST-*.xml | grep -o '[0-9]*' | paste -sd+ | bc`）。
+  中途两枚日志是过程证据，不当成最终读数：`gate.log` 是判据写错腿的那一次红（`2466 completed, 2 failed`），
+  `gate2.log` 是修好判据、但扫面闸尚未补上时的绿（`332 类 / 2466 条`，`BUILD SUCCESSFUL in 5m 58s`）。
+- **`IconBadgeContrastContractTest` 未被连带放宽**：本轮没碰它的任何一行，它在上面的全量里照绿；
+  骨架/光带的 ≥16 级锚与它的 3:1 尺子是两套判据，本批只把前者写进 `docs/design/visual-style-guide.md` 的一句口径说明。
+- `ShimmerSpecContractTest`：本轮只改了一处**报错文案**（把「不许把色档写在用法点」点名到 `SkeletonInk.band` / `bandBlend`），
+  判据条数与强度未减；另按 TDD 补一条**扫面闸**——`SkeletonInk.kt` 是批 C-7 新增的色档唯一落点，
+  禁令族原先只扫 `Shimmer.kt` / `Skeleton.kt`，新文件不进去就等于把取色挪到判据管不到的地方。
+  红（`.git/qa-scratch/c7/red-skeletonink-scan.log`，17:57）：`tests="7" failures="1"`，
+  失败腿是 `the colour tier file is inside the offender scan`，消息点名「现名单：[Shimmer.kt, Skeleton.kt]」；
+  绿（`green-scan.log`）：`tests="7" failures="0"`，名单加入 `SkeletonInk.kt` 后同一枚类全绿。
+  名单与那条判据成对存在，把文件名从名单里摘掉就红。
+- `SkeletonFamilyContractTest`：合规夹具示例从 `outlineSoft.copy(alpha = 0.22f)` 改为 `SkeletonInk.fill(appColors())`——
+  已退役的色档继续出现在「合规形状」里会被下一个人当范例抄，判据本身没放宽。
+
+### connected（本批只补 compact UI 包单腿）
+
+C-7 只改色档与取色机制，不改版面、不改尺寸类判据，故按「UI 包全量」口径重跑 compact 一腿，
+**wide 腿未重跑**（最近一次 wide UI 全量证据仍是批 C-6 的 `OK (588 tests)` / `Time: 662.658`）。
+
+```bash
+bash .git/qa-scratch/c7/connected_c7.sh   # install -r 两枚 APK + am instrument -e package …ui
+```
+
+前置实测 `Physical size: 1080x1920` / `Physical density: 420`（**无 Override**，脚本带 Override 残留即中止的护栏）、
+`font_scale=1.0` / `animator_duration_scale=1.0` / `ui_night_mode=1`（浅色）。
+两枚 `install -r` 均 `Success`（数据保留，未 onboarding）。
+
+| 腿 | 结果 | 日志（gitignored） |
+|---|---|---|
+| compact UI 全量（门禁产物，18:06 构建） | `Time: 504.914` `OK (588 tests)`（墙钟 507s），全流零 `F`/`E` 标记 | `.git/qa-scratch/c7/c7-compact-ui.log` |
+
+- 枚数与批 C-6 的 588 **相同**：本批没新增 instrumentation 用例，截图册的取证类 `SkeletonShimmerEvidenceTest` 仍是 7 枚方法
+  （日志里那行 `:.......` 恰 7 点），所以这腿的增量是**同一个取证类在新色档下重跑一遍**，不是新判据。
+- 按点数合计出 585 而非 588：部分类的点串换行落在下一行（如 `AppScreenOverlayContainerTest:` 单独成行），
+  只按类名前缀行累加会漏；成败以末行 `OK (588 tests)` 为准。
+- 注意口径：**门禁绿不等于设备上是新包**。这腿跑前重新 `assembleDebug` + `assembleDebugAndroidTest`（18:06 产物）并 `install -r` 两枚。
+  截图册用的是本批早前装上的同一份 C-7 生产改动（装包时按 APK 时间戳核过它是带 `SkeletonInk` / `peakAlpha = 0.6f` 的那一枚）；
+  本批最后几处改动是注释级 KDoc 与测试侧名单，不改渲染，截图册与 connected 用包不构成新色档的偏差。
+
+### 待用户目视（在 C-6 累计清单之上追加）
+
+- 浅档骨架条从 1 级跳到 20 级，**观感是否偏重**（它现在和 `outline` 描边同色，只是不带 alpha）；嫌抢眼就落 `0.55f` 光带 + 换填充档，两者独立。
+- 光带 `Screen` 提亮在白卡面上是否过亮（浅档峰值 +19 级、落色 `#F0F4F0`）；C-6 那条「画成暗带」的疑问随本轮改向消解，剩下的是强弱取舍。
+- 「首帧 → 今日计划可读」这段骨架时长仍未测（C-6 遗留，量它要插临时桩，本轮未做）。
+
+
