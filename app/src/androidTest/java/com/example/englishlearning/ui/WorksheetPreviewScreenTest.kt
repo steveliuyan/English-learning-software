@@ -1,19 +1,26 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.export.WorksheetPdfRenderer
 import com.example.englishlearning.learning.worksheet.WorksheetPage
+import com.example.englishlearning.ui.theme.MintGlassTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -135,5 +142,51 @@ class WorksheetPreviewScreenTest {
 
         composeRule.onNodeWithTag("inline_notice_error").assertIsDisplayed()
         composeRule.onNodeWithText("默写纸生成失败，请稍后重试。").assertIsDisplayed()
+    }
+
+    /**
+     * 顶档（`fontScale = 3.0`，AC5-03 判据要求的档，既有 connected 护栏只覆盖到 2.0）下，
+     * 本屏的两枚触控目标仍是 ≥48dp 的可点方块：页头返回位 + 吸底「导出 PDF」。
+     *
+     * 为什么值得单独一条：QA 第三轮任务书 §3 把这三屏列为「零测试引用族」——48dp 与对比度
+     * 此前只有源码 `heightIn(min = 52.dp)` 和静态契约支撑，设备上一次都没量过。
+     * 本屏的旧版是「返回修改 + 导出 PDF」并排两枚按钮（`Modifier.weight(1f).height(52.dp)`），
+     * 批 2 收口后返回上移到共享页头、行里只剩导出，并把固定高改成 `heightIn(min = 52.dp)`
+     * （大字号下按钮可自行长高）。所以「两枚按钮行」的判据落到设备上就是这两枚目标：
+     * 行内那枚 + 页头那枚，两个都钉。
+     *
+     * 口径沿用 `AppScreenHeaderTest` 的先例：尺寸断言读 unclipped 矩形（`heightIn` 生效但被祖先
+     * 裁掉时仍算达标，正是「目标尺寸」这条契约要的量法）；`assertIsDisplayed()` 单独钉可见性，
+     * 不吃滚动——吸底条若在顶档被挤出屏幕，这条会当场红。写法用 `LocalDensity` 换 fontScale，
+     * 不改设备全局字体档（改完还得复原，且会同毒化其它用例）。
+     */
+    @Test
+    fun touchTargetsStayAtLeast48dpAtTopFontScale() {
+        composeRule.setContent {
+            val base = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 3f)) {
+                MintGlassTheme {
+                    WorksheetPreviewScreen(
+                        pages = emptyList(),
+                        renderedFile = null,
+                        rendering = false,
+                        message = null,
+                        onBack = {},
+                        onExport = {},
+                    )
+                }
+            }
+        }
+
+        val export = composeRule.onNodeWithTag("worksheet_export_action")
+        export.assertIsDisplayed()
+        export.assertHeightIsAtLeast(48.dp)
+        export.assertWidthIsAtLeast(48.dp)
+
+        val back = composeRule.onNodeWithContentDescription("返回")
+        back.assertHasClickAction()
+        back.assertIsDisplayed()
+        back.assertHeightIsAtLeast(48.dp)
+        back.assertWidthIsAtLeast(48.dp)
     }
 }
