@@ -99,7 +99,38 @@ grep -n "delay(1200)\|provideDatabase" app/src/main/java/com/example/englishlear
   `AiLearningScreen`、`ProfileScreen` **先补 Loading 分支**（当前零处理，§2.3）再铺骨架。补的分支只处理「本地读盘中」，不引入新状态机语义。
   ——C-2 交付时按 §2.3 的订正落点执行：AI 屏实测为静态、不进铺面（改由一条「静态页不许长出没骨架的等待分支」钉住），
   「我的」页的等待态补在**宿主的入参**上（三枚统计改可空 + 屏侧占位格），屏侧不长 `Loading` 分支。
-- C-3 本地读盘子页（今日计划词卡流、查词、学习记录、词书单词、生词复习、试卷预览、备份导出/恢复的本地校验段）：转圈换骨架，形状照各自真实行/卡。判据是「第一帧就有一条正确形状的行」，不是「转圈更好看」。
+- C-3 本地读盘子页（词卡流、词书单词、生词复习、学习记录、查词结果、**文章整篇阅读**、试卷预览、备份导出/恢复的本地校验段）：转圈换骨架，形状照各自真实行/卡。判据是「第一帧就有一条正确形状的行」，不是「转圈更好看」。
+- C-3 开工实测把等待分成**三类**而不是原写的两类（§2.3 那份 15 处清单只数了转圈，漏了一处只有裸文案的读屏，也混进了动作进行中那几处）：
+  1. **等数据**（首帧该有形状）→ 换骨架：`WordCardScreen`、`WordBookWordsScreen`、`VocabularyRelearnScreen`、`LearningRecordsScreen`、
+     `GlobalVocabularySearchScreen` 的 `Loading`，外加 `ArticleReadingScreen`——它没有转圈，只有一句 `Text("正在加载…")`，
+     与 C-2 之前阅读 tab 同一形状缺陷，属于「本地读盘」所以进 C-3 而不是 C-4。
+  2. **动作进行中**（不是等数据，是在做事）→ **保留活动指示 + 真话文案，不画骨架**：`BackupPairingExportScreen` 的
+     认证中/导出中两枚、`BackupRestoreScreen` 的恢复中一枚、`GlobalVocabularySearchScreen` 的「正在清空历史…」、
+     `WorksheetPreviewScreen` 的「正在生成 PDF 预览…」。骨架承诺的是「马上出现的就是这个形状的内容」，
+     而这五处接下来出现的是**结果回执或整屏换掉**，画骨架等于预告一个不会以那个形状落地的东西；
+     它们的文案本就说清了在做什么，属于 C-4 的进行中语义族，只是动作在本地。台账里这五行不删，逐条写明豁免理由。
+  3. **网络 / AI 等待** → C-4（原文那条不变）。
+  另：`AppScreen` 闪屏那枚 `LinearProgressIndicator` 是确定性进度（品牌页动画），永远不在铺面对象里。
+- **C-3 交付实况**（本轮，六屏收完）：
+  1. 分类 1 全部落地——`LearningRecordsScreen` / `WordCardScreen` / `VocabularyRelearnScreen` / `WordBookWordsScreen` /
+     `GlobalVocabularySearchScreen` 的 `Loading` 与 `ArticleReadingScreen` 的 `current == null` 共六处换成同形状骨架。
+     `ArticleReadingScreen` 用 `SkeletonBar` 逐条镜像而**不是** `SkeletonCard`：真版面页头之后是一列裸排内容，没有卡壳，
+     套壳就是预告一个不会以那个形状落地的东西。
+  2. 骨架族为此长出的是**两种镜像能力**，不是第六件形状：`leading`（关掉行首圆点，供 `WordRow` 那族无前导图标的行）与
+     `framed`（把一行画成带壳卡行 + 10dp 缝，供 `Card` 包 `WordRow` 那一族）。两条各由
+     `LocalSubpageSkeletonContractTest` 钉「族里恰两枚声明 + 确有屏在用」，防止参数长出来没人用；
+     **无壳那一支的 modifier 链逐字未动**，C-1 那两条 connected 行高判据照旧读同一份形状。
+     已知局限如实记录：族里一行只画两条横，四行的查词结果行靠 `rowHeight = 96.dp` 承接总高，不为其长第三种行内版式。
+  3. 数据量型列表（学习记录 / 词书单词 / 查词结果）的行数判据只钉**写法**（读 `*_PLACEHOLDER_ROWS` 常量、不写字面量），
+     取值由每屏常量自己的算术交代；C-2 那两屏是版面常量组，仍跑**值判据**（`rows == 真实裸行数`）。
+     两种写法不是两套口径，是「首帧知不知道有几条」这一事实的两种结果。
+  4. 转圈台账 9 行 → **5 行**：删掉三行「等数据」站点（生词复习 / 词书单词 / 词卡流），保留四行豁免
+     （配对 ×2、恢复、清空历史、生成 PDF）。`GlobalVocabularySearchScreen` 那一行**留着**：
+     `GlobalSearchProgress` 原先一支两用，本批把 `Loading` 拆出骨架后它只剩 `ClearingHistory` 一种语义，
+     删行的判据是「这处转圈的调用面只剩动作进行中」。
+  5. connected 侧按 tag 的落地判据新增 7 条（六屏各一条；生词复习的 `Idle` 与 `Loading` 共用同一支，
+     因「同一测试两次 `setContent` 真机必崩」拆成两个方法），逐条判「骨架在、行数上界对、进行中文案与假数字不在、
+     真内容节点不提前组合」。
 - C-4 网络 / AI 等待屏（文章生成、AI 问答、拍照翻译、生图、句法分析）：**不许长得像已有结果**。这一类的等待语义与骨架不同——骨架承诺「马上出现的是这个形状的内容」，而 AI 生成失败率高、时长不可知，画骨架会变成「假内容」，与 `2026-11-06-placeholder-text-is-not-learning-content` 同源。所以 C-4 的交付是**进行中语义**：明确「正在向 AI 请求今日文章（可取消）」+ 不定量的活动指示 + 取消入口，绝不画成「已有 N 条」的假快照，也绝不预生成占位文本。
 - C-1 是这些的基建与契约闸；C-5 是真预取；C-6 是门禁 + 截图册 + connected + 报告。
 

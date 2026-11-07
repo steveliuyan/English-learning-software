@@ -32,6 +32,10 @@
 - C-1 基建：`Skeleton.kt` 重写为骨架族（`SkeletonBar`/`SkeletonRow`/`SkeletonList`/`SkeletonCard`/`SkeletonStatGrid`），`Shimmer.kt` 落 `drawBehind` + 相位渐变（末尾=静息），`AppScreen` 私有骨架迁入且 `wordbook_row_skeleton_` / `WORD_BOOK_PLACEHOLDER_ROWS` 两枚既有闸不动；契约闸 `SkeletonFamilyContractTest` + `ShimmerSpecContractTest`（唯一性、定格=静息的纯函数判据、禁裸 hex、禁时长换算入口、骨架零 `Text`）。
 - C-2 一级页：`TodayPlanScreen` / `ReadingAccessScreen` 换骨架；`AiLearningScreen` / `ProfileScreen` 先补 Loading 分支再铺（补的是「本地读盘中」，不新增状态机语义）。
 - C-3 本地读盘子页：今日计划词卡流、查词、学习记录、词书单词、生词复习、试卷预览、备份本地校验段——转圈换同形状骨架，等待指示器调用点计数只减不增。
+  ——C-3 交付实况：换了六屏（上述前五屏的 `Loading` + `ArticleReadingScreen` 那句裸 `Text("正在加载…")`，本屏没有转圈所以原清单没点到它，按「本地读盘」补入）；
+  **试卷预览与备份三处不换骨架**——实测它们的等待是「动作进行中」（生成 PDF / 认证中 / 导出中 / 恢复中），接下来落的是回执而不是同形状内容，
+  分类与逐条豁免理由见决策册决定 3 第 2 类与 `docs/specs/05` F5-05 新增那条；`GlobalVocabularySearchScreen` 只换 `Loading` 那一支，`ClearingHistory` 保留指示。
+  转圈台账因此 9 行 → 5 行（剩四文件五处全部为豁免站点）。
 - C-4 网络/AI 等待屏：文章生成、AI 问答、拍照翻译、生图、句法分析改成进行中语义（说清在请求谁 + 可取消 + 超时），禁止假结果骨架与占位内容。
 - C-5 真预取：`StartupLocalDataWarmer`（形状照抄 `StartupPronunciationWarmer`，只做开库，把 `DatabaseStartup.open` 挪进闪屏那 1.2 秒）+ tab 预读只补本地装载点；零出站探针与装载点对账是硬判据。
 - C-6 收口：三连门禁 + 双形态 connected + `scale=0` / `scale=1` 截图册 + 首帧耗时读数 + 按 `REPORT-TEMPLATE` 报告 + 分功能域提交、推送请示。
