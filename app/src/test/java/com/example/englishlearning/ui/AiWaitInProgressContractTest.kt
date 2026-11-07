@@ -40,20 +40,24 @@ import kotlin.test.assertTrue
  */
 class AiWaitInProgressContractTest {
 
-    /** 一枚等待臂：屏文件、分支头、下一条分支头、稳定锚 tag、以及 message 里必须出现的操作词。 */
+    /** 一枚等待臂：屏文件、分支头、下一条分支头、稳定锚 tag、取消键 tag、以及 message 里必须出现的操作词。 */
     private data class WaitArm(
         val fileName: String,
         val startMarker: String,
         val endMarker: String,
         val statusTag: String,
+        val cancelTag: String,
         val operationWord: String,
         val label: String,
     )
 
     /**
-     * 本批的五枚臂（生图两臂）。`PhotoTranslationScreen` 的翻译在飞此前**没有分支**，
-     * 随批 C-4c 补 `state.translating` 后入表；那张表先不含它，是因为 C-4c 之前那一臂不存在，
-     * 提前入表只会得到一条「找不到分支头」的红，把「尚未实现」误报成「实现漂移」。
+     * 本批的六枚臂（五屏，生图两臂）。
+     *
+     * C-4b 收前两屏时这张表只有两行，理由是「那一臂还不存在，提前入表只会得到一条找不到分支头的红，
+     * 把尚未实现误报成实现漂移」。C-4c 把剩下四枚臂真的建出来了（拍照翻译那枚此前连分支都没有，
+     * 随 `state.translating` 补上），所以表补满六行——**这张表现在是全覆盖**，
+     * 新增第七枚 AI 等待臂而不入表，本契约不会替谁兜着（决策 §4 那半条口径）。
      */
     private val arms = listOf(
         WaitArm(
@@ -61,6 +65,7 @@ class AiWaitInProgressContractTest {
             startMarker = "WordAiQaUiState.Asking ->",
             endMarker = "is WordAiQaUiState.Answered ->",
             statusTag = "word_qa_asking",
+            cancelTag = "word_qa_cancel",
             operationWord = "问",
             label = "AI 问词",
         ),
@@ -69,8 +74,45 @@ class AiWaitInProgressContractTest {
             startMarker = "SentenceAnalysisUiState.Analyzing ->",
             endMarker = "is SentenceAnalysisUiState.Analyzed ->",
             statusTag = "sentence_analysis_analyzing",
+            cancelTag = "sentence_analysis_cancel",
             operationWord = "分析",
             label = "长难句分析",
+        ),
+        WaitArm(
+            fileName = "ReadingAccessScreen.kt",
+            startMarker = "GenerationUiState.Generating ->",
+            endMarker = "GenerationUiState.StorageFailed ->",
+            statusTag = "generation_status",
+            cancelTag = "generation_cancel",
+            operationWord = "生成",
+            label = "今日文章生成",
+        ),
+        WaitArm(
+            fileName = "ImageStudioScreen.kt",
+            startMarker = "ImageStudioUiState.DraftingPrompt ->",
+            endMarker = "is ImageStudioUiState.PromptReady ->",
+            statusTag = "image_studio_drafting",
+            cancelTag = "image_studio_cancel_drafting",
+            operationWord = "描述",
+            label = "画面描述起草",
+        ),
+        WaitArm(
+            fileName = "ImageStudioScreen.kt",
+            startMarker = "ImageStudioUiState.GeneratingImage ->",
+            endMarker = "is ImageStudioUiState.ImageReady ->",
+            statusTag = "image_studio_generating",
+            cancelTag = "image_studio_cancel_image",
+            operationWord = "图片",
+            label = "生图",
+        ),
+        WaitArm(
+            fileName = "PhotoTranslationScreen.kt",
+            startMarker = "if (state.translating) {",
+            endMarker = "when (val issue = state.translationIssue)",
+            statusTag = "photo_translation_translating",
+            cancelTag = "photo_translation_cancel_translate",
+            operationWord = "翻译",
+            label = "拍照翻译的 AI 翻译",
         ),
     )
 
@@ -78,6 +120,27 @@ class AiWaitInProgressContractTest {
     fun `every ai wait arm goes through the single in-progress component`() {
         val found = arms.flatMap { arm ->
             offenders(arm.label, armBody(arm))
+        }
+        assertTrue(found.isEmpty(), found.joinToString("\n"))
+    }
+
+    /**
+     * 两枚稳定锚必须真的从臂里传进去。
+     *
+     * 为什么单独钉这一条而不是只靠 connected：connected 用例按 tag 取节点，tag 拼错只会让**那一屏**的用例红；
+     * 而本契约读的是臂体字面量，`statusTestTag =` / `cancelTestTag =` 缺任一档，组件会退化成用默认 tag
+     * 或干脆不画取消键——那种漂移在 connected 侧可能表现为「取到了另一个节点」而不是「取不到」。
+     * 逐臂点名两枚锚，等于把「设备侧要按哪个 tag 找它」写进唯一权威表。
+     */
+    @Test
+    fun `every ai wait arm passes both stable anchors the connected cases read`() {
+        val found = arms.mapNotNull { arm ->
+            val body = armBody(arm)
+            val missing = listOfNotNull(
+                """statusTestTag = "${arm.statusTag}"""".takeUnless { it in body },
+                """cancelTestTag = "${arm.cancelTag}"""".takeUnless { it in body },
+            )
+            if (missing.isEmpty()) null else "${arm.label}: 臂内缺 $missing"
         }
         assertTrue(found.isEmpty(), found.joinToString("\n"))
     }
@@ -166,6 +229,9 @@ class AiWaitInProgressContractTest {
         listOf(
             "wordQaViewModel?.cancelAsk()" to 2,
             "sentenceAnalysisViewModel?.cancelAnalysis()" to 1,
+            "readingAccessViewModel?.cancelGeneration()" to 1,
+            "imageStudioViewModel?.cancelGeneration()" to 1,
+            "photoTranslationViewModel?.cancelTranslate()" to 1,
         ).forEach { (anchor, expected) ->
             val hits = countMatches(host, Regex(Regex.escape(anchor)))
             assertTrue(

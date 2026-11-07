@@ -43,6 +43,8 @@ import com.example.englishlearning.reading.domain.ReadingPreference
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -231,6 +233,114 @@ class ReadingAccessViewModelTest {
         val body = h.transport.lastRequest!!.body
         assertTrue(body.contains("orchard"), "regeneration must tell the model to avoid previously covered lemmas")
         assertTrue(h.viewModel.readingTarget.value != null)
+    }
+
+    // ---------- 批 C-4：取消是真取消，等待期间不许多发一次 ----------
+
+    /**
+     * 取消一枚在飞的生成 = 不再等待 + 迟到文章不回写 + 不多发一次。
+     *
+     * 判据必须让请求**真的在飞**（`hangOn`）：立即返回的假传输上 `advanceUntilIdle()` 之后协程早跑完了，
+     * VM 不持句柄也能通过——那种用例是绿的，但它什么都没证明。
+     */
+    @Test
+    fun cancelGenerationStopsWaitingAndDiscardsTheLateArticle() = runTest(dispatcher) {
+        Dispatchers.setMain(dispatcher)
+        val h = harness()
+        val gate = CompletableDeferred<AiHttpResult>()
+        h.transport.hangOn = { call -> if (call == 1) gate else null }
+
+        h.viewModel.load("p1", isUnlocked = true, unlockReason = "")
+        advanceUntilIdle()
+        h.viewModel.generate()
+        advanceUntilIdle()
+        h.viewModel.confirmOutbound(confirmed = true)
+        advanceUntilIdle()
+
+        assertEquals(GenerationUiState.Generating, viewModelReady(h).generation)
+        assertEquals(1, h.transport.callCount)
+
+        h.viewModel.cancelGeneration()
+        assertEquals(GenerationUiState.Idle, viewModelReady(h).generation)
+        assertNull(h.viewModel.readingTarget.value)
+
+        // 迟到的那一篇在取消之后才回来：不许把界面推成结果，也不许再发第二次。
+        gate.complete(AiHttpResult.Responded(AiHttpResponse(200, chatBody(validContent))))
+        advanceUntilIdle()
+
+        assertEquals(GenerationUiState.Idle, viewModelReady(h).generation, "取消之后迟到的文章不许回写")
+        assertNull(h.viewModel.readingTarget.value, "取消之后不许自动打开文章")
+        assertEquals(1, h.transport.callCount, "取消不该再发一次请求")
+        assertTrue(h.articles.stored.isEmpty(), "取消之后迟到的文章不许落库")
+    }
+
+    /**
+     * 取消回的是 `Ready` 且 `generation = Idle`：**已经读到的今日文章不许被抹掉**。
+     *
+     * 决策 2026-11-07 §3 决定 3 第 2 条给阅读屏单独立了这一档例外——其余屏取消就是回 `Idle`
+     * （没开始过的样子），而这一屏的 `Idle` 里装着用户已经拿到手的内容，取消一次请求不该替他销毁。
+     */
+    @Test
+    fun cancelGenerationKeepsTheArticleAlreadyOnScreen() = runTest(dispatcher) {
+        Dispatchers.setMain(dispatcher)
+        val existing = existingTodayArticle(coveredLemmas = listOf("apple"))
+        val h = harness(history = listOf(existing))
+        val gate = CompletableDeferred<AiHttpResult>()
+        h.transport.hangOn = { call -> if (call == 1) gate else null }
+
+        h.viewModel.load("p1", isUnlocked = true, unlockReason = "")
+        advanceUntilIdle()
+        assertEquals(existing, viewModelReady(h).todayArticle)
+
+        h.viewModel.generate(regenerate = true)
+        advanceUntilIdle()
+        h.viewModel.confirmOutbound(confirmed = true)
+        advanceUntilIdle()
+        h.viewModel.cancelGeneration()
+
+        assertEquals(GenerationUiState.Idle, viewModelReady(h).generation)
+        assertEquals(existing, viewModelReady(h).todayArticle, "取消一次等待不许销毁已经读到的文章")
+        gate.complete(AiHttpResult.Responded(AiHttpResponse(200, chatBody(validContent))))
+        advanceUntilIdle()
+        assertEquals(existing, viewModelReady(h).todayArticle)
+    }
+
+    /**
+     * 等待期间再点一次生成：屏侧禁用是第一道防线，VM 侧「旧的先取消、不许两个同时在飞」是第二道。
+     *
+     * 钉的形状是**第一发的迟到响应不回写**：如果第二次点只是又开一枪而不管第一枪，
+     * 两发都会落地，用户付两次钱、界面显示哪一篇由竞态决定。
+     */
+    @Test
+    fun startingANewGenerationCancelsThePreviousInFlightRequest() = runTest(dispatcher) {
+        Dispatchers.setMain(dispatcher)
+        val h = harness()
+        val first = CompletableDeferred<AiHttpResult>()
+        val second = CompletableDeferred<AiHttpResult>()
+        h.transport.hangOn = { call -> when (call) { 1 -> first; 2 -> second; else -> null } }
+
+        h.viewModel.load("p1", isUnlocked = true, unlockReason = "")
+        advanceUntilIdle()
+        h.viewModel.generate()
+        advanceUntilIdle()
+        h.viewModel.confirmOutbound(confirmed = true)
+        advanceUntilIdle()
+        assertEquals(1, h.transport.callCount)
+
+        // 大字号/慢帧下按钮禁用还没来得及生效，用户已经又点了一次（屏侧的 `enabled` 由 connected 用例钉）。
+        h.viewModel.generate()
+        advanceUntilIdle()
+        h.viewModel.confirmOutbound(confirmed = true)
+        advanceUntilIdle()
+        assertEquals(2, h.transport.callCount, "第二次点应当真的重发一次，而不是把在飞的那次当成已完成")
+
+        first.complete(AiHttpResult.Responded(AiHttpResponse(200, chatBody(validContent))))
+        advanceUntilIdle()
+        assertNull(h.viewModel.readingTarget.value, "被顶掉的那一发不许回写")
+
+        second.complete(AiHttpResult.Responded(AiHttpResponse(200, chatBody(validContent))))
+        advanceUntilIdle()
+        assertTrue(h.viewModel.readingTarget.value != null, "最后那一发才是当前等待的答案")
     }
 
     // ---------- 粘贴导入 ----------
@@ -490,9 +600,20 @@ class ReadingAccessViewModelTest {
         var callCount = 0
         var lastRequest: AiHttpRequest? = null
         val responses = ArrayDeque<AiHttpResult>()
+
+        /**
+         * 非空即让 `send` 停在「已经计数、还没返回」的那一档——批 C-4 的取消判据要的就是这一档。
+         *
+         * 立即返回的假传输上，`advanceUntilIdle()` 之后协程早跑完了，VM 不持句柄也能通过取消用例；
+         * 那种绿什么都没证明。按**第几发**取门（而不是全局一枚门）是为了让「第二发」能单独挂起、
+         * 第一发的取消与第二发的回写分成两件事来量。
+         */
+        var hangOn: ((call: Int) -> Deferred<AiHttpResult>?)? = null
+
         override suspend fun send(request: AiHttpRequest): AiHttpResult {
             callCount++
             lastRequest = request
+            hangOn?.invoke(callCount)?.await()?.let { return it }
             return responses.removeFirstOrNull() ?: error("no scripted response for call #$callCount")
         }
     }

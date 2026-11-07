@@ -24,6 +24,8 @@ import com.example.englishlearning.imagegen.ImageStudioNotConfiguredReason
 import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -86,8 +88,17 @@ class ImageStudioViewModelTest {
         var result: AiHttpResult = AiHttpResult.Responded(AiHttpResponse(200, "{}")),
     ) : AiHttpTransport {
         val requests = mutableListOf<AiHttpRequest>()
+
+        /**
+         * 按**第几发**挂起（批 C-4 的取消判据）：立即返回的假传输上 `advanceUntilIdle()` 之后协程早跑完了，
+         * VM 不持句柄也能通过取消用例——那种绿什么都没证明。取号而不是全局一枚门，是为了把
+         * 「旧发被顶掉」与「新发落地」分成两件事量（生图两臂各有一条）。
+         */
+        var hangOn: ((call: Int) -> Deferred<AiHttpResult>?)? = null
+
         override suspend fun send(request: AiHttpRequest): AiHttpResult {
             requests += request
+            hangOn?.invoke(requests.size)?.await()?.let { return it }
             return result
         }
     }
@@ -394,6 +405,138 @@ class ImageStudioViewModelTest {
             ImageStudioUiState.AwaitingConfirmation("api.example.com", ImageStudioConfirmationStage.Prompt),
             f.viewModel.uiState.value,
         )
+    }
+
+    // ---------- 批 C-4：两枚在飞各取消各的，取消不许把已付费的描述一起销毁 ----------
+
+    /**
+     * 起草描述在飞时取消 → 回 `Idle`，迟到的描述不回写，也不多要一次。
+     *
+     * `hang` 是这一批的前提：立即返回的假传输上协程早跑完了，VM 不持句柄也能「通过」取消用例。
+     */
+    @Test
+    fun cancellingThePromptDraftDiscardsTheLateDescription() = runTest {
+        val f = fixture()
+        f.viewModel.generatePrompt("苹果")
+        advanceUntilIdle()
+        val gate = CompletableDeferred<AiHttpResult>()
+        f.promptTransport.hangOn = { call -> if (call == 1) gate else null }
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+
+        assertEquals(ImageStudioUiState.DraftingPrompt, f.viewModel.uiState.value)
+        assertEquals(1, f.promptTransport.requests.size)
+
+        f.viewModel.cancelGeneration()
+        assertEquals(ImageStudioUiState.Idle, f.viewModel.uiState.value)
+
+        gate.complete(promptResponse)
+        advanceUntilIdle()
+
+        assertEquals(ImageStudioUiState.Idle, f.viewModel.uiState.value, "取消之后迟到的描述不许把界面推成结果")
+        assertEquals(1, f.promptTransport.requests.size, "取消不该再要一次描述")
+    }
+
+    /**
+     * 生成图片在飞时取消 → 回**那份描述**（`PromptReady`），不是 `Idle`。
+     *
+     * 描述是一次已付费的文本出站换来的（决策 2026-11-07 §3 决定 3 第 2 条的例外）：把它连同图片一起销毁，
+     * 用户想再出图就得再付一次文本调用。迟到的图片不许落盘——落一张没人等的图是白花钱，
+     * 所以取消之后目录里必须还是一片干净。
+     */
+    @Test
+    fun cancellingTheImageKeepsThePaidDescriptionAndDiscardsTheLatePicture() = runTest {
+        val f = fixture()
+        f.viewModel.generatePrompt("苹果")
+        advanceUntilIdle()
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+        f.viewModel.generateImage()
+        advanceUntilIdle()
+        val gate = CompletableDeferred<AiHttpResult>()
+        f.imageTransport.hangOn = { call -> if (call == 1) gate else null }
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+
+        assertEquals(ImageStudioUiState.GeneratingImage, f.viewModel.uiState.value)
+        assertEquals(1, f.imageTransport.requests.size)
+
+        f.viewModel.cancelGeneration()
+        assertEquals(
+            ImageStudioUiState.PromptReady("a watercolor apple"),
+            f.viewModel.uiState.value,
+            "取消一次出图不该销毁已经花钱买到的画面描述",
+        )
+
+        gate.complete(f.imageTransport.result)
+        advanceUntilIdle()
+
+        assertTrue(f.viewModel.uiState.value !is ImageStudioUiState.ImageReady, "取消之后迟到的图片不许回写")
+        assertTrue(
+            directory.listFiles()?.none { it.name.endsWith(".png") } ?: true,
+            "取消之后不许落盘",
+        )
+    }
+
+    /**
+     * 描述起草在飞时又点一次生成描述：旧的那发必须先被顶掉，不许两发同时在飞。
+     *
+     * 屏侧那枚主操作在 `busy` 时本来就禁用（connected 用例钉），这一条是 VM 侧的第二道防线：
+     * 慢帧下两次点击都进了 VM，也只能有最后一发的结果落地。
+     */
+    @Test
+    fun startingANewDraftCancelsThePreviousInFlightDescription() = runTest {
+        val f = fixture()
+        val first = CompletableDeferred<AiHttpResult>()
+        val second = CompletableDeferred<AiHttpResult>()
+        f.promptTransport.hangOn = { call -> when (call) { 1 -> first; 2 -> second; else -> null } }
+
+        f.viewModel.generatePrompt("苹果")
+        advanceUntilIdle()
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+        assertEquals(1, f.promptTransport.requests.size)
+        assertEquals(ImageStudioUiState.DraftingPrompt, f.viewModel.uiState.value)
+
+        // 域名已确认过，第二发不再问第二次——正是这一发把上一发顶掉的那一档。
+        f.viewModel.generatePrompt("青苹果")
+        advanceUntilIdle()
+        assertEquals(2, f.promptTransport.requests.size, "重新一发应当真的重发，而不是把在飞的那次当成已完成")
+
+        first.complete(promptResponse)
+        advanceUntilIdle()
+        assertEquals(
+            ImageStudioUiState.DraftingPrompt,
+            f.viewModel.uiState.value,
+            "被顶掉的那一发不许回写",
+        )
+
+        second.complete(
+            AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"a green apple"}}]}""")),
+        )
+        advanceUntilIdle()
+        assertEquals(ImageStudioUiState.PromptReady("a green apple"), f.viewModel.uiState.value)
+    }
+
+    /**
+     * 离开功能页（`reset`）时在飞的那一发同样要停掉：清掉界面却留着请求，等于让用户回到本页时
+     * 被一张他没在等的图片顶掉当前版面。
+     */
+    @Test
+    fun leavingThePageStopsTheInFlightDescription() = runTest {
+        val f = fixture()
+        f.viewModel.generatePrompt("苹果")
+        advanceUntilIdle()
+        val gate = CompletableDeferred<AiHttpResult>()
+        f.promptTransport.hangOn = { call -> if (call == 1) gate else null }
+        f.viewModel.confirm(true)
+        advanceUntilIdle()
+
+        f.viewModel.reset()
+        gate.complete(promptResponse)
+        advanceUntilIdle()
+
+        assertEquals(ImageStudioUiState.Idle, f.viewModel.uiState.value, "离开页面后迟到的描述不该把界面推成结果")
     }
 
     private companion object {

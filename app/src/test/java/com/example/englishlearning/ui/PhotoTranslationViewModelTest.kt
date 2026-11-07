@@ -36,9 +36,12 @@ import com.example.englishlearning.phototranslation.SavedPhotoTranslation
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -104,10 +107,14 @@ class PhotoTranslationViewModelTest {
         val requests = mutableListOf<AiHttpRequest>()
         var result: AiHttpResult = AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"鸟儿会飞。"}}]}"""))
 
+        /** 按**第几发**挂起（批 C-4）：立即返回的假传输上取消永远测不出真假。 */
+        var hangOn: ((call: Int) -> Deferred<AiHttpResult>?)? = null
+
         override suspend fun send(
             request: AiHttpRequest,
         ): AiHttpResult {
             requests += request
+            hangOn?.invoke(requests.size)?.await()?.let { return it }
             return result
         }
     }
@@ -355,6 +362,97 @@ class PhotoTranslationViewModelTest {
 
         assertEquals("Birds fly." to "鸟儿会飞。", vm.uiState.value.translation)
         assertNull(vm.uiState.value.translationIssue)
+    }
+
+    @Test
+    fun translatingIsVisibleWhileTheRequestIsInFlight() = runTest(dispatcher) {
+        val transport = RecordingTransport()
+        val gate = CompletableDeferred<AiHttpResult>()
+        transport.hangOn = { call -> if (call == 1) gate else null }
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), transport)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.translating, "翻译在飞时屏上必须有一个说「正在等」的面，而不是只把按钮变灰")
+        assertNull(vm.uiState.value.pendingConfirmationHost, "点确认后确认框就要收起，否则进行中面被压在框后面看不见")
+        assertNull(vm.uiState.value.translation)
+    }
+
+    @Test
+    fun cancelTranslateStopsWaitingAndKeepsTheRecognizedText() = runTest(dispatcher) {
+        val transport = RecordingTransport()
+        val gate = CompletableDeferred<AiHttpResult>()
+        transport.hangOn = { call -> if (call == 1) gate else null }
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), transport)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+
+        vm.cancelTranslate()
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.translating)
+        assertEquals("Birds fly.", vm.uiState.value.ocrText, "取消只是不再等这次结果，识别出的字还在编辑框里可改可重试")
+        assertNull(vm.uiState.value.translation)
+
+        // 迟到的结果不认：请求可能真的发出去了，钱可能真的花了，但用户已选择不再等。
+        gate.complete(AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"鸟儿会飞。"}}]}""")))
+        testScheduler.advanceUntilIdle()
+        assertNull(vm.uiState.value.translation)
+    }
+
+    @Test
+    fun tappingTranslateWhileTranslatingDoesNotSendASecondRequest() = runTest(dispatcher) {
+        val transport = RecordingTransport()
+        val gate = CompletableDeferred<AiHttpResult>()
+        transport.hangOn = { call -> if (call == 1) gate else null }
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), transport)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, transport.requests.size, "在飞时再按翻译不该把请求换掉重发——那是一次新的计费")
+
+        gate.complete(AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"鸟儿会飞。"}}]}""")))
+        testScheduler.advanceUntilIdle()
+        assertEquals("Birds fly." to "鸟儿会飞。", vm.uiState.value.translation, "第二次点击不能顺手掐死正在飞的那一发")
+    }
+
+    @Test
+    fun aNewCaptureVoidsThePreviousInFlightTranslation() = runTest(dispatcher) {
+        val transport = RecordingTransport()
+        val gate = CompletableDeferred<AiHttpResult>()
+        transport.hangOn = { call -> if (call == 1) gate else null }
+        val vm = viewModel(OcrProviderChain(listOf(ScriptedOcrProvider(OcrEngineKind.MlKit, recognized("Birds fly.")))), transport)
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onConfirmationResult(confirmed = true)
+        testScheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.translating)
+
+        vm.onImageBytes(byteArrayOf(2))
+        testScheduler.advanceUntilIdle()
+        gate.complete(AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"鸟儿会飞。"}}]}""")))
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.translating, "重拍一张后不该还挂着上一张的翻译等待面")
+        assertNull(vm.uiState.value.translation, "上一张的译文不许写进新拍的这一张")
     }
 
     @Test
