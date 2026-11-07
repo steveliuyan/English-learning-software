@@ -1383,3 +1383,35 @@ adb -s emulator-5554 shell settings get global animator_duration_scale          
   回读 `adb shell id` 应为 `uid=2000(shell)`（本棒实测已复原）。
 - **待用户目视**（本棒不替人眼判）：① 进行中卡里的「取消」是 `PillStyle.Secondary` 白底胶囊，落在浅绿卡面上像一枚浮起的方块，
   是否要换成更轻的文本式出口；② 活动指示 `18.dp`/`2.dp` 在静帧截图里只读出一小段弧（动帧正常），观感是否够「在做事」。
+
+## 2026-11-07 批 C-4c：文章生成 / 生图两臂 / 拍照翻译进行中面取证（`emulator-5554`）
+
+来源是同一 connected 类 `RequestInProgressEvidenceTest`（批 C-4b 的 2 例 + 本批 4 例，实跑 `OK (6 tests)`），
+外加三屏各自的「取消恰好转发一次 + 面随之收起」用例：`ReadingAccessScreenTest` `OK (21 tests)`、
+`ImageStudioScreenTest` `OK (14 tests)`、`PhotoTranslationScreenTest` `OK (9 tests)`。
+判据与 C-4b 同形（三件齐 + `boundsInRoot.top` 严格递增），本批只是把臂从两屏铺到三屏四臂。
+
+- 产物（**不入库**，`.git/qa-scratch/c4c/`）：`reading-generating.png`（203,237 B）、
+  `image-studio-drafting.png`（135,555 B）、`image-studio-generating.png`（134,656 B）、
+  `photo-translation-translating.png`（218,806 B），另含 C-4b 两枚同批重跑
+  （`word-qa-asking.png` 103,541 B、`sentence-analysis-analyzing.png` 142,298 B）。
+  重算：`ls -l .git/qa-scratch/c4c/*.png`。
+- 复跑：`ANDROID_SERIAL=emulator-5554` → `adb install -r` 两枚 APK →
+  `am instrument -w -e class com.example.englishlearning.ui.<类名> com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`。
+  取文件要临时 `adb root`，读完复原 `setprop service.adb.root 0` + `setprop ctl.restart adbd`；
+  本棒收尾回读 `adb shell id` = `uid=2000(shell)`，`font_scale` 1.0、`animator_duration_scale` 1.0、`wm size` 1080x1920 / `density` 420（默认档）。
+- 设备侧只读到的形状（截图为证，非人眼结论）：三屏的禁用出口都真的灰了——阅读页「生成今天的文章」、
+  生图页吸底那枚「请稍候…」与主题输入框、拍照翻译「翻译成中文」；拍照翻译取消后识别文本仍留在编辑框里可改。
+
+### 取证时改判的一处断言（写下来免得下一任当 bug 找）
+
+`image_generation_face_…` 起初多断了一条「按张计费那句（`image_studio_image_cost_hint`）在生成图片时还在」，
+设备实测**红**：那句长在 `PromptReady` 的描述编辑器里，`GeneratingImage` 臂不组合它。
+屏侧的真实形状是「决策那一刻（确认框 + 描述编辑器）告知按张计费，等待中只留通用费用句」。
+断言已改成实话（通用句恰在、按张句恰不在），**没有为它改屏**——把按张句搬进等待面属于新的版面裁决，不在 C-4c 口径内。
+
+### 待用户目视（累计，本棒不替人眼判）
+
+- C-4b 结转两问：① 进行中卡里的「取消」是 `PillStyle.Secondary` 白底胶囊，落在浅绿卡面上像一枚浮起的方块；
+  ② 活动指示 `18.dp`/`2.dp` 在静帧截图里只读出一小段弧（动帧正常）。本批四张图同样如此，五屏一致 ⇒ 若要改是改组件，不是改某一屏。
+- 批 C 骨架/shimmer 与批 B 自适应的既列四项（见上文各节）仍未销。

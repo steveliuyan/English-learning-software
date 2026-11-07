@@ -188,6 +188,13 @@ grep -n "busy = true" app/src/main/java/com/example/englishlearning/ui/PhotoTran
    不能把已读到的今日文章一起清掉）。回 `Idle` 而不是新增 `Cancelled` 态：用户主动取消不是失败，
    `docs/specs/02:30` 那条「取消」列的是**请求结果**分类，屏侧把它落成失败卡反而是在吓唬人；
    `ReadingAccessViewModel` 现有的 `catch (CancellationException) → Idle` 注释已经是这个口径。
+   - **落点随「取消时手里已经有什么」而定**（C-4c 开工时补的例外，与阅读屏那条同源，不是新增第三种状态）：
+     生图屏的**起草描述**在飞时取消回 `Idle`（那时手里只有用户自己打的主题，屏侧输入框本来就留着）；
+     **生成图片**在飞时取消回 `PromptReady(那份描述)`——描述是一次已付费的文本出站换来的结果，
+     把它连同图片一起销毁，等于让用户为一枚他按下的取消再付一次钱。这一档与既有
+     「出站确认框拒绝后回到同一份 `PromptReady`」（`ImageStudioScreen.kt` 的 `appliedPrompt` 哨兵注释）
+     是同一口径，屏侧不重置用户改过的字。
+     拍照翻译同理：取消翻译只销毁「等待」，`ocrText`（本机识别的结果）必须留在原地可继续编辑。
 3. **等待期间不许长出第二次出站**：这一条是本批唯一的**缺陷修复**，不是美化。
    `runGeneration` 先 `generationJob?.cancel()` 再 launch（与 `runTranslation` 既有写法对齐），
    同时 `PrimaryCtaButton` 补 `enabled` 形参、`Generating` 时禁用；
