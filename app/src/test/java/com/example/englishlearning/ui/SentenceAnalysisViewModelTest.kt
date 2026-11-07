@@ -18,6 +18,7 @@ import com.example.englishlearning.sentence.SentenceAnalysisUseCase
 import com.example.englishlearning.sentence.SentenceRole
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -64,15 +65,35 @@ class SentenceAnalysisViewModelTest {
         override fun has(reference: SecretReference) = Result.success(true)
     }
 
-    private class RecordingTransport : AiHttpTransport {
+    private open class RecordingTransport : AiHttpTransport {
         var sends = 0
         var result: AiHttpResult = AiHttpResult.Responded(
             AiHttpResponse(200, """{"choices":[{"message":{"content":"主句\tBirds fly.\t鸟会飞。"}}]}"""),
         )
 
-        override suspend fun send(request: AiHttpRequest): AiHttpResult {
+        open override suspend fun send(request: AiHttpRequest): AiHttpResult {
             sends += 1
             return result
+        }
+    }
+
+    /**
+     * 挂起版传输：`send` 停在 `gate.await()` 上，直到测试自己 `complete`。
+     *
+     * 批 C-4 的取消判据必须有这一枚。`RecordingTransport` 立即返回，`advanceUntilIdle()` 之后
+     * 协程早就跑完了——「取消一枚在飞的请求」在这种假传输上**永远是真的**，
+     * 用它测取消会得到一条假绿（VM 不加 Job 句柄也照样通过）。
+     *
+     * 继承而不是并列：`viewModel(transport = …)` 的形参类型是 `RecordingTransport`，
+     * 两枚各写一个类就得改那条构造口（连带全部既有用例的 `transport.sends` 取数）；
+     * 挂起版只覆盖「什么时候才返回」这一件事，计数与响应形状沿用父类那一份。
+     */
+    private class HangingTransport : RecordingTransport() {
+        val gate = CompletableDeferred<AiHttpResult>()
+
+        override suspend fun send(request: AiHttpRequest): AiHttpResult {
+            sends += 1
+            return gate.await()
         }
     }
 
@@ -189,5 +210,74 @@ class SentenceAnalysisViewModelTest {
 
         assertEquals(SentenceAnalysisUiState.Idle, viewModel.uiState.value)
         assertEquals(0, transport.sends)
+    }
+
+    /**
+     * 批 C-4「可取消」的正身：取消必须做到「不再等待 + 迟到结果不回写 + 不多发一次」。
+     *
+     * 三条断言各挡一种假实现：
+     *  - 只把界面文案换掉、VM 不留句柄 → 取消后 `gate.complete(…)` 迟到结果照样把状态推成 `Analyzed`
+     *    （用户按了取消，画面却长出结果），第二条 `assertEquals(Idle, …)` 即红；
+     *  - 取消被实现成「重发一次以求快」→ 第一条 `sends` 计数即红；
+     *  - 取消被当成失败 → 状态会是 `Failed`，第一条即时红。
+     * `grants` 预授权 `api.example.com`：本用例测的是**在飞请求**，不能让它停在出站确认框上，
+     * 否则协程根本没开始，取消测的还是空档（那也是真机侧「点了取消没反应」的同一种形状）。
+     */
+    @Test
+    fun cancelStopsWaitingAndDiscardsTheLateAnalysis() = runTest(dispatcher) {
+        val transport = HangingTransport()
+        val grants = AiOutboundGrantStore().apply { confirm("api.example.com") }
+        val (viewModel, _) = viewModel(transport = transport, grants = grants)
+
+        viewModel.analyze("Birds fly.", profileId = "default")
+        advanceUntilIdle()
+        assertEquals(SentenceAnalysisUiState.Analyzing, viewModel.uiState.value)
+        assertEquals(1, transport.sends)
+
+        viewModel.cancelAnalysis()
+        advanceUntilIdle()
+        assertEquals(SentenceAnalysisUiState.Idle, viewModel.uiState.value)
+
+        transport.gate.complete(
+            AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"主句\tBirds fly.\t鸟会飞。"}}]}""")),
+        )
+        advanceUntilIdle()
+
+        assertEquals(SentenceAnalysisUiState.Idle, viewModel.uiState.value, "取消之后迟到的响应不许把界面推成结果")
+        assertEquals(1, transport.sends, "取消不该再发一次请求")
+    }
+
+    /**
+     * 取消**不回收**已经给过的域名授权（决策 2026-11-07 §5 那一条相互作用风险的判据）。
+     *
+     * 记账点在「点确认」那一刻，取消一次在飞请求不该把授权退回去——否则每次取消都换来
+     * 一次重新弹框，用户会得到「我按了取消，所以你得再确认一遍」这种说不通的因果。
+     * 判据用 `sends` 而不是 `uiState`：第二次直接出站（`Analyzing`）就是免确认的证据，
+     * 若授权被回退，状态会停在 `NeedsOutboundConfirmation` 且 `sends` 仍为 1。
+     */
+    @Test
+    fun cancelKeepsTheDomainGrantForTheNextAnalysis() = runTest(dispatcher) {
+        val transport = HangingTransport()
+        val grants = AiOutboundGrantStore().apply { confirm("api.example.com") }
+        val (viewModel, _) = viewModel(transport = transport, grants = grants)
+
+        viewModel.analyze("Birds fly.", profileId = "default")
+        advanceUntilIdle()
+        viewModel.cancelAnalysis()
+        advanceUntilIdle()
+
+        viewModel.analyze("Fish swim.", profileId = "default")
+        advanceUntilIdle()
+
+        assertEquals(2, transport.sends, "取消后重新分析应当免二次确认直接出站")
+        assertTrue(
+            viewModel.uiState.value is SentenceAnalysisUiState.Analyzing,
+            "第二次分析停在 ${viewModel.uiState.value}：授权被回退了，取消换来的是重新弹框",
+        )
+
+        transport.gate.complete(
+            AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"主句\tFish swim.\t鱼会游。"}}]}""")),
+        )
+        advanceUntilIdle()
     }
 }

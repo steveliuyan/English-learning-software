@@ -248,9 +248,13 @@ class WordQaLayoutContractTest {
             countMatches(source, Regex("""\bMint[A-Za-z0-9_]*""")),
             "`Mint*` 全局读点必须清零：配色一律走 `appColors()` / `appDomain()`",
         )
+        // 下限 8 → 7（批 C-4）：等待臂那句 `AppType.Footnote` 的文案位搬进了共享组件
+        // `components/RequestInProgress.kt`（屏侧只给 message 与取消），不是屏上少了一档排印——
+        // 是那一档换了住的地方。放宽的是**归属**，不是标准：组件里那句仍由 `AiWaitInProgressContractTest`
+        // 钉「臂必须调用该组件」，删掉组件调用会让那条闸判红，而不是让这条下限悄悄漏下去。
         assertTrue(
-            countMatches(source, Regex("""AppType\.""")) >= 8,
-            "六档排印至少要落到 8 处（现 ${countMatches(source, Regex("""AppType\."""))}）：标题/说明/正文/注脚/标签各有所属",
+            countMatches(source, Regex("""AppType\.""")) >= 7,
+            "六档排印至少要落到 7 处（现 ${countMatches(source, Regex("""AppType\."""))}）：标题/说明/正文/注脚/标签各有所属",
         )
         assertEquals(
             1,

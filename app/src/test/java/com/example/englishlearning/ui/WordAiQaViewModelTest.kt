@@ -21,6 +21,7 @@ import com.example.englishlearning.wordqa.WordQaUseCase
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -67,13 +68,28 @@ class WordAiQaViewModelTest {
         override fun has(reference: SecretReference) = Result.success(true)
     }
 
-    private class RecordingTransport : AiHttpTransport {
+    private open class RecordingTransport : AiHttpTransport {
         var sends = 0
         var result: AiHttpResult = AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"这是一个回答。"}}]}"""))
 
-        override suspend fun send(request: AiHttpRequest): AiHttpResult {
+        open override suspend fun send(request: AiHttpRequest): AiHttpResult {
             sends += 1
             return result
+        }
+    }
+
+    /**
+     * 挂起版传输：`send` 停在 `gate.await()`，直到测试自己 `complete`。
+     *
+     * 与长难句那一份同理由（批 C-4）：立即返回的 `RecordingTransport` 上「取消」永远测不出真假——
+     * `advanceUntilIdle()` 之后协程早跑完了，VM 不持句柄也能通过。取消的判据必须让请求真的在飞。
+     */
+    private class HangingTransport : RecordingTransport() {
+        val gate = CompletableDeferred<AiHttpResult>()
+
+        override suspend fun send(request: AiHttpRequest): AiHttpResult {
+            sends += 1
+            return gate.await()
         }
     }
 
@@ -348,5 +364,62 @@ class WordAiQaViewModelTest {
 
         assertEquals(listOf("note-1"), viewModel.savedNotes.value.map { it.noteId })
         assertEquals(1, notes.saved.size)
+    }
+
+    /**
+     * 批 C-4：取消一枚在飞的问词请求 = 不再等待 + 迟到答案不回写 + 不多发一次。
+     *
+     * 三条断言各挡一种假实现（只换文案不留句柄 → 迟到答案把界面推成 `Answered`；
+     * 取消被实现成重发 → `sends`；取消被当成失败 → 状态是 `Failed`）。
+     * `grants` 预授权让请求真的出站：默认那枚 store 会把状态停在出站确认框，
+     * 那一档取消的不是在飞请求（`decliningConfirmationReturnsToIdleWithoutSending` 已经在管它）。
+     */
+    @Test
+    fun cancelStopsWaitingAndDiscardsTheLateAnswer() = runTest(dispatcher) {
+        val transport = HangingTransport()
+        val grants = AiOutboundGrantStore().apply { confirm("api.example.com") }
+        val (viewModel, _, _) = viewModel(transport = transport, grants = grants)
+
+        viewModel.ask(WordQaKind.Sentence, lemma = "apple", context = null, profileId = "default")
+        advanceUntilIdle()
+        assertEquals(WordAiQaUiState.Asking, viewModel.uiState.value)
+        assertEquals(1, transport.sends)
+
+        viewModel.cancelAsk()
+        advanceUntilIdle()
+        assertEquals(WordAiQaUiState.Idle, viewModel.uiState.value)
+
+        transport.gate.complete(AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"这是一个回答。"}}]}""")))
+        advanceUntilIdle()
+
+        assertEquals(WordAiQaUiState.Idle, viewModel.uiState.value, "取消之后迟到的答案不许把界面推成结果")
+        assertEquals(1, transport.sends, "取消不该再发一次请求")
+    }
+
+    /**
+     * 取消不回收已给的域名授权（与长难句同一口径，决策 2026-11-07 §5）。
+     *
+     * 判 `sends == 2`：第二次问法若被回退成「重新确认」，`sends` 会停在 1 而状态停在
+     * `NeedsOutboundConfirmation`——用户按了取消却要多确认一次，这条红就是那种因果。
+     */
+    @Test
+    fun cancelKeepsTheDomainGrantForTheNextQuestion() = runTest(dispatcher) {
+        val transport = HangingTransport()
+        val grants = AiOutboundGrantStore().apply { confirm("api.example.com") }
+        val (viewModel, _, _) = viewModel(transport = transport, grants = grants)
+
+        viewModel.ask(WordQaKind.Sentence, lemma = "apple", context = null, profileId = "default")
+        advanceUntilIdle()
+        viewModel.cancelAsk()
+        advanceUntilIdle()
+
+        viewModel.ask(WordQaKind.Breakdown, lemma = "apple", context = null, profileId = "default")
+        advanceUntilIdle()
+
+        assertEquals(2, transport.sends, "取消后重新提问应当免二次确认直接出站")
+        assertEquals(WordAiQaUiState.Asking, viewModel.uiState.value)
+
+        transport.gate.complete(AiHttpResult.Responded(AiHttpResponse(200, """{"choices":[{"message":{"content":"拆词义回答。"}}]}""")))
+        advanceUntilIdle()
     }
 }

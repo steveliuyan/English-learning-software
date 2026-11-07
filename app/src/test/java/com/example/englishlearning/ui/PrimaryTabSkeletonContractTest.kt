@@ -333,17 +333,25 @@ class PrimaryTabSkeletonContractTest {
 
 /**
  * 批 C 进行中的全仓转圈台账。条目形状与 [violations] 的返回一致：
- * 「文件名: 折叠空白后的源码行」。C-3（本地读盘子页）与 C-4（网络/AI 等待屏）逐屏收口时**只能删行**；
+ * 「文件名: 折叠空白后的源码行」。C-3（本地读盘子页）与 C-4（网络/AI 等待屏）逐屏收口时**屏侧只能删行**；
  * 想加一行必须先在该屏的分支判据里补骨架，否则本闸判红。
+ *
+ * **唯一被预先声明的例外**（决策 2026-11-07 决定 3 的 C-4 段、`docs/specs/05` F5-05 第 4 条同口径）：
+ * `components/RequestInProgress.kt` 那一行。批 C-4 把五处 AI 等待臂的活动指示**收进组件**，
+ * 站点数因此不降反升一——升的是「同一枚指示只有一份实现」，不是新的转圈面：
+ * 五臂各自画转圈的形状被 `AiWaitInProgressContractTest` 禁掉了（臂内出现任何进度指示即红），
+ * 所以这一行是唯一落点，计数恰 1；多一枚就要在那条闸里一起改。
  *
  * 两枚 `BackupPairingExportScreen.kt` 是同一条折叠行的两次命中（配对页两态各一枚），
  * [violations] 刻意不做 distinct，台账因此按多重集比对而不是集合比对。
  *
  * 剩下的站点不是「还没排到」，而是**已判定不该换骨架**的那两类（决策 2026-11-07 决定 3 的三分类）：
  * 「动作进行中」——接下来落地的是回执而不是这个形状的内容，画骨架等于预告一个不会以那个形状落地的东西，
- * 所以保留活动指示 + 真话文案；「网络 / AI 等待」——归 C-4 的进行中语义。逐行理由写在行尾。
+ * 所以保留活动指示 + 真话文案；「网络 / AI 等待」——归 C-4 的进行中语义，指示器住在组件里。逐行理由写在行尾。
  */
 private val SPINNER_LEDGER = listOf(
+    // 进行中族的唯一落点：五处 AI 等待臂的活动指示都从这里出，屏侧不许再自己画（见上一段与 AiWaitInProgressContractTest）。
+    "RequestInProgress.kt: CircularProgressIndicator(",
     // 动作进行中：配对码生成/等待扫码，接下来落的是配对回执，不是这一屏的形状。
     "BackupPairingExportScreen.kt: CircularProgressIndicator(color = settingsPalette.deep)",
     "BackupPairingExportScreen.kt: CircularProgressIndicator(color = settingsPalette.deep)",

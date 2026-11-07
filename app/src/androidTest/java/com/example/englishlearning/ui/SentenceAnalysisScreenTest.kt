@@ -1,5 +1,8 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -43,7 +46,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Idle,
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = { backed++ }, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = { backed++ }, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = {},
             )
         }
@@ -66,7 +69,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Idle,
-                onAnalyze = { analyzed = it }, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = { analyzed = it }, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = {},
             )
         }
@@ -82,7 +85,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Analyzed(segments()),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = {},
             )
         }
@@ -102,7 +105,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Analyzed(segments()),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = { spoken = it },
             )
         }
@@ -123,7 +126,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Analyzed(segments()),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
                 speakMessage = "这句读不了，换个语音服务再试。", onSpeak = {},
             )
         }
@@ -137,14 +140,48 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Analyzing,
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = {},
             )
         }
 
-        composeRule.onNodeWithText("正在分析…").assertExists()
+        // 批 C-4：等待面从一行裸文案换成进行中组件——「向谁请求 + 还在飞 + 可以取消」三件齐。
+        composeRule.onNodeWithTag("sentence_analysis_analyzing").assertExists()
+        composeRule.onNodeWithText("正在向你配置的 AI 服务分析这句英文").assertExists()
+        composeRule.onNodeWithTag("sentence_analysis_cancel").assertExists()
+        composeRule.onNodeWithText("取消只是不再等待这次结果").assertExists()
         composeRule.onNodeWithTag("sentence_analysis_analyze").assertIsNotEnabled()
         composeRule.onNodeWithTag("sentence_analysis_input").assertIsNotEnabled()
+    }
+
+    /**
+     * 取消键的 connected 射程只有两件事：**按得到、回调恰好转发一次**，以及取消后整个进行中面消失。
+     * 「请求真的停了」量不到字节，归 JVM 侧挂起假 transport 的用例（决策 2026-11-07 §4）；
+     * 宿主把取消接到持有 `Job` 的那个 VM 上，归 `AiWaitInProgressContractTest` 的 `AppScreen` 锚点。
+     */
+    @Test
+    fun waitingFaceCancelForwardsExactlyOnceAndDisappearsWithTheFace() {
+        var cancelled = 0
+        lateinit var hostState: MutableState<SentenceAnalysisUiState>
+        composeRule.setContent {
+            hostState = remember { mutableStateOf<SentenceAnalysisUiState>(SentenceAnalysisUiState.Analyzing) }
+            SentenceAnalysisScreen(
+                state = hostState.value,
+                onAnalyze = {},
+                onCancelAnalysis = {
+                    cancelled += 1
+                    hostState.value = SentenceAnalysisUiState.Idle
+                },
+                onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                speakMessage = null, onSpeak = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("sentence_analysis_cancel").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, cancelled)
+        composeRule.onNodeWithTag("sentence_analysis_cancel").assertDoesNotExist()
+        composeRule.onNodeWithTag("sentence_analysis_analyzing").assertDoesNotExist()
     }
 
     @Test
@@ -153,7 +190,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.NeedsOutboundConfirmation("api.example.com"),
-                onAnalyze = {}, onConfirmOutbound = { confirmed = it }, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = { confirmed = it }, onBack = {}, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = {},
             )
         }
@@ -175,7 +212,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.Failed(AiFailure.Unauthorized),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = {},
             )
         }
@@ -189,7 +226,7 @@ class SentenceAnalysisScreenTest {
         composeRule.setContent {
             SentenceAnalysisScreen(
                 state = SentenceAnalysisUiState.NotConfigured(SentenceAnalysisNotConfiguredReason.NoDefaultProfile),
-                onAnalyze = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
+                onAnalyze = {}, onCancelAnalysis = {}, onConfirmOutbound = {}, onBack = {}, onOpenAiSettings = {},
                 speakMessage = null, onSpeak = {},
             )
         }

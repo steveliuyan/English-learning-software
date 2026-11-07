@@ -207,9 +207,12 @@ class SentenceAnalysisLayoutContractTest {
         // 阈值随 U-1 的搬家从 8 降到 6（不是放宽判据）：对话框那两枚读点（标题档 + 正文档）现在长在
         // 共享件 `OutboundConfirmDialog.kt` 里，由 `OutboundDialogFamilyTest.theSharedDialogStillSetsItsOwnType` 逐档钉住。
         // 重算：`grep -c 'AppType\.' app/src/main/java/com/example/englishlearning/ui/SentenceAnalysisScreen.kt`（含注释，比本判据宽）。
+        // 6 → 5（批 C-4，同一口径的第二次搬家）：等待臂那句 `AppType.Footnote` 现在长在
+        // `components/RequestInProgress.kt` 里；删掉组件调用不会让这条下限漏过去，而是让
+        // `AiWaitInProgressContractTest` 的臂判据判红。重算同上（现值 5）。
         assertTrue(
-            countMatches(source, Regex("""AppType\.""")) >= 6,
-            "六档排印至少要落到 6 处（现 ${countMatches(source, Regex("""AppType\."""))}）：标题/说明/标签/正文/注脚各有所属",
+            countMatches(source, Regex("""AppType\.""")) >= 5,
+            "六档排印至少要落到 5 处（现 ${countMatches(source, Regex("""AppType\."""))}）：标题/说明/标签/正文/注脚各有所属",
         )
         listOf(
             "sentence_analysis_outbound_confirmation_text",

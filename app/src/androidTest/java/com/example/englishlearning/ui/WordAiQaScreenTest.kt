@@ -1,5 +1,8 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -35,14 +38,14 @@ class WordAiQaScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     private fun setIdle() = composeRule.setContent {
-        WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {})
+        WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {})
     }
 
     @Test
     fun idleShowsTheFixedQuestionChipsAndBack() {
         var backed = false
         composeRule.setContent {
-            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = { backed = true }, onOpenAiSettings = {})
+            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Idle, onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = { backed = true }, onOpenAiSettings = {})
         }
 
         aiChipKinds.forEach { kind ->
@@ -65,7 +68,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Answered(WordQaKind.Sentence, "I ate an apple."),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
+                onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -89,7 +92,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Idle,
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
+                onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
                 savedNotes = listOf(
                     com.example.englishlearning.wordqa.WordAiNote(
                         noteId = "n-1",
@@ -115,7 +118,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Answered(WordQaKind.Sentence, "I ate an apple."),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = { saved += 1 }, onBack = {}, onOpenAiSettings = {},
+                onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = { saved += 1 }, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -132,7 +135,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Answered(WordQaKind.Sentence, "答案", saved = true),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
+                onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -146,7 +149,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.NeedsOutboundConfirmation("api.example.com"),
-                onAsk = {}, onConfirmOutbound = { confirmed = it }, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
+                onAsk = {}, onCancelAsk = {}, onConfirmOutbound = { confirmed = it }, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -165,7 +168,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.Failed(AiFailure.Unauthorized),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
+                onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -179,7 +182,7 @@ class WordAiQaScreenTest {
             WordAiQaScreen(
                 lemma = "apple",
                 state = WordAiQaUiState.NotConfigured(WordQaNotConfiguredReason.NoDefaultProfile),
-                onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
+                onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
             )
         }
 
@@ -189,13 +192,48 @@ class WordAiQaScreenTest {
     @Test
     fun askingStateShowsProgressAndDisablesChips() {
         composeRule.setContent {
-            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Asking, onAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {})
+            WordAiQaScreen(lemma = "apple", state = WordAiQaUiState.Asking, onAsk = {}, onCancelAsk = {}, onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {})
         }
 
-        composeRule.onNodeWithText("正在询问…").assertExists()
+        // 批 C-4：一行裸文案换成了进行中组件——说清在向谁请求、有活动指示、有取消键，缺一不可。
+        composeRule.onNodeWithTag("word_qa_asking").assertExists()
+        composeRule.onNodeWithText("正在向你配置的 AI 服务问这个词").assertExists()
+        composeRule.onNodeWithTag("word_qa_cancel").assertExists()
+        composeRule.onNodeWithText("取消只是不再等待这次结果").assertExists()
         aiChipKinds.forEach { kind ->
             composeRule.onNodeWithTag("word_qa_chip_${kind.name}").assertIsNotEnabled()
         }
+    }
+
+    /**
+     * 取消键在屏侧只负责「按得到、恰好转发一次」；请求真停没停归 JVM 侧的挂起假 transport 用例
+     * （决策 2026-11-07 §4：字节层面的停止在 connected 量不出来）。
+     * 节点消失那一步由本测试扮演宿主把状态改回 `Idle`——真机的 VM 接线在 `AppScreen` 侧，
+     * 单测里已经在 `AppScreen` 锚点判据钉过（`AiWaitInProgressContractTest`）。
+     */
+    @Test
+    fun waitingFaceCancelForwardsExactlyOnceAndDisappearsWithTheFace() {
+        var cancelled = 0
+        lateinit var hostState: MutableState<WordAiQaUiState>
+        composeRule.setContent {
+            hostState = remember { mutableStateOf<WordAiQaUiState>(WordAiQaUiState.Asking) }
+            WordAiQaScreen(
+                lemma = "apple",
+                state = hostState.value,
+                onAsk = {},
+                onCancelAsk = {
+                    cancelled += 1
+                    hostState.value = WordAiQaUiState.Idle
+                },
+                onConfirmOutbound = {}, onSaveNote = {}, onBack = {}, onOpenAiSettings = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("word_qa_cancel").performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, cancelled)
+        composeRule.onNodeWithTag("word_qa_cancel").assertDoesNotExist()
+        composeRule.onNodeWithTag("word_qa_asking").assertDoesNotExist()
     }
 
     @Test

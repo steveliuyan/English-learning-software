@@ -349,6 +349,8 @@ class SharedComponentUniquenessRatchetTest {
         "AppField.kt",
         "EmptyState.kt",
         "PlanBar.kt",
+        // 批 C-4：网络 / AI 等待面的进行中语义组件（唯一落点，见 decisions 2026-11-07 决定 3 的 C-4 段）。
+        "RequestInProgress.kt",
     )
 
     /** 组件名 → 承载它的文件（`IconBadge.kt` 与 `InlineNotice.kt` 各承载两枚公开组件）。 */
@@ -380,6 +382,8 @@ class SharedComponentUniquenessRatchetTest {
         "AppField" to "AppField.kt",
         "EmptyState" to "EmptyState.kt",
         "PlanProgressBar" to "PlanBar.kt",
+        // 批 C-4：进行中族唯一落点。第二份顶层定义（哪怕藏在某屏私有函数里）就是「取消语义各写一份」的复发。
+        "RequestInProgress" to "RequestInProgress.kt",
     )
 
     /**
