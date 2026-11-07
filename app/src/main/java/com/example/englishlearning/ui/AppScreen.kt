@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -83,6 +82,7 @@ import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.PickRow
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.SectionHeading
+import com.example.englishlearning.ui.components.SkeletonList
 import com.example.englishlearning.ui.components.Sticker
 import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.components.glass.GlassDialog
@@ -2880,13 +2880,15 @@ internal fun WordBookPicker(
             .selectableGroup(),
     ) {
         if (loading && wordBooks.isEmpty()) {
-            repeat(WORD_BOOK_PLACEHOLDER_ROWS) { index ->
-                WordBookRowSkeleton(
-                    // 骨架与真实行同一套形状与线序：首行不画线，回填时线不许从别处冒出来。
-                    tag = "wordbook_row_skeleton_$index",
-                    topDivider = index > 0,
-                )
-            }
+            // 批 C-1：骨架形状迁进共享族 `ui/components/Skeleton.kt`，本屏只留三条锚——
+            // 行数读生产常量 `WORD_BOOK_PLACEHOLDER_ROWS`、testTag 前缀 `wordbook_row_skeleton_`
+            // 原样不动（`LearningSetupLayoutContractTest` 与 `WordbookPickerHeaderTest` 都读它），
+            // 线序仍按「首行不画线」。tag 挂在 hairlineTop 外侧这件事改由族内保证，理由见 Skeleton.kt。
+            SkeletonList(
+                rows = WORD_BOOK_PLACEHOLDER_ROWS,
+                rowHeight = WordBookRowMinHeight,
+                tagPrefix = "wordbook_row_skeleton_",
+            )
         } else {
             wordBooks.forEachIndexed { index, book ->
                 key(book.id) {
@@ -2978,56 +2980,6 @@ private fun WordBookPickRow(
         // 宿主只关心「哪一本被点」，故忽略布尔值直接转给 onSelect（取消选中不是一条路：活动册不许为空）。
         onCheckedChange = { onSelect() },
     )
-}
-
-/**
- * 一行的首帧骨架：与 [WordBookPickRow] 同形状、同线序，但不写任何数字、也不画任何文案。
- *
- * 骨架里出现「0 词」是最容易被写进去的假信号（F1-01：首帧不许放假数字），所以这里只有形状。
- * 与真实行同样的是：22dp 标记盒、12dp 间隙、上下 12dp、`heightIn(min = WordBookRowMinHeight)`、
- * 首行不画线；不一样的是它没有可点面（骨架不是入口，读屏也不该聚焦它）。
- */
-@Composable
-private fun WordBookRowSkeleton(
-    tag: String,
-    topDivider: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val colors = appColors()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            // 线与真实行同序、同宽度，但它挂在 testTag **外侧**：`hairlineTop` 的 1dp 顶内距会裁掉
-            // 内侧语义节点的 bounds（`PaddingModifier.semanticsBounds`），真实行因为 `PickRow` 里那条
-            // 更靠内的 `semantics{}` 也被裁掉 1dp，骨架这一支没有内层语义节点——不把它放在外侧，
-            // 骨架量到的行框就比真实行**多出** 1dp，「骨架与真实行同形状」这条判据会自己骗自己。
-            .then(hairlineTop(if (topDivider) colors.outlineSoft else null, startIndent = 0.dp))
-            .testTag(tag)
-            .heightIn(min = WordBookRowMinHeight)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            Modifier
-                .size(22.dp)
-                .background(colors.outlineSoft.copy(alpha = 0.30f), CircleShape),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(
-                Modifier
-                    .fillMaxWidth(0.42f)
-                    .height(12.dp)
-                    .background(colors.outlineSoft.copy(alpha = 0.22f), AppShape.Icon),
-            )
-            Box(
-                Modifier
-                    .fillMaxWidth(0.24f)
-                    .height(10.dp)
-                    .background(colors.outlineSoft.copy(alpha = 0.22f), AppShape.Icon),
-            )
-        }
-    }
 }
 
 /**
