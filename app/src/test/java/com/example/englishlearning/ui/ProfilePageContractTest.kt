@@ -217,8 +217,9 @@ class ProfilePageContractTest {
         )
         assertEquals(
             1,
-            countMatches(host, Regex(Regex.escape("onOpenLicenses = { showAbout = false; showLicenses = true },"))),
-            "许可的唯一入口必须接在关于页（0 = 关于页点了没反应；2 = 又长出第二份）",
+            countMatches(host, Regex(Regex.escape("onOpenLicenses = { showLicenses = true },"))),
+            "许可的唯一入口必须接在关于页（0 = 关于页点了没反应；2 = 又长出第二份）。" +
+                "QA3 A1 起入口不再顺手关关于页——返回栈要留住下一页（`LicensesHostBackStackContractTest` 钉全四件套）",
         )
     }
 

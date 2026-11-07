@@ -2767,6 +2767,59 @@ class AppScreenTest {
         composeRule.onNodeWithTag("settings_screen").assertDoesNotExist()
     }
 
+    /**
+     * QA3 A1：许可页是「我的 → 关于 → 开源许可」这条链的最内层，系统返回键必须**一级一级往回退**。
+     *
+     * 旧形里 `showLicenses` 缺「四件套」中的两件（不进 `overlayOpen`、没有专属 `BackHandler`），
+     * 返回键越过许可页落到「不在学习 tab 就切回学习 tab」那条最低优先级处理器上——
+     * 实测第一后人还停在许可页、第二下直接退到桌面（走查册 §A1，五份图证同形）。
+     * 本条按真机同一条分派链驱动（[pressSystemBack] 注 KeyEvent，不是屏内返回位）。
+     */
+    @Test
+    fun systemBackFromTheLicensesPageWalksBackToTheAboutPage() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_open_about").assertExists().performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("about_screen").assertExists()
+        composeRule.onNodeWithTag("about_licenses_row").assertExists().performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("licenses_screen").assertExists()
+
+        pressSystemBack()
+        // 注入的按键事件是异步派发的，所以先等「许可页消失」这一枚**已在本文件其他返回键用例里跑通的**形状，
+        // 再断言关于页回到台前。诊断记录（2026-11-08，probe 跑出 `licenses=1 → about=1`）证明生产侧确实
+        // 一级一级回退；把 waitUntil 的条件写成「关于页出现」时同一条链路反而等不到，故按消失→存在两步判。
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("licenses_screen").fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag("about_screen").assertExists()
+    }
+
+    /**
+     * QA3 A1 的次生那一半：页内返回位必须落回**关于页**。旧接线在打开许可页时顺手 `showAbout = false`，
+     * 于是栈底下沉到 hub，页内「返回」把用户丢回「我的」——等于把三跳的路径走成两跳。
+     */
+    @Test
+    fun inPageBackFromTheLicensesPageReturnsToTheAboutPage() {
+        composeRule.setContent { readyAppScreen() }
+        createProfile()
+        composeRule.onNodeWithTag("app_tab_profile").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile_open_about").assertExists().performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("about_licenses_row").assertExists().performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("licenses_screen").assertExists()
+
+        composeRule.onNodeWithContentDescription("返回").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("about_screen").assertExists()
+        composeRule.onNodeWithTag("licenses_screen").assertDoesNotExist()
+    }
+
     @Test
     fun mandatorySetupOffersNoCancelEntry() {
         val repository = InMemoryLocalProfileRepository()

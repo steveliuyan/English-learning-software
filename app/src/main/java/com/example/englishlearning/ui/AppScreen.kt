@@ -578,7 +578,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || showTodayWordList || showReviewQueue || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showSettings || showWordBookTransfer || showLearningRecords || showAbout || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showSettings || showWordBookTransfer || showLearningRecords || showAbout || showLicenses || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBank ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null
@@ -712,6 +712,10 @@ fun AppScreen(
             // 再从 hub 回到设置页。
             BackHandler(enabled = showBackupHub) { showBackupHub = false }
             BackHandler(enabled = showAbout) { showAbout = false }
+            // QA3 A1：许可页原先没有专属处理器，系统返回键越过它落到「不在学习 tab 就切回学习 tab」
+            // 那条最低优先级处理器上（第一下没反应、第二下退应用）。声明在关于页**之后**——
+            // 本文件按「后声明者优先」分派返回键。
+            BackHandler(enabled = showLicenses) { showLicenses = false }
             BackHandler(enabled = showBackupExport) { showBackupExport = false }
             BackHandler(enabled = showBackupRestore) { showBackupRestore = false }
             BackHandler(enabled = showBackupPairingExport) { showBackupPairingExport = false }
@@ -1583,23 +1587,16 @@ fun AppScreen(
                     },
                     deleteAllLearningDataNotice = learningDataDeletionUi.notice,
                 )
-            } else if (showAbout) {
-                // 「关于」页：版本号从构建信息取（`buildConfig = true`），许可数暂留 `null`
-                // （行文案退成不带数字的那一句；许可条数以 `LicensesScreen` 的解析结果为准，后续注入）。
-                AboutScreen(
-                    versionName = BuildConfig.VERSION_NAME,
-                    licenseCount = null,
-                    onBack = { showAbout = false },
-                    // 2026-10-31 去重：许可只从关于页进（关于页只剩这一条说明行）；
-                    // 备份的唯一入口在 设置 → 数据与安全，本页不再挂同落点的第二行。
-                    onOpenLicenses = { showAbout = false; showLicenses = true },
-                )
             } else if (showLicenses) {
                 // F5-04：许可台账页。数据源=构建期从 docs/third-party-notices.md 同步的 assets；
                 // 读不到传空串，页面如实显示「许可台账暂不可读」，零假台账零假入口。
                 // 批 5 Task 3（对账 2 的宿主侧一半）：空态的「重新读取」必须能真的重读——旧写法是
                 // 无键 `remember`，一次失败就永远缓存了空串，页面那枚重试键会是假按钮。
                 // 故把重读次数当键：点一次重读，`remember` 失效重跑一遍 assets 读取。
+                //
+                // QA3 A1：本分支必须排在下面 `showAbout` 之前。挂载 `else if` 链先声明者赢，而许可页
+                // 如今不再清 `showAbout`（清了会让页内「返回」落回「我的」而不是「关于」）——
+                // 两枚同时为真时只有先声明者进得了组合，顺序写反等于「点了许可行没反应」。
                 val licensesContext = LocalContext.current
                 var licensesReload by remember { mutableStateOf(0) }
                 val noticesMarkdown = remember(licensesReload) {
@@ -1611,6 +1608,19 @@ fun AppScreen(
                     markdown = noticesMarkdown,
                     onBack = { showLicenses = false },
                     onRetry = { licensesReload += 1 },
+                )
+            } else if (showAbout) {
+                // 「关于」页：版本号从构建信息取（`buildConfig = true`），许可数暂留 `null`
+                // （行文案退成不带数字的那一句；许可条数以 `LicensesScreen` 的解析结果为准，后续注入）。
+                AboutScreen(
+                    versionName = BuildConfig.VERSION_NAME,
+                    licenseCount = null,
+                    onBack = { showAbout = false },
+                    // 2026-10-31 去重：许可只从关于页进（关于页只剩这一条说明行）；
+                    // 备份的唯一入口在 设置 → 数据与安全，本页不再挂同落点的第二行。
+                    // QA3 A1：这里不再顺手 `showAbout = false`——关于页留在栈下，
+                    // 许可页的两条出口（页内返回、系统返回）都自然回到关于页。
+                    onOpenLicenses = { showLicenses = true },
                 )
             } else if (selectedFeature == AiFeature.SENTENCE_ANALYSIS) {
                 // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
