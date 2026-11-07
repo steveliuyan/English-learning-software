@@ -1367,3 +1367,19 @@ adb -s emulator-5554 shell settings get global animator_duration_scale          
 
 - 浮层（`GlassOverlay`）关闭时的收拢观感：本批把退场缓动从 `cubic-bezier(.2,.7,.3,1)` 改为 `cubic-bezier(.4,0,.8,.3)`，
   是**行为变化**，只由 JVM 形状闸与代码评审保证「按口径写」，观感是否更合适只有人眼能判。
+
+## 2026-11-07 批 C-4b：AI 问词 / 长难句进行中面取证（`emulator-5554`）
+
+来源是 connected 类 `app/src/androidTest/java/com/example/englishlearning/ui/RequestInProgressEvidenceTest.kt`
+（2 例，实跑 `OK (2 tests)`）。为什么这条走设备而不是源码正则：JVM 闸（`AiWaitInProgressContractTest`）能钉
+「臂调了组件、`onCancel` 是必给参数、文案含『AI 服务』」，钉不出**渲染出来是不是三件齐**、也钉不出读屏自上而下的顺序。
+本类量的是节点：状态句、取消键、取消陈述都在树上，且 `boundsInRoot.top` 严格递增（先说在做什么 → 再给出路 → 最后说清出路是什么）。
+
+- 产物（**不入库**，`.git/qa-scratch/c4b/`）：`word-qa-asking.png`（103,541 B）、`sentence-analysis-analyzing.png`（142,298 B）。
+  重算：`ls -l .git/qa-scratch/c4b/*.png`。
+- 落盘路径：用例把整屏 PNG 写到设备 `…/files/c4-in-progress-evidence/`（`getExternalFilesDir(null)`），会话侧 pull 回本地。
+- 复跑：`ANDROID_SERIAL=emulator-5554` → `adb install -r` 两枚 APK → `am instrument -w -e class com.example.englishlearning.ui.RequestInProgressEvidenceTest com.example.englishlearning.test/androidx.test.runner.AndroidJUnitRunner`。
+  取文件要临时 `adb root`（应用外部目录 shell 读不到）；读完必须复原：`setprop service.adb.root 0` + `setprop ctl.restart adbd`，
+  回读 `adb shell id` 应为 `uid=2000(shell)`（本棒实测已复原）。
+- **待用户目视**（本棒不替人眼判）：① 进行中卡里的「取消」是 `PillStyle.Secondary` 白底胶囊，落在浅绿卡面上像一枚浮起的方块，
+  是否要换成更轻的文本式出口；② 活动指示 `18.dp`/`2.dp` 在静帧截图里只读出一小段弧（动帧正常），观感是否够「在做事」。
