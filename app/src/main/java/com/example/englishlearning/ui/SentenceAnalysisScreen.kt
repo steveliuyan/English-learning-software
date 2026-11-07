@@ -35,6 +35,7 @@ import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
+import com.example.englishlearning.ui.components.RequestInProgress
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -63,6 +64,7 @@ import com.example.englishlearning.ui.theme.appDomain
 fun SentenceAnalysisScreen(
     state: SentenceAnalysisUiState,
     onAnalyze: (String) -> Unit,
+    onCancelAnalysis: () -> Unit,
     onConfirmOutbound: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenAiSettings: () -> Unit,
@@ -134,11 +136,11 @@ fun SentenceAnalysisScreen(
 
         when (state) {
             SentenceAnalysisUiState.Idle -> Unit
-            SentenceAnalysisUiState.Analyzing -> Text(
-                text = "正在分析…",
-                style = AppType.Footnote,
-                color = colors.text2,
-                modifier = Modifier.testTag("sentence_analysis_analyzing"),
+            SentenceAnalysisUiState.Analyzing -> RequestInProgress(
+                message = "正在向你配置的 AI 服务分析这句英文",
+                onCancel = onCancelAnalysis,
+                statusTestTag = "sentence_analysis_analyzing",
+                cancelTestTag = "sentence_analysis_cancel",
             )
             is SentenceAnalysisUiState.Analyzed -> SegmentList(
                 segments = state.segments,

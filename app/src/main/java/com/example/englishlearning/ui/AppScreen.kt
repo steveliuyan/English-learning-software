@@ -1208,6 +1208,7 @@ fun AppScreen(
                                 lemma = qaCard.lemma,
                                 state = wordQaUiState,
                                 onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                onCancelAsk = { wordQaViewModel?.cancelAsk() },
                                 onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
                                 onSaveNote = { wordQaViewModel?.saveNote() },
                                 onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
@@ -1623,6 +1624,7 @@ fun AppScreen(
                 SentenceAnalysisScreen(
                     state = sentenceState,
                     onAnalyze = { sentence -> sentenceAnalysisViewModel?.analyze(sentence, state.profile.id) },
+                    onCancelAnalysis = { sentenceAnalysisViewModel?.cancelAnalysis() },
                     onConfirmOutbound = { sentenceAnalysisViewModel?.confirmOutbound(it) },
                     speakMessage = sentenceSpeakMessage.message(),
                     onSpeak = { text ->
@@ -1981,6 +1983,7 @@ fun AppScreen(
                                 lemma = qaCard.lemma,
                                 state = wordQaUiState,
                                 onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                onCancelAsk = { wordQaViewModel?.cancelAsk() },
                                 onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
                                 onSaveNote = { wordQaViewModel?.saveNote() },
                                 onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },

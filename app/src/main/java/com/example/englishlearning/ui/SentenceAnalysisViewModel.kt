@@ -11,6 +11,7 @@ import com.example.englishlearning.sentence.SentenceSegment
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -51,6 +52,30 @@ class SentenceAnalysisViewModel @Inject constructor(
 
     private var pendingSentence: String? = null
 
+    /**
+     * 在飞的那一次分析（批 C-4）。取消键要停的是**请求**，不是文案：没有这枚句柄，
+     * 屏侧的「取消」只能把界面改回 `Idle`，迟到的响应照样会把 `Analyzed` 推回来。
+     */
+    private var analysisJob: Job? = null
+
+    /**
+     * 取消这次分析：停掉在飞请求 + 回 `Idle`，并清掉待重放的句子。
+     *
+     * 只在 `Analyzing` 那一档生效——取消是等待面的动作，结果已经落地时不该被它抹掉
+     * （`Analyzed` / `Failed` 都是读到了东西，把它们退回 `Idle` 等于替用户销毁历史）。
+     * 授权台账**不回收**：记账发生在点确认那一刻（下面 `confirmOutbound` 的注释同口径），
+     * 取消一次请求换来「请再确认一遍」是说不通的因果。
+     * 取消不是失败：这里不写 `Failed`，`docs/specs/02:30` 那列「取消」说的是请求结果分类，
+     * 用户主动按下的取消该回到没开始过的样子。
+     */
+    fun cancelAnalysis() {
+        if (_uiState.value != SentenceAnalysisUiState.Analyzing) return
+        analysisJob?.cancel()
+        analysisJob = null
+        pendingSentence = null
+        _uiState.value = SentenceAnalysisUiState.Idle
+    }
+
     fun analyze(sentence: String, profileId: String) {
         pendingSentence = sentence
         _uiState.value = SentenceAnalysisUiState.Analyzing
@@ -82,21 +107,23 @@ class SentenceAnalysisViewModel @Inject constructor(
     }
 
     private fun runAnalysis(sentence: String, confirmedTextHosts: Set<String>) {
-        viewModelScope.launch {
-            try {
-                when (val result = analyze.analyze(sentence, confirmedTextHosts)) {
-                    is SentenceAnalysisResult.Analyzed ->
-                        _uiState.value = SentenceAnalysisUiState.Analyzed(result.segments)
-                    is SentenceAnalysisResult.NeedsConfirmation ->
-                        _uiState.value = SentenceAnalysisUiState.NeedsOutboundConfirmation(result.host)
-                    is SentenceAnalysisResult.Failed -> _uiState.value = SentenceAnalysisUiState.Failed(result.failure)
-                    is SentenceAnalysisResult.NotConfigured -> _uiState.value = SentenceAnalysisUiState.NotConfigured(result.reason)
+        analysisJob?.cancel()
+        analysisJob =
+            viewModelScope.launch {
+                try {
+                    when (val result = analyze.analyze(sentence, confirmedTextHosts)) {
+                        is SentenceAnalysisResult.Analyzed ->
+                            _uiState.value = SentenceAnalysisUiState.Analyzed(result.segments)
+                        is SentenceAnalysisResult.NeedsConfirmation ->
+                            _uiState.value = SentenceAnalysisUiState.NeedsOutboundConfirmation(result.host)
+                        is SentenceAnalysisResult.Failed -> _uiState.value = SentenceAnalysisUiState.Failed(result.failure)
+                        is SentenceAnalysisResult.NotConfigured -> _uiState.value = SentenceAnalysisUiState.NotConfigured(result.reason)
+                    }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Throwable) {
+                    _uiState.value = SentenceAnalysisUiState.Idle
                 }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Throwable) {
-                _uiState.value = SentenceAnalysisUiState.Idle
             }
-        }
     }
 }

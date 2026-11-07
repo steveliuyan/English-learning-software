@@ -15,6 +15,7 @@ import com.example.englishlearning.wordqa.WordQaUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -85,6 +86,30 @@ class WordAiQaViewModel @Inject constructor(
     private var cardId: String = ""
     private var pendingRequest: WordQaRequest? = null
     private var lastAnswer: Pair<WordQaKind, String>? = null
+
+    /**
+     * 在飞的那一次问答（批 C-4）。取消键要停的是**请求**，不是文案：没有这枚句柄，
+     * 屏侧的「取消」只能把界面改回 `Idle`，迟到的回答照样会把 `Answered` 推回来。
+     */
+    private var askJob: Job? = null
+
+    /**
+     * 取消这次问答：停掉在飞请求 + 回 `Idle`，并清掉待重放的请求与上一答。
+     *
+     * 只在 `Asking` 那一档生效——取消是等待面的动作，结果已经落地时不该被它抹掉
+     * （`Answered` / `Failed` 都是读到了东西，把它们退回 `Idle` 等于替用户销毁历史）。
+     * 授权台账**不回收**：记账发生在点确认那一刻（下面 `confirmOutbound` 的注释同口径），
+     * 取消一次请求换来「请再确认一遍」是说不通的因果。
+     * 取消不是失败：这里不写 `Failed`，用户主动按下的取消该回到没开始过的样子。
+     */
+    fun cancelAsk() {
+        if (_uiState.value != WordAiQaUiState.Asking) return
+        askJob?.cancel()
+        askJob = null
+        pendingRequest = null
+        lastAnswer = null
+        _uiState.value = WordAiQaUiState.Idle
+    }
 
     /** 打开新词的问答层时清空上一词的状态，避免把 A 词的回答显示到 B 词的屏幕上。 */
     fun reset() {
@@ -216,23 +241,25 @@ class WordAiQaViewModel @Inject constructor(
     }
 
     private fun runAsk(request: WordQaRequest, confirmedTextHosts: Set<String>) {
-        viewModelScope.launch {
-            try {
-                when (val result = ask.ask(request, confirmedTextHosts)) {
-                    is WordQaResult.Answered -> {
-                        lastAnswer = request.kind to result.answer
-                        _uiState.value = WordAiQaUiState.Answered(request.kind, result.answer)
+        askJob?.cancel()
+        askJob =
+            viewModelScope.launch {
+                try {
+                    when (val result = ask.ask(request, confirmedTextHosts)) {
+                        is WordQaResult.Answered -> {
+                            lastAnswer = request.kind to result.answer
+                            _uiState.value = WordAiQaUiState.Answered(request.kind, result.answer)
+                        }
+                        is WordQaResult.NeedsConfirmation ->
+                            _uiState.value = WordAiQaUiState.NeedsOutboundConfirmation(result.host)
+                        is WordQaResult.Failed -> _uiState.value = WordAiQaUiState.Failed(result.failure)
+                        is WordQaResult.NotConfigured -> _uiState.value = WordAiQaUiState.NotConfigured(result.reason)
                     }
-                    is WordQaResult.NeedsConfirmation ->
-                        _uiState.value = WordAiQaUiState.NeedsOutboundConfirmation(result.host)
-                    is WordQaResult.Failed -> _uiState.value = WordAiQaUiState.Failed(result.failure)
-                    is WordQaResult.NotConfigured -> _uiState.value = WordAiQaUiState.NotConfigured(result.reason)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Throwable) {
+                    _uiState.value = WordAiQaUiState.Idle
                 }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Throwable) {
-                _uiState.value = WordAiQaUiState.Idle
             }
-        }
     }
 }

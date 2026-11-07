@@ -31,6 +31,7 @@ import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
 import com.example.englishlearning.ui.components.NotConfiguredCard
 import com.example.englishlearning.ui.components.OutboundConfirmDialog
+import com.example.englishlearning.ui.components.RequestInProgress
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
@@ -78,6 +79,7 @@ fun WordAiQaScreen(
     lemma: String,
     state: WordAiQaUiState,
     onAsk: (WordQaKind) -> Unit,
+    onCancelAsk: () -> Unit,
     onConfirmOutbound: (Boolean) -> Unit,
     onSaveNote: () -> Unit,
     onSavePersonalNote: (String) -> Unit = {},
@@ -117,11 +119,11 @@ fun WordAiQaScreen(
                 color = colors.text2,
                 modifier = Modifier.testTag("word_qa_idle_hint"),
             )
-            WordAiQaUiState.Asking -> Text(
-                text = "正在询问…",
-                style = AppType.Footnote,
-                color = colors.text2,
-                modifier = Modifier.testTag("word_qa_asking"),
+            WordAiQaUiState.Asking -> RequestInProgress(
+                message = "正在向你配置的 AI 服务问这个词",
+                onCancel = onCancelAsk,
+                statusTestTag = "word_qa_asking",
+                cancelTestTag = "word_qa_cancel",
             )
             is WordAiQaUiState.Answered -> AnsweredContent(state.kind, state.answer, state.saved, state.saveFailed, onSaveNote)
             // U-1（决策 2026-11-03 整合 §1）：私写的 `OutboundConfirmationDialog` 下线，改调共享件；
