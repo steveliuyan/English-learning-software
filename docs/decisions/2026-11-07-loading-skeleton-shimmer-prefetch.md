@@ -36,6 +36,19 @@
 
 更关键的是缺口：`grep -n "Loading|Progress|Skeleton"` 在 `ui/AiLearningScreen.kt` 与 `ui/ProfileScreen.kt` **零命中**。这两个 tab 没有等待分支，第一帧画的是「空列表」——对用户来说和「没有数据」是同一个形状。所以「全站都铺」不是给已有 Loading 态换皮，而是要先补出两屏的态，再统一铺骨架。
 
+**C-2 实测订正（2026-11-07，读完两屏源码后）**：上面这段「补态再铺」对两屏的落点都判错了方向，此处按实测改写，
+否则下一任会去 `AiLearningScreen` 找一个根本不该存在的分支。
+
+- `AiLearningScreen` **没有任何异步读盘**：功能目录由 `AiFeature.entries` 静态派生，屏侧不收 UiState、没有 ViewModel，
+  「零命中」不是漏了等待态而是根本没有可等的东西。给它补 `Loading ->` 分支就是为一个不存在的过程画占位。
+  处置：本屏不进铺面，改由一条闸钉住它的位置——静态页**不许**长出没有骨架的 `Loading` 分支
+  （`PrimaryTabSkeletonContractTest.static ai tab keeps no loading arm of its own`），将来真接异步态时必须同时铺骨架。
+- `ProfileScreen` 的等待态不在屏内：它的数字来自宿主注入的打卡快照与阅读历史，屏侧「零命中」的原因是
+  宿主把还没读到的值写成 `checkInReady?.streakDays ?: 0` ——首帧因此念「连续打卡 0 天 · 累计学过 0 个词」并把
+  统计格画成 `0`。这不是「画成空列表」，而是 F1-01 那枚**假数字**换了承载。处置：三枚入参改 `Int?`，
+  宿主只在快照 `Loading` 那一档传 `null`（`Unavailable` 不动，那是读到了「读不到」），屏侧 `null` 画占位格、
+  读屏念「正在统计」。于是「我的」页的骨架落在**格子里**（`SkeletonBar` 两条），不是整屏一个 `Loading` 分支。
+
 ### 2.4 预取窗口里确实有活，但只有一处先例可抄形状
 
 - 闪屏侧：`launch/BrandLaunchActivity.kt` 的 `LaunchedEffect(Unit) { delay(1200); startActivity(MainActivity) ; finish() }` —— **1.2 秒纯等，零工作**。而 `di/AppModule.kt:112 provideDatabase` 是 `@Provides @Singleton` 惰性方法：真正的 `DatabaseStartup.open(context)`（建库 + 迁移）发生在 MainActivity 首次要 `AppDatabase` 的那一刻，即闪屏之后。这就是那 1.2 秒该干的活。
@@ -82,7 +95,10 @@ grep -n "delay(1200)\|provideDatabase" app/src/main/java/com/example/englishlear
 
 ### 决定 3：铺面分四层，等待语义按「数据来自哪里」分两类
 
-- C-2 一级页（学习 / 阅读 / AI / 我的）：`TodayPlanScreen` 与 `ReadingAccessScreen` 的转圈/裸文本换骨架；`AiLearningScreen`、`ProfileScreen` **先补 Loading 分支**（当前零处理，§2.3）再铺骨架。补的分支只处理「本地读盘中」，不引入新状态机语义。
+- C-2 一级页（学习 / 阅读 / AI / 我的）：`TodayPlanScreen` 与 `ReadingAccessScreen` 的转圈/裸文本换骨架；
+  `AiLearningScreen`、`ProfileScreen` **先补 Loading 分支**（当前零处理，§2.3）再铺骨架。补的分支只处理「本地读盘中」，不引入新状态机语义。
+  ——C-2 交付时按 §2.3 的订正落点执行：AI 屏实测为静态、不进铺面（改由一条「静态页不许长出没骨架的等待分支」钉住），
+  「我的」页的等待态补在**宿主的入参**上（三枚统计改可空 + 屏侧占位格），屏侧不长 `Loading` 分支。
 - C-3 本地读盘子页（今日计划词卡流、查词、学习记录、词书单词、生词复习、试卷预览、备份导出/恢复的本地校验段）：转圈换骨架，形状照各自真实行/卡。判据是「第一帧就有一条正确形状的行」，不是「转圈更好看」。
 - C-4 网络 / AI 等待屏（文章生成、AI 问答、拍照翻译、生图、句法分析）：**不许长得像已有结果**。这一类的等待语义与骨架不同——骨架承诺「马上出现的是这个形状的内容」，而 AI 生成失败率高、时长不可知，画骨架会变成「假内容」，与 `2026-11-06-placeholder-text-is-not-learning-content` 同源。所以 C-4 的交付是**进行中语义**：明确「正在向 AI 请求今日文章（可取消）」+ 不定量的活动指示 + 取消入口，绝不画成「已有 N 条」的假快照，也绝不预生成占位文本。
 - C-1 是这些的基建与契约闸；C-5 是真预取；C-6 是门禁 + 截图册 + connected + 报告。
