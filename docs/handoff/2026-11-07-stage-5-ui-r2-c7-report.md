@@ -117,11 +117,15 @@ bash .git/qa-scratch/c7/connected_c7.sh
   → 本报告所在 docs 枚（决策册 §6 与 §4 补条 + 验证册批 C-7 那节 + 风格指南一句口径 + 计划册 C-7 行 + 本报告），零 `app/src/main` 改动。
 - 工作树未入库物证：`.git/qa-scratch/c7/`（610 帧截图、6 份 gradle 日志、4 份脚本）按红线留在忽略区，
   零密钥、零挑战码明文、零用户数据。
-- 推送状态见 §5：**逐批请示**，本报告写完未推。
+- 推送：用户在本棒收口后点头「推送这 3 个提交」，已推并核验。
+  `git -c credential.interactive=false push origin stage-5-ui-r2-learning-path` 回 `e7a1dab..a19cce9`（exit 0，走全局 git 代理，未需要清空代理那一招）；
+  随后 `git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path` = `a19cce971e2a6dbe0ce4a978dd8c382bedeab6f4`，
+  与 `git rev-parse HEAD` 逐字一致，`git rev-list --count origin/<branch>..HEAD` = 0。备份成立。
+  本枚「补记推送成功」的 docs 提交在推送之后，远端 tip 以推送后的 `ls-remote` 现算为准，不在这里预填它自己的哈希。
 
 ## 5. 未完成与遗留
 
-- **推送待用户点头**（口径「推送逐批请示」）。
+- **批 C 整批（C-1..C-7）已推送并核验**，见 §4；本批无未推送提交。
 - **wide 腿未重跑**：C-7 只改色档与取色机制，不改版面、不改尺寸类判据；批 C-6 的 wide UI 全量（`OK (588 tests)`）仍是同族判据的最近证据。
   本批只补 compact UI 包单腿。若用户要 wide 复验，走 `.git/qa-scratch/c6/connected.sh` 的四格口径即可。
 - **待用户目视**（人眼判，本棒不替判）：
