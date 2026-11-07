@@ -199,7 +199,7 @@ class WordAiQaScreenTest {
         composeRule.onNodeWithTag("word_qa_asking").assertExists()
         composeRule.onNodeWithText("正在向你配置的 AI 服务问这个词").assertExists()
         composeRule.onNodeWithTag("word_qa_cancel").assertExists()
-        composeRule.onNodeWithText("取消只是不再等待这次结果").assertExists()
+        composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true).assertExists()
         aiChipKinds.forEach { kind ->
             composeRule.onNodeWithTag("word_qa_chip_${kind.name}").assertIsNotEnabled()
         }

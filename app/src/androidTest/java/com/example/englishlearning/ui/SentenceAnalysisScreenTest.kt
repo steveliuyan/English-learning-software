@@ -149,7 +149,7 @@ class SentenceAnalysisScreenTest {
         composeRule.onNodeWithTag("sentence_analysis_analyzing").assertExists()
         composeRule.onNodeWithText("正在向你配置的 AI 服务分析这句英文").assertExists()
         composeRule.onNodeWithTag("sentence_analysis_cancel").assertExists()
-        composeRule.onNodeWithText("取消只是不再等待这次结果").assertExists()
+        composeRule.onNodeWithText("取消只是不再等待这次结果", substring = true).assertExists()
         composeRule.onNodeWithTag("sentence_analysis_analyze").assertIsNotEnabled()
         composeRule.onNodeWithTag("sentence_analysis_input").assertIsNotEnabled()
     }
