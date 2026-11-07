@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -18,7 +19,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -413,6 +417,182 @@ class WordCardScreenTest {
             val bounds = node.getUnclippedBoundsInRoot()
             assertTrue("$tag 在 fontScale=2.0 下被纵向裁出屏幕：节点=$bounds 屏幕根=$root", bounds.top >= root.top && bounds.bottom <= root.bottom)
             assertTrue("$tag 在 fontScale=2.0 下被横向裁出卡片：节点=$bounds 屏幕根=$root", bounds.left >= root.left && bounds.right <= root.right)
+        }
+    }
+
+    /**
+     * QA3 A2.5（用户 2026-11-08 拍板「全部都做」＝立为缺陷修）：Android「字体大小」顶档 3.0 下，
+     * 回忆态那张卡的**唯一出口**「显示释义」必须在首帧就在可点区内，不许藏在折叠线之下。
+     *
+     * 先把走查册那句原话证伪一半（本轮在 emulator-5554 用真机路径复现：`settings put system font_scale 3.0`
+     * → 今日计划 → 开始学习 → 词卡，节点树与截图落 `.git/qa-scratch/qa3-repro/`）：
+     * 「滑动不产生位移、节点树原地不动」**不成立**——两下 `input swipe` 后词头从 `[100,358][980,1113]`
+     * 移到 `[100,311][985,838]`，「显示释义」升到 `[100,742][980,920]`（可点高 178px ≈ 68dp）并点得动，
+     * 点完释义自动进视口（F5-03 的焦点迁移顺带把它滚进来了）。
+     * 但**这条链仍然要修**：首帧画面是「一个占满视口的词头 + 一整排吸底评分按钮」，
+     * 出口在折叠线之下且没有任何提示，顶档用户面对的是「只能评分、看不见还能揭晓」——
+     * AC5-03 承诺的是关键流程支持动态字体，不是"肯滑两下就能走完"。
+     *
+     * 所以判据钉在**首帧、零滚动**：`getUnclippedBoundsInRoot()` 一上来就量，不许先 `performScrollTo()`
+     * 把按钮搬进视口再断言（那样等于把缺陷本身当成了前置步骤）。
+     *
+     * 可视区的界取**吸底评分条的上沿**而不是屏根下沿：本屏是「顶栏 + 可滚内容（`weight(1f)`）+ 吸底条」，
+     * 内容视口的实际底边就是评分条的顶边。只比屏根会放过「出口排到了评分条身后」这一档。
+     *
+     * 宿主必须是**带状态的真流程**（`onReveal` 翻 `meaningRevealed`，同 `WordCardRevealFocusTest` 的夹具写法）：
+     * 用默认空回调时释义节点根本不进组合，那时断的是「我的夹具没接上」，不是「屏有缺陷」。
+     * 揭晓之后释义仍按**内容**对待——允许滚一下才读到（`performScrollTo()` 在这一步是正当的），
+     * 但评分三档必须还在屏上：揭晓不许把下一步挤出画面。
+     */
+    @Test
+    fun revealActionIsOnScreenAtTopFontScaleWithoutScrolling() {
+        val revealed = mutableStateOf(false)
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                WordCardScreen(
+                    state = ready(meaningRevealed = revealed.value),
+                    onReveal = { revealed.value = true },
+                )
+            }
+        }
+
+        val root = composeRule.onNodeWithTag("word_card_screen").getUnclippedBoundsInRoot()
+        val barTop = composeRule.onNodeWithTag("word_card_feedback_bar").getUnclippedBoundsInRoot().top
+        val reveal = composeRule.onNodeWithTag("word_card_reveal")
+        val firstFrame = reveal.getUnclippedBoundsInRoot()
+        assertTrue(
+            "fontScale=3.0 首帧「显示释义」不在可点区（F1-03 回忆→揭晓的唯一出口藏在折叠线下）：" +
+                "按钮=$firstFrame 屏根=$root 评分条顶=$barTop",
+            firstFrame.top >= root.top && firstFrame.bottom <= minOf(root.bottom, barTop) + 0.5.dp,
+        )
+        reveal.assertIsDisplayed()
+
+        reveal.performClick()
+        composeRule.waitForIdle()
+
+        val meaning = composeRule.onNodeWithTag("word_card_meaning")
+        meaning.assertExists()
+        meaning.performScrollTo()
+        val meaningBounds = meaning.getUnclippedBoundsInRoot()
+        assertTrue(
+            "fontScale=3.0 下点了「显示释义」却读不到释义（流程在此断裂）：" +
+                "释义=$meaningBounds 屏根=$root 评分条顶=$barTop",
+            meaningBounds.top >= root.top && meaningBounds.bottom <= minOf(root.bottom, barTop) + 0.5.dp,
+        )
+        listOf("word_card_feedback_unknown", "word_card_feedback_fuzzy", "word_card_feedback_known")
+            .forEach { tag ->
+                composeRule.onNodeWithTag(tag).assertIsDisplayed()
+            }
+    }
+
+    /**
+     * QA3 A2.3（用户 2026-11-08 拍板「全部都做」＝立为缺陷修）：顶档 3.0 下词头必须**整词排完**。
+     *
+     * 走查册那句是「词头尾字母被裁、无省略号」。设备复现（`.git/qa-scratch/qa3/fs300-20-wordcard.png`，
+     * 真机路径 `confidence`）按像素量过：词头占两行，第一行 4 个墨团（`c`+`o`+`n`+`fi` 粘连）、
+     * 第二行 4 个（`denc`），两行都止于 x≈847，而卡片可视底边在 y=1098——
+     * 第三行那颗 `e` 既没画出来、也没被省略号替代，用户看到的是「confidenc」。
+     *
+     * 判据取两条互补的口径，因为「丢字」有两种成因，只看一种会漏：
+     *  - **排版侧**：`GetTextLayoutResult` 的最后一行行尾必须等于词头长度——行被排出来却没画，
+     *    与压根没排出来，在截图上长得一样，只有排版结果分得开；
+     *  - **绘制侧**：词头的真实占位（`getUnclippedBoundsInRoot`）下沿必须落在可滚视口内——
+     *    越过视口下沿的那一截被 `verticalScroll` 的父级裁掉，而词头没设 `maxLines`、不产生省略号，
+     *    用户看到的就是「confidenc」。
+     *
+     * 绘制侧一律用 Dp 比 Dp：`getUnclippedBoundsInRoot()` 回 `DpRect`，`fetchSemanticsNode().boundsInRoot`
+     * 回的是像素 `Rect`，两者直接判等永远红（本条首版就红在这一句上，不是缺陷红，是单位红）。
+     *
+     * 词头用 `confidence`（10 字母）而不是夹具默认的 `ability`（7 字母）：顶档一行只站得住 5 个字母，
+     * 7 个字母两行就排完了，缺陷在这一枚词上根本不出现，拿它跑绿等于什么都没验。
+     */
+    @Test
+    fun lemmaKeepsEveryLetterLaidOutAndVisibleAtTopFontScale() {
+        val lemma = "confidence"
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                WordCardScreen(state = ready(card = card().copy(lemma = lemma)))
+            }
+        }
+
+        val node = composeRule.onNodeWithTag("word_card_lemma")
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals("word_card_lemma 的 GetTextLayoutResult 产出 ${layouts.size} 份布局（期望恰 1 份）", 1, layouts.size)
+        val layout = layouts.single()
+        val lastLine = layout.lineCount - 1
+        assertEquals(
+            "fontScale=3.0 下词头「$lemma」只排到第 ${layout.getLineEnd(lastLine)} 个字符就结束了" +
+                "（共 ${layout.lineCount} 行）：剩下的字母既没画也没换成省略号，屏幕上是一截残缺词（QA3 A2.3）",
+            lemma.length,
+            layout.getLineEnd(lastLine),
+        )
+
+        val root = composeRule.onNodeWithTag("word_card_screen").getUnclippedBoundsInRoot()
+        // 顶档下「显示释义」被常驻在吸底区（A2.5），可滚视口的下沿因此由它决定而不是评分条；
+        // 两个 tag 都量一遍取较紧的那条，判据就不依赖「这一档到底 pin 不 pin」这个还会变的事实。
+        val viewportBottom = listOf("word_card_reveal", "word_card_feedback_bar")
+            .map { composeRule.onNodeWithTag(it).getUnclippedBoundsInRoot().top }
+            .minOf { it }
+        val unclipped = node.getUnclippedBoundsInRoot()
+        assertTrue(
+            "fontScale=3.0 下词头画出可滚视口、被裁在卡片中途：词头=$unclipped 屏根=$root 视口下沿=$viewportBottom（QA3 A2.3）",
+            unclipped.top >= root.top && unclipped.bottom <= viewportBottom + 0.5.dp,
+        )
+    }
+
+    /**
+     * QA3 A2.4（同上拍板）：顶档 3.0 下三档评分按钮不许把吸底区撑破。
+     *
+     * 设备复现（同一张截图）：三枚各拿 `weight(1f)` ≈ 110dp 宽，而这一档 `AppType.Label` 是 12sp×3=36sp、
+     * `AppType.Caption` 12sp×3 同值——「不认识」三字就 ≈110dp，于是左格排成「不认/识/想不/起来」四行，
+     * 整枚按钮底边越过窗口下沿（像素上被导航条那一带切断），中间那格同样四行。
+     * 走查册记的「折行撑破卡片」是这件事的人话版本。
+     *
+     * 判据分两条，各管这件缺陷的两半：
+     *  - **每一句文案排成一行**（`GetTextLayoutResult.lineCount == 1`）：顶档这条摆法的承诺就是
+     *    「三档一眼分得开、且不靠行高换可读性」。句数用 `useUnmergedTree = true` 点名到字级节点——
+     *    按钮父节点的合并语义会把三句并成一枚 `Text`，行数量不到真实排版。
+     *  - **整格落在窗口之内**（真实占位下沿 ≤ 屏根下沿）：折行一旦把吸底区撑到 226dp，
+     *    卡面就只剩评分条（A2.3 的另一半），所以「撑破」必须在边界上证伪。
+     *
+     * 两条都是 Dp 比 Dp / 纯计数，不混用 `boundsInRoot`（像素 `Rect`）与 `getUnclippedBoundsInRoot()`
+     * （`DpRect`）——那对比较恒不等，红的是单位不是版面。
+     */
+    @Test
+    fun feedbackTiersStayWholeAndInsideTheWindowAtTopFontScale() {
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                WordCardScreen(state = ready())
+            }
+        }
+
+        val root = composeRule.onNodeWithTag("word_card_screen").getUnclippedBoundsInRoot()
+        listOf(
+            "word_card_feedback_unknown" to listOf("不认识", "想不起来"),
+            "word_card_feedback_fuzzy" to listOf("模糊", "差点没想起"),
+            "word_card_feedback_known" to listOf("认识", "脱口而出"),
+        ).forEach { (tag, texts) ->
+            val unclipped = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+            assertTrue(
+                "fontScale=3.0 下「${texts.first()}」那格画到窗口之外：节点=$unclipped 屏根=$root（QA3 A2.4）",
+                unclipped.top >= root.top && unclipped.bottom <= root.bottom + 0.5.dp,
+            )
+            texts.forEach { text ->
+                val layouts = mutableListOf<TextLayoutResult>()
+                composeRule.onNodeWithText(text, useUnmergedTree = true)
+                    .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                assertEquals("「$text」的字级节点产出 ${layouts.size} 份布局（期望恰 1 份）", 1, layouts.size)
+                assertEquals(
+                    "fontScale=3.0 下「$text」排成 ${layouts.single().lineCount} 行：折行把整条吸底区撑高，" +
+                        "卡面被压到只剩评分（QA3 A2.4）",
+                    1,
+                    layouts.single().lineCount,
+                )
+            }
         }
     }
 

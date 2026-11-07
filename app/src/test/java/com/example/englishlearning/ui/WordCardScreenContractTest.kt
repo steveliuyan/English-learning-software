@@ -642,8 +642,13 @@ class WordCardScreenContractTest {
 
     /**
      * 原型 `feedbackBlock()`（`assets/app.js:286`）给三档各配一枚 10px 副标：忘记/想不起来、模糊/差点没想起、
-     * 认识/脱口而出。三枚副标必须落在**吸底条**里（`WordCardFeedbackBar` 与 `FeedbackButton` 的定义之间），
-     * 否则「副标挂在别的清单上」这种误放也会让字面量计数照绿。
+     * 认识/脱口而出。
+     *
+     * QA3 A2.4 之后「落在吸底条里」有了两层含义，判据随之改成**文案单点 + 唯一消费处**：
+     * 条内在顶档换成整宽堆叠、在钉档保持三等宽，两分支各画一遍 `FeedbackButton` 会开门，所以三档的内容
+     * （档位、两行文案、tag）上移到 `FeedbackTiers` 清单，由条内两个分支各自 `FeedbackTiers.forEach` 消费。
+     * 于是「副标挂在别的清单上」这种误放仍然被判红——只是取样区间从「条定义到按钮定义」改成「清单本身」，
+     * 并加了一条「清单被引用的枚数」：清单若被条以外的地方消费，同一份文案就有了第二个主人。
      *
      * 档名保留应用的「不认识」而不是原型的「忘记」：F1-03 与学习记录/生词本用的是同一术语，
      * 改一名牵动四个屏与既有契约，属产品文案裁决，登记在批 1 报告里。
@@ -651,16 +656,21 @@ class WordCardScreenContractTest {
     @Test
     fun `each feedback tier carries its prototype sub caption inside the pinned bar`() {
         val source = uiScreenSource(WORD_CARD_SCREEN)
-        val barStart = source.indexOf("private fun WordCardFeedbackBar(")
-        val barEnd = source.indexOf("private fun FeedbackButton(")
-        assertTrue(barStart >= 0 && barEnd > barStart, "取不到吸底条的取样区间（bar=$barStart, button=$barEnd）")
+        // 按行取样而不是按偏移区间：本机 `core.autocrlf=true`，源码是 CRLF，
+        // 任何 `indexOf("\n\n")` 之类的「声明结束在空行」写法都会拿到 -1 而假红。
+        val tierLines = source.lines().filter { it.trimStart().startsWith("FeedbackTierSpec(") }
+        assertEquals(3, tierLines.size, "`FeedbackTiers` 必须恰好三档（不认识 / 模糊 / 认识），实际 ${tierLines.size} 档")
+        assertEquals(
+            3,
+            countMatches(source, Regex("""\bFeedbackTiers\b""")),
+            "清单只有声明一处 + 吸底条两个分支各引用一处 = 3；第 4 处 = 条以外还有别的主人",
+        )
         listOf("想不起来", "差点没想起", "脱口而出").forEach { caption ->
             val literal = "\"$caption\""
             assertEquals(1, countMatches(source, Regex(Regex.escape(literal))), "副标「$caption」必须恰出现一次")
-            val at = source.indexOf(literal)
             assertTrue(
-                at in barStart until barEnd,
-                "副标「$caption」必须由吸底条给出（当前偏移 $at 不在 $barStart..$barEnd 内）",
+                tierLines.any { literal in it },
+                "副标「$caption」必须由 `FeedbackTiers` 清单那一行给出，而不是挂在别的容器里",
             )
         }
     }
