@@ -35,8 +35,15 @@
 Ready 态二级屏里**唯一**缺「四件套」（状态位 + `overlayOpen` + `BackHandler` + 挂载分支）的那一个。
 另有一条次生现象：`:1595` 打开许可页时顺手 `showAbout = false`，所以从许可页用**页内**返回会落回「我的」而不是「关于」。
 
-- [ ] 处置：补四件套（`showLicenses` 进 `overlayOpen` + 加 `BackHandler`），还是连「打开时不该清 `showAbout`」一起改？
-  改法归 TDD（先红后绿），本册不动一行生产码。→
+- [x] 处置：**四件套 + 打开时不清 `showAbout` 一起改**（用户 2026-11-08「全部都做」）。
+  落点：`showLicenses` 进 `overlayOpen` 表达式；声明在 `showAbout` 处理器**之后**的 `BackHandler(enabled = showLicenses)`
+  （本文件「后声明者优先」）；`AboutScreen.onOpenLicenses` 改成只置 `showLicenses = true`，关于页留在栈下；
+  挂载 `else if (showLicenses)` 分支提到 `else if (showAbout)` **之前**——两枚同时为真时先声明者赢，
+  顺序不翻就是「点了许可行没反应」的第二半。
+  判据：`LicensesHostBackStackContractTest` 五条（状态位 / 进链 / 自有处理器 / 分支次序 / 不再清 about）
+  + 设备侧 `AppScreenTest.systemBackFromTheLicensesPageWalksBackToTheAboutPage`、
+  `inPageBackFromTheLicensesPageReturnsToTheAboutPage`。本册不动生产码，改码与取证见
+  `docs/handoff/2026-11-08-qa3-a-group-report.md`。
 
 ### A2 动态字体顶档（`fontScale = 3.0`）的七处破坏
 
@@ -44,28 +51,90 @@ AC5-03 要求「最大档不破版、不截断关键操作」，既有 connected
 前两处与 A2.6/A2.7 是形状变丑，**A2.5 是流程断裂**（其余为裁切与越出容器）。图证统一在
 `.git/qa-scratch/qa3/fs300-*.png`，每处都给「1.0 对照 → 3.0」两张。
 
-- [ ] A2.1 今日计划页计数行「0」字掉形：`0/12` 只读出一条斜杠（数字被裁到看不见）。
-  对照 `fs100-01-today.png` vs `fs300-01-today.png`。→ 判：接受 / 修（修=改这行的排版档位或允许换行）
-- [ ] A2.2 底栏「AI 助学」折两行且图标上浮：该格可点区 270x352px，同排其余三格 270x226px，四格不再等高。
-  对照 `fs100-08-mine-apps.png` 同屏底栏。→ 判：接受 / 修
-- [ ] A2.3 词卡词头折两行、**尾字母被裁**：`confidence` 的结尾字母缺半。
+> **2026-11-08 收口（用户裁决「全部都做」）**：七条一律立为缺陷修，改动落 A2.1 / A2.2 / A2.3 / A2.4 / A2.5 /
+> A2.6① / A2.6② / A2.7 八处；唯一**登记而不改**的是 A2.6③（分段头压在可滚页的折叠线上，理由见该条补正）。
+> 统一口径：**只换摆法 / 换档，不换内容、不换术语、不增删控件**，阈值一律严格大于 2.0
+> （AC-R-07 钉住的验收档一像素不动）。
+> 决策与量法见 `docs/decisions/2026-11-08-max-font-scale-layout-degradation.md`，
+> 验收标准补为 AC-R-24，逐屏口径见 `docs/superpowers/specs/2026-10-25-full-layout-redesign-design.md` §5.1。
+>
+> 收口复测（3.0 档逐屏实拍）另撞出**第八处**：词卡音标被喇叭药片挤成三行断字，已单独立为 **A2.8 待拍板**
+> （它不在这七条的范围里，按规矩不顺手改码）。
+
+- [x] A2.1 今日计划页计数行「0」字掉形：`0/12` 只读出一条斜杠（数字被裁到看不见）。
+  对照 `fs100-01-today.png` vs `fs300-01-today.png`。→ 判：**修（用户 2026-11-08「全部都做」）**
+  根因不是裁切而是**挤压**：大数 `0/12` 与右侧「还剩 N 个词」在同一行抢宽，顶档下先被挤没的是那个 `0`。
+  修法：`> 2f` 时脚注挪到大数下方一行，计数行保持单行。
+  判据 `TodayPlanScreenTest.summaryCountRowStaysSingleLineAtTopFontScale`（`GetTextLayoutResult.lineCount`）
+  + `TodayPlanLayoutContractTest` 两条（阈值与单一渲染点）。
+- [x] A2.2 底栏「AI 助学」折两行且图标上浮：该格可点区 270x352px，同排其余三格 270x226px，四格不再等高。
+  对照 `fs100-08-mine-apps.png` 同屏底栏。→ 判：**修（与 A2.7 同一根因、同一次整改）**
+  `Row.height(IntrinsicSize.Max)` + 每格 `fillMaxHeight` 让四格同一条矩形、同一块可点区。
+- [x] A2.3 词卡词头折两行、**尾字母被裁**：`confidence` 的结尾字母缺半。
   注意这条**没有省略号**，`uiautomator` 的 bounds/text 判据量不出来（本轮自动判据报绿，人眼才看到），
-  属于「客观判据的盲区」，登记在 QA3 报告 §5。图证 `fs300-20-wordcard.png`、`fs300-b-wordcard.png`。→ 判：接受 / 修
-- [ ] A2.4 三档反馈按钮（不认识/模糊/认识）文案折行撑破卡片。图证 `fs300-wc-1-front.png`。→ 判：接受 / 修
-- [ ] A2.5 **回忆-揭晓流程断裂**：3.0 档「显示释义」按钮落在视口之外，而词卡本身不可滚动
+  属于「客观判据的盲区」，登记在 QA3 报告 §5。图证 `fs300-20-wordcard.png`、`fs300-b-wordcard.png`。
+  → 判：**修**　补正根因：排版侧其实是**完整**的（`GetTextLayoutResult` 末行行尾 = 10 = 词头长度，十个字母全排出来了），
+  被裁的是**绘制**：词头真实占位 449.5dp，而顶档可滚视口只剩 220dp（被 A2.4 撑到 226dp 的吸底区压的），
+  第三行落在视口外且不产生省略号。所以「补个 ellipsis」是错修——词头就是学习内容。
+  修法：`> 2f` 词头从 `AppType.Display` 换到 `AppType.StrongTitle`（见 A2.4 同批）。
+  判据 `WordCardScreenTest.lemmaKeepsEveryLetterLaidOutAndVisibleAtTopFontScale` 两条各管一半（排版完整 + 占位在视口内）。
+- [x] A2.4 三档反馈按钮（不认识/模糊/认识）文案折行撑破卡片。图证 `fs300-wc-1-front.png`。
+  → 判：**修**　3.0 档每枚 `weight(1f)` ≈110dp 宽，而「不认识」三字 ≈110dp，左格排成四行、整条吸底区 226dp。
+  修法：`> 2f` 三枚改整宽上下堆叠、每枚一行（档名与副说明并排）；档位文案上移成 `FeedbackTiers` 单点清单，
+  两分支共用。判据 `WordCardScreenTest.feedbackTiersStayWholeAndInsideTheWindowAtTopFontScale`
+  （每句 `lineCount == 1` + 整格在窗口内）。
+- [x] A2.5 **回忆-揭晓流程断裂**：3.0 档「显示释义」按钮落在视口之外，而词卡本身不可滚动
   （`fs300-wc-2-scrolled.png` 证明滑动不产生位移，节点树原地不动）→ 顶档用户点不到揭晓，核心学习流程走不完。
-  这条是 AC5-03 顶档判据的**不达标项**，不是观感取舍。→ 判：立为缺陷修 / 认下「顶档不承诺」并改 spec 口径
-- [ ] A2.6 **AI 助学页顶档三处**（本轮补拍，`fs300-ai-*.png` 5 张）：
+  这条是 AC5-03 顶档判据的**不达标项**，不是观感取舍。→ 判：**立为缺陷修（已修）**
+  补正一句：走查册那句「词卡本身不可滚动／滑动不产生位移」**不成立**——Ready 分支的内容段带 `verticalScroll`
+  （`WordCardScreen.kt:305`），本轮 `performScrollTo()` 能把它带上来的。仍然成立、也确实要修的的是另一半：
+  **首帧**出口在折叠线之下（3.0 档词头单枚就占 288dp，吸底评分条从 `y=1145` 起画，可滚视口 855px），
+  靠滚才够得着的唯一出口等于把流程做成隐藏关卡。修法：`> 2f` 时「显示释义」常驻吸底区（评分条之上）。
+  判据 `WordCardScreenTest.revealActionIsOnScreenAtTopFontScaleWithoutScrolling`（不滚动，首帧即可点）。
+- [x] A2.6 **AI 助学页顶档三处**（本轮补拍，`fs300-ai-*.png` 5 张）：
   ① 页头副标题「每个功能都先做本机能做的部分…」在 3.0 占 4 行 645px，首屏几乎只剩标题区（`fs300-ai-01-hub.png`）；
   ② 功能卡标题折两行（「长难句 / 分析」「拍照翻 / 译」），状态徽标「现在能用」被推到卡片可视区之外，
   需滚动才看得到——本页根 `ScrollView [0,63][1080,1439]` **可滚**（`fs300-ai-04-hub-half.png`、
   `fs300-ai-03-hub-scrolled.png`），所以不是 A2.5 那种流程断裂，是排印取舍；
   ③ 「还在打磨 4 个」分段标题被视口下沿**切掉半行**（节点 bounds 已被父容器裁成 `[64,1365][818,1439]`，
   越界判据看不见这种裁，见下「判据盲区」）。
-  → 判：接受 / 修（②③同一根因：卡片与分段头按 1.0 档定尺）
-- [ ] A2.7 底栏「AI 助学」格在 3.0 档**画到栏外**：格 bounds `[540,1442][810,1794]`，而导航栏本体是
+  → 判：**① ② 修；③ 登记不修（本页可滚，不是流程断裂）**
+  ② 修法：`aiFeatureGridColumns` 在 `> 2f` 把两列降到一列，每张卡拿到整幅宽度，徽标回可视区
+  （判据 `AiLearningScreenTest.featureCardsFallBackToOneColumnAtTopFontScale` + `AiLearningLayoutContractTest`；
+  2.0 档双列形状由 `the_feature_cards_are_laid_out_in_two_columns` 一字未动地守着）。
+  ① 修法：共享页头 `AppScreenHeader` 的副标题腿加 `maxLines = 3` + `Ellipsis`。上限取 3 不取 2，
+  因为那句 31 字说明在 2.0 档恰好 3 行——压到 2 就是为顶档好看而让钉档丢字。
+  判据两条互为正反：`headerSubtitleStaysWithinThreeLinesAtTopFontScale`（顶档不再无限长高）与
+  `headerSubtitleKeepsEveryWordAtThePinnedFontTier`（钉档 `getLineEnd(last) == 整句长度`，一个字都不许丢）。
+  代价如实记：超过 3 行的文案在顶档末行走省略号，语义文本仍是整句（TalkBack 读得到）。
+  ③ **不改**：分段头压在 `ScrollView` 下沿是滚动折叠的必然结果，往上滚半格就完整；
+  把它钉成「必须在首帧完整可见」等于要求每屏分段头都不许出现在折叠线上，是做不到的约束。
+  与 A2.5 的分界在此：A2.5 藏的是**唯一出口**（流程断裂），③ 藏的是一段标题（观感取舍）。
+- [x] A2.7 底栏「AI 助学」格在 3.0 档**画到栏外**：格 bounds `[540,1442][810,1794]`，而导航栏本体是
   `[*,1505][*,1731]`——图标浮到栏沿之上压住页面内容，文案第二行「学」掉到栏沿之下（`fs300-ai-01-hub.png` 可见）。
-  A2.2 记的是「不等高」，这条记的是「越出容器」。→ 判：接受 / 修（修=底栏标签允许截断或格高随字号）
+  A2.2 记的是「不等高」，这条记的是「越出容器」。→ 判：**修**
+  补正根因：不是这格真的画到了栏外，而是**四格各自居中导致字形不在同一条横线**——两行标签那格的图标被顶到
+  栏沿 hairline（`y=1442`）上、第二行落在栏沿之下，读起来像越界。修法两条腿：等高矩形（A2.2）+
+  每格顶对齐并按档留 `bottomBarSlotVerticalBreathing` 余量（只在 `> 2f` 给，1.0/2.0 档一像素不动，
+  实测理由见该函数注释与决策文档 §4）。不取「标签截断」：`AI 助学` 截成 `AI …` 是把目的地名字改没。
+  判据 `AppBottomBarTest.slotsStayInsideTheBarAtTopFontScale`（+ 窄屏那条）。
+
+- [ ] A2.8 **收口复测新发现（待拍板，不在「全部都做」那七条里）**：3.0 档词卡正面的**音标被压成三行断字**。
+  图证 `.git/qa-scratch/qa3-a2-final/fs300-a23-a24-wordcard-front.png`（首帧）与 `fs300-a23-card-scrolled.png`
+  （滚下之后），层级 `dump-wordcard-fs300.txt` / `dump-wordcard-scrolled-fs300.txt`；1.0 对照 `fs100-a23-a24-wordcard-front.png`。
+  实测节点：音标 `/prəˈɡresɪv/` 在 3.0 排成 `/prə` `ˈgres` `ɪv/` 三行（节点 `[100,354][335,806]`，宽只有 235px = 89.6dp），
+  喇叭药片那一枚占 `[466,556][938,727]`（472px = 180dp），词性 `adj.` 因此被顶到 `[100,817][263,928]`、首帧看不见。
+  1.0 同屏对照：音标一行 `[100,518][275,558]`、药片 `[782,534][938,590]`（156px）、词性 `[100,569][156,606]` 一行到位。
+  根因是 `WordCardScreen.kt:326-358` 那一行 `Row { Column(weight(1f)){ 音标 ; 词性 } ; SpeakerButton }`：
+  `SpeakerButton` 的**可见文字**与朗读文案同源（`SpeakerButton.kt:50-52` 的口径），顶档下这枚文字连字形长到 180dp，
+  把 `weight(1f)` 那一侧挤到只剩 89.6dp，于是 IPA 在音节中间断行。
+  性质：**不是流程断裂**（内容段可滚，揭晓与三档评分在吸底区常驻，A2.5 那条已修），是排印破坏——
+  和 A2.6② 同类，比 A2.3 更刺眼（音标是「怎么念」的权威写法，断成三行等于把读音也弄错了观感）。
+  候选修法（按已定口径「只换摆法」）：`> 2f` 时把喇叭药片从音标那一行挪到**单独一行**（整行左对齐），
+  音标与词性那一列拿到整幅宽度；1.0/2.0 档一像素不动。
+  代价：顶档卡面多一行高度，词头那一屏的滚动量再涨一点（可滚，不影响出口常驻）。
+  → 判：**待用户拍板**（本条是收口复测时撞出来的第八处，不属于 2026-11-08「全部都做」那七条的范围，
+  所以按规矩先登记、不动码；拍板「修」则与 A2.1-A2.7 同一套阈值与判据形状落地）。
 
 **判据盲区（本轮两次撞上，登记以免下一棒误信自动绿）**：`uiautomator` 的 `bounds` 是节点与父容器的
 **可视交集**，被裁掉的节点永远「不越界」；文案被裁也**不产生省略号**（Compose 的 `Text` 溢出裁剪不走 ellipsis）。

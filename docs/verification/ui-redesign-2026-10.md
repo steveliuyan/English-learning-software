@@ -1823,3 +1823,102 @@ bash .git/qa-scratch/c7/connected_c7.sh   # install -r 两枚 APK + am instrumen
 - 「首帧 → 今日计划可读」这段骨架时长仍未测（C-6 遗留，量它要插临时桩，本轮未做）。
 
 
+
+## 2026-11-08 QA3 A 组：许可页返回栈 + 动态字体顶档七处降级（`emulator-5554`，API 30）
+
+走查册 `docs/verification/visual-walkthrough-2026-11-08.md` §A 里挂「待拍板」的条目，用户 2026-11-08 裁决
+**「全部都做」**：A1 + A2.1…A2.7 一律立为缺陷修。本册只记这一批的读数与量法，逐条根因与取舍写在
+`docs/decisions/2026-11-08-max-font-scale-layout-degradation.md`，验收口径补为 AC-R-24
+（`docs/superpowers/specs/2026-10-17-ui-redesign-design.md`）与逐屏降级表
+（`docs/superpowers/specs/2026-10-25-full-layout-redesign-design.md` §5.1）。
+
+**统一口径**：只换摆法 / 换档，不换内容、不换术语、不增删控件；阈值一律**严格大于 2.0**
+（AC-R-07 钉住的验收档一像素不动）。每屏读自己那一枚 `internal fun …(fontScale: Float)` 纯函数，
+屏侧只读 `LocalDensity.current.fontScale`，不读 `Configuration.fontScale`（后者在测试注入的
+`LocalDensity` 覆盖下不变，用它判档会让顶档护栏在设备与 connected 两侧同时失明）。
+
+### 判据先红（TDD 记录）
+
+| 条 | 红样（改动前的真实形状） | RED 读数 |
+|---|---|---|
+| A1 | `showLicenses` 不进 `overlayOpen`、无专属 `BackHandler` | `AppScreenTest.systemBackFromTheLicensesPageWalksBackToTheAboutPage`：第一下返回后 `licenses_screen` 仍在、第二下整屏消失（落到「不在学习 tab 就切回学习 tab」那条最低优先级处理器） |
+| A2.1 | 大数 `0/12` 与脚注同行抢宽 | `TodayPlanScreenTest.summaryCountRowStaysSingleLineAtTopFontScale`：`lineCount` 超 1，`0` 被挤掉 |
+| A2.3 | 词头 `AppType.Display` 三行 449.5dp，视口只剩 220dp | `WordCardScreenTest.lemmaKeepsEveryLetterLaidOutAndVisibleAtTopFontScale`：词头 `getUnclippedBoundsInRoot().bottom = 561.9048dp` > 视口下沿 `332.1905dp`（屏根 bottom 659.4286dp） |
+| A2.4 | 三枚 `weight(1f)` ≈110dp，装不下「不认识」三字 | `WordCardScreenTest.feedbackTiersStayWholeAndInsideTheWindowAtTopFontScale`：`「不认识」排成 2 行 expected:<1> but was:<2>` |
+| A2.4（JVM） | 档位文案散在两枚分支里 | `WordCardLayoutContractTest.the top tier swaps containers without duplicating the decision or the copy`：`FeedbackTierSpec(` 计数 ≠ 4、副标字面量计数 ≠ 1 |
+| A2.6① | 页头副标题顶档 4 行 645px 吃掉首屏 | `AiLearningScreenTest.headerSubtitleStaysWithinThreeLinesAtTopFontScale`：`lineCount = 4` > 3 |
+| A2.6② | 功能卡双列，卡标题折两行、徽标出可视区 | `AiLearningScreenTest.featureCardsFallBackToOneColumnAtTopFontScale`：列数 = 2 |
+| A2.2 / A2.7 | 四格各自居中，两行标签那格图标顶到栏沿 hairline | `AppBottomBarTest.slotsStayInsideTheBarAtTopFontScale`：AI 格上沿 1442px、其余 1505px；字形线差 24dp |
+
+### 变异探针两枚（钉「判据认得出错形」，跑完即撤）
+
+探针不动渲染，只改决策/文案的**形状**，验 JVM 侧那两条新契约不是空断言：
+
+| 探针 | 改法 | 结果 |
+|---|---|---|
+| A | `wordCardLemmaUsesCompactTier` / `wordCardStacksFeedbackTiers` 阈值 `> 2f` → `> 5f` | `23 tests completed, 2 failed`（正是本批新增那两条） |
+| B | 堆叠分支里直写三枚 `FeedbackButton`（绕开 `FeedbackTiers` 清单） | `23 tests completed, 3 failed`（`the top tier swaps…` + `the three feedback actions…` + `each feedback tier…`） |
+
+撤销一律走 Edit/Python 逐处回写，**不用 `git checkout --`**（工作树里还有本批其它在途改动，一条 checkout 会连带抹掉）。
+
+### 门禁（`--rerun-tasks` 才算真跑）
+
+```bash
+GRADLE=/c/Users/steveliuyan/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle.bat
+"$GRADLE" :app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin \
+  --no-daemon --no-build-cache --rerun-tasks 2>&1 | grep -aE 'FAILED|expected|BUILD|tests completed|^e:' ; exit ${PIPESTATUS[0]}
+```
+
+`BUILD SUCCESSFUL in 4m 15s`。本次实跑读数（取自本轮新生成的 `app/build/test-results/testDebugUnitTest/TEST-*.xml`，
+门禁跑一半不数 XML）：**334 个测试类 / 2479 条 / 0 失败 / 0 错误 / 0 跳过**。
+对照上一基线 332 类 / 2467 条 = **+2 类 / +12 条**（新增 `TodayPlanLayoutContractTest` 与 `LicensesHostBackStackContractTest`），
+基线只增不减。
+
+### connected（`adb install -r` 双包 + `am instrument`，禁 `connectedDebugAndroidTest`）
+
+| 组 | 方法 | 结果 |
+|---|---|---|
+| 顶档降级 | `WordCardScreenTest` 8 条（本批新增 2 + A2.5 + 2.0 档护栏 + 4 条回归）、`TodayPlanScreenTest` 1、`AppBottomBarTest` 2、`AiLearningScreenTest` 4 | `OK (15 tests)` |
+| A1 返回栈 | `AppScreenTest` 许可页两条（系统返回键逐级回退 + 页内返回落回关于页） | `OK (2 tests)` |
+
+一条如实记录的抖动：`systemBackFromTheLicensesPageWalksBackToTheAboutPage` 在**合并跑**里红过一次
+`ComposeTimeoutException: Condition still not satisfied after 5000 ms`；单跑两次 `OK (1 test)`、再配对跑 `OK (2 tests)`。
+判定为装包后首轮冷启动/dexopt 抖动，不是生产回归——但这条判据用的是 `waitUntil` 等「许可页消失」，
+下一棒若再见红，先按「装包后首轮」复现，别直接改生产码。
+
+### 设备实拍（3.0 与 1.0 各一册，`.git/qa-scratch/qa3-a2-final/`，不入库）
+
+前置 `Physical size: 1080x1920` / `Physical density: 420`（无 Override）、`font_scale` 由 3.0 复测后**已复原 1.0**。
+每屏都取「截屏 + `uiautomator` 层级」两样，层级文本按 UTF-8 落盘（GBK 控制台会把 IPA 字符 `ə` 打崩，
+`PYTHONIOENCODING=utf-8` 重定向到文件才拿得全）。
+
+| 屏 | 3.0 读数（修后） | 1.0 对照 |
+|---|---|---|
+| 今日计划 | `还剩 21 个词` `[106,330][678,477]` 单行落在大数 `2` `[106,63][245,319]` 与 `/ 23 个词` `[250,156][685,303]` 之下 | `还剩 21 个词` `[784,567][974,616]` 与大数同行（降级只在 `> 2f` 生效） |
+| 底栏四格 | 四格同为 `[*,1410][*,1778]`（等高），`AI 助学` 标签 `[540,1516][810,1778]` 落在本格内 | 四格 `[*,1626][*,1794]`，`AI 助学` 一行 `[624,1716][727,1761]` |
+| 词卡正面 | 词头 `progressive` 两行全出（`[100,358][980,859]`，排版侧末行行尾 = 10 = 词头长度）；三档改整宽堆叠，每枚一行 | 词头一行 `[100,337][695,478]`；三档 `weight(1f)` 横排 |
+| 词卡揭晓态 | 释义 + 三档堆叠全在窗口内，出口常驻吸底区 | — |
+| AI 主页 | 功能卡降到单列（`长难句分析` 拿整幅 `[53,248][1027,1103]`），副标题 3 行封顶带省略号 | 双列 `[53,377][524,799]` + `[556,377][1027,799]` |
+
+### 收口复测新发现的第八处（已登记，未改码）
+
+3.0 档词卡正面的**音标被喇叭药片挤成三行断字**：`/prəˈɡresɪv/` 排成 `/prə` `ˈgres` `ɪv/`
+（节点 `[100,354][335,806]`，宽仅 235px = 89.6dp），药片那枚可见文字连字形长到 472px = 180dp
+（`[466,556][938,727]`），把 `Row { Column(weight(1f)){音标;词性} ; SpeakerButton }` 的另一侧挤没，
+词性 `adj.` 因此掉到首帧之外。1.0 对照：音标一行、药片 156px、词性一行到位。
+
+性质与 A2.6② 同类（可滚，不是流程断裂），不在「全部都做」那七条范围内，所以按规矩**先登记、不动码**，
+立为走查册 §A2.8 待用户拍板；候选修法沿用同一口径（`> 2f` 把药片挪成单独一行，音标列拿整幅宽度）。
+
+### 判据盲区（本轮又撞第三次，写死在走查册里）
+
+`uiautomator` 的 `bounds` 是节点与父容器的**可视交集**：被裁掉的节点永远「不越界」，被挤没的行干脆不出现在层级里。
+所以 A2.3（词头裁切）、A2.6③（分段头压折叠线）、A2.8（音标断行 + 词性掉出首帧）三处都是**自动判据报绿、人眼/实拍才看到**。
+凡顶档屏必须「截屏 + 层级 + 人眼」三样都交，只交判据不算走过。
+
+### 待用户目视（在 C-7 累计清单之上追加）
+
+- A2.4 顶档三档改**整宽上下堆叠**后的观感：吸底区从一行三枚变三行，评分条吃掉的高度会不会让卡面显得局促。
+- A2.6① 顶档副标题 3 行封顶带省略号：末行「把必要的文字交…」被截，读屏仍念整句，视觉上是否可接受。
+- A2.7 顶档底栏 `AI 助学` 仍折两行（格高随字号的必然结果，另一条腿是截断成 `AI …`，已否）：观感是否可接受。
+- A2.8 音标断行要不要一并修（本轮只登记，未动码）。

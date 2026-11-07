@@ -221,6 +221,27 @@ AI 主页里「查看词表 / 查看详情」改为直接进词库，不再只�
 | AI 问词 | 4 枚按钮分主次：首选「拆词义」实底，其余文字按钮；回答上移 |
 | 启动/建档 | 三屏内完成：欢迎 → 选词书与目标 → 开始；封面用品牌渐变；选词书改 ~~**2 列色块卡**（域色 tint + `Book` 字形 + 书名 + 词数，不引封面图）~~ → **本条已作废（2026-10-29 逐屏对照原型后由用户改判）**：原型两处选词书（`assets/app.js:595` 与 `:1475`）都是 `.pick.pick-radio` 通栏单选行，全原型没有一处词书网格画法；现行版面见 `docs/decisions/2026-10-29-word-book-picker-rows-supersede-tiles.md` 与批 1 台账 Task 13-A 一节 |
 
+### 5.1 顶档动态字体的降级口径（QA3 批，2026-11-08 由用户「全部都做」拍板立为缺陷修）
+
+上表所有逐屏差异都按 **1.0 档**与 AC-R-07 钉住的 **2.0 档**画；Android「字体大小」顶档 3.0 会让
+同一批控件超出可滚视口，出现三类真失效：唯一出口落在折叠线下、词头被视口切在半截、吸底区被折行撑高
+而把卡面压没。本规格就此补一条范围：**超过 2.0 档只换摆法，不换内容、不换术语、不增删控件。**
+
+- **词卡**：> 2.0 时①「显示释义」从卡内移进吸底区（评分条之上）常驻；②词头从 `Display` 换到
+  `StrongTitle`；③三档反馈从「三等宽横排、两行居中」换成「整宽上下堆叠、每枚一行」。
+  2.0 档的卡面形状由 `lemmaAndRevealedMeaningStayFullyVisibleAtMaximumLargeFontScale` 钉死，本次一字未动。
+- **今日计划**：> 2.0 时「还剩 N 个词」从大数右侧换到大数下方一行，计数行本身保持单行（`0` 不再被挤没）。
+- **AI 主页**：> 2.0 时能力卡从两列降到一列，状态徽标不再被推出可视区；共享页头 `AppScreenHeader` 的
+  副标题腿取 `maxLines = 3`（上限取 3 不取 2：那句 31 字说明在 2.0 档恰好 3 行，压到 2 就是为顶档好看
+  而让钉档丢字），超出部分走省略号，语义文本仍是整句。
+- **底栏**：> 2.0 时给每格补竖向留白，标签行不再画到栏外。
+
+判定一律收在各屏自有的纯函数（`wordCardPinsRevealAction` / `wordCardLemmaUsesCompactTier` /
+`wordCardStacksFeedbackTiers` / `todayPlanRemainingMovesBelowCount` / `aiFeatureGridColumns` /
+`bottomBarSlotVerticalBreathing`），阈值统一 **严格大于 2f**，屏侧只读 `LocalDensity.current.fontScale`；
+裁决与量法见 `docs/decisions/2026-11-08-max-font-scale-layout-degradation.md`，
+验收标准补在 `docs/superpowers/specs/2026-10-17-ui-redesign-design.md` 的 AC-R-24。
+
 ## 6. 分批实施（每批独立门禁）
 
 | 批 | 内容 | 涉及屏 | 门禁 |
