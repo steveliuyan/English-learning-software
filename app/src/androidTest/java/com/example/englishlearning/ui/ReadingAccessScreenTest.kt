@@ -29,6 +29,28 @@ import org.junit.runner.RunWith
 class ReadingAccessScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /**
+     * 批 C-2（Spec 05 F5-05）：阅读 tab 的 `Loading` 从一句「正在读取本地阅读状态…」换成同形状骨架。
+     * 本条钉三件：骨架锚存在（与学习页 `today_plan_loading` 同一形状的稳定判据）、占位行真的落地、
+     * 旧那句进行中文案不再出现（首帧不许用文案代替形状）。
+     */
+    @Test
+    fun loadingFrameDrawsSkeletonInsteadOfACaption() {
+        composeRule.setContent {
+            ReadingAccessScreen(
+                state = ReadingAccessUiState.Loading,
+                onSelectType = {},
+                onOpenHistory = {},
+            )
+        }
+        composeRule.onNodeWithTag("reading_access_screen").assertExists()
+        composeRule.onNodeWithTag("reading_access_loading").assertExists()
+        composeRule.onNodeWithTag("reading_row_skeleton_0").assertExists()
+        composeRule.onNodeWithTag("reading_row_skeleton_2").assertExists()
+        composeRule.onNodeWithTag("reading_row_skeleton_3").assertDoesNotExist()
+        composeRule.onNodeWithText("正在读取本地阅读状态", substring = true).assertDoesNotExist()
+    }
+
     @Test
     fun lockedStateShowsReasonAndOneSentenceInsteadOfTypeButtons() {
         composeRule.setContent {

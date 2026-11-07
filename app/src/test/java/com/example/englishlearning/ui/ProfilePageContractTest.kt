@@ -222,23 +222,36 @@ class ProfilePageContractTest {
         )
     }
 
+    /**
+     * 三枚统计的取数只在宿主派生一次（本条的原始使命，2026-11-02 起未变），但**派生形状**随
+     * 批 C-2 改过一次：旧写法 `checkInReady?.learnedWordCount ?: 0` 把「还没读到」压成 0，
+     * 我的页首帧因此念「累计学过 0 个词」——F5-05 判的是同一件事（假数字），只是承载从文案换到了数字。
+     * 现在宿主给 `Int?`，`Loading` 那一档传 `null` 由屏侧画占位格；`streakDays` 那枚旧的 `?: 0`
+     * 仍在（学习页副标题读它，那里 0 = 「没有连续记录」、整行不出现，是另一条既有口径）。
+     * pending 语义本身由 `PrimaryTabSkeletonContractTest` 钉，本条只钉「接线恰一处、屏侧不自己读仓库」。
+     */
     @Test
     fun `the host feeds the three numbers from their real sources`() {
         listOf(
-            "val streakDays = checkInReady?.streakDays ?: 0",
-            "val learnedWordCount = checkInReady?.learnedWordCount ?: 0",
-            "articleCount = readingState.historyOrEmpty.size",
+            "val profileStreakDays: Int? = if (checkInState is CheckInUiState.Loading) null else checkInReady?.streakDays ?: 0",
+            "val profileLearnedWordCount: Int? = if (checkInState is CheckInUiState.Loading) null else checkInReady?.learnedWordCount ?: 0",
+            "val profileArticleCount: Int? = if (readingState is ReadingAccessUiState.Loading) null else readingState.historyOrEmpty.size",
         ).forEach { wiring ->
             assertEquals(
                 1,
                 countMatches(host, Regex(Regex.escape(wiring))),
-                "我的页取数接线必须恰一处：$wiring（0 = 那一格恒为 0，是假数字）",
+                "我的页取数接线必须恰一处：$wiring（0 = 那一格要么恒为 0 是假数字、要么页面自己读仓库）",
             )
         }
         assertEquals(
             1,
-            countMatches(host, Regex("""learnedWordCount = learnedWordCount,""")),
+            countMatches(host, Regex("""learnedWordCount = profileLearnedWordCount,""")),
             "我的页必须拿到宿主派生的已学词数（0 = 页面自己又 as? Ready 一遍，兜底值各写各的）",
+        )
+        assertEquals(
+            0,
+            countMatches(host, Regex(Regex.escape("articleCount = readingState.historyOrEmpty.size"))),
+            "宿主不得再把 `historyOrEmpty` 的 size 直接当文章数传给我的页：`Loading` 时那份 emptyList 就是假 0",
         )
     }
 }

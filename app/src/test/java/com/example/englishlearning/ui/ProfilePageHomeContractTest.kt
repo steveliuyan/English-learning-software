@@ -46,15 +46,31 @@ class ProfilePageHomeContractTest {
             .toList()
     }
 
+    /**
+     * 页头那两句仍是原型 `.head-sub` 的两句真话，但**拼法**随批 C-2 改过（`docs/decisions/2026-11-07-loading-skeleton-shimmer-prefetch.md`
+     * 决定 3 / Spec 05 F5-05）：两枚数字改成可空形参，副标题由 `listOfNotNull` 只拼**读到的那几枚**，
+     * 都没读到时整行不出现。旧判据钉的是「`$streakDays` 直接插进整句」，那正是首帧念出
+     * 「连续打卡 0 天 · 累计学过 0 个词」的形状——把「还没读到」说成「一个都没学」。
+     * pending 的三格占位与宿主接线由 `PrimaryTabSkeletonContractTest` 与 `ProfilePageContractTest` 承重。
+     */
     @Test
     fun `the header subtitle reads the two real facts the page receives`() {
         assertTrue(
-            "连续打卡 ${'$'}streakDays 天" in screen,
-            "副标题第一段取连续天数真值（原型 `.head-sub`）",
+            "streakDays?.let { \"连续打卡 ${'$'}it 天\" }" in screen,
+            "副标题第一段取连续天数真值（原型 `.head-sub`），且必须经 `?.let`——null 时整段不拼",
         )
         assertTrue(
-            "累计学过 ${'$'}learnedWordCount 个词" in screen,
-            "副标题第二段取累计学过词数真值（原型 `.head-sub`）",
+            "learnedWordCount?.let { \"累计学过 ${'$'}it 个词\" }" in screen,
+            "副标题第二段取累计学过词数真值（原型 `.head-sub`），且必须经 `?.let`——null 时整段不拼",
+        )
+        assertTrue(
+            "listOfNotNull(" in screen,
+            "两句必须由一份可空清单拼：写死的整句模板就是假 0 的入口",
+        )
+        assertEquals(
+            0,
+            countMatches(screen, Regex(Regex.escape("连续打卡 \$streakDays"))),
+            "不得再把可空的 streakDays 直接插进整句（null 会念成「连续打卡 null 天」）",
         )
         assertEquals(
             0,

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -52,7 +53,13 @@ class TodayPlanScreenTest {
     @Test fun loading_has_stable_tag() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Loading) }
         composeRule.onNodeWithTag("today_plan_screen").assertExists()
+        // 批 C-2（Spec 05 F5-05）：这一帧从 48dp 转圈 + 一句「正在准备今日计划…」换成同形状骨架。
+        // 锚名不变（本条就是它的判据），新增的是「占位行真的落地」与「旧那句进行中文案不再在场」。
         composeRule.onNodeWithTag("today_plan_loading").assertExists()
+        composeRule.onNodeWithTag("today_plan_row_skeleton_0").assertExists()
+        composeRule.onNodeWithTag("today_plan_row_skeleton_3").assertExists()
+        composeRule.onNodeWithTag("today_plan_row_skeleton_4").assertDoesNotExist()
+        composeRule.onNodeWithText("正在准备今日计划", substring = true).assertDoesNotExist()
     }
 
     @Test fun missing_setup_offers_clickable_setup() {

@@ -47,15 +47,19 @@ class ProfileScreenTest {
         wordBookName: String? = null,
         aiProfileSubtitle: String? = null,
         fontScale: Float? = null,
+        // 批 C-2：三枚统计默认给真值；传 `null` = 「宿主还没读到快照」那一档（`PendingStats` 那条用例）。
+        streakDays: Int? = 5,
+        learnedWordCount: Int? = 42,
+        articleCount: Int? = 7,
     ) {
         composeRule.setContent {
             MintGlassTheme(themeMode = ThemeMode.System) {
                 val hub: @androidx.compose.runtime.Composable () -> Unit = {
                     ProfileScreen(
                         profileName = "小刘",
-                        streakDays = 5,
-                        learnedWordCount = 42,
-                        articleCount = 7,
+                        streakDays = streakDays,
+                        learnedWordCount = learnedWordCount,
+                        articleCount = articleCount,
                         onOpenWordBankSection = { opened += "section:${it.name}" },
                         onOpenCheckIn = { opened += "checkIn" },
                         onOpenReadingHistory = { opened += "readingHistory" },
@@ -100,6 +104,29 @@ class ProfileScreenTest {
         composeRule.onNodeWithContentDescription("已学词，当前 42").assertExists()
         composeRule.onNodeWithContentDescription("连续天数，当前 5").assertExists()
         composeRule.onNodeWithContentDescription("文章，当前 7").assertExists()
+    }
+
+    /**
+     * 批 C-2（Spec 05 F5-05 / 决策 2026-11-07 决定 3）：宿主「还没读到快照」时这一屏不许把 pending
+     * 说成 0。旧形状是 `?: 0` 之后页头念「连续打卡 0 天 · 累计学过 0 个词」、三格画三个 0，
+     * 那是把「还没读到」说成「一个都没学」（2026-11-06 占位诚实化同一条禁令的数字化身）。
+     * 现在三格保留外壳与命中区、数字位换成占位条，读屏整句换成「标签，正在统计」。
+     */
+    @Test
+    fun pendingStatsRenderPlaceholderCellsInsteadOfZeros() {
+        setHub(streakDays = null, learnedWordCount = null, articleCount = null)
+        composeRule.onNodeWithTag("profile_screen").assertExists()
+        composeRule.onNodeWithTag("profile_stats").assertExists()
+        listOf("profile_stat_learned", "profile_stat_streak", "profile_stat_articles").forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertExists().assertHasClickAction()
+        }
+        // 数字一个都不许在场：0 属于「读了且确实是 0」，pending 只能有形状。
+        composeRule.onNodeWithText("0").assertDoesNotExist()
+        composeRule.onNodeWithText("连续打卡 0 天 · 累计学过 0 个词").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("已学词，正在统计").assertExists()
+        composeRule.onNodeWithContentDescription("连续天数，正在统计").assertExists()
+        composeRule.onNodeWithContentDescription("文章，正在统计").assertExists()
+        composeRule.onNodeWithContentDescription("已学词，当前 null").assertDoesNotExist()
     }
 
     /**
