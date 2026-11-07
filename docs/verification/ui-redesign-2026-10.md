@@ -1487,3 +1487,177 @@ adb -s emulator-5554 shell settings get global animator_duration_scale          
 
 - 冷启动进今日页：闪屏结束后那一屏骨架停留是否比预期短、有没有出现「骨架闪一下就变成内容」的更难看形状。
   读数只能说主线程不再堵那几十毫秒，说不了人眼看着是否更顺。
+
+## 2026-11-07 批 C-6：骨架 / shimmer 截图册与首帧读数（`emulator-5554`，API 30）
+
+来源＝新增 connected 类 `app/src/androidTest/java/com/example/englishlearning/ui/components/SkeletonShimmerEvidenceTest.kt`
+（7 例 = 7 枚骨架规格，逐例 `OK (1 test)`，`animator_duration_scale=0` 与 `=1` 两档各跑一遍）。
+宿主＝`ActivityScenario.launch(ComponentActivity)` + `ComposeView.setContent`：批 A 已证**循环动画不能用
+`createComposeRule()` 取证**（测试帧时钟替身会让 `waitForIdle()` 1ms 返回、循环值恒 `0.0`），
+这一条只能走真窗口的 `WindowRecomposer` 与真 Choreographer。用例在 `onActivity` 里打
+`QA-C6 spec=<id> scale=<现值> holdStartMs=…`，观察窗 6 秒，采集脚本以这枚 logcat 行为对齐点。
+
+- 采集脚本（**不入库**，`.git/qa-scratch/c6/`）：`capture.sh <0|1>` 两档各 14 张、`capture1burst.sh` 每规格连拍 12 帧、
+  `pick_frames.py` 选中段帧、`probe.py` 取样颜色与逐像素差、`firstframe.sh` 首帧读数、`connected.sh` 双形态全量。
+  证据类**入库**（它可复跑），脚本与 PNG **不入库**——AGENTS.md 与既有口径：截图与脚本落 `.git/qa-scratch/`。
+
+### 截图册（7 枚规格，逐张交代）
+
+| 骨架规格 | 用例方法 | 镜像的真实形状 | scale=0 定格 | scale=1（有效帧 / 静息格 / 动帧 / 中段帧最大Δ） |
+|---|---|---|---|---|
+| 通栏四条 | `skeleton_bar` | 文章阅读首屏三行（`ArticleReadingScreen` 的 0.72/26、0.46/12、0.34/12）+ 生词复习那条 0.24/10（`VocabularyRelearnScreen`） | 两帧逐字节同 | 11 / 6 / 5 / 1 级 |
+| 前导点行 | `skeleton_row_leading` | 默认档（`leading = true`、`markSize = 22.dp`）：选词书 `PickRow`、今日计划「接下来」、阅读页历史 | 两帧逐字节同 | 11 / 5 / 6 / 1 级 |
+| 无前导点 96dp | `skeleton_row_flat_96` | 查词结果行（`GlobalVocabularySearchScreen`：96dp、0.28/0.66） | 两帧逐字节同 | 10 / 4 / 6 / 1 级 |
+| 无前导点 48dp | `skeleton_row_flat_48` | 学习记录 `WordRow`（`LearningRecordsScreen`：48dp、0.34/0.68） | 两帧逐字节同 | 11 / 5 / 6 / 1 级 |
+| 带壳行 | `skeleton_row_framed` | `WordBookWordsScreen` 的 `Card(surface + 1dp 描边)` 行（`framed = true`、0.30/0.62、48dp 逐字相同） | 两帧逐字节同 | 11 / 4 / 7 / 3 级 |
+| 骨架卡 | `skeleton_card` | 通用卡 `SkeletonCard(bars = 3)`，与 `VocabularyRelearnScreen` 的 `bars` 档同（`minHeight` 本册未抄，那一屏传 170dp） | 两帧逐字节同 | 11 / 4 / 7 / 3 级 |
+| 统计格 | `skeleton_stat_grid` | 词卡流三枚统计：`WordCardScreen` 的 `cells = 3, rowHeight = 54.dp` 逐字相同 | 两帧逐字节同 | 10 / 1 / 9 / 3 级 |
+
+**scale=0 那半条判据成立**（决策册决定 2 的「末尾 = 静息骨架、无光泽」）：七枚规格的 `a` / `b` 两帧（相隔 2 秒）
+**应用区域逐字节相同**。现算：
+
+```bash
+python - <<'PY'   # 裁掉状态条与导航条后取 md5：七对规格两两相同
+from PIL import Image; import glob, hashlib, os.path
+for f in sorted(glob.glob(".git/qa-scratch/c6/*-scale0-*.png")):
+    print(hashlib.md5(Image.open(f).convert("RGB").crop((0, 64, 1080, 1792)).tobytes()).hexdigest()[:10],
+          os.path.basename(os.path.normpath(f)))   # Git Bash 下 glob 会带反斜杠，不 normpath 就截不出文件名
+PY
+```
+
+实测输出（14 行 = 7 对，逐对同哈希）：`05f5239070 bar` / `7396b963c3 card` / `c14efe0f3e row-flat-48` /
+`3390b0bda9 row-flat-96` / `3514ef2303 row-framed` / `b084bb69b9 row-leading` / `a02fe1d58f stat-grid`。
+
+整帧 `md5sum` 只在 `row-flat-96` 一对上不同，逐像素定位后差异落在 `bbox=(72,19)-(92,47)`、334 个点、
+全是灰阶（117↔216）——**状态条上的时钟走了一个字**。裁掉系统条带后七对全同（上面的命令就是裁后口径）。
+
+**scale=1 那半条判据成立但需要连拍才看得见**：每规格连拍 12 帧里 5–9 帧与静息格不同，光带确实在扫；
+中段帧存为 `.git/qa-scratch/c6/<规格>-scale1-mid.png`（7 枚）。
+
+### 两条取样纪律（本轮踩到的，下一棒别再踩）
+
+1. **两帧间隔 2 秒量 1200ms 周期会混叠**。第一版 `capture.sh 1` 的 `+1.0s / +3.0s` 两帧，七个规格**逐字节等于
+   `scale=0` 的静息帧**——看着像「光带没扫」，其实是七枚规格共用同一相位原点（都在 `holdStart` 之后第一次组合启动）
+   + 轮询检测延迟几乎恒定 ⇒ 每次都抓到同一格相位，而那格恰好在周期末尾的静息段（后 1/4、300ms 宽）。
+   改成连拍 12 帧再按像素选帧才是这条观感判据该有的取样密度。
+2. **连拍的头一帧一定是上一个窗口**（页底取样点 `#FAFAFA`，不是本页的 `#F1F4EF`），末 1–2 帧偶尔是拆窗后的白屏
+   （`#FFFFFF`）。`pick_frames.py` 因此先按页底那一点过滤，再谈差异帧数——否则会把「抓到了别的窗口」说成动效。
+
+### 观感读数：骨架与光带的对比度都在可感知阈下（本节的结论，需用户裁决）
+
+截图册的本职是判「看得清看不清」，读数是 `probe.py single` 对 `scale=0` 定格帧逐点取样（浅色档，实机像素）：
+
+| 元素 | token 算式 | 实测色 vs 容器 | 最大单通道差 | 对比度 |
+|---|---|---|---|---|
+| 通栏骨架条 | `outlineSoft.copy(alpha=0.22f)` 压 `background` | `#F0F3EF` vs `#F1F4EF` | 1 级 | 1.008:1 |
+| 行内发丝线 | `outlineSoft` 满值 | `#EEF2ED` vs `#F1F4EF` | 3 级 | 1.020:1 |
+| 卡壳（`framed` / `card` / `stat_grid`） | `surface` vs 页底 | `#FFFFFF` vs `#F1F4EF` | 16 级 | 1.110:1 |
+| 卡内骨架条 | 同第一行，压 `surface` | `#FBFCFB` vs `#FFFFFF` | 4 级 | 1.028:1 |
+| shimmer 光带 | `tint.copy(alpha≤0.16f)` | 相对静息帧最多再差 1–3 级 | ≤3 级 | ≤1.08:1 |
+
+按 token 现算的候选档（浅色，页底 `#F1F4EF` 上；混合值按整数落色后再算，与实机像素同口径）：
+`outlineSoft` 满值 → `#EEF2ED` 1.020:1；`outline` 满值 → `#DDE5DD` 20 级 / 1.159:1；
+`tint2` 满值 → `#DCEBE1` 21 级 / 1.112:1；`outline@0.55` → `#E6ECE5` 11 级 / 1.082:1。
+深色档为**算式核对、未实机拍**：`outlineSoft@0.22` 压 `#101814` → `#141D18`，5 级 / 1.048:1；`outline` 满值 33 级 / 1.486:1。
+重算（无 numpy，纯 PIL + WCAG 相对亮度）：
+
+```bash
+python - <<'PY'   # token 档 → 落色 → 与容器的最大单通道差 + WCAG 比
+def lin(c):
+    c = c / 255.0
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+def L(t): r, g, b = t; return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+def ratio(a, b):
+    la, lb = L(a), L(b); hi, lo = max(la, lb), min(la, lb); return (hi + 0.05) / (lo + 0.05)
+def hx(h):
+    h = h.lstrip('#'); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+def mix(fg, bg, a): return tuple(round(f * a + b * (1 - a)) for f, b in zip(fg, bg))
+def dmax(a, b): return max(abs(x - y) for x, y in zip(a, b))
+page, surf, dp = hx('#F1F4EF'), hx('#FFFFFF'), hx('#101814')
+for name, c, ref in [
+    ('骨架条实测', hx('#F0F3EF'), page), ('骨架条算式', mix(hx('#EEF2ED'), page, .22), page),
+    ('发丝线', hx('#EEF2ED'), page), ('卡壳', surf, page), ('卡内实测', hx('#FBFCFB'), surf),
+    ('outline 满值', hx('#DDE5DD'), page), ('tint2 满值', hx('#DCEBE1'), page),
+    ('outline@0.55', mix(hx('#DDE5DD'), page, .55), page),
+    ('深色 outlineSoft@0.22', mix(hx('#202D27'), dp, .22), dp), ('深色 outline 满值', hx('#2A3931'), dp),
+]:
+    print(f'{name}: #{"".join("%02X" % v for v in c)} dmax={dmax(c, ref)} ratio={ratio(c, ref):.3f}:1')
+PY
+```
+
+**这三行读数说明的事**：所有节点级、语义级判据（`SkeletonFamilyContractTest`、`ShimmerSpecContractTest`、
+`PrimaryTabSkeletonContractTest`、`LocalSubpageSkeletonContractTest`、各屏按 tag 的 connected 判据）都绿，
+只能证明「骨架被画了、形状对、读屏不念假数字」，**证不了「第一帧不再是空白」**。
+按实机像素，通栏骨架条与它下面的页底差 1 个通道级、卡内骨架条差 4 级、光带最多再加 3 级——人眼读作空白页；
+唯一看得见的是卡壳那 16 级。这与本仓立下的「图形/非文本对比 ≥3:1（WCAG 1.4.11）」尺度差了一个量级以上
+——口径落点 `docs/design/visual-style-guide.md` §对比度口径 与 `docs/superpowers/plans/2026-10-17-ui-redesign.md` 全局约束 7，
+同一判据由 `IconBadgeContrastContractTest` 按亮度当场复算。骨架与光带是否要受这条判据约束，本身也是待裁决项（见下）。
+**改色档（`outlineSoft@0.22f` → 哪一档、光带取色要不要从 `tint` 换成比容器亮的色）属版面裁决，本棒未动一行实现**，
+已作为待裁决项写进 `docs/handoff/2026-11-07-stage-5-ui-r2-c6-report.md` §5 与下面的目视清单。
+
+### 首帧耗时读数（`am start -W`，五轮，装包后首轮含 dexopt 已丢弃）
+
+```bash
+bash .git/qa-scratch/c6/firstframe.sh   # 读数落 .git/qa-scratch/c6/firstframe.txt
+```
+
+| 轮 | `TotalTime`（闪屏） | `Displayed .launch.BrandLaunchActivity` | `Displayed .MainActivity` |
+|---|---|---|---|
+| 1 | 2000 ms | +1s971ms | +930ms |
+| 2 | 1928 ms | +1s928ms | +699ms |
+| 3 | 1958 ms | +1s958ms | +701ms |
+| 4 | 2006 ms | +2s6ms | +675ms |
+| 5 | 1898 ms | +1s898ms | +705ms |
+
+- 与批 C-5 的接线后读数同向（MainActivity 出帧 716–854 ms），本轮没有新增生产改动，**不把它当成新的性能改进证据**。
+- **未测一项**：「首帧 → 今日计划可读」这段骨架时长。量它要在 `TodayPlanViewModel` 的 `Ready` 落点插临时桩再走一轮双构建；
+  `uiautomator dump` 在本 AVD 读不到 Compose `testTag`（resource-id 只有 `android:id/content` 一类），做不了旁路取证。
+  按决策册 §4「本批不承诺具体毫秒数」的口径如实标注未测，归入下面的目视清单。
+
+### connected 四格与「全量」这个词的口径（本轮把它钉死）
+
+批 B 那两格写作「全量」的 connected（`.git/qa-scratch/b-b3-compact-full-after.log` compact `Time: 406.62` /
+`…-wide-full-after.log` wide `Time: 437.893`，各 `OK (559 tests)`）**实测只含 `com.example.englishlearning.ui` 包**
+——wide 那枚日志干净，按类名数出 64 枚；compact 那枚被 NUL 打坏只剩 51 枚类名，所以枚数按 wide 侧读。
+本仓「双形态 connected」的既有口径就是 **UI 包全量**。这一点必须写下来，因为按字面「整个 androidTest」跑会出事：
+
+- 第一版脚本不带 `-e class/package`，跑整套件（本机 androidTest 共 113 枚类）。第 12 枚类
+  `core.storage.VocabularySearchGramIndexTest#realCorpusContainsResultsMatchTheFullTableScanExactly`
+  从设备时间 08:05:19 `started` 起 **13 分钟没有 `finished`**：该用例把 24MB 用户库整份拷进 cache、
+  逐行灌 gram 索引（`CursorWindow: Window is full` 三连），再对每枚 needle 跑一次整表 `LIKE`。
+  本轮人为中止（`shortMsg=Process crashed` / `INSTRUMENTATION_CODE: 0`），**这套件的中止不登记成全绿**，
+  也不登记成红——它是没跑完，不是跑失败。批 C 没动过 search/storage 那半边。
+- 第二版按 UI 包跑（`-e package com.example.englishlearning.ui`），与批 B 可比，读数见下表。
+- **`wm size` / `wm density` 的 `Override` 行是第二行**，`head -1` 会把它吞掉：于是「compact 腿」的表头看着干净，
+  设备其实还带着上一腿的平板档 override。第二版打印两行，并在 compact 腿前加「override 残留即中止」护栏。
+  另外本 AVD 把 `wm size 2560x1600` **夹到 2160x1600**（实测），sw 仍落在宽档，登记按夹后值。
+- **设备前置缺失，非本批回归**：`/data/local/tmp/qa-b1-package.zip` 与 `qa-b1-code.txt` 不在设备上
+  （`/data/local/tmp` 只作临时输入通道，按红线清掉），故整套件里的 `DevicePairedRestoreE2ETest` 两条
+  必红 `FileNotFoundException`——与前例同形状，见 `docs/handoff/2026-11-03-duplication-consolidation-report.md` §3.3。
+
+| 腿 | 造法 | 结果 | 日志（gitignored） |
+|---|---|---|---|
+| compact UI 全量 | `-e package com.example.englishlearning.ui`，`1080x1920 @420` 无 Override，`font_scale=1.0` | `Time: 506.052` `OK (588 tests)`（墙钟 509s） | `.git/qa-scratch/c6/c6-compact-ui-full.log` |
+| wide UI 全量 | 同上，`Override size: 2160x1600` / `Override density: 320`，`font_scale=1.0` | `Time: 662.658` `OK (588 tests)`（墙钟 665s） | `.git/qa-scratch/c6/c6-wide-ui-full.log` |
+| wide 大字号 | `AppScreenHeaderTest`+`NotConfiguredCardTest`+`AppScreenOverlayContainerTest`，平板档 + `font_scale=2.0` | `Time: 22.735` `OK (13 tests)` | `.git/qa-scratch/c6/c6-wide-fontscale2.log` |
+| compact 大字号 | 同上三枚类，`1080x1920 @420` + `font_scale=2.0` | `Time: 23.118` `OK (13 tests)` | `.git/qa-scratch/c6/c6-compact-fontscale2.log` |
+
+收尾复原：`Physical size: 1080x1920` / `Physical density: 420` / `font_scale=1.0` / `animator_duration_scale=1.0`。
+取证类 `SkeletonShimmerEvidenceTest` 的 7 枚规格就在两枚全量腿里各跑一遍（7 点），截图册与 connected 判据同源。
+**588 vs 批 B 的 559 差 +29 枚，未逐条对齐**：本轮 `ui` 包源码 66 枚测试文件（`ReminderSettingsScreenTest.kt`
+内含 `ReminderTest` / `FlakyReminderTest` 两枚嵌套类，故按类名数是 68），批 B 那枚 wide 日志按同法数出 64 枚类名；
+可直接点名的新增只有批 C-4b 的 `RequestInProgressEvidenceTest`（6 条）与本批的 `SkeletonShimmerEvidenceTest`（7 条），
+剩下 16 条落在各批既有 UI 类新增的方法上，本轮没逐枚核。批 B 的 compact 日志被 NUL 打坏（4272 字节 / 927 枚 NUL），
+只数出 51 枚类名——所以「UI 包口径」这条推断不能只靠它，wide 那枚是干净的。
+
+### 待用户目视 / 待裁决（在 C-5 累计清单之上追加）
+
+- **【已拍板 2026-11-07】骨架与光带的色档**：现值在实机像素上差 1–4 级，读作空白页。要么把填充提到 `outline` / `tint2` 一档
+  （1.11–1.16:1，与卡壳同强），要么承认骨架只做「形状预留」而不做「可见占位」并改口径——**这两条都得用户说哪一条**，
+  本棒不替人眼也不替设计拍板。
+  → 用户裁决 **「提到可见档」**：填充提到 `outline` / `tint2` 一档、光带取色改为比容器**更亮**，
+  执行归批 C-7（本轮零生产改动不动一行色档）；`ShimmerSpec.peakAlpha` 与骨架 alpha 同处复核，深浅两档重拍截图册。
+- shimmer 在白色卡面上是把光带画成**更暗**的一条（`tint #E8F2EA` 压 `#FFFFFF`），不是提亮；观感是否接受归目视。
+  → 同上，随批 C-7 的「光带比容器亮」改法一并消解。
+- 深色档的骨架对比度只有算式核对（1.048:1），本轮未拍深色截图册；若色档改了，深浅两档都要重拍。
+
