@@ -127,7 +127,7 @@
 | 34 | `Settings` | `showSettings` | 2020 | — |
 
 tab 宿主（今天的 `} else {`，`AppScreen.kt:2026`）不是 route，用 `null` 表示，`AppOverlayRouteResolver.TAB_HOST_INDEX = 35`。
-表里 35 行由 D-1 的两条闸（route 枚数 == 35、每枚 route 在 `AppScreen.kt` 恰好一个 `is` 消费点）与 D-3 的站点数闸共同钉住，不靠人工核对。
+表里 35 行由 D-2 Step 1 的两条闸（route 枚数 == 35、每枚 route 在 `AppScreen.kt` 恰好一个 `is` 消费点）与 D-3 的站点数闸共同钉住，不靠人工核对。
 
 ---
 
@@ -142,7 +142,7 @@ tab 宿主（今天的 `} else {`，`AppScreen.kt:2026`）不是 route，用 `nu
 - Test: `app/src/test/java/com/example/englishlearning/ui/ScreenTransitionDirectionTest.kt`
 
 **Interfaces:**
-- Consumes: 同包既有类型 `WordCard`（`learning.domain.WordCard`）、`TodayPlanUiState`（`ui/TodayPlanViewModel.kt:60`）、`ReadingTarget`（`ui/ReadingAccessViewModel.kt:81`，同包无需 import）、`Article`（`reading.domain.Article`）、`AiFeature`（`ai.domain.AiFeature`）、`AppTab`（`ui/AppTab.kt:18`，ordinal 序 LEARNING/READING/AI/PROFILE）。
+- Consumes: 同包既有类型 `WordCard`（`learning.domain.WordCard`）、`TodayPlanUiState`（`ui/TodayPlanViewModel.kt:60`）、`ReadingTarget`（`ui/ReadingAccessViewModel.kt:81`，同包无需 import）、`Article`（`reading.domain.Article`）、`AiFeature`（`ui/AiFeature.kt:32`，同包无需 import——**批 D-1 实测勘误**：本仓只有这一枚 `AiFeature`，`ai/domain/` 下没有它）、`AppTab`（`ui/AppTab.kt:18`，ordinal 序 LEARNING/READING/AI/PROFILE）。
 - Produces（D-2/D-3 逐字按此签名消费，不得改名）：
   - `sealed interface AppOverlayRoute { val mountIndex: Int }` + 上表 35 枚变体
   - `data class AppMountFlags(... 35 枚入参，全部带默认值 ...)`
@@ -157,7 +157,6 @@ tab 宿主（今天的 `} else {`，`AppScreen.kt:2026`）不是 route，用 `nu
 ```kotlin
 package com.example.englishlearning.ui
 
-import com.example.englishlearning.ai.domain.AiFeature
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.reading.domain.Article
 import kotlin.test.Test
@@ -374,7 +373,6 @@ Expected: 编译失败 `Unresolved reference: AppOverlayRoute` 一类——**必
 ```kotlin
 package com.example.englishlearning.ui
 
-import com.example.englishlearning.ai.domain.AiFeature
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.reading.domain.Article
 
@@ -440,7 +438,6 @@ sealed interface AppOverlayRoute {
 ```kotlin
 package com.example.englishlearning.ui
 
-import com.example.englishlearning.ai.domain.AiFeature
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.reading.domain.Article
 
@@ -494,8 +491,6 @@ data class AppMountFlags(
 
 ```kotlin
 package com.example.englishlearning.ui
-
-import com.example.englishlearning.ai.domain.AiFeature
 
 /**
  * 挂载权威：`AppMountFlags` → 当前该挂的那一支全屏覆盖层（`null` = tab 宿主）。
@@ -624,21 +619,34 @@ private const val RESOLVER_SOURCE_PATH = "src/main/java/com/example/englishlearn
 private const val OVERLAY_ROUTE_COUNT = 35
 ```
 
-两条判据（都要先看红）：
-1. `chainHasNoMountLevelFlagConditionsAnymore`：`AppScreen.kt` 剥注释后不得再出现
-   Regex `"""\b\} else if \((?:show[A-Z]\w*|selected[A-Z]\w* \!= null|setupRequired)"""` 之类的**挂载级**原判据
-   （即链上必须只剩 `is AppOverlayRoute.`，一处原标志位判定都不许留）。
+三条判据（都要先看红）：
+1. `chainHasNoMountLevelFlagConditionsAnymore`：**正向白名单扫描**，不许抄负则。
+   取链区（D-2 之后仍是 `AppScreen.kt` 里那段唯一的 `if / else if` 挂载链）顶层每一条 `if (` 与 `} else if (`
+   的**条件文本**，逐条断言它含 `route is AppOverlayRoute.` 或 `route == null`，否则判红并列出残留行。
+   为什么不用负则：原判据 35 支里有 4 支的条件文字（`selectedFeature == AiFeature.X` 三支 +
+   `readingTarget != null || historyArticle != null`）落在
+   `"""\} else if \((?:show[A-Z]\w*|selected[A-Z]\w* \!= null|setupRequired)"""` 这类模式之外——
+   按负则写闸，这 4 支残留会静默过关，正是批 A 纪律里「反空转」要防的形状。
    已知豁免名单**只有一条**且必须写明理由：`AppScreen.kt:580`–`584` 的 `overlayOpen`——
    它是「有覆盖层标志位亮着」（含两枚不在链上的页内浮层位 `selectedArticleCard` / `showWordQaCard`，
    且不含 `&& todayReady != null` 那类守卫），消费者是 :587 的 `BackHandler`，与「挂载了哪一支」是两个不同问题
-   （决策 §1.3-1）。名单按文件名 + 行区间钉死，超出一律判红。
+   （决策 §1.3-1）。它本来不是 `} else if` 条件行，正向扫描天然不命中；名单仍按文件名 + 行区间钉死，
+   超出一律判红。**不许**顺手把 `overlayOpen` 改成 `route != null`。
 2. `everyRouteVariantIsConsumedByExactlyOneBranch`：从 `AppOverlayRoute.kt` 解析出 35 个变体名，
    每个在 `AppScreen.kt` 剥注释后恰好出现一次 `is AppOverlayRoute.<Name>`；
    枚数 != `OVERLAY_ROUTE_COUNT` 直接报「route 表被改而本契约未同步」（反空转：解析到 0 枚必须判红）。
+3. `chainBranchOrderEqualsResolverArmOrder`：把链区按出现顺序取出的 35 枚 `is AppOverlayRoute.<Name>`
+   末支再补 `route == null`，与 `AppOverlayRouteResolver.kt` 里 `when` 分支的 route 名顺序**逐行相等**
+   （且等价于 `mountIndex` 0..34 的升序）。
+   为什么必须有：D-2 之后链上的原判据文字下线，「链的顺序 = resolver 的顺序」只剩人工核对；
+   而链的声明序就是 z 序与返回键优先级（QA3 A1 的许可/关于就是这条），重排链 = 改产品行为。
+   D-1 的表驱动测试钉的是 resolver 内部序号，钉不住链与 resolver 是否同序——
+   `selectedFeature` 那三支（24/25/26）取值互斥、flags 层面看不出先后，正是这条补的空位。
 
 - [ ] **Step 2：跑 RED**
   `"$GRADLE" :app:testDebugUnitTest --rerun-tasks --tests "*ScreenTransitionContractTest"`
-  Expected: 两条都红——①「链上仍残留 34 枚原判据」，②「`is AppOverlayRoute.` 出现 0 次」。
+  Expected: 三条都红——①「链上仍残留 35 枚挂载级原判据（列出前若干行）」，②「`is AppOverlayRoute.` 出现 0 次」，
+  ③「链上取到 0 支，与 resolver 的 35 支不同序」。
 
 - [ ] **Step 3：链头接线**（在 `AppScreen.kt` 原 727 行 `BackHandler(enabled = selectedFeatureKey != null) { … }` 之后、728 行之前插入）
 
