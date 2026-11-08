@@ -1309,6 +1309,75 @@ private fun TabLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
 - [ ] **Step 7：secret-scan** `scripts/secret-scan.sh` exit 0。
 - [ ] **Step 8：报告七节** → 分功能域提交 → **推送请示**（用户点头后才 `git -c credential.interactive=false push origin stage-5-ui-r2-learning-path`，并 `ls-remote` 对 `rev-parse` 核验，远端 tip 回填报告 §4）。
 
+#### D-4 终评补口（批 D 整批评审的裁定；先改 Spec 口径，再动代码）
+
+整批评审（`b075060..1a31534`）判「With fixes」：1 Critical + 6 Important + 5 Minor。逐条裁定如下，
+其中第 1、2、3 条要**先改 Spec 05 F5-06 与决策文档的口径再实施**（AGENTS.md：范围变化先改规格）。
+分两席顺序做：**席 A 只改文档口径**（1/2/3/6 的 Spec、决策、矩阵、报告部分，零代码），
+**席 B 按 A 定稿的口径做代码与测试**（1/2/3/4/5/7），一席做完再派下一席（两席都会碰 `ScreenTransitionContractTest`，不许并行）。
+
+1. **Critical：链声明序是「优先级」不是「层深」，阅读档与学习档四条边因此把前进播成返回。**
+   实测证据（控制器复核过）：`AppOverlayRouteResolver.kt` 的臂序为 ReadingHistory=29（`:45`）、ReadingFeed=30（`:46`）、
+   ArticleImport=31（`:47`）、ArticleReading=32（`:48`），而 LearningSetup=7（`:23`）、LearningFlow=8（`:24`）；
+   `AppScreen.kt:1865` 的 `onOpenArticle = { historyArticle = it }` 在 `showReadingHistory` 仍为真时把 route 从 29 换到 32，
+   `ScreenTransitionDirection.kt:17` 因此判 Backward，`AppTransition.kt:35` 让新屏**从左侧进**——用户点开的是一篇文章，
+   动画说的是「你返回了」。这与 Spec 05 line 55 的口径假设（声明顺序就是层深）以及 `AppOverlayRoute.kt:9-11` 的
+   KDoc 承诺直接冲突，也是 Spec 05 line 54「判据只搬不译」这条纪律的代价：**搬过来的顺序保住了 z 序与返回键优先级，
+   却把 fall-through 守卫造成的「后声明反而更深」一起搬进了方向判据**。
+   裁定：**不重排链、不改守卫**（顺序就是产品承诺），改为在同一张 route 表上增设
+   `transitionDepth: Int`，默认 `= mountIndex`，只在**有点名 from→to 边证据**的支上覆写；
+   `ScreenTransitionDirectionPolicy.overlay` 改比 `transitionDepth`，`mountIndex` 继续只承担挂载/返回键语义。
+   配套纪律：每条覆写必须在 `ScreenTransitionDirectionTest` 有一条命名边的方向用例，
+   `ScreenTransitionContractTest` 新增判据钉「覆写清单 == 用例清单」（多一条覆写少一条用例即判红），
+   并新增一条「`transitionDepth` 默认等于 `mountIndex`、覆写只能出现在清单里」的守卫；
+   Spec 05 line 55 与 `AppOverlayRoute.kt:9-11` 的「不需要第二张深度表」按此改写为
+   「层深与优先级分列于同一张 route 表，不另建第二张手工表」。
+   待覆写边以**实测**为准，不许凭直觉列：至少含 29→32、30→32、31→32、7→8 四对，
+   实施席须逐对找到发起点行号（照 `:1865` 的做法）后才写进表。
+2. **Important：payload 携带实时派生数据 ⇒ 一次数据刷新被 `AnimatedContent` 读成一次导航。**
+   `AppOverlayRoute.kt:31/32` 的 `ReviewQueue(plan)` / `TodayWordList(plan)` 直接把 `TodayPlanUiState.Ready` 冻进 route
+   （来源 `AppScreen.kt:397` `todayReady = todayState as? Ready`），而 `Ready` 含 `newDone`/`dueDone`/卡面；
+   route 是 data class，所以**每提交一次三档反馈**都造出一枚不等的 route ⇒ 起一轮新转场
+   （同序号 ⇒ Crossfade）⇒ 该腿重新组合、屏内 `remember` 态清零、首帧效果重跑。词卡类 payload（`:20/22/23/24`）同理。
+   裁定：给 route 增设 `navigationIdentity`（每支的**稳定身份**，剥掉易变进度字段），
+   站 1 用 `AnimatedContent(contentKey = { it?.navigationIdentity })`，把「用户换了一屏」与「同一屏的数据变了」分开。
+   **先红后绿**：失败用例 = 挂着 ReviewQueue 推一份只改 `newDone` 的 `Ready`，断言转场腿数仍为 1 且屏内 `remember` 态存活；
+   若实测发现「同 key 换值」Compose 不把新值送进 content lambda，回退方案 = payload 只装身份、渲染腿按现行口径读实时 VM，
+   并把这一取舍写进决策文档（不许悄悄改成「什么都不做」）。
+   Spec 05 line 55 的「同层互换只做淡入淡出」在新口径下只对**身份不同**的同支互换生效，措辞随第 1 条一并改。
+3. **Important：冻结口径只兑现了挂载半边，渲染半边 27/35 腿仍读实时 VM。**
+   Spec 05 line 54 的字面要求是「屏渲染只认解析结果携带的值」，批 D 实际做到的是「挂载只认解析结果」；
+   最尖锐的一处是 `ArticleReading` 腿渲染读共享 VM（`AppScreen.kt:1911-1917`）而 `route.historyArticle` 无人读，
+   被 `ScreenTransitionContractTest.kt:788` 的 `KNOWN_UNREAD_PAYLOAD_FIELDS` 登记成「已知未读」。
+   裁定：本批**不**把 35 支的渲染输入全数搬进 payload（范围与风险都超出批 D），但「冻了却没人读」不接受——
+   二选一：要么 ArticleReading 腿的正文渲染改读 `route.historyArticle`，要么把 `historyArticle` 从 payload 摘掉、
+   `fromHistory` 判据由 `readingTarget == null` 单独承担并删掉该登记项。同时决策文档把「冻结值」的适用范围
+   写死为「挂载判据 + 已点名携带的 payload 字段」，Spec 05 line 54 末句按此收窄措辞，
+   `KNOWN_UNREAD_PAYLOAD_FIELDS` 判据继续钉住「不得新增冻了不读的子」。
+4. **Important：F5-06 的 AI 出站半边结构性没有靶面**（`ScreenTransitionInstrumentedTest.kt:198-202` 断的恒为 0）。
+   裁定：不再往仪器化上加码，改立**闭集源码闸**——照 `StartupPrefetchLoadPointContractTest` 的形，
+   枚举两站腿体内「组合即发起出站/发音」的发起点（今日为 `pronunciationProvider?.speakWord` / `speakSentence`，
+   以实测计数为准），清单外多一枚即判红。
+5. **Important：无障碍断言只覆盖站 2。** `TabLeg` 已带状态 tag，`OverlayLeg` 仍是不区分离场腿的同一枚 tag，
+   所以 35 支子页的「离场屏对 TalkBack 不可见」没有任何测试钉着。裁定：`OverlayLeg` tag 补状态后缀，
+   connected 用例断言隐藏子树是**离场那一支自己的** tag；报告 §5(a) 的真机目视按 D-4 Step 5 恢复成全量五条
+   （TalkBack 是否只读一屏 / 转场跟不跟手 / 底栏随旧屏滑出 / 中途连点连按返回 / `clip` 贴边裁切），
+   并把第 1 条的 29→32 复现步骤（阅读历史点开一篇文章，新屏应从右进）列为第一条目视项。
+6. **Important：矩阵 AC5-07 行的两处措辞超出证据。**（a）「挂载层唯一性结构断言」实为
+   `chainScan` 主缩进启发 + `is AppOverlayRoute.` == 35，按实际形态改写；
+   （b）「顶档 3.0 字号在动画结束后逐字复现」在本批证据里跑过的是 `font_scale=1.0`
+   （`task-D4a-report.md` / `task-D4b-report.md` 逐处可查）——要么补一次 `font_scale=3.0` 的 connected 读数再保留该句，
+   要么把该行措辞降为「按推理（转场只走 graphicsLayer 平移）不改测量与布局，顶档字号未实测」。**二选一，不许含糊**。
+7. **Minor 批量**（一并做掉，不单独派席）：`MOUNT_CONDITION_EXEMPTIONS` 与其 `isExempted` 是死代码且 KDoc 行号过期；
+   `overlay_transition_leg` 在 overlap 窗口内同名两枚，`OverlayLeg` 上补一行 KDoc 警示；
+   Spec 05 line 58 只写了底栏、未写侧栏（Wide 下 `AppSideNav` 在站 2 退场腿里同样会滑出），补一句口径；
+   `AppTransition.kt:14` 的 theme→ui 反向 import 维持批 D 冲突扫描 #11 的裁定，在文件注释里留退路记录；
+   `AppScreen.kt:1293` 那条注释在闸后变乐观（退场腿被闸时 `consumeShareRequest()` 一并跳过，
+   待发分享请求会活到下次挂载）——按现行行为改写注释，不改行为。
+
+**验收**：席 B 收口 = 门禁三连全绿（JVM 只增不减）+ 受影响 connected 类在 emulator-5554 复跑 +
+`git diff -w` 复核 + 一次 scoped 复评。**仍不合 main、不推送**；真机目视与推送请示交回用户。
+
 ## 台账
 
 进度与裁定记在 `.superpowers/sdd/2026-11-06-motion-and-adaptive/progress.md`（gitignored，接手先读它）；证据表续写 `docs/verification/ui-redesign-2026-10.md`；截图与日志一律落 `.git/qa-scratch/`，不入库。
