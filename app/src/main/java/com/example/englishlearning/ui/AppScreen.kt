@@ -783,1230 +783,180 @@ fun AppScreen(
                 },
             ) { route ->
                 OverlayLeg(route == overlayRoute) {
-            if (route is AppOverlayRoute.VocabularyDetail) {
-                val card = route.card
-                LaunchedEffect(card.cardId) {
-                    val cardSnapshot = card
-                    val request = ++searchPronunciationRequest
-                    searchPronunciationJob?.cancel()
-                    searchPronunciationMessage = PronunciationStatus.Playing
-                    searchPronunciationJob = launch {
-                        val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
-                        if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
-                            searchPronunciationMessage = result
-                        }
-                    }
-                }
-                // 「下一个」只能沿**打开详情的那份列表**推进：用来源枚举选列表，
-                // 而不是让所有来源共用一份判断。不同来源的结果集不同，
-                // 复用同一段判断会让「下一个」悄悄跳到另一份列表里去。
-                val globalSearchResults = (globalSearchState as? GlobalVocabularySearchUiState.Ready)?.results.orEmpty()
-                val nextFromSource: (() -> Unit)? = when (detailSource) {
-                    DetailSource.VOCABULARY ->
-                        nextAfter(vocabularyCards) { it.cardId == card.cardId }
-                            ?.let { next -> { selectedSearchCard = next } }
-                    // 全量查词的下一张同样要走回源：索引里没有可渲染的完整卡片。
-                    DetailSource.GLOBAL_SEARCH ->
-                        nextAfter(globalSearchResults) { it.result.cardId == card.cardId }
-                            ?.let { next -> { globalVocabularySearchViewModel?.open(next.result) } }
-                    // 批 1 Task 16：「今日词单」点开的那一枚，「下一个」沿**该屏的呈现序**推进
-                    // （新学段在前、复习段在后，与词单屏两节的上下次序逐字一致），
-                    // 不借用生词本 / 词书那两份列表。
-                    DetailSource.TODAY_QUEUE ->
-                        nextAfter(todayReady?.newQueue.orEmpty() + todayReady?.dueQueue.orEmpty()) { it.cardId == card.cardId }
-                            ?.let { next -> { selectedSearchCard = next } }
-                    else -> null
-                }
-                CardDetailScreen(
-                    card = card,
-                    onBack = closeSearchDetail,
-                    onRelearn = {
-                        selectedRelearnCard = card
-                        vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
-                    },
-                    onNext = nextFromSource,
-                    onSpeak = {
-                        val cardSnapshot = card
-                        val request = ++searchPronunciationRequest
-                        searchPronunciationJob?.cancel()
-                        searchPronunciationMessage = PronunciationStatus.Playing
-                        searchPronunciationJob = pronunciationScope.launch {
-                            val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
-                            if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
-                                searchPronunciationMessage = result
-                            }
-                        }
-                    },
-                    onSpeakBritish = {
-                        val cardSnapshot = card
-                        val request = ++searchPronunciationRequest
-                        searchPronunciationJob?.cancel()
-                        searchPronunciationMessage = PronunciationStatus.Playing
-                        searchPronunciationJob = pronunciationScope.launch {
-                            val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
-                            if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
-                                searchPronunciationMessage = result
-                            }
-                        }
-                    },
-                    pronunciationStatus = searchPronunciationMessage,
-                    notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
-                    onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
-                    onDeleteNote = { wordQaViewModel?.deleteNote(it) },
-                    personalNoteSaveStatus = personalNoteSaveStatus,
-                    vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
-                    onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
-                    favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
-                    onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
-                    onAskAi = null,
-                )
-            } else if (route is AppOverlayRoute.GlobalSearch) {
-                val globalSearch = globalVocabularySearchViewModel
-                GlobalVocabularySearchScreen(
-                    state = globalSearchState,
-                    query = globalSearchQuery,
-                    onQueryChange = { globalSearch?.updateQuery(it) },
-                    onSubmit = { globalSearch?.search() },
-                    onRetry = { globalSearch?.retry() },
-                    onClearHistory = { globalSearch?.requestClearHistory() },
-                    onOpenHistory = { query ->
-                        globalSearch?.updateQuery(query)
-                        globalSearch?.search()
-                    },
-                    // 索引只提供结果列表要显示的列，这里不做「把摘要当卡片」的事：
-                    // 交给 ViewModel 按 cardId 回源取完整词卡，取到后再由下面的
-                    // LaunchedEffect 打开详情。
-                    onSelect = { result -> globalSearch?.open(result) },
-                    onBack = { showGlobalVocabularySearch = false },
-                )
-                // F4-01 Spec L18：清空搜索历史=不可逆操作，先报级联条数再二次确认；
-                // 「清空搜索历史」按钮只做 request，仓储 clear 只从「确认清空」进入。
-                val pendingClear = globalSearch?.pendingClear?.collectAsState()?.value
-                pendingClear?.let { pending ->
-                    ConfirmDestructiveDialog(
-                        state = true,
-                        title = "清空搜索历史？",
-                        cascadeLines = listOf(
-                            if (pending.recordCount != null) {
-                                "将删除本机全部 ${pending.recordCount} 条搜索记录。"
-                            } else {
-                                "将删除本机全部搜索记录（暂时读不到具体条数）。"
-                            },
-                        ),
-                        // 保留面逐字沿用站点原文；「不可撤销」声明交组件固定句承载（AGENTS.md 业务规则）。
-                        keepLines = listOf("收藏、文章与学习记录不受影响。"),
-                        irreversible = true,
-                        confirmLabel = "确认清空",
-                        onConfirm = { globalSearch?.clearHistory() },
-                        onDismiss = { globalSearch?.cancelClearHistory() },
-                    )
-                }
-            } else if (route is AppOverlayRoute.RelearnCard) {
-                val card = route.card
-                VocabularyRelearnScreen(
-                    state = vocabularyRelearnViewModel?.state?.collectAsState()?.value
-                        ?: VocabularyRelearnUiState.Idle,
-                    onSubmit = { vocabularyRelearnViewModel?.submit(it) },
-                    onRetry = { vocabularyRelearnViewModel?.loadCard(state.profile.id, card) },
-                    onBack = {
-                        selectedRelearnCard = null
-                        vocabularyRelearnViewModel?.load(state.profile.id, todayReady?.activeWordBookId)
-                    },
-                )
-            } else if (route is AppOverlayRoute.LearningRecordDetail) {
-                val card = route.card
-                // 发音只由用户点击触发：打开学习记录详情不自动发音。
-                // （2bff744 曾在此自动 speak(lemma)，与 onSpeak 叠加成两次调用，
-                //   learningRecordDetailPronunciationRoutesTheHeldLemmaToTheProvider 断言
-                //   spokenTexts 恰为一次点击的结果，据此还原为用户触发的唯一路径。）
-                CardDetailScreen(
-                    card = card,
-                    onRelearn = {
-                        selectedRelearnCard = card
-                        vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
-                    },
-                    onNext = recordCards.indexOfFirst { it.cardId == card.cardId }
-                        .takeIf { it >= 0 && it + 1 < recordCards.size }
-                        ?.let { index -> {
-                            selectedLearningRecordCard = recordCards[index + 1]
-                            detailPronunciationRequest++
-                            detailPronunciationMessage = PronunciationStatus.Idle
-                        } },
-                    onBack = {
-                        selectedLearningRecordCard = null
-                        detailPronunciationMessage = PronunciationStatus.Idle
-                        detailPronunciationRequest++
-                        learningRecordPronunciationRequest++
-                        learningRecordsViewModel?.clearDetail()
-                    },
-                    onSpeak = {
-                        val cardSnapshot = card
-                        val request = ++learningRecordPronunciationRequest
-                        detailPronunciationMessage = PronunciationStatus.Playing
-                        pronunciationScope.launch {
-                            val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
-                            if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
-                                detailPronunciationMessage = result
-                            }
-                        }
-                    },
-                    onSpeakBritish = {
-                        val cardSnapshot = card
-                        val request = ++learningRecordPronunciationRequest
-                        detailPronunciationMessage = PronunciationStatus.Playing
-                        pronunciationScope.launch {
-                            val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
-                            if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
-                                detailPronunciationMessage = result
-                            }
-                        }
-                    },
-                    pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
-                    pronunciationControlsEnabled = true,
-                    pauseResumeSupported = pauseResumeSupported,
-                    // 暂停/继续**不**自增代次：暂停不改变这一次发声的归属（裁决 B3）。
-                    onPauseResume = {
-                        val held = detailPronunciationMessage
-                        val next = when {
-                            held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
-                            held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                            // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
-                            // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
-                            else -> held
-                        }
-                        detailPronunciationMessage = next
-                    },
-                    // 停止：先自增**本宿主发声结果所用的**代次（这里是 learningRecordPronunciationRequest，
-                    // 详情三宿主各用自己的守卫计数器），再 stopPlayback()，然后直接置空闲（裁决 B3）。
-                    onStopPronunciation = {
-                        learningRecordPronunciationRequest++
-                        pronunciationProvider?.stopPlayback()
-                        detailPronunciationMessage = PronunciationStatus.Idle
-                    },
-                    notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
-                    onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
-                    onDeleteNote = { wordQaViewModel?.deleteNote(it) },
-                    personalNoteSaveStatus = personalNoteSaveStatus,
-                    vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
-                    onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
-                    favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
-                    onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
-                )
-            } else if (route is AppOverlayRoute.FavoriteDetail) {
-                val card = route.card
-                // 收藏详情与学习记录详情同一 UI-only 模式：发音只由用户点击触发；
-                // 请求序号 + 卡引用双重守卫，防止跨页竞态把旧结果写进当前状态。
-                CardDetailScreen(
-                    card = card,
-                    onRelearn = {
-                        selectedRelearnCard = card
-                        vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
-                    },
-                    onBack = {
-                        selectedFavoriteCard = null
-                        favoritesPronunciationMessage = PronunciationStatus.Idle
-                        favoritesPronunciationRequest++
-                    },
-                    onSpeak = {
-                        val cardSnapshot = card
-                        val request = ++favoritesPronunciationRequest
-                        favoritesPronunciationMessage = PronunciationStatus.Playing
-                        pronunciationScope.launch {
-                            val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
-                            if (request == favoritesPronunciationRequest && selectedFavoriteCard === cardSnapshot) {
-                                favoritesPronunciationMessage = result
-                            }
-                        }
-                    },
-                    onSpeakBritish = {
-                        val cardSnapshot = card
-                        val request = ++favoritesPronunciationRequest
-                        favoritesPronunciationMessage = PronunciationStatus.Playing
-                        pronunciationScope.launch {
-                            val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
-                            if (request == favoritesPronunciationRequest && selectedFavoriteCard === cardSnapshot) {
-                                favoritesPronunciationMessage = result
-                            }
-                        }
-                    },
-                    pronunciationStatus = favoritesPronunciationMessage,
-                    notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
-                    onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
-                    onDeleteNote = { wordQaViewModel?.deleteNote(it) },
-                    personalNoteSaveStatus = personalNoteSaveStatus,
-                    vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
-                    onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
-                    favoritePresent = true,
-                    onToggleFavorite = { favoritesViewModel?.toggle(card.cardId, card.wordBookId, card.lemma) },
-                )
-            } else if (route is AppOverlayRoute.VocabularyRelearnList) {
-                val relearnState by vocabularyRelearnViewModel?.state?.collectAsState() ?: remember { mutableStateOf<VocabularyRelearnUiState>(VocabularyRelearnUiState.Idle) }
-                VocabularyRelearnScreen(
-                    state = relearnState,
-                    onSubmit = { vocabularyRelearnViewModel?.submit(it) },
-                    onRetry = { vocabularyRelearnViewModel?.load(state.profile.id, todayReady?.activeWordBookId) },
-                    onBack = {
-                        showVocabularyRelearn = false
-                        vocabularyViewModel?.load(state.profile.id)
-                    },
-                )
-            } else if (route is AppOverlayRoute.LearningRecords) {
-                LearningRecordsScreen(
-                    state = learningRecordsState,
-                    onBack = { showLearningRecords = false },
-                    onSelectTab = { learningRecordsViewModel?.selectTab(it) },
-                    onRetry = { learningRecordsViewModel?.retry() },
-                    onOpenRecord = {
-                        learningRecordsViewModel?.openRow(it)
-                        detailPronunciationMessage = PronunciationStatus.Idle
-                        learningRecordPronunciationRequest++
-                        detailSource = DetailSource.RECORDS
-                        selectedLearningRecordCard = it.wordCard
-                    },
-                )
-            } else if (route is AppOverlayRoute.LearningSetup) {
-                LearningSetupScreen(
-                    profileId = state.profile.id,
-                    viewModel = learningSetupViewModel,
-                    onSaved = {
-                        showSetup = false
-                        todayPlanViewModel.load(state.profile.id)
-                    },
-                    onCancel = cancelSetup,
-                )
-            } else if (route is AppOverlayRoute.LearningFlow) {
-                val cardState by wordCardViewModel.uiState.collectAsState()
-                val pronunciationScope = rememberCoroutineScope()
-                val detailCard by wordCardViewModel.detailCard.collectAsState()
-                LaunchedEffect(detailCard) {
-                    detailCard?.let { vocabularyViewModel?.loadMembership(state.profile.id, it) }
-                }
-                // The detail page is an overlay inside the learning branch: it leaves the
-                // showLearning state machine untouched, and returning from it (clearDetail) drops
-                // the user back onto the same card / normal learning state.
-                Box(modifier = Modifier.fillMaxSize()) {
-                    // 学习时自动发音（D1，docs/decisions/2026-10-06-auto-pronunciation-and-wordbook-words.md）：
-                    // 词卡就绪自动朗读一次，受语音设置开关控制（默认开）；与用户点击 onSpeak
-                    // 共存互不取消——就绪自动 1 次 + 点击 = 2 次是合法序列。浏览场景（详情/词书/
-                    // 记录/阅读）一律不自动发音，维持批次 5/6 的用户触发唯一契约。
-                    val autoSpeakOnCardReady = speechSettingsViewModel?.state?.collectAsState()?.value?.autoSpeakOnCardReady ?: true
-                    LaunchedEffect((cardState as? WordCardUiState.Ready)?.card?.cardId) {
-                        val card = (cardState as? WordCardUiState.Ready)?.card ?: return@LaunchedEffect
-                        if (!autoSpeakOnCardReady) return@LaunchedEffect
-                        val request = ++wordCardPronunciationRequest
-                        wordCardPronunciationStatus = PronunciationStatus.Playing
-                        wordCardPronunciationMessage = PronunciationStatus.Playing.message()
-                        // 状态与文案同源于一个局部 val：链式 .message() 会让「呈现的文案」与
-                        // 「播控组的呈现状态」两次求值，两者一旦分叉按钮组就和文字说不上话。
-                        val resultStatus = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, entity = PronunciationEntityRef.wordCard(card.cardId)))
-                        if (request == wordCardPronunciationRequest) {
-                            wordCardPronunciationStatus = resultStatus
-                            wordCardPronunciationMessage = resultStatus.message()
-                        }
-                    }
-                    if (cardState is WordCardUiState.AllDone) {
-                        // 批 1 Task 18（新建屏 sSummary；原型 `app.js:1688` / `:1701` 末卡推进 → `go('learn-summary')`）：
-                        // 本轮最后一张卡提交完、按「完成本轮」之后，画面交给「今日完成」而不是词卡屏——
-                        // 原型在这条路径上画的是收尾屏，不是「词卡都提交完了」那一行字。
-                        // 三个要件：
-                        //  - **不新增导航状态位**：收尾屏挂在既有的 `showLearning` 分支里、按 `AllDone` 分派，
-                        //    所以系统返回键仍由 `BackHandler(enabled = showLearning)` 那一条接管，`overlayOpen`
-                        //    也不必再改；
-                        //  - **三枚「退出」出口同一条 `exitLearning`**：页头 ← / 页头「完成」/ 吸底「回到今日」在原型里
-                        //    都是 `data-to="learn-home"`，这里复用同一枚退出通路（回今日学习并重算计划），
-                        //    不另写一份「只关浮层不重算」的半边退出；第四枚「去读今日文章」走 §1-B 的
-                        //    `openTodayArticleFromSummary`（先退学习流，再按真值直达文章或落阅读首页），
-                        //    不再无条件切 tab；
-                        //  - **收尾屏不碰播放器**：换成这一屏时 `WordCardScreen` 自己离开组合，F5-03 的退出停播
-                        //    守卫照常把停播恰好委托给宿主一次（`AppScreenTest` / `WordCardScreenTest` 钉着计数）。
-                        // `dateLabel` 只在计划快照就绪时给；没就绪就传 null，屏侧 `.eyebrow` 整行不进组合。
-                        val done = cardState as WordCardUiState.AllDone
-                        TodaySummaryScreen(
-                            state = done,
-                            dateLabel = todayReady?.localDateLabel,
-                            articleRead = todayArticleRead,
-                            onBack = exitLearning,
-                            onDone = exitLearning,
-                            onOpenReading = openTodayArticleFromSummary,
-                        )
-                    } else {
-                        WordCardScreen(
-                            state = cardState,
-                            onSubmit = wordCardViewModel::submit,
-                            onReveal = wordCardViewModel::revealMeaning,
-                            onSpeak = { lemma ->
-                                val request = ++wordCardPronunciationRequest
-                                wordCardPronunciationStatus = PronunciationStatus.Playing
-                                wordCardPronunciationMessage = PronunciationStatus.Playing.message()
-                                pronunciationScope.launch {
-                                    val resultStatus = pronunciationStatus(
-                                        // 词卡屏的回调只交出 lemma，主键得从当前 cardState 取——
-                                        // 取不到就留 null（台账记 Unattached），不许拿 lemma 当 id（决策 D-9）。
-                                        pronunciationProvider?.speakWord(
-                                            lemma,
-                                            entity = (cardState as? WordCardUiState.Ready)?.card?.cardId
-                                                ?.let { PronunciationEntityRef.wordCard(it) },
-                                        ),
-                                    )
-                                    if (request == wordCardPronunciationRequest) {
-                                        wordCardPronunciationStatus = resultStatus
-                                        wordCardPronunciationMessage = resultStatus.message()
-                                    }
+                    if (route is AppOverlayRoute.VocabularyDetail) {
+                        val card = route.card
+                        LaunchedEffect(card.cardId) {
+                            val cardSnapshot = card
+                            val request = ++searchPronunciationRequest
+                            searchPronunciationJob?.cancel()
+                            searchPronunciationMessage = PronunciationStatus.Playing
+                            searchPronunciationJob = launch {
+                                val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
+                                if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
+                                    searchPronunciationMessage = result
                                 }
-                            },
-                            pronunciationMessage = wordCardPronunciationMessage,
-                            pronunciationStatus = wordCardPronunciationStatus,
-                            pauseResumeSupported = pauseResumeSupported,
-                            onPauseResume = {
-                                val next = when {
-                                    wordCardPronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
-                                    wordCardPronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                    // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
-                                    // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
-                                    else -> wordCardPronunciationStatus
-                                }
-                                wordCardPronunciationStatus = next
-                                wordCardPronunciationMessage = next.message()
-                            },
-                            // 裁决 B3：先自增代次再 stopPlayback()——播放器层把用户主动停止以 Played 收口，
-                            // 迟到的 Played 会被代次挡掉，不会覆盖这里的 Idle 呈现；也禁止另立「已停止」文案。
-                            onStopPronunciation = {
-                                wordCardPronunciationRequest++
-                                pronunciationProvider?.stopPlayback()
-                                wordCardPronunciationStatus = PronunciationStatus.Idle
-                                wordCardPronunciationMessage = null
-                            },
-                            onRetry = { wordCardViewModel.load(state.profile.id) },
-                            onStartNewPhase = wordCardViewModel::startNewPhase,
-                            // 回执态的唯一推进口（原型「下一个词 / 完成本轮」）：只有它换卡，
-                            // 评分成功后的三档按钮已经不在组合里。
-                            onNext = wordCardViewModel::advance,
-                            onBackToPlan = exitLearning,
-                        )
-                    }
-                    if (detailCard != null) {
-                        val card = detailCard!!
-                        // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
-                        // 否则点击一次会累计两次调用（见 2bff744 回归）。
+                            }
+                        }
+                        // 「下一个」只能沿**打开详情的那份列表**推进：用来源枚举选列表，
+                        // 而不是让所有来源共用一份判断。不同来源的结果集不同，
+                        // 复用同一段判断会让「下一个」悄悄跳到另一份列表里去。
+                        val globalSearchResults = (globalSearchState as? GlobalVocabularySearchUiState.Ready)?.results.orEmpty()
+                        val nextFromSource: (() -> Unit)? = when (detailSource) {
+                            DetailSource.VOCABULARY ->
+                                nextAfter(vocabularyCards) { it.cardId == card.cardId }
+                                    ?.let { next -> { selectedSearchCard = next } }
+                            // 全量查词的下一张同样要走回源：索引里没有可渲染的完整卡片。
+                            DetailSource.GLOBAL_SEARCH ->
+                                nextAfter(globalSearchResults) { it.result.cardId == card.cardId }
+                                    ?.let { next -> { globalVocabularySearchViewModel?.open(next.result) } }
+                            // 批 1 Task 16：「今日词单」点开的那一枚，「下一个」沿**该屏的呈现序**推进
+                            // （新学段在前、复习段在后，与词单屏两节的上下次序逐字一致），
+                            // 不借用生词本 / 词书那两份列表。
+                            DetailSource.TODAY_QUEUE ->
+                                nextAfter(todayReady?.newQueue.orEmpty() + todayReady?.dueQueue.orEmpty()) { it.cardId == card.cardId }
+                                    ?.let { next -> { selectedSearchCard = next } }
+                            else -> null
+                        }
                         CardDetailScreen(
                             card = card,
+                            onBack = closeSearchDetail,
                             onRelearn = {
                                 selectedRelearnCard = card
                                 vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
                             },
-                            onBack = {
-                                detailPronunciationRequest++
-                                detailPronunciationMessage = PronunciationStatus.Idle
-                                wordCardViewModel.clearDetail()
-                            },
-                            onNext = if (wordCardViewModel.hasNextDetail()) {
-                                {
-                                    detailPronunciationRequest++
-                                    detailPronunciationMessage = PronunciationStatus.Idle
-                                    wordCardViewModel.nextDetail()
-                                }
-                            } else {
-                                null
-                            },
+                            onNext = nextFromSource,
                             onSpeak = {
-                                val request = ++detailPronunciationRequest
-                                detailPronunciationMessage = PronunciationStatus.Playing
-                                pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(card.cardId)))
-                                    if (request == detailPronunciationRequest && detailCard === card) {
-                                        detailPronunciationMessage = result
+                                val cardSnapshot = card
+                                val request = ++searchPronunciationRequest
+                                searchPronunciationJob?.cancel()
+                                searchPronunciationMessage = PronunciationStatus.Playing
+                                searchPronunciationJob = pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
+                                    if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
+                                        searchPronunciationMessage = result
                                     }
                                 }
                             },
                             onSpeakBritish = {
-                                val request = ++detailPronunciationRequest
-                                detailPronunciationMessage = PronunciationStatus.Playing
-                                pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(card.cardId)))
-                                    if (request == detailPronunciationRequest && detailCard === card) {
-                                        detailPronunciationMessage = result
+                                val cardSnapshot = card
+                                val request = ++searchPronunciationRequest
+                                searchPronunciationJob?.cancel()
+                                searchPronunciationMessage = PronunciationStatus.Playing
+                                searchPronunciationJob = pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
+                                    if (request == searchPronunciationRequest && selectedSearchCard === cardSnapshot) {
+                                        searchPronunciationMessage = result
                                     }
                                 }
                             },
-                            pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
-                            pronunciationControlsEnabled = true,
-                            pauseResumeSupported = pauseResumeSupported,
-                            // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
-                            onPauseResume = {
-                                val held = detailPronunciationMessage
-                                val next = when {
-                                    held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
-                                    held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                    // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
-                                    // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
-                                    else -> held
-                                }
-                                detailPronunciationMessage = next
-                            },
-                            // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
-                            // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
-                            onStopPronunciation = {
-                                detailPronunciationRequest++
-                                pronunciationProvider?.stopPlayback()
-                                detailPronunciationMessage = PronunciationStatus.Idle
-                            },
+                            pronunciationStatus = searchPronunciationMessage,
+                            notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                            onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
+                            onDeleteNote = { wordQaViewModel?.deleteNote(it) },
+                            personalNoteSaveStatus = personalNoteSaveStatus,
+                            vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
+                            onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
                             favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
                             onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
-                            onAskAi = {
-                                // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
-                                showWordQaCard = card
-                                wordQaViewModel?.reset()
-                                wordQaViewModel?.loadNotes(state.profile.id, card.lemma, card.wordBookId, card.cardId)
+                            onAskAi = null,
+                        )
+                    } else if (route is AppOverlayRoute.GlobalSearch) {
+                        val globalSearch = globalVocabularySearchViewModel
+                        GlobalVocabularySearchScreen(
+                            state = globalSearchState,
+                            query = globalSearchQuery,
+                            onQueryChange = { globalSearch?.updateQuery(it) },
+                            onSubmit = { globalSearch?.search() },
+                            onRetry = { globalSearch?.retry() },
+                            onClearHistory = { globalSearch?.requestClearHistory() },
+                            onOpenHistory = { query ->
+                                globalSearch?.updateQuery(query)
+                                globalSearch?.search()
+                            },
+                            // 索引只提供结果列表要显示的列，这里不做「把摘要当卡片」的事：
+                            // 交给 ViewModel 按 cardId 回源取完整词卡，取到后再由下面的
+                            // LaunchedEffect 打开详情。
+                            onSelect = { result -> globalSearch?.open(result) },
+                            onBack = { showGlobalVocabularySearch = false },
+                        )
+                        // F4-01 Spec L18：清空搜索历史=不可逆操作，先报级联条数再二次确认；
+                        // 「清空搜索历史」按钮只做 request，仓储 clear 只从「确认清空」进入。
+                        val pendingClear = globalSearch?.pendingClear?.collectAsState()?.value
+                        pendingClear?.let { pending ->
+                            ConfirmDestructiveDialog(
+                                state = true,
+                                title = "清空搜索历史？",
+                                cascadeLines = listOf(
+                                    if (pending.recordCount != null) {
+                                        "将删除本机全部 ${pending.recordCount} 条搜索记录。"
+                                    } else {
+                                        "将删除本机全部搜索记录（暂时读不到具体条数）。"
+                                    },
+                                ),
+                                // 保留面逐字沿用站点原文；「不可撤销」声明交组件固定句承载（AGENTS.md 业务规则）。
+                                keepLines = listOf("收藏、文章与学习记录不受影响。"),
+                                irreversible = true,
+                                confirmLabel = "确认清空",
+                                onConfirm = { globalSearch?.clearHistory() },
+                                onDismiss = { globalSearch?.cancelClearHistory() },
+                            )
+                        }
+                    } else if (route is AppOverlayRoute.RelearnCard) {
+                        val card = route.card
+                        VocabularyRelearnScreen(
+                            state = vocabularyRelearnViewModel?.state?.collectAsState()?.value
+                                ?: VocabularyRelearnUiState.Idle,
+                            onSubmit = { vocabularyRelearnViewModel?.submit(it) },
+                            onRetry = { vocabularyRelearnViewModel?.loadCard(state.profile.id, card) },
+                            onBack = {
+                                selectedRelearnCard = null
+                                vocabularyRelearnViewModel?.load(state.profile.id, todayReady?.activeWordBookId)
                             },
                         )
-                        showWordQaCard?.let { qaCard ->
-                            WordAiQaScreen(
-                                lemma = qaCard.lemma,
-                                state = wordQaUiState,
-                                onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
-                                onCancelAsk = { wordQaViewModel?.cancelAsk() },
-                                onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
-                                onSaveNote = { wordQaViewModel?.saveNote() },
-                                onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
-                                savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
-                                onBack = { showWordQaCard = null },
-                                onOpenAiSettings = {
-                                    showWordQaCard = null
-                                    openAiProfilesOrSettings()
-                                },
-                            )
-                        }
-                    }
-                }
-            } else if (route is AppOverlayRoute.WorksheetPreview) {
-                val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
-                val context = androidx.compose.ui.platform.LocalContext.current
-                // 只有用户显式点「导出」才会拉起系统面板；重进预览页不会重复弹出。
-                val shareFile = worksheetViewModel?.shareRequest?.collectAsState()?.value
-                LaunchedEffect(shareFile) {
-                    shareFile?.let { file ->
-                        val launched = runCatching {
-                            val intent = WorksheetShareLauncher(context).createChooser(file)
-                            if (context !is android.app.Activity) {
-                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        }.isSuccess
-                        if (launched) {
-                            worksheetViewModel?.consumeShareRequest()
-                        } else {
-                            worksheetViewModel?.reportShareUnavailable()
-                            worksheetViewModel?.consumeShareRequest()
-                        }
-                    }
-                }
-                WorksheetPreviewScreen(
-                    pages = worksheetState?.pages.orEmpty(),
-                    renderedFile = worksheetState?.renderedFile,
-                    rendering = worksheetState?.rendering ?: false,
-                    message = worksheetState?.message,
-                    onBack = {
-                        worksheetViewModel?.dismissPreview()
-                        showWorksheetPreview = false
-                    },
-                    onExport = { worksheetViewModel?.export() },
-                )
-            } else if (route is AppOverlayRoute.WorksheetSettings) {
-                val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
-                WorksheetSettingsScreen(
-                    settings = worksheetState?.settings
-                        ?: com.example.englishlearning.learning.worksheet.WorksheetSettings(),
-                    selectedCount = worksheetState?.selectedCount ?: 0,
-                    onToggleDirection = { worksheetViewModel?.toggleDirection(it) },
-                    onSelectRange = { worksheetViewModel?.selectRange(it) },
-                    onSelectTemplate = { worksheetViewModel?.selectTemplate(it) },
-                    onToggleGrid = { worksheetViewModel?.toggleGrid(it) },
-                    onToggleAnswers = { worksheetViewModel?.toggleAnswers(it) },
-                    onPreview = {
-                        worksheetViewModel?.preview()
-                        if (worksheetViewModel?.uiState?.value?.phase == WorksheetPhase.PREVIEW) {
-                            showWorksheetPreview = true
-                        }
-                    },
-                    onBack = { showWorksheetSettings = false },
-                )
-            } else if (route is AppOverlayRoute.ReviewQueue) {
-                // 批 1 Task 17：复习队列（原型 `learn-review`）。数据不另开通路——到期队列就是今日计划快照的
-                // `dueCardIds` 取到内容后的那份列表，与「今日词单」的复习节同一份快照、同一个来源。
-                // 挂载位置排在词单分支之前：两条路由互斥（没有一处界面能同时打开它们），但「挂载更早 = z 序更高」
-                // 与本文件「后声明的 BackHandler 优先」必须配成一对，否则以后有人照着返回键去猜层级。
-                ReviewQueueScreen(
-                    state = route.plan,
-                    onBack = { showReviewQueue = false },
-                    onStartReview = {
-                        showReviewQueue = false
-                        wordCardViewModel.load(state.profile.id)
-                        showLearning = true
-                    },
-                    onOpenWord = { card ->
-                        selectedSearchCard = card
-                        detailSource = DetailSource.TODAY_QUEUE
-                    },
-                )
-            } else if (route is AppOverlayRoute.TodayWordList) {
-                // 批 1 Task 16：今日词单（原型 `learn-queue`）。数据不另开一条通路——词单就是今日计划快照
-                // 的 `newCardIds` / `dueCardIds` 取到内容后的那份列表，与同屏强卡的计数同一份快照。
-                TodayWordListScreen(
-                    state = route.plan,
-                    onBack = { showTodayWordList = false },
-                    onOpenSetup = {
-                        // 原型 `.bar-action「调整」→ plan-edit`：设置层压在本层之上（挂载更早 = z 序更高），
-                        // 这里把本层关掉，返回时回到学习主页，而不是留下两层叠着等返回键逐层拆。
-                        showTodayWordList = false
-                        showSetup = true
-                    },
-                    onStartLearning = {
-                        showTodayWordList = false
-                        wordCardViewModel.load(state.profile.id)
-                        showLearning = true
-                    },
-                    onOpenWord = { card ->
-                        selectedSearchCard = card
-                        detailSource = DetailSource.TODAY_QUEUE
-                    },
-                )
-            } else if (route is AppOverlayRoute.CheckIn) {
-                // 批 1 Task 6：快照在宿主层统一收（见上方 checkInState），这里不再收第二份。
-                CheckInScreen(
-                    state = checkInState,
-                    onBack = { showCheckIn = false },
-                    onRetry = { checkInViewModel?.load(state.profile.id) },
-                )
-            } else if (route is AppOverlayRoute.WordBank) {
-                // 词库页（spec §3.3）：一枚壳 + 四分段，一段一面。两枚旧页降级为 pane——
-                // 词书段复用 WordBookWordsScreen（自带筛选与字母栏），其余三段复用合并页 MyWordsScreen
-                // 并靠 visibleSections 收窄到点名的那一段（三段共用同一处形参表，见 myWordsPane）。
-                // 页头只留壳上那一枚：两枚 pane 都以 showHeader = false 挂进来。
-                val myWordsPane: @Composable (MyWordsSection) -> Unit = { paneSection ->
-                    MyWordsScreen(
-                        favoritesState = favoritesState ?: FavoritesUiState.Loading,
-                        vocabularyState = vocabularyState,
-                        wrongWordsState = wrongWordsState,
-                        section = paneSection,
-                        // 收窄到点名段：合并页默认三段同屏（老行为与 connected 夹具不破），
-                        // 词库页里每格只该看见自己那一段。
-                        visibleSections = listOf(paneSection),
-                        showHeader = false,
-                        onBack = { showWordBank = false },
-                        onOpenFavoriteWord = { favoritesViewModel?.open(it) },
-                        onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
-                        onOpenVocabularyCard = {
-                            detailSource = DetailSource.VOCABULARY
-                            selectedSearchCard = it
-                        },
-                        onOpenWrongWord = {
-                            detailPronunciationMessage = PronunciationStatus.Idle
-                            learningRecordPronunciationRequest++
-                            detailSource = DetailSource.RECORDS
-                            selectedLearningRecordCard = it
-                        },
-                        // I-4（修复轮 1）：生词本段两枚能力接宿主**现成**通路，不新建任何线路——
-                        // 重学走 showVocabularyRelearn 分支（其渲染早于本页、自带 BackHandler），
-                        // 行内标记走老页挂载处同一回调 vocabularyViewModel?.markMastered。
-                        onStartRelearn = { showVocabularyRelearn = true },
-                        onMarkMastered = { vocabularyViewModel?.markMastered(state.profile.id, it) },
-                        // N-1（修复轮 3）：结果态必须由本页消费并复位——与老页挂载处 :852/:853 **同一来源**
-                        // （vocabularyMasteryState 在宿主层恒收集，复位回调就是 clearMasteryMessage），
-                        // 不新建通路。少了这两行时：失败静默（StorageUnavailable 不 reload、合并页零反馈），
-                        // 而残留的 Success 会让随后打开的老生词页弹出一枚属于另一页动作的结果框。
-                        masteryState = vocabularyMasteryState,
-                        onDismissMasteryMessage = { vocabularyViewModel?.clearMasteryMessage() },
-                        // m-2（修复轮 1）：重试只刷用户点的那一册，不再一次拉三册
-                        // （旧写法会把另外两段打回 Loading，连带闪 loading 与历史 I-1 的重复落位）。
-                        onRetry = { retrySection ->
-                            when (retrySection) {
-                                MyWordsSection.Favorites -> favoritesViewModel?.load(state.profile.id)
-                                MyWordsSection.Wordbook -> vocabularyViewModel?.load(state.profile.id)
-                                MyWordsSection.Wrong -> wrongWordsViewModel?.load(state.profile.id)
-                            }
-                        },
-                    )
-                }
-                WordBankScreen(
-                    wordBookName = todayReady?.wordBookName ?: "未选择词书",
-                    section = wordBankSection,
-                    onSelectSection = { wordBankSection = it },
-                    onBack = {
-                        if (bookPaneShowsWordList) bookPaneShowsWordList = false else showWordBank = false
-                    },
-                    bookPane = {
-                        if (bookPaneShowsWordList) {
-                            // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
-                            // 页头关掉（`showHeader = false`）：返回位只留壳那一枚，否则同屏两个「返回」。
-                            WordBookWordsScreen(
-                                state = wordBookWordsState,
-                                listState = wordBookWordsListState,
-                                onBack = { bookPaneShowsWordList = false },
-                                onFilter = { wordBookWordsViewModel?.selectFilter(it) },
-                                onRetry = { wordBookWordsViewModel?.retry() },
-                                onOpenWord = {
-                                    detailPronunciationMessage = PronunciationStatus.Idle
-                                    learningRecordPronunciationRequest++
-                                    detailSource = DetailSource.RECORDS
-                                    selectedLearningRecordCard = it.card
-                                },
-                                showHeader = false,
-                            )
-                        } else {
-                            // 两枚状态计数只在词单真读出来时给：`null` 让详情页把那两行整行不画，
-                            // 而不是在「还没读出来」时摆一个「0」（读不到的那枚整枚不显示）。
-                            val bookWords = wordBookWordsState.words
-                            val wordsReadable = !wordBookWordsState.loading &&
-                                wordBookWordsState.error == null &&
-                                bookWords.isNotEmpty()
-                            BookDetailScreen(
-                                bookName = todayReady?.wordBookName ?: "未选择词书",
-                                progress = todayReady?.bookProgress,
-                                learningCount = if (wordsReadable) {
-                                    bookWords.count { it.status == WordBookRecordStatus.Learning }
-                                } else {
-                                    null
-                                },
-                                dueCount = if (wordsReadable) {
-                                    bookWords.count { it.status == WordBookRecordStatus.Due }
-                                } else {
-                                    null
-                                },
-                                onOpenWordList = { bookPaneShowsWordList = true },
-                                // 「更换词书」走既有学习设置（选词书在那里）：先关词库再把设置层压上来，
-                                // 返回时回到学习主页，不留两层叠着等返回键逐层拆（与今日词单同一条口径）。
-                                onOpenPicker = {
-                                    showWordBank = false
-                                    showSetup = true
-                                },
-                            )
-                        }
-                    },
-                    newPane = { myWordsPane(MyWordsSection.Wordbook) },
-                    wrongPane = { myWordsPane(MyWordsSection.Wrong) },
-                    favoritePane = { myWordsPane(MyWordsSection.Favorites) },
-                    // 分段标签的条数（原型 `sMeWords` 的三格计数）：只从三段**已有的** UiState 现算，
-                    // 不新开数据通路、不读仓储。读不到就是 null —— 壳会把那一格画成裸段名，
-                    // 而不是用 0 把「还没读出来」说成「确实是空的」。
-                    newCount = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
-                    wrongCount = (wrongWordsState as? WrongWordsUiState.Ready)?.cards?.size,
-                    favoriteCount = (favoritesState as? FavoritesUiState.Ready)?.words?.size,
-                )
-            } else if (route is AppOverlayRoute.AiProfiles) {
-                val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
-                // 批 4 Task 3：AI 服务屏里的两枚危险动作（清除密钥 / 删除配置）不再点了就执行——
-                // 屏侧只发请求，确认框住在这里。请求态是屏内局部状态，所以两枚确认框必须与
-                // `AiProfileSettingsScreen(` 同住这一分支：合成样片之外的第三级浮层不归本层管。
-                var pendingAiProfileDelete by remember(state.profile.id) { mutableStateOf<String?>(null) }
-                var pendingAiProfileKeyClear by remember(state.profile.id) { mutableStateOf<String?>(null) }
-                AiProfileSettingsScreen(
-                    listState = aiProfiles ?: AiProfileListUiState.Loading,
-                    editor = editor,
-                    onAdd = { aiProfileViewModel?.startCreate() },
-                    onEdit = { aiProfileViewModel?.startEdit(it) },
-                    onDraftChange = { aiProfileViewModel?.updateDraft(it) },
-                    onSave = { aiProfileViewModel?.save() },
-                    onCloseEditor = { aiProfileViewModel?.closeEditor() },
-                    onRequestDeleteProfile = { pendingAiProfileDelete = it },
-                    onRequestDeleteKey = { pendingAiProfileKeyClear = it },
-                    onTestConnection = { aiProfileViewModel?.testConnection() },
-                    onConfirmOutbound = { confirmed -> aiProfileViewModel?.confirmOutbound(confirmed) },
-                    onSetDefaultTextProfile = { aiProfileViewModel?.setDefaultTextProfile(it) },
-                    onSetDefaultImageProfile = { aiProfileViewModel?.setDefaultImageProfile(it) },
-                    onBack = {
-                        showAiProfiles = false
-                        speechSettingsViewModel?.load()
-                    },
-                )
-                // 删除配置：配置元数据与已保存的密钥一起走（仓储侧先删密钥再删元数据），
-                // 所以正文必须点名密钥也会清除；文章/收藏/学习记录不在这一侧，如实保留面。
-                pendingAiProfileDelete?.let { profileId ->
-                    ConfirmDestructiveDialog(
-                        state = true,
-                        title = "删除这套 AI 配置？",
-                        cascadeLines = listOf(
-                            "将删除这台设备上这套配置的名称、网站地址、Endpoint、模型与高级参数，并清除已保存的密钥。",
-                        ),
-                        keepLines = listOf(
-                            "文章、收藏、学习记录与词库不受影响；其他 AI 配置也不受影响。",
-                        ),
-                        irreversible = true,
-                        confirmLabel = "确认删除",
-                        onConfirm = {
-                            aiProfileViewModel?.deleteProfile(profileId)
-                            pendingAiProfileDelete = null
-                        },
-                        onDismiss = { pendingAiProfileDelete = null },
-                    )
-                }
-                // 清除密钥：元数据全留，只丢密钥；这套配置若正被当作默认服务，默认位会一并解绑。
-                pendingAiProfileKeyClear?.let { profileId ->
-                    ConfirmDestructiveDialog(
-                        state = true,
-                        title = "清除已保存的密钥？",
-                        cascadeLines = listOf(
-                            "清除后这套配置将无法调用服务，需要重新粘贴密钥才能再用。",
-                        ),
-                        keepLines = listOf(
-                            "名称、网站地址、Endpoint、模型与高级参数保留；文章、收藏与学习记录不受影响。",
-                        ),
-                        irreversible = true,
-                        confirmLabel = "确认清除",
-                        onConfirm = {
-                            aiProfileViewModel?.deleteKey(profileId)
-                            pendingAiProfileKeyClear = null
-                        },
-                        onDismiss = { pendingAiProfileKeyClear = null },
-                    )
-                }
-            } else if (route is AppOverlayRoute.SpeechSettings) {
-                SpeechSettingsScreen(
-                    state = speechState,
-                    onSelect = { engine, profileId -> speechSettingsViewModel?.select(engine, profileId) },
-                    onOpenAiProfiles = {
-                        aiProfileViewModel?.load()
-                        showAiProfiles = aiProfileViewModel != null
-                    },
-                    onAddMiMoPreset = { speechSettingsViewModel?.addMiMoPreset() },
-                    onPreview = { text -> speechSettingsViewModel?.preview(text) },
-                    onToggleAutoSpeakOnCardReady = { enabled ->
-                        speechSettingsViewModel?.setAutoSpeakOnCardReady(enabled)
-                    },
-                    // 批 5 Task 1：语速由点按循环改为滑杆，宿主只把滑杆位置转成倍率下发；
-                    // 吸附到四档由 ViewModel 做（`SpeechRateSteps` 是唯一档位表）。
-                    onSetSpeechRate = { rate -> speechSettingsViewModel?.setSpeechRate(rate) },
-                    onBack = { showSpeechSettings = false },
-                )
-            } else if (route is AppOverlayRoute.ReminderSettings) {
-                // F4-02：权限判定在 composable 上下文完成；onEnableRequested 只收"已授权"结果。
-                // 拒绝后不重复请求（Android 记住拒绝态），设置说明提供系统设置入口。
-                //
-                // 批 5 收口（真机目视）：原来把 `notificationGranted` 当**组合期快照**捕获进 lambda，
-                // 授权完成后没有任何回调去 `setEnabled(true)`，于是开关永远停在关、用户得先退出本页再进来。
-                // 改成「权限结果走 launcher 回调」：授权成功当场打开开关；已授权时点一下直接落库。
-                // 只换权限通路，状态机与落库口径一律不动（仍只经 `setEnabled(true)`）。
-                val reminderActivity = LocalContext.current as? android.app.Activity
-                val needsNotificationPermission = android.os.Build.VERSION.SDK_INT >= 33 &&
-                    reminderActivity != null &&
-                    androidx.core.content.ContextCompat.checkSelfPermission(
-                        reminderActivity,
-                        android.Manifest.permission.POST_NOTIFICATIONS,
-                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-                val notificationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-                    androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-                ) { granted ->
-                    if (granted) reminderSettingsViewModel?.setEnabled(true)
-                }
-                ReminderSettingsScreen(
-                    onBack = { showReminderSettings = false },
-                    onEnableRequested = {
-                        if (needsNotificationPermission) {
-                            notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            reminderSettingsViewModel?.setEnabled(true)
-                        }
-                    },
-                    viewModel = reminderSettingsViewModel,
-                )
-            } else if (route is AppOverlayRoute.BackupExport) {
-                // F4-03：无认证 Salvage 包导出确认页；SAF「另存为」在页面内部处理，取消不写文件。
-                BackupExportScreen(
-                    onBack = { showBackupExport = false },
-                    viewModel = backupExportViewModel,
-                )
-            } else if (route is AppOverlayRoute.BackupRestore) {
-                // F4-04：新设备认证恢复页；扫码/密码/二次确认在页面内部处理，无旁路入口。
-                BackupRestoreScreen(
-                    onBack = { showBackupRestore = false },
-                    viewModel = backupRestoreViewModel,
-                )
-            } else if (route is AppOverlayRoute.BackupPairingExport) {
-                // F4-04：旧设备认证导出页；系统认证门控 + 配对二维码 + 可选密码 + SAF 落盘，页面内无跳过认证入口。
-                BackupPairingExportScreen(
-                    onBack = { showBackupPairingExport = false },
-                    viewModel = backupPairingExportViewModel,
-                )
-            } else if (route is AppOverlayRoute.BackupHub) {
-                // 裁决⑥：三节子页。它挂在三枚子屏**之后**（先真先赢）——子屏开着时压在上面，
-                // 子屏 onBack 只置子屏 false，自然回到本页；本页返回键再回设置页。
-                BackupHubScreen(
-                    onBack = { showBackupHub = false },
-                    onOpenBackupExport = { showBackupExport = backupExportViewModel != null },
-                    onOpenBackupPairingExport = { showBackupPairingExport = backupPairingExportViewModel != null },
-                    onOpenBackupRestore = { showBackupRestore = backupRestoreViewModel != null },
-                    onDeleteAllLearningData = {
-                        learningDataDeletionViewModel?.requestDelete(state.profile.id)
-                    },
-                    deleteAllLearningDataNotice = learningDataDeletionUi.notice,
-                )
-            } else if (route is AppOverlayRoute.Licenses) {
-                // F5-04：许可台账页。数据源=构建期从 docs/third-party-notices.md 同步的 assets；
-                // 读不到传空串，页面如实显示「许可台账暂不可读」，零假台账零假入口。
-                // 批 5 Task 3（对账 2 的宿主侧一半）：空态的「重新读取」必须能真的重读——旧写法是
-                // 无键 `remember`，一次失败就永远缓存了空串，页面那枚重试键会是假按钮。
-                // 故把重读次数当键：点一次重读，`remember` 失效重跑一遍 assets 读取。
-                //
-                // QA3 A1：本分支必须排在下面 `showAbout` 之前。挂载 `else if` 链先声明者赢，而许可页
-                // 如今不再清 `showAbout`（清了会让页内「返回」落回「我的」而不是「关于」）——
-                // 两枚同时为真时只有先声明者进得了组合，顺序写反等于「点了许可行没反应」。
-                val licensesContext = LocalContext.current
-                var licensesReload by remember { mutableStateOf(0) }
-                val noticesMarkdown = remember(licensesReload) {
-                    runCatching {
-                        licensesContext.assets.open("third-party-notices.md").bufferedReader().use { it.readText() }
-                    }.getOrDefault("")
-                }
-                LicensesScreen(
-                    markdown = noticesMarkdown,
-                    onBack = { showLicenses = false },
-                    onRetry = { licensesReload += 1 },
-                )
-            } else if (route is AppOverlayRoute.About) {
-                // 「关于」页：版本号从构建信息取（`buildConfig = true`），许可数暂留 `null`
-                // （行文案退成不带数字的那一句；许可条数以 `LicensesScreen` 的解析结果为准，后续注入）。
-                AboutScreen(
-                    versionName = BuildConfig.VERSION_NAME,
-                    licenseCount = null,
-                    onBack = { showAbout = false },
-                    // 2026-10-31 去重：许可只从关于页进（关于页只剩这一条说明行）；
-                    // 备份的唯一入口在 设置 → 数据与安全，本页不再挂同落点的第二行。
-                    // QA3 A1：这里不再顺手 `showAbout = false`——关于页留在栈下，
-                    // 许可页的两条出口（页内返回、系统返回）都自然回到关于页。
-                    onOpenLicenses = { showLicenses = true },
-                )
-            } else if (route is AppOverlayRoute.SentenceAnalysis) {
-                // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
-                val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
-                    ?: SentenceAnalysisUiState.Idle
-                // 批 4 Task 5：屏侧只上报朗读请求，语音能力与代次校验留在本层（与拍照翻译同形）：
-                // 连点两枚段落后，先发的那次朗读结果不许覆盖后一次的反馈。
-                var sentenceSpeakMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
-                var sentenceSpeakRequest by remember { mutableStateOf(0L) }
-                var sentenceSpeakJob by remember { mutableStateOf<Job?>(null) }
-                SentenceAnalysisScreen(
-                    state = sentenceState,
-                    onAnalyze = { sentence -> sentenceAnalysisViewModel?.analyze(sentence, state.profile.id) },
-                    onCancelAnalysis = { sentenceAnalysisViewModel?.cancelAnalysis() },
-                    onConfirmOutbound = { sentenceAnalysisViewModel?.confirmOutbound(it) },
-                    speakMessage = sentenceSpeakMessage.message(),
-                    onSpeak = { text ->
-                        val request = ++sentenceSpeakRequest
-                        sentenceSpeakJob?.cancel()
-                        sentenceSpeakMessage = PronunciationStatus.Playing
-                        sentenceSpeakJob = pronunciationScope.launch {
-                            val result = pronunciationStatus(
-                                // 长难句分析屏没有任何主键可交代，kind 照记、id 留空（决策 D-7/D-9）。
-                                pronunciationProvider?.speakSentence(text, entity = PronunciationEntityRef.SentenceAnalysis),
-                            )
-                            if (request == sentenceSpeakRequest) {
-                                sentenceSpeakMessage = result
-                            }
-                        }
-                    },
-                    onBack = {
-                        sentenceSpeakJob?.cancel()
-                        selectedFeatureKey = null
-                    },
-                    onOpenAiSettings = {
-                        selectedFeatureKey = null
-                        openAiProfilesOrSettings()
-                    },
-                )
-            } else if (route is AppOverlayRoute.PhotoTranslation) {
-                // F3-03：拍照翻译。图片只进临时工作区（零残留由状态机保证）；翻译每次出站都确认。
-                val photoState = photoTranslationViewModel?.uiState?.collectAsState()?.value
-                    ?: PhotoTranslationUiState()
-                var photoSpeakMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
-                var photoSpeakRequest by remember { mutableStateOf(0L) }
-                var photoSpeakJob by remember { mutableStateOf<Job?>(null) }
-                // 批 4 Task 4：历史删除不再点了就执行——屏侧只发请求，确认框归本层（与 AI 服务页同形）。
-                var pendingPhotoTranslationDelete by remember(state.profile.id) { mutableStateOf<String?>(null) }
-                LaunchedEffect(state.profile.id) { photoTranslationViewModel?.refreshHistory(state.profile.id) }
-                PhotoTranslationScreen(
-                    state = photoState,
-                    onImageBytes = { bytes -> photoTranslationViewModel?.onImageBytes(bytes) },
-                    onOcrTextEdited = { text -> photoTranslationViewModel?.onOcrTextEdited(text) },
-                    onTranslate = { photoTranslationViewModel?.onTranslateTapped() },
-                    onConfirmOutbound = { confirmed -> photoTranslationViewModel?.onConfirmationResult(confirmed) },
-                    onCancelTranslate = { photoTranslationViewModel?.cancelTranslate() },
-                    onRefreshModelStatus = { photoTranslationViewModel?.refreshModelStatus() },
-                    onInstallModel = { photoTranslationViewModel?.installModel() },
-                    onUninstallModel = { photoTranslationViewModel?.uninstallModel() },
-                    onSave = { photoTranslationViewModel?.saveCurrentTranslation(state.profile.id) },
-                    onRequestDeleteSaved = { recordId -> pendingPhotoTranslationDelete = recordId },
-                    onOpenDictionary = { tapped ->
-                        selectedSearchCard = null
-                        searchPronunciationMessage = PronunciationStatus.Idle
-                        searchPronunciationRequest++
-                        searchPronunciationJob?.cancel()
-                        globalVocabularySearchViewModel?.setProfile(state.profile.id)
-                        globalVocabularySearchViewModel?.openSearch(tapped)
-                        showGlobalVocabularySearch = globalVocabularySearchViewModel != null
-                    },
-                    speakMessage = photoSpeakMessage.message(),
-                    onSpeak = { sentence ->
-                        val request = ++photoSpeakRequest
-                        photoSpeakJob?.cancel()
-                        photoSpeakMessage = PronunciationStatus.Playing
-                        photoSpeakJob = pronunciationScope.launch {
-                            // 拍照翻译的句子只有保存之后才有主键；未保存时 kind 记 PhotoTranslation、id 留空。
-                            val result = pronunciationStatus(
-                                pronunciationProvider?.speakSentence(sentence, entity = PronunciationEntityRef.photoTranslation(photoState?.lastSavedRecordId)),
-                            )
-                            if (request == photoSpeakRequest) {
-                                photoSpeakMessage = result
-                            }
-                        }
-                    },
-                    onBack = {
-                        photoSpeakJob?.cancel()
-                        photoTranslationViewModel?.reset()
-                        selectedFeatureKey = null
-                    },
-                    onOpenAiSettings = {
-                        selectedFeatureKey = null
-                        openAiProfilesOrSettings()
-                    },
-                )
-                // 批 4 Task 4：历史删除的确认门。级联句说清「原图 + 译文一起走」，保留面说清「别的都没动」，
-                // 不点确认零写入（与「删除这一版」「删除这套 AI 配置」同一档）。
-                pendingPhotoTranslationDelete?.let { recordId ->
-                    ConfirmDestructiveDialog(
-                        state = true,
-                        title = "删除这条翻译记录？",
-                        cascadeLines = listOf(
-                            "将删除这条已保存的原文、译文，以及随它保存的原图（图片文件同时从本机清除）。",
-                        ),
-                        keepLines = listOf(
-                            "其他历史记录、词库、文章与学习记录不受影响。",
-                        ),
-                        irreversible = true,
-                        confirmLabel = "确认删除",
-                        onConfirm = {
-                            photoTranslationViewModel?.deleteSaved(state.profile.id, recordId)
-                            pendingPhotoTranslationDelete = null
-                        },
-                        onDismiss = { pendingPhotoTranslationDelete = null },
-                    )
-                }
-            } else if (route is AppOverlayRoute.ImageStudio) {
-                val studioState = imageStudioViewModel?.uiState?.collectAsState()?.value
-                    ?: ImageStudioUiState.Idle
-                ImageStudioScreen(
-                    state = studioState,
-                    onGeneratePrompt = { subject -> imageStudioViewModel?.generatePrompt(subject) },
-                    // 描述可编辑（批 4 Task 6）：屏内改过的那一句从这里进 VM，出站用它而不是模型原稿。
-                    onGenerateImage = { prompt -> imageStudioViewModel?.generateImage(prompt) },
-                    onConfirm = { imageStudioViewModel?.confirm(it) },
-                    onCancelGeneration = { imageStudioViewModel?.cancelGeneration() },
-                    onBack = { selectedFeatureKey = null },
-                    onOpenAiSettings = {
-                        selectedFeatureKey = null
-                        openAiProfilesOrSettings()
-                    },
-                )
-            } else if (route is AppOverlayRoute.AiFeatureScaffold) {
-                AiFeatureScreen(
-                    feature = route.feature,
-                    onBack = { selectedFeatureKey = null },
-                    onOpenSettings = {
-                        selectedFeatureKey = null
-                        // 配置页真的存在了，就直接送过去；少了这个 ViewModel 时（预览/测试夹具）
-                        // 退回「设置」栏，不假装能直达。
-                        aiProfileViewModel?.load()
-                        if (aiProfileViewModel != null) {
-                            showAiProfiles = true
-                        } else {
-                            showSettings = true
-                        }
-                    },
-                    onOpenLearning = {
-                        selectedFeatureKey = null
-                        selectedTab = AppTab.LEARNING
-                    },
-                )
-            } else if (route is AppOverlayRoute.UnknownAiFeature) {
-                // 未知 AI 功能 key：`selectedFeatureKey` 是 rememberSaveable 的字符串，枚举改名 / 删项后
-                // 旧状态仍可能带着一个认不出的 key 恢复回来。旧链条在这里没有任何分支，整个覆盖层会静默
-                // 消失；落到授权新建的「页面不可用」（原型 `sUnavailable`），两枚出口都是真导航。
-                UnavailableScreen(
-                    onBack = { selectedFeatureKey = null },
-                    onGoLearning = {
-                        selectedFeatureKey = null
-                        selectedTab = AppTab.LEARNING
-                    },
-                    onBrowseFeatures = {
-                        selectedFeatureKey = null
-                        selectedTab = AppTab.AI
-                    },
-                )
-            } else if (route is AppOverlayRoute.ReadingHistory) {
-                // 锁定态同样要给出历史：历史与解锁正交，未解锁只挡住「今天生成新文章」。
-                val history = readingState.historyOrEmpty
-                val versionState = articleVersionViewModel?.uiState?.collectAsState()?.value ?: ArticleVersionUiState()
-                ReadingHistoryScreen(
-                    history = history,
-                    onBack = { showReadingHistory = false },
-                    onOpenArticle = { historyArticle = it },
-                    onRequestDeleteVersion = { articleVersionViewModel?.requestDelete(it) },
-                    notice = versionState.notice,
-                )
-                // F4-01 决策 §8：删除前二次确认，并明列级联影响条数；不点「确认删除」零写入。
-                val pendingDelete = versionState.pending
-                pendingDelete?.let { pending ->
-                    ConfirmDestructiveDialog(
-                        state = true,
-                        title = "删除这一版？",
-                        // 这一枚的保留面（「同组剩余 N 个版本可读」）本来就写在级联句里，
-                        // 拆成两行会改动措辞，所以按逐字保留红线整句归 cascadeLines、保留面档留空。
-                        cascadeLines = listOf(
-                            "将删除《${pending.article.title}》第 ${pending.article.version} 版（${pending.article.localDate}）。",
-                            "级联影响：该版阅读完成记录 ${pending.impact.removedCompletionCount} 条将一并删除；同组剩余 ${pending.impact.remainingVersionCount} 个版本可读。",
-                        ),
-                        keepLines = emptyList(),
-                        irreversible = true,
-                        confirmLabel = "确认删除",
-                        onConfirm = { articleVersionViewModel?.confirmDelete() },
-                        onDismiss = { articleVersionViewModel?.cancelDelete() },
-                    )
-                }
-            } else if (route is AppOverlayRoute.ReadingFeed) {
-                // 裁决⑤ 第二件：外刊列表与抓取归本层，阅读主页只留 `reading_source_feed` 一枚入口。
-                // 挂载守卫照抄 `showReadingHistory && historyArticle == null` 那一形：文章层一旦在顶上，
-                // 列表就让位，返回键先把文章关掉、再退本层（对应上面的 BackHandler 声明顺序）。
-                val feedState = (readingState as? ReadingAccessUiState.Ready)?.feed ?: FeedUiState.Idle
-                ReadingFeedScreen(
-                    feed = feedState,
-                    onBack = { showReadingFeed = false },
-                    onFetchFeedItem = { readingAccessViewModel?.fetchFeedItem(it) },
-                    // 批 3 Task 1：两种取源失败态各带一枚「重试」，接的是现成入口 `openFeed()`
-                    // （`ReadingAccessViewModel.kt:190-207`，内部会先把状态置 Loading 再取源）。
-                    // 屏不持 ViewModel、也不新增数据通路：这里只转一次回调。
-                    onRetry = { readingAccessViewModel?.openFeed() },
-                )
-            } else if (route is AppOverlayRoute.ArticleImport) {
-                val importState = (readingState as? ReadingAccessUiState.Ready)?.import ?: ImportUiState()
-                ArticleImportScreen(
-                    state = importState,
-                    onTitleChange = { readingAccessViewModel?.importTitleChange(it) },
-                    onBodyChange = { readingAccessViewModel?.importBodyChange(it) },
-                    onImport = { readingAccessViewModel?.submitImport() },
-                    onBack = { showArticleImport = false },
-                )
-            } else if (route is AppOverlayRoute.ArticleReading) {
-                val articleState = articleReadingViewModel?.uiState?.collectAsState()?.value
-                val pronunciationScope = rememberCoroutineScope()
-                val fromHistory = route.readingTarget == null
-                Box(Modifier.fillMaxSize()) {
-                    ArticleReadingScreen(
-                        state = articleState,
-                        onBack = {
-                            // I-2 收口①：屏内「返回」与两条 BackHandler 走同一清场闭包。
-                            clearArticlePronunciation()
-                            if (fromHistory) historyArticle = null else readingAccessViewModel?.closeArticle()
-                        },
-                        onOpenCard = {
-                            detailSource = DetailSource.ARTICLE
-                            selectedArticleCard = it
-                        },
-                        onModeChange = { articleReadingViewModel?.setMode(it) },
-                        onToggleTranslation = { articleReadingViewModel?.toggleTranslation() },
-                        onOpenDictionaryPlaceholder = {},
-                        onOpenDictionary = { tapped ->
-                            selectedSearchCard = null
-                            searchPronunciationMessage = PronunciationStatus.Idle
-                            searchPronunciationRequest++
-                            searchPronunciationJob?.cancel()
-                            // 阅读页点中的词进索引版全量搜索：旧实现每次都要逐册解析词书包，
-                            // 正是用户反馈的「查词慢」。
-                            globalVocabularySearchViewModel?.setProfile(state.profile.id)
-                            globalVocabularySearchViewModel?.openSearch(tapped)
-                            showGlobalVocabularySearch = globalVocabularySearchViewModel != null
-                        },
-                        onOpenPronunciationPlaceholder = {},
-                        // F3-02：整篇朗读从 fire-and-forget 升级为「有状态、可播控」——
-                        // 请求前置 Playing、回来后按代次校验写回结果（旧的即发即忘连文案都不给）。
-                        onSpeakSentence = { sentence ->
-                            val request = ++articlePronunciationRequest
-                            articlePronunciationStatus = PronunciationStatus.Playing
-                            articlePronunciationMessage = PronunciationStatus.Playing.message()
-                            pronunciationScope.launch {
-                                // 文章句子的关联实体就是这篇文章本身：articleId 是本地主键。
-                                val result = pronunciationStatus(
-                                    pronunciationProvider?.speakSentence(
-                                        sentence,
-                                        entity = articleState?.article?.articleId?.let { PronunciationEntityRef.article(it) },
-                                    ),
-                                )
-                                if (request == articlePronunciationRequest) {
-                                    articlePronunciationStatus = result
-                                    articlePronunciationMessage = result.message()
-                                }
-                            }
-                        },
-                        pronunciationMessage = articlePronunciationMessage,
-                        pronunciationStatus = articlePronunciationStatus,
-                        pauseResumeSupported = pauseResumeSupported,
-                        onPauseResume = {
-                            val next = when {
-                                articlePronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
-                                articlePronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
-                                // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
-                                else -> articlePronunciationStatus
-                            }
-                            articlePronunciationStatus = next
-                            articlePronunciationMessage = next.message()
-                        },
-                        onStopPronunciation = {
-                            articlePronunciationRequest++
-                            pronunciationProvider?.stopPlayback()
-                            articlePronunciationStatus = PronunciationStatus.Idle
-                            articlePronunciationMessage = null
-                        },
-                        onSetLearnedMarks = { articleReadingViewModel?.setLearnedMarks(it) },
-                        onCompleteReading = { articleReadingViewModel?.completeReading() },
-                        articleScrollPosition = articleScrollPosition,
-                        onArticleScrollPositionChange = { articleScrollPosition = it },
-                    )
-                    // 点词的详情是阅读页之上的覆盖层，不动 readingTarget 的状态机。
-                        selectedArticleCard?.let { card ->
-                        // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
-                        // 否则点击一次会累计两次调用（见 2bff744 回归）。
+                    } else if (route is AppOverlayRoute.LearningRecordDetail) {
+                        val card = route.card
+                        // 发音只由用户点击触发：打开学习记录详情不自动发音。
+                        // （2bff744 曾在此自动 speak(lemma)，与 onSpeak 叠加成两次调用，
+                        //   learningRecordDetailPronunciationRoutesTheHeldLemmaToTheProvider 断言
+                        //   spokenTexts 恰为一次点击的结果，据此还原为用户触发的唯一路径。）
                         CardDetailScreen(
                             card = card,
                             onRelearn = {
                                 selectedRelearnCard = card
                                 vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
                             },
-                            onNext = articleState?.cards?.indexOfFirst { it.cardId == card.cardId }
-                                ?.takeIf { it >= 0 && it + 1 < (articleState?.cards?.size ?: 0) }
+                            onNext = recordCards.indexOfFirst { it.cardId == card.cardId }
+                                .takeIf { it >= 0 && it + 1 < recordCards.size }
                                 ?.let { index -> {
-                                    selectedArticleCard = articleState?.cards?.get(index + 1)
+                                    selectedLearningRecordCard = recordCards[index + 1]
                                     detailPronunciationRequest++
                                     detailPronunciationMessage = PronunciationStatus.Idle
                                 } },
                             onBack = {
-                                selectedArticleCard = null
-                                detailPronunciationRequest++
+                                selectedLearningRecordCard = null
                                 detailPronunciationMessage = PronunciationStatus.Idle
+                                detailPronunciationRequest++
+                                learningRecordPronunciationRequest++
+                                learningRecordsViewModel?.clearDetail()
                             },
                             onSpeak = {
-                                val request = ++detailPronunciationRequest
+                                val cardSnapshot = card
+                                val request = ++learningRecordPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(card.cardId)))
-                                    if (request == detailPronunciationRequest && selectedArticleCard === card) {
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
+                                    if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
                                         detailPronunciationMessage = result
                                     }
                                 }
                             },
                             onSpeakBritish = {
-                                val request = ++detailPronunciationRequest
+                                val cardSnapshot = card
+                                val request = ++learningRecordPronunciationRequest
                                 detailPronunciationMessage = PronunciationStatus.Playing
                                 pronunciationScope.launch {
-                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(card.cardId)))
-                                    if (request == detailPronunciationRequest && selectedArticleCard === card) {
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
+                                    if (request == learningRecordPronunciationRequest && selectedLearningRecordCard === cardSnapshot) {
                                         detailPronunciationMessage = result
                                     }
                                 }
@@ -2014,7 +964,7 @@ fun AppScreen(
                             pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
                             pronunciationControlsEnabled = true,
                             pauseResumeSupported = pauseResumeSupported,
-                            // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
+                            // 暂停/继续**不**自增代次：暂停不改变这一次发声的归属（裁决 B3）。
                             onPauseResume = {
                                 val held = detailPronunciationMessage
                                 val next = when {
@@ -2026,233 +976,1285 @@ fun AppScreen(
                                 }
                                 detailPronunciationMessage = next
                             },
-                            // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
-                            // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
+                            // 停止：先自增**本宿主发声结果所用的**代次（这里是 learningRecordPronunciationRequest，
+                            // 详情三宿主各用自己的守卫计数器），再 stopPlayback()，然后直接置空闲（裁决 B3）。
                             onStopPronunciation = {
-                                detailPronunciationRequest++
+                                learningRecordPronunciationRequest++
                                 pronunciationProvider?.stopPlayback()
                                 detailPronunciationMessage = PronunciationStatus.Idle
                             },
+                            notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                            onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
+                            onDeleteNote = { wordQaViewModel?.deleteNote(it) },
+                            personalNoteSaveStatus = personalNoteSaveStatus,
+                            vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
+                            onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
                             favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
                             onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
-                            onAskAi = {
-                                // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
-                                showWordQaCard = card
-                                wordQaViewModel?.reset()
-                                wordQaViewModel?.loadNotes(state.profile.id, card.lemma, card.wordBookId, card.cardId)
+                        )
+                    } else if (route is AppOverlayRoute.FavoriteDetail) {
+                        val card = route.card
+                        // 收藏详情与学习记录详情同一 UI-only 模式：发音只由用户点击触发；
+                        // 请求序号 + 卡引用双重守卫，防止跨页竞态把旧结果写进当前状态。
+                        CardDetailScreen(
+                            card = card,
+                            onRelearn = {
+                                selectedRelearnCard = card
+                                vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
+                            },
+                            onBack = {
+                                selectedFavoriteCard = null
+                                favoritesPronunciationMessage = PronunciationStatus.Idle
+                                favoritesPronunciationRequest++
+                            },
+                            onSpeak = {
+                                val cardSnapshot = card
+                                val request = ++favoritesPronunciationRequest
+                                favoritesPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
+                                    if (request == favoritesPronunciationRequest && selectedFavoriteCard === cardSnapshot) {
+                                        favoritesPronunciationMessage = result
+                                    }
+                                }
+                            },
+                            onSpeakBritish = {
+                                val cardSnapshot = card
+                                val request = ++favoritesPronunciationRequest
+                                favoritesPronunciationMessage = PronunciationStatus.Playing
+                                pronunciationScope.launch {
+                                    val result = pronunciationStatus(pronunciationProvider?.speakWord(cardSnapshot.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(cardSnapshot.cardId)))
+                                    if (request == favoritesPronunciationRequest && selectedFavoriteCard === cardSnapshot) {
+                                        favoritesPronunciationMessage = result
+                                    }
+                                }
+                            },
+                            pronunciationStatus = favoritesPronunciationMessage,
+                            notes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                            onSavePersonalNote = { wordQaViewModel?.savePersonalNote(card.lemma, it, card.wordBookId, card.cardId) },
+                            onDeleteNote = { wordQaViewModel?.deleteNote(it) },
+                            personalNoteSaveStatus = personalNoteSaveStatus,
+                            vocabularyPresent = vocabularyMembership?.takeIf { it.cardId == card.cardId }?.present,
+                            onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
+                            favoritePresent = true,
+                            onToggleFavorite = { favoritesViewModel?.toggle(card.cardId, card.wordBookId, card.lemma) },
+                        )
+                    } else if (route is AppOverlayRoute.VocabularyRelearnList) {
+                        val relearnState by vocabularyRelearnViewModel?.state?.collectAsState() ?: remember { mutableStateOf<VocabularyRelearnUiState>(VocabularyRelearnUiState.Idle) }
+                        VocabularyRelearnScreen(
+                            state = relearnState,
+                            onSubmit = { vocabularyRelearnViewModel?.submit(it) },
+                            onRetry = { vocabularyRelearnViewModel?.load(state.profile.id, todayReady?.activeWordBookId) },
+                            onBack = {
+                                showVocabularyRelearn = false
+                                vocabularyViewModel?.load(state.profile.id)
                             },
                         )
-                        showWordQaCard?.let { qaCard ->
-                            WordAiQaScreen(
-                                lemma = qaCard.lemma,
-                                state = wordQaUiState,
-                                onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
-                                onCancelAsk = { wordQaViewModel?.cancelAsk() },
-                                onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
-                                onSaveNote = { wordQaViewModel?.saveNote() },
-                                onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
-                                savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
-                                onBack = { showWordQaCard = null },
-                                onOpenAiSettings = {
-                                    showWordQaCard = null
-                                    openAiProfilesOrSettings()
+                    } else if (route is AppOverlayRoute.LearningRecords) {
+                        LearningRecordsScreen(
+                            state = learningRecordsState,
+                            onBack = { showLearningRecords = false },
+                            onSelectTab = { learningRecordsViewModel?.selectTab(it) },
+                            onRetry = { learningRecordsViewModel?.retry() },
+                            onOpenRecord = {
+                                learningRecordsViewModel?.openRow(it)
+                                detailPronunciationMessage = PronunciationStatus.Idle
+                                learningRecordPronunciationRequest++
+                                detailSource = DetailSource.RECORDS
+                                selectedLearningRecordCard = it.wordCard
+                            },
+                        )
+                    } else if (route is AppOverlayRoute.LearningSetup) {
+                        LearningSetupScreen(
+                            profileId = state.profile.id,
+                            viewModel = learningSetupViewModel,
+                            onSaved = {
+                                showSetup = false
+                                todayPlanViewModel.load(state.profile.id)
+                            },
+                            onCancel = cancelSetup,
+                        )
+                    } else if (route is AppOverlayRoute.LearningFlow) {
+                        val cardState by wordCardViewModel.uiState.collectAsState()
+                        val pronunciationScope = rememberCoroutineScope()
+                        val detailCard by wordCardViewModel.detailCard.collectAsState()
+                        LaunchedEffect(detailCard) {
+                            detailCard?.let { vocabularyViewModel?.loadMembership(state.profile.id, it) }
+                        }
+                        // The detail page is an overlay inside the learning branch: it leaves the
+                        // showLearning state machine untouched, and returning from it (clearDetail) drops
+                        // the user back onto the same card / normal learning state.
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // 学习时自动发音（D1，docs/decisions/2026-10-06-auto-pronunciation-and-wordbook-words.md）：
+                            // 词卡就绪自动朗读一次，受语音设置开关控制（默认开）；与用户点击 onSpeak
+                            // 共存互不取消——就绪自动 1 次 + 点击 = 2 次是合法序列。浏览场景（详情/词书/
+                            // 记录/阅读）一律不自动发音，维持批次 5/6 的用户触发唯一契约。
+                            val autoSpeakOnCardReady = speechSettingsViewModel?.state?.collectAsState()?.value?.autoSpeakOnCardReady ?: true
+                            LaunchedEffect((cardState as? WordCardUiState.Ready)?.card?.cardId) {
+                                val card = (cardState as? WordCardUiState.Ready)?.card ?: return@LaunchedEffect
+                                if (!autoSpeakOnCardReady) return@LaunchedEffect
+                                val request = ++wordCardPronunciationRequest
+                                wordCardPronunciationStatus = PronunciationStatus.Playing
+                                wordCardPronunciationMessage = PronunciationStatus.Playing.message()
+                                // 状态与文案同源于一个局部 val：链式 .message() 会让「呈现的文案」与
+                                // 「播控组的呈现状态」两次求值，两者一旦分叉按钮组就和文字说不上话。
+                                val resultStatus = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, entity = PronunciationEntityRef.wordCard(card.cardId)))
+                                if (request == wordCardPronunciationRequest) {
+                                    wordCardPronunciationStatus = resultStatus
+                                    wordCardPronunciationMessage = resultStatus.message()
+                                }
+                            }
+                            if (cardState is WordCardUiState.AllDone) {
+                                // 批 1 Task 18（新建屏 sSummary；原型 `app.js:1688` / `:1701` 末卡推进 → `go('learn-summary')`）：
+                                // 本轮最后一张卡提交完、按「完成本轮」之后，画面交给「今日完成」而不是词卡屏——
+                                // 原型在这条路径上画的是收尾屏，不是「词卡都提交完了」那一行字。
+                                // 三个要件：
+                                //  - **不新增导航状态位**：收尾屏挂在既有的 `showLearning` 分支里、按 `AllDone` 分派，
+                                //    所以系统返回键仍由 `BackHandler(enabled = showLearning)` 那一条接管，`overlayOpen`
+                                //    也不必再改；
+                                //  - **三枚「退出」出口同一条 `exitLearning`**：页头 ← / 页头「完成」/ 吸底「回到今日」在原型里
+                                //    都是 `data-to="learn-home"`，这里复用同一枚退出通路（回今日学习并重算计划），
+                                //    不另写一份「只关浮层不重算」的半边退出；第四枚「去读今日文章」走 §1-B 的
+                                //    `openTodayArticleFromSummary`（先退学习流，再按真值直达文章或落阅读首页），
+                                //    不再无条件切 tab；
+                                //  - **收尾屏不碰播放器**：换成这一屏时 `WordCardScreen` 自己离开组合，F5-03 的退出停播
+                                //    守卫照常把停播恰好委托给宿主一次（`AppScreenTest` / `WordCardScreenTest` 钉着计数）。
+                                // `dateLabel` 只在计划快照就绪时给；没就绪就传 null，屏侧 `.eyebrow` 整行不进组合。
+                                val done = cardState as WordCardUiState.AllDone
+                                TodaySummaryScreen(
+                                    state = done,
+                                    dateLabel = todayReady?.localDateLabel,
+                                    articleRead = todayArticleRead,
+                                    onBack = exitLearning,
+                                    onDone = exitLearning,
+                                    onOpenReading = openTodayArticleFromSummary,
+                                )
+                            } else {
+                                WordCardScreen(
+                                    state = cardState,
+                                    onSubmit = wordCardViewModel::submit,
+                                    onReveal = wordCardViewModel::revealMeaning,
+                                    onSpeak = { lemma ->
+                                        val request = ++wordCardPronunciationRequest
+                                        wordCardPronunciationStatus = PronunciationStatus.Playing
+                                        wordCardPronunciationMessage = PronunciationStatus.Playing.message()
+                                        pronunciationScope.launch {
+                                            val resultStatus = pronunciationStatus(
+                                                // 词卡屏的回调只交出 lemma，主键得从当前 cardState 取——
+                                                // 取不到就留 null（台账记 Unattached），不许拿 lemma 当 id（决策 D-9）。
+                                                pronunciationProvider?.speakWord(
+                                                    lemma,
+                                                    entity = (cardState as? WordCardUiState.Ready)?.card?.cardId
+                                                        ?.let { PronunciationEntityRef.wordCard(it) },
+                                                ),
+                                            )
+                                            if (request == wordCardPronunciationRequest) {
+                                                wordCardPronunciationStatus = resultStatus
+                                                wordCardPronunciationMessage = resultStatus.message()
+                                            }
+                                        }
+                                    },
+                                    pronunciationMessage = wordCardPronunciationMessage,
+                                    pronunciationStatus = wordCardPronunciationStatus,
+                                    pauseResumeSupported = pauseResumeSupported,
+                                    onPauseResume = {
+                                        val next = when {
+                                            wordCardPronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                            wordCardPronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                            // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                            // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                            else -> wordCardPronunciationStatus
+                                        }
+                                        wordCardPronunciationStatus = next
+                                        wordCardPronunciationMessage = next.message()
+                                    },
+                                    // 裁决 B3：先自增代次再 stopPlayback()——播放器层把用户主动停止以 Played 收口，
+                                    // 迟到的 Played 会被代次挡掉，不会覆盖这里的 Idle 呈现；也禁止另立「已停止」文案。
+                                    onStopPronunciation = {
+                                        wordCardPronunciationRequest++
+                                        pronunciationProvider?.stopPlayback()
+                                        wordCardPronunciationStatus = PronunciationStatus.Idle
+                                        wordCardPronunciationMessage = null
+                                    },
+                                    onRetry = { wordCardViewModel.load(state.profile.id) },
+                                    onStartNewPhase = wordCardViewModel::startNewPhase,
+                                    // 回执态的唯一推进口（原型「下一个词 / 完成本轮」）：只有它换卡，
+                                    // 评分成功后的三档按钮已经不在组合里。
+                                    onNext = wordCardViewModel::advance,
+                                    onBackToPlan = exitLearning,
+                                )
+                            }
+                            if (detailCard != null) {
+                                val card = detailCard!!
+                                // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
+                                // 否则点击一次会累计两次调用（见 2bff744 回归）。
+                                CardDetailScreen(
+                                    card = card,
+                                    onRelearn = {
+                                        selectedRelearnCard = card
+                                        vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
+                                    },
+                                    onBack = {
+                                        detailPronunciationRequest++
+                                        detailPronunciationMessage = PronunciationStatus.Idle
+                                        wordCardViewModel.clearDetail()
+                                    },
+                                    onNext = if (wordCardViewModel.hasNextDetail()) {
+                                        {
+                                            detailPronunciationRequest++
+                                            detailPronunciationMessage = PronunciationStatus.Idle
+                                            wordCardViewModel.nextDetail()
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    onSpeak = {
+                                        val request = ++detailPronunciationRequest
+                                        detailPronunciationMessage = PronunciationStatus.Playing
+                                        pronunciationScope.launch {
+                                            val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(card.cardId)))
+                                            if (request == detailPronunciationRequest && detailCard === card) {
+                                                detailPronunciationMessage = result
+                                            }
+                                        }
+                                    },
+                                    onSpeakBritish = {
+                                        val request = ++detailPronunciationRequest
+                                        detailPronunciationMessage = PronunciationStatus.Playing
+                                        pronunciationScope.launch {
+                                            val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(card.cardId)))
+                                            if (request == detailPronunciationRequest && detailCard === card) {
+                                                detailPronunciationMessage = result
+                                            }
+                                        }
+                                    },
+                                    pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                                    pronunciationControlsEnabled = true,
+                                    pauseResumeSupported = pauseResumeSupported,
+                                    // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
+                                    onPauseResume = {
+                                        val held = detailPronunciationMessage
+                                        val next = when {
+                                            held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                            held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                            // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                            // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                            else -> held
+                                        }
+                                        detailPronunciationMessage = next
+                                    },
+                                    // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
+                                    // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
+                                    onStopPronunciation = {
+                                        detailPronunciationRequest++
+                                        pronunciationProvider?.stopPlayback()
+                                        detailPronunciationMessage = PronunciationStatus.Idle
+                                    },
+                                    favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
+                                    onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
+                                    onAskAi = {
+                                        // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
+                                        showWordQaCard = card
+                                        wordQaViewModel?.reset()
+                                        wordQaViewModel?.loadNotes(state.profile.id, card.lemma, card.wordBookId, card.cardId)
+                                    },
+                                )
+                                showWordQaCard?.let { qaCard ->
+                                    WordAiQaScreen(
+                                        lemma = qaCard.lemma,
+                                        state = wordQaUiState,
+                                        onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                        onCancelAsk = { wordQaViewModel?.cancelAsk() },
+                                        onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
+                                        onSaveNote = { wordQaViewModel?.saveNote() },
+                                        onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
+                                        savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                                        onBack = { showWordQaCard = null },
+                                        onOpenAiSettings = {
+                                            showWordQaCard = null
+                                            openAiProfilesOrSettings()
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    } else if (route is AppOverlayRoute.WorksheetPreview) {
+                        val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        // 只有用户显式点「导出」才会拉起系统面板；重进预览页不会重复弹出。
+                        val shareFile = worksheetViewModel?.shareRequest?.collectAsState()?.value
+                        LaunchedEffect(shareFile) {
+                            shareFile?.let { file ->
+                                val launched = runCatching {
+                                    val intent = WorksheetShareLauncher(context).createChooser(file)
+                                    if (context !is android.app.Activity) {
+                                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                }.isSuccess
+                                if (launched) {
+                                    worksheetViewModel?.consumeShareRequest()
+                                } else {
+                                    worksheetViewModel?.reportShareUnavailable()
+                                    worksheetViewModel?.consumeShareRequest()
+                                }
+                            }
+                        }
+                        WorksheetPreviewScreen(
+                            pages = worksheetState?.pages.orEmpty(),
+                            renderedFile = worksheetState?.renderedFile,
+                            rendering = worksheetState?.rendering ?: false,
+                            message = worksheetState?.message,
+                            onBack = {
+                                worksheetViewModel?.dismissPreview()
+                                showWorksheetPreview = false
+                            },
+                            onExport = { worksheetViewModel?.export() },
+                        )
+                    } else if (route is AppOverlayRoute.WorksheetSettings) {
+                        val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
+                        WorksheetSettingsScreen(
+                            settings = worksheetState?.settings
+                                ?: com.example.englishlearning.learning.worksheet.WorksheetSettings(),
+                            selectedCount = worksheetState?.selectedCount ?: 0,
+                            onToggleDirection = { worksheetViewModel?.toggleDirection(it) },
+                            onSelectRange = { worksheetViewModel?.selectRange(it) },
+                            onSelectTemplate = { worksheetViewModel?.selectTemplate(it) },
+                            onToggleGrid = { worksheetViewModel?.toggleGrid(it) },
+                            onToggleAnswers = { worksheetViewModel?.toggleAnswers(it) },
+                            onPreview = {
+                                worksheetViewModel?.preview()
+                                if (worksheetViewModel?.uiState?.value?.phase == WorksheetPhase.PREVIEW) {
+                                    showWorksheetPreview = true
+                                }
+                            },
+                            onBack = { showWorksheetSettings = false },
+                        )
+                    } else if (route is AppOverlayRoute.ReviewQueue) {
+                        // 批 1 Task 17：复习队列（原型 `learn-review`）。数据不另开通路——到期队列就是今日计划快照的
+                        // `dueCardIds` 取到内容后的那份列表，与「今日词单」的复习节同一份快照、同一个来源。
+                        // 挂载位置排在词单分支之前：两条路由互斥（没有一处界面能同时打开它们），但「挂载更早 = z 序更高」
+                        // 与本文件「后声明的 BackHandler 优先」必须配成一对，否则以后有人照着返回键去猜层级。
+                        ReviewQueueScreen(
+                            state = route.plan,
+                            onBack = { showReviewQueue = false },
+                            onStartReview = {
+                                showReviewQueue = false
+                                wordCardViewModel.load(state.profile.id)
+                                showLearning = true
+                            },
+                            onOpenWord = { card ->
+                                selectedSearchCard = card
+                                detailSource = DetailSource.TODAY_QUEUE
+                            },
+                        )
+                    } else if (route is AppOverlayRoute.TodayWordList) {
+                        // 批 1 Task 16：今日词单（原型 `learn-queue`）。数据不另开一条通路——词单就是今日计划快照
+                        // 的 `newCardIds` / `dueCardIds` 取到内容后的那份列表，与同屏强卡的计数同一份快照。
+                        TodayWordListScreen(
+                            state = route.plan,
+                            onBack = { showTodayWordList = false },
+                            onOpenSetup = {
+                                // 原型 `.bar-action「调整」→ plan-edit`：设置层压在本层之上（挂载更早 = z 序更高），
+                                // 这里把本层关掉，返回时回到学习主页，而不是留下两层叠着等返回键逐层拆。
+                                showTodayWordList = false
+                                showSetup = true
+                            },
+                            onStartLearning = {
+                                showTodayWordList = false
+                                wordCardViewModel.load(state.profile.id)
+                                showLearning = true
+                            },
+                            onOpenWord = { card ->
+                                selectedSearchCard = card
+                                detailSource = DetailSource.TODAY_QUEUE
+                            },
+                        )
+                    } else if (route is AppOverlayRoute.CheckIn) {
+                        // 批 1 Task 6：快照在宿主层统一收（见上方 checkInState），这里不再收第二份。
+                        CheckInScreen(
+                            state = checkInState,
+                            onBack = { showCheckIn = false },
+                            onRetry = { checkInViewModel?.load(state.profile.id) },
+                        )
+                    } else if (route is AppOverlayRoute.WordBank) {
+                        // 词库页（spec §3.3）：一枚壳 + 四分段，一段一面。两枚旧页降级为 pane——
+                        // 词书段复用 WordBookWordsScreen（自带筛选与字母栏），其余三段复用合并页 MyWordsScreen
+                        // 并靠 visibleSections 收窄到点名的那一段（三段共用同一处形参表，见 myWordsPane）。
+                        // 页头只留壳上那一枚：两枚 pane 都以 showHeader = false 挂进来。
+                        val myWordsPane: @Composable (MyWordsSection) -> Unit = { paneSection ->
+                            MyWordsScreen(
+                                favoritesState = favoritesState ?: FavoritesUiState.Loading,
+                                vocabularyState = vocabularyState,
+                                wrongWordsState = wrongWordsState,
+                                section = paneSection,
+                                // 收窄到点名段：合并页默认三段同屏（老行为与 connected 夹具不破），
+                                // 词库页里每格只该看见自己那一段。
+                                visibleSections = listOf(paneSection),
+                                showHeader = false,
+                                onBack = { showWordBank = false },
+                                onOpenFavoriteWord = { favoritesViewModel?.open(it) },
+                                onUnfavorite = { favoritesViewModel?.toggle(it.cardId, it.wordBookId, it.lemma) },
+                                onOpenVocabularyCard = {
+                                    detailSource = DetailSource.VOCABULARY
+                                    selectedSearchCard = it
+                                },
+                                onOpenWrongWord = {
+                                    detailPronunciationMessage = PronunciationStatus.Idle
+                                    learningRecordPronunciationRequest++
+                                    detailSource = DetailSource.RECORDS
+                                    selectedLearningRecordCard = it
+                                },
+                                // I-4（修复轮 1）：生词本段两枚能力接宿主**现成**通路，不新建任何线路——
+                                // 重学走 showVocabularyRelearn 分支（其渲染早于本页、自带 BackHandler），
+                                // 行内标记走老页挂载处同一回调 vocabularyViewModel?.markMastered。
+                                onStartRelearn = { showVocabularyRelearn = true },
+                                onMarkMastered = { vocabularyViewModel?.markMastered(state.profile.id, it) },
+                                // N-1（修复轮 3）：结果态必须由本页消费并复位——与老页挂载处 :852/:853 **同一来源**
+                                // （vocabularyMasteryState 在宿主层恒收集，复位回调就是 clearMasteryMessage），
+                                // 不新建通路。少了这两行时：失败静默（StorageUnavailable 不 reload、合并页零反馈），
+                                // 而残留的 Success 会让随后打开的老生词页弹出一枚属于另一页动作的结果框。
+                                masteryState = vocabularyMasteryState,
+                                onDismissMasteryMessage = { vocabularyViewModel?.clearMasteryMessage() },
+                                // m-2（修复轮 1）：重试只刷用户点的那一册，不再一次拉三册
+                                // （旧写法会把另外两段打回 Loading，连带闪 loading 与历史 I-1 的重复落位）。
+                                onRetry = { retrySection ->
+                                    when (retrySection) {
+                                        MyWordsSection.Favorites -> favoritesViewModel?.load(state.profile.id)
+                                        MyWordsSection.Wordbook -> vocabularyViewModel?.load(state.profile.id)
+                                        MyWordsSection.Wrong -> wrongWordsViewModel?.load(state.profile.id)
+                                    }
                                 },
                             )
                         }
-                    }
-                }
-            } else if (route is AppOverlayRoute.WordBookTransfer) {
-                // 决策 §4：`.wbpack` 的导入/导出子页。两枚 SAF launcher 与选册对话框都住在子屏内部
-                // （owner 与消费屏同层，与 `BackupExportScreen` / `BackupRestoreScreen` 的分工一致），
-                // 宿主这一分支只负责路由；VM 为 null 时子屏自己把两行真禁用。
-                WordBookTransferScreen(
-                    onBack = { showWordBookTransfer = false },
-                    viewModel = wordBookTransferViewModel,
-                )
-            } else if (route is AppOverlayRoute.Settings) {
-                // 2026-11-02：设置回到「我的」里的子页（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
-                // 上面所有设置子屏（发音 / 提醒 / 备份 hub / 关于 / AI 服务）都先真先赢，
-                // 所以本分支挂的是设置首页本身；返回键由声明更早的 `showSettings` BackHandler 接管。
-                // 词书内容包与提醒发音不再是这页的折叠行：它们是同级的两枚子页（上面两支）。
-                SettingsScreen(onBack = { showSettings = false })
-            } else if (route == null) {
-                // 四个一级 tab 的根页面装在这里；上面所有分支都是覆盖全屏的二级层，因此天然不显示导航。
-                //
-                // 批 B（决策 `docs/decisions/2026-11-06-adaptive-window-layout.md`）：窗口类别**只在宿主这一层判定一次**，
-                // 判定源是内容区实测宽度（[BoxWithConstraints.maxWidth]），不是屏幕密度换算出来的假值；结果经
-                // [LocalAppWindowLayout] 下发给页头（hero 降级）与内容列（宽度上限）。各业务屏自己**不读**类别——
-                // 版面分支收在这一层，避免每个屏各自长出一套横屏版面（`AppWindowLayoutContractTest` 按读点白名单钉死）。
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val windowLayout = AppWindowLayoutPolicy.classify(maxWidth)
-                    val usesSideNavigation = AppWindowLayoutPolicy.usesSideNavigation(windowLayout)
-                    CompositionLocalProvider(LocalAppWindowLayout provides windowLayout) {
-                        Scaffold(
-                            containerColor = MintBackground,
-                            // 窄窗（手机竖屏）仍是底部四栏；中/宽窗改由内容区里的侧边导航栏承担同一套导航语义。
-                            bottomBar = {
-                                if (!usesSideNavigation) {
-                                    AppBottomBar(selected = selectedTab, onSelect = { selectedTab = it })
+                        WordBankScreen(
+                            wordBookName = todayReady?.wordBookName ?: "未选择词书",
+                            section = wordBankSection,
+                            onSelectSection = { wordBankSection = it },
+                            onBack = {
+                                if (bookPaneShowsWordList) bookPaneShowsWordList = false else showWordBank = false
+                            },
+                            bookPane = {
+                                if (bookPaneShowsWordList) {
+                                    // 词书单词是纯浏览场景：点词只打开详情，不自动发音（D1/D2）。
+                                    // 页头关掉（`showHeader = false`）：返回位只留壳那一枚，否则同屏两个「返回」。
+                                    WordBookWordsScreen(
+                                        state = wordBookWordsState,
+                                        listState = wordBookWordsListState,
+                                        onBack = { bookPaneShowsWordList = false },
+                                        onFilter = { wordBookWordsViewModel?.selectFilter(it) },
+                                        onRetry = { wordBookWordsViewModel?.retry() },
+                                        onOpenWord = {
+                                            detailPronunciationMessage = PronunciationStatus.Idle
+                                            learningRecordPronunciationRequest++
+                                            detailSource = DetailSource.RECORDS
+                                            selectedLearningRecordCard = it.card
+                                        },
+                                        showHeader = false,
+                                    )
+                                } else {
+                                    // 两枚状态计数只在词单真读出来时给：`null` 让详情页把那两行整行不画，
+                                    // 而不是在「还没读出来」时摆一个「0」（读不到的那枚整枚不显示）。
+                                    val bookWords = wordBookWordsState.words
+                                    val wordsReadable = !wordBookWordsState.loading &&
+                                        wordBookWordsState.error == null &&
+                                        bookWords.isNotEmpty()
+                                    BookDetailScreen(
+                                        bookName = todayReady?.wordBookName ?: "未选择词书",
+                                        progress = todayReady?.bookProgress,
+                                        learningCount = if (wordsReadable) {
+                                            bookWords.count { it.status == WordBookRecordStatus.Learning }
+                                        } else {
+                                            null
+                                        },
+                                        dueCount = if (wordsReadable) {
+                                            bookWords.count { it.status == WordBookRecordStatus.Due }
+                                        } else {
+                                            null
+                                        },
+                                        onOpenWordList = { bookPaneShowsWordList = true },
+                                        // 「更换词书」走既有学习设置（选词书在那里）：先关词库再把设置层压上来，
+                                        // 返回时回到学习主页，不留两层叠着等返回键逐层拆（与今日词单同一条口径）。
+                                        onOpenPicker = {
+                                            showWordBank = false
+                                            showSetup = true
+                                        },
+                                    )
                                 }
                             },
-                        ) { contentPadding ->
-                            Row(modifier = Modifier.fillMaxSize()) {
-                                if (usesSideNavigation) {
-                                    AppSideNav(selected = selectedTab, onSelect = { selectedTab = it })
+                            newPane = { myWordsPane(MyWordsSection.Wordbook) },
+                            wrongPane = { myWordsPane(MyWordsSection.Wrong) },
+                            favoritePane = { myWordsPane(MyWordsSection.Favorites) },
+                            // 分段标签的条数（原型 `sMeWords` 的三格计数）：只从三段**已有的** UiState 现算，
+                            // 不新开数据通路、不读仓储。读不到就是 null —— 壳会把那一格画成裸段名，
+                            // 而不是用 0 把「还没读出来」说成「确实是空的」。
+                            newCount = (vocabularyState as? VocabularyUiState.Ready)?.items?.size,
+                            wrongCount = (wrongWordsState as? WrongWordsUiState.Ready)?.cards?.size,
+                            favoriteCount = (favoritesState as? FavoritesUiState.Ready)?.words?.size,
+                        )
+                    } else if (route is AppOverlayRoute.AiProfiles) {
+                        val editor by aiProfileViewModel?.editor?.collectAsState() ?: remember { mutableStateOf(null) }
+                        // 批 4 Task 3：AI 服务屏里的两枚危险动作（清除密钥 / 删除配置）不再点了就执行——
+                        // 屏侧只发请求，确认框住在这里。请求态是屏内局部状态，所以两枚确认框必须与
+                        // `AiProfileSettingsScreen(` 同住这一分支：合成样片之外的第三级浮层不归本层管。
+                        var pendingAiProfileDelete by remember(state.profile.id) { mutableStateOf<String?>(null) }
+                        var pendingAiProfileKeyClear by remember(state.profile.id) { mutableStateOf<String?>(null) }
+                        AiProfileSettingsScreen(
+                            listState = aiProfiles ?: AiProfileListUiState.Loading,
+                            editor = editor,
+                            onAdd = { aiProfileViewModel?.startCreate() },
+                            onEdit = { aiProfileViewModel?.startEdit(it) },
+                            onDraftChange = { aiProfileViewModel?.updateDraft(it) },
+                            onSave = { aiProfileViewModel?.save() },
+                            onCloseEditor = { aiProfileViewModel?.closeEditor() },
+                            onRequestDeleteProfile = { pendingAiProfileDelete = it },
+                            onRequestDeleteKey = { pendingAiProfileKeyClear = it },
+                            onTestConnection = { aiProfileViewModel?.testConnection() },
+                            onConfirmOutbound = { confirmed -> aiProfileViewModel?.confirmOutbound(confirmed) },
+                            onSetDefaultTextProfile = { aiProfileViewModel?.setDefaultTextProfile(it) },
+                            onSetDefaultImageProfile = { aiProfileViewModel?.setDefaultImageProfile(it) },
+                            onBack = {
+                                showAiProfiles = false
+                                speechSettingsViewModel?.load()
+                            },
+                        )
+                        // 删除配置：配置元数据与已保存的密钥一起走（仓储侧先删密钥再删元数据），
+                        // 所以正文必须点名密钥也会清除；文章/收藏/学习记录不在这一侧，如实保留面。
+                        pendingAiProfileDelete?.let { profileId ->
+                            ConfirmDestructiveDialog(
+                                state = true,
+                                title = "删除这套 AI 配置？",
+                                cascadeLines = listOf(
+                                    "将删除这台设备上这套配置的名称、网站地址、Endpoint、模型与高级参数，并清除已保存的密钥。",
+                                ),
+                                keepLines = listOf(
+                                    "文章、收藏、学习记录与词库不受影响；其他 AI 配置也不受影响。",
+                                ),
+                                irreversible = true,
+                                confirmLabel = "确认删除",
+                                onConfirm = {
+                                    aiProfileViewModel?.deleteProfile(profileId)
+                                    pendingAiProfileDelete = null
+                                },
+                                onDismiss = { pendingAiProfileDelete = null },
+                            )
+                        }
+                        // 清除密钥：元数据全留，只丢密钥；这套配置若正被当作默认服务，默认位会一并解绑。
+                        pendingAiProfileKeyClear?.let { profileId ->
+                            ConfirmDestructiveDialog(
+                                state = true,
+                                title = "清除已保存的密钥？",
+                                cascadeLines = listOf(
+                                    "清除后这套配置将无法调用服务，需要重新粘贴密钥才能再用。",
+                                ),
+                                keepLines = listOf(
+                                    "名称、网站地址、Endpoint、模型与高级参数保留；文章、收藏与学习记录不受影响。",
+                                ),
+                                irreversible = true,
+                                confirmLabel = "确认清除",
+                                onConfirm = {
+                                    aiProfileViewModel?.deleteKey(profileId)
+                                    pendingAiProfileKeyClear = null
+                                },
+                                onDismiss = { pendingAiProfileKeyClear = null },
+                            )
+                        }
+                    } else if (route is AppOverlayRoute.SpeechSettings) {
+                        SpeechSettingsScreen(
+                            state = speechState,
+                            onSelect = { engine, profileId -> speechSettingsViewModel?.select(engine, profileId) },
+                            onOpenAiProfiles = {
+                                aiProfileViewModel?.load()
+                                showAiProfiles = aiProfileViewModel != null
+                            },
+                            onAddMiMoPreset = { speechSettingsViewModel?.addMiMoPreset() },
+                            onPreview = { text -> speechSettingsViewModel?.preview(text) },
+                            onToggleAutoSpeakOnCardReady = { enabled ->
+                                speechSettingsViewModel?.setAutoSpeakOnCardReady(enabled)
+                            },
+                            // 批 5 Task 1：语速由点按循环改为滑杆，宿主只把滑杆位置转成倍率下发；
+                            // 吸附到四档由 ViewModel 做（`SpeechRateSteps` 是唯一档位表）。
+                            onSetSpeechRate = { rate -> speechSettingsViewModel?.setSpeechRate(rate) },
+                            onBack = { showSpeechSettings = false },
+                        )
+                    } else if (route is AppOverlayRoute.ReminderSettings) {
+                        // F4-02：权限判定在 composable 上下文完成；onEnableRequested 只收"已授权"结果。
+                        // 拒绝后不重复请求（Android 记住拒绝态），设置说明提供系统设置入口。
+                        //
+                        // 批 5 收口（真机目视）：原来把 `notificationGranted` 当**组合期快照**捕获进 lambda，
+                        // 授权完成后没有任何回调去 `setEnabled(true)`，于是开关永远停在关、用户得先退出本页再进来。
+                        // 改成「权限结果走 launcher 回调」：授权成功当场打开开关；已授权时点一下直接落库。
+                        // 只换权限通路，状态机与落库口径一律不动（仍只经 `setEnabled(true)`）。
+                        val reminderActivity = LocalContext.current as? android.app.Activity
+                        val needsNotificationPermission = android.os.Build.VERSION.SDK_INT >= 33 &&
+                            reminderActivity != null &&
+                            androidx.core.content.ContextCompat.checkSelfPermission(
+                                reminderActivity,
+                                android.Manifest.permission.POST_NOTIFICATIONS,
+                            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                        val notificationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                            androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                        ) { granted ->
+                            if (granted) reminderSettingsViewModel?.setEnabled(true)
+                        }
+                        ReminderSettingsScreen(
+                            onBack = { showReminderSettings = false },
+                            onEnableRequested = {
+                                if (needsNotificationPermission) {
+                                    notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    reminderSettingsViewModel?.setEnabled(true)
                                 }
-                                // 内容列：侧栏那一格之外剩余空间内居中，并按类别收成上限宽度内的单列，
-                                // 免得平板上正文行在 1200dp 里横向拉成一条带。
-                                Box(
-                                    modifier = Modifier.weight(1f).padding(contentPadding),
-                                    contentAlignment = Alignment.TopCenter,
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .widthIn(max = AppWindowLayoutPolicy.contentMaxWidth(windowLayout))
-                                            .fillMaxSize(),
-                                    ) {
-                                        // 批 D-3 站 2：整段 tab 分发放进 AnimatedContent，退场腿在自己的
-                                        // lambda 入参 `tab` 里读旧 tab；`tab == selectedTab` 才是「这腿是当前目标」。
-                                        // 四支内容与外层两级 Box 一字不动，只把分发对象换成 lambda 入参。
-                                        AnimatedContent(
-                                            targetState = selectedTab,
-                                            modifier = Modifier.fillMaxSize(),
-                                            transitionSpec = {
-                                                AppTransition.contentTransform(
-                                                    ScreenTransitionDirectionPolicy.tab(
-                                                        from = initialState,
-                                                        to = targetState,
-                                                    ),
-                                                )
-                                            },
-                                        ) { tab ->
-                                            TabLeg(tab == selectedTab) {
-                                                when (tab) {
-                                            AppTab.LEARNING -> TodayPlanScreen(
-                                                state = todayState,
-                                                onRetry = { todayPlanViewModel.load(state.profile.id) },
-                                                onOpenSetup = { showSetup = true },
-                                                onStartLearning = {
-                                                    wordCardViewModel.load(state.profile.id)
-                                                    showLearning = true
-                                                },
-                                                // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
-                                                // 全屏页，避免出现「底导之上再压一层」的混乱层级。
-                                                // D-5：落点由 [openTodayArticleFromLearningPage] 按真值判——今天有文章就直开，
-                                                // 没文章/没解锁才切到阅读 tab 交代原因。
-                                                onOpenReading = openTodayArticleFromLearningPage,
-                                                // 批 1 Task 4/5 + Task 16/17：学习页的四条裸行，目的地分别是今日词单 / 复习队列 /
-                                                // 今日文章 / 本机词库。词库那条打开通路必须**同时**点名段位：只赋 showWordBank 不赋段位 =
-                                                // 从复习行落到词书段（用户点的是复习，看到的是列表第一页）。
-                                                onOpenWordList = { showTodayWordList = true },
-                                                onOpenReviewQueue = { showReviewQueue = true },
-                                                onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
-                                                // 批 1 Task 19：「复习生词本」那枚终点（`onReviewWords` → 词库生词段）随原型
-                                                // `sLearnEmpty`（`assets/app.js:501-518`）下线——那一屏只画两枚出口，而它的两枚
-                                                // 走下面的既有通路（onOpenSetup / onOpenReading）。生词段的出口是词库页自己的
-                                                // 分段控件（`WordBankScreen` 的四格 tab），不留第二条绕过 tab 的暗线。
-                                                onOpenSearch = {
-                                                    // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
-                                                    // 「浏览词书」——那属于词书管理语义，不是「查一个词」。
-                                                    // 传空串即落在「最近搜索」。
-                                                    globalVocabularySearchViewModel?.setProfile(state.profile.id)
-                                                    globalVocabularySearchViewModel?.openSearch("")
-                                                    showGlobalVocabularySearch = globalVocabularySearchViewModel != null
-                                                },
-                                                // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
-                                                // 2026-11-02 起设置是「我的」里的子页：齿轮直接打开设置子页，
-                                                // 返回即回到原页；底导不再有第五格。
-                                                onOpenSettings = { showSettings = true },
-                                                // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
-                                                // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
-                                                streakDays = streakDays,
-                                                todayArticleRead = todayArticleRead,
-                                            )
-                                            AppTab.READING -> ReadingAccessScreen(
-                                                state = readingState,
-                                                onSelectType = { readingAccessViewModel?.selectType(it) },
-                                                onOpenHistory = { showReadingHistory = true },
-                                                onGenerate = { readingAccessViewModel?.generate() },
-                                                onRegenerate = { readingAccessViewModel?.generate(regenerate = true) },
-                                                onOpenTodayArticle = { readingAccessViewModel?.openTodayArticle() },
-                                                onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
-                                                onCancelGeneration = { readingAccessViewModel?.cancelGeneration() },
-                                                onOpenAiSettings = {
-                                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置子页。
-                                                    aiProfileViewModel?.load()
-                                                    if (aiProfileViewModel != null) {
-                                                        showAiProfiles = true
-                                                    } else {
-                                                        showSettings = true
+                            },
+                            viewModel = reminderSettingsViewModel,
+                        )
+                    } else if (route is AppOverlayRoute.BackupExport) {
+                        // F4-03：无认证 Salvage 包导出确认页；SAF「另存为」在页面内部处理，取消不写文件。
+                        BackupExportScreen(
+                            onBack = { showBackupExport = false },
+                            viewModel = backupExportViewModel,
+                        )
+                    } else if (route is AppOverlayRoute.BackupRestore) {
+                        // F4-04：新设备认证恢复页；扫码/密码/二次确认在页面内部处理，无旁路入口。
+                        BackupRestoreScreen(
+                            onBack = { showBackupRestore = false },
+                            viewModel = backupRestoreViewModel,
+                        )
+                    } else if (route is AppOverlayRoute.BackupPairingExport) {
+                        // F4-04：旧设备认证导出页；系统认证门控 + 配对二维码 + 可选密码 + SAF 落盘，页面内无跳过认证入口。
+                        BackupPairingExportScreen(
+                            onBack = { showBackupPairingExport = false },
+                            viewModel = backupPairingExportViewModel,
+                        )
+                    } else if (route is AppOverlayRoute.BackupHub) {
+                        // 裁决⑥：三节子页。它挂在三枚子屏**之后**（先真先赢）——子屏开着时压在上面，
+                        // 子屏 onBack 只置子屏 false，自然回到本页；本页返回键再回设置页。
+                        BackupHubScreen(
+                            onBack = { showBackupHub = false },
+                            onOpenBackupExport = { showBackupExport = backupExportViewModel != null },
+                            onOpenBackupPairingExport = { showBackupPairingExport = backupPairingExportViewModel != null },
+                            onOpenBackupRestore = { showBackupRestore = backupRestoreViewModel != null },
+                            onDeleteAllLearningData = {
+                                learningDataDeletionViewModel?.requestDelete(state.profile.id)
+                            },
+                            deleteAllLearningDataNotice = learningDataDeletionUi.notice,
+                        )
+                    } else if (route is AppOverlayRoute.Licenses) {
+                        // F5-04：许可台账页。数据源=构建期从 docs/third-party-notices.md 同步的 assets；
+                        // 读不到传空串，页面如实显示「许可台账暂不可读」，零假台账零假入口。
+                        // 批 5 Task 3（对账 2 的宿主侧一半）：空态的「重新读取」必须能真的重读——旧写法是
+                        // 无键 `remember`，一次失败就永远缓存了空串，页面那枚重试键会是假按钮。
+                        // 故把重读次数当键：点一次重读，`remember` 失效重跑一遍 assets 读取。
+                        //
+                        // QA3 A1：本分支必须排在下面 `showAbout` 之前。挂载 `else if` 链先声明者赢，而许可页
+                        // 如今不再清 `showAbout`（清了会让页内「返回」落回「我的」而不是「关于」）——
+                        // 两枚同时为真时只有先声明者进得了组合，顺序写反等于「点了许可行没反应」。
+                        val licensesContext = LocalContext.current
+                        var licensesReload by remember { mutableStateOf(0) }
+                        val noticesMarkdown = remember(licensesReload) {
+                            runCatching {
+                                licensesContext.assets.open("third-party-notices.md").bufferedReader().use { it.readText() }
+                            }.getOrDefault("")
+                        }
+                        LicensesScreen(
+                            markdown = noticesMarkdown,
+                            onBack = { showLicenses = false },
+                            onRetry = { licensesReload += 1 },
+                        )
+                    } else if (route is AppOverlayRoute.About) {
+                        // 「关于」页：版本号从构建信息取（`buildConfig = true`），许可数暂留 `null`
+                        // （行文案退成不带数字的那一句；许可条数以 `LicensesScreen` 的解析结果为准，后续注入）。
+                        AboutScreen(
+                            versionName = BuildConfig.VERSION_NAME,
+                            licenseCount = null,
+                            onBack = { showAbout = false },
+                            // 2026-10-31 去重：许可只从关于页进（关于页只剩这一条说明行）；
+                            // 备份的唯一入口在 设置 → 数据与安全，本页不再挂同落点的第二行。
+                            // QA3 A1：这里不再顺手 `showAbout = false`——关于页留在栈下，
+                            // 许可页的两条出口（页内返回、系统返回）都自然回到关于页。
+                            onOpenLicenses = { showLicenses = true },
+                        )
+                    } else if (route is AppOverlayRoute.SentenceAnalysis) {
+                        // 已实现的功能走真实屏幕；骨架页只留给尚未接通的功能。
+                        val sentenceState = sentenceAnalysisViewModel?.uiState?.collectAsState()?.value
+                            ?: SentenceAnalysisUiState.Idle
+                        // 批 4 Task 5：屏侧只上报朗读请求，语音能力与代次校验留在本层（与拍照翻译同形）：
+                        // 连点两枚段落后，先发的那次朗读结果不许覆盖后一次的反馈。
+                        var sentenceSpeakMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
+                        var sentenceSpeakRequest by remember { mutableStateOf(0L) }
+                        var sentenceSpeakJob by remember { mutableStateOf<Job?>(null) }
+                        SentenceAnalysisScreen(
+                            state = sentenceState,
+                            onAnalyze = { sentence -> sentenceAnalysisViewModel?.analyze(sentence, state.profile.id) },
+                            onCancelAnalysis = { sentenceAnalysisViewModel?.cancelAnalysis() },
+                            onConfirmOutbound = { sentenceAnalysisViewModel?.confirmOutbound(it) },
+                            speakMessage = sentenceSpeakMessage.message(),
+                            onSpeak = { text ->
+                                val request = ++sentenceSpeakRequest
+                                sentenceSpeakJob?.cancel()
+                                sentenceSpeakMessage = PronunciationStatus.Playing
+                                sentenceSpeakJob = pronunciationScope.launch {
+                                    val result = pronunciationStatus(
+                                        // 长难句分析屏没有任何主键可交代，kind 照记、id 留空（决策 D-7/D-9）。
+                                        pronunciationProvider?.speakSentence(text, entity = PronunciationEntityRef.SentenceAnalysis),
+                                    )
+                                    if (request == sentenceSpeakRequest) {
+                                        sentenceSpeakMessage = result
+                                    }
+                                }
+                            },
+                            onBack = {
+                                sentenceSpeakJob?.cancel()
+                                selectedFeatureKey = null
+                            },
+                            onOpenAiSettings = {
+                                selectedFeatureKey = null
+                                openAiProfilesOrSettings()
+                            },
+                        )
+                    } else if (route is AppOverlayRoute.PhotoTranslation) {
+                        // F3-03：拍照翻译。图片只进临时工作区（零残留由状态机保证）；翻译每次出站都确认。
+                        val photoState = photoTranslationViewModel?.uiState?.collectAsState()?.value
+                            ?: PhotoTranslationUiState()
+                        var photoSpeakMessage by remember { mutableStateOf(PronunciationStatus.Idle) }
+                        var photoSpeakRequest by remember { mutableStateOf(0L) }
+                        var photoSpeakJob by remember { mutableStateOf<Job?>(null) }
+                        // 批 4 Task 4：历史删除不再点了就执行——屏侧只发请求，确认框归本层（与 AI 服务页同形）。
+                        var pendingPhotoTranslationDelete by remember(state.profile.id) { mutableStateOf<String?>(null) }
+                        LaunchedEffect(state.profile.id) { photoTranslationViewModel?.refreshHistory(state.profile.id) }
+                        PhotoTranslationScreen(
+                            state = photoState,
+                            onImageBytes = { bytes -> photoTranslationViewModel?.onImageBytes(bytes) },
+                            onOcrTextEdited = { text -> photoTranslationViewModel?.onOcrTextEdited(text) },
+                            onTranslate = { photoTranslationViewModel?.onTranslateTapped() },
+                            onConfirmOutbound = { confirmed -> photoTranslationViewModel?.onConfirmationResult(confirmed) },
+                            onCancelTranslate = { photoTranslationViewModel?.cancelTranslate() },
+                            onRefreshModelStatus = { photoTranslationViewModel?.refreshModelStatus() },
+                            onInstallModel = { photoTranslationViewModel?.installModel() },
+                            onUninstallModel = { photoTranslationViewModel?.uninstallModel() },
+                            onSave = { photoTranslationViewModel?.saveCurrentTranslation(state.profile.id) },
+                            onRequestDeleteSaved = { recordId -> pendingPhotoTranslationDelete = recordId },
+                            onOpenDictionary = { tapped ->
+                                selectedSearchCard = null
+                                searchPronunciationMessage = PronunciationStatus.Idle
+                                searchPronunciationRequest++
+                                searchPronunciationJob?.cancel()
+                                globalVocabularySearchViewModel?.setProfile(state.profile.id)
+                                globalVocabularySearchViewModel?.openSearch(tapped)
+                                showGlobalVocabularySearch = globalVocabularySearchViewModel != null
+                            },
+                            speakMessage = photoSpeakMessage.message(),
+                            onSpeak = { sentence ->
+                                val request = ++photoSpeakRequest
+                                photoSpeakJob?.cancel()
+                                photoSpeakMessage = PronunciationStatus.Playing
+                                photoSpeakJob = pronunciationScope.launch {
+                                    // 拍照翻译的句子只有保存之后才有主键；未保存时 kind 记 PhotoTranslation、id 留空。
+                                    val result = pronunciationStatus(
+                                        pronunciationProvider?.speakSentence(sentence, entity = PronunciationEntityRef.photoTranslation(photoState?.lastSavedRecordId)),
+                                    )
+                                    if (request == photoSpeakRequest) {
+                                        photoSpeakMessage = result
+                                    }
+                                }
+                            },
+                            onBack = {
+                                photoSpeakJob?.cancel()
+                                photoTranslationViewModel?.reset()
+                                selectedFeatureKey = null
+                            },
+                            onOpenAiSettings = {
+                                selectedFeatureKey = null
+                                openAiProfilesOrSettings()
+                            },
+                        )
+                        // 批 4 Task 4：历史删除的确认门。级联句说清「原图 + 译文一起走」，保留面说清「别的都没动」，
+                        // 不点确认零写入（与「删除这一版」「删除这套 AI 配置」同一档）。
+                        pendingPhotoTranslationDelete?.let { recordId ->
+                            ConfirmDestructiveDialog(
+                                state = true,
+                                title = "删除这条翻译记录？",
+                                cascadeLines = listOf(
+                                    "将删除这条已保存的原文、译文，以及随它保存的原图（图片文件同时从本机清除）。",
+                                ),
+                                keepLines = listOf(
+                                    "其他历史记录、词库、文章与学习记录不受影响。",
+                                ),
+                                irreversible = true,
+                                confirmLabel = "确认删除",
+                                onConfirm = {
+                                    photoTranslationViewModel?.deleteSaved(state.profile.id, recordId)
+                                    pendingPhotoTranslationDelete = null
+                                },
+                                onDismiss = { pendingPhotoTranslationDelete = null },
+                            )
+                        }
+                    } else if (route is AppOverlayRoute.ImageStudio) {
+                        val studioState = imageStudioViewModel?.uiState?.collectAsState()?.value
+                            ?: ImageStudioUiState.Idle
+                        ImageStudioScreen(
+                            state = studioState,
+                            onGeneratePrompt = { subject -> imageStudioViewModel?.generatePrompt(subject) },
+                            // 描述可编辑（批 4 Task 6）：屏内改过的那一句从这里进 VM，出站用它而不是模型原稿。
+                            onGenerateImage = { prompt -> imageStudioViewModel?.generateImage(prompt) },
+                            onConfirm = { imageStudioViewModel?.confirm(it) },
+                            onCancelGeneration = { imageStudioViewModel?.cancelGeneration() },
+                            onBack = { selectedFeatureKey = null },
+                            onOpenAiSettings = {
+                                selectedFeatureKey = null
+                                openAiProfilesOrSettings()
+                            },
+                        )
+                    } else if (route is AppOverlayRoute.AiFeatureScaffold) {
+                        AiFeatureScreen(
+                            feature = route.feature,
+                            onBack = { selectedFeatureKey = null },
+                            onOpenSettings = {
+                                selectedFeatureKey = null
+                                // 配置页真的存在了，就直接送过去；少了这个 ViewModel 时（预览/测试夹具）
+                                // 退回「设置」栏，不假装能直达。
+                                aiProfileViewModel?.load()
+                                if (aiProfileViewModel != null) {
+                                    showAiProfiles = true
+                                } else {
+                                    showSettings = true
+                                }
+                            },
+                            onOpenLearning = {
+                                selectedFeatureKey = null
+                                selectedTab = AppTab.LEARNING
+                            },
+                        )
+                    } else if (route is AppOverlayRoute.UnknownAiFeature) {
+                        // 未知 AI 功能 key：`selectedFeatureKey` 是 rememberSaveable 的字符串，枚举改名 / 删项后
+                        // 旧状态仍可能带着一个认不出的 key 恢复回来。旧链条在这里没有任何分支，整个覆盖层会静默
+                        // 消失；落到授权新建的「页面不可用」（原型 `sUnavailable`），两枚出口都是真导航。
+                        UnavailableScreen(
+                            onBack = { selectedFeatureKey = null },
+                            onGoLearning = {
+                                selectedFeatureKey = null
+                                selectedTab = AppTab.LEARNING
+                            },
+                            onBrowseFeatures = {
+                                selectedFeatureKey = null
+                                selectedTab = AppTab.AI
+                            },
+                        )
+                    } else if (route is AppOverlayRoute.ReadingHistory) {
+                        // 锁定态同样要给出历史：历史与解锁正交，未解锁只挡住「今天生成新文章」。
+                        val history = readingState.historyOrEmpty
+                        val versionState = articleVersionViewModel?.uiState?.collectAsState()?.value ?: ArticleVersionUiState()
+                        ReadingHistoryScreen(
+                            history = history,
+                            onBack = { showReadingHistory = false },
+                            onOpenArticle = { historyArticle = it },
+                            onRequestDeleteVersion = { articleVersionViewModel?.requestDelete(it) },
+                            notice = versionState.notice,
+                        )
+                        // F4-01 决策 §8：删除前二次确认，并明列级联影响条数；不点「确认删除」零写入。
+                        val pendingDelete = versionState.pending
+                        pendingDelete?.let { pending ->
+                            ConfirmDestructiveDialog(
+                                state = true,
+                                title = "删除这一版？",
+                                // 这一枚的保留面（「同组剩余 N 个版本可读」）本来就写在级联句里，
+                                // 拆成两行会改动措辞，所以按逐字保留红线整句归 cascadeLines、保留面档留空。
+                                cascadeLines = listOf(
+                                    "将删除《${pending.article.title}》第 ${pending.article.version} 版（${pending.article.localDate}）。",
+                                    "级联影响：该版阅读完成记录 ${pending.impact.removedCompletionCount} 条将一并删除；同组剩余 ${pending.impact.remainingVersionCount} 个版本可读。",
+                                ),
+                                keepLines = emptyList(),
+                                irreversible = true,
+                                confirmLabel = "确认删除",
+                                onConfirm = { articleVersionViewModel?.confirmDelete() },
+                                onDismiss = { articleVersionViewModel?.cancelDelete() },
+                            )
+                        }
+                    } else if (route is AppOverlayRoute.ReadingFeed) {
+                        // 裁决⑤ 第二件：外刊列表与抓取归本层，阅读主页只留 `reading_source_feed` 一枚入口。
+                        // 挂载守卫照抄 `showReadingHistory && historyArticle == null` 那一形：文章层一旦在顶上，
+                        // 列表就让位，返回键先把文章关掉、再退本层（对应上面的 BackHandler 声明顺序）。
+                        val feedState = (readingState as? ReadingAccessUiState.Ready)?.feed ?: FeedUiState.Idle
+                        ReadingFeedScreen(
+                            feed = feedState,
+                            onBack = { showReadingFeed = false },
+                            onFetchFeedItem = { readingAccessViewModel?.fetchFeedItem(it) },
+                            // 批 3 Task 1：两种取源失败态各带一枚「重试」，接的是现成入口 `openFeed()`
+                            // （`ReadingAccessViewModel.kt:190-207`，内部会先把状态置 Loading 再取源）。
+                            // 屏不持 ViewModel、也不新增数据通路：这里只转一次回调。
+                            onRetry = { readingAccessViewModel?.openFeed() },
+                        )
+                    } else if (route is AppOverlayRoute.ArticleImport) {
+                        val importState = (readingState as? ReadingAccessUiState.Ready)?.import ?: ImportUiState()
+                        ArticleImportScreen(
+                            state = importState,
+                            onTitleChange = { readingAccessViewModel?.importTitleChange(it) },
+                            onBodyChange = { readingAccessViewModel?.importBodyChange(it) },
+                            onImport = { readingAccessViewModel?.submitImport() },
+                            onBack = { showArticleImport = false },
+                        )
+                    } else if (route is AppOverlayRoute.ArticleReading) {
+                        val articleState = articleReadingViewModel?.uiState?.collectAsState()?.value
+                        val pronunciationScope = rememberCoroutineScope()
+                        val fromHistory = route.readingTarget == null
+                        Box(Modifier.fillMaxSize()) {
+                            ArticleReadingScreen(
+                                state = articleState,
+                                onBack = {
+                                    // I-2 收口①：屏内「返回」与两条 BackHandler 走同一清场闭包。
+                                    clearArticlePronunciation()
+                                    if (fromHistory) historyArticle = null else readingAccessViewModel?.closeArticle()
+                                },
+                                onOpenCard = {
+                                    detailSource = DetailSource.ARTICLE
+                                    selectedArticleCard = it
+                                },
+                                onModeChange = { articleReadingViewModel?.setMode(it) },
+                                onToggleTranslation = { articleReadingViewModel?.toggleTranslation() },
+                                onOpenDictionaryPlaceholder = {},
+                                onOpenDictionary = { tapped ->
+                                    selectedSearchCard = null
+                                    searchPronunciationMessage = PronunciationStatus.Idle
+                                    searchPronunciationRequest++
+                                    searchPronunciationJob?.cancel()
+                                    // 阅读页点中的词进索引版全量搜索：旧实现每次都要逐册解析词书包，
+                                    // 正是用户反馈的「查词慢」。
+                                    globalVocabularySearchViewModel?.setProfile(state.profile.id)
+                                    globalVocabularySearchViewModel?.openSearch(tapped)
+                                    showGlobalVocabularySearch = globalVocabularySearchViewModel != null
+                                },
+                                onOpenPronunciationPlaceholder = {},
+                                // F3-02：整篇朗读从 fire-and-forget 升级为「有状态、可播控」——
+                                // 请求前置 Playing、回来后按代次校验写回结果（旧的即发即忘连文案都不给）。
+                                onSpeakSentence = { sentence ->
+                                    val request = ++articlePronunciationRequest
+                                    articlePronunciationStatus = PronunciationStatus.Playing
+                                    articlePronunciationMessage = PronunciationStatus.Playing.message()
+                                    pronunciationScope.launch {
+                                        // 文章句子的关联实体就是这篇文章本身：articleId 是本地主键。
+                                        val result = pronunciationStatus(
+                                            pronunciationProvider?.speakSentence(
+                                                sentence,
+                                                entity = articleState?.article?.articleId?.let { PronunciationEntityRef.article(it) },
+                                            ),
+                                        )
+                                        if (request == articlePronunciationRequest) {
+                                            articlePronunciationStatus = result
+                                            articlePronunciationMessage = result.message()
+                                        }
+                                    }
+                                },
+                                pronunciationMessage = articlePronunciationMessage,
+                                pronunciationStatus = articlePronunciationStatus,
+                                pauseResumeSupported = pauseResumeSupported,
+                                onPauseResume = {
+                                    val next = when {
+                                        articlePronunciationStatus == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                        articlePronunciationStatus == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                        // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                        // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                        else -> articlePronunciationStatus
+                                    }
+                                    articlePronunciationStatus = next
+                                    articlePronunciationMessage = next.message()
+                                },
+                                onStopPronunciation = {
+                                    articlePronunciationRequest++
+                                    pronunciationProvider?.stopPlayback()
+                                    articlePronunciationStatus = PronunciationStatus.Idle
+                                    articlePronunciationMessage = null
+                                },
+                                onSetLearnedMarks = { articleReadingViewModel?.setLearnedMarks(it) },
+                                onCompleteReading = { articleReadingViewModel?.completeReading() },
+                                articleScrollPosition = articleScrollPosition,
+                                onArticleScrollPositionChange = { articleScrollPosition = it },
+                            )
+                            // 点词的详情是阅读页之上的覆盖层，不动 readingTarget 的状态机。
+                                selectedArticleCard?.let { card ->
+                                // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
+                                // 否则点击一次会累计两次调用（见 2bff744 回归）。
+                                CardDetailScreen(
+                                    card = card,
+                                    onRelearn = {
+                                        selectedRelearnCard = card
+                                        vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
+                                    },
+                                    onNext = articleState?.cards?.indexOfFirst { it.cardId == card.cardId }
+                                        ?.takeIf { it >= 0 && it + 1 < (articleState?.cards?.size ?: 0) }
+                                        ?.let { index -> {
+                                            selectedArticleCard = articleState?.cards?.get(index + 1)
+                                            detailPronunciationRequest++
+                                            detailPronunciationMessage = PronunciationStatus.Idle
+                                        } },
+                                    onBack = {
+                                        selectedArticleCard = null
+                                        detailPronunciationRequest++
+                                        detailPronunciationMessage = PronunciationStatus.Idle
+                                    },
+                                    onSpeak = {
+                                        val request = ++detailPronunciationRequest
+                                        detailPronunciationMessage = PronunciationStatus.Playing
+                                        pronunciationScope.launch {
+                                            val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(card.cardId)))
+                                            if (request == detailPronunciationRequest && selectedArticleCard === card) {
+                                                detailPronunciationMessage = result
+                                            }
+                                        }
+                                    },
+                                    onSpeakBritish = {
+                                        val request = ++detailPronunciationRequest
+                                        detailPronunciationMessage = PronunciationStatus.Playing
+                                        pronunciationScope.launch {
+                                            val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(card.cardId)))
+                                            if (request == detailPronunciationRequest && selectedArticleCard === card) {
+                                                detailPronunciationMessage = result
+                                            }
+                                        }
+                                    },
+                                    pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                                    pronunciationControlsEnabled = true,
+                                    pauseResumeSupported = pauseResumeSupported,
+                                    // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
+                                    onPauseResume = {
+                                        val held = detailPronunciationMessage
+                                        val next = when {
+                                            held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                            held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                            // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                            // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                            else -> held
+                                        }
+                                        detailPronunciationMessage = next
+                                    },
+                                    // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
+                                    // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
+                                    onStopPronunciation = {
+                                        detailPronunciationRequest++
+                                        pronunciationProvider?.stopPlayback()
+                                        detailPronunciationMessage = PronunciationStatus.Idle
+                                    },
+                                    favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
+                                    onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
+                                    onAskAi = {
+                                        // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
+                                        showWordQaCard = card
+                                        wordQaViewModel?.reset()
+                                        wordQaViewModel?.loadNotes(state.profile.id, card.lemma, card.wordBookId, card.cardId)
+                                    },
+                                )
+                                showWordQaCard?.let { qaCard ->
+                                    WordAiQaScreen(
+                                        lemma = qaCard.lemma,
+                                        state = wordQaUiState,
+                                        onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                        onCancelAsk = { wordQaViewModel?.cancelAsk() },
+                                        onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
+                                        onSaveNote = { wordQaViewModel?.saveNote() },
+                                        onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
+                                        savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                                        onBack = { showWordQaCard = null },
+                                        onOpenAiSettings = {
+                                            showWordQaCard = null
+                                            openAiProfilesOrSettings()
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    } else if (route is AppOverlayRoute.WordBookTransfer) {
+                        // 决策 §4：`.wbpack` 的导入/导出子页。两枚 SAF launcher 与选册对话框都住在子屏内部
+                        // （owner 与消费屏同层，与 `BackupExportScreen` / `BackupRestoreScreen` 的分工一致），
+                        // 宿主这一分支只负责路由；VM 为 null 时子屏自己把两行真禁用。
+                        WordBookTransferScreen(
+                            onBack = { showWordBookTransfer = false },
+                            viewModel = wordBookTransferViewModel,
+                        )
+                    } else if (route is AppOverlayRoute.Settings) {
+                        // 2026-11-02：设置回到「我的」里的子页（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
+                        // 上面所有设置子屏（发音 / 提醒 / 备份 hub / 关于 / AI 服务）都先真先赢，
+                        // 所以本分支挂的是设置首页本身；返回键由声明更早的 `showSettings` BackHandler 接管。
+                        // 词书内容包与提醒发音不再是这页的折叠行：它们是同级的两枚子页（上面两支）。
+                        SettingsScreen(onBack = { showSettings = false })
+                    } else if (route == null) {
+                        // 四个一级 tab 的根页面装在这里；上面所有分支都是覆盖全屏的二级层，因此天然不显示导航。
+                        //
+                        // 批 B（决策 `docs/decisions/2026-11-06-adaptive-window-layout.md`）：窗口类别**只在宿主这一层判定一次**，
+                        // 判定源是内容区实测宽度（[BoxWithConstraints.maxWidth]），不是屏幕密度换算出来的假值；结果经
+                        // [LocalAppWindowLayout] 下发给页头（hero 降级）与内容列（宽度上限）。各业务屏自己**不读**类别——
+                        // 版面分支收在这一层，避免每个屏各自长出一套横屏版面（`AppWindowLayoutContractTest` 按读点白名单钉死）。
+                        BoxWithConstraints(Modifier.fillMaxSize()) {
+                            val windowLayout = AppWindowLayoutPolicy.classify(maxWidth)
+                            val usesSideNavigation = AppWindowLayoutPolicy.usesSideNavigation(windowLayout)
+                            CompositionLocalProvider(LocalAppWindowLayout provides windowLayout) {
+                                Scaffold(
+                                    containerColor = MintBackground,
+                                    // 窄窗（手机竖屏）仍是底部四栏；中/宽窗改由内容区里的侧边导航栏承担同一套导航语义。
+                                    bottomBar = {
+                                        if (!usesSideNavigation) {
+                                            AppBottomBar(selected = selectedTab, onSelect = { selectedTab = it })
+                                        }
+                                    },
+                                ) { contentPadding ->
+                                    Row(modifier = Modifier.fillMaxSize()) {
+                                        if (usesSideNavigation) {
+                                            AppSideNav(selected = selectedTab, onSelect = { selectedTab = it })
+                                        }
+                                        // 内容列：侧栏那一格之外剩余空间内居中，并按类别收成上限宽度内的单列，
+                                        // 免得平板上正文行在 1200dp 里横向拉成一条带。
+                                        Box(
+                                            modifier = Modifier.weight(1f).padding(contentPadding),
+                                            contentAlignment = Alignment.TopCenter,
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .widthIn(max = AppWindowLayoutPolicy.contentMaxWidth(windowLayout))
+                                                    .fillMaxSize(),
+                                            ) {
+                                                // 批 D-3 站 2：整段 tab 分发放进 AnimatedContent，退场腿在自己的
+                                                // lambda 入参 `tab` 里读旧 tab；`tab == selectedTab` 才是「这腿是当前目标」。
+                                                // 四支内容与外层两级 Box 一字不动，只把分发对象换成 lambda 入参。
+                                                AnimatedContent(
+                                                    targetState = selectedTab,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    transitionSpec = {
+                                                        AppTransition.contentTransform(
+                                                            ScreenTransitionDirectionPolicy.tab(
+                                                                from = initialState,
+                                                                to = targetState,
+                                                            ),
+                                                        )
+                                                    },
+                                                ) { tab ->
+                                                    TabLeg(tab == selectedTab) {
+                                                        when (tab) {
+                                                            AppTab.LEARNING -> TodayPlanScreen(
+                                                                state = todayState,
+                                                                onRetry = { todayPlanViewModel.load(state.profile.id) },
+                                                                onOpenSetup = { showSetup = true },
+                                                                onStartLearning = {
+                                                                    wordCardViewModel.load(state.profile.id)
+                                                                    showLearning = true
+                                                                },
+                                                                // 阅读与学习工具的完整页面已经各自成为一级 tab，这里不再叠一层
+                                                                // 全屏页，避免出现「底导之上再压一层」的混乱层级。
+                                                                // D-5：落点由 [openTodayArticleFromLearningPage] 按真值判——今天有文章就直开，
+                                                                // 没文章/没解锁才切到阅读 tab 交代原因。
+                                                                onOpenReading = openTodayArticleFromLearningPage,
+                                                                // 批 1 Task 4/5 + Task 16/17：学习页的四条裸行，目的地分别是今日词单 / 复习队列 /
+                                                                // 今日文章 / 本机词库。词库那条打开通路必须**同时**点名段位：只赋 showWordBank 不赋段位 =
+                                                                // 从复习行落到词书段（用户点的是复习，看到的是列表第一页）。
+                                                                onOpenWordList = { showTodayWordList = true },
+                                                                onOpenReviewQueue = { showReviewQueue = true },
+                                                                onOpenWordBank = { wordBankSection = WordBankSection.Book; showWordBank = true },
+                                                                // 批 1 Task 19：「复习生词本」那枚终点（`onReviewWords` → 词库生词段）随原型
+                                                                // `sLearnEmpty`（`assets/app.js:501-518`）下线——那一屏只画两枚出口，而它的两枚
+                                                                // 走下面的既有通路（onOpenSetup / onOpenReading）。生词段的出口是词库页自己的
+                                                                // 分段控件（`WordBankScreen` 的四格 tab），不留第二条绕过 tab 的暗线。
+                                                                onOpenSearch = {
+                                                                    // 主页查词走索引版全量搜索：这里没有旧词书搜索页的
+                                                                    // 「浏览词书」——那属于词书管理语义，不是「查一个词」。
+                                                                    // 传空串即落在「最近搜索」。
+                                                                    globalVocabularySearchViewModel?.setProfile(state.profile.id)
+                                                                    globalVocabularySearchViewModel?.openSearch("")
+                                                                    showGlobalVocabularySearch = globalVocabularySearchViewModel != null
+                                                                },
+                                                                // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
+                                                                // 2026-11-02 起设置是「我的」里的子页：齿轮直接打开设置子页，
+                                                                // 返回即回到原页；底导不再有第五格。
+                                                                onOpenSettings = { showSettings = true },
+                                                                // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
+                                                                // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
+                                                                streakDays = streakDays,
+                                                                todayArticleRead = todayArticleRead,
+                                                            )
+                                                            AppTab.READING -> ReadingAccessScreen(
+                                                                state = readingState,
+                                                                onSelectType = { readingAccessViewModel?.selectType(it) },
+                                                                onOpenHistory = { showReadingHistory = true },
+                                                                onGenerate = { readingAccessViewModel?.generate() },
+                                                                onRegenerate = { readingAccessViewModel?.generate(regenerate = true) },
+                                                                onOpenTodayArticle = { readingAccessViewModel?.openTodayArticle() },
+                                                                onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
+                                                                onCancelGeneration = { readingAccessViewModel?.cancelGeneration() },
+                                                                onOpenAiSettings = {
+                                                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置子页。
+                                                                    aiProfileViewModel?.load()
+                                                                    if (aiProfileViewModel != null) {
+                                                                        showAiProfiles = true
+                                                                    } else {
+                                                                        showSettings = true
+                                                                    }
+                                                                },
+                                                                onOpenImport = { showArticleImport = true },
+                                                                // 主页这一枚只负责导航：进二级层的同时触发一次取列表（取源本体仍归 ViewModel）。
+                                                                onOpenFeed = {
+                                                                    showReadingFeed = true
+                                                                    readingAccessViewModel?.openFeed()
+                                                                },
+                                                            )
+                                                            AppTab.AI -> AiLearningScreen(
+                                                                onOpenFeature = {
+                                                                    selectedFeatureKey = it.key
+                                                                    // 每次进入功能页都清掉上一句的分析结果与上一张的生图状态，防止旧结果串屏。
+                                                                    if (it == AiFeature.SENTENCE_ANALYSIS) sentenceAnalysisViewModel?.reset()
+                                                                    if (it == AiFeature.PHOTO_TRANSLATION) photoTranslationViewModel?.reset()
+                                                                    if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
+                                                                },
+                                                                // 参考 `sAiHome` 的页头配置按钮：配置页可用就直达，否则退回设置子页。
+                                                                onOpenAiProfiles = openAiProfilesOrSettings,
+                                                            )
+                                                            AppTab.PROFILE -> ProfileScreen(
+                                                                profileName = state.profile.displayName,
+                                                                streakDays = profileStreakDays,
+                                                                learnedWordCount = profileLearnedWordCount,
+                                                                // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
+                                                                // 所以锁定态下这一格也是真数；只有 `Loading` 传 null 画占位格。
+                                                                articleCount = profileArticleCount,
+                                                                // 决策 §2：「我的」= 功能入口中心，13 行逐行接线。
+                                                                // 词汇三行与「已学词」统计格都点名落哪一段：只赋 showWordBank 不赋段位
+                                                                // = 点「错词」却看到词书段（同学习页复习行的既有判据）。行名取分段短名（U-8，决策 2026-11-03 §5）。
+                                                                onOpenWordBankSection = { section -> wordBankSection = section; showWordBank = true },
+                                                                onOpenCheckIn = { showCheckIn = true },
+                                                                onOpenReadingHistory = { showReadingHistory = true },
+                                                                onOpenLearningRecords = { showLearningRecords = true },
+                                                                onOpenPlan = { showSetup = true },
+                                                                onOpenWorksheet = {
+                                                                    worksheetViewModel?.load(state.profile.id)
+                                                                    showWorksheetSettings = worksheetViewModel != null
+                                                                },
+                                                                onOpenWordBookTransfer = { showWordBookTransfer = true },
+                                                                // 参考 `sAiHome` 页头配置按钮的同一规则：配置页可用就直达，否则退回设置子页。
+                                                                onOpenAiProfiles = openAiProfilesOrSettings,
+                                                                // U-13（决策 2026-11-03 §9）：中转页退役，两行直连既有子屏。
+                                                                // VM 缺席（预览/测试夹具）时不假装能直达：与 AI 配置兜底同一口径。
+                                                                onOpenReminderSettings = {
+                                                                    reminderSettingsViewModel?.load()
+                                                                    showReminderSettings = reminderSettingsViewModel != null
+                                                                },
+                                                                onOpenSpeechSettings = {
+                                                                    speechSettingsViewModel?.load()
+                                                                    showSpeechSettings = speechSettingsViewModel != null
+                                                                },
+                                                                onOpenSettings = { showSettings = true },
+                                                                // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
+                                                                onOpenBackupHub = { showBackupHub = true },
+                                                                // 许可唯一入口在 关于 →「开源许可与隐私说明」：别处不再保留同落点的第二行。
+                                                                onOpenAbout = { showAbout = true },
+                                                                // 两枚行副标题取宿主真值：词书名来自今日计划，AI 摘要来自配置列表；
+                                                                // 拿不到时由屏侧给出「尚未…」的真话，不写死文案（假信息）。
+                                                                wordBookName = todayReady?.wordBookName,
+                                                                aiProfileSubtitle = aiProfiles?.let { ready ->
+                                                                    if (ready.items.isEmpty()) {
+                                                                        "尚未添加，点这里添加第一套 OpenAI 兼容服务"
+                                                                    } else {
+                                                                        "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
+                                                                    }
+                                                                },
+                                                                // 「语音朗读」行的供应商真值（原住「提醒与发音」导航页，U-13 随行搬进 hub）。
+                                                                speechEngineSubtitle = "当前供应商：${speechState.engineStatuses().currentProvider}",
+                                                            )
+                                                        }
                                                     }
-                                                },
-                                                onOpenImport = { showArticleImport = true },
-                                                // 主页这一枚只负责导航：进二级层的同时触发一次取列表（取源本体仍归 ViewModel）。
-                                                onOpenFeed = {
-                                                    showReadingFeed = true
-                                                    readingAccessViewModel?.openFeed()
-                                                },
-                                            )
-                                            AppTab.AI -> AiLearningScreen(
-                                                onOpenFeature = {
-                                                    selectedFeatureKey = it.key
-                                                    // 每次进入功能页都清掉上一句的分析结果与上一张的生图状态，防止旧结果串屏。
-                                                    if (it == AiFeature.SENTENCE_ANALYSIS) sentenceAnalysisViewModel?.reset()
-                                                    if (it == AiFeature.PHOTO_TRANSLATION) photoTranslationViewModel?.reset()
-                                                    if (it == AiFeature.IMAGE_STUDIO) imageStudioViewModel?.reset()
-                                                },
-                                                // 参考 `sAiHome` 的页头配置按钮：配置页可用就直达，否则退回设置子页。
-                                                onOpenAiProfiles = openAiProfilesOrSettings,
-                                            )
-                                            AppTab.PROFILE -> ProfileScreen(
-                                                profileName = state.profile.displayName,
-                                                streakDays = profileStreakDays,
-                                                learnedWordCount = profileLearnedWordCount,
-                                                // 阅读历史与解锁状态正交（`historyOrEmpty` 四种状态都表态），
-                                                // 所以锁定态下这一格也是真数；只有 `Loading` 传 null 画占位格。
-                                                articleCount = profileArticleCount,
-                                                // 决策 §2：「我的」= 功能入口中心，13 行逐行接线。
-                                                // 词汇三行与「已学词」统计格都点名落哪一段：只赋 showWordBank 不赋段位
-                                                // = 点「错词」却看到词书段（同学习页复习行的既有判据）。行名取分段短名（U-8，决策 2026-11-03 §5）。
-                                                onOpenWordBankSection = { section -> wordBankSection = section; showWordBank = true },
-                                                onOpenCheckIn = { showCheckIn = true },
-                                                onOpenReadingHistory = { showReadingHistory = true },
-                                                onOpenLearningRecords = { showLearningRecords = true },
-                                                onOpenPlan = { showSetup = true },
-                                                onOpenWorksheet = {
-                                                    worksheetViewModel?.load(state.profile.id)
-                                                    showWorksheetSettings = worksheetViewModel != null
-                                                },
-                                                onOpenWordBookTransfer = { showWordBookTransfer = true },
-                                                // 参考 `sAiHome` 页头配置按钮的同一规则：配置页可用就直达，否则退回设置子页。
-                                                onOpenAiProfiles = openAiProfilesOrSettings,
-                                                // U-13（决策 2026-11-03 §9）：中转页退役，两行直连既有子屏。
-                                                // VM 缺席（预览/测试夹具）时不假装能直达：与 AI 配置兜底同一口径。
-                                                onOpenReminderSettings = {
-                                                    reminderSettingsViewModel?.load()
-                                                    showReminderSettings = reminderSettingsViewModel != null
-                                                },
-                                                onOpenSpeechSettings = {
-                                                    speechSettingsViewModel?.load()
-                                                    showSpeechSettings = speechSettingsViewModel != null
-                                                },
-                                                onOpenSettings = { showSettings = true },
-                                                // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
-                                                onOpenBackupHub = { showBackupHub = true },
-                                                // 许可唯一入口在 关于 →「开源许可与隐私说明」：别处不再保留同落点的第二行。
-                                                onOpenAbout = { showAbout = true },
-                                                // 两枚行副标题取宿主真值：词书名来自今日计划，AI 摘要来自配置列表；
-                                                // 拿不到时由屏侧给出「尚未…」的真话，不写死文案（假信息）。
-                                                wordBookName = todayReady?.wordBookName,
-                                                aiProfileSubtitle = aiProfiles?.let { ready ->
-                                                    if (ready.items.isEmpty()) {
-                                                        "尚未添加，点这里添加第一套 OpenAI 兼容服务"
-                                                    } else {
-                                                        "已配置 ${ready.items.size} 套 · ${ready.items.count { it.hasKey }} 套已设置密钥"
-                                                    }
-                                                },
-                                                // 「语音朗读」行的供应商真值（原住「提醒与发音」导航页，U-13 随行搬进 hub）。
-                                                speechEngineSubtitle = "当前供应商：${speechState.engineStatuses().currentProvider}",
-                                            )
                                                 }
                                             }
                                         }
@@ -2261,8 +2263,6 @@ fun AppScreen(
                             }
                         }
                     }
-                }
-            }
                 }
             }
         }
