@@ -1,6 +1,7 @@
 package com.example.englishlearning.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -90,6 +92,7 @@ import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.ui.theme.AppTransition
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.AppleMintEnd
 import com.example.englishlearning.ui.theme.AppleMintMiddle
@@ -767,7 +770,19 @@ fun AppScreen(
                     showSettings = showSettings,
                 ),
             )
-            val route = overlayRoute
+            // 批 D-3 站 1：整条链放进 AnimatedContent，退场腿在自己的 lambda 参数里读旧 route，
+            // 于是 `route == overlayRoute` 才是「这条腿是不是当前目标」；删掉了旧那行 `val route = overlayRoute`，
+            // route 此后只由 lambda 入参提供（留着它退场腿会读外层新值、渲染成「只有一屏在淡」）。
+            AnimatedContent(
+                targetState = overlayRoute,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    AppTransition.contentTransform(
+                        ScreenTransitionDirectionPolicy.overlay(from = initialState, to = targetState),
+                    )
+                },
+            ) { route ->
+                OverlayLeg(route == overlayRoute) {
             if (route is AppOverlayRoute.VocabularyDetail) {
                 val card = route.card
                 LaunchedEffect(card.cardId) {
@@ -2095,7 +2110,23 @@ fun AppScreen(
                                             .widthIn(max = AppWindowLayoutPolicy.contentMaxWidth(windowLayout))
                                             .fillMaxSize(),
                                     ) {
-                                        when (selectedTab) {
+                                        // 批 D-3 站 2：整段 tab 分发放进 AnimatedContent，退场腿在自己的
+                                        // lambda 入参 `tab` 里读旧 tab；`tab == selectedTab` 才是「这腿是当前目标」。
+                                        // 四支内容与外层两级 Box 一字不动，只把分发对象换成 lambda 入参。
+                                        AnimatedContent(
+                                            targetState = selectedTab,
+                                            modifier = Modifier.fillMaxSize(),
+                                            transitionSpec = {
+                                                AppTransition.contentTransform(
+                                                    ScreenTransitionDirectionPolicy.tab(
+                                                        from = initialState,
+                                                        to = targetState,
+                                                    ),
+                                                )
+                                            },
+                                        ) { tab ->
+                                            TabLeg(tab == selectedTab) {
+                                                when (tab) {
                                             AppTab.LEARNING -> TodayPlanScreen(
                                                 state = todayState,
                                                 onRetry = { todayPlanViewModel.load(state.profile.id) },
@@ -2222,12 +2253,16 @@ fun AppScreen(
                                                 // 「语音朗读」行的供应商真值（原住「提醒与发音」导航页，U-13 随行搬进 hub）。
                                                 speechEngineSubtitle = "当前供应商：${speechState.engineStatuses().currentProvider}",
                                             )
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                }
+            }
                 }
             }
         }
@@ -2259,6 +2294,34 @@ fun AppScreen(
         }
         is AppUiState.Error -> ErrorScreen(error = state.error, onRetry = { viewModel.reload() })
     }
+}
+
+/** 转场腿根容器：腿标签给 connected 判据数腿，退场腿对 TalkBack 隐身（决策 §3.4）。 */
+@Composable
+private fun OverlayLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("overlay_transition_leg")
+            .then(
+                if (isCurrentTarget) Modifier
+                else Modifier.semantics { invisibleToUser() },
+            ),
+    ) { content() }
+}
+
+/** 站 2 的转场腿根容器：判据与 `OverlayLeg` 同一条，只是 tag 归 tab 站。 */
+@Composable
+private fun TabLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("tab_transition_leg")
+            .then(
+                if (isCurrentTarget) Modifier
+                else Modifier.semantics { invisibleToUser() },
+            ),
+    ) { content() }
 }
 
 /**

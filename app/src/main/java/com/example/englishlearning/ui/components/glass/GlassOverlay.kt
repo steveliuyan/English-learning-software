@@ -1,11 +1,6 @@
 package com.example.englishlearning.ui.components.glass
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,7 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.dp
-import com.example.englishlearning.ui.theme.AppMotion
+import com.example.englishlearning.ui.theme.AppTransition
 import com.example.englishlearning.ui.theme.AppPalette
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.appColors
@@ -57,10 +52,8 @@ fun BoxScope.GlassOverlay(
     val panelInteraction = remember { MutableInteractionSource() }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(AppMotion.Normal, easing = AppMotion.EasingOut)) +
-            scaleIn(tween(AppMotion.Normal, easing = AppMotion.EasingOut), initialScale = 0.92f),
-        exit = fadeOut(tween(AppMotion.Normal, easing = AppMotion.EasingIn)) +
-            scaleOut(tween(AppMotion.Normal, easing = AppMotion.EasingIn), targetScale = 0.92f),
+        enter = AppTransition.DialogEnter,
+        exit = AppTransition.DialogExit,
         modifier = Modifier.align(Alignment.Center),
     ) {
         Box(

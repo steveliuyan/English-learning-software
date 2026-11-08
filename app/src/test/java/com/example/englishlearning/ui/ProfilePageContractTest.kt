@@ -176,11 +176,11 @@ class ProfilePageContractTest {
         ).forEach { (flag, routeVariant) ->
             assertEquals(
                 1,
-                countMatches(host, Regex("""else if \(route is $routeVariant\) \{""")),
+                countMatches(host, Regex("""else if \(route is ${Regex.escape(routeVariant)}\) \{""")),
                 "$flag 的挂载分支必须恰一处（0 = 路由没有落点，2 = 先声明的那支顶掉后一支）",
             )
             assertFalse(
-                Regex("""else if \(route is $routeVariant\) \{\s*\}""").containsMatchIn(host),
+                Regex("""else if \(route is ${Regex.escape(routeVariant)}\) \{\s*\}""").containsMatchIn(host),
                 "$flag 的挂载分支只剩注释 = 点进去一整屏空白（先声明先赢，真分支被顶掉）",
             )
         }

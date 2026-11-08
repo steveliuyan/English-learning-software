@@ -206,6 +206,22 @@ class MotionSpecContractTest {
                 "留别名就是让「退场借入场曲线」重新长出来",
         )
     }
+
+    /**
+     * 批 D-3：转场规格的唯一宿主落点（决策 §3.3）。
+     * 全仓唯一的转场时长/缓动/位移规格必须住在 `theme/AppTransition.kt`，且该文件确实承载 `tween(` 规格
+     * （不是空文件冒充「唯一权威」）。锚点从旧的分散读点改到这一枚规格宿主。
+     */
+    @Test
+    fun `transition specs live in exactly one host file`() {
+        val transitionHost = File(UI_THEME_SOURCE_PATH + "/AppTransition.kt")
+        assertTrue(transitionHost.isFile, "批 D 的位移/时长规格唯一落点缺失：${transitionHost.path}")
+        val stripped = stripComments(transitionHost.readText())
+        assertTrue(
+            Regex("""(?<![A-Za-z0-9_])tween\(""").containsMatchIn(stripped),
+            "AppTransition.kt 必须承载 tween( 规格，否则「唯一权威」是空文件",
+        )
+    }
 }
 
 private const val MOTION_SPEC_CONTRACT_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui"
