@@ -211,12 +211,12 @@ class MotionSpecContractTest {
      * 批 D-3：转场规格的唯一宿主落点（决策 §3.3）。
      * 全仓唯一的转场时长/缓动/位移规格必须住在 `theme/AppTransition.kt`，且该文件确实承载 `tween(` 规格
      * （不是空文件冒充「唯一权威」）。锚点从旧的分散读点改到这一枚规格宿主。
+     * 读法走本文件自己的 [sourceOf]（修复轮 1：旧写法按字符串拼路径 `File(UI_THEME_SOURCE_PATH + "/AppTransition.kt")`
+     * 绕过了「同名文件恰好一个」守卫——规格宿主被复制成两枚时本判据仍对着一枚绿）。
      */
     @Test
     fun `transition specs live in exactly one host file`() {
-        val transitionHost = File(UI_THEME_SOURCE_PATH + "/AppTransition.kt")
-        assertTrue(transitionHost.isFile, "批 D 的位移/时长规格唯一落点缺失：${transitionHost.path}")
-        val stripped = stripComments(transitionHost.readText())
+        val stripped = stripComments(sourceOf(File(UI_THEME_SOURCE_PATH), "AppTransition.kt"))
         assertTrue(
             Regex("""(?<![A-Za-z0-9_])tween\(""").containsMatchIn(stripped),
             "AppTransition.kt 必须承载 tween( 规格，否则「唯一权威」是空文件",

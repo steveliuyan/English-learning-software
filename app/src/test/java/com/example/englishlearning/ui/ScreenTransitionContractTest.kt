@@ -47,14 +47,15 @@ class ScreenTransitionContractTest {
         return text
     }
 
-    /** 文件数响亮守卫：目标文件在 `ui/` 扫描根下必须恰一枚（0 = 搬家，≥2 = 同名冒名）。 */
-    private fun assertExactlyOne(name: String) {
-        val hits = uiFiles().count { it.name == name }
+    /** 文件数响亮守卫：目标文件在 `ui/` 扫描根下必须恰一枚（0 = 搬家，≥2 = 同名冒名）；返回该文件供调用方直接读。 */
+    private fun assertExactlyOne(name: String): File {
+        val hits = uiFiles().filter { it.name == name }
         assertTrue(
-            hits == 1,
-            "$name 应在 $UI_MAIN_SOURCE_PATH 下恰好一枚，实际 $hits 枚" +
+            hits.size == 1,
+            "$name 应在 $UI_MAIN_SOURCE_PATH 下恰好一枚，实际 ${hits.size} 枚" +
                 "（0 枚 = 文件搬家让本契约读不到，≥2 枚 = 同名文件互相冒名顶替）。",
         )
+        return hits.single()
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -364,19 +365,46 @@ class ScreenTransitionContractTest {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // 批 D-3 三条：站点数 / 规格唯一落点 / 位移口径（本批唯一可见变化的静态形状闸）
+    // 批 D-3 四条：站点数 / 规格唯一落点 / 位移口径 / 规格面合成双边（本批唯一可见变化的静态形状闸）
+    // 编号①②③④⑤齐全：④ 是修复轮 1 补的 brief Step 9 ④，⑤ 是 controller-carried 的 payload 读者计数。
     // ---------------------------------------------------------------------------------------------
 
-    /** 判据 D-3-①：`AppScreen.kt` 恰有两站 `AnimatedContent`，且两站都把规格交给 `AppTransition.contentTransform`。 */
+    /**
+     * 判据 D-3-①：转场站点全 `ui/` 子树恰两枚，且两枚都住在 `AppScreen.kt`（站 1 包链、站 2 包 tab 分发），
+     * 两站 `transitionSpec` 都交给 `AppTransition.contentTransform`。
+     * 修复轮 1 把「数站点」从只看 `AppScreen.kt` 扩成**扫全子树**：第三枚站点若长在别的屏文件里，
+     * 旧口径读不到，而它就是第三套转场宿主（同判据 ② 的失明面）。
+     * 计数只认 `AnimatedContent(`，不认 `AnimatedVisibility(`（`GlassOverlay.kt` 的浮层淡入淡出是另一个 API，
+     * 本批末段用一条反证钉住两者不得混记，免得哪天把「组件显隐」也数成站点）。
+     */
     @Test
     fun appScreenHasExactlyTwoTransitionStations() {
-        val appScreen = stripComments(readSource(APP_SCREEN_SOURCE_PATH))
+        assertExactlyOne("AppScreen.kt")
+        // 每份源码只剥一次注释，剥完的表既当站点名单也当宿主正文（避免对 AppScreen.kt 二次剥注释）。
+        val scannedByName = uiFiles().map { it.name to stripComments(it.readText()) }
+        val stations = scannedByName.map { (name, stripped) ->
+            name to Regex("""(?<![A-Za-z0-9_])AnimatedContent\(""").findAll(stripped).count()
+        }.filter { it.second > 0 }
         assertEquals(
             2,
-            Regex("""(?<![A-Za-z0-9_])AnimatedContent\(""").findAll(appScreen).count(),
-            "AppScreen.kt 剥注释后应恰有两枚 AnimatedContent（站 1 包住整条链、站 2 包住 when(selectedTab)）。" +
-                "0 枚 = 转场根本没接上，≥3 枚 = 长出第三个站点（第二套转场宿主）。",
+            stations.sumOf { it.second },
+            "全 ui/ 子树剥注释后应恰有两枚 AnimatedContent（站 1 包住整条链、站 2 包住 when(selectedTab)）。" +
+                "0 枚 = 转场根本没接上，≥3 枚 = 长出第三个站点（第二套转场宿主）。实测：$stations",
         )
+        assertEquals(
+            listOf("AppScreen.kt"),
+            stations.map { it.first }.distinct(),
+            "两枚 AnimatedContent 站点都必须住在 AppScreen.kt（转场只有这两站）；实测散落在：$stations",
+        )
+        val animatedVisibilityHosts = scannedByName.count {
+            Regex("""(?<![A-Za-z0-9_])AnimatedVisibility\(""").containsMatchIn(it.second)
+        }
+        assertTrue(
+            animatedVisibilityHosts >= 1,
+            "全 ui/ 子树扫不到任何 AnimatedVisibility(：站点计数器把两枚 API 混成一枚口径了（本判据只数 AnimatedContent，" +
+                "浮层淡入淡出归 AnimatedVisibility，两者混记就会让第三套宿主冒充合法站点）。",
+        )
+        val appScreen = scannedByName.first { it.first == "AppScreen.kt" }.second
         assertEquals(
             2,
             Regex("""AppTransition\.contentTransform\(""").findAll(appScreen).count(),
@@ -391,47 +419,66 @@ class ScreenTransitionContractTest {
     }
 
     /**
-     * 判据 D-3-②：转场规格 API（`slide{In,Out}Horizontally` / `togetherWith`）的生产读点只在
-     * `theme/AppTransition.kt`（白名单一条），且两站宿主 `AppScreen.kt` 不得就地写 `tween(` / 直接读
-     * `AppMotion.Slow`。这是防回归闸（决策 §3.3「全仓唯一转场落点」）；改码前后都该绿，报告如实登记，不冒充 RED。
+     * 判据 D-3-②：转场规格面（位置参数形态的 `tween(AppMotion.Slow` + `slide{In,Out}Horizontally` +
+     * `togetherWith`）在生产侧的唯一落点是 `theme/AppTransition.kt`，扫描范围是**整个 `ui/` 子树**
+     * （修复轮 1 补口：旧版只看 `AppScreen.kt` 一枚文件名，第二套规格换个文件就隐形）；
+     * 两站宿主 `AppScreen.kt` 另加「不得有任何 `tween(` / 不得直读 `AppMotion.Slow`」两条。
+     * 这是防回归闸（决策 §3.3「全仓唯一转场落点」），改码前后都该绿；它的牙齿由判据 ④ 的合成双边自证。
      * 注意本条**不**泛化到 `AppMotion.Slow` 全仓唯一——`PlanBar`/`Shimmer` 的段宽/循环周期读 Slow 属批 C，不在转场口径内。
      */
     @Test
     fun transitionSpecSurfaceLivesOnlyInAppTransition() {
         assertExactlyOne("AppTransition.kt")
-        val offenders = uiFiles().flatMap { file ->
-            val stripped = stripComments(file.readText())
-            val usesSlide = Regex("""(?<![A-Za-z0-9_])slide(?:In|Out)Horizontally\(""").containsMatchIn(stripped)
-            val usesTogether = Regex("""\btogetherWith\b""").containsMatchIn(stripped)
-            if ((usesSlide || usesTogether) && file.name != "AppTransition.kt") {
-                val shapes = listOfNotNull(
-                    if (usesSlide) "slide{In,Out}Horizontally" else null,
-                    if (usesTogether) "togetherWith" else null,
-                )
-                listOf("${file.name}: ${shapes.joinToString(" + ")}")
-            } else {
-                emptyList()
-            }
-        }
+        val offenders = uiFiles().flatMap { transitionSpecOffenders(it.name, stripComments(it.readText())) }
         assertTrue(
             offenders.isEmpty(),
-            "转场规格 API（slideIn/OutHorizontally / togetherWith）只能出现在 theme/AppTransition.kt：" +
-                offenders.joinToString("\n"),
+            "转场规格面（tween(AppMotion.Slow / slideIn/OutHorizontally / togetherWith）只能住在 theme/AppTransition.kt" +
+                "（AppScreen.kt 作为两站宿主另禁就地 tween( 与 AppMotion.Slow）：\n" + offenders.joinToString("\n"),
         )
-        val appScreen = stripComments(readSource(APP_SCREEN_SOURCE_PATH))
-        assertTrue(
-            !Regex("""(?<![A-Za-z0-9_])tween\(""").containsMatchIn(appScreen),
-            "AppScreen.kt 不得就地写 tween(：两站规格全部交给 AppTransition，宿主再抄一份就是第二套时长口径。",
-        )
-        assertTrue(
-            !appScreen.contains("AppMotion.Slow"),
-            "AppScreen.kt 不得直接读 AppMotion.Slow：页面转场时长归 AppTransition。",
-        )
+    }
+
+    /**
+     * 判据 D-3-②/④ 的取样本体（纯函数：文件名 + **已剥注释**的源码 → offender 清单；每份源码只剥一次注释）。
+     *
+     * 修复轮 1 把口径**扩到全 `ui/` 子树**（brief Step 9 ④ 的存在理由：旧口径按文件名只看 `AppScreen.kt`，
+     * 第二份转场规格只要写在别的屏文件里就完全隐形）：
+     *  - `theme/AppTransition.kt` 是唯一规格宿主，永不判红；
+     *  - 其余任何 `ui/` 文件都不得承载三枚页面转场写法：位置参数形态的 `tween(AppMotion.Slow`、
+     *    `slide{In,Out}Horizontally(`、`togetherWith`；
+     *  - `AppScreen.kt` 作为两站宿主另加两条更严的禁令：不得出现任何 `tween(`，也不得直读 `AppMotion.Slow`
+     *    （宿主就地抄规格 = 第二套时长口径）。
+     *
+     * **有意放行**（如实收窄，不假装「`AppMotion.Slow` 全仓唯一」那种做不到的绝对口径，见决策 §3.3 与批 C）：
+     *  - 具名参数形态 `tween(durationMillis = AppMotion.Slow, …)`——`components/PlanBar.kt:92/97` 的段宽**属性动画**；
+     *  - 不在 `tween(` 里的 `AppMotion.Slow` 算术——`components/Shimmer.kt:40/46` 的铺光循环周期；
+     *  两者都不是页面转场规格，判红就是把转场口径伸进批 C 的账。双侧都由
+     *  [judgementFourFlagsSyntheticScreenBodySpecAndPassesOverlayOpen] 的合成夹具钉住。
+     */
+    private fun transitionSpecOffenders(fileName: String, stripped: String): List<String> {
+        if (fileName == TRANSITION_SPEC_HOST_NAME) return emptyList()
+        return buildList {
+            if (Regex("""(?<![A-Za-z0-9_])tween\(\s*AppMotion\.Slow\b""").containsMatchIn(stripped)) {
+                add("$fileName: tween(AppMotion.Slow 页面转场时长")
+            }
+            if (Regex("""(?<![A-Za-z0-9_])slide(?:In|Out)Horizontally\(""").containsMatchIn(stripped)) {
+                add("$fileName: slide{In,Out}Horizontally 页面位移")
+            }
+            if (Regex("""\btogetherWith\b""").containsMatchIn(stripped)) {
+                add("$fileName: togetherWith 转场组装")
+            }
+            if (fileName == "AppScreen.kt") {
+                if (Regex("""(?<![A-Za-z0-9_])tween\(""").containsMatchIn(stripped)) {
+                    add("$fileName: tween( 就地时长")
+                }
+                if (stripped.contains("AppMotion.Slow")) add("$fileName: AppMotion.Slow 直读")
+            }
+        }
     }
 
     /** 判据 D-3-③：位移口径 ¼ 幅——四枚页面 slide 的 lambda 必须 `/ PageOffsetDenominator`（=4），出现整幅即红。 */
     @Test
     fun pageDisplacementIsQuarterAmplitude() {
+        assertExactlyOne("AppTransition.kt")
         val host = stripComments(readSource(APP_TRANSITION_SOURCE_PATH))
         assertEquals(
             4,
@@ -450,6 +497,93 @@ class ScreenTransitionContractTest {
         assertTrue(
             !Regex("""\{ -?it \}""").containsMatchIn(host),
             "出现整幅位移 `{ it }` / `{ -it }`：300ms 走完整屏会读成「甩」，页面位移口径是 ¼ 幅不是整幅。",
+        )
+    }
+
+    /**
+     * 判据 D-3-④（brief Step 9 ④，修复轮 1 补口）：规格面取样的**合成双边**。
+     *
+     * must-flag：假屏体里就地写一枚 `tween(AppMotion.Slow)` 页面转场规格必须被同一套取样判出——
+     * 判据 ② 旧口径只按文件名盯 `AppScreen.kt`，别的屏文件长出第二套转场规格完全隐形，
+     * 「全仓唯一规格落点」就成了对着空档放行的口号（这正是 ④ 存在的理由）。
+     * must-not-flag：唯一豁免 `overlayOpen` 那一行（AppScreen.kt:580–584）必须被放行——
+     * 它问的是「有没有覆盖层亮着」，不含任何规格写法；把它判红就是拿规格禁令去改挂载口径。
+     *
+     * 双边之外再钉两枚「不许空转 / 不许过严」的形状：
+     *  - 规格宿主本体（按非宿主文件名取样）必须一次命中三枚写法，名单不是摆设；
+     *  - 批 C 的两枚合法 `AppMotion.Slow` 读点（`PlanBar` 的具名参数属性动画、`Shimmer` 的循环周期算术）
+     *    必须放行——规则如实收窄，不假装「Slow 全仓唯一」这种根本做不到的绝对口径。
+     */
+    @Test
+    fun judgementFourFlagsSyntheticScreenBodySpecAndPassesOverlayOpen() {
+        val syntheticScreen = """
+            @Composable
+            fun FakeScreen(route: AppOverlayRoute?) {
+                AnimatedContent(
+                    targetState = route,
+                    transitionSpec = {
+                        fadeIn(tween(AppMotion.Slow, easing = AppMotion.EasingOut)) +
+                            slideInHorizontally(tween(AppMotion.Slow)) { it / 4 } togetherWith
+                            fadeOut(tween(AppMotion.Slow, easing = AppMotion.EasingIn)),
+                ) { leg -> FakeBody(leg) }
+            }
+        """.trimIndent()
+        val flagged = transitionSpecOffenders("FakeScreen.kt", stripComments(syntheticScreen))
+        assertTrue(
+            flagged.any { it.contains("tween(AppMotion.Slow") },
+            "判据 ④ 的 must-flag 侧失明：假屏体 FakeScreen.kt 里就地写的 tween(AppMotion.Slow) 没被判出——" +
+                "取样只按文件名盯 AppScreen.kt，任何其它 ui/ 文件长出第二份转场规格都隐形。实测命中：$flagged",
+        )
+        assertTrue(
+            flagged.any { it.contains("slide{In,Out}Horizontally") } && flagged.any { it.contains("togetherWith") },
+            "判据 ④ 的合成夹具里 slide / togetherWith 两枚写法没同时被取样点名（规格面只盯一面）：$flagged",
+        )
+
+        val hostShapes = transitionSpecOffenders(
+            "NotTheHost.kt",
+            stripComments(readSource(APP_TRANSITION_SOURCE_PATH)),
+        )
+        assertEquals(
+            3,
+            hostShapes.size,
+            "规格宿主 theme/AppTransition.kt 按「非宿主」取样应一次命中三枚写法（tween(AppMotion.Slow) / " +
+                "slide{In,Out}Horizontally / togetherWith），实际 $hostShapes——少一枚就是白名单在服务一份空规格表。",
+        )
+
+        val exemption = MOUNT_CONDITION_EXEMPTIONS.single()
+        val overlayOpenRegion = readSource(APP_SCREEN_SOURCE_PATH)
+            .lines()
+            .subList(exemption.firstLine - 1, exemption.lastLine)
+            .joinToString("\n")
+        assertTrue(
+            overlayOpenRegion.contains("val overlayOpen ="),
+            "豁免行区间 ${exemption.fileName}:${exemption.firstLine}–${exemption.lastLine} 已不指向 overlayOpen，" +
+                "本双边用例的 must-not-flag 一侧等于在测一段别的代码。",
+        )
+        assertTrue(
+            transitionSpecOffenders("AppScreen.kt", stripComments(overlayOpenRegion)).isEmpty(),
+            "overlayOpen 那一行被规格面禁令判红：它是挂载层的「有没有覆盖层」口径，不含任何转场规格写法，" +
+                "判红只会逼人把豁免行改成读 route（同文件另一条判据明令禁止）。",
+        )
+
+        val batchCReaders = listOf("PlanBar.kt", "Shimmer.kt").flatMap { name ->
+            transitionSpecOffenders(name, stripComments(assertExactlyOne(name).readText()))
+        }
+        assertTrue(
+            batchCReaders.isEmpty(),
+            "批 C 的合法 AppMotion.Slow 读点被转场口径误判：$batchCReaders——" +
+                "PlanBar 的 tween(durationMillis = AppMotion.Slow) 是段宽属性动画、Shimmer 的 Slow*4 是循环周期，" +
+                "都不在「两站转场规格」的口径内。",
+        )
+
+        val commentOnly = """
+            // 历史说明：旧写法把 fadeIn(tween(AppMotion.Slow)) + slideInHorizontally(tween(AppMotion.Slow)) togetherWith
+            @Composable
+            fun FakeCleanScreen() { FakeBody() }
+        """.trimIndent()
+        assertTrue(
+            transitionSpecOffenders("FakeCleanScreen.kt", stripComments(commentOnly)).isEmpty(),
+            "注释里的规格字面量被判成违例：说明取样没走 stripComments，或者把同一份源码剥了两次注释。",
         )
     }
 
@@ -636,6 +770,9 @@ private const val ROUTE_SOURCE_PATH = "src/main/java/com/example/englishlearning
 private const val RESOLVER_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui/AppOverlayRouteResolver.kt"
 private const val APP_TRANSITION_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui/theme/AppTransition.kt"
 private const val OVERLAY_ROUTE_COUNT = 35
+
+/** 转场规格面的唯一宿主文件名（判据 D-3-②/④ 的白名单条目；宿主的落点目录见 APP_TRANSITION_SOURCE_PATH）。 */
+private const val TRANSITION_SPEC_HOST_NAME = "AppTransition.kt"
 
 /** tab 宿主（原链末 `} else {`，对应 `AppOverlayRouteResolver.TAB_HOST_INDEX`）在链上的条件文本。 */
 private const val TAB_HOST_CONDITION = "route == null"
