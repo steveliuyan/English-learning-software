@@ -130,11 +130,15 @@ XML 现算 **334 类 / 2479 条 / 0 失败 / 0 错误 / 0 跳过**，且 334 份
   `912ee649609e1a928ff227c23f78941e34358189`，与 `git rev-parse HEAD` **逐字相同** → 远端备份账写实。
   分支不合 `main`（用户口径）。
 - 工作树无未提交的源码改动；证据（截图与层级文本）全部在 `.git/qa-scratch/qa3-a2-final/`，按红线不入库。
-- **A2.8 收口追加两枚本地提交**（尚未推送，按「推送逐批请示」等用户批准）：
+- **A2.8 收口追加三枚提交，已推送并核验**（用户 2026-11-08 请示后批准）：
   - `7f48be1` fix(ui): QA3 A2.8 词卡顶档发音行换容器
   - `f5b240e` docs(ui): QA3 A2.8 拍板与修法入决策册、AC-R-24、走查册与台账
-  推送前远端 tip 仍是 `912ee64`，本地 `HEAD` 比它 ahead 2 枚；推后须用
-  `git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path` 与 `git rev-parse HEAD` 逐字比对才算备份。
+  - `b9bce11` docs(handoff): QA3 A2.8 收口补记入 A 组工作报告
+  `git -c credential.interactive=false push origin stage-5-ui-r2-learning-path` 回 `912ee64..b9bce11`；
+  随后 `ls-remote` 回 `b9bce117bbe8e770c4f1f4c7cfd39f30c5d5228f`，与 `git rev-parse HEAD` **逐字相同**，
+  `git status -sb` 不再显示 ahead → 异地备份账写实。
+  本条补记本身另成第 4 枚 `docs(handoff)` 提交随后推送，故下一棒读到的远端 tip 会比 `b9bce11` 新；
+  现算口径：`git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path` 对 `git rev-parse HEAD`。
 
 ## 5. 未完成 / 遗留问题
 
