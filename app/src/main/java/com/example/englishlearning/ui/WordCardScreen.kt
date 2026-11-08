@@ -323,39 +323,50 @@ fun WordCardScreen(
                                 .testTag("word_card_lemma")
                                 .semantics { contentDescription = state.card.lemma },
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            // IPA 与词性是主词的注脚，合成一列让它们与词面左沿对齐；喇叭占行尾，
-                            // 与 44sp 主词同一视觉行（旧版喇叭单独一行，等于把「怎么念」排到词义之后）。
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Text(
-                                    text = state.card.ipa,
-                                    style = AppType.Footnote,
-                                    modifier = Modifier
-                                        .testTag("word_card_ipa")
-                                        .semantics { contentDescription = "音标 ${state.card.ipa}" },
-                                )
-                                Text(
-                                    text = state.card.partOfSpeech,
-                                    style = AppType.Label,
-                                    color = learn.deep,
-                                    modifier = Modifier
-                                        .testTag("word_card_part_of_speech")
-                                        .semantics { contentDescription = "词性 ${state.card.partOfSpeech}" },
-                                )
-                            }
+                        // QA3 A2.8：顶档（> 2.0）把喇叭药片另起一行。这一行的旧形是
+                        // `Row { Column(weight(1f)){ 音标 ; 词性 } ; SpeakerButton }`，而药片的**可见文字**
+                        // 与朗读文案同源（`SpeakerButton.kt` 的「一处定义」口径），3.0 档那四个字连字形长到
+                        // 180dp，`weight(1f)` 那一侧只剩 89.6dp——`/prəˈɡresɪv/` 被切成 `/prə` `ˈgres` `ɪv/`
+                        // 三截的音节（设备实拍 `.git/qa-scratch/qa3-a2-final/fs300-a23-card-scrolled.png`）。
+                        // 换摆法不换内容：注脚与药片各只有一处渲染点（两个分支共用同一份），
+                        // 判据 `pronunciationKeepsTheIpaOnOneLineAtTopFontScale`，阈值口径见文件末尾。
+                        val pronunciationStacks = wordCardStacksPronunciationRow(fontScale)
+                        val speakerPill: @Composable () -> Unit = {
                             // Task 15：私有喇叭药片换成共享药片组件（F5-03「喇叭药片放大」的屏侧落地）。
                             // 48dp 触控下限、底色与三态朗读文案都由组件交付，屏侧只给 tag 与动作。
+                            // 调用窗口必须**只此一枚**（`WordCardScreenContractTest` 钉「SpeakerButton 的调用
+                            // 窗口恰两枚」：待播 + 播控档各一枚），所以两个分支共用这份槽位而不是各写一遍。
                             SpeakerButton(
                                 state = SpeakerState.Idle,
                                 onClick = { onSpeak(state.card.lemma) },
                                 modifier = Modifier.testTag("word_card_speak"),
                             )
+                        }
+                        if (pronunciationStacks) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                WordCardPronunciationFootnotes(
+                                    ipa = state.card.ipa,
+                                    partOfSpeech = state.card.partOfSpeech,
+                                    partOfSpeechInk = learn.deep,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                speakerPill()
+                            }
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                // IPA 与词性是主词的注脚，合成一列让它们与词面左沿对齐；喇叭占行尾，
+                                // 与 44sp 主词同一视觉行（旧版喇叭单独一行，等于把「怎么念」排到词义之后）。
+                                WordCardPronunciationFootnotes(
+                                    ipa = state.card.ipa,
+                                    partOfSpeech = state.card.partOfSpeech,
+                                    partOfSpeechInk = learn.deep,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                speakerPill()
+                            }
                         }
                         if (revealed) {
                             Text(
@@ -816,6 +827,45 @@ private fun BackToPlanButton(onBackToPlan: () -> Unit) {
 }
 
 /**
+ * 词头下面那两行注脚：IPA 与词性（QA3 A2.8 把它们从屏体里抽出来，为了**只有一处渲染点**）。
+ *
+ * 旧形是内联在 Ready 分支的一枚 `Column`，A2.8 之后顶档要换容器（药片另起一行），
+ * 如果两处分支各写一遍这两枚 `Text`，就长出「同一件控件两个措辞/两个 tag」那扇门——
+ * `WordCardLayoutContractTest` 里 `word_card_ipa` / `word_card_part_of_speech` 各恰 1 处的判据当场红。
+ *
+ * 两行仍合成一列让它们与词面左沿对齐；[modifier] 由调用方给整幅或 `weight(1f)`，
+ * 本组件不自己决定占多宽（宽度归那一行的容器，不归注脚）。
+ */
+@Composable
+private fun WordCardPronunciationFootnotes(
+    ipa: String,
+    partOfSpeech: String,
+    partOfSpeechInk: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = ipa,
+            style = AppType.Footnote,
+            modifier = Modifier
+                .testTag("word_card_ipa")
+                .semantics { contentDescription = "音标 $ipa" },
+        )
+        Text(
+            text = partOfSpeech,
+            style = AppType.Label,
+            color = partOfSpeechInk,
+            modifier = Modifier
+                .testTag("word_card_part_of_speech")
+                .semantics { contentDescription = "词性 $partOfSpeech" },
+        )
+    }
+}
+
+/**
  * 顶档降级判据（QA3 A2.5）：字号档超过验收钉住的 2.0 时，回忆态的唯一出口「显示释义」
  * 从卡内搬进吸底区常驻。
  *
@@ -866,6 +916,26 @@ internal fun wordCardLemmaUsesCompactTier(fontScale: Float): Boolean = fontScale
  * 阈值同上两条：严格大于 2f。
  */
 internal fun wordCardStacksFeedbackTiers(fontScale: Float): Boolean = fontScale > 2f
+
+/**
+ * 顶档降级判据（QA3 A2.8，收口复测实拍发现、用户 2026-11-08 拍板「立缺陷修，同批口径」）：
+ * 字号档超过验收钉住的 2.0 时，喇叭药片从「与音标/词性同一行」改成**另起一行**。
+ *
+ * 设备实测（emulator-5554，`WordCardScreenTest.pronunciationKeepsTheIpaOnOneLineAtTopFontScale`
+ * 的红态 `expected:<1> but was:<3>`）：药片是 `Row { Column(weight(1f)){ 音标 ; 词性 } ; SpeakerButton }`
+ * 的行尾一枚，而它的**可见文字**与朗读文案同源（`SpeakerButton.kt` 的「一处定义」口径，
+ * 屏侧不许再补定语，`the_screen_uses_the_shared_pill_and_restates_no_readout` 钉着）——
+ * 于是这一档那四个字连 18dp 字形一起长到 472px = 180dp，`weight(1f)` 那一侧只剩 235px = 89.6dp，
+ * `/prəˈɡresɪv/` 被切成 `/prə` `ˈgres` `ɪv/` 三截的音节，词性 `adj.` 顺带掉出首帧。
+ *
+ * 换摆法而不是缩文字：药片上的字就是朗读文案，缩掉或截断等于把「点下去会发生什么」这句真值改没；
+ * 也不给音标加 `maxLines`——音标是「怎么念」的权威写法，截断它比断行更糟。
+ * 药片另起一行后注脚拿到整幅 ≈335dp，一行排完；词性掉出首帧那一半**不钉**成
+ * 「首帧必须可见」：内容段带 `verticalScroll`，可滚，与 A2.6③ 同档（口径见决策文档 §不做什么）。
+ *
+ * 阈值同上三条：严格大于 2f。
+ */
+internal fun wordCardStacksPronunciationRow(fontScale: Float): Boolean = fontScale > 2f
 
 /**
  * 学完的卡片数 / 总数，夹进 0..1。

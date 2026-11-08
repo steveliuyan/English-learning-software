@@ -208,19 +208,25 @@ class WordCardLayoutContractTest {
     /**
      * QA3 A2.3 + A2.4（用户 2026-11-08 拍板「全部都做」＝立为缺陷修）：顶档还要换两处摆法。
      *
-     * 两条判据合在一条用例里，因为它们钉的是同一个决策的两侧——**只有超过钉档 2.0 才换**：
+     * 三条判据合在一条用例里，因为它们钉的是同一个决策的两侧——**只有超过钉档 2.0 才换**：
      *  - 词头从 `AppType.Display`（44sp）换到 `AppType.StrongTitle`（27sp）。3.0 档设备实测一枚
      *    `confidence` 词头按 Display 排到 449dp 高，而可滚视口只剩 220dp：尾字母既没画也没省略号（A2.3）。
      *  - 三档评分从「三等宽横排」换成「整宽上下堆叠 + 每枚一行」。3.0 档横排时每枚 ≈110dp 宽，
      *    「不认识」三字 ≈110dp 已经站不住，左格排成四行、整条吸底区吃掉 226dp——
      *    卡面被压没（A2.4 与 A2.3 是同一件事的两半）。
+     *  - 音标/词性与喇叭药片从「同一行」换成「药片另起一行」。3.0 档药片的**可见文字**连字形长到 180dp，
+     *    `weight(1f)` 那一侧只剩 89.6dp，`/prəˈɡresɪv/` 被切成三截的音节（A2.8，收口复测实拍发现）。
      *
      * 阈值仍取**严格大于 2f**：2.0 档的卡面形状由 `lemmaAndRevealedMeaningStayFullyVisibleAtMaximumLargeFontScale`
-     * 钉死（AC-R-07），这两处降级不许动它一根手指。
+     * 钉死（AC-R-07），这三处降级不许动它一根手指。
      */
     @Test
-    fun `the lemma tier and the feedback arrangement change only above the pinned acceptance font tier`() {
-        listOf(::wordCardLemmaUsesCompactTier, ::wordCardStacksFeedbackTiers).forEach { decide ->
+    fun `the lemma tier, the feedback arrangement and the pronunciation row change only above the pinned acceptance font tier`() {
+        listOf(
+            ::wordCardLemmaUsesCompactTier,
+            ::wordCardStacksFeedbackTiers,
+            ::wordCardStacksPronunciationRow,
+        ).forEach { decide ->
             assertFalse(decide(1f), "1.0 档是按设计稿画的版面，不得被降级改动")
             assertFalse(decide(2f), "2.0 是 AC-R-07 钉住的验收档，那一档仍按稿画")
             assertTrue(decide(2.5f), "超过钉档就要换档/换摆法")
@@ -231,12 +237,15 @@ class WordCardLayoutContractTest {
     /**
      * 顶档换的是**容器与字号档**，不是文案。
      *
-     * 四条约各防一种半途改法：
+     * 五条约各防一种半途改法：
      *  - `AppType.StrongTitle` 只出现 1 次且和 `AppType.Display` 同在一枚 `if` 里：词头若在别处再换一次档，
      *    「只改一半」就会让 1.0 档的卡面跟着抖；
-     *  - 两个判档函数各只有「定义 + 调用」2 处命中：第三处 = 判定被抄进容器里，变成一串散 `if`；
-     *  - `fontScale > 2f` 恰好 3 处（出口常驻 / 词头换档 / 评分条换摆法）：第 4 处必须是新决策漏登记，
-     *    少一处说明某条降级被并进了别的分支；
+     *  - 三个判档函数各只有「定义 + 调用」2 处命中：第三处 = 判定被抄进容器里，变成一串散 `if`；
+     *  - `fontScale > 2f` 恰好 4 处（出口常驻 / 词头换档 / 评分条换摆法 / 发音行换容器）：
+     *    第 5 处必须是新决策漏登记，少一处说明某条降级被并进了别的分支；
+     *  - 音标与词性两枚 tag 各只出现 1 次：A2.8 的两个容器分支共用同一份注脚与同一枚药片调用点，
+     *    「同一件控件在两个分支各画一遍」正是这条要关的门（药片那侧由
+     *    `WordCardScreenContractTest.the_screen_uses_the_shared_pill_and_restates_no_readout` 钉「调用窗口恰两枚」）；
      *  - 三句副说明各只出现 1 次：档位文案的唯一来源是 `FeedbackTiers`，两个容器分支不许各写一遍
      *    （「同一档在两处措辞不同」正是这条要关的门）。
      */
@@ -253,10 +262,21 @@ class WordCardLayoutContractTest {
         )
         assertEquals(2, countMatches(source, Regex("""wordCardLemmaUsesCompactTier\(""")), "定义 + 唯一调用点")
         assertEquals(2, countMatches(source, Regex("""wordCardStacksFeedbackTiers\(""")), "定义 + 唯一调用点")
+        assertEquals(2, countMatches(source, Regex("""wordCardStacksPronunciationRow\(""")), "定义 + 唯一调用点")
         assertEquals(
-            3,
+            4,
             countMatches(source, Regex(Regex.escape("fontScale > 2f"))),
-            "本屏的顶档降级只有三件事：揭晓出口常驻、词头换档、评分条换摆法",
+            "本屏的顶档降级只有四件事：揭晓出口常驻、词头换档、评分条换摆法、发音行换容器",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("""testTag("word_card_ipa")"""))),
+            "音标只能有一处渲染点：A2.8 的两个分支共用同一份注脚，各画一遍就是第二份真值",
+        )
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("""testTag("word_card_part_of_speech")"""))),
+            "词性只能有一处渲染点（与音标同一条理由）",
         )
         assertEquals(
             4,

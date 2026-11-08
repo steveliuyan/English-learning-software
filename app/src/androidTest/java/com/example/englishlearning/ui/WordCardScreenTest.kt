@@ -544,6 +544,53 @@ class WordCardScreenTest {
     }
 
     /**
+     * QA3 A2.8（收口复测实拍发现，用户 2026-11-08 拍板「立缺陷修，同批口径」）：
+     * 顶档 3.0 下音标必须**整串一行**，喇叭药片不许与它抢同一行的宽。
+     *
+     * 设备复现（`.git/qa-scratch/qa3-a2-final/fs300-a23-card-scrolled.png`，真机路径 `progressive`）：
+     * `/prəˈɡresɪv/` 被排成 `/prə` `ˈgres` `ɪv/` 三行（节点 `[100,354][335,806]`，宽只剩 235px = 89.6dp），
+     * 而喇叭药片那一枚占 `[466,556][938,727]` = 472px = 180dp。成因是
+     * `Row { Column(weight(1f)){ 音标 ; 词性 } ; SpeakerButton }` 这一行里，药片的**可见文字**与朗读文案同源
+     * （`SpeakerButton.kt` 的「一处定义」口径），顶档下那四个字连字形一起长到 180dp，把 `weight(1f)` 那一侧挤没。
+     * 1.0 同屏对照：音标一行 `[100,518][275,558]`、药片 156px、词性一行到位。
+     *
+     * 为什么音标单独判、词性不判：音标是「怎么念」的权威写法，断在音节中间等于把读音也弄错了观感，
+     * 是这一条的缺陷本体；词性掉出首帧属于**可滚**（内容段带 `verticalScroll`），与 A2.6③ 同档，
+     * 按已定口径只登记不钉成「首帧必须可见」那种做不到的约束。
+     *
+     * 夹具词换成 `progressive`：默认那枚 `ability` 的音标 `/əˈbɪləti/` 在这一档本来就排得下一行，
+     * 拿它跑绿等于什么都没验（与 A2.3 换 `confidence` 同一个理由）。
+     */
+    @Test
+    fun pronunciationKeepsTheIpaOnOneLineAtTopFontScale() {
+        val ipa = "/prəˈɡresɪv/"
+        composeRule.setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, fontScale = 3f)) {
+                WordCardScreen(state = ready(card = card().copy(lemma = "progressive", ipa = ipa)))
+            }
+        }
+
+        val node = composeRule.onNodeWithTag("word_card_ipa", useUnmergedTree = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals("word_card_ipa 的字级节点产出 ${layouts.size} 份布局（期望恰 1 份）", 1, layouts.size)
+        val layout = layouts.single()
+        assertEquals(
+            "fontScale=3.0 下音标「$ipa」只排到第 ${layout.getLineEnd(layout.lineCount - 1)} 个字符就结束了" +
+                "（共 ${layout.lineCount} 行）：剩下的音标字符被挤到下一行，屏幕上是一截断字（QA3 A2.8）",
+            ipa.length,
+            layout.getLineEnd(layout.lineCount - 1),
+        )
+        assertEquals(
+            "fontScale=3.0 下音标「$ipa」排成 ${layout.lineCount} 行：喇叭药片与它抢同一行的宽，" +
+                "音标被切成三截的音节（QA3 A2.8）",
+            1,
+            layout.lineCount,
+        )
+    }
+
+    /**
      * QA3 A2.4（同上拍板）：顶档 3.0 下三档评分按钮不许把吸底区撑破。
      *
      * 设备复现（同一张截图）：三枚各拿 `weight(1f)` ≈ 110dp 宽，而这一档 `AppType.Label` 是 12sp×3=36sp、
