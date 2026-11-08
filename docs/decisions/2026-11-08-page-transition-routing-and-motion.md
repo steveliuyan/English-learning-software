@@ -261,13 +261,13 @@ grep -n "onOpenArticle = { historyArticle = it }" app/src/main/java/com/example/
 
 `AppScreen.kt:1865` 的 `onOpenArticle` 在 `showReadingHistory` 仍为真的时候把 route 从 29 换成 32；
 `ScreenTransitionDirection.kt:17`（`mountIndex(to) > mountIndex(from) → Backward`）因此判成返回；
-`AppTransition.kt:35` 的 `PageBackwardEnter` 是新屏**从左侧进**。用户点开的是一篇文章，动画说的是「你返回了」。
+`AppTransition.kt:35` 的 `PageBackwardEnter` 让新屏**从左侧进**。用户点开的是一篇文章，动画说的是「你返回了」。
 同理 LearningSetup(7) → LearningFlow(8)、ReadingFeed(30)/ArticleImport(31) → ArticleReading(32)。
 这条不是实现跑偏，是「判据只搬不译」（§3.1）的必然后果：搬过来的顺序保住了 z 序与返回键优先级，
 也把守卫造成的「后声明反而更深」一起搬进了方向判据。
 
 **裁定**：**不重排链、不改守卫**（顺序就是产品承诺，QA3 A1 的许可/关于顺序依赖它）。改为在同一张 route 表上增设
-`transitionDepth: Int`，默认 `= mountIndex`，**只在点名且有点位可核的 from→to 边证据的支上覆写**；
+`transitionDepth: Int`，默认 `= mountIndex`，**只在点名、且发起点行号可核的 from→to 边上覆写**；
 `ScreenTransitionDirectionPolicy.overlay` 改比 `transitionDepth`，`mountIndex` 继续只承担挂载与返回键语义。
 配套纪律：每条覆写在 `ScreenTransitionDirectionTest` 里必须有一条**命名边**的方向用例，
 `ScreenTransitionContractTest` 钉「覆写清单 == 用例清单」（多一条覆写或少一条用例即红），
@@ -295,7 +295,7 @@ grep -n "onOpenArticle = { historyArticle = it }" app/src/main/java/com/example/
 **口径连带**：§3.3 表格里的 `CrossfadeEnter/CrossfadeExit`（同层互换）与 Spec 05 那句「同层互换只做淡入淡出」，
 在新口径下只对**身份不同**的同支互换生效；同身份换值是就地更新，不进入任何转场规格。
 红线保护：一次数据刷新既不得造出第二条转场腿，也不得重放「组合即发起」的出站——这是 §4.1 的出站红线（Spec 05 F5-06 末条）
-与本条的交点，红线本身按原文成立，不作 weakening。
+与本条的交点，红线本身按原文成立，不予弱化。
 
 ### 修正 3（Important）：冻结义务的**实际范围**——挂载判据 + 该腿确实读到的 payload
 
