@@ -140,6 +140,33 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
 - Step 7【测】`bash scripts/secret-scan.sh > /tmp/ss.out 2>&1; echo $?` → **`EXIT=0`，输出 0 字节 / 0 行**。
   脚本静默即通过（`scripts/secret-scan.sh` 只在命中或环境异常时打印；本次扫描面含 git 跟踪文件与已构建的 `app/build/outputs/apk/debug/app-debug.apk`）。
 
+### 3.7 2026-11-09 控制器补记：终评补口后的 connected 双形态复跑（原矩阵 AC5-07 的「待办」在此关闭）
+
+补口各席只跑过单形态（Compact），矩阵 AC5-07 那行留下一条待办：9 枚全类的 Compact/Wide 双形态重跑。现已在最终内容上跑完，
+并把中途观察到的一趟偶发红按「只加守卫、不放宽断言」硬化掉。全部走 `adb install -r` 双包 + `am instrument -e class`，
+未用 `connectedDebugAndroidTest`，设备数据零清除；`bf353dda` 零命令。
+
+读数（均为 `com.example.englishlearning.ui.ScreenTransitionInstrumentedTest` 全类，`-e class` 单类）：
+
+| # | HEAD 内容 | 形态 | 结果 |
+|---|---|---|---|
+| 1 | `f3cc0c3`（补口前最后一次代码侧收口，硬化未加） | Wide（`wm size 2560x1600`，落为 2160x1600 override） | `FAILURES!!! Tests run: 9, Failures: 1` — 红点是 `transitionsProduceNoExtraBillableOutbound` 里 `pumpUntil` 的 3s 超时（`.superpowers/sdd/2026-11-06-motion-and-adaptive-layout/b4-wide-connected.log`），不是出站计数断言 |
+| 2 | `ff4177c` 内容（加两道守卫） | Compact（1080x1920，无 override） | `OK (9 tests)` 21.75s |
+| 3 | 同上 | Wide | `OK (9 tests)` 22.57s |
+| 4–5 | 同上 | Wide | `OK (9 tests)` 21.03s / `OK (9 tests)` 20.34s |
+| 6 | `ff4177c`（注释订正后重装） | Compact | `OK (9 tests)` 19.57s |
+
+即 shipped 内容上 **Compact 2 趟 + Wide 3 趟 = 5 趟全类连绿**；唯一一趟红出现在硬化之前、且红在靶面守卫而非判据本身。
+
+硬化内容（`ff4177c`，纯 androidTest，零生产码）：①按返回键前先断言词卡腿恰有一枚在场，把「转场没开播」与「驱动走空」分开；
+②`pumpUntil` 超时文本带现场读数（站 1 腿数、各腿 tag、`word_card_screen` 在场枚数）。
+同时订正一处旧定性：席 B2 报告 §connected 读数表第 2 行那趟红是在**摘掉 `contentKey` 的变异探针配置**里观察到的，
+本就不该记成 shipped 配置的 flake（订正写进用例注释，B2 报告原文不改）。
+
+门禁同步复跑（同一棵树）：`BUILD SUCCESSFUL in 4m 5s`，`341 类 / 2553 条 / 0 失败 / 0 错误 / 0 跳过`
+（`--no-daemon --no-build-cache --rerun-tasks`，341 份结果 XML 全部为本次新落盘，按 mtime 计数而非沿用旧文件）。
+设备收口状态：`wm size reset` → 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0，两枚 APK 在装。
+
 ## 4. Git 状态
 
 - 【测】分支：`stage-5-ui-r2-learning-path`；本席开工 HEAD `d347b86`（`git rev-parse --short HEAD`）。
@@ -157,6 +184,18 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
   两枚落库后未推送提交数应为 **18**（上条现算的 16 + 本席 2 枚），收工复核 = `git log --oneline origin/stage-5-ui-r2-learning-path..HEAD | wc -l`。
 - **远端 tip：待推送后回填**。本席**未执行任何 `git push`**（简报 Global Constraints：`git push` 逐批请示，绝不自动；推送是控制器的步骤，不是本席的）。
 - 未提交的遗留文件：无。取证原始件全部在跟踪树之外的 `.git/qa-scratch/d4a/`、`.git/qa-scratch/d4b/`（277 个文件 / 56M，按简报「不入库」处置）。
+
+**2026-11-09 终评补口收口补记（控制器现算，本席 D-4 那段数字是当时点、不回头改）**：
+
+- 【测】`git rev-parse --short HEAD` → `ff4177c`；【测】`git log --oneline origin/stage-5-ui-r2-learning-path..HEAD | wc -l` → **33**
+  （origin tip 仍是 `5d93cdc`；`git merge-base --is-ancestor 5d93cdc HEAD` 通过，快进关系）。
+- 终评补口 7 条落成的 14 枚提交（旧→新）：`18945d0` `06f6d05` `046a9ea`（席 A：Spec/决策册）→
+  `b1fd4bb`（第 1 条：层深列 `transitionDepth`）→ `46f4e9b` `45c9f59`（第 2、3 条：身份列 + `contentKey`、摘零读字段）→
+  `8a24854` `2cfd11d`（第 5、4 条：状态 tag 无障碍判据、闭集发音闸）→
+  `3fbe426` `46d6814` `5a30b81` `0c8cc2c`（第 6、7 条 + 26 处旧口径活文档）→ `f3cc0c3`（第 7 条代码侧收口）→
+  `ff4177c`（connected 硬化 + 双形态复跑读数）。
+- **仍未推送**：本批全程零 `git push`（用户规则：推送逐批请示）。推送后的远端 tip 待回填此处。
+- 不合 `main`，分支停在 `stage-5-ui-r2-learning-path`。
 
 ## 5. 未完成 / 遗留问题
 
