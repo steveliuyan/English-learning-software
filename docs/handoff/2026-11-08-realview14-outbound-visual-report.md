@@ -81,8 +81,16 @@
 
 - 分支：`stage-5-ui-r2-learning-path`（不合 `main`，按既有口径）。
 - 本会话开工前 HEAD：`2c6d335`（A2.8 推送核验补记），工作树干净。
-- 本次提交 `885ccc9`（两份文档：本报告 + 待办 3 打勾），逐文件 `git add`，带 `-c user.name/-c user.email`，不 `--amend`、不 `--no-verify`；本节这次补记本身是紧随其后的一枚 docs 枚（§3.5 把 secret-scan 从「未重跑」改成实跑 exit 0）。
-- 是否已推送 GitHub：**尚未推送，待用户点头**（推送逐批请示）。写作本节时的现算实况：本地 HEAD `885ccc9`，`git ls-remote origin stage-5-ui-r2-learning-path` = `2c6d335`（= 上一批 A2.8 核验过的远端 tip），`git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD` = 1。推送后须把远端 tip 与本地哈希对读再补记。
+- 主提交 `885ccc9`（两份文档：本报告 + 待办 3 打勾），逐文件 `git add`，带 `-c user.name/-c user.email`，不 `--amend`、不 `--no-verify`；其后本文件还有自查后的补记枚（§3.5 把 secret-scan 从「未重跑」改成实跑 exit 0、§4 改现算口径）。
+  **补记会改变 HEAD，别在文档里追自己的哈希**——待推送清单以 `git log --oneline 2c6d335..HEAD` 现列为准。
+- 是否已推送 GitHub：**尚未推送，待用户点头**（推送逐批请示）。开工时远端 tip 是 `2c6d335`（上一批 A2.8 的核验值），本批全部提交都在它之后。
+  现算三件套（推送前后各跑一次，别引用本节写的值）：
+  ```
+  git rev-parse HEAD
+  git -c credential.interactive=false ls-remote origin stage-5-ui-r2-learning-path
+  git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD
+  ```
+  推送成功后须把 `ls-remote` 返回值与 `rev-parse` 逐字对读，一致才算已备份。
 - 无未提交的遗留文件；证据册在 `.git/` 下，本就不入库。
 
 ## 5. 未完成 / 遗留问题
