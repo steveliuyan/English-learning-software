@@ -48,7 +48,7 @@ object AppOverlayRouteResolver {
         flags.showReadingFeed && flags.readingTarget == null && flags.historyArticle == null -> AppOverlayRoute.ReadingFeed
         flags.showArticleImport -> AppOverlayRoute.ArticleImport
         flags.readingTarget != null || flags.historyArticle != null ->
-            AppOverlayRoute.ArticleReading(flags.readingTarget, flags.historyArticle)
+            AppOverlayRoute.ArticleReading(flags.readingTarget)
         flags.showWordBookTransfer -> AppOverlayRoute.WordBookTransfer
         flags.showSettings -> AppOverlayRoute.Settings
         else -> null

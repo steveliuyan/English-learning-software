@@ -32,6 +32,14 @@ import kotlin.test.assertTrue
  *  5. **覆写清单 == 命名边用例清单**（[transitionDepthOverrideListEqualsNamedEdgeTestList]）：多一条覆写
  *     少一条用例、或用例指着一条已不覆写的边，都判红；牙齿由合成双边自证。
  *
+ * 终评补口第 2 席（席 B2）再追加两条（决策册「2026-11-09 修正」修正 2）：
+ *
+ *  6. **身份列覆写律**（[routeIdentityColumnIsOverriddenOnEveryDataClassBranch]）：`navigationIdentity` 默认
+ *     访问器只服务 `data object`，9 枚 `data class` 必须逐枚覆写台账点名的稳定主键并带支别前缀。
+ *  7. **站 1 的身份接线**（[stationOneAnimatedContentPassesNavigationIdentityAsContentKey]）：站 1 的
+ *     `AnimatedContent` 参数窗里必须有 `contentKey = { it?.navigationIdentity }`，且全文件只许这一枚
+ *     （站 2 的 tab 身份就是 `AppTab` 枚举本身，不过度接线）。
+ *
  * 扫描纪律（Global Constraints 四条齐备）：路径常量 + 文件数响亮守卫 + 合成 must-flag/must-not-flag 双边 +
  * 反空转消费点计数；剥注释只用 `SourceRatchet` 的 [stripComments]，每份源码**只剥一次**（二次剥会把
  * 字面量里的斜杠星号序列当注释起点，本批实测过的假红形状）。
@@ -597,8 +605,9 @@ class ScreenTransitionContractTest {
     /**
      * 判据 D-3-⑤（controller-carried：计划 Step 9 未定义此闸，本条为补「route payload 冻成零读者」而加）：
      * 每一枚带 payload 的 route 变体，其字段在宿主渲染腿里必须有 `route.<字段>` 读者。零读者 = 值冻进了 route
-     * 却没人回读，退场腿期间要么白屏要么读错屏。已知两枚零读者显式挂在 [KNOWN_UNREAD_PAYLOAD_FIELDS]（点名登记，
-     * 非静默豁免）：名单之外新长出一枚零读者字段即判红；某枚已登记的字段被接上读者后，把对应项从名单删掉。
+     * 却没人回读，退场腿期间要么白屏要么读错屏。已登记的零读者显式挂在 [KNOWN_UNREAD_PAYLOAD_FIELDS]（点名登记，
+     * 非静默豁免）：名单之外新长出一枚零读者字段即判红；某枚已登记的字段被接上读者后，把对应项从名单删掉，
+     * 或者按终评补口 第 3 条那样把没人读的字段直接从 payload 摘掉（`historyArticle` 走的就是这一支）。
      */
     @Test
     fun everyRoutePayloadFieldHasAProductionReader() {
@@ -750,6 +759,147 @@ class ScreenTransitionContractTest {
         assertTrue(
             namedEdgePairingOffenders(stripComments(commentOnly)).any { it.contains("空转") },
             "注释里的命名边被当作用例（取样没剥注释），或空名单守卫失明（对着空清单比对覆写等于没牙）。",
+        )
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // 判据 D-4fix-③/④（终评补口 第 2 条，席 B2）：身份列的覆写律 + 站 1 的 contentKey 接线
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * 判据 D-4fix-③：route 表的**身份列覆写律**。
+     * `navigationIdentity` 的默认访问器（`val navigationIdentity: Any get() = this`）只服务 26 枚 `data object`
+     * （单例的 `this` 天然稳定）；9 枚 `data class` 必须各自 `override val navigationIdentity` 给出稳定业务主键——
+     * 漏一枚就是「payload 一变 = 一枚新身份 = 站 1 起一轮新转场」（第 2 条裁定的缺陷本体）。
+     * 支数与身份取值逐枚记在 [NAVIGATION_IDENTITY_LEDGER]（本席报告的「第 2 条身份表」一节同源）。
+     */
+    @Test
+    fun routeIdentityColumnIsOverriddenOnEveryDataClassBranch() {
+        assertExactlyOne("AppOverlayRoute.kt")
+        val routeSource = stripComments(readSource(ROUTE_SOURCE_PATH))
+        assertEquals(
+            OVERLAY_ROUTE_COUNT,
+            routeIdentityRows(routeSource).size,
+            "从 AppOverlayRoute.kt 解析到 ${routeIdentityRows(routeSource).size} 枚 route 变体（应为 $OVERLAY_ROUTE_COUNT 枚）：" +
+                "route 表被改形而身份闸读不到，覆写律对着空名单放行就是空转（批 A 反空转纪律）。",
+        )
+        assertEquals(
+            NAVIGATION_IDENTITY_OVERRIDE_COUNT,
+            routeIdentityRows(routeSource).count { it.isDataClass },
+            "route 表的 data class 支数与身份台账登记数不符（台账 $NAVIGATION_IDENTITY_OVERRIDE_COUNT 枚）：" +
+                "支数漂移 = 新增/删改了一枚带 payload 的支，必须先改台账与理由，再动本闸。",
+        )
+        val offenders = navigationIdentityOffenders(routeSource)
+        assertTrue(
+            offenders.isEmpty(),
+            "navigationIdentity 列违反覆写律（决策册「2026-11-09 修正」修正 2）：\n" + offenders.joinToString("\n") +
+                "\n口径：默认访问器承载 data object，data class 逐枚覆写稳定业务主键；新增一支 data class 必须同时给身份与理由。",
+        )
+    }
+
+    /**
+     * 判据 D-4fix-④：站 1 的 `AnimatedContent` 必须把身份列当 `contentKey` 接上。
+     * 取样按「`targetState = overlayRoute` 那一行 → 内容 lambda 起点 `) { route ->`」取参数窗，
+     * 站 2 不在口径内（tab 的 `AppTab` 枚举本身即身份）⇒ 全文件 `contentKey =` 恰一枚，多一枚即过度接线。
+     */
+    @Test
+    fun stationOneAnimatedContentPassesNavigationIdentityAsContentKey() {
+        assertExactlyOne("AppScreen.kt")
+        val appScreen = stripComments(readSource(APP_SCREEN_SOURCE_PATH))
+        val offenders = stationOneContentKeyOffenders(appScreen)
+        assertTrue(
+            offenders.isEmpty(),
+            "站 1 的身份接线不合格（决策册「2026-11-09 修正」修正 2）：\n" + offenders.joinToString("\n") +
+                "\n口径：`AnimatedContent(targetState = overlayRoute, …, contentKey = { it?.navigationIdentity })`——" +
+                "没有 contentKey，route 的 data class 等值就是把「同一屏的数据变了」读成「换了一屏」。",
+        )
+    }
+
+    /**
+     * 判据 D-4fix-③/④ 的合成双边（本闸的牙齿自证）：
+     * ①data class 支漏覆写身份、②身份不带支别前缀、③台账外新增长出的 data class、④默认访问器被拆、⑤取样空转、
+     * ⑥站 1 参数窗没有 contentKey、⑦contentKey 不引用身份列、⑧站 2 长出第二枚 contentKey、⑨站 1 形状失踪，
+     * 全部 must-flag；合规假表 + 合规假站点必须全放行（must-not-flag）。
+     */
+    @Test
+    fun judgementIdentityGateFlagsMissingOverrideAndStationWithoutContentKey() {
+        val compliantRouteTable = """
+            sealed interface FakeRoute {
+                val mountIndex: Int
+                val navigationIdentity: Any get() = this
+                data object Settings : FakeRoute { override val mountIndex = 0 }
+                data class UnknownAiFeature(val featureKey: String) : FakeRoute { override val mountIndex = 1; override val navigationIdentity get() = mountIndex to featureKey }
+            }
+        """.trimIndent()
+        assertTrue(
+            navigationIdentityOffenders(stripComments(compliantRouteTable)).isEmpty(),
+            "合规身份表被判红（must-not-flag 侧过严会把补口本身卡死）：${navigationIdentityOffenders(stripComments(compliantRouteTable))}",
+        )
+
+        val missingOverride = compliantRouteTable.replace("; override val navigationIdentity get() = mountIndex to featureKey", "")
+        assertTrue(
+            navigationIdentityOffenders(stripComments(missingOverride)).any { it.contains("UnknownAiFeature") },
+            "data class 支漏覆写身份没被判出：身份列退回 route 实例，一次数据刷新又被读成一次导航。",
+        )
+        val noBranchPrefix = compliantRouteTable.replace("mountIndex to featureKey", "featureKey")
+        assertTrue(
+            navigationIdentityOffenders(stripComments(noBranchPrefix)).any { it.contains("支别前缀") },
+            "身份不带支别前缀的形状没被判出：同一枚主键的两支不同屏（词卡详情→重学页，AppScreen.kt:830-832）会被并成同一身份。",
+        )
+        val rogueBranch = compliantRouteTable.replace(
+            "data object Settings : FakeRoute { override val mountIndex = 0 }",
+            "data class Rogue(val whatever: String) : FakeRoute { override val mountIndex = 0; override val navigationIdentity get() = mountIndex to whatever }",
+        )
+        assertTrue(
+            navigationIdentityOffenders(stripComments(rogueBranch)).any { it.contains("台账") },
+            "台账外新长出一枚 data class 没被判红：新支的身份没有登记与理由，闸就会对它默认放行。",
+        )
+        val noDefault = compliantRouteTable.replace("val navigationIdentity: Any get() = this", "val navigationIdentity: Any")
+        assertTrue(
+            navigationIdentityOffenders(stripComments(noDefault)).any { it.contains("默认访问器") },
+            "接口默认访问器被拆没被判出：26 枚 data object 的身份从此无源可依。",
+        )
+        assertTrue(
+            navigationIdentityOffenders(stripComments("sealed interface Empty { val mountIndex: Int }")).any { it.contains("空转") },
+            "取样解析到 0 枚变体时本闸静默放行：正是批 A 要防的空转形状。",
+        )
+
+        val compliantStation = """
+            @Composable
+            fun FakeHost(overlayRoute: AppOverlayRoute?) {
+                AnimatedContent(
+                    targetState = overlayRoute,
+                    modifier = Modifier.fillMaxSize(),
+                    contentKey = { it?.navigationIdentity },
+                    transitionSpec = { AppTransition.contentTransform(ScreenTransitionDirectionPolicy.overlay(initialState, targetState)) },
+                ) { route ->
+                    OverlayLeg(route == overlayRoute) { Body(route) }
+                }
+            }
+        """.trimIndent()
+        assertTrue(
+            stationOneContentKeyOffenders(stripComments(compliantStation)).isEmpty(),
+            "合规站 1 被判红（must-not-flag 侧过严）：${stationOneContentKeyOffenders(stripComments(compliantStation))}",
+        )
+
+        val withoutKey = compliantStation.replace(Regex("""(?m)^ *contentKey = \{ it\?\.navigationIdentity \},\r?\n"""), "")
+        assertTrue(
+            stationOneContentKeyOffenders(stripComments(withoutKey)).any { it.contains("contentKey") },
+            "站 1 缺 contentKey 没被判出：本席判据 ④ 等于没写。",
+        )
+        val wrongKey = compliantStation.replace("contentKey = { it?.navigationIdentity }", "contentKey = { it?.mountIndex }")
+        assertTrue(
+            stationOneContentKeyOffenders(stripComments(wrongKey)).any { it.contains("navigationIdentity") },
+            "contentKey 指向别的列（如 mountIndex）没被判出：同支换数据照样被读成换屏。",
+        )
+        val secondStation = compliantStation + "\n" + compliantStation.replace("targetState = overlayRoute", "targetState = selectedTab")
+        assertTrue(
+            stationOneContentKeyOffenders(stripComments(secondStation)).any { it.contains("恰一枚") },
+            "站 2 长出第二枚 contentKey 没被判出：tab 宿主腿的身份就是 AppTab 枚举本身，裁定明令不过度接线。",
+        )
+        assertTrue(
+            stationOneContentKeyOffenders(stripComments("@Composable fun X() { Box { } }")).any { it.contains("参数窗") },
+            "站 1 形状失踪（改名/搬走/拆形）时本闸静默放行：判据 ④ 对着空档过关。",
         )
     }
 
@@ -906,6 +1056,97 @@ class ScreenTransitionContractTest {
         }
     }
 
+    /**
+     * 身份闸取样（判据 D-4fix-③；与 [routeDepthRows] 同族的**按支分段**取样器，席 B2 新增列不复用旧正则）：
+     * 每枚 `data class/object` 从自己的起点截到下一枚变体的起点，段内取至多一枚
+     * `override val navigationIdentity …` 声明（整行，含取值表达式）。真实文件与合成夹具走同一份实现。
+     */
+    private data class RouteIdentityRow(
+        val variant: String,
+        val isDataClass: Boolean,
+        val identityDeclaration: String?,
+    ) {
+        val declaresNavigationIdentity: Boolean get() = identityDeclaration != null
+    }
+
+    private fun routeIdentityRows(strippedRouteSource: String): List<RouteIdentityRow> {
+        val starts = ROUTE_VARIANT_KIND_DECL.findAll(strippedRouteSource)
+            .map { Triple(it.groupValues[1] == "class", it.groupValues[2], it.range.first) }
+            .toList()
+        return starts.mapIndexed { index, (isClass, name, start) ->
+            val end = if (index + 1 < starts.size) starts[index + 1].third else strippedRouteSource.length
+            RouteIdentityRow(
+                variant = name,
+                isDataClass = isClass,
+                identityDeclaration = DECLARED_NAVIGATION_IDENTITY.find(strippedRouteSource.substring(start, end))?.value,
+            )
+        }
+    }
+
+    /** 判据 D-4fix-③ 的本体（纯函数：已剥注释的 route 源码 → offender 文案清单；真实与合成共用）。 */
+    private fun navigationIdentityOffenders(strippedRouteSource: String): List<String> = buildList {
+        val rows = routeIdentityRows(strippedRouteSource)
+        if (rows.isEmpty()) {
+            add("身份闸从 route 源码解析到 0 枚变体：取样空转，覆写比对无从进行。")
+            return@buildList
+        }
+        if (!ROUTE_IDENTITY_DEFAULT_ACCESSOR.containsMatchIn(strippedRouteSource)) {
+            add("route 接口缺少 `val navigationIdentity: Any get() = this` 默认访问器：26 枚 data object 的身份从此无源可依。")
+        }
+        rows.filter { it.isDataClass }.forEach { row ->
+            val needle = NAVIGATION_IDENTITY_LEDGER[row.variant]
+            val declaration = row.identityDeclaration
+            when {
+                needle == null -> add(
+                    "data class 支 `${row.variant}` 不在身份台账 NAVIGATION_IDENTITY_LEDGER 里：新增一支必须先登记稳定业务主键、" +
+                        "取值理由与证据行号（台账与本席报告的「第 2 条身份表」同源），再动 route 表。",
+                )
+                declaration == null -> add(
+                    "data class 支 `${row.variant}` 没有 `override val navigationIdentity`：身份退回 route 实例本身，" +
+                        "payload 任一字段一变就被站 1 的 AnimatedContent 读成换了一屏（终评补口 第 2 条的缺陷本体）。",
+                )
+                !declaration.contains(needle) -> add(
+                    "支 `${row.variant}` 的身份声明没读出台账点名的稳定主键 `$needle`：实测 `$declaration`。" +
+                        "换主键就是换「哪一屏」的判据，须先回台账改口径与理由。",
+                )
+                !ROUTE_IDENTITY_BRANCH_PREFIX.containsMatchIn(declaration) -> add(
+                    "支 `${row.variant}` 的身份没带支别前缀 `mountIndex to`：同一枚主键的两支不同屏" +
+                        "（如词卡详情→重学页，AppScreen.kt:830-832）会被并成同一身份而不起转场。",
+                )
+            }
+        }
+    }
+
+    /**
+     * 站 1 参数窗取样（判据 D-4fix-④）：从 `targetState = overlayRoute,` 那一行扫到内容 lambda 的起点行
+     * （`^) { 形参 ->`，缩进自适应），两端都取到才算窗；取不到返回 null，由调用方响亮判红而不是空转放行。
+     */
+    private fun stationOneArguments(strippedAppScreen: String): String? {
+        val lines = strippedAppScreen.lines()
+        val start = lines.indexOfFirst { STATION_ONE_TARGET_LINE.containsMatchIn(it) }
+        if (start < 0) return null
+        val end = (start + 1 until lines.size).firstOrNull { CONTENT_LAMBDA_OPEN.containsMatchIn(lines[it]) } ?: return null
+        return lines.subList(start, end).joinToString("\n")
+    }
+
+    /** 判据 D-4fix-④ 的本体（纯函数：已剥注释的宿主源码 → offender 文案清单；真实与合成共用）。 */
+    private fun stationOneContentKeyOffenders(strippedAppScreen: String): List<String> {
+        val window = stationOneArguments(strippedAppScreen)
+            ?: return listOf("站 1 的 AnimatedContent 参数窗取不到（`targetState = overlayRoute,` 那行或其后的 `) { 形参 ->` 改了形）：" +
+                "身份接线无从核对，判红而不是对着空档放行。")
+        return buildList {
+            if (!STATION_ONE_CONTENT_KEY.containsMatchIn(window)) {
+                add("站 1 的参数窗里没有 `contentKey = { it?.navigationIdentity }`：route 是 data class，" +
+                    "没有 contentKey 时「同一屏换数据」与「换一屏」在 AnimatedContent 眼里是同一件事。")
+            }
+            val total = STATION_CONTENT_KEY_DECL.findAll(strippedAppScreen).count()
+            if (total != 1) {
+                add("AppScreen.kt 里 `contentKey =` 应恰一枚（站 1），实测 $total 枚：站 2 的 tab 宿主腿身份就是 AppTab 枚举本身，" +
+                    "裁定明令不过度接线；0 枚则是判据失踪。")
+            }
+        }
+    }
+
     /** 变体名 → 声明里的 mountIndex 字面量（判据 3 用它核对「链序 = 0..34 升序」）。 */
     private fun routeMountIndexes(strippedRouteSource: String): Map<String, Int> {
         val names = routeVariants(strippedRouteSource)
@@ -1006,6 +1247,62 @@ private val ROUTE_VARIANT_DECL = Regex("""^ *data (?:class|object) (\w+)""", Reg
 private val DECLARED_MOUNT_INDEX = Regex("""override val mountIndex = (\d+)""")
 private val DECLARED_TRANSITION_DEPTH = Regex("""override val transitionDepth = (\d+)""")
 
+// ---------------------------------------------------------------------------------------------
+// 终评补口 第 2 条（席 B2）：导航身份列的取样正则与身份台账
+// ---------------------------------------------------------------------------------------------
+
+/** 身份列的默认访问器（26 枚 `data object` 的唯一承载体，写法与 [ROUTE_DEPTH_DEFAULT_ACCESSOR] 同族）。 */
+private val ROUTE_IDENTITY_DEFAULT_ACCESSOR = Regex("""val navigationIdentity: Any get\(\) = this""")
+
+/** 一枚 `data class` 支的身份声明整行（到行尾），取样器据此核对台账点名的主键与支别前缀。 */
+private val DECLARED_NAVIGATION_IDENTITY = Regex("""override val navigationIdentity[^\n]*""")
+
+/** 变体声明 + 支别种类（group 1 = class/object，group 2 = 支名）；层深闸的 ROUTE_VARIANT_DECL 不带种类，故另开一枚。 */
+private val ROUTE_VARIANT_KIND_DECL = Regex("""^ *data (class|object) (\w+)""", RegexOption.MULTILINE)
+
+/** 身份必须带支别前缀：同一枚主键的两支不同屏不能并成同一身份。 */
+private val ROUTE_IDENTITY_BRANCH_PREFIX = Regex("""mountIndex to\b""")
+
+/** 站 1 的 AnimatedContent 参数窗起点行（宿主里唯一以 route 为目标的那枚站点；`\s*$` 容忍 CRLF 工作树）。 */
+private val STATION_ONE_TARGET_LINE = Regex("""^\s*targetState = overlayRoute,\s*$""")
+
+/** 参数窗终点：内容 lambda 的起点行 `) { 形参 ->`（Compose 的尾随 lambda 形，花括号在箭头之前）。 */
+private val CONTENT_LAMBDA_OPEN = Regex("""^\s*\) \{ (\w+) ->\s*$""")
+
+/** 站 1 的身份接线形状（裁定原话：`contentKey = { it?.navigationIdentity }`）。 */
+private val STATION_ONE_CONTENT_KEY = Regex("""contentKey\s*=\s*\{\s*it\?\.navigationIdentity\s*\}""")
+
+/** 全文件的 `contentKey =` 声明（只许站 1 一枚；站 2 的 tab 身份就是 AppTab 枚举本身）。 */
+private val STATION_CONTENT_KEY_DECL = Regex("""(?<![A-Za-z0-9_])contentKey\s*=""")
+
+/** 带 payload 的 `data class` 支数（route 表 35 枚里的 9 枚；新增/删改一支须三处同改：route 表、台账、本计数）。 */
+private const val NAVIGATION_IDENTITY_OVERRIDE_COUNT = 9
+
+/**
+ * 身份台账（支名 → 稳定业务主键的取值表达式，判据 D-4fix-③ 逐枚核对）；取值理由与字段证据：
+ *  - `card.cardId`（四枚词卡支）：`WordCard.kt:57` 的 `cardId: String` 就是词卡的业务主键（`wordBookId` 已含在
+ *    占位 id 的命名空间里，真实册里 cardId 亦全局唯一）；卡面（lemma/ipa/释义/例句/senses）是易变字段，不进身份。
+ *  - `plan.planId`（ReviewQueue / TodayWordList）：`TodayPlanViewModel.kt:72` 的 `planId: String?`，
+ *    **可空**⇒ 兜底取 `activeWordBookId`（`:73`）+ `localDateLabel`（`:64`）拼出的非空键（见 route 表注释）；
+ *    `newDone`/`dueDone`/`isUnlocked`/队列卡面/`bookProgress` 全是派生态，正是本条裁定要剥掉的那批字段。
+ *  - `feature`（AiFeatureScaffold）：`AiFeature` 是 enum（`AiFeature.kt:32`），枚举实例本身就是稳定身份。
+ *  - `featureKey`（UnknownAiFeature）：未注册 key 的字符串就是那一屏的业务主键。
+ *  - `readingTarget`（ArticleReading）：`ReadingTarget.article.articleId`（`Article.kt:4`）；历史腿（`readingTarget == null`）
+ *    没有可携带主键（`historyArticle` 已按第 3 条摘除），落到一枚支内哨兵常量上——全仓历史腿的唯一发起点是
+ *    `AppScreen.kt:1868`，进出都经过 ReadingHistory 列表，因此不存在「两篇历史文章同身份而不转场」的真实边。
+ */
+private val NAVIGATION_IDENTITY_LEDGER = mapOf(
+    "VocabularyDetail" to "card.cardId",
+    "RelearnCard" to "card.cardId",
+    "LearningRecordDetail" to "card.cardId",
+    "FavoriteDetail" to "card.cardId",
+    "ReviewQueue" to "plan.planId",
+    "TodayWordList" to "plan.planId",
+    "AiFeatureScaffold" to "feature",
+    "UnknownAiFeature" to "featureKey",
+    "ArticleReading" to "readingTarget",
+)
+
 /** 转场规格面的唯一宿主文件名（判据 D-3-②/④ 的白名单条目；宿主的落点目录见 APP_TRANSITION_SOURCE_PATH）。 */
 private const val TRANSITION_SPEC_HOST_NAME = "AppTransition.kt"
 
@@ -1016,11 +1313,14 @@ private const val TAB_HOST_CONDITION = "route == null"
  * 判据 D-3-⑤ 已登记的「冻进 route 但宿主渲染腿无 `route.<字段>` 读者」的 payload 字段（点名，非静默豁免）：
  *  - `featureKey`（`UnknownAiFeature`，route 表 idx 28）：未知 AI 功能 key 的兜底页按链外的 `selectedFeatureKey`
  *    渲染通用脚手架，链上那一支不回读 `route.featureKey`（自 HEAD 起即如此，计划批 D route 表点名的就是这一枚）。
- *  - `historyArticle`（`ArticleReading`，idx 32）：来源判定 `fromHistory` 只读 `route.readingTarget == null`，
- *    历史文章正文由 `articleReadingViewModel` 的 uiState 提供，腿里不回读 `route.historyArticle`（D-2 冻结形状）。
- * 二者的接线属 D-2/后续批的渲染腿语义，不在 D-3 转场范围；此处显式登记，将来某枚接上读者就把对应项删掉。
+ *
+ * 终评补口 第 3 条（席 B2）把 `historyArticle` 从登记名单里**删掉**了，走的是裁定给的第二支：
+ * 那枚字段被从 payload 摘除（`AppOverlayRoute.ArticleReading` 改为单参 `readingTarget`），
+ * 「冻了却没人读」的形状随之消失——来源判定 `fromHistory` 一直只读 `route.readingTarget == null`（`AppScreen.kt:1917`），
+ * 正文由 `articleReadingViewModel` 的 uiState 供给，全仓对 `route.historyArticle` 零读者。
+ * 本名单继续钉「不得新增冻了不读的子」：新长出一枚零读者即判红。
  */
-private val KNOWN_UNREAD_PAYLOAD_FIELDS = setOf("featureKey", "historyArticle")
+private val KNOWN_UNREAD_PAYLOAD_FIELDS = setOf("featureKey")
 
 /** 链上一支的合规形状：条件文本恰为 `route is AppOverlayRoute.<变体名>`。 */
 private val ROUTE_CONSUMPTION = Regex("""^route is AppOverlayRoute\.\w+$""")

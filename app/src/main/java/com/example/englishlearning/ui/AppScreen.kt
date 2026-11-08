@@ -776,6 +776,9 @@ fun AppScreen(
             // route 此后只由 lambda 入参提供（留着它退场腿会读外层新值、渲染成「只有一屏在淡」）。
             // transitionSpec 的方向出自 ScreenTransitionDirectionPolicy.overlay，比对的是 route 表的
             // transitionDepth 层深列（默认 = 序号、点名边覆写），不再是声明序号本身（修正 1）。
+            // contentKey 比的是 navigationIdentity 列（修正 2）：route 是 data class，只给 targetState 时
+            // 「同一屏换数据」（三档反馈把 newDone 从 2 跳到 3）与「换一屏」在 AnimatedContent 眼里是同一件事，
+            // 于是每次刷新都起一轮转场、该腿重新组合、屏内 remember 态清零。
             AnimatedContent(
                 targetState = overlayRoute,
                 modifier = Modifier.fillMaxSize(),
@@ -784,6 +787,7 @@ fun AppScreen(
                         ScreenTransitionDirectionPolicy.overlay(from = initialState, to = targetState),
                     )
                 },
+                contentKey = { it?.navigationIdentity },
             ) { route ->
                 OverlayLeg(route == overlayRoute) {
                     if (route is AppOverlayRoute.VocabularyDetail) {

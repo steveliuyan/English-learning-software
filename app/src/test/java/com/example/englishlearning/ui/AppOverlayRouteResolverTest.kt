@@ -61,7 +61,9 @@ class AppOverlayRouteResolverTest {
             AppOverlayRouteResolver.resolve(AppMountFlags(showReadingHistory = true, historyArticle = null)),
         )
         assertEquals(
-            AppOverlayRoute.ArticleReading(null, cardArticle()),
+            // 历史腿的 payload 只有 `readingTarget` 一枚（终评补口 第 3 条摘掉 `historyArticle`）：
+            // 这一支照样要压过 ReadingHistory，挂载判据读的是 flags，不是 payload。
+            AppOverlayRoute.ArticleReading(readingTarget = null),
             AppOverlayRouteResolver.resolve(AppMountFlags(showReadingHistory = true, historyArticle = cardArticle())),
         )
         assertEquals(
@@ -113,8 +115,8 @@ class AppOverlayRouteResolverTest {
      * · 29/30 的守卫要求 `historyArticle` / `readingTarget` 为空，所以它们的「下一支」只在
      *   不破坏守卫的范围内点亮（29 点亮 30 的 `showReadingFeed`，30 点亮 31 的 `showArticleImport`）。
      *
-     * 32 的 payload 是可空对（`ReadingTarget?` + `Article?`），表里走 `historyArticle` 腿，
-     * `readingTarget` 腿在表下单独补一条；34 是表末，它的「下一支」是 tab 宿主，由
+     * 32 的 payload 只有 `readingTarget` 一枚可空值（终评补口 第 3 条摘掉 `historyArticle` 后如此），
+     * 表里走 `historyArticle` **判据**那一腿，`readingTarget` 腿在表下单独补一条；34 是表末，它的「下一支」是 tab 宿主，由
      * `ScreenTransitionDirectionTest.tabHostIsTheShallowestLayer` 与 `noFlagsMeansTabHost` 合起来钉。
      */
     @Test
@@ -176,11 +178,11 @@ class AppOverlayRouteResolverTest {
             AppOverlayRouteResolver.resolve(AppMountFlags(selectedFeature = AiFeature.CLOZE)),
         )
 
-        // 32 的另一条腿：由 readingTarget 触发（`fromHistory` 判据靠 payload 这对可空值）。
+        // 32 的另一条腿：由 readingTarget 触发（`fromHistory` 判据读的就是这一枚 payload）。
         val target = ReadingTarget(cardArticle(), listOf(card))
         val articleFromTarget = AppOverlayRouteResolver.resolve(AppMountFlags(readingTarget = target))
         assertEquals(32, articleFromTarget?.mountIndex)
-        assertEquals(AppOverlayRoute.ArticleReading(target, null), articleFromTarget)
+        assertEquals(AppOverlayRoute.ArticleReading(target), articleFromTarget)
     }
 
     @Test

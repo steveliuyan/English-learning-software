@@ -54,14 +54,14 @@ class ScreenTransitionDirectionTest {
      * 方向改比 `AppOverlayRoute` 的 `transitionDepth` 列后，这四条边必须判 Forward；
      * 用例注释即发起点行号证据（照决策册「2026-11-09 修正」证据 :1865 的做法逐对找齐）。
      * 本组用例的 to 支集合与覆写清单相等由 `ScreenTransitionContractTest` 钉死。
-     * 方向判据只读层深列、不读 payload，故 ArticleReading 取双 null 实例。
+     * 方向判据只读层深列、不读 payload，故 ArticleReading 取 `readingTarget = null` 的单参实例即可。
      */
     @Test
     fun namedEdgeReadingHistoryToArticleReadingIsForward() = assertEquals(
         ScreenTransitionDirection.Forward,
         ScreenTransitionDirectionPolicy.overlay(
             from = AppOverlayRoute.ReadingHistory,
-            to = AppOverlayRoute.ArticleReading(readingTarget = null, historyArticle = null),
+            to = AppOverlayRoute.ArticleReading(readingTarget = null),
         ),
     ) // 发起点 AppScreen.kt:1865 `onOpenArticle = { historyArticle = it }`（showReadingHistory 仍真，29→32）
 
@@ -69,7 +69,7 @@ class ScreenTransitionDirectionTest {
     fun namedEdgeArticleReadingToReadingHistoryIsBackward() = assertEquals(
         ScreenTransitionDirection.Backward,
         ScreenTransitionDirectionPolicy.overlay(
-            from = AppOverlayRoute.ArticleReading(readingTarget = null, historyArticle = null),
+            from = AppOverlayRoute.ArticleReading(readingTarget = null),
             to = AppOverlayRoute.ReadingHistory,
         ),
     ) // 反向可走：AppScreen.kt:1921 `fromHistory` 腿清 historyArticle，route 32→29 落回历史臂
@@ -79,7 +79,7 @@ class ScreenTransitionDirectionTest {
         ScreenTransitionDirection.Forward,
         ScreenTransitionDirectionPolicy.overlay(
             from = AppOverlayRoute.ReadingFeed,
-            to = AppOverlayRoute.ArticleReading(readingTarget = null, historyArticle = null),
+            to = AppOverlayRoute.ArticleReading(readingTarget = null),
         ),
     ) // 发起点 AppScreen.kt:1896 `onFetchFeedItem` → ReadingAccessViewModel.kt:243 置 readingTarget（feed 臂守卫 `readingTarget == null` 让位，30→32）
 
@@ -87,7 +87,7 @@ class ScreenTransitionDirectionTest {
     fun namedEdgeArticleReadingToReadingFeedIsBackward() = assertEquals(
         ScreenTransitionDirection.Backward,
         ScreenTransitionDirectionPolicy.overlay(
-            from = AppOverlayRoute.ArticleReading(readingTarget = null, historyArticle = null),
+            from = AppOverlayRoute.ArticleReading(readingTarget = null),
             to = AppOverlayRoute.ReadingFeed,
         ),
     ) // 反向可走：ReadingAccessViewModel.kt:253 `closeArticle()` 清 readingTarget，route 32→30 落回 feed 臂
@@ -97,7 +97,7 @@ class ScreenTransitionDirectionTest {
         ScreenTransitionDirection.Forward,
         ScreenTransitionDirectionPolicy.overlay(
             from = AppOverlayRoute.ArticleImport,
-            to = AppOverlayRoute.ArticleReading(readingTarget = null, historyArticle = null),
+            to = AppOverlayRoute.ArticleReading(readingTarget = null),
         ),
     ) // 发起点 ReadingAccessViewModel.kt:201 `submitImport` 成功置 readingTarget + AppScreen.kt:529 让位清 showArticleImport，route 31→32
 
@@ -125,7 +125,7 @@ class ScreenTransitionDirectionTest {
      */
     @Test
     fun overriddenDepthsStillLeaveTabHostShallowest() {
-        val article = AppOverlayRoute.ArticleReading(readingTarget = null, historyArticle = null)
+        val article = AppOverlayRoute.ArticleReading(readingTarget = null)
         assertEquals(ScreenTransitionDirection.Forward, ScreenTransitionDirectionPolicy.overlay(from = null, to = article))
         assertEquals(ScreenTransitionDirection.Backward, ScreenTransitionDirectionPolicy.overlay(from = article, to = null))
         assertEquals(ScreenTransitionDirection.Forward, ScreenTransitionDirectionPolicy.overlay(from = null, to = AppOverlayRoute.LearningFlow))
