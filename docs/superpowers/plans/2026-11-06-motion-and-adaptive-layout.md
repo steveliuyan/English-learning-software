@@ -1309,6 +1309,19 @@ private fun TabLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
 - [ ] **Step 7：secret-scan** `scripts/secret-scan.sh` exit 0。
 - [ ] **Step 8：报告七节** → 分功能域提交 → **推送请示**（用户点头后才 `git -c credential.interactive=false push origin stage-5-ui-r2-learning-path`，并 `ls-remote` 对 `rev-parse` 核验，远端 tip 回填报告 §4）。
 
+> **历史措辞指针（2026-11-09，终评补口席 B4 追加；只指路，不重写正文）**：上面 D-1…D-4 正文里的下列措辞已被本节末尾的
+> 「#### D-4 终评补口」裁定取代——
+> ① **声明序即层深 → 同一张 route 表的两列**（`mountIndex` 管优先级与返回键、`transitionDepth` 管层深）：
+> `:89` 小标题「链声明序 = `mountIndex`」、`:310` 与 `:561` 的 KDoc 草稿「链声明序就是层深，不建第二张深度表」、
+> `:382-384` 的「序号即层级：越小越深、越先赢……不需要第二张深度表」；
+> ② **序号比较定方向 → `transitionDepth` 比较**：`:567-573` 的 `ScreenTransitionDirectionPolicy` 实现草稿（`mountIndex(to) < / > mountIndex(from)`）；
+> ③ **payload 全冻 → 挂载判据 + 该腿确实读取的字段 + 站 1 按 `navigationIdentity` 取键**：
+> `:386-388` 的冻结理由草稿、`:426` 的 `ArticleReading` 双参注释（其引的 `AppScreen.kt:1847` 今天现算 `:1921`）；
+> ④ **「链序等价于 `mountIndex` 0..34 升序」继续成立，但它钉的是优先级序列，不随层深改写**：`:640`。
+> 正文保留原样是执行记录，不回头改；规范性口径以 `docs/specs/05-release-quality-and-compliance.md` 的 F5-06 / AC5-07 与
+> `docs/decisions/2026-11-08-page-transition-routing-and-motion.md`「2026-11-09 修正」节为准，活文档的逐处订正见
+> `.superpowers/sdd/2026-11-06-motion-and-adaptive-layout/task-D4fixB4-report.md`（不入库）。
+
 #### D-4 终评补口（批 D 整批评审的裁定；先改 Spec 口径，再动代码）
 
 整批评审（`b075060..1a31534`）判「With fixes」：1 Critical + 6 Important + 5 Minor。逐条裁定如下，

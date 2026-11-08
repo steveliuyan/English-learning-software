@@ -236,7 +236,8 @@ javap -p androidx/compose/ui/semantics/SemanticsPropertiesKt.class | grep -i inv
 ## 2026-11-09 修正（批 D 整批评审后）
 
 日期：2026-11-09　评审范围：`b075060..1a31534`（收口 HEAD `911ad0b`）　裁定：整批「With fixes」（1 Critical + 6 Important + 5 Minor），
-逐条裁定在册 `docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md` 的「#### D-4 终评补口」（:1312 起）。
+逐条裁定在册 `docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md` 的「#### D-4 终评补口」（登记时 :1312 起；
+2026-11-09 席 B4 在其前面追加了一处「历史措辞指针」，现落在 :1325 起——本节 §1–§6 与计划正文的**文字**都未因此改动）。
 本节只做**口径修正**：上面 §1–§6 是 2026-11-08 当天的决定，历史一字不改，被本节推翻的三处以「§x.y 的某句不成立」的形式点名，
 Spec 05 F5-06 的对应措辞已随本节改写（本席零代码；`transitionDepth` / `navigationIdentity` / payload 摘除由同批下一席按本节口径实施）。
 
