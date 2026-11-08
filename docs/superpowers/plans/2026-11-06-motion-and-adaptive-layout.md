@@ -1247,6 +1247,50 @@ private fun TabLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
 
 - [ ] **Step 11：Commit** — `feat(ui): 批 D-3 两站 AnimatedContent 转场与 AppTransition 规格表`
 
+#### D-3 评审补口（修复轮 1 的授权范围；控制器裁定，不重开辩论）
+
+段评审（Spec ❌ / Needs fixes）指出：站 1 上线后**两屏在 300ms 窗口内同时组合**，而本段把 F5-06
+红线押在一枚今天不可能失败的用例上，另有两条 brief 步骤未落地。以下五条是本段的收尾工作，
+其中第 1 条是对「链体文字不动」的**明示豁免**（范围变化先写进计划，即本节）。
+
+1. **退场腿不得再发起出站/发音**（Critical 的修法）。实测：链体内共 5 处效果体
+   —— `AppScreen.kt:788`、`:1081`、`:1093`（其 `:1101` 直接 `pronunciationProvider?.speakWord(...)`）、
+   `:1286`、`:1724`；其中 `:1081`/`:1093` 的 key 读的是**实时 VM**而非冻结进 route 的 payload，
+   共享宿主计数器在 `:253`–`255`。裁定：给这些效果体加**退场闸**
+   （腿内先取 `val isLiveLeg = route == overlayRoute`，退场时 `return@LaunchedEffect` 早退），
+   只闸「发起新工作」的动作，不改渲染、不改 key、不动时长；`selectedSearchCard === cardSnapshot`
+   那类既有结果丢弃保持原样。**豁免范围只到这三类发起点**，其余链体文字仍不许动。
+2. **F5-06 用例改到有牙齿的地方**。`transitionsProduceNoExtraBillableOutbound` 现只驱动
+   SentenceAnalysis 腿（idx 24），而该腿没有组合触发的出站——计数在改造前后都是 0，等于没判据。
+   改成驱动**有 composition-triggered 效果的腿**（查词腿 `:788` / 词卡腿 `:1081`+`:1093`），
+   测试宿主必须把 `pronunciationProvider` 接进去（现 `ScreenTransitionInstrumentedTest.kt:166` 根本没传），
+   并同时统计 AI 出站与发音调用；判据 = 一次进出转场的 overlap 窗口内两者都不许多于改造前。
+   另按评审 Minor 9 在 `performScrollTo()` 前补 `waitUntil`（与同文件 `:89` 的姊妹用例一致），
+   把「设备得保持清醒」这条前置条件从口头变成代码。
+3. **brief Step 9 ④ 落地**（现缺）。合成双边：假源码把 `tween(AppMotion.Slow)` 写进屏体必须被判出，
+   `overlayOpen` 那行必须被放行；并把「规格面只在 `theme/AppTransition.kt`」的检查从
+   *按文件名只看 `AppScreen.kt`* 改成**扫全 `ui` 子树**（否则任何其它屏文件里另写一枚 `tween(AppMotion.Slow)`
+   都看不见——这正是 ④ 存在的理由）。
+4. **brief Step 5 的缩进补齐**。链体现在比它的 lambda 宿主还浅（`AppScreen.kt:785` 开在 16 空格、
+   `:786` 起链在 12），站 2 同形（`:2116`）。补齐整块右移一级；安全性已核过——`chainScan` 按 trim 与
+   主缩进取样、唯一豁免钉在链之上的 `:580`–`584`，所以纯缩进提交不挂判据。**收口凭据 = `git diff -w`
+   只剩既有的包裹行 + 门禁全绿**；编码纪律 = 只按 UTF-8 读写并复核中文注释未腐坏，做不到就停下来报告，
+   不许拿破坏文件换整齐。
+5. **两条 connected 判据的自证不足要补**（Important 3/4）。`firstCompositionDoesNotPlayATransition`
+   在 `waitForIdle()` 跑完之后才冻时钟，改造前后都必然绿——改成组合前就 `autoAdvance = false`、
+   首帧断言腿数==1、再恢复；`outgoingLegIsHiddenFromAccessibility` 只数「有 1 枚带 `InvisibleToUser`」，
+   不验是**哪**一枚，极性反过来也过——改成腿 tag 带状态（`tab_transition_leg_<tab>`）或断言隐藏子树里
+   是离场那屏自己的 tag。
+6. **登记为 D-4 走查项，本段不改码**：overlap 窗口内退场腿仍可命中指针（`invisibleToUser` 只是语义属性），
+   且腿内自声明的 `BackHandler`（`AppScreen.kt:710`–`712` 记录过这种形态）在这 300ms 里后声明优先。
+   D-4 Step 5 的真机目视加一条「转场中途连点/连按返回」，拿到实测再决定是否上输入闸；
+   `AnimatedContent` 默认 `clip = true` 与 TalkBack 真实读屏同样只在 D-4 取证。
+
+> 裁定留档：判据 ② 的「`AppMotion.Slow` 生产读点只在 `AppTransition.kt`」实现时被**收窄**为
+> 「`AppScreen.kt` 内不得出现 `tween(` / `AppMotion.Slow`」，理由（`PlanBar`/`Shimmer` 按批 C 合法读 `Slow`）
+> 成立，本节把它从 KDoc 口头升格为计划口径。评审另两条 Minor（每 arm × 字段的消费点计数、
+> `MotionSpecContractTest` 失败文案里已下线的 `GlassOverlay` 枚举）按裁定转入 D-4/最终评审，不阻塞本段。
+
 ---
 
 ### D-4：取证、矩阵登记与收口
@@ -1260,7 +1304,7 @@ private fun TabLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
 - [ ] **Step 2：双形态 connected**——手机竖屏（Compact）与平板形窗口（Wide）各跑 `AppScreenTest` + `ScreenTransitionInstrumentedTest` + `RecoveryScreenTest`，两侧末行 `OK (n tests)` 原文入册。
 - [ ] **Step 3：截图册**——`animator_duration_scale=1` 的转场中间帧（¼ 幅位移可见）与 `=0` 的定格帧各一册，落 `.git/qa-scratch/`（不入库）；读数表记位移像素、时长、两屏共存帧数。
 - [ ] **Step 4：`gfxinfo` 掉帧对照**——转场前后各 5 次 tab/子页切换的 `adb shell dumpsys gfxinfo <pkg>` 读数（Janky frames%、50/90/95th 百分位），前后对比入册。
-- [ ] **Step 5：真机 `bf353dda` 里程碑装机目视**（用户执行）——TalkBack 是否只读一屏、转场跟不跟手、底栏随屏滑走（决策 §3.4.1 的明示变化）能否接受。装机只用 `adb install -r`，不跑 instrumented。
+- [ ] **Step 5：真机 `bf353dda` 里程碑装机目视**（用户执行）——TalkBack 是否只读一屏、转场跟不跟手、底栏随屏滑走（决策 §3.4.1 的明示变化）能否接受。装机只用 `adb install -r`，不跑 instrumented。**新增两条（D-3 评审结转）**：①转场中途连点/连按返回——退场腿在 overlap 窗口内仍可命中指针、且腿内自声明的 `BackHandler` 后声明优先，实测决定是否需要输入闸；②`AnimatedContent` 默认 `clip = true` 下两栏宿主与贴边内容的中间帧有无被裁（截图册一并取）。
 - [ ] **Step 6：矩阵登记**——AC5-07 行（证据 = `AppOverlayRouteResolverTest`、`ScreenTransitionDirectionTest`、`ScreenTransitionContractTest`、`ScreenTransitionInstrumentedTest`、决策文档路径）；同批补 AC5-06 行（批 C 证据已在 `docs/verification/`）。跑 `"$GRADLE" verifyAcTraceabilityMatrix`（该任务只校 AC0–AC4，AC5 段是人工追踪，如实写明）。
 - [ ] **Step 7：secret-scan** `scripts/secret-scan.sh` exit 0。
 - [ ] **Step 8：报告七节** → 分功能域提交 → **推送请示**（用户点头后才 `git -c credential.interactive=false push origin stage-5-ui-r2-learning-path`，并 `ls-remote` 对 `rev-parse` 核验，远端 tip 回填报告 §4）。
