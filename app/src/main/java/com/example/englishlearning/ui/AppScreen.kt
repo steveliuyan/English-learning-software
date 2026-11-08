@@ -786,6 +786,10 @@ fun AppScreen(
                     if (route is AppOverlayRoute.VocabularyDetail) {
                         val card = route.card
                         LaunchedEffect(card.cardId) {
+                            // 批 D-3 补口①：退场腿在 300ms overlap 窗口内不得再发起新发音（F5-06）。
+                            // 只闸「发起」与它的计数/取消副作用；下方 selectedSearchCard === cardSnapshot
+                            // 那类既有结果丢弃闸逐字保留。
+                            if (route != overlayRoute) return@LaunchedEffect
                             val cardSnapshot = card
                             val request = ++searchPronunciationRequest
                             searchPronunciationJob?.cancel()
@@ -1079,6 +1083,8 @@ fun AppScreen(
                         val pronunciationScope = rememberCoroutineScope()
                         val detailCard by wordCardViewModel.detailCard.collectAsState()
                         LaunchedEffect(detailCard) {
+                            // 批 D-3 补口①：key 读的是实时 VM（detailCard），退场腿内不再发起新工作。
+                            if (route != overlayRoute) return@LaunchedEffect
                             detailCard?.let { vocabularyViewModel?.loadMembership(state.profile.id, it) }
                         }
                         // The detail page is an overlay inside the learning branch: it leaves the
@@ -1091,6 +1097,9 @@ fun AppScreen(
                             // 记录/阅读）一律不自动发音，维持批次 5/6 的用户触发唯一契约。
                             val autoSpeakOnCardReady = speechSettingsViewModel?.state?.collectAsState()?.value?.autoSpeakOnCardReady ?: true
                             LaunchedEffect((cardState as? WordCardUiState.Ready)?.card?.cardId) {
+                                // 批 D-3 补口①：key 是实时 cardState 的 cardId，转场 overlap 窗口里
+                                // 退场腿重启时不得替用户发起新发音（含 :++request 的计数侧效应）；结果丢弃闸原样保留。
+                                if (route != overlayRoute) return@LaunchedEffect
                                 val card = (cardState as? WordCardUiState.Ready)?.card ?: return@LaunchedEffect
                                 if (!autoSpeakOnCardReady) return@LaunchedEffect
                                 val request = ++wordCardPronunciationRequest
@@ -1284,6 +1293,8 @@ fun AppScreen(
                         // 只有用户显式点「导出」才会拉起系统面板；重进预览页不会重复弹出。
                         val shareFile = worksheetViewModel?.shareRequest?.collectAsState()?.value
                         LaunchedEffect(shareFile) {
+                            // 批 D-3 补口①：key 是实时 shareRequest，退场腿不再拉起系统分享面板/消费请求。
+                            if (route != overlayRoute) return@LaunchedEffect
                             shareFile?.let { file ->
                                 val launched = runCatching {
                                     val intent = WorksheetShareLauncher(context).createChooser(file)
@@ -1721,7 +1732,11 @@ fun AppScreen(
                         var photoSpeakJob by remember { mutableStateOf<Job?>(null) }
                         // 批 4 Task 4：历史删除不再点了就执行——屏侧只发请求，确认框归本层（与 AI 服务页同形）。
                         var pendingPhotoTranslationDelete by remember(state.profile.id) { mutableStateOf<String?>(null) }
-                        LaunchedEffect(state.profile.id) { photoTranslationViewModel?.refreshHistory(state.profile.id) }
+                        LaunchedEffect(state.profile.id) {
+                            // 批 D-3 补口①：退场腿不再发起历史刷新（本腿唯一的组合触发工作入口）。
+                            if (route != overlayRoute) return@LaunchedEffect
+                            photoTranslationViewModel?.refreshHistory(state.profile.id)
+                        }
                         PhotoTranslationScreen(
                             state = photoState,
                             onImageBytes = { bytes -> photoTranslationViewModel?.onImageBytes(bytes) },
@@ -2125,7 +2140,7 @@ fun AppScreen(
                                                         )
                                                     },
                                                 ) { tab ->
-                                                    TabLeg(tab == selectedTab) {
+                                                    TabLeg(isCurrentTarget = tab == selectedTab, tab = tab) {
                                                         when (tab) {
                                                             AppTab.LEARNING -> TodayPlanScreen(
                                                                 state = todayState,
@@ -2310,13 +2325,17 @@ private fun OverlayLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit
     ) { content() }
 }
 
-/** 站 2 的转场腿根容器：判据与 `OverlayLeg` 同一条，只是 tag 归 tab 站。 */
+/**
+ * 站 2 的转场腿根容器：判据与 `OverlayLeg` 同一条，只是 tag 归 tab 站。
+ * D-3 补口⑤：tag 按腿的 tab 分态（`tab_transition_leg_<TAB>`）——connected 判据要能点名
+ * 「被 invisibleToUser 隐掉的是不是离场那一枚」，不分态就退化成只数数量。
+ */
 @Composable
-private fun TabLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
+private fun TabLeg(isCurrentTarget: Boolean, tab: AppTab, content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("tab_transition_leg")
+            .testTag("tab_transition_leg_${tab.name}")
             .then(
                 if (isCurrentTarget) Modifier
                 else Modifier.semantics { invisibleToUser() },
