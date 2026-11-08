@@ -1952,3 +1952,123 @@ JVM 侧 `WordCardLayoutContractTest` 的 `fontScale > 2f` 锚由 3 处升到 **4
 - A2.7 顶档底栏 `AI 助学` 仍折两行（格高随字号的必然结果，另一条腿是截断成 `AI …`，已否）：观感是否可接受。
 - A2.8 修后顶档卡面多出行（音标一行 + 词性一行 + 药片一行），**药片要滚一下才够得着**：这是改前就有的可达性
   （改前它连节点都不在层级里），本轮只按「换摆法」收口，没把它钉进吸底区——观感是否可接受、要不要进一步常驻，请人眼判。
+
+## 2026-11-09 批 D：页面转场双形态 connected、截图册与掉帧对照（`emulator-5554`，API 30）
+
+口径与红线在 `docs/decisions/2026-11-08-page-transition-routing-and-motion.md`，分段执行在
+`docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md`（批 D D-1…D-4），逐段报告与台账在
+`.superpowers/sdd/2026-11-06-motion-and-adaptive-layout/`（`task-D1/D2/D3-report.md`、`task-D4a-report.md`、
+`task-D4b-report.md`、`progress.md`）。本批两个取证席位：D-4a = 三连门禁 + 双形态 connected，
+D-4b = 截图册 + `gfxinfo` 对照。原始日志与帧图在 `.git/qa-scratch/d4a/`、`.git/qa-scratch/d4b/`
+（**不入库**；`find .git/qa-scratch/d4b -type f | wc -l` → 277、`du -sh` → 56M，`task-D4b-report.md` §五 9）。
+
+标注沿用两席的口径：**【测】** = 命令原样读数，**【推】** = 由读数做出的推断，**【算】** = 由规格常量算出、不是量出来的。
+
+### 门禁（D-4a Step 1，`--rerun-tasks` 才算真跑）
+
+`task-D4a-report.md` §一原文两行：`BUILD SUCCESSFUL in 4m 9s` / `GATE_EXIT=0`（过滤集合内无 `FAILED`、无 `e:`）。
+判据本体是本轮新生成的 XML：`find . -maxdepth 1 -name '*.xml' -newermt "2026-11-09 00:06:21" | wc -l` → 339，
+与目录内 XML 总数 339 相等（无陈旧件）。求和读数【测】：**339 类 / 2522 条 / 0 失败 / 0 错误 / 0 跳过**。
+
+对照式（基线 336 类 / 2494 条 + 本批逐段新增；逐段数字取自台账 `progress.md` 与分段报告，非现算）：
+
+| 段 | 提交 | 类 | 条 | 本段新增 | 出处 |
+|---|---|---|---|---|---|
+| 批 D 开工基线 | `b075060` | 336 | 2494 | — | `task-D4-brief.md` Global Constraints |
+| D-1 | `9ea2d72`（修复轮 `fd3eeed`） | 338 | 2510 | +2 类 / +16 条（resolver 9 + direction 7） | `progress.md` D-1「结果」+ 冲突扫描 #6 |
+| D-2 | `0f92e82` | 339 | 2516 | +1 类 / +6 条（`ScreenTransitionContractTest` 建类 6 枚） | `progress.md` D-2「结果」 |
+| D-3 | `82a8171`（修复轮到 `d347b86`） | 339 | 2522 | +6 条（`2516→2521` 段 +5、`d347b86` 段 +1 判据④），类数不变 | `task-D3-report.md:62`、`:179` |
+| D-4 收口复跑 | `d347b86` | 339 | 2522 | 0（持平） | `task-D4a-report.md` §一 |
+
+算式自洽：336 + 2 + 1 = **339**，2494 + 16 + 6 + 6 = **2522**，只增不减。
+
+### connected 双形态（D-4a Step 2，`adb install -r` 双包 + `am instrument`，禁 `connectedDebugAndroidTest`）
+
+| 形态 | `ui.AppScreenTest` | `ui.ScreenTransitionInstrumentedTest` | `ui.RecoveryScreenTest` |
+|---|---|---|---|
+| Compact（`Physical 1080x1920 @ 420`，`grep -i override` 无匹配） | 首趟 `Time: 124.009` / `Tests run: 66, Failures: 1`；隔离单例 `Time: 3.757` / `OK (1 test)`；同命令整类重跑 `Time: 114.387` / `OK (66 tests)` | `Time: 11.339` / `OK (5 tests)` | `Time: 4.947` / `OK (5 tests)` |
+| Wide（`Override size: 2160x1600` @ `Override density: 320`，sw=800dp） | `Time: 129.456` / `OK (66 tests)` | `Time: 11.068` / `OK (5 tests)` | `Time: 4.983` / `OK (5 tests)` |
+
+- 简报「两侧末行 `OK (n tests)`」在 Compact 的 `AppScreenTest` 一腿**不成立**：首趟是红，三条读数并列在册，不挑一条写。
+- 那枚红原文（`task-D4a-report.md` §2.1）：`startLearningOpensTheWordCardAndBackReturnsToTheTodayPlan`
+  → `androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 5000 ms`，
+  抛在 `AppScreenTest.kt:2866` 的 `waitUntil(timeoutMillis = 5_000)`。用例数与 `@Test` 计数吻合（66 / 5 / 5，无 `@Ignore`）。
+- 【推】判性留白：Wide 一次通过、Compact 重跑一次通过，形状与在册最久 flake 同款；但本批确实改了返回键后的换屏路径，
+  故不销案，交真机目视①（转场中途连点/连按返回）定。
+
+### 截图册（D-4b Step 3）
+
+册 A `animator_duration_scale=1.0`（入库口径那一册）：5 次驱动合计【测】 **132 帧**（12+11+35+10+64），
+其中【测】 **12 帧**为可判定的两屏共存中间帧（逐驱动 1 / 3 / 3 / 3 / 2）。
+
+| 驱动 | 帧数 | 共存帧 | 关键读数（`task-D4b-report.md` §一） |
+|---|---|---|---|
+| 站 2 tab 学习→阅读（Forward，方法① screencap） | 12 | 1 | `B1_04` MAD before=19.21 / after=3.36；出屏整层淡出且左移，左缘文字被屏幕边界齐切 |
+| 站 2 tab 学习→阅读（Forward，方法② screenrecord） | 11 | 3 | `f010` 出屏 `dx=-208`（MAD 24.59）、入屏 `dx=+14`（MAD 5.67 可信） |
+| 站 2 tab 阅读→学习（Backward，方法②） | 35 | 3 | `f025` 入屏 `dx=-32`（MAD 4.09 可信）；出屏粉色地标最左列 932→1048 = **+116 px**、`f028` +130 px |
+| 站 1 子页打开（Forward，方法②） | 10 | 3 | `f008` 入屏 `dx=+232`（弱）、`f009` 出屏 `dx=-202` / 入屏 `dx=+44`（MAD 6.20 可信） |
+| 站 1 子页返回（Backward，方法②） | 64 | 2 | `f050` 入屏 `dx=-76`（MAD 6.20 可信）、`f056` 出屏 `dx=+228`（弱） |
+
+- 位移：270 px = 1080 ÷ 4【算】（`ui/theme/AppTransition.kt:29 PageOffsetDenominator = 4`，腿 `fillMaxSize`）；宽形态 540 px = 2160 ÷ 4【算】；时长 300 ms = `AppMotion.Slow`【算】。
+- 【测】实测到的最大可见位移 **208–232 px**，方向与 ¼ 幅口径一致；**270 px 的峰值瞬间未被 `scale=1` 的任何一帧命中**（采样率限制，见下面的取样纪律 1），本批不宣称「量到 270」。
+- 【测】该口径的可复核锁：`ScreenTransitionContractTest.pageDisplacementIsQuarterAmplitude`，单类跑
+  `BUILD SUCCESSFUL in 16s` → `<testsuite tests="11" skipped="0" failures="0" errors="0">`。
+- 册 B `animator_duration_scale=0`：`B_scale0/` 逐步 5 帧 + 连拍 8 帧 = 13 帧，共存中间帧【测】 **0 帧**；
+  学习页三处稳态 md5 逐字节相同（`ae7317ac…`），连拍里 `01/02` 对 before = 0.00、`04–08` 对 after = 0.00。
+  唯一残差 `03`（对 before 18.38 / 对 after 5.38）差集只在 `y[308..713] x[53..1026]`，目视是**完整新屏 + 骨架条**（批 C 的加载形态），
+  不是半位移、不是接缝 ⇒【推】系统减动效即定格，批 D 承诺成立。
+
+### `clip = true` 取证（宽形态，模拟器侧旁证）
+
+- 【测】宽形态 `scale=1` **拿不到干净中间帧**：`V/wide_sub_open` 源片只编 4 帧（`f025` before=2.70 稳态、`f027` after=2.76 收尾）；
+  `W/w2/W2` 连拍 12 帧 0 共存，cap03→cap04 之间 219 ms 空隙把整个 300 ms 窗口吞掉。
+- 【测】故按简报的「辅助」口径改取 `scale=5.0`（时长 ×5 = 1500 ms，**位移口径不变**）：`W/w3_5x/W3` 10 帧、中间帧 4 枚，
+  最佳 `W3_05`（MAD before=11.86 / after=7.97）。入屏绿 CTA 右缘稳态 `x=[40..2119]` → `W3_05` `x=[192..2159]`，
+  左缘 +152 与 `shift.py` 的入屏 `dx=+152`（MAD 4.82 可信）独立吻合。
+- 【测】结论：**贴容器边界硬切，有**。按 +152 px 位移，未裁时右缘应在 2119+152 = 2271，而帧里到 2159（屏末列）为止，
+  即该瞬间约 **111 px** 的贴边内容（CTA 右端、行分隔线、右对齐「待学」列）被切；出屏侧栏导轨该瞬间未被切（最左列 41→14，仍在窗口内）；
+  所有帧两层都止于窗口边界，无「画到容器外」的涂抹。竖屏同行为在 `V/sub_open f009`、`A_Learn2Read/B1_04` 已有直接旁证。
+- 【推】②的**主证据仍是真机目视**；模拟器侧只证明「硬切行为存在且属容器裁切，不是版面缺陷」。
+
+### `gfxinfo` 掉帧对照（D-4b Step 4，裁定：同一安装包 A/B，不装旧包）
+
+`animator_duration_scale=1`（转场在放）与 `=0`（转场被抑制）各跑同一套 15 步驱动（5 次 tab 切换 + 5 次子页开合），
+驱动序列逐字相同（`diff` 去数字后无输出，脚本回显 `DRIVE-SEQUENCES-IDENTICAL`）。原文读数【测】：
+
+| 读数 | 臂1 scale=1 | 臂2 scale=0 | 差 |
+|---|---|---|---|
+| Janky frames | **1532 (73.69%)** | **1567 (74.02%)** | −0.33 pp |
+| Total frames rendered | 2079 | 2117 | −38（−1.8%） |
+| 50th / 90th / 95th percentile | 19 / 34 / 69 ms | 19 / 38 / 77 ms | 0 / −4 / −8 ms |
+| Missed Vsync / Slow UI thread | 47 / 119 | 50 / 136 | −3 / −17 |
+| Slow bitmap uploads / Slow issue draw | 3 / 69 | 3 / 69 | 0 / 0 |
+| gpu 50th / 90th / 95th | 7 / 11 / 12 ms | 7 / 11 / 12 ms | 0 |
+
+- **裁定表述**：同包 `scale=1` vs `scale=0` 对照隔离出的正是批 D 那两站 `AnimatedContent`；两臂差在 ±0.33 pp / ±8 ms 内且**转场档没有更差**，
+  73–74% 是本 AVD 软件渲染栈的基线水位 ⇒ 【推】本批转场**未引入可测出的掉帧回归**。这不等于「转场零成本」，真机读数留给 Step 5。
+
+### 取样纪律（本轮踩到，下一棒别再踩）
+
+1. 本 AVD 的采样率对 300 ms 转场是**稀疏**的：`screencap`（raw）≈195 ms/帧、`screencap -p` ≈389 ms/帧、
+   `screenrecord` 只编 4–8 帧/0.7–0.9 s（`ffprobe`：`nb_frames=8`/`duration=0.655333`）。抓不到峰值瞬间是采样率问题，不能读成「动效没跑」。
+2. **每次驱动与每批连拍前**读 `dumpsys window | grep -i mCurrentFocus` 并必要时 `monkey … LAUNCHER 1` 拉回前台：
+   本轮两批作废（① `input` 前缀传了两遍 → `Error: Unknown command: input`；② 多按一枚 `keyevent 4` 把应用退到桌面，12 帧全 `MAD 0.00/0.00`）。
+3. H.264 有损使「稳态帧对稳态参照」的 MAD 噪声底 ≈2.4–2.9：判中间帧要求 MAD 明显高于噪声底**且**目视看到两层地标，两个条件缺一不可。
+4. `screencap`（raw）帧带 16 字节头（1080×1920×4 + 16 = 8 294 416 B），解析先 `struct.unpack('<4i', b[:16])` 取宽高。
+5. `wm size 2560x1600` 在本 AVD 被钳到 **2160x1600**，在册登记一律用钳制值（与批 B-5 / C-6 / D-4a 同口径）；Wide 腿只覆盖 sw=800dp 这一档，
+   真实平板/折叠与多窗口分屏未取证，声称「Wide 全档」需限定措辞。
+6. 设备上留着 `svc power stayon true`（D-4a 有意交给 D-4b，防息屏吞输入）；批 D 收工若要出厂态需显式 `svc power stayon false`。
+
+### 观察（登记，未定性）
+
+- 站 2 的**退场腿会重新组合**：异步加载的屏在 300 ms 里以骨架形态退场（`V/tab_read2learn f021` 退场的阅读页整屏是骨架条），
+  而本地读盘屏以真实内容退场（`A_Learn2Read/B1_04`、`V/sub_open f009`）。【推】与 `AnimatedContent` 为旧状态新建一条腿、`remember` 态不跨腿保留有关。
+  属观感取舍还是缺陷，交真机目视与用户判，本轮不改码。
+
+### 待用户目视（真机 `bf353dda`，只有人眼能判；本批零 adb 命令打到真机）
+
+- ①**转场中途连点 / 连按返回**：退场腿在 ~300 ms overlap 窗口内仍可命中指针（`invisibleToUser` 是纯语义属性，不拦触摸），
+  且腿内自声明的 `BackHandler` 按声明顺序后声明者优先——实测是否需要输入闸。
+- ②**`clip = true` 的贴边裁切**：两栏宿主与贴边内容在中间帧被硬切约 111 px（模拟器旁证已在册），观感是否可接受。
+- ③上述「异步屏以骨架退场、本地屏以实内容退场」的观感。
+- 沿用简报的三条老目视：TalkBack 是否只读一屏、转场跟不跟手、底栏随全屏子页滑走（决策 §3.4.1 的明示变化）能否接受。
