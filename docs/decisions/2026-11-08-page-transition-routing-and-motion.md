@@ -1,0 +1,234 @@
+# 决策：页面转场的挂载权威、方向判据与规格落点（批 D）
+
+日期：2026-11-08　分支：`stage-5-ui-r2-learning-path`　范围：阶段 5 UI 重设计轮 批 D
+关联：`docs/decisions/2026-11-06-motion-foundation-and-system-reduced-motion.md`（批 A 口径表与降级判据）、
+`docs/decisions/2026-11-06-adaptive-window-layout.md`（批 B 窗口类别只在宿主判一次）、
+`docs/decisions/2026-11-07-loading-skeleton-shimmer-prefetch.md`（批 C 骨架与 `scale=0` 定格口径）、
+`docs/specs/05-release-quality-and-compliance.md`（本批新增 AC5-07）
+
+用户拍板：方案 1（挂载权威收进纯函数 + 两站转场），覆盖「一级 tab 切换 + 全屏子页进出 + 对话框浮层并表」，
+形态为「方向滑动 + 淡入淡出」，按 D-1…D-4 分段交付、每段跑一次门禁。
+
+## 1. 现状（全部现算，命令附后）
+
+| 事实 | 读数 | 出处 |
+|---|---|---|
+| 全屏子页挂载链 | 35 支（首支 `if` + 34 枚 12 空格缩进的 `} else if (`），跨度 `AppScreen.kt:728`–`2025`，末支 `showSettings` | `grep -cE "^            \} else if \(" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt` → 34 |
+| 返回键处理器 | 37 枚 `BackHandler(`，与链分离声明，靠「后声明者优先」分派 | 同文件 `grep -c "BackHandler("` → 37 |
+| 链的末段 | `} else {`（`AppScreen.kt:2026`）= 四个一级 tab 的宿主，注释原文即「上面所有分支都是覆盖全屏的二级层，因此天然不显示导航」 | `AppScreen.kt:2027` |
+| tab 内容宿主 | **只有一处** `when (selectedTab)`，在 `Scaffold` 的 `contentPadding` 内容盒里（`AppScreen.kt:2061`）；底栏与批 B 侧栏都在它外围，两者写同一个 `selectedTab` | `grep -rn "when (selectedTab)" app/src/main` → 1 hit |
+| 今天有没有转场 | 链与 tab 都是**瞬间硬切**；全站唯一有动画的切换腿是对话框浮层 `GlassOverlay` 的 `AnimatedVisibility`（`fadeIn+scaleIn(0.92)` 入场、`fadeOut+scaleOut(0.92)` 退场，四枚 `tween(AppMotion.Normal, …)`） | `ui/components/glass/GlassOverlay.kt:58`–`64` |
+| 时长/缓动 token | `AppMotion.Fast=160 / Normal=220 / Slow=300`，`EasingOut=cubic-bezier(.2,.7,.3,1)`、`EasingIn=cubic-bezier(.4,0,.8,.3)`；批 A 已删除换算入口，降级交给平台 | `ui/theme/AppMotion.kt` |
+| 批 A 给本批留的账 | 口径表有一行「页面转场 = `Slow` 300ms + 入场 `EasingOut` / 退场 `EasingIn`，批 D 落地」；§4 明写「行级子串匹配看不到 `easing = ` 换行、也看不到把 spec 包进工厂函数的间接传参——由批 D 的转场判据兜」 | 批 A 决策 §3.3 / §4 |
+
+### 1.1 结构性障碍只有一个
+
+`AnimatedContent` 要播**退场**，就必须在状态改变后继续组合离场那一屏；而链的分支是当场由 35 个布尔位决定的——
+标志位一变，旧屏立刻从组合里消失，没有任何东西可以淡出/滑出。
+所以「当前可见屏」必须成为一个**值**，而且判据只能有**一处**。
+这正是上一批 N-1 刚付过学费的形状（同一条 403 规则内联抄六遍、每遍都漏），本批不打算再犯一次。
+
+### 1.2 测试资产现状（现算，本批逐帧断言落点的依据）
+
+```bash
+grep -rl "createComposeRule\|createAndroidComposeRule" app/src/test | wc -l        # → 0
+grep -rl "createComposeRule\|createAndroidComposeRule" app/src/androidTest | wc -l # → 67
+grep -rln "mainClock" app/src/test app/src/androidTest                              # → 1 个文件，且只在注释里
+ls app/src/test/java/com/example/englishlearning/ui/*.kt | wc -l                    # → 168（JVM 侧只测纯函数与源码扫描）
+```
+
+⇒ 本仓的 Compose 语义/行为断言**全部**在 androidTest；JVM 的 168 枚 ui 测试是纯函数与源码契约扫描。
+批 D 的两站转场行为判据因此必须写在 connected，不能凭空在 JVM 长出一套 `createComposeRule` 用法。
+
+### 1.3 链边的三处相邻事实（本批不动，但必须先说清，否则会被当成漏改）
+
+1. **`overlayOpen`（`AppScreen.kt:580`–`584`）是第二份「覆盖层」判据，但它的语义不是「挂载了覆盖层」**：
+   它把 35 枚标志位**无守卫地**并起来（`showReviewQueue` 亮但 `todayReady == null` 时链上根本没有分支命中、
+   屏幕上其实还是 tab 宿主，`overlayOpen` 仍为 true），另外还含两枚**不在链上**的页内浮层位
+   （`selectedArticleCard` / `showWordQaCard`，声明在 343 / 365，渲染在文章分支与学习分支内部）。
+   它唯一的消费者是 `BackHandler(enabled = !overlayOpen && selectedTab != AppTab.LEARNING)`（:587）。
+   ⇒ 本批**不把它换成 `route != null`**：那会在上述守卫形里改变返回键行为，属于夹带。
+   收口口径：resolver 与 `overlayOpen` 的语义差由一条 JVM 用例明确钉住（见 §5 D-1），
+   「两处判据」在这里是**两个不同问题**，不是同一问题抄两遍，与 N-1 的形状不同。
+2. **`ConfirmDestructiveDialog`（`AppScreen.kt:486`，`if (pending != null)`）不是链支**：
+   它是 `Ready` 顶层的独立浮层（注释原文：入口已搬进 hub，对话框必须住顶层才在任何子页打开时组合）。
+   它自己走窗口层级，与本批的两站转场无交集，链改造时不碰。
+3. **`GlassOverlay`（对话框浮层）也不是链支**：它是 `BoxScope` 扩展，渲染在消费者屏内部
+   （今天唯一消费者 = `AiProfileSettingsScreen` 音色浮层）。本批对它只做**规格并表**
+   （四枚 `tween(` 搬进 `AppTransition`），不改它的挂载点、容器与可见形态。
+
+## 2. API 实测（不凭文档印象设计）
+
+方法按仓内口径：AAR 只有包没有裸 jar，临时目录一律放**仓库外**（Windows 索引进程会把仓库内空目录 lock 成删不掉）。
+
+```bash
+unzip -o -q <ui.aar> classes.jar && unzip -o -q classes.jar
+grep -rl "invisibleToUser" .          # 唯一命中 androidx/compose/ui/semantics/SemanticsPropertiesKt.class
+javap -p androidx/compose/ui/semantics/SemanticsPropertiesKt.class | grep -i invisible
+# public static final void invisibleToUser(androidx.compose.ui.semantics.SemanticsPropertyReceiver);
+```
+
+- `androidx.compose.animation:animation-android:1.10.0` 里 `AnimatedContentKt` 存在，两站可直接用它。
+- **纠正一处直觉**：本仓锁定的 `ui-android:1.10.0` **没有** `Modifier.invisibleToUser()`；
+  唯一声明是 `SemanticsPropertyReceiver` 上的扩展。⇒ 生产写法只有一种：
+  `Modifier.semantics { invisibleToUser() }`。下一任若照公开文章写 `Modifier.invisibleToUser()`，编译即失败。
+- Compose BOM 锁 `2025.12.00`（`gradle/libs.versions.toml:5`）。
+- **`AnimatedContent` 的真实形状**（`javap -p androidx.compose.animation.AnimatedContentKt`）：
+  `transitionSpec` 的返回类型是 **`ContentTransform`**，不是「`EnterTransition + ExitTransition`」；
+  构造它的是顶层 `infix fun EnterTransition.togetherWith(ExitTransition): ContentTransform`
+  （字节码里同位还有一枚旧的 `with`，本批一律用 `togetherWith`）。
+  参数顺序 `(targetState, modifier, transitionSpec, contentAlignment, label, contentKey, content)`，
+  ⇒ 计划里只按名传 `targetState` / `modifier` / `transitionSpec` 加尾随 lambda，不依赖位置。
+- **`content` 是 `@Composable AnimatedContentScope.(targetState: S) -> Unit`**：
+  lambda 的入参就是**这一腿自己的状态值**，退场腿拿到的是旧 route。
+  ⇒ 链必须读这个入参（渲染腿的状态由传入值决定），不能读外层 val——否则退场腿会被渲染成新屏，
+  转场看起来像「只有一屏在淡」。这也是 §3.1 把 payload 冻进 route 的直接原因。
+- `AnimatedContentTransitionScope`（`transitionSpec` 的接收者）提供 `initialState` / `targetState`
+  （继承自 `Transition.Segment`）与 `slideIntoContainer` / `slideOutOfContainer`；
+  本批**不用** `slideIntoContainer`——它按整容器宽度位移，与 §3.3 选定的 ¼ 幅不一致，
+  直接用 `slideInHorizontally { it / 4 }` / `slideOutHorizontally { -it / 4 }`（腿本身 `fillMaxSize`，
+  `it` 就是全屏宽，¼ 幅口径成立）。
+
+## 3. 决定
+
+### 3.1 挂载权威：`AppOverlayRoute` + `AppOverlayRouteResolver`（判据只搬不译）
+
+- 新建 `ui/AppOverlayRoute.kt`：`sealed interface`，35 支链各对应一枚 route；链末的 tab 宿主用 `null` 表示「无覆盖层」。
+- 新建 `ui/AppOverlayRouteResolver.kt`：纯函数 `resolve(flags): AppOverlayRoute?`，
+  **判据逐字搬自链、顺序逐字照抄**——「先声明先赢」是语义而不是风格，
+  QA3 A1「许可页必须排在关于页之前」那类顺序承诺因此一字不动。
+  每枚 route 带一个 `mountIndex`（它在链里的声明序号），tab 宿主 = 序号 35。
+- 携带 payload 的分支（`selectedSearchCard` / `selectedRelearnCard` / `selectedLearningRecordCard` /
+  `selectedFavoriteCard` / `todayReady` / `selectedFeature` / `selectedFeatureKey` / `readingTarget` / `historyArticle`）
+  把值放进 route，而不是让渲染腿回读实时状态。理由见 §1.1：退场腿必须由**冻结的 route 值**渲染。
+- 链改成 `AnimatedContent(targetState = route) { r -> when (r) { … } }`；
+  分支体内部的次级 `if`（例如词卡详情里 `if (card != null)`、对话框挂载）**原样留在渲染腿**，
+  只有链级挂载判据上移。
+- `AppScreen` 侧新增一份 `AppMountFlags`（把散在 `rememberSaveable` 里的标志位收成入参），
+  每次组合构造一次；不新增状态、不改任何写入点。
+
+**为什么不选另外两条路**：
+(a) 在链上「加一个 key 字符串 + 渲染时再 `when (字符串)`」= 同一组判据存在两处（key 计算与链条件），
+正是 §1.1 要避免的形状；
+(b) 迁 `NavHost` = 重写导航层（35 支链 + 37 枚 `BackHandler` + 状态保持全动），
+且 AGENTS.md 要求新子系统先获用户批准——本批不申请。
+
+### 3.2 方向判据：链声明序就是层深，不建第二张表
+
+- 前进/返回由 `mountIndex` 比较得出：新序号 **小于** 旧序号 = 更深 = 前进；大于 = 返回；相等 = 同层。
+  链的声明顺序本身就是层级顺序（越靠前越能压住后者），tab 宿主最浅，因此
+  「基座 → 子页」「子页 → 更深子页」「子页 → 返回」三种常见腿都落在同一条判据上，不需要独立深度表。
+- tab 之间按 `AppTab` 序号（学习 0 / 阅读 1 / AI 助学 2 / 我的 3）定横向：序号增大 = 内容左移、新页从右进。
+- 同层互换（当前链上几乎不存在该路径）只做淡入淡出，不假装判得出方向。
+- **首次组合不播**（`animateEnterExit` 只作用于状态变化后的腿；挂载初值由 `rememberSaveable` 恢复时同样不播），
+  避免冷启动与批 C 的闪屏预热抢同一帧。
+- 判据做成纯函数 `ScreenTransitionDirection`，JVM 穷举用例覆盖上述五形。
+
+### 3.3 规格落点：`AppTransition` 是时长/缓动/位移的唯一权威
+
+新建 `ui/theme/AppTransition.kt`，只暴露**具名转场规格**，值全部取 `AppMotion` token：
+
+| 规格（`AppTransition` 上的具名 `val`，标识符按计划 D-3 定稿） | 时长 | 缓动 | 位移 | 透明度 |
+|---|---|---|---|---|
+| `PageForwardEnter` / `PageBackwardEnter` | `Slow` 300 | `EasingOut` | 入场腿 `+¼w → 0` / `−¼w → 0` | `0 → 1` |
+| `PageForwardExit` / `PageBackwardExit` | `Slow` 300 | `EasingIn` | 退场腿 `0 → ∓¼w` | `1 → 0` |
+| tab 站复用上面四枚（方向按 `AppTab` 序号，值同规则） | `Slow` 300 | 入 `EasingOut` / 退 `EasingIn` | 同上 | 同上 |
+| `CrossfadeEnter` / `CrossfadeExit`（同层互换） | `Slow` 300 | 入 `EasingOut` / 退 `EasingIn` | 无位移 | `0 → 1` / `1 → 0` |
+| `DialogEnter` / `DialogExit` | `Normal` 220 | 入 `EasingOut` / 退 `EasingIn` | 无位移 | `fade` + `scale 0.92`（逐字保持今天形态） |
+
+- **位移取 ¼ 屏宽而不是整幅**：300ms 走完一整屏会读成「甩」，¼ 幅既保住方向感又不让人等；
+  与 Material 轴向转场的 ⅛–¼ 惯例一致。这是观感参数，真机目视后要调也只调 `AppTransition` 一处常数。
+- 对话框「并表但不变形」：`GlassOverlay` 那四枚 `tween(AppMotion.Normal, …)` 搬进表里，
+  可见形态（淡入 + 92% 缩放，无水平位移）逐字不动。浮层不是页面，给它加位移会误导层级。
+- 两站之外**不留 per-screen 逃生口**：不提供「某屏自己传 spec」的参数。允许逐屏自定义 = 长出第二份规格，
+  与 §3.1 同一个错误。
+
+### 3.4 无障碍与降级
+
+- 退场腿套 `Modifier.semantics { invisibleToUser() }`（形状按 §2 实测），使 300ms 里 TalkBack 不会同时读到两屏；
+  入场腿语义零改动，「进屏即朗读」的时机与今天一致。
+- 站 2 在 `contentPadding` 内容盒内，**导航条不参与位移**；站 1 是整窗替换，
+  所以底栏会随旧屏一起滑走——这是本批唯一明示的可见行为变化，取舍见 §3.4.1。
+- `animator_duration_scale=0` 下两腿首帧即落位、无残影（批 A §2.2 实测平台行为），
+  按批 C 口径出定格截图；不新增运行时开关，也不新增应用内动效设置行（批 A §3.1）。
+- 顶档（字号 3.0）与批 B 三档窗口类别不受影响：位移只走 `graphicsLayer`，不改测量与布局，
+  QA3 A2.x 那批版面判据在 settle 后应当逐字复现（作为回归用例钉住）。
+
+#### 3.4.1 底栏跟屏滑走（已明示，用户判）
+
+今天打开子页底栏**立刻消失**；转场后它是旧屏的一部分，随旧屏向左滑出。
+想让底栏钉住，必须把 `Scaffold` 上提到链外、把 35 支子页塞进 `contentPadding`，
+等于重排全部子页版面（含各自的内边距与骨架形状），不在本批范围。
+本批按「整窗滑」实现；若用户目视后判定不可接受，退路是 D-1 只做站 2（tab 切换），站 1 另立一批。
+
+### 3.5 明确不做
+
+`NavHost` / predictive back 迁移；底栏钉住版重排；逐屏自定义转场；应用内动效开关；
+把 35 支链拆成多文件（本批只搬判据，不改文件结构）；`when (selectedTab)` 的分支内容任何调整。
+
+## 4. 风险与兜底
+
+1. **转场期间不得多出一次计费出站**（本批最贵的一条）。
+   推理是：入场腿今天就立即组合，`LaunchedEffect` 不会因此多跑；退场腿是同一 composition 的延续而非重建。
+   但这是推理，不是证据 ⇒ D-3 用 fake provider 钉一枚「从阅读基座进入文章生成页全程出站次数 == 1」，
+   并且批 C-4c 已整改的 CTA 重复点击腿同批复跑。
+2. **退场腿回读实时状态的已知伪影**：route 的 payload 已冻结，但分支体里 `collectAsState()` 的派生状态仍是活的，
+   退场那 300ms 里旧屏内容可能已经变化（例如返回列表被清空）。
+   处置：不掩盖、不作为缺陷修——配合 §3.4 的 `invisibleToUser()` 与 300ms 时长，决策上记为已知取舍；
+   若真机目视认为刺眼，改法是给退场腿传快照，成本另计。
+3. **`MotionSpecContractTest` 的覆盖面锚点：本批实测后把预判改窄（原文预判会红，实测不会）**。
+   剥注释后含 `tween(` 的宿主是 **7 枚**（命令：
+   `grep -rnE "tween\(" app/src/main/java/com/example/englishlearning/ui --include=*.kt | grep -vE ":[0-9]+: *(//|\*|/\*)" | awk -F: '{print $1}' | sort | uniq -c`
+   → SpeechSettingsScreen ×2 / WordCardViewModel ×1 / AppSwitch ×3 / PlanBar ×2 / SegmentedControl ×1 /
+   GlassButton ×1 / GlassOverlay ×4；`AppMotion.kt` 与 `Shimmer.kt` 只在注释里出现 `tween(`，不算宿主），
+   而锚点是 `size >= MIN_TWEEN_HOST_FILES = 6`（同文件 :214）。
+   把 `GlassOverlay` 的四枚 `tween(` 搬进 `theme/AppTransition.kt` 后是 **7 → 7**（GlassOverlay 失去、AppTransition 新增），
+   断言**不会**变红 ⇒ 真正过期的只有那条失败信息里写死的「六族」名单，以及「锚点还能不能代表覆盖面」这个问题本身。
+   处置：D-3 里先把锚点改成按**规格宿主**计数（`theme/AppTransition.kt` 必须恰好一枚规格宿主 + 全仓 `tween(` 宿主下限），
+   改锚点的用例**必须在旧实现上先红一次**（红点：新的「AppTransition 必须含 tween」判据），
+   不许直接改数字放行，也不许拿「本来就红不了」当理由跳过 RED。
+4. **逐帧断言的落点：本仓 Compose 语义测试只在 androidTest，JVM 一枚都没有**（本批实测，命令见 §1.2）。
+   判据若写进 JVM 会静默变成「只测了纯函数」，所以两站转场的行为断言一律放 connected，
+   用 `composeRule.mainClock.autoAdvance = false` + `advanceTimeBy` 取中间帧；`gfxinfo` 与截图册同理。
+   已知风险是本仓**没有任何逐帧驱动先例**（`mainClock` 全仓只在 `SetupScreenScreenshotTest.kt:34` 以注释出现过一次，
+   从未真正拨过时钟），批 C-5 又有「`Displayed` 差 6ms 落在噪声内」的先例 ⇒
+   若实测中间帧不可控，退路是只断言「切换后同一帧内两屏都在语义树里 + settle 后只剩一屏」，
+   不承诺具体毫秒帧；退路必须如实写进报告，不得拿 settle 断言冒充中间帧断言。
+   纯函数侧（resolver / direction / `AppTransition` 规格表）仍在 JVM 穷举，两者互补而非替代。
+5. **`AppScreenProductionWiringTest` 的接线闸**：该测试强制 AppScreen 每个可选参数都在 `MainActivity` 接线。
+   本批不给 AppScreen 加参数（flags 由内部 `remember` 收），若实现中被迫加参数，须同批接线并复核该闸。
+
+## 5. 验证口径（RED 先行）
+
+- **D-1 RED**：`AppOverlayRouteResolverTest`（多真取先声明、9 处 payload 冻结、守卫形 `showReviewQueue && todayReady != null`
+  在 ready 缺失时必须落到浅层、A1 的许可/关于顺序）与 `ScreenTransitionDirectionTest`（前进/返回/同层/tab 左右/首帧不播）
+  ——先写用例、看它们红在「类型还不存在」，再搬判据。
+- **D-2 等价性判据**：把链的 35 枚挂载条件换成 `when (route)` 是**行为等价重构**，本段不许出现任何动画。
+  等价性靠两件事证明：① resolver 的 JVM 用例逐支覆盖（35 支各有「这一支赢」的用例 + 相邻支互斥）；
+  ② 既有 connected 全量（`AppScreenTest` 等）在本段前后读数一致——任何一屏在重构后打不开，都是判据搬错了，
+  不允许用「改测试适配实现」放行。
+- **D-3 行为 RED**（androidTest/connected，依据见 §1.2）：`ScreenTransitionInstrumentedTest` 里断言
+  「切 tab / 开子页时两屏同时存在过、离场那屏对无障碍不可见、settle 后只剩一屏」，
+  以及 §4.1 的出站次数 == 1。改码前必须红，红点必须在「离场腿根本没被组合」这一句上。
+- **契约闸**（`ScreenTransitionContractTest`，源码扫描，仓内四条纪律齐备）：
+  ① 转场站点数 == 2（链 + tab 内容盒），且两站都消费 `AppTransition` 具名规格；
+  ② 链上不得残留挂载级 `if (show…)` / `else if (selected…)` 判据（防有人把条件抄回链上，重演 N-1）；
+  ③ `AppMotion.Slow` 只被 `AppTransition` 读取；
+  ④ 合成 must-flag（一段把 `tween(AppMotion.Slow)` 写在屏体里的假源码必须被判出）与 must-not-flag 双边、
+  路径常量 + 文件数守卫 + 反空转，扫描交给 `countMatches` 自剥注释、本类不二次剥（既有教训）。
+- **门禁**：每段跑 `:app:assembleDebug` → `:app:testDebugUnitTest --rerun-tasks` → `:app:compileDebugAndroidTestKotlin`，
+  JVM 单测是验收线，detekt/ktlint 存量债不当回归；基线只增不减，现算写进报告。
+- **收口（D-4）**：双形态 connected（手机竖屏 / 平板宽窗）、`scale=1` 中间帧 + `scale=0` 定格截图册、
+  `gfxinfo` 转场前后各 5 次切换的掉帧对照读数、真机 `bf353dda` 里程碑装机由用户目视 TalkBack 与「跟不跟手」，
+  按 `docs/handoff/REPORT-TEMPLATE.md` 写报告、分功能域提交、推送请示。
+
+## 6. 影响文件
+
+新增：`ui/AppOverlayRoute.kt`、`ui/AppOverlayRouteResolver.kt`、`ui/ScreenTransitionDirection.kt`、
+`ui/theme/AppTransition.kt`、`ui/AppMountFlags.kt`、对应 JVM 测试、`ScreenTransitionContractTest`、
+`app/src/androidTest/…/ui/ScreenTransitionInstrumentedTest.kt`。
+改动：`ui/AppScreen.kt`（链 → `AnimatedContent` + `when (route)`，tab 内容盒加一站）、
+`ui/components/glass/GlassOverlay.kt`（四枚规格并表，形态不动）、
+`ui/MotionSpecContractTest`（重算锚点）、`docs/specs/05`（新增 AC5-07）、
+`docs/verification/ac-traceability-matrix.md`（AC5-07 行；同批补上批 C 漏登记的 AC5-06 行）、
+`docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md`（批 D 展开为 D-1…D-4）。
