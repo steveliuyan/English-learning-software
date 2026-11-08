@@ -90,6 +90,7 @@ object AiStatusFailure {
 
 - **RED 先行**：六处各加一枚 403 用例，期望 `AiFailure.Unauthorized`，用例体就用真机取证的那段 `GROUP_DELETED` JSON——保证「修的是这次真机撞到的东西」，不是凭空造的边界。改码之前必须先看它们红，且红在「落 InvalidResponse」这一句上。
 - **映射单测**：`AiStatusFailure` 逐档穷举（401/403 同档、429、500/503、200/3xx/400/404/405/428 归 null），并钉住「鉴权档不得因文案变化而漂」。
-- **契约闸**（源码扫描，唯一权威不许长出第二份）：`main` 源码里出现 `401 ->` 或 `401, 403 ->` 这类内联鉴权判据的文件，只允许 `AiStatusFailure.kt` 与 `AiConnectionProbe.kt`（后者只借鉴权档，`Grep -rn` 现算 8 行 → 收口后应变 2 行）。按本仓既有口径，扫描面剥注释后判、路径常量 + 文件数守卫 + 反空转夹具（合成一段含 `401 ->` 的假源码必须被判出），避免 `walkTopDown()` 打空路径静默放行。
+- **契约闸**（源码扫描，唯一权威不许长出第二份）：`main` 源码里把 `401`/`403` 当 `when` 判据写下来的文件，**只允许两处**——`ai/AiStatusFailure.kt`（唯一权威）与登记在案的例外 `imagegen/GeneratedImageStore.kt`（无密钥 CDN 下载，§5）。探活不再算例外：它向权威借鉴权档，自己那行 `401, 403 ->` 一并收掉（收口后 `grep -rn "401 -> \|401, 403 ->" app/src/main/java/com/example/englishlearning` 现算应为 2 行：权威 1 + 例外 1；改前是 8 行）。按本仓既有口径，扫描面剥注释后判、规则抽成纯函数、路径常量 + 文件数守卫 + 反空转夹具（合成一段含 `401 ->` 的假源码必须被判出，含 `AiStatusFailure.of(` 的正常消费点必须判为干净），避免 `walkTopDown()` 打空路径静默放行。
+- **消费点反空转**：同一契约类里钉死「六个带密钥的响应路径都真的调了 `AiStatusFailure.of(`」——只删内联判据不接权威，同样要红。
 - **探活语义不破**：既有 `AC2-11` 那批用例（429/5xx → 「服务返回错误状态」而非「密钥被拒绝」）必须全绿，用来证明 §2 的「只借鉴权档」不是嘴上说说。
 - 门禁按仓内口径：`:app:assembleDebug` → `:app:testDebugUnitTest --rerun-tasks` → `:app:compileDebugAndroidTestKotlin`，JVM 单测是验收线（detekt/ktlint 存量债不当回归）。设备侧只需一次里程碑装机（`bf353dda` `install -r`），密钥修复前后的对照目视由用户执行——**本批代码修的是「怎么说」，用户侧「能用」要等他在 `www.sssai.xin` 重新生成密钥并回「我的 → AI 服务 · 贝贝」重填**。模型名 `gpt-6.1-sol` 是否有效在此之前仍不可验。
