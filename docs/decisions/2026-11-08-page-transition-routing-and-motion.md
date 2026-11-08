@@ -297,6 +297,16 @@ grep -n "onOpenArticle = { historyArticle = it }" app/src/main/java/com/example/
 红线保护：一次数据刷新既不得造出第二条转场腿，也不得重放「组合即发起」的出站——这是 §4.1 的出站红线（Spec 05 F5-06 末条）
 与本条的交点，红线本身按原文成立，不予弱化。
 
+> **实测脚注（2026-11-09，席 B2）**：同 `contentKey` 换值时 Compose **会**把新值送进 content lambda ——
+> 回退方案（payload 只装身份、渲染腿读实时 VM）**未启用**。证据两枚读数：最小探针用例
+> `contentLambdaReceivesTheNewValueUnderUnchangedContentKey` 与真宿主用例
+> `sameKeyPayloadRefreshFeedsTheNewQueueIntoTheContentLambda`（dueQueue 12→13、`planId` 恒定，
+> 屏内「13 个词在等你」读数跟随更新而转场腿数恒为 1——腿数那一半由同文件的
+> `sameIdentityProgressRefreshDoesNotPlayTransitionOrResetScroll` 钉）。原始红/绿记录见
+> `.superpowers/sdd/2026-11-06-motion-and-adaptive-layout/task-D4fixB2-report.md`（不入库目录）。
+> 用例名与读数行号已于 2026-11-09 按 `app/src/androidTest/java/com/example/englishlearning/ui/ScreenTransitionInstrumentedTest.kt`
+> 现状核对（`:315` / `:370` / `:408`，「N 个词在等你」的断言在 `:381` 与 `:393`）。
+
 ### 修正 3（Important）：冻结义务的**实际范围**——挂载判据 + 该腿确实读到的 payload
 
 **发现**：§3.1 的理由句与 Spec 05 原句「屏渲染只认解析结果携带的值……退场那一屏必须由冻结值渲染」把话说到了渲染半边；
@@ -344,3 +354,8 @@ Spec 05 line 58 已补一句：这与 §3.4.1 是**同一条**明示的可见行
 - `app/` 侧 KDoc：`AppOverlayRoute.kt:9-11`「序号即层级…不需要第二张深度表」、`:13-15` 与 `:53`（其中 `:53` 引的
   `AppScreen.kt:1847` 已漂到 `:1914`）、`ScreenTransitionDirection.kt:7-9`、`AppTransition.kt:40` 的「同层互换」注释、
   `AppOverlayRouteResolver.kt:6-9`；测试侧 `ScreenTransitionDirectionTest.kt:8`、`ScreenTransitionContractTest.kt:25`。
+
+**收口指针（2026-11-09，席 B4）**：上列清单的处置——本节 §1–§6 与计划 D-1…D-3 正文**保留为历史**（改在计划批 D 节头加一处指针），
+其余活文档（矩阵 AC5-07 行、交接报告、走查册、`app/` 与测试侧 KDoc）已逐处改到与本节一致；被本节订正的代码证据行号也按当天现状重算
+（例如 `ArticleReading` 的发起点 `AppScreen.kt:1865` 今天落在 `:1872`，正文里的历史读数不改、活动 KDoc 改）。
+逐位点的「旧句 → 新句 / 无动作 + 为什么」见 `.superpowers/sdd/2026-11-06-motion-and-adaptive-layout/task-D4fixB4-report.md`（不入库目录）。
