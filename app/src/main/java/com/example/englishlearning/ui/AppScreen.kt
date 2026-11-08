@@ -728,7 +728,8 @@ fun AppScreen(
             }
             // 按 key 而不是按枚举判定：未知 key 时 `selectedFeature` 为 null，旧条件会让用户困在兜底页。
             BackHandler(enabled = selectedFeatureKey != null) { selectedFeatureKey = null }
-            // 批 D-2：挂载判据搬到 AppOverlayRouteResolver（35 枚条件逐字搬、顺序逐字照抄），
+            // 批 D-2：挂载判据搬到 AppOverlayRouteResolver（35 枚条件逐字搬、顺序逐字照抄——那枚顺序是 z 序与
+            // 返回键优先级，不是层深；方向比 route 表的 transitionDepth 列，决策册 2026-11-09 修正 1），
             // 下面这条链只读解析出来的 route；payload 冻在 route 里，退场腿不回读实时状态（决策 §3.1）。
             // `route` 这一枚局部只读名是给链用的，批 D-3 把链塞进 AnimatedContent 的 lambda 后由那一段自己接。
             val overlayRoute = AppOverlayRouteResolver.resolve(
@@ -773,6 +774,8 @@ fun AppScreen(
             // 批 D-3 站 1：整条链放进 AnimatedContent，退场腿在自己的 lambda 参数里读旧 route，
             // 于是 `route == overlayRoute` 才是「这条腿是不是当前目标」；删掉了旧那行 `val route = overlayRoute`，
             // route 此后只由 lambda 入参提供（留着它退场腿会读外层新值、渲染成「只有一屏在淡」）。
+            // transitionSpec 的方向出自 ScreenTransitionDirectionPolicy.overlay，比对的是 route 表的
+            // transitionDepth 层深列（默认 = 序号、点名边覆写），不再是声明序号本身（修正 1）。
             AnimatedContent(
                 targetState = overlayRoute,
                 modifier = Modifier.fillMaxSize(),

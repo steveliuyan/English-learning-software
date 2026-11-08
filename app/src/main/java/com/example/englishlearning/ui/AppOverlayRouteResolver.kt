@@ -7,6 +7,8 @@ package com.example.englishlearning.ui
  * 「先声明先赢」在原文件里既是 z 序也是返回键优先级承诺（QA3 A1 的许可/关于顺序就是这条），
  * 所以这里改顺序 = 改产品行为，必须回到决策文档重开，不许顺手「整理」。
  * 由 `ScreenTransitionContractTest`（批 D-2 落闸）双向钉：链上不许残留挂载级判据，本文件不许漏支。
+ * 2026-11-09 修正 1 补口径：这一列臂序**只**承载优先级；守卫让「更深的一屏声明在更后」，
+ * 转场方向因此比 `AppOverlayRoute.transitionDepth` 列（同一张 route 表），不比本文件的臂序。
  */
 object AppOverlayRouteResolver {
     /** 链末 `} else {`（tab 宿主）的层级序号：比 34 支都浅，比任何 route 都浅。 */

@@ -25,6 +25,13 @@ import kotlin.test.assertTrue
  *     且等价于 `mountIndex` 0..34 升序。链的声明序就是 z 序与返回键优先级（QA3 A1 的许可/关于就是这条），
  *     D-2 之后原判据文字下线，这条顺序只剩本闸能钉。
  *
+ * 终评补口第 1 席追加两条（决策册「2026-11-09 修正」修正 1；与本节判据 3 互不替代——序号仍只管优先级）：
+ *
+ *  4. **层深默认律**（[routeDepthColumnDefaultsToMountIndexExceptOnOverrideList]）：`transitionDepth` 默认
+ *     等于 `mountIndex`（接口默认访问器承载），覆写只允许出现在点名清单上且数值逐枚相符。
+ *  5. **覆写清单 == 命名边用例清单**（[transitionDepthOverrideListEqualsNamedEdgeTestList]）：多一条覆写
+ *     少一条用例、或用例指着一条已不覆写的边，都判红；牙齿由合成双边自证。
+ *
  * 扫描纪律（Global Constraints 四条齐备）：路径常量 + 文件数响亮守卫 + 合成 must-flag/must-not-flag 双边 +
  * 反空转消费点计数；剥注释只用 `SourceRatchet` 的 [stripComments]，每份源码**只剥一次**（二次剥会把
  * 字面量里的斜杠星号序列当注释起点，本批实测过的假红形状）。
@@ -621,6 +628,132 @@ class ScreenTransitionContractTest {
     }
 
     // ---------------------------------------------------------------------------------------------
+    // 判据 D-4fix-①/②（终评补口 第 1 条，Critical 裁定）：transitionDepth 列的默认律与「覆写清单 == 命名边用例清单」
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * 判据 D-4fix-①：`transitionDepth` 默认等于 `mountIndex`（接口默认访问器），
+     * 覆写只允许出现在 [TRANSITION_DEPTH_OVERRIDES] 点名的支上且数值逐枚相符；
+     * 清单外的覆写、清单内却消失的声明、与清单不符的值、默认访问器失踪，任一形状即判红。
+     */
+    @Test
+    fun routeDepthColumnDefaultsToMountIndexExceptOnOverrideList() {
+        assertExactlyOne("AppOverlayRoute.kt")
+        val routeSource = stripComments(readSource(ROUTE_SOURCE_PATH))
+        assertEquals(
+            OVERLAY_ROUTE_COUNT,
+            routeDepthRows(routeSource).size,
+            "从 AppOverlayRoute.kt 解析到 ${routeDepthRows(routeSource).size} 枚 route 变体（应为 $OVERLAY_ROUTE_COUNT 枚）：" +
+                "route 表被改形而本判据读不到，层深闸对着空名单放行就是空转（批 A 反空转纪律）。",
+        )
+        val offenders = depthDeclarationOffenders(routeSource)
+        assertTrue(
+            offenders.isEmpty(),
+            "transitionDepth 列违反默认律（决策册「2026-11-09 修正」修正 1）：\n" + offenders.joinToString("\n") +
+                "\n口径：默认 = mountIndex，覆写仅限清单点名的支；新增覆写必须先找到发起点行号、补命名边用例，再进清单。",
+        )
+    }
+
+    /**
+     * 判据 D-4fix-②：覆写清单 == 命名边用例清单。
+     * 从 `ScreenTransitionDirectionTest.kt` 扫 `fun namedEdge<From>To<To>IsForward(` 的 to 支集合，
+     * 与 [TRANSITION_DEPTH_OVERRIDES] 的键集合必须相等——多一条覆写少一条用例、或用例指着一条已不覆写的边，都判红；
+     * 命名边对数恰为 [NAMED_FORWARD_EDGE_COUNT]（扩清单须清单、用例、计数三处同改，禁止只动其一）。
+     */
+    @Test
+    fun transitionDepthOverrideListEqualsNamedEdgeTestList() {
+        val directionTest = stripComments(readSource(DIRECTION_TEST_SOURCE_PATH))
+        val forwardEdges = NAMED_FORWARD_EDGE.findAll(directionTest).toList()
+        assertEquals(
+            NAMED_FORWARD_EDGE_COUNT,
+            forwardEdges.size,
+            "命名前进边用例实测 ${forwardEdges.size} 条（应为 $NAMED_FORWARD_EDGE_COUNT 条：${forwardEdges.map { it.groupValues[0] }}）。" +
+                "裁定钉的就是 29→32、30→32、31→32、7→8 四对；增删必须同步决策册与本契约。",
+        )
+        val offenders = namedEdgePairingOffenders(directionTest)
+        assertTrue(
+            offenders.isEmpty(),
+            "覆写清单与命名边用例清单不相等（决策册「2026-11-09 修正」修正 1 的配套纪律）：\n" + offenders.joinToString("\n"),
+        )
+    }
+
+    /**
+     * 判据 D-4fix-①/② 的合成双边（must-flag / must-not-flag，本闸的牙齿自证）：
+     * ①清单外野覆写、②覆写值漂移、③清单内声明失踪、④默认访问器被拆、⑤有覆写没用例、⑥有用例指没覆写的边、
+     * ⑦注释里的命名边不算（取样只走一次 stripComments，二次剥是缺陷）；合规假表 + 合规假用例必须全放行。
+     */
+    @Test
+    fun judgementDepthGateFlagsSyntheticOverrideAndUnpairedNamedEdge() {
+        val fakeRoute = """
+            sealed interface FakeRoute {
+                val mountIndex: Int
+                val transitionDepth: Int get() = mountIndex
+                data object LearningFlow : FakeRoute { override val mountIndex = 1; override val transitionDepth = 6 }
+                data object Settings : FakeRoute { override val mountIndex = 2 }
+                data object Rogue : FakeRoute { override val mountIndex = 3; override val transitionDepth = 0 }
+            }
+        """.trimIndent()
+        val offenders = depthDeclarationOffenders(stripComments(fakeRoute))
+        assertTrue(
+            offenders.any { it.contains("Rogue") },
+            "清单外野覆写没被判出：层深默认律对第二套深度口径失明。实测：$offenders",
+        )
+        assertTrue(
+            offenders.none { it.contains("LearningFlow") },
+            "合规覆写被误判红（过严会把补口本身卡死）：$offenders",
+        )
+        val drifted = fakeRoute.replace("override val transitionDepth = 6", "override val transitionDepth = 9")
+        assertTrue(
+            depthDeclarationOffenders(stripComments(drifted)).any { it.contains("LearningFlow") },
+            "覆写值与清单漂移没被判出：改值就是改方向判定，必须走清单。",
+        )
+        val vanished = fakeRoute.replace("; override val transitionDepth = 6", "")
+        assertTrue(
+            depthDeclarationOffenders(stripComments(vanished)).any { it.contains("LearningFlow") },
+            "清单内支的声明消失没被判出：方向会静默退回比序号，命名边重新被播成返回。",
+        )
+        val noDefault = fakeRoute.replace("val transitionDepth: Int get() = mountIndex", "val transitionDepth: Int")
+        assertTrue(
+            depthDeclarationOffenders(stripComments(noDefault)).any { it.contains("默认访问器") },
+            "接口默认访问器被拆没被判出：未覆写支的层深从此无源可依。",
+        )
+
+        val pairedTest = """
+            class FakeDirectionTest {
+                fun namedEdgeReadingHistoryToArticleReadingIsForward() {}
+                fun namedEdgeReadingFeedToArticleReadingIsForward() {}
+                fun namedEdgeArticleImportToArticleReadingIsForward() {}
+                fun namedEdgeLearningSetupToLearningFlowIsForward() {}
+            }
+        """.trimIndent()
+        assertTrue(
+            namedEdgePairingOffenders(pairedTest).isEmpty(),
+            "合规的「四对命名边 == 清单」形状被判红（must-not-flag 侧过严）：${namedEdgePairingOffenders(pairedTest)}",
+        )
+        val missingCase = pairedTest.replace(
+            "fun namedEdgeLearningSetupToLearningFlowIsForward() {}",
+            "fun learningFlowEdgeWasDeleted() {}",
+        )
+        assertTrue(
+            namedEdgePairingOffenders(missingCase).any { it.contains("LearningFlow") },
+            "有覆写没用例的形状没被判出：这正是裁定要防的「覆写清单 ≠ 用例清单」。",
+        )
+        val strayCase = pairedTest.replace(
+            "namedEdgeArticleImportToArticleReadingIsForward",
+            "namedEdgeArticleImportToGlobalSearchIsForward",
+        )
+        assertTrue(
+            namedEdgePairingOffenders(strayCase).any { it.contains("GlobalSearch") },
+            "用例指向一条不覆写的边没被判出（must-flag 侧）：$strayCase",
+        )
+        val commentOnly = "// fun namedEdgeReadingHistoryToArticleReadingIsForward()\n// fun namedEdgeReadingFeedToArticleReadingIsForward()"
+        assertTrue(
+            namedEdgePairingOffenders(stripComments(commentOnly)).any { it.contains("空转") },
+            "注释里的命名边被当作用例（取样没剥注释），或空名单守卫失明（对着空清单比对覆写等于没牙）。",
+        )
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // 取样助手（纯函数：输入源码文本 → 输出结构；真实文件与合成夹具共用同一份实现）
     // ---------------------------------------------------------------------------------------------
 
@@ -708,6 +841,71 @@ class ScreenTransitionContractTest {
             .map { it.groupValues[1] }
             .toList()
 
+    /**
+     * 层深闸取样（判据 D-4fix-①/② 与 [routeVariants] 同族但按**支分段**）：
+     * 每个 `data class/object` 从自己的起点截到下一枚变体的起点，段内取恰一枚
+     * `override val mountIndex`（0 或 ≥2 枚 = 取样失真，记 null 响亮报）与至多一枚
+     * `override val transitionDepth`。真实文件与合成夹具走同一实现。
+     */
+    private data class RouteDepthRow(val variant: String, val mountIndex: Int?, val declaredTransitionDepth: Int?)
+
+    private fun routeDepthRows(strippedRouteSource: String): List<RouteDepthRow> {
+        val starts = ROUTE_VARIANT_DECL.findAll(strippedRouteSource).map { it.groupValues[1] to it.range.first }.toList()
+        return starts.mapIndexed { index, (name, start) ->
+            val end = if (index + 1 < starts.size) starts[index + 1].second else strippedRouteSource.length
+            val segment = strippedRouteSource.substring(start, end)
+            val mountIndexes = DECLARED_MOUNT_INDEX.findAll(segment).map { it.groupValues[1].toInt() }.toList()
+            val depths = DECLARED_TRANSITION_DEPTH.findAll(segment).map { it.groupValues[1].toInt() }.toList()
+            RouteDepthRow(
+                variant = name,
+                mountIndex = if (mountIndexes.size == 1) mountIndexes.single() else null,
+                declaredTransitionDepth = depths.singleOrNull(),
+            )
+        }
+    }
+
+    /** 判据 D-4fix-① 的本体（纯函数：已剥注释的 route 源码 → offender 文案清单；真实与合成共用）。 */
+    private fun depthDeclarationOffenders(strippedRouteSource: String): List<String> = buildList {
+        val rows = routeDepthRows(strippedRouteSource)
+        if (rows.isEmpty()) {
+            add("层深闸从 route 源码解析到 0 枚变体：取样空转，清单比对无从进行。")
+            return@buildList
+        }
+        rows.filter { it.mountIndex == null }.forEach {
+            add("route 支 `${it.variant}` 段内枚数正常的 `override val mountIndex` 取不到（0 或重复）：取样失真，本判据拒绝比对。")
+        }
+        if (!ROUTE_DEPTH_DEFAULT_ACCESSOR.containsMatchIn(strippedRouteSource)) {
+            add("route 接口缺少 `val transitionDepth: Int get() = mountIndex` 默认访问器：未覆写支的层深从此无源可依，「默认 = 序号」这条前提静默失效。")
+        }
+        rows.forEach { row ->
+            val declared = row.declaredTransitionDepth
+            val expected = TRANSITION_DEPTH_OVERRIDES[row.variant]
+            when {
+                declared != null && expected == null ->
+                    add("支 `${row.variant}` 在覆写清单之外声明 transitionDepth = $declared：没有命名边用例背书的覆写即判红。")
+                declared != null && declared != expected ->
+                    add("支 `${row.variant}` 覆写值 $declared 与清单期望 $expected 不符：改值就是改方向判定，须先回清单与理由。")
+                declared == null && expected != null ->
+                    add("支 `${row.variant}` 在覆写清单里但 route 源码的声明消失：方向退回比序号，命名边会重新被播成返回。")
+            }
+        }
+    }
+
+    /** 判据 D-4fix-② 的本体（纯函数：已剥注释的方向用例源码 → offender 文案清单；真实与合成共用）。 */
+    private fun namedEdgePairingOffenders(strippedDirectionTestSource: String): List<String> = buildList {
+        val forwardTargets = NAMED_FORWARD_EDGE.findAll(strippedDirectionTestSource).map { it.groupValues[2] }.toSet()
+        if (forwardTargets.isEmpty()) {
+            add("从方向用例源码读不到任何 `fun namedEdge…To…IsForward(` 用例：用例清单为空，与覆写清单的比对就是空转。")
+            return@buildList
+        }
+        (forwardTargets - TRANSITION_DEPTH_OVERRIDES.keys).forEach {
+            add("命名边用例指向 `$it`，但覆写清单没有它：这条边要么已回到不覆写（删用例），要么漏了声明（补清单并给出发起点行号）。")
+        }
+        (TRANSITION_DEPTH_OVERRIDES.keys - forwardTargets).forEach {
+            add("覆写清单点名 `$it`，但没有任何命名边用例指向它：无测试的覆写正是裁定要防的形状。")
+        }
+    }
+
     /** 变体名 → 声明里的 mountIndex 字面量（判据 3 用它核对「链序 = 0..34 升序」）。 */
     private fun routeMountIndexes(strippedRouteSource: String): Map<String, Int> {
         val names = routeVariants(strippedRouteSource)
@@ -769,7 +967,44 @@ private const val APP_SCREEN_SOURCE_PATH = "src/main/java/com/example/englishlea
 private const val ROUTE_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui/AppOverlayRoute.kt"
 private const val RESOLVER_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui/AppOverlayRouteResolver.kt"
 private const val APP_TRANSITION_SOURCE_PATH = "src/main/java/com/example/englishlearning/ui/theme/AppTransition.kt"
+
+/** 命名边用例的所在文件（判据 D-4fix-② 的用例侧权威；readSource 的存在性守卫就是它的响亮文件数闸）。 */
+private const val DIRECTION_TEST_SOURCE_PATH = "src/test/java/com/example/englishlearning/ui/ScreenTransitionDirectionTest.kt"
+
 private const val OVERLAY_ROUTE_COUNT = 35
+
+/**
+ * `transitionDepth` 覆写清单（决策册「2026-11-09 修正」修正 1；默认律与「清单 == 用例清单」由
+ * [routeDepthColumnDefaultsToMountIndexExceptOnOverrideList] 与 [transitionDepthOverrideListEqualsNamedEdgeTestList] 钉住）。
+ * 取值理由（逐边，发起点见方向用例注释）：
+ *  - `ArticleReading = 28`：它是 29/30/31 三枚列表层点名的更深一屏，序号 32 却比三枚发起层都「浅」，
+ *    只比序号会把「历史/选读/导入 点开文章」三枚前进边播成返回。28 是 <29 的最大整数：
+ *    与 ≤27 各臂的先后关系和序号时代逐字相同（零改判），改判区恰为发起臂 29/30/31；
+ *    与 UnknownAiFeature(28) 同值只会 Crossfade，而 resolver 的臂序（`:44` 让位于 `:48`）决定两臂互斥、
+ *    全仓没有同时写 `selectedFeatureKey` 与文章目标的发起点，改判的是不存在的边。
+ *  - `LearningFlow = 6`：设置臂守卫 `setupRequired || showSetup`（resolver `:23`）压在学习臂（`:24`）之前，
+ *    学习流在强制设置落位后回到 8 是把前进播成返回的同形边。6 是 <7 的最大整数，改判区 {6,7} 只有
+ *    LearningRecords 与 LearningSetup 两臂：前者全仓没有置 `showLearning` 的回调（`showLearning = true`
+ *    实测只落在 `AppScreen.kt:1355/:1377/:2151`，随覆写值仍判 Forward 或不变），后者正是点名的发起臂。
+ * 两枚值都必须数值小于 TAB_HOST_INDEX(35)——「子页收回 tab 宿主」仍是 Backward（方向用例
+ * `overriddenDepthsStillLeaveTabHostShallowest` 钉住）。
+ */
+private val TRANSITION_DEPTH_OVERRIDES = mapOf(
+    "ArticleReading" to 28,
+    "LearningFlow" to 6,
+)
+
+/** 命名前进边用例的对数（终评补口点名的 29→32、30→32、31→32、7→8 四对；扩缩清单须清单、用例、计数三处同改）。 */
+private const val NAMED_FORWARD_EDGE_COUNT = 4
+
+/** route 接口里「未覆写支默认 = 序号」的唯一机制；丢了它，默认律没有承载体。 */
+private val ROUTE_DEPTH_DEFAULT_ACCESSOR = Regex("""val transitionDepth: Int get\(\) = mountIndex""")
+
+/** 命名前进边的形状：`fun namedEdge<From>To<To>IsForward(`，group 2 = to 支变体名。 */
+private val NAMED_FORWARD_EDGE = Regex("""fun namedEdge(.+?)To(.+?)IsForward\(""")
+private val ROUTE_VARIANT_DECL = Regex("""^ *data (?:class|object) (\w+)""", RegexOption.MULTILINE)
+private val DECLARED_MOUNT_INDEX = Regex("""override val mountIndex = (\d+)""")
+private val DECLARED_TRANSITION_DEPTH = Regex("""override val transitionDepth = (\d+)""")
 
 /** 转场规格面的唯一宿主文件名（判据 D-3-②/④ 的白名单条目；宿主的落点目录见 APP_TRANSITION_SOURCE_PATH）。 */
 private const val TRANSITION_SPEC_HOST_NAME = "AppTransition.kt"
