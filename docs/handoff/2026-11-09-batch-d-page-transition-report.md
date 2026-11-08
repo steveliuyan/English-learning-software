@@ -21,14 +21,21 @@ Step 1/2 的读数来自取证席 `task-D4a-report.md`，Step 3/4 的读数来�
 
 - **D-1（`9ea2d72` + 修复轮 `fd3eeed`）纯函数层**：新增 `ui/AppOverlayRoute.kt`、`ui/AppOverlayRouteResolver.kt`（54 行，35 枚挂载判据逐字搬入、
   顺序照抄即 z 序与返回键优先级承诺）、`ui/AppMountFlags.kt`（35 枚形参）、`ui/ScreenTransitionDirection.kt`（方向由声明序号比较得出）；
+  （2026-11-09 终评补口订正：方向判据今天比对的是同一张 route 表的 `transitionDepth` 列——默认等于声明序号、只在点名且有发起点证据的
+  from→to 边上覆写，`TRANSITION_DEPTH_OVERRIDES` 现值 `ArticleReading = 28` / `LearningFlow = 6`；声明序号 `mountIndex` 只承担挂载与
+  返回键优先级。覆写清单 == 命名边用例清单由契约闸双向钉。详见决策册「2026-11-09 修正」修正 1）；
   新增 JVM 测试 `ui/AppOverlayRouteResolverTest`（9 枚）、`ui/ScreenTransitionDirectionTest`（7 枚），表驱动逐行「除本支判据外还点亮紧随一支」，
   配两次变异探针。
+  （2026-11-09 终评补口订正·枚数现算：`ui.AppOverlayRouteResolverTest` **9**、`ui.ScreenTransitionDirectionTest` **15**（补口第 1 条加 8 枚：
+  4 对命名前进边 + 3 对反向边 + 覆写值不顶穿 tab 宿主）、`ui.ScreenTransitionContractTest` **17**（建类 6 枚 → 批 D 收口 11 枚 → 补口席 B1 +3、席 B2 +3）、
+  新增 `ui.AppOverlayRouteNavigationIdentityTest` **13**（补口第 2 条）与 `ui.ScreenTransitionComposeFiredPronunciationContractTest` **4**（补口第 4 条）、
+  `androidTest ui.ScreenTransitionInstrumentedTest` **9**（原 5 + 补口第 2 条 3 + 第 5 条 1）；命令 `grep -c '@Test' <文件>`，矩阵 AC5-07 行已同步）
 - **D-2（`0f92e82`）链改为消费 `route`（行为等价、零动画）**：`AppScreen.kt` 链 35 枚挂载级判据全部改成读 `route`，
   链尾 tab 宿主腿收成唯一 `route == null`；新增源码契约闸 `ui/ScreenTransitionContractTest`（建类 6 枚，现 11 枚）；
   9 枚既有源扫契约测试重锚到新形状。**本段不是严格 TDD**，见 §5(b)。
 - **D-3（`82a8171` + 修复轮 `c1952ce`/`0e9b06a`/`f8e288e`/`d347b86`）两站转场**：`ui/theme/AppTransition.kt`（58 行）成为时长/缓动/位移的唯一规格宿主
   （`AppMotion.Slow` 300 ms、入场 `EasingOut`／退场 `EasingIn`、`PageOffsetDenominator = 4` 即 ¼ 幅、crossfade 两腿无位移）；
-  站 1（全屏子页链，`AppScreen.kt:776`）与站 2（tab 分发，`AppScreen.kt:2131`）各包一枚 `AnimatedContent`，退场腿在自己的 lambda 参数里读**冻结的旧 route**；
+  站 1（全屏子页链，`AppScreen.kt:776`）与站 2（tab 分发，`AppScreen.kt:2131`）各包一枚 `AnimatedContent`，退场腿在自己的 lambda 参数里读**冻结的旧 route**（2026-11-09 终评补口订正：站 1 今天落在 `AppScreen.kt:782` 与 `:2138`；准确说法是「**挂载**由解析结果选出」——渲染半边只在该腿确实读取的 payload 字段上是冻结的，腿体内仍有 20 处 `collectAsState()` 读实时 VM，属决策册「2026-11-09 修正」修正 3 记明的取舍，不是已兑现的承诺）；
   对话框/浮层并入批 A 口径表（无位移）；离场腿加 `invisibleToUser` 语义、入场朗读时机零改动；退场腿出站闸（F5-06 红线：转场不得产生第二次计费出站）；
   新增 connected `androidTest ui.ScreenTransitionInstrumentedTest`（5 枚）；`GlassOverlay` 的 `tween(` 并表后由 `MotionSpecContractTest` 重算锚点。
 - **文档面（D 批开工提交 `b075060`）**：`docs/decisions/2026-11-08-page-transition-routing-and-motion.md`、
@@ -170,6 +177,11 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
    在 `scale=1` vs `scale=0` 两臂掉帧差在 ±0.33 pp / ±8 ms 内、转场档未更差，但**真机读数与手感不在其中**，需人眼与手指判定。
 4. **底栏随旧屏滑出**（决策 §3.4.1 的明示变化）。底栏（及 Wide 形态的侧栏 `AppSideNav`）写在站 2 退场腿里，tab 切换时它会**随旧屏一起滑出**——
    这是批 D 明示的形态变化，请在真机确认观感能否接受。
+   （2026-11-09 终评补口订正·落点与触发都改了口径：底栏/侧栏**不在站 2 的退场腿里**，而在**站 1 的 tab 宿主腿**里
+   （现算 `AppScreen.kt:2100` `} else if (route == null) {` → `:2111 Scaffold(` → `:2116 AppBottomBar` → `:2122 AppSideNav`，
+   站 2 的 `AnimatedContent :2138` 在 Scaffold 的 content 之内）；因此**tab 切换时底栏/侧栏不动**（Spec 05 F5-06 line 58 的
+   「tab 切换只动内容盒」），滑出发生在**全屏子页进出**那一站——退的是整支 tab 宿主腿。Wide 档侧栏与底栏同属这一支腿、同进同出，
+   是同一条明示变化而非第二个变化，也不算缺陷（决策册「2026-11-09 修正」修正 4）。）
 5. **转场中途连点 / 连按返回**。机制在册：退场腿在那 ~300 ms 的两屏 overlap 窗口内**仍可命中指针**——`invisibleToUser` 是
    **纯语义属性**（只影响 TalkBack 的可达面，不拦触摸），且腿内自声明的 `BackHandler` **按声明顺序后声明者优先**。
    请在转场进行中连点两下、或连按返回键，看是否出现「点进了正在退场的那一屏」或返回落点异常，据此决定**是否需要输入闸**。
@@ -214,11 +226,17 @@ MIUI 的「USB 安装」开关与息屏吞输入会影响走查，必要时先 `
 - **KDoc 活文档债**：`ui/AppOverlayRouteResolver.kt:6` 承诺「与 `AppScreen.kt` 链逐字一致」——今日由 `ScreenTransitionContractTest`
   的判据 1（正向白名单：链区每条顶层 `if (`/`} else if (` 必含 `route is AppOverlayRoute.` 或 `route == null`）与判据 3
   （链上 `is` 序列 == resolver 分支序列 == `mountIndex` 升序）兜住，属 D-3 评审点名在册的那句，**不必改码**。
+  （2026-11-09 终评补口订正：这条判据今天钉的仍是**优先级**序列 == `mountIndex` 升序，`mountIndex` 不再被当作层深；
+  层深另由同一张 route 表的 `transitionDepth` 列承担，并由「覆写清单 == 命名边用例清单」双向钉住，两枚判据互不替代。
+  另：`AppOverlayRouteResolver.kt:6` 那句 KDoc 已于同日补上「序号不承担层深」，矩阵 AC5-07 行的在册债同步收口）
 - **每 arm × 字段的消费点计数收紧**：现判据只到「每枚 route 字段至少一个生产读者」（`everyRoutePayloadFieldHasAProductionReader`），
   评审建议的「每枚 arm × 每枚字段」矩阵收紧**未拍板实施**，留作后续可选项，本段未动手。
 - **异步屏以骨架退场（D-4b 新观察，登记未定性）**：站 2 的退场腿会重新组合，`remember` 态不跨腿保留 ⇒ 异步加载的屏在 300 ms 里
   以骨架形态退场（`V/tab_read2learn f021`），本地读盘屏以真实内容退场（`A_Learn2Read/B1_04`、`V/sub_open f009`）。
   目前判为**观感现象、不是缺陷**（无判据违例、无多余出站），交 §5(a) 真机目视与用户定；若判为缺陷，修法方向是退场腿复用旧屏的状态持有者。
+  （2026-11-09 终评补口订正：补口第 2 条落地后，站 1 的**同身份数据刷新不再起腿**，这条现象在数据刷新路径上已消解，只剩真换屏时起腿；
+  同一条裁定还立了出站红线的另一半边——**一次数据刷新不得重放「组合即发起」的出站**，今天由闭集源码闸
+  `ui.ScreenTransitionComposeFiredPronunciationContractTest`（4 例）与 `transitionsProduceNoExtraBillableOutbound` 的 transport 计数腿分担。）
 
 **(e) 其他在册遗留**
 
@@ -255,6 +273,10 @@ MIUI 的「USB 安装」开关与息屏吞输入会影响走查，必要时先 `
    判据（哪一屏可见）只在 `ui/AppOverlayRouteResolver.kt`，方向只在 `ui/ScreenTransitionDirection.kt`。
 6. **不给 `AppScreen` 加参数**（`AppScreenProductionWiringTest` 是接线闸），**不新增应用内动效开关**（只跟随系统 `animator_duration_scale`），
    **转场不得产生第二次计费出站**（F5-06 红线，退场腿出站闸在 `AppScreen.kt:792` 附近，早于计数器自增 `:794`）。
+   （2026-11-09 终评补口订正：闸的形状已从「只在这一枚附近」扩到**五处**且都早于任何发起——`grep -n "if (route != overlayRoute) return@LaunchedEffect"`
+   现算 `AppScreen.kt:799 / :1094 / :1109 / :1304 / :1744`；其中只有 `:799`（查词详情腿 `speakWord`）与 `:1109`（词卡腿 `speakWord`）护的是计费发音，
+   另三枚护的是本地取数与系统分享面板。补口第 4 条另立闭集源码闸锁「组合即发起发音」的发起点恰两枚；
+   **一次数据刷新不得重放这些「组合即发起」的出站**——同身份换值不再起腿，因此不再重启 `LaunchedEffect`，这条与红线本身按原文同时成立。）
 7. **取证环境的坑**（详见 `docs/verification/ui-redesign-2026-10.md` §2026-11-09 批 D「取样纪律」）：screencap/screenrecord 对 300 ms 转场是稀疏采样、
    每次驱动前必读 `mCurrentFocus`（本批两批帧因此作废）、H.264 噪声底 MAD≈2.4–2.9、`screencap` raw 带 16 字节头、`wm size 2560x1600` 会被钳到 2160x1600。
 8. **中文注释的读取纪律**：源码与文档一律用 Read 工具读，**不要用 `cat`/`sed`/`head`/python 打印**——本仓控制台会腐坏中文注释，已造成过假证据。
@@ -266,11 +288,22 @@ MIUI 的「USB 安装」开关与息屏吞输入会影响走查，必要时先 `
 
 - **范围**：一级 tab 切换 + 全屏子页进出 + 对话框浮层，**三类全部重做**（对话框不位移，只走批 A 的展开/收起口径）。
 - **形态**：方向滑动 + 淡入淡出（前进从右来、返回从左去；同层互换只淡，不假装判得出方向）。
+  （2026-11-09 终评补口订正：「同层互换只淡」在新口径下只对**身份不同**的同支互换生效——`navigationIdentity` 相同的换 payload
+  是就地更新、根本不起转场腿，因此也谈不上淡；见决策册「2026-11-09 修正」修正 2 的口径连带段。）
 - **架构**：**方案 1**——「哪一屏可见」由纯函数解析器集中给出，链上不留任何挂载级判据；屏渲染只认解析结果携带的冻结值。
+  （2026-11-09 终评补口订正：后半句今天只兑现到**挂载**半边 + 该腿确实读取的 payload 字段。站 1 腿体内 `collectAsState()`
+  现算仍是 20 处（`grep -n "collectAsState()" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt | awk -F: '$1>=782 && $1<=2137' | wc -l`），
+  退场那 300 ms 里旧屏内容仍可能变化，这是决策册 §4 与「2026-11-09 修正」修正 3 记明的取舍；「冻了却没人读」的那一支
+  （`ArticleReading.historyArticle`）已按裁定摘除，零读者登记项现值只剩 `featureKey`。）
 - **位移幅度**：**¼ 屏宽**（`PageOffsetDenominator = 4`），不整幅平移。
 - **应用内动效开关**：**不做**；只跟随系统 `animator_duration_scale`，应用侧不新增降级分支或时长换算。
 - **红线**：转场不得产生第二次计费出站；`animator_duration_scale=0` 下定格须与改动前静态版面逐字相同；
   顶档 3.0 字号与三档窗口类别的既有版面判据在动画结束后逐字复现。
+  （2026-11-09 终评补口订正·两句：① 出站红线补上另一半边——**一次数据刷新不得重放「组合即发起」的出站**，
+  同身份换值不再起腿、不再重启 `LaunchedEffect`，另有闭集源码闸 `ui.ScreenTransitionComposeFiredPronunciationContractTest`（4 例）
+  与 transport 计数腿分担；② 「顶档 3.0 字号…逐字复现」**降为推定**：本批 connected 证据跑的是 `font_scale=1.0`
+  （见 `.superpowers/sdd/…/task-D4a-report.md`、`task-D4b-report.md`），而仪器化断的是腿数与出站次数、3.0 档重跑也测不到排印，
+  该档留待真机目视/走查册补证（走查册 §2026-11-09 批 D「待用户目视」已列第④条）。Spec 05 AC5-07 与矩阵 AC5-07 行同批改口。）
 - **分支与推送**：**不合 main**；**逐批请示后才推送**（本批未推送，见 §4/§5(e)）。
 - **`gfxinfo` 对照口径**（控制器裁定、用户未反对的取证裁定）：**同一安装包 `scale=1` vs `scale=0` 作 A/B**，不构建、不安装转场前的旧包。
 
