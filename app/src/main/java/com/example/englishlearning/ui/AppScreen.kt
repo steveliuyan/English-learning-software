@@ -1297,7 +1297,7 @@ fun AppScreen(
                     } else if (route is AppOverlayRoute.WorksheetPreview) {
                         val worksheetState = worksheetViewModel?.uiState?.collectAsState()?.value
                         val context = androidx.compose.ui.platform.LocalContext.current
-                        // 只有用户显式点「导出」才会拉起系统面板；重进预览页不会重复弹出。
+                        // 只有用户显式点「导出」才会拉起系统面板；重进预览页不会重复弹出。终评补口 第 7 条第 5 枚（2026-11-09，为不移动行号写成一行）：不重复弹出的真正理由是下面 `:1304` 的退场闸让退场腿整段不发，两枚 `consumeShareRequest()`（`:1314` / `:1317`）因此一并跳过——不是请求被消费掉；代价是退场窗口里到期的请求会活到下一次挂载再发。行为与闸位都不动。
                         val shareFile = worksheetViewModel?.shareRequest?.collectAsState()?.value
                         LaunchedEffect(shareFile) {
                             // 批 D-3 补口①：key 是实时 shareRequest，退场腿不再拉起系统分享面板/消费请求。

@@ -16,6 +16,9 @@ import com.example.englishlearning.learning.domain.WordCard
  * payload 为什么冻在这里而不是让渲染腿回读实时状态：`AnimatedContent` 的退场腿在标志位翻转之后
  * 仍要继续组合（时长/位移见批 D-3 的 `AppTransition`），回读实时状态会让旧屏在退场期间被换掉内容
  * 甚至直接 NPE（原链 849 行 `selectedRelearnCard!!` 就是那种写法）。
+ * 口径边界（决策册「2026-11-09 修正」修正 3）：这条理由只覆盖**挂载判据 + 该腿确实渲染读取的字段**——
+ * 站 1 腿体内仍有 20 处 `collectAsState()` 读实时 VM（2026-11-09 现算），「冻了却没人读」的字段按裁定从 payload 摘掉，
+ * 零读者登记项只许变短；把 35 支渲染输入全数搬进 payload 不在批 D 范围。
  */
 sealed interface AppOverlayRoute {
     val mountIndex: Int
@@ -44,7 +47,7 @@ sealed interface AppOverlayRoute {
     val navigationIdentity: Any get() = this
 
     // 身份取 cardId（WordCard.kt:57 的业务主键；卡面 lemma/ipa/释义/例句是易变字段，不进身份）。
-    // 四枚词卡支共用主键 ⇒ 靠 mountIndex 支别前缀区分（词卡详情→重学页 AppScreen.kt:830-832 即此类边）。
+    // 四枚词卡支共用主键 ⇒ 靠 mountIndex 支别前缀区分（词卡详情→重学页 AppScreen.kt:834-836 即此类边；行号为 2026-11-09 现算）。
     data class VocabularyDetail(val card: WordCard) : AppOverlayRoute {
         override val mountIndex = 0
         override val navigationIdentity: Any get() = mountIndex to card.cardId
@@ -65,8 +68,8 @@ sealed interface AppOverlayRoute {
     data object VocabularyRelearnList : AppOverlayRoute { override val mountIndex = 5 }
     data object LearningRecords : AppOverlayRoute { override val mountIndex = 6 }
     data object LearningSetup : AppOverlayRoute { override val mountIndex = 7 }
-    // 覆写（终评补口 第 1 条，发起点证据 AppScreen.kt:1075-1077 onSaved 落位后 setup 臂守卫 `setupRequired || showSetup`
-    // 翻假、学习臂 resolver :24 接住，7→8 是前进）：层深压在 LearningSetup(7) 之下一档；
+    // 覆写（终评补口 第 1 条，发起点证据 AppScreen.kt:1082-1085 onSaved 落位后 setup 臂守卫 `setupRequired || showSetup`
+    //（resolver :25）翻假、学习臂 resolver :26 接住，7→8 是前进）：层深压在 LearningSetup(7) 之下一档；
     // 取 <7 的最大整数 6，改判区只有序号 {6,7} 两臂（命名边用例 namedEdgeLearningSetupToLearningFlowIsForward）。
     data object LearningFlow : AppOverlayRoute { override val mountIndex = 8; override val transitionDepth = 6 }
     data object WorksheetPreview : AppOverlayRoute { override val mountIndex = 9 }
@@ -110,20 +113,20 @@ sealed interface AppOverlayRoute {
     data object ArticleImport : AppOverlayRoute { override val mountIndex = 31 }
 
     /**
-     * `readingTarget` 单参：来源判定只认它——`AppScreen.kt:1917` 的 `fromHistory = route.readingTarget == null`。
+     * `readingTarget` 单参：来源判定只认它——`AppScreen.kt:1921` 的 `fromHistory = route.readingTarget == null`（行号 2026-11-09 现算）。
      * 终评补口 第 3 条把旧的 `historyArticle` 参数从 payload 摘了：全仓对它零读者（正文由 `articleReadingViewModel`
      * 的 uiState 供给），「冻了却没人读」不接受，所以按裁定取「摘字段」而不是「给腿长出第二个真相源」，
      * `KNOWN_UNREAD_PAYLOAD_FIELDS` 的登记项同步缩短（决策册「2026-11-09 修正」修正 3）。
-     * 挂载判据那半边不受影响：`AppMountFlags.historyArticle` 仍在，resolver 的 :47/:48/:49 三条守卫照旧读它。
+     * 挂载判据那半边不受影响：`AppMountFlags.historyArticle` 仍在，resolver 的 :47/:48/:50 三条守卫照旧读它（行号 2026-11-09 现算）。
      */
     data class ArticleReading(val readingTarget: ReadingTarget?) : AppOverlayRoute {
         override val mountIndex = 32
         // 身份取 article.articleId（Article.kt:4）；cards 列表是易变字段，不进身份。
         // 历史腿（readingTarget == null）没有可携带的主键（historyArticle 已按第 3 条摘除），落到一枚支内哨兵常量：
-        // 全仓历史腿唯一发起点 AppScreen.kt:1868 进出一律经过 ReadingHistory 列表，故不存在「两篇历史文章同身份」的真实边。
+        // 全仓历史腿唯一发起点 AppScreen.kt:1872（2026-11-09 现算）进出一律经过 ReadingHistory 列表，故不存在「两篇历史文章同身份」的真实边。
         override val navigationIdentity: Any get() = mountIndex to (readingTarget?.article?.articleId ?: "reading-history-leg")
-        // 覆写（终评补口 第 1 条）：三枚列表臂的挂载守卫带 fall-through（resolver :45-48），文章层比它们都深，
-        // 序号 32 却把「更深」读成「更浅」；发起点证据 AppScreen.kt:1865（历史）、:1896 +
+        // 覆写（终评补口 第 1 条）：三枚列表臂的挂载守卫带 fall-through（resolver :47–:50，2026-11-09 现算），文章层比它们都深，
+        // 序号 32 却把「更深」读成「更浅」；发起点证据 AppScreen.kt:1872（历史）、:1903 +
         // ReadingAccessViewModel.kt:243（选读）、ReadingAccessViewModel.kt:201 + AppScreen.kt:529（导入）。
         // 取 <29 的最大整数 28：与 ≤27 各臂的先后关系逐字不变，改判区恰为发起臂 29/30/31
         //（命名边用例 namedEdgeReadingHistory/ReadingFeed/ArticleImportToArticleReadingIsForward 三对 + 反向两对）。

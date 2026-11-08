@@ -221,7 +221,7 @@ class ScreenTransitionContractTest {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // 唯一豁免：AppScreen.kt:580–584 的 overlayOpen（按文件名 + 原文行区间钉死）
+    // 唯一豁免：AppScreen.kt:583–587 的 overlayOpen（按文件名 + 原文行区间钉死；2026-11-09 现算，消费者 BackHandler 在 :590）
     // ---------------------------------------------------------------------------------------------
 
     @Test
@@ -521,7 +521,7 @@ class ScreenTransitionContractTest {
      * must-flag：假屏体里就地写一枚 `tween(AppMotion.Slow)` 页面转场规格必须被同一套取样判出——
      * 判据 ② 旧口径只按文件名盯 `AppScreen.kt`，别的屏文件长出第二套转场规格完全隐形，
      * 「全仓唯一规格落点」就成了对着空档放行的口号（这正是 ④ 存在的理由）。
-     * must-not-flag：唯一豁免 `overlayOpen` 那一行（AppScreen.kt:580–584）必须被放行——
+     * must-not-flag：唯一豁免 `overlayOpen` 那一行（AppScreen.kt:583–587）必须被放行——
      * 它问的是「有没有覆盖层亮着」，不含任何规格写法；把它判红就是拿规格禁令去改挂载口径。
      *
      * 双边之外再钉两枚「不许空转 / 不许过严」的形状：
@@ -1189,17 +1189,17 @@ private data class MountConditionExemption(
 }
 
 /**
- * 全契约**唯一**一条豁免：`AppScreen.kt:580–584` 的 `overlayOpen`。
+ * 全契约**唯一**一条豁免：`AppScreen.kt:583–587` 的 `overlayOpen`。
  * 它问的是「有没有覆盖层标志位亮着」（含两枚不在链上的页内浮层位 `selectedArticleCard` / `showWordQaCard`，
- * 且不含 `&& todayReady != null` 那类守卫），唯一消费者是 :587 的 `BackHandler`，
+ * 且不含 `&& todayReady != null` 那类守卫），唯一消费者是 :590 的 `BackHandler`，
  * 与「挂载了哪一支」是两个不同问题（决策 §1.3-1）；它本来不是 `} else if` 条件行，正向扫描天然不命中。
  * **不许**把它改成 `route != null`（同文件另有 `overlayOpenIsTheOnlyExemptionAndStaysFlagBased` 钉这条）。
  */
 private val MOUNT_CONDITION_EXEMPTIONS = listOf(
     MountConditionExemption(
         fileName = "AppScreen.kt",
-        firstLine = 580,
-        lastLine = 584,
+        firstLine = 583,
+        lastLine = 587,
         reason = "BackHandler(enabled = !overlayOpen …) 的低优先级返回键口径，不是挂载判据",
     ),
 )
@@ -1221,12 +1221,13 @@ private const val OVERLAY_ROUTE_COUNT = 35
  *  - `ArticleReading = 28`：它是 29/30/31 三枚列表层点名的更深一屏，序号 32 却比三枚发起层都「浅」，
  *    只比序号会把「历史/选读/导入 点开文章」三枚前进边播成返回。28 是 <29 的最大整数：
  *    与 ≤27 各臂的先后关系和序号时代逐字相同（零改判），改判区恰为发起臂 29/30/31；
- *    与 UnknownAiFeature(28) 同值只会 Crossfade，而 resolver 的臂序（`:44` 让位于 `:48`）决定两臂互斥、
+ *    与 UnknownAiFeature(28) 同值只会 Crossfade，而 resolver 的臂序（UnknownAiFeature 支 `:46` 声明在
+ *    ArticleReading 支 `:50` 之前，先声明先赢）决定两臂互斥、
  *    全仓没有同时写 `selectedFeatureKey` 与文章目标的发起点，改判的是不存在的边。
- *  - `LearningFlow = 6`：设置臂守卫 `setupRequired || showSetup`（resolver `:23`）压在学习臂（`:24`）之前，
+ *  - `LearningFlow = 6`：设置臂守卫 `setupRequired || showSetup`（resolver `:25`）压在学习臂（`:26`）之前，
  *    学习流在强制设置落位后回到 8 是把前进播成返回的同形边。6 是 <7 的最大整数，改判区 {6,7} 只有
  *    LearningRecords 与 LearningSetup 两臂：前者全仓没有置 `showLearning` 的回调（`showLearning = true`
- *    实测只落在 `AppScreen.kt:1355/:1377/:2151`，随覆写值仍判 Forward 或不变），后者正是点名的发起臂。
+ *    实测只落在 `AppScreen.kt:1362/:1384/:2158`，随覆写值仍判 Forward 或不变），后者正是点名的发起臂。
  * 两枚值都必须数值小于 TAB_HOST_INDEX(35)——「子页收回 tab 宿主」仍是 Backward（方向用例
  * `overriddenDepthsStillLeaveTabHostShallowest` 钉住）。
  */
@@ -1289,7 +1290,7 @@ private const val NAVIGATION_IDENTITY_OVERRIDE_COUNT = 9
  *  - `featureKey`（UnknownAiFeature）：未注册 key 的字符串就是那一屏的业务主键。
  *  - `readingTarget`（ArticleReading）：`ReadingTarget.article.articleId`（`Article.kt:4`）；历史腿（`readingTarget == null`）
  *    没有可携带主键（`historyArticle` 已按第 3 条摘除），落到一枚支内哨兵常量上——全仓历史腿的唯一发起点是
- *    `AppScreen.kt:1868`，进出都经过 ReadingHistory 列表，因此不存在「两篇历史文章同身份而不转场」的真实边。
+ *    `AppScreen.kt:1872`，进出都经过 ReadingHistory 列表，因此不存在「两篇历史文章同身份而不转场」的真实边。
  */
 private val NAVIGATION_IDENTITY_LEDGER = mapOf(
     "VocabularyDetail" to "card.cardId",
@@ -1316,7 +1317,7 @@ private const val TAB_HOST_CONDITION = "route == null"
  *
  * 终评补口 第 3 条（席 B2）把 `historyArticle` 从登记名单里**删掉**了，走的是裁定给的第二支：
  * 那枚字段被从 payload 摘除（`AppOverlayRoute.ArticleReading` 改为单参 `readingTarget`），
- * 「冻了却没人读」的形状随之消失——来源判定 `fromHistory` 一直只读 `route.readingTarget == null`（`AppScreen.kt:1917`），
+ * 「冻了却没人读」的形状随之消失——来源判定 `fromHistory` 一直只读 `route.readingTarget == null`（`AppScreen.kt:1921`），
  * 正文由 `articleReadingViewModel` 的 uiState 供给，全仓对 `route.historyArticle` 零读者。
  * 本名单继续钉「不得新增冻了不读的子」：新长出一枚零读者即判红。
  */
