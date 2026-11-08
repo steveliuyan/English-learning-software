@@ -63,7 +63,8 @@
 ### 3.5 门禁
 
 本会话仓库零代码改动，**未跑门禁**，也未重算 JVM 用例数——A 组收口报告里的 334 类 / 2479 条是上一批的现算值，
-不得引用为本会话证据。`scripts/secret-scan.sh` 同理未重跑（本轮无新增源码，只有两份 markdown）。
+不得引用为本会话证据。`bash scripts/secret-scan.sh` 在两份文档落完后实跑过一次，**exit 0、零命中**
+（本轮无新增源码，只有两份 markdown）。
 
 ### 3.6 设备侧写入的数据（用户已授权）
 
@@ -80,8 +81,8 @@
 
 - 分支：`stage-5-ui-r2-learning-path`（不合 `main`，按既有口径）。
 - 本会话开工前 HEAD：`2c6d335`（A2.8 推送核验补记），工作树干净。
-- 本次提交：两份文档（本报告 + 待办 3 打勾），逐文件 `git add`，带 `-c user.name/-c user.email`，不 `--amend`、不 `--no-verify`。
-- 是否已推送 GitHub：**待用户点头**（推送逐批请示）。核验值推送后按 `git ls-remote origin <branch>` 与 `git rev-parse HEAD` 对读补记。
+- 本次提交 `885ccc9`（两份文档：本报告 + 待办 3 打勾），逐文件 `git add`，带 `-c user.name/-c user.email`，不 `--amend`、不 `--no-verify`；本节这次补记本身是紧随其后的一枚 docs 枚（§3.5 把 secret-scan 从「未重跑」改成实跑 exit 0）。
+- 是否已推送 GitHub：**尚未推送，待用户点头**（推送逐批请示）。写作本节时的现算实况：本地 HEAD `885ccc9`，`git ls-remote origin stage-5-ui-r2-learning-path` = `2c6d335`（= 上一批 A2.8 核验过的远端 tip），`git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD` = 1。推送后须把远端 tip 与本地哈希对读再补记。
 - 无未提交的遗留文件；证据册在 `.git/` 下，本就不入库。
 
 ## 5. 未完成 / 遗留问题
