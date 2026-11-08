@@ -232,3 +232,115 @@ javap -p androidx/compose/ui/semantics/SemanticsPropertiesKt.class | grep -i inv
 `ui/MotionSpecContractTest`（重算锚点）、`docs/specs/05`（新增 AC5-07）、
 `docs/verification/ac-traceability-matrix.md`（AC5-07 行；同批补上批 C 漏登记的 AC5-06 行）、
 `docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md`（批 D 展开为 D-1…D-4）。
+
+## 2026-11-09 修正（批 D 整批评审后）
+
+日期：2026-11-09　评审范围：`b075060..1a31534`（收口 HEAD `911ad0b`）　裁定：整批「With fixes」（1 Critical + 6 Important + 5 Minor），
+逐条裁定在册 `docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md` 的「#### D-4 终评补口」（:1312 起）。
+本节只做**口径修正**：上面 §1–§6 是 2026-11-08 当天的决定，历史一字不改，被本节推翻的三处以「§x.y 的某句不成立」的形式点名，
+Spec 05 F5-06 的对应措辞已随本节改写（本席零代码；`transitionDepth` / `navigationIdentity` / payload 摘除由同批下一席按本节口径实施）。
+
+### 修正 1（Critical）：声明顺序只是**优先级**，层深是同一张表上的**另一列**——§3.2 的公理不成立
+
+**发现**：§3.2 写「链声明序就是层深，不建第二张深度表」，把两件事当成一件。链的臂序承载的是「先声明先赢」的**优先级**
+（z 序 + 返回键先后），而挂载判据带 fall-through 守卫，**更深的那一屏因此常常声明在更后**——序号于是同时背了两个含义，
+方向判据就在带守卫的那几支上读反。
+
+**证据**（HEAD `911ad0b` 现算，命令与读数）：
+
+```bash
+grep -n "override val mountIndex" app/src/main/java/com/example/englishlearning/ui/AppOverlayRoute.kt
+# :49 ReadingHistory=29 / :50 ReadingFeed=30 / :51 ArticleImport=31 / :55 ArticleReading=32
+# :27 LearningSetup=7 / :28 LearningFlow=8
+grep -n "showReadingHistory\|showReadingFeed\|showArticleImport\|readingTarget != null" \
+  app/src/main/java/com/example/englishlearning/ui/AppOverlayRouteResolver.kt
+# :45 `showReadingHistory && historyArticle == null` / :46 `showReadingFeed && readingTarget == null && historyArticle == null`
+# :47 `showArticleImport` / :48 `readingTarget != null || historyArticle != null` —— 守卫把列表层让给更深的文章层
+grep -n "onOpenArticle = { historyArticle = it }" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt   # :1865
+```
+
+`AppScreen.kt:1865` 的 `onOpenArticle` 在 `showReadingHistory` 仍为真的时候把 route 从 29 换成 32；
+`ScreenTransitionDirection.kt:17`（`mountIndex(to) > mountIndex(from) → Backward`）因此判成返回；
+`AppTransition.kt:35` 的 `PageBackwardEnter` 是新屏**从左侧进**。用户点开的是一篇文章，动画说的是「你返回了」。
+同理 LearningSetup(7) → LearningFlow(8)、ReadingFeed(30)/ArticleImport(31) → ArticleReading(32)。
+这条不是实现跑偏，是「判据只搬不译」（§3.1）的必然后果：搬过来的顺序保住了 z 序与返回键优先级，
+也把守卫造成的「后声明反而更深」一起搬进了方向判据。
+
+**裁定**：**不重排链、不改守卫**（顺序就是产品承诺，QA3 A1 的许可/关于顺序依赖它）。改为在同一张 route 表上增设
+`transitionDepth: Int`，默认 `= mountIndex`，**只在点名且有点位可核的 from→to 边证据的支上覆写**；
+`ScreenTransitionDirectionPolicy.overlay` 改比 `transitionDepth`，`mountIndex` 继续只承担挂载与返回键语义。
+配套纪律：每条覆写在 `ScreenTransitionDirectionTest` 里必须有一条**命名边**的方向用例，
+`ScreenTransitionContractTest` 钉「覆写清单 == 用例清单」（多一条覆写或少一条用例即红），
+并钉「未覆写支的 `transitionDepth` 等于 `mountIndex`、覆写只出现在清单里」。
+待覆写边以实测为准（至少 29→32、30→32、31→32、7→8 四对，逐对找到 `:1865` 那样的发起点行号才进表）。
+**仍然是同一张表的两列，不是第二张手工表**——§3.2「不建第二张表」的初衷（同一份层级事实不许存在两处）不变，
+被推翻的只是「序号本身就是层深」这句。
+
+### 修正 2（Important）：route 值变了 ≠ 用户换了一屏——站 1 必须按**稳定身份**取键
+
+**发现**：route 变体是 data class，payload 里冻的是**实时派生数据**，于是「同一屏的数据变了」被 `AnimatedContent` 读成「换了一屏」。
+
+**证据**：`AppOverlayRoute.kt:31/32` 的 `ReviewQueue(plan)` / `TodayWordList(plan)` 冻的是 `TodayPlanUiState.Ready`
+（来源 `AppScreen.kt:397` `val todayReady = todayState as? TodayPlanUiState.Ready`），内含 `newDone` / `dueDone` / 卡面；
+词卡类 payload（`:20/22/23/24`）同理。⇒ **每提交一次三档反馈**都造出一枚不等的 route ⇒ 起一轮新转场（同序号 ⇒ Crossfade）
+⇒ 该腿重新组合、屏内 `remember` 态清零、首帧效果重跑。截图册旁证已在册：`docs/verification/ui-redesign-2026-10.md:2064-2066`
+记的「异步加载的屏在 300ms 里以骨架形态退场」正是这条的可见形状。
+
+**裁定**：给 route 增设 `navigationIdentity`（每支的**稳定身份**，剥掉易变进度字段），站 1 用
+`AnimatedContent(contentKey = { it?.navigationIdentity })`，把「用户换了一屏」与「同一屏的数据变了」分开。
+**先红后绿**：失败用例 = 挂着 `ReviewQueue` 推一份只改 `newDone` 的 `Ready`，断言转场腿数仍为 1 且屏内 `remember` 态存活。
+若实测「同 key 换值」时 Compose 不把新值送进 content lambda，回退方案 = payload 只装身份、渲染腿按现行口径读实时 VM，
+并把这一取舍追加在本节下面——**不许悄悄改成「什么都不做」**。
+
+**口径连带**：§3.3 表格里的 `CrossfadeEnter/CrossfadeExit`（同层互换）与 Spec 05 那句「同层互换只做淡入淡出」，
+在新口径下只对**身份不同**的同支互换生效；同身份换值是就地更新，不进入任何转场规格。
+红线保护：一次数据刷新既不得造出第二条转场腿，也不得重放「组合即发起」的出站——这是 §4.1 的出站红线（Spec 05 F5-06 末条）
+与本条的交点，红线本身按原文成立，不作 weakening。
+
+### 修正 3（Important）：冻结义务的**实际范围**——挂载判据 + 该腿确实读到的 payload
+
+**发现**：§3.1 的理由句与 Spec 05 原句「屏渲染只认解析结果携带的值……退场那一屏必须由冻结值渲染」把话说到了渲染半边；
+批 D 实际兑现的是**挂载**只认解析结果。
+
+**证据**：站 1 腿体内 `collectAsState()` 实测 20 处
+（`grep -n "collectAsState()" app/src/main/java/com/example/englishlearning/ui/AppScreen.kt | awk -F: '$1>=776 && $1<=2100' | wc -l` → 20），
+另有 `AppScreen.kt:269`–`510` 在链外统一 collect 的派生值由各支腿直接消费；整批评审读数为 35 支里 27 支从实时 VM 渲染。
+最尖锐的一处：`ArticleReading` 腿渲染读 `articleReadingViewModel?.uiState`（`AppScreen.kt:1911-1917`），
+而 `route.historyArticle` 没有生产读者，被 `ScreenTransitionContractTest.kt:788` 的
+`KNOWN_UNREAD_PAYLOAD_FIELDS = setOf("featureKey", "historyArticle")` 登记成零读者。
+
+**裁定**：本批**不**把 35 支的渲染输入全数搬进 payload（范围与风险都超出批 D，§4.2 的「退场腿回读实时状态」继续按已知伪影记）。
+但「冻了却没人读」不接受，二选一：`ArticleReading` 腿的正文改读 `route.historyArticle`，
+或把 `historyArticle` 从 payload 摘掉、`fromHistory` 判据由 `readingTarget == null`（`AppScreen.kt:1914`）单独承担并删掉登记项。
+冻结义务自此在规格里写实为「**挂载判据 + 已点名携带且被渲染读取的 payload 字段**」，零读者登记项只许变短。
+**不弱化**的部分：「禁止在链上再留任何挂载级判据」照旧（契约闸判据 2 钉着），挂载冻结一句也不收回。
+
+### 修正 4（Minor，随批一句）：Wide 侧栏与底栏同进同出
+
+§3.4 与 §3.4.1 只登记了底栏随旧屏滑走。实测 `AppScreen.kt:2104-2115`：`Scaffold` 的 `bottomBar`（`:2107` `AppBottomBar`）
+与 `usesSideNavigation` 分支下的 `AppSideNav`（`:2115`）**都在站 1 的 tab 宿主腿之内**，
+所以 Wide 档从子页退回 tab 宿主时，侧栏与底栏是同一支退场腿的一部分、同样随旧屏滑出。
+Spec 05 line 58 已补一句：这与 §3.4.1 是**同一条**明示的可见行为变化、同一份责任，不是新增的第二个变化，也不算缺陷。
+
+### 与本节有关、但不改口径的两条（留给实施席）
+
+- Spec 05 line 57 的 `invisibleToUser` 是**纯语义属性**（不拦触摸，实测旁证 `docs/verification/ui-redesign-2026-10.md:2070`），
+  且当前「离场屏不可见」的 connected 断言只覆盖站 2（`TabLeg` 带状态 tag，`OverlayLeg` 不区分离场腿）——
+  覆盖面的补强是 D-4 第 5 条的代码活，本节不动该句规格。
+- 矩阵 AC5-07 行的两处超证据措辞（「挂载层唯一性结构断言」「顶档 3.0 字号在动画结束后逐字复现」）由 D-4 第 6 条处理，
+  本节不动矩阵。
+
+### 因本节而变陈旧的复述点（实施席逐处核，勿漏）
+
+- `docs/decisions/…-page-transition-routing-and-motion.md` §3.2 标题与正文（:116-122）、§3.3 表格的 crossfade 行（:136）、
+  §3.1 的理由句（:103）——**保留为历史**，以本节为准，不重写。
+- `docs/superpowers/plans/2026-11-06-motion-and-adaptive-layout.md`：:89「链声明序 = `mountIndex`」、
+  :310 与 :561 的 KDoc 草稿「链声明序就是层深，不建第二张深度表」、:382-384 `AppOverlayRoute` KDoc 草稿、
+  :567-571 `ScreenTransitionDirectionPolicy` 实现草稿、:640 契约闸判据描述。
+- `docs/verification/ac-traceability-matrix.md:82`（AC5-07 行）：「方向由声明序号比较得出」「每枚 route 字段有生产读者」
+  「挂载层唯一性结构断言」「顶档 3.0 字号…逐字复现」四处。
+- `docs/handoff/2026-11-09-batch-d-page-transition-report.md`：:23「方向由声明序号比较得出」、:31「退场腿读冻结的旧 route」、
+  :255「同层互换只淡」、:256「屏渲染只认解析结果携带的冻结值」。
+- `app/` 侧 KDoc：`AppOverlayRoute.kt:9-11`「序号即层级…不需要第二张深度表」、`:13-15` 与 `:53`（其中 `:53` 引的
+  `AppScreen.kt:1847` 已漂到 `:1914`）、`ScreenTransitionDirection.kt:7-9`、`AppTransition.kt:40` 的「同层互换」注释、
+  `AppOverlayRouteResolver.kt:6-9`；测试侧 `ScreenTransitionDirectionTest.kt:8`、`ScreenTransitionContractTest.kt:25`。
