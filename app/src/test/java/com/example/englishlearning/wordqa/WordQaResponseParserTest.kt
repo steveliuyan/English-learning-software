@@ -37,6 +37,18 @@ class WordQaResponseParserTest {
         assertEquals(AiFailure.InvalidResponse, failureOf(404, "不存在"))
     }
 
+    /**
+     * N-1（真机 2026-11-08）：网关 `www.sssai.xin` 对失效密钥答 **403** +
+     * `{"code":"GROUP_DELETED",...}`，本屏却念「返回内容不合格，可以重新生成」，
+     * 把人推向重试一条永远不会成功的路。鉴权档与探活（`AiConnectionProbe` 早就认 403）必须一致。
+     * 体就用真机取到的那份答复，判的是这次真撞上的事，不是凭空造的边界。
+     */
+    @Test
+    fun forbiddenIsAnAuthFailureNotAnInvalidResponse() {
+        val gatewayBody = """{"code":"GROUP_DELETED","message":"API Key 所属分组已删除"}"""
+        assertEquals(AiFailure.Unauthorized, failureOf(403, gatewayBody))
+    }
+
     @Test
     fun malformedBodiesAreInvalidResponses() {
         assertEquals(AiFailure.InvalidResponse, failureOf(200, "not-json"))

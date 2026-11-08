@@ -197,6 +197,25 @@ class DrawingPromptUseCaseTest {
         )
     }
 
+    /**
+     * N-1（真机 2026-11-08）：网关对失效密钥答 **403**（`GROUP_DELETED`），提示词这条腿当时折成
+     * 「返回内容不合格」，于是界面给的是「重新生成」——密钥被拒时唯一有效动作是回去换密钥。
+     * 本处是结果形态（不抛异常），共享映射必须同样覆盖到它。
+     */
+    @Test
+    fun forbiddenPromptCallIsAnAuthFailureNotAnInvalidResponse() = runTest {
+        val transport = RecordingTransport().apply {
+            result = AiHttpResult.Responded(
+                AiHttpResponse(403, """{"code":"GROUP_DELETED","message":"API Key 所属分组已删除"}"""),
+            )
+        }
+        val (case, _, _) = useCase(transport = transport)
+        assertEquals(
+            DrawingPromptResult.Failed(AiFailure.Unauthorized),
+            case.generate("苹果", confirmedTextHosts = setOf("api.example.com")),
+        )
+    }
+
     @Test
     fun cancelledTransportIsRethrownAsCancellation() = runTest {
         val transport = RecordingTransport().apply { result = AiHttpResult.Cancelled }

@@ -48,6 +48,17 @@ class PhotoTranslationParserTest {
         assertEquals(AiFailure.InvalidResponse, PhotoTranslationParser.parse(200, "not json").failure())
     }
 
+    /**
+     * N-1（真机 2026-11-08）：网关对失效密钥答 **403** + `GROUP_DELETED`，拍照翻译当时念
+     * 「返回内容不合格，可以重新生成」——而这条腿重新生成还要再吃一次图片出站确认。
+     * 鉴权档必须与 `AiConnectionProbe`（认 401/403）同口径。
+     */
+    @Test
+    fun forbiddenIsAnAuthFailureNotAnInvalidResponse() {
+        val gatewayBody = """{"code":"GROUP_DELETED","message":"API Key 所属分组已删除"}"""
+        assertEquals(AiFailure.Unauthorized, PhotoTranslationParser.parse(403, gatewayBody).failure())
+    }
+
     private fun <T> Result<T>.failure(): Any? =
         (exceptionOrNull() as? com.example.englishlearning.ai.AiException)?.failure
 }

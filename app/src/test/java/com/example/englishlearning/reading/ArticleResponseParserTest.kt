@@ -47,6 +47,16 @@ class ArticleResponseParserTest {
         assertEquals(AiFailure.Unauthorized, ArticleResponseParser.parse(401, "{}").appFailure())
     }
 
+    /**
+     * N-1（真机 2026-11-08）：网关对失效密钥答 **403**（`GROUP_DELETED`），文章生成本屏当时念的
+     * 是「返回内容不合格，可以重新生成」。请求根本没进模型，重新生成只会再花一次逐次确认。
+     */
+    @Test
+    fun forbiddenIsAnAuthFailureNotAnInvalidResponse() {
+        val gatewayBody = """{"code":"GROUP_DELETED","message":"API Key 所属分组已删除"}"""
+        assertEquals(AiFailure.Unauthorized, ArticleResponseParser.parse(403, gatewayBody).appFailure())
+    }
+
     @Test
     fun maps429ToRateLimited() {
         assertEquals(AiFailure.RateLimited, ArticleResponseParser.parse(429, "{}").appFailure())

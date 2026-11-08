@@ -63,6 +63,17 @@ class SentenceAnalysisParserTest {
         assertEquals(AiFailure.InvalidResponse, failureOf(404, "不存在"))
     }
 
+    /**
+     * N-1（真机 2026-11-08）：失效密钥在 `www.sssai.xin` 换来的是 **403** +
+     * `{"code":"GROUP_DELETED",...}`——请求根本没进模型，说「内容不合格，重新生成」是答非所问。
+     * 本屏与「测试连接」（`AiConnectionProbe` 认 401/403）必须给同一个鉴权结论。
+     */
+    @Test
+    fun forbiddenIsAnAuthFailureNotAnInvalidResponse() {
+        val gatewayBody = """{"code":"GROUP_DELETED","message":"API Key 所属分组已删除"}"""
+        assertEquals(AiFailure.Unauthorized, failureOf(403, gatewayBody))
+    }
+
     @Test
     fun malformedEnvelopeIsInvalidResponse() {
         assertEquals(AiFailure.InvalidResponse, failureOf(200, "not-json"))

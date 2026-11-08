@@ -58,6 +58,18 @@ class ImageGenerationResponseParserTest {
         assertEquals(AiFailure.InvalidResponse, failureOf(404, "不存在"))
     }
 
+    /**
+     * N-1（真机 2026-11-08）：带密钥的出图请求被网关以 **403** 挡在模型之前（`GROUP_DELETED`），
+     * 这里曾把它折成「返回内容不合格，可以重新生成」——密钥失效时重新生成永远白跑一次。
+     * 注意与 `GeneratedImageStore` 区分：那一处下载的是 CDN 图片 URL、**不带密钥**，
+     * 它的 401/403 说的是链接不可取，不是密钥被拒，故不入共享映射（决策 §5）。
+     */
+    @Test
+    fun forbiddenIsAnAuthFailureNotAnInvalidResponse() {
+        val gatewayBody = """{"code":"GROUP_DELETED","message":"API Key 所属分组已删除"}"""
+        assertEquals(AiFailure.Unauthorized, failureOf(403, gatewayBody))
+    }
+
     private fun failureOf(status: Int, body: String): AiFailure = try {
         ImageGenerationResponseParser.parse(status, body).getOrThrow()
         fail("expected failure for status $status")
