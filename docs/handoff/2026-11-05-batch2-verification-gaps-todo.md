@@ -1,4 +1,4 @@
-# 2026-11-05 AI 缺口批第 2 批 · 三处验证缺口（现状：一已判定、二已处置、三待你目视）
+# 2026-11-05 AI 缺口批第 2 批 · 三处验证缺口（现状：一已判定、二已处置、三已真机目视，剩两条腿被 N-1 堵死）
 
 来源：`docs/handoff/2026-11-05-ai-outbound-granularity-and-network-baseline-report.md` §3、§5。
 口径不变：门禁是 `:app:assembleDebug :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin` 三连 +
@@ -49,22 +49,31 @@
 行为面证据在 JVM 侧（`imagegen.DrawingPromptUseCaseTest` 等）。真要放量打包时由操作者在真机带
 `-e operatorTool true` 显式点名，届时这条才升级为设备级证据。
 
-## 待办 3 · 真机四项目视 —— 仍待你来验（只有你的眼睛能做）
+## 待办 3 · 真机四项目视 —— 已于 2026-11-08 跑完（1/2/3 通过，第 4 项两条腿未触及）
 
-已完成的只有冒烟：装包 Success、`.launch.BrandLaunchActivity` 拉起后 `mCurrentFocus` 到 `MainActivity`、
-logcat 无 nsc 解析错误与崩溃。未做的四项：
+当时的起点只有冒烟：装包 Success、`.launch.BrandLaunchActivity` 拉起后 `mCurrentFocus` 到 `MainActivity`、
+logcat 无 nsc 解析错误与崩溃。四项本身 2026-11-05 未做，2026-11-08 在真机 `bf353dda` 手工做完。
+结果与证据逐条登记在 `docs/handoff/2026-11-08-realview14-outbound-visual-report.md` §3.2；下面保留原始四项口径，
+每项后面补实际结论，**别把这一节整体读成「四项全过」**：
 
-1. 长难句首次输入 ⇒ 出域名确认框；
-2. 同一域名本次使用内第二次提问 ⇒ 不再弹；
-3. 查词页 AI 问答同域名 ⇒ 也不弹（两屏共享一份台账的直接证据）；
+1. 长难句首次输入 ⇒ 出域名确认框；**通过**（含「取消不落账、再提交仍弹」）；
+2. 同一域名本次使用内第二次提问 ⇒ 不再弹；**通过**；
+3. 查词页 AI 问答同域名 ⇒ 也不弹（两屏共享一份台账的直接证据）；**通过，但落点不是查词页**——
+   词典侧词义详情压根没有 AI 问词入口（新缺陷 N-2），实际从学习词卡的详情验到零弹框；
 4. 拍照翻译 / 生图出图 / 文章「换一篇」⇒ **每一次都还弹**（放宽没有渗漏）。
+   拍照翻译：**通过**；文章：**生成腿在台账热的状态下连问两次，均弹，通过**，但「换一篇」按钮本体要有一次
+   成功的文章生成才出现，而本轮所有真实出站一律返回「内容不合格」（新缺陷 N-1），按钮没见到；
+   **生图出图：真机未验**，只有结构证据（图片载荷在 `requiredConfirmation` 里无条件 `Required`，不走任何台账）。
 
-分层执行，别一上来就烧钱：
+分层执行，别一上来就烧钱（2026-11-08 实际按这条口径跑的）：
 
 - **零出站可完成**：第 1、4 项。弹框都在出站之前，点「取消」即零字节
   （`AiConnectionProbeTest#unconfirmedHostStopsBeforeAnyByteLeaves` 与两屏用例钉的就是这个语义）。
 - **必须发一次真实请求才能验**：第 2、3 项（要先有一次成功确认入账，才谈得上「第二次不问」）。
   若不愿在真机发付费请求，就在报告里把这两项标成「JVM 台账用例已证 + 真机未验」，别写成已确认。
+  实际发生 **4 次**真实文本出站而非 1 次：「同域名第二次不弹」的唯一可观测形式就是让第二次请求真的零弹框出去，
+  第 2 项吃 2 次、第 3 项吃 1 次，另 1 次为把「换一篇」摸到手而确认的文章生成；
+  4 次全部返回「内容不合格」（见报告 N-1），逐条对账见报告 §3.4。
 - 取证规则：截图/日志落 `.git/qa-scratch/`；`adb pull` 前加 `MSYS_NO_PATHCONV=1`；
   真机只手工试用、**禁止 instrument**；MIUI 会自动卸载，跑前先
   `adb -s bf353dda shell pm list packages | grep english` 确认包还在。
@@ -76,4 +85,6 @@ logcat 无 nsc 解析错误与崩溃。未做的四项：
 python .git/qa-scratch/tally.py .git/qa-scratch/counts.txt   # 第二个参数是写出读数的目标文件
 bash scripts/secret-scan.sh
 ```
-待办 1、2 已随本轮收口；待办 3 留给下一位（或你）在真机上顺手做完即可，无需代码改动。
+待办 1、2 已随本轮收口；待办 3 已于 2026-11-08 真机跑完（零代码改动），结论、4 次出站对账与两条新缺陷
+N-1（端点返回内容一律不合格）、N-2（词典词义详情谎报 AI 问词入口）见
+`docs/handoff/2026-11-08-realview14-outbound-visual-report.md` §5。
