@@ -11,8 +11,8 @@ import com.example.englishlearning.reading.domain.Article
  * 所以方向判据（[ScreenTransitionDirectionPolicy]）只比序号，不需要第二张深度表。
  *
  * payload 为什么冻在这里而不是让渲染腿回读实时状态：`AnimatedContent` 的退场腿在标志位翻转之后
- * 还要继续组合 300ms，回读实时状态会让旧屏在半秒里被换掉内容甚至直接 NPE
- * （原链 849 行 `selectedRelearnCard!!` 就是那种写法）。
+ * 仍要继续组合（时长/位移见批 D-3 的 `AppTransition`），回读实时状态会让旧屏在退场期间被换掉内容
+ * 甚至直接 NPE（原链 849 行 `selectedRelearnCard!!` 就是那种写法）。
  */
 sealed interface AppOverlayRoute {
     val mountIndex: Int

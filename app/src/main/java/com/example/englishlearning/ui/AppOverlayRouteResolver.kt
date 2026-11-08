@@ -6,7 +6,7 @@ package com.example.englishlearning.ui
  * 下面 35 枚条件与 `AppScreen.kt:728`–`2020` 原链**逐字一致、顺序逐字照抄**：
  * 「先声明先赢」在原文件里既是 z 序也是返回键优先级承诺（QA3 A1 的许可/关于顺序就是这条），
  * 所以这里改顺序 = 改产品行为，必须回到决策文档重开，不许顺手「整理」。
- * 由 `ScreenTransitionContractTest` 双向钉：链上不许残留挂载级判据，本文件不许漏支。
+ * 由 `ScreenTransitionContractTest`（批 D-2 落闸）双向钉：链上不许残留挂载级判据，本文件不许漏支。
  */
 object AppOverlayRouteResolver {
     /** 链末 `} else {`（tab 宿主）的层级序号：比 34 支都浅，比任何 route 都浅。 */
