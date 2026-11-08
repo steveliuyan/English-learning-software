@@ -74,10 +74,10 @@ class LicensesHostBackStackContractTest {
     /** 四件套之四：挂载分支在册，且因为关于页不再被清，许可页必须**先**声明才拿得到组合。 */
     @Test
     fun licenses_mount_branch_precedes_the_about_branch_it_overlays() {
-        val licensesMount = host.indexOf("} else if (showLicenses) {")
-        val aboutMount = host.indexOf("} else if (showAbout) {")
-        assertTrue(licensesMount >= 0, "许可页挂载分支 `} else if (showLicenses) {` 不在册（被删或改了形状）")
-        assertTrue(aboutMount >= 0, "关于页挂载分支 `} else if (showAbout) {` 不在册（被删或改了形状）")
+        val licensesMount = host.indexOf("} else if (route is AppOverlayRoute.Licenses) {")
+        val aboutMount = host.indexOf("} else if (route is AppOverlayRoute.About) {")
+        assertTrue(licensesMount >= 0, "许可页挂载分支 `} else if (route is AppOverlayRoute.Licenses) {` 不在册（被删或改了形状）")
+        assertTrue(aboutMount >= 0, "关于页挂载分支 `} else if (route is AppOverlayRoute.About) {` 不在册（被删或改了形状）")
         assertTrue(
             licensesMount < aboutMount,
             "许可页分支必须排在关于页分支**之前**（实测下标 $licensesMount vs $aboutMount）" +

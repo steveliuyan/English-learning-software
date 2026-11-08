@@ -18,21 +18,22 @@ import kotlin.test.fail
  * 结果回调里直接 `setEnabled(true)`；已授权时点一下当场落库，不重复弹窗。
  * **落库口径零改动**：仍然只有 `setEnabled(true)` 一个入口，状态机与偏好写入都没碰。
  *
- * 本契约只读宿主分支（`AppScreen.kt` 的 `else if (showReminderSettings)` 整块）的源码，
+ * 本契约只读宿主分支（`AppScreen.kt` 的 `else if (route is AppOverlayRoute.ReminderSettings)` 整块；
+ * 批 D-2 之前那一支写的是原判据 `else if (showReminderSettings)`）的源码，
  * 按符号与花括号配对取窗口，不锚行号；改判据时配套改本文件的期望值并在批 5 计划与报告里留因。
  */
 class ReminderPermissionLaunchContractTest {
 
     private val source: String by lazy { uiScreenSource("AppScreen.kt") }
 
-    /** 提醒设置分支整块（`else if (showReminderSettings) { … }`），取不到就响亮失败，不许空转。 */
+    /** 提醒设置分支整块（`else if (route is AppOverlayRoute.ReminderSettings) { … }`），取不到就响亮失败，不许空转。 */
     private val reminderBranch: String by lazy {
-        branchBodyAfter(reminderBranchAt, "else if (showReminderSettings)")
+        branchBodyAfter(reminderBranchAt, "else if (route is AppOverlayRoute.ReminderSettings)")
     }
 
     /** 分支锚在 `source` 里的下标（窗口助手都在 `source` 上取位置，下标必须同源，不许跨窗口混用）。 */
     private val reminderBranchAt: Int by lazy {
-        val anchor = "else if (showReminderSettings)"
+        val anchor = "else if (route is AppOverlayRoute.ReminderSettings)"
         val at = source.indexOf(anchor)
         if (at < 0) fail("找不到 `$anchor`：提醒设置分支被改名/搬走，本契约不许空转")
         at

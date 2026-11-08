@@ -168,14 +168,19 @@ class ProfilePageContractTest {
      */
     @Test
     fun `each subpage flag is mounted exactly once and with a real body`() {
-        listOf("showWordBookTransfer", "showSettings").forEach { flag ->
+        // 批 D-2：链不再自己写判据，挂载形状从 `else if (showX)` 变成 `else if (route is AppOverlayRoute.X)`；
+        // 状态位仍在宿主（入口接线与 BackHandler 都没动），这里的两条形状判定一字未改，只换了锚的形状。
+        mapOf(
+            "showWordBookTransfer" to "AppOverlayRoute.WordBookTransfer",
+            "showSettings" to "AppOverlayRoute.Settings",
+        ).forEach { (flag, routeVariant) ->
             assertEquals(
                 1,
-                countMatches(host, Regex("""else if \($flag\) \{""")),
+                countMatches(host, Regex("""else if \(route is $routeVariant\) \{""")),
                 "$flag 的挂载分支必须恰一处（0 = 路由没有落点，2 = 先声明的那支顶掉后一支）",
             )
             assertFalse(
-                Regex("""else if \($flag\) \{\s*\}""").containsMatchIn(host),
+                Regex("""else if \(route is $routeVariant\) \{\s*\}""").containsMatchIn(host),
                 "$flag 的挂载分支只剩注释 = 点进去一整屏空白（先声明先赢，真分支被顶掉）",
             )
         }

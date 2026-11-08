@@ -249,8 +249,8 @@ class Batch2EntryScreensContractTest {
             "宿主必须恰调用 1 处 `UnavailableScreen(`：它是「未知 AI 功能 key」的兜底页，不是第二套通用空态",
         )
         assertTrue(
-            "else if (selectedFeatureKey != null)" in appSource,
-            "挂载条件必须是「key 在、枚举认不出」：已知 key 由上面各功能屏接走，不许被兜底页截胡",
+            "else if (route is AppOverlayRoute.UnknownAiFeature)" in appSource,
+            "挂载分支必须是批 D-2 的 UnknownAiFeature 那一支（判据本体在 AppOverlayRouteResolver：「key 在、枚举认不出」，已知 key 由上面各功能屏接走，不许被兜底页截胡）",
         )
         listOf("onGoLearning = {", "onBrowseFeatures = {").forEach { wiring ->
             assertTrue(wiring in appSource, "兜底页两枚出口必须真接线（$wiring）")

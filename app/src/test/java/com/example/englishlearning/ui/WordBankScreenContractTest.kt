@@ -233,8 +233,8 @@ class WordBankScreenContractTest {
                 "（而不是退出整屏 / 穿透到底层导航）的唯一静态凭据",
         )
         assertTrue(
-            Regex("""else if \(showWordBank\)[\s\S]*?WordBankScreen\(""").containsMatchIn(host),
-            "渲染分支 `else if (showWordBank)` 后必须紧跟 WordBankScreen 挂载（0 = 状态位与渲染脱节）",
+            Regex("""else if \(route is AppOverlayRoute\.WordBank\)[\s\S]*?WordBankScreen\(""").containsMatchIn(host),
+            "渲染分支 `else if (route is AppOverlayRoute.WordBank)` 后必须紧跟 WordBankScreen 挂载（0 = 路由没有落点）",
         )
     }
 }

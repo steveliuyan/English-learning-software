@@ -212,7 +212,7 @@ class ProfileHubLedgerTest {
         listOf(
             """var showWordBookTransfer by rememberSaveable""" to "词书内容包状态位",
             """BackHandler\(enabled = showWordBookTransfer\) \{ showWordBookTransfer = false \}""" to "词书内容包 BackHandler",
-            """\} else if \(showWordBookTransfer\) \{""" to "词书内容包挂载分支",
+            """\} else if \(route is AppOverlayRoute\.WordBookTransfer\) \{""" to "词书内容包挂载分支",
             """onOpenWordBookTransfer = \{ showWordBookTransfer = true \}""" to "我的 hub 入口接线",
         ).forEach { (pattern, station) ->
             assertTrue(

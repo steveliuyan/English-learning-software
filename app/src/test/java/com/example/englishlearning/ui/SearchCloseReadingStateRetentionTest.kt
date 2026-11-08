@@ -75,8 +75,8 @@ class SearchCloseReadingStateRetentionTest {
         // 搜索打开时文章离开组合，关闭时靠 rememberSaveable 恢复——
         // 这是「保留阅读位置」的机制前提。若层级被重排（例如文章先命中），
         // 搜索页将永远无法盖在文章上，F3-01 阅读位置保留需重新验收。
-        val searchAt = source.indexOf("} else if (showGlobalVocabularySearch)")
-        val articleAt = source.indexOf("} else if (readingTarget != null || historyArticle != null)")
+        val searchAt = source.indexOf("} else if (route is AppOverlayRoute.GlobalSearch)")
+        val articleAt = source.indexOf("} else if (route is AppOverlayRoute.ArticleReading)")
         assertTrue(searchAt in 1 until articleAt, "搜索分支必须先于文章分支命中（overlay 优先展示）")
     }
 }

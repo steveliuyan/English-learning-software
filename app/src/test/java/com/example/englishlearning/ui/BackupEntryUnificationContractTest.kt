@@ -90,7 +90,7 @@ class BackupEntryUnificationContractTest {
         listOf(
             """var showBackupHub by rememberSaveable""" to "状态位（rememberSaveable）",
             """BackHandler\(enabled = showBackupHub\) \{ showBackupHub = false \}""" to "BackHandler",
-            """\} else if \(showBackupHub\) \{""" to "挂载分支",
+            """\} else if \(route is AppOverlayRoute\.BackupHub\) \{""" to "挂载分支",
             """onOpenBackupHub = \{ showBackupHub = true \}""" to "设置页入口接线",
         ).forEach { (pattern, station) ->
             assertTrue(
@@ -104,14 +104,18 @@ class BackupEntryUnificationContractTest {
         // ① 挂载分支：hub 必须排在三枚子屏之后——`else if` 先真先赢，前移会让「从 hub 点导出」
         //    变成屏幕不动的静默失效；
         // ② BackHandler：hub 必须声明在三枚子屏之前——后声明者优先，颠倒会让子屏里的返回把 hub 关掉。
-        val hubMount = src.indexOf("} else if (showBackupHub) {")
+        val hubMount = src.indexOf("} else if (route is AppOverlayRoute.BackupHub) {")
         val hubBack = src.indexOf("BackHandler(enabled = showBackupHub)")
         assertTrue(hubMount > 0 && hubBack > 0, "取不到 hub 的挂载/返回站点下标（$hubMount / $hubBack）")
-        listOf("showBackupExport", "showBackupRestore", "showBackupPairingExport").forEach { child ->
-            val childMount = src.indexOf("} else if ($child) {")
+        listOf(
+            "showBackupExport" to "BackupExport",
+            "showBackupRestore" to "BackupRestore",
+            "showBackupPairingExport" to "BackupPairingExport",
+        ).forEach { (child, childRoute) ->
+            val childMount = src.indexOf("} else if (route is AppOverlayRoute.$childRoute) {")
             assertTrue(
                 childMount in 0 until hubMount,
-                "「$child」的挂载分支必须排在 `else if (showBackupHub)` 之前（实测下标 $childMount vs $hubMount）" +
+                "「$child」的挂载分支必须排在 `else if (route is AppOverlayRoute.BackupHub)` 之前（实测下标 $childMount vs $hubMount）" +
                     "——hub 前移会把子屏入口顶掉，点了没反应",
             )
             val childBack = src.indexOf("BackHandler(enabled = $child)")
@@ -127,10 +131,10 @@ class BackupEntryUnificationContractTest {
         // 传错字段，全仓没有第二条判据能抓。这里按去空白后的形状钉死三行。
         // 右界本身也要在册：`showLicenses` 分支被删或改名时，substringBefore 会静默返回文件尾，
         // 五条接线断言就退化成「全文件包含」，hub 之外的同一片段也能凑绿。
-        val hubBodyEnd = src.indexOf("} else if (showLicenses) {")
+        val hubBodyEnd = src.indexOf("} else if (route is AppOverlayRoute.Licenses) {")
         assertTrue(
             hubBodyEnd > hubMount,
-            "hub 挂载体取样失真的右界 `else if (showLicenses)` 不在 hub 之后（实测下标 $hubBodyEnd vs $hubMount）",
+            "hub 挂载体取样失真的右界 `else if (route is AppOverlayRoute.Licenses)` 不在 hub 之后（实测下标 $hubBodyEnd vs $hubMount）",
         )
         val hubBody = src.substring(hubMount, hubBodyEnd).replace(Regex("""\s+"""), " ")
         assertTrue(

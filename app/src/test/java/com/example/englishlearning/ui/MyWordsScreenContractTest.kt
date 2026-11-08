@@ -271,8 +271,8 @@ class MyWordsScreenContractTest {
         )
         assertEquals(
             1,
-            countMatches(appScreen, Regex("""else if \(showWordBank\)[\s\S]*?WordBankScreen\(""")),
-            "渲染分支 `else if (showWordBank)` 后必须紧跟 WordBankScreen 挂载（0 = 状态位与渲染脱节）",
+            countMatches(appScreen, Regex("""else if \(route is AppOverlayRoute\.WordBank\)[\s\S]*?WordBankScreen\(""")),
+            "渲染分支 `else if (route is AppOverlayRoute.WordBank)` 后必须紧跟 WordBankScreen 挂载（0 = 路由没有落点）",
         )
         // myWordsSummary 的「三段全 Ready 才非 null」规则本体仍在 MyWordsSummary.kt（判据 MyWordsSummaryTest），
         // 但它的**显示面**（旧「我的词」入口行的尾部计数，稿 mockups:916 的 `34 · 12 · 8`）已随 Task 4 的
@@ -398,8 +398,8 @@ class MyWordsScreenContractTest {
         // Task 5 起合并页是词库页的一段 pane：挂载分支由 `showMyWords` 改名为 `showWordBank`，
         // 定界符随形改，判据形状（挂载段内逐条点名）一字未动。
         val myWordsMount = appScreen
-            .substringAfter("else if (showWordBank)")
-            .substringBefore("else if (showAiProfiles)")
+            .substringAfter("else if (route is AppOverlayRoute.WordBank)")
+            .substringBefore("else if (route is AppOverlayRoute.AiProfiles)")
         assertTrue(
             "onStartRelearn = { showVocabularyRelearn = true }" in myWordsMount,
             "合并页挂点的 onStartRelearn 必须接宿主现成的 showVocabularyRelearn 通路（不新建通路）",
@@ -478,11 +478,11 @@ class MyWordsScreenContractTest {
         // Task 5：合并页降为词库页的复用面（三段共用同一处 `myWordsPane` 形参表），挂载分支改名
         // `showWordBank`；切片里仍必须恰一枚 `MyWordsScreen(`——它就是那块复用面本体。
         val myWordsMount = appScreen
-            .substringAfter("else if (showWordBank)")
-            .substringBefore("else if (showAiProfiles)")
+            .substringAfter("else if (route is AppOverlayRoute.WordBank)")
+            .substringBefore("else if (route is AppOverlayRoute.AiProfiles)")
         assertTrue(
             myWordsMount.contains("MyWordsScreen("),
-            "挂载段定界符失效（`else if (showWordBank)` 之后必须紧跟 MyWordsScreen 复用面），" +
+            "挂载段定界符失效（`else if (route is AppOverlayRoute.WordBank)` 之后必须紧跟 MyWordsScreen 复用面），" +
                 "否则下面的恰一处判定会在错位切片上假绿",
         )
         assertEquals(
