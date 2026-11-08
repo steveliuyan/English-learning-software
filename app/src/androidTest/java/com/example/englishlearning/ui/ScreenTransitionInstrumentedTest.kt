@@ -1,11 +1,21 @@
 package com.example.englishlearning.ui
 
 import android.view.KeyEvent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -29,14 +39,21 @@ import com.example.englishlearning.core.time.FixedClockProvider
 import com.example.englishlearning.language.domain.PronunciationCapability
 import com.example.englishlearning.language.domain.PronunciationProvider
 import com.example.englishlearning.language.domain.PronunciationResult
+import com.example.englishlearning.learning.AppendEventResult
 import com.example.englishlearning.learning.BundledWordBookIdSource
 import com.example.englishlearning.learning.GetLearningSettingsUseCase
+import com.example.englishlearning.learning.LearningEventRepository
 import com.example.englishlearning.learning.PlaceholderWordCardSource
+import com.example.englishlearning.learning.RepositoryResult
 import com.example.englishlearning.learning.SaveLearningSettingsUseCase
 import com.example.englishlearning.learning.SelectWordBookAndSetDailyTargetUseCase
 import com.example.englishlearning.learning.SeedWordBooksUseCase
 import com.example.englishlearning.learning.TodayPlan
 import com.example.englishlearning.learning.TodayPlanResult
+import com.example.englishlearning.learning.WordCardSource
+import com.example.englishlearning.learning.domain.CardReviewState
+import com.example.englishlearning.learning.domain.LearningEvent
+import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.profile.CreateLocalProfileUseCase
 import com.example.englishlearning.profile.InMemoryLocalProfileRepository
 import java.time.Instant
@@ -241,6 +258,146 @@ class ScreenTransitionInstrumentedTest {
         }
     }
 
+    // ---------- 终评补口 第 2 条（席 B2）：导航身份与「同 key 换值」实测 ----------
+
+    /**
+     * 判据 6（第 2 条三层判据的 connected 那一层，emulator-5554）：挂着「复习队列」子页推一份
+     * **只改 `newDone`** 的 `Ready`（三档反馈后的今日计划刷新就是这个形状），站 1 不许播转场。
+     *
+     * 缺陷形状：`ReviewQueue(plan)` 冻的是实时派生数据，route 又是 `data class` ⇒ 旧口径下
+     * `AnimatedContent` 没有 contentKey，新 `plan` = 新 route = 「换了一屏」⇒ 一次刷新起一轮转场。
+     * 两枚读数都取自缺陷的直接后果：
+     *  - 逐帧腿数：转场一旦开播，overlap 窗口里 `overlay_transition_leg` 会是 2 枚；
+     *  - 屏内 `remember` 存活：`ReviewQueueScreen.kt:107` 的 `verticalScroll(rememberScrollState())`
+     *    滚动位就住在该腿的 remember 槽里，腿重新组合 ⇒ 滚回顶部 ⇒ `review_queue_summary` 重新可见。
+     *
+     * 牙齿守卫：刷新必须真的落到 route 上。判据 7 用同一套夹具把「payload 换了值」做成屏幕文案读得出来的形状，
+     * 本条的 `assertEquals(1, 腿数.max())` 在摘掉 contentKey 的构建上实测为 2（RED 原文见本席报告）。
+     */
+    @Test
+    fun sameIdentityProgressRefreshDoesNotPlayTransitionOrResetScroll() {
+        val events = MutableCompletedEvents()
+        val cards = QueueCardSource()
+        val viewModel = TodayPlanViewModel(
+            { reviewQueuePlan(newCards = 1, dueCards = 12) },
+            FakeLearningProfileRepository(),
+            events,
+            cards = cards,
+        )
+        renderReviewQueueHost(viewModel)
+
+        // 屏内 remember 态的observable：把滚动面滚到底，顶部的强卡（`review_queue_summary`）应当离开视口。
+        composeRule.onNodeWithTag("review_queue_mode_card").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("review_queue_summary").assertIsNotDisplayed()
+
+        // 刷新：`completedCardIds` 多一张新卡 ⇒ `UnlockPolicy.progress` 把 newDone 从 0 抬到 1，
+        // planId/dueQueue 逐字不变（route 的新实例只在派生字段上不等）。
+        composeRule.mainClock.autoAdvance = false
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            events.completed += PlaceholderWordCardSource.cardId("cet4", "ability")
+            viewModel.load("profile-transition")
+        }
+        val legCounts = mutableListOf<Int>()
+        composeRule.waitForIdle()
+        repeat(25) {
+            composeRule.mainClock.advanceTimeBy(16)
+            legCounts += overlayLegNodes().size
+        }
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "只改 newDone 的刷新被站 1 读成了一次导航（overlap 窗口里两腿共存 = 转场开播）；逐帧腿数 = $legCounts",
+            1,
+            legCounts.max(),
+        )
+        composeRule.onNodeWithTag("review_queue_screen").assertExists()
+        // `remember` 存活：腿没重新组合，滚动位就还在底部。
+        composeRule.onNodeWithTag("review_queue_summary").assertIsNotDisplayed()
+    }
+
+    /**
+     * 判据 7（第 2 条裁定点名的实测）：**同 key 换值**时 Compose 到底把不把新值送进 content lambda？
+     * 站 1 加 `contentKey = { it?.navigationIdentity }` 之后，「同一屏换数据」不再起转场，但那一腿的
+     * `route` 形参还是不是新 payload，是裁定里唯一没被实测钉住的一环：
+     *  - 送 ⇒ 冻进 payload 的渲染输入在新口径下仍然新鲜，不需要回退；
+     *  - 不送 ⇒ 按裁定回退「payload 只装身份、渲染腿按现行口径读实时 VM」，并写进决策文档。
+     *
+     * 读数取屏幕上「N 个词在等你」那一行（`ReviewQueueScreen.kt:123`，直接由 `route.plan.dueQueue.size` 驱动）：
+     * 到期队列 12 → 13 而 planId 不变 ⇒ 身份不变 ⇒ 若 lambda 收到新值，文案必须跟着变。
+     */
+    @Test
+    fun sameKeyPayloadRefreshFeedsTheNewQueueIntoTheContentLambda() {
+        val events = MutableCompletedEvents()
+        val cards = QueueCardSource()
+        var dueCards = 12
+        val viewModel = TodayPlanViewModel(
+            { reviewQueuePlan(newCards = 1, dueCards = dueCards) },
+            FakeLearningProfileRepository(),
+            events,
+            cards = cards,
+        )
+        renderReviewQueueHost(viewModel)
+        assertEquals("基线读数", listOf("12 个词在等你"), dueQueueLines())
+
+        dueCards = 13
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { viewModel.load("profile-transition") }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "「同 key 换值」读数：contentKey（navigationIdentity）不变时，content lambda 有没有收到新的 plan？" +
+                "屏幕上「个词在等你」那一行停留在旧读数 ⇒ Compose 没把新值送进 lambda，" +
+                "按裁定须回退「payload 只装身份、渲染腿读实时 VM」",
+            listOf("13 个词在等你"),
+            dueQueueLines(),
+        )
+    }
+
+    /**
+     * 判据 7 的最小对照（不带宿主，只留 `AnimatedContent` 本体）：把 content lambda 收到的实参序列记下来。
+     *
+     * **读数（2026-11-09，emulator-5554，Compose BOM 2025.12.00）**：同 key 换值时 lambda 收到的是**新值**——
+     * 首帧序列 `[first]`，换值后序列尾部为 `second`（每次重组各追加一枚，屏上文本节点也从 `first` 变成 `second`，
+     * 旧文本节点归零）。RED 原文（未接线时的对照形状）与这条读数一并见本席报告「同 key 换值实测结论」一节。
+     * 结论：Compose **会**把新值送进同 key 的 content lambda ⇒ 冻进 payload 的渲染输入在新口径下仍然新鲜
+     * ⇒ 裁定给的回退支（payload 只装身份、渲染腿读实时 VM）**不启用**，无需改决策文档。
+     */
+    @Test
+    fun contentLambdaReceivesTheNewValueUnderUnchangedContentKey() {
+        val lambdaArguments = mutableListOf<String>()
+        var payload by mutableStateOf("first")
+        composeRule.setContent {
+            AnimatedContent(
+                targetState = "same-key" to payload,
+                contentKey = { it.first },
+            ) { state ->
+                lambdaArguments += state.second
+                Text(state.second)
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals("基线读数：lambda 只该见过 first", listOf("first"), lambdaArguments.toList())
+
+        payload = "second"
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+
+        assertEquals(
+            "「同 key 换值」读数：contentKey 恒定（身份没变）时 lambda 的最新实参 = ${lambdaArguments.lastOrNull()}，" +
+                "全部实参序列 = $lambdaArguments",
+            "second",
+            lambdaArguments.last(),
+        )
+        composeRule.onAllNodesWithText("second").assertCountEquals(1)
+        composeRule.onAllNodesWithText("first").assertCountEquals(0)
+    }
+
     // ---------- 宿主与夹具（形状逐字来自本包既有 connected 类，不是新造） ----------
 
     /**
@@ -251,8 +408,9 @@ class ScreenTransitionInstrumentedTest {
         sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
         pronunciationProvider: PronunciationProvider? = null,
         wordCardViewModel: WordCardViewModel = wordCardFixtureViewModel(),
+        todayPlanViewModel: TodayPlanViewModel? = null,
     ) {
-        setAppScreenContent(sentenceAnalysisViewModel, pronunciationProvider, wordCardViewModel)
+        setAppScreenContent(sentenceAnalysisViewModel, pronunciationProvider, wordCardViewModel, todayPlanViewModel)
         createProfile()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("app_tab_learning").fetchSemanticsNodes().isNotEmpty()
@@ -264,6 +422,7 @@ class ScreenTransitionInstrumentedTest {
         sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
         pronunciationProvider: PronunciationProvider? = null,
         wordCardViewModel: WordCardViewModel = wordCardFixtureViewModel(),
+        todayPlanViewModel: TodayPlanViewModel? = null,
     ) {
         val repository = InMemoryLocalProfileRepository()
         val clock = FixedClockProvider(Instant.EPOCH, ZoneOffset.UTC)
@@ -277,7 +436,8 @@ class ScreenTransitionInstrumentedTest {
                     AndroidTestHealthyDatabaseStartupProbe,
                 ),
                 learningSetupViewModel = setupViewModel(),
-                todayPlanViewModel = TodayPlanViewModel({ placeholderCardPlan() }, FakeLearningProfileRepository()),
+                todayPlanViewModel = todayPlanViewModel
+                    ?: TodayPlanViewModel({ placeholderCardPlan() }, FakeLearningProfileRepository()),
                 wordCardViewModel = wordCardViewModel,
                 sentenceAnalysisViewModel = sentenceAnalysisViewModel,
                 pronunciationProvider = pronunciationProvider,
@@ -452,4 +612,82 @@ class ScreenTransitionInstrumentedTest {
             com.example.englishlearning.ai.AiOutboundGrantStore(),
         )
     }
+
+    // ---------- 终评补口 第 2 条（席 B2）夹具：可控的「只改派生字段」刷新 ----------
+
+    /**
+     * 今日计划假事件源：`completedCardIds` 是唯一可变量 ⇒ `UnlockPolicy.progress`（UnlockPolicy.kt:13）
+     * 把 `newDone` 抬起来，而 `planId` / `dueCardIds` 逐字不动——正是「三档反馈后刷新一次」的形状。
+     */
+    private class MutableCompletedEvents : LearningEventRepository {
+        val completed = mutableListOf<String>()
+
+        override suspend fun append(event: LearningEvent, nextState: CardReviewState) =
+            AppendEventResult.Appended(duplicate = false)
+
+        override suspend fun findEvent(eventId: String) = RepositoryResult.Success<LearningEvent?>(null)
+
+        override suspend fun findCardState(cardId: String) = RepositoryResult.Success<CardReviewState?>(null)
+
+        override suspend fun countEventsForCard(planId: String, cardId: String) = RepositoryResult.Success(0)
+
+        override suspend fun completedCardIds(planId: String) = RepositoryResult.Success(completed.toList())
+
+        override suspend fun reviewedCardIds(wordBookId: String) = RepositoryResult.Success(completed.toList())
+
+        override suspend fun dueCardIds(wordBookId: String, now: Instant) = RepositoryResult.Success(emptyList<String>())
+    }
+
+    /** 词面假来源：按 id 造一张占位卡，队列长度 = 屏上「N 个词在等你」的 N（判据 7 的读数口径）。 */
+    private class QueueCardSource : WordCardSource {
+        override suspend fun cardIds(wordBookId: String) = emptyList<String>()
+
+        override suspend fun cards(cardIds: List<String>) = cardIds.map { id ->
+            WordCard(
+                cardId = id,
+                wordBookId = "cet4",
+                lemma = "word-$id",
+                ipa = "",
+                partOfSpeech = "n.",
+                meaningZh = "释义 $id",
+            )
+        }
+    }
+
+    /** 一份「1 枚新词 + N 枚到期词」的今日计划：planId 恒定，队列规模可控。 */
+    private fun reviewQueuePlan(newCards: Int, dueCards: Int): TodayPlanResult =
+        TodayPlanResult.Ready(
+            TodayPlan(
+                planId = "plan-review-queue",
+                profileId = "profile-1",
+                localDate = LocalDate.of(2026, 9, 19),
+                zoneId = "Asia/Shanghai",
+                activeWordBookId = "cet4",
+                newTarget = newCards,
+                dueTarget = dueCards,
+                newCardIds = (1..newCards).map { PlaceholderWordCardSource.cardId("cet4", "ability") },
+                dueCardIds = (1..dueCards).map { "due-$it" },
+                ruleVersion = "v1",
+                generatedAt = Instant.EPOCH,
+            ),
+        )
+
+    /** 宿主立起来后把「复习队列」点开（入口 tag 与 AppScreenTest.kt:854 同一枚）。 */
+    private fun renderReviewQueueHost(viewModel: TodayPlanViewModel) {
+        renderAppScreen(todayPlanViewModel = viewModel)
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("today_plan_open_review_queue").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("today_plan_open_review_queue").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("review_queue_screen").assertExists()
+        composeRule.onNodeWithTag("review_queue_summary").assertIsDisplayed()
+    }
+
+    /** 屏上「N 个词在等你」那一行的读数（`ReviewQueueScreen.kt:123`，直接由 `route.plan.dueQueue.size` 驱动）。 */
+    private fun dueQueueLines(): List<String> = composeRule.onAllNodes(
+        SemanticsMatcher("含「个词在等你」的文本节点") { node ->
+            node.config.getOrNull(SemanticsProperties.Text)?.any { "个词在等你" in it } == true
+        },
+    ).fetchSemanticsNodes().flatMap { node -> node.config[SemanticsProperties.Text].map { it.text } }
 }
