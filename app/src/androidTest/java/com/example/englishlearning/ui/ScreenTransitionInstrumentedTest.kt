@@ -114,6 +114,41 @@ class ScreenTransitionInstrumentedTest {
     }
 
     /**
+     * 判据 2b（终评补口 第 5 条）：站 1（35 支全屏子页）的退场腿同样对 TalkBack 隐身。
+     *
+     * 旧形状里 `OverlayLeg` 的 tag 不区分离场/在场（两腿同名 `overlay_transition_leg`），无障碍断言只能数
+     * 「隐了几枚」，指不出隐掉的是**哪一腿**，35 支子页的「离场屏不可达」因此没有测试钉着（判据 2 只覆盖站 2）。
+     * 现 `OverlayLeg` tag 按挂载状态分态（`overlay_transition_leg_current` / `overlay_transition_leg_exiting`），
+     * 这里点名「被 `invisibleToUser` 隐掉的那一坨子树必须是离场腿自己那一枚」，在场腿排除在隐身之外——
+     * 与判据 2 对站 2 的 `tab_transition_leg_LEARNING` 点名同一套形状。
+     */
+    @Test
+    fun outgoingOverlayLegIsHiddenFromAccessibility() {
+        renderReadyAppOnProfileTab()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("profile_open_settings").fetchSemanticsNodes().isNotEmpty()
+        }
+        // 与判据 3 同一驱动：先在推进开着时把「设置」行滚入并 settle，再冻时钟停在转场半程。
+        composeRule.onNodeWithTag("profile_open_settings").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithTag("profile_open_settings").performClick()
+        composeRule.mainClock.advanceTimeBy(150)
+        val legs = overlayLegNodes()
+        assertEquals("开子页半程必须两腿共存，否则没有离场腿可点名", 2, legs.size)
+        val hiddenTags = legs
+            .filter { it.config.contains(SemanticsProperties.InvisibleToUser) }
+            .map { it.config[SemanticsProperties.TestTag] }
+        assertEquals(
+            "两腿里必须恰好一枚带 invisibleToUser，且必须是离场腿自己（exiting），在场腿（current）不许隐身",
+            listOf("overlay_transition_leg_exiting"),
+            hiddenTags,
+        )
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+    }
+
+    /**
      * 判据 3：开全屏子页（站 1）同样两腿共存。
      * 入口与锚点全部现读，不是编的：`app_tab_ai` 与 `profile_open_settings` 分别是
      * `AppBottomBar.kt:187`（`app_tab_${tab.name.lowercase()}`）与 `ProfileScreen.kt:104` 的既有 tag，
@@ -188,13 +223,15 @@ class ScreenTransitionInstrumentedTest {
         assertEquals(listOf("ability"), pronunciation.spokenTexts)
 
         // 退场：词卡腿进入 300ms overlap 窗口；窗口中途把实时 VM 换成下一张卡（achieve）。
+        // 终评补口 第 5 条裁定 3 的硬化：旧形状用「固定 30 帧 while 泵」停在半程，在 emulator-5554 上四趟全类跑里
+        // 出现过一次「泵满 30 帧仍未见两腿」的红（红点是下面的靶面守卫，不是出站计数）。改成带超时上限的手动帧泵
+        // pumpUntil——本文件既有的「手动时钟下的 waitUntil 替身」：冻住时钟按 16ms 步进帧直到两腿共存，墙钟超时兜底，
+        // 把「固定帧数可能不够」换成「有超时上限的逐帧步进」；守卫（仍要求恰两腿）与驱动（返回→观察 overlap→换 VM）都不动。
+        // 不用 composeRule.waitUntil：两腿共存是冻时钟下的瞬态，waitUntil 会一路跑到 idle 只剩 1 腿
+        // （本席实测：去掉冻时钟改用 waitUntil(3000) 稳定 ComposeTimeoutException，见 task-D4fixB3-report §4）。
         composeRule.mainClock.autoAdvance = false
         pressSystemBack()
-        var pump = 0
-        while (pump < 30 && overlayLegNodes().size != 2) {
-            composeRule.mainClock.advanceTimeBy(16)
-            pump++
-        }
+        pumpUntil(timeoutMillis = 3_000) { overlayLegNodes().size == 2 }
         assertEquals("退场半程必须两腿共存，否则 overlap 窗口没开着、本判据失去靶面", 2, overlayLegNodes().size)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
@@ -267,7 +304,7 @@ class ScreenTransitionInstrumentedTest {
      * 缺陷形状：`ReviewQueue(plan)` 冻的是实时派生数据，route 又是 `data class` ⇒ 旧口径下
      * `AnimatedContent` 没有 contentKey，新 `plan` = 新 route = 「换了一屏」⇒ 一次刷新起一轮转场。
      * 两枚读数都取自缺陷的直接后果：
-     *  - 逐帧腿数：转场一旦开播，overlap 窗口里 `overlay_transition_leg` 会是 2 枚；
+     *  - 逐帧腿数：转场一旦开播，overlap 窗口里 `overlay_transition_leg_*`（current + exiting 两态）会是 2 枚；
      *  - 屏内 `remember` 存活：`ReviewQueueScreen.kt:107` 的 `verticalScroll(rememberScrollState())`
      *    滚动位就住在该腿的 remember 槽里，腿重新组合 ⇒ 滚回顶部 ⇒ `review_queue_summary` 重新可见。
      *
@@ -500,9 +537,16 @@ class ScreenTransitionInstrumentedTest {
         },
     ).fetchSemanticsNodes()
 
-    /** 站 1 腿节点：tag 不分态（判据 3 沿用）。 */
-    private fun overlayLegNodes() =
-        composeRule.onAllNodesWithTag("overlay_transition_leg").fetchSemanticsNodes()
+    /**
+     * 站 1 腿节点：tag 终评补口 第 5 条起按挂载状态分态（`overlay_transition_leg_current` /
+     * `overlay_transition_leg_exiting`），前缀匹配把两腿一起数（与 [tabLegNodes] 同一套写法）。
+     */
+    private fun overlayLegNodes() = composeRule.onAllNodes(
+        SemanticsMatcher("overlay_transition_leg_<STATE>") { node ->
+            node.config.contains(SemanticsProperties.TestTag) &&
+                node.config[SemanticsProperties.TestTag].startsWith("overlay_transition_leg_")
+        },
+    ).fetchSemanticsNodes()
 
     /**
      * 手动时钟下的 waitUntil 替身：以 16ms 步进帧直到条件成立（autoAdvance=false 时 waitUntil 拿不到

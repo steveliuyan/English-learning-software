@@ -2318,13 +2318,20 @@ fun AppScreen(
     }
 }
 
-/** 转场腿根容器：腿标签给 connected 判据数腿，退场腿对 TalkBack 隐身（决策 §3.4）。 */
+/**
+ * 站 1 的转场腿根容器：判据与 `TabLeg` 同一条，只是 tag 归全屏子页站。
+ * 终评补口 第 5 条：tag 按挂载状态分态（`overlay_transition_leg_current` / `overlay_transition_leg_exiting`）——
+ * 35 支子页都共用这一枚腿 tag，不分态则 overlap 窗口里两腿同名，connected 只数得出「隐了几枚」，
+ * 指不出隐掉的是**哪一腿**，「离场屏对 TalkBack 不可见」这条无障碍判据就落空。分态后 connected 能点名
+ * 被 `invisibleToUser` 隐掉的那一坨子树正是离场腿自己（`_exiting`），在场腿（`_current`）不隐身。
+ * 两态由 `isCurrentTarget`（= `route == overlayRoute`）互斥且恰好覆盖：同一枚腿要么 current 要么 exiting。
+ */
 @Composable
 private fun OverlayLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("overlay_transition_leg")
+            .testTag(if (isCurrentTarget) "overlay_transition_leg_current" else "overlay_transition_leg_exiting")
             .then(
                 if (isCurrentTarget) Modifier
                 else Modifier.semantics { invisibleToUser() },
