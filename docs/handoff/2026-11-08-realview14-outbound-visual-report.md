@@ -91,6 +91,14 @@
   git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD
   ```
   推送成功后须把 `ls-remote` 返回值与 `rev-parse` 逐字对读，一致才算已备份。
+
+**推送核验（2026-11-08 用户「直接推送」后实跑）**：`git -c credential.interactive=false push origin stage-5-ui-r2-learning-path`
+回显 `2c6d335..0af13e2`，随后对读逐字一致——`git rev-parse HEAD` 与
+`git ls-remote origin stage-5-ui-r2-learning-path` 同为 `0af13e218f1823eb6c0376c6f14f35321c6257ea`，
+`git rev-list --count origin/stage-5-ui-r2-learning-path..HEAD` = 0，工作树干净。
+本批共三枚（`885ccc9` 报告 + 待办打勾 / `e71c378` §3.5 secret-scan 实跑值 / `0af13e2` §4 现算口径），
+承载远端备份的就是这三枚；**登记的是核验那一刻的 tip，写这份补记的枚本身在其之后，别拿本节当 tip 现值**——
+现值用上面三条命令现算。**不合 `main`**（UI 重设计轮口径不变）。
 - 无未提交的遗留文件；证据册在 `.git/` 下，本就不入库。
 
 ## 5. 未完成 / 遗留问题
