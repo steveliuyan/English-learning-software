@@ -224,14 +224,30 @@ class ScreenTransitionInstrumentedTest {
 
         // 退场：词卡腿进入 300ms overlap 窗口；窗口中途把实时 VM 换成下一张卡（achieve）。
         // 终评补口 第 5 条裁定 3 的硬化：旧形状用「固定 30 帧 while 泵」停在半程，在 emulator-5554 上四趟全类跑里
-        // 出现过一次「泵满 30 帧仍未见两腿」的红（红点是下面的靶面守卫，不是出站计数）。改成带超时上限的手动帧泵
+        // 出现过一次「泵满 30 帧仍未见两腿」的红（红点是下面的靶面守卫，不是出站计数）。
+        // 【2026-11-09 控制器订正】那一趟红发生在**摘掉 `contentKey` 的变异探针配置**里（席 B2 报告 §读数 2 的表第 2 行），
+        // 探针本就会让腿数偏离预期，所以它不算 shipped 配置下的 flake 证据；shipped 配置下可证的偶发红见下面
+        // 「2026-11-09 控制器再加两道」那段引用的 f3cc0c3 Wide 读数。硬化照做不变：固定帧数换成有墙钟超时上限的逐帧步进，本身是判据健壮性。
+        // 改成带超时上限的手动帧泵
         // pumpUntil——本文件既有的「手动时钟下的 waitUntil 替身」：冻住时钟按 16ms 步进帧直到两腿共存，墙钟超时兜底，
         // 把「固定帧数可能不够」换成「有超时上限的逐帧步进」；守卫（仍要求恰两腿）与驱动（返回→观察 overlap→换 VM）都不动。
         // 不用 composeRule.waitUntil：两腿共存是冻时钟下的瞬态，waitUntil 会一路跑到 idle 只剩 1 腿
         // （本席实测：去掉冻时钟改用 waitUntil(3000) 稳定 ComposeTimeoutException，见 task-D4fixB3-report §4）。
+        // 2026-11-09 控制器再加两道（起因：HEAD f3cc0c3 的 Wide 全类跑出一趟 `Tests run: 9, Failures: 1`，红点正是下面
+        // pumpUntil 的靶面守卫而不是出站计数；同一形态隔离跑与后续三趟全类均 `OK (9 tests)`，日志
+        // `.superpowers/sdd/2026-11-06-motion-and-adaptive-layout/b4-wide-connected.log`）。
+        //   ①按返回前先确认「此刻确实挂在词卡腿上」——把「转场没开播」与「驱动本身走空」分开。
+        //     未经证实的猜测方向：上一枚用例的后退事件跨用例补投递，那样本用例按返回时 route 已回到 tab 宿主。
+        //   ②pumpUntil 超时带上现场读数（见 overlayLegSnapshot），下次再红能直接读出当时挂了几条腿、哪条腿在场。
+        // 两者都只加守卫，不放宽任何断言。
+        assertEquals(
+            "按返回键之前词卡腿必须恰有一枚在场，否则本用例驱动的不是「从词卡腿退场」${overlayLegSnapshot()}",
+            1,
+            composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().size,
+        )
         composeRule.mainClock.autoAdvance = false
         pressSystemBack()
-        pumpUntil(timeoutMillis = 3_000) { overlayLegNodes().size == 2 }
+        pumpUntil(timeoutMillis = 3_000, diagnostic = ::overlayLegSnapshot) { overlayLegNodes().size == 2 }
         assertEquals("退场半程必须两腿共存，否则 overlap 窗口没开着、本判据失去靶面", 2, overlayLegNodes().size)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
@@ -549,16 +565,29 @@ class ScreenTransitionInstrumentedTest {
     ).fetchSemanticsNodes()
 
     /**
+     * 腿的现场读数（tag + 词卡屏是否在场），只给 `pumpUntil` 的超时信息用：
+     * 「1 腿 = current」= 转场压根没开播（多半是驱动走空），「2 腿但缺 exiting」= 分态写反，「0 腿」= 站 1 整个没挂上。
+     */
+    private fun overlayLegSnapshot(): String {
+        val legs = overlayLegNodes()
+        val tags = legs.map { node -> node.config.getOrNull(SemanticsProperties.TestTag) ?: "?" }
+        val wordCard = composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().size
+        return "；现场：站 1 腿 ${legs.size} 枚 tag=$tags，word_card_screen 在场 $wordCard 枚"
+    }
+
+    /**
      * 手动时钟下的 waitUntil 替身：以 16ms 步进帧直到条件成立（autoAdvance=false 时 waitUntil 拿不到
      * 推进帧，判据 5 用它把「首帧」钉在真实的第一批帧上），超时如实报错。
+     * `diagnostic`（2026-11-09 加）：超时时把现场读数一并写进报错文本——HEAD f3cc0c3 的 Wide 全类跑出一趟红在这条
+     * 超时上（`Tests run: 9, Failures: 1`），没有现场读数就分不清「转场没开播」与「驱动本身走空」。
      */
-    private fun pumpUntil(timeoutMillis: Long, condition: () -> Boolean) {
+    private fun pumpUntil(timeoutMillis: Long, diagnostic: () -> String = { "" }, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
             if (condition()) return
             composeRule.mainClock.advanceTimeBy(16)
         }
-        assertTrue("手动步进 ${timeoutMillis}ms 内条件仍未成立", condition())
+        assertTrue("手动步进 ${timeoutMillis}ms 内条件仍未成立${diagnostic()}", condition())
     }
 
     /**
