@@ -4,6 +4,7 @@ import com.example.englishlearning.ai.AiException
 import com.example.englishlearning.ai.AiFailure
 import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.ai.AiProfileSecretUseCase
+import com.example.englishlearning.ai.AiStatusFailure
 import com.example.englishlearning.ai.ChatResponseEnvelope
 import com.example.englishlearning.ai.DefaultImageProfileResult
 import com.example.englishlearning.ai.DefaultImageProfileResolver
@@ -77,13 +78,13 @@ class DrawingPromptUseCase(
                 .getOrElse { return DrawingPromptResult.NotConfigured(ImageStudioNotConfiguredReason.InvalidEndpoint) }
 
             return when (val response = transport.send(outbound)) {
-                is AiHttpResult.Responded -> when (response.response.statusCode) {
-                    // 状态码先于解析：401/429/5xx 的响应体是服务端错误说明，解析无意义。
-                    401 -> DrawingPromptResult.Failed(AiFailure.Unauthorized)
-                    429 -> DrawingPromptResult.Failed(AiFailure.RateLimited)
-                    in 500..599 -> DrawingPromptResult.Failed(AiFailure.ServerUnavailable)
-                    else -> parseDraft(response.response)
-                }
+                // 状态码先于解析，归档判据走唯一权威 `AiStatusFailure`（决策 2026-11-08）。
+                // 这一腿是**结果形态**（不抛异常），所以拿到的失败直接进 Failed：
+                // 真机上网关对失效密钥答 403，这里曾折成「内容不合格」，界面于是给「重新生成」——
+                // 而提示词步骤每次都要重新花一次出站，密钥没换就永远白跑。
+                is AiHttpResult.Responded -> AiStatusFailure.of(response.response.statusCode)
+                    ?.let { DrawingPromptResult.Failed(it) }
+                    ?: parseDraft(response.response)
                 AiHttpResult.NetworkUnavailable -> DrawingPromptResult.Failed(AiFailure.NetworkUnavailable)
                 AiHttpResult.TimedOut -> DrawingPromptResult.Failed(AiFailure.Timeout)
                 AiHttpResult.ResponseTooLarge -> DrawingPromptResult.Failed(AiFailure.InvalidResponse)

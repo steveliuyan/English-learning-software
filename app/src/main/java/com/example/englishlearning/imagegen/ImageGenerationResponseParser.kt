@@ -2,6 +2,7 @@ package com.example.englishlearning.imagegen
 
 import com.example.englishlearning.ai.AiException
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiStatusFailure
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -11,7 +12,9 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * images/generations 响应 → [GeneratedImage]。
  *
- * 映射顺序与文章/问答解析器一致：**状态码先于解析**。401/429/5xx 的响应体是
+ * 映射顺序与文章/问答解析器一致：**状态码先于解析**，且归档判据只在 [AiStatusFailure] 一处
+ * （决策 `docs/decisions/2026-11-08-http-403-auth-failure-single-source.md`：网关对失效密钥的 403
+ * 曾被这里折成「内容不合格」）。已知失败档的响应体是
  * 服务端错误说明，解析无意义；其余不合规状态与一切结构畸形（坏 JSON、空 data、
  * 两个产物字段都不可用）统一 [AiFailure.InvalidResponse]。
  *
@@ -24,13 +27,8 @@ object ImageGenerationResponseParser {
     const val maxBase64Length = 13_981_012
 
     fun parse(httpStatusCode: Int, body: String): Result<GeneratedImage> = runCatching {
-        when (httpStatusCode) {
-            401 -> throw AiException(AiFailure.Unauthorized)
-            429 -> throw AiException(AiFailure.RateLimited)
-            in 500..599 -> throw AiException(AiFailure.ServerUnavailable)
-            in 200..299 -> Unit // 2xx 进解析
-            else -> throw AiException(AiFailure.InvalidResponse)
-        }
+        AiStatusFailure.of(httpStatusCode)?.let { throw AiException(it) }
+        if (httpStatusCode !in 200..299) throw AiException(AiFailure.InvalidResponse) // 非 2xx 且非已知档：不解析
         try {
             parseBody(body)
         } catch (ai: AiException) {

@@ -99,9 +99,15 @@ class AiConnectionProbe(
         }
     }
 
-    private fun classifyStatus(statusCode: Int): ConnectionProbeResult = when (statusCode) {
-        in 200..299 -> ConnectionProbeResult.Reachable
-        401, 403 -> ConnectionProbeResult.Unauthorized
+    /**
+     * 探活自己的三档口径不变（决策 `docs/decisions/2026-11-04-ai-profile-vision-and-connection-test.md` §3：
+     * 「可达 / 密钥被拒 / 服务返回错误状态」是三件事，AC2-11 不许把 429 与 5xx 说成鉴权失败）。
+     * 但**鉴权档本身向 [AiStatusFailure] 借**——401 与 403 是同一条规则，探活当年正是靠写了 403
+     * 才没跟着响应路径一起把失效密钥念成「内容不合格」（N-1）。留字面量在这儿，就等于允许它哪天漏回来。
+     */
+    private fun classifyStatus(statusCode: Int): ConnectionProbeResult = when {
+        statusCode in 200..299 -> ConnectionProbeResult.Reachable
+        AiStatusFailure.of(statusCode) == AiFailure.Unauthorized -> ConnectionProbeResult.Unauthorized
         else -> ConnectionProbeResult.ServiceError
     }
 }

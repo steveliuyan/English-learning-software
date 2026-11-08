@@ -2,11 +2,13 @@ package com.example.englishlearning.phototranslation
 
 import com.example.englishlearning.ai.AiException
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiStatusFailure
 import com.example.englishlearning.ai.ChatResponseEnvelope
 
 /**
- * HTTP 响应 → 译文。状态码先于解析；模型输出是不可信输入：空白、超长或带
- * 脚本/框架等危险标记的内容整体判 InvalidResponse，绝不渲染半份译文。
+ * HTTP 响应 → 译文。状态码先于解析，状态码归哪一档只由 [AiStatusFailure] 说（决策
+ * `docs/decisions/2026-11-08-http-403-auth-failure-single-source.md`）；模型输出是不可信输入：
+ * 空白、超长或带脚本/框架等危险标记的内容整体判 InvalidResponse，绝不渲染半份译文。
  */
 object PhotoTranslationParser {
     const val maxTranslationLength = 8000
@@ -18,12 +20,7 @@ object PhotoTranslationParser {
         body: String,
     ): Result<String> =
         runCatching {
-            when (httpStatusCode) {
-                401 -> throw AiException(AiFailure.Unauthorized)
-                429 -> throw AiException(AiFailure.RateLimited)
-                in 500..599 -> throw AiException(AiFailure.ServerUnavailable)
-                else -> Unit
-            }
+            AiStatusFailure.of(httpStatusCode)?.let { throw AiException(it) }
             val content =
                 try {
                     ChatResponseEnvelope.extractContent(body)

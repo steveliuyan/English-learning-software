@@ -2,6 +2,7 @@ package com.example.englishlearning.sentence
 
 import com.example.englishlearning.ai.AiException
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiStatusFailure
 import com.example.englishlearning.ai.ChatResponseEnvelope
 
 /** 一个句子成分：语法角色 + 原句片段 + 中文解释。字段都是终态值，渲染层直接用。 */
@@ -35,12 +36,8 @@ object SentenceAnalysisParser {
     private val rolesByLabel = SentenceRole.entries.associateBy { it.label }
 
     fun parse(httpStatusCode: Int, body: String): Result<List<SentenceSegment>> = runCatching {
-        when (httpStatusCode) {
-            401 -> throw AiException(AiFailure.Unauthorized)
-            429 -> throw AiException(AiFailure.RateLimited)
-            in 500..599 -> throw AiException(AiFailure.ServerUnavailable)
-            else -> Unit // 200 进解析；其余状态按不合规响应处理
-        }
+        // 状态码先于解析，判据只在 `AiStatusFailure` 一处（决策 2026-11-08：网关的 403 曾被念成「内容不合格」）。
+        AiStatusFailure.of(httpStatusCode)?.let { throw AiException(it) }
         try {
             val content = ChatResponseEnvelope.extractContent(body)
             parseLines(ChatResponseEnvelope.stripCodeFence(content))

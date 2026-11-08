@@ -53,6 +53,17 @@ class GeneratedImageStore(
         failure(AiFailure.InvalidResponse)
     }
 
+    /**
+     * **有意不进共享映射**（`ai/AiStatusFailure`，决策
+     * `docs/decisions/2026-11-08-http-403-auth-failure-single-source.md` §5）：这条腿下载的是
+     * 生图服务返回的 **CDN 图片 URL**，`AudioHttpRequest` 不带任何 `Authorization` 头（类注释已写明）。
+     * 这里的 401/403 说的是「那个链接此刻不可取」，不是「你的密钥被拒」——接进共享映射就等于在密钥
+     * 明明有效时支使用户去换密钥，正是 N-1 要消灭的那类误导。
+     *
+     * 登记在案的遗留（决策 §5，本批不修）：严格说这一处把鉴权码归成 `Unauthorized` 也带着同一族误导，
+     * 更诚实的归档是「链接不可取」一类的失败；它没进本批范围，
+     * 因为真机证据只证到带密钥的响应路径，且改动会牵动生图出图腿的展示文案。
+     */
     private fun failureOf(statusCode: Int): AiFailure = when (statusCode) {
         401 -> AiFailure.Unauthorized
         429 -> AiFailure.RateLimited

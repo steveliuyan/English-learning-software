@@ -2,6 +2,7 @@ package com.example.englishlearning.reading
 
 import com.example.englishlearning.ai.AiException
 import com.example.englishlearning.ai.AiFailure
+import com.example.englishlearning.ai.AiStatusFailure
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -13,8 +14,10 @@ data class RawArticle(val title: String, val englishText: String, val chineseTex
 /**
  * HTTP 响应 → [RawArticle]。
  *
- * 映射顺序是刻意的：**状态码先于解析**。401/429/5xx 时响应体是服务端的错误说明，
- * 解析它毫无意义；调用方需要的失败分类只由状态码决定。其余任何不合规（坏 JSON、
+ * 映射顺序是刻意的：**状态码先于解析**，但状态码归哪一档由唯一权威 [AiStatusFailure] 说
+ * （这里曾把网关的 403 念成「内容不合格，重新生成」，见决策
+ * `docs/decisions/2026-11-08-http-403-auth-failure-single-source.md`）。已知失败档时响应体是
+ * 服务端的错误说明，解析它毫无意义；调用方需要的失败分类只由状态码决定。其余任何不合规（坏 JSON、
  * 缺信封、content 不是请求的 JSON、缺字段）统一 [AiFailure.InvalidResponse]——
  * 「返回了东西但没法用」对用户的处置是同一个：重新生成。
  *
@@ -23,12 +26,7 @@ data class RawArticle(val title: String, val englishText: String, val chineseTex
  */
 object ArticleResponseParser {
     fun parse(httpStatusCode: Int, body: String): Result<RawArticle> = runCatching {
-        when (httpStatusCode) {
-            401 -> throw AiException(AiFailure.Unauthorized)
-            429 -> throw AiException(AiFailure.RateLimited)
-            in 500..599 -> throw AiException(AiFailure.ServerUnavailable)
-            else -> Unit // 200 进解析；其余状态按不合规响应处理
-        }
+        AiStatusFailure.of(httpStatusCode)?.let { throw AiException(it) }
         try {
             extract(body)
         } catch (ai: AiException) {
