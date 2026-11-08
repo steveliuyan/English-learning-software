@@ -19,7 +19,7 @@ QA 第三轮走查册在 `font_scale = 3.0`（Android「字体大小」顶档）
 | 类别 | 条目 | 性质 | 修法 |
 |---|---|---|---|
 | 流程断裂 | A2.5 | 回忆→揭晓的唯一出口落在视口外，顶档用户走不完核心流程（AC1-22 不达标） | 出口常驻吸底区 |
-| 容器被挤爆 | A2.1 / A2.3 / A2.4 / A2.2 + A2.7 / A2.6② | 内容排得出来但放不下，于是裁切、折行撑高、越出容器 | 按档换摆法/换字号档/降列 |
+| 容器被挤爆 | A2.1 / A2.3 / A2.4 / A2.2 + A2.7 / A2.6② / A2.8 | 内容排得出来但放不下，于是裁切、折行撑高、越出容器 | 按档换摆法/换字号档/降列 |
 | 首屏被散文吃掉 | A2.6① | 共享页头副标题腿没有行数上限，顶档排 4 行 645px | 上限 3 行 + 钉档不丢字护栏 |
 | 滚动折叠的必然结果 | A2.6③ | 本页可滚，分段头落在折叠线上是滚动态而非破版 | 登记，不钉死 |
 
@@ -30,9 +30,10 @@ QA 第三轮走查册在 `font_scale = 3.0`（Android「字体大小」顶档）
 
 ## 2. 决定一：阈值统一「严格大于 2f」，判定收在各屏自有纯函数
 
-六处降级各自的判据都写成 `internal fun xxx(fontScale: Float)`，屏侧只读 `LocalDensity.current.fontScale`：
+七处降级各自的判据都写成 `internal fun xxx(fontScale: Float)`，屏侧只读 `LocalDensity.current.fontScale`：
 
-- `wordCardPinsRevealAction`（A2.5）、`wordCardLemmaUsesCompactTier`（A2.3）、`wordCardStacksFeedbackTiers`（A2.4）
+- `wordCardPinsRevealAction`（A2.5）、`wordCardLemmaUsesCompactTier`（A2.3）、`wordCardStacksFeedbackTiers`（A2.4）、
+  `wordCardStacksPronunciationRow`（A2.8，收口复测后补）
 - `todayPlanRemainingMovesBelowCount`（A2.1）
 - `aiFeatureGridColumns`（A2.6②）
 - `bottomBarSlotVerticalBreathing`（A2.7 / A2.2）
@@ -44,19 +45,27 @@ QA 第三轮走查册在 `font_scale = 3.0`（Android「字体大小」顶档）
 本轮不另起一套。
 
 **为什么不用 `Configuration.fontScale` 或全局策略一处判**：`LocalDensity.current.fontScale` 是这一帧真正生效的缩放，
-`Configuration` 在分屏/预览夹具里会滞后；而把六件事收进一枚「全站降级策略」枚举，判据就变成了
+`Configuration` 在分屏/预览夹具里会滞后；而把七件事收进一枚「全站降级策略」枚举，判据就变成了
 「策略知道词卡长什么样」，各屏反而失去可单测的自有函数。这与批 B 的读点白名单是同一条设计取向：**能穷举成纯函数的算术，
 不要留在 `if` 链里**。
 
-代价：六枚函数各自写了一遍 `> 2f`，改口径要动六处。缓解：`WordCardLayoutContractTest` 里那条
-`fontScale > 2f` 计数 == 3 的锚（本屏三件事）把「漏登记」变成当场红；跨屏的口径一致性由本文档与 AC-R-24 承担。
+代价：七枚函数各自写了一遍 `> 2f`，改口径要动七处。缓解：`WordCardLayoutContractTest` 里那条
+`fontScale > 2f` 计数 == 4 的锚（本屏四件事：揭晓出口常驻、词头换档、评分条换摆法、发音行换容器）把「漏登记」变成当场红；
+跨屏的口径一致性由本文档与 AC-R-24 承担。
 
-## 3. 决定二：词卡三处降级，评分条两分支共用一份档位清单
+## 3. 决定二：词卡四处降级，评分条两分支共用一份档位清单
 
 - 词头 `AppType.Display`（46/500）→ 顶档 `AppType.StrongTitle`（27/500）。这是本屏唯一的顶档换档，
   且 `AppType.StrongTitle` 在整屏只出现 1 次、和 `AppType.Display` 同在一枚 `if` 的两个分支里。
 - 三档反馈：钉档以内维持「三等宽横排 + 每枚两行居中」；顶档换成「三枚整宽上下堆叠 + 每枚一行（档名与副说明并排）」。
 - 「显示释义」（A2.5，上一轮已修）常驻在评分条之上。
+- 发音行（A2.8，收口复测后补）：钉档以内维持「音标+词性一列（`weight(1f)`）与喇叭药片同一行」；
+  顶档换成「音标+词性一列拿整幅宽度，药片另起一行」。根因是药片的**可见文字**与朗读文案同源（组件口径，不许改），
+  3.0 档那枚文字连字形长到 180dp，把 `weight(1f)` 一侧挤到 89.6dp，于是 `/prəˈɡresɪv/` 在音节中间断成三行。
+  **只换容器，不换控件**：`SpeakerButton(` 的调用点仍恰两枚，两个分支共用同一枚
+  `val speakerPill: @Composable () -> Unit` 槽位——把药片在分支里各写一遍会当场撞
+  `WordCardScreenContractTest.the_screen_uses_the_shared_pill_and_restates_no_readout` 的「调用窗口 == 2」，
+  那正是这条治理闸想关的门（第二份同构几何）。
 
 这里有一个必须记下来的取舍：两分支不能各写一遍三枚按钮，否则「同一档在两处措辞不同」就有了入口，
 而 `uiautomator` 那类按文案取样的判据只会看到其中一份。于是档位内容（`CardFeedback`、档名、副说明、tag）
@@ -114,11 +123,15 @@ A2.1 的原始描述「`0/12` 只读出一条斜杠」看着像裁切，实测�
 - **RED（把两处阈值回拨成 `> 5f` 复现旧摆法，同一判据当场见红）**
   - A2.3：`词头 DpRect(bottom=561.90.dp) 越过视口下沿 332.19.dp`（屏根高 659.43dp）。
   - A2.4：`「不认识」排成 2 行（expected:<1> but was:<2>）`。
+  - A2.8（收口复测后补，真机旧摆法直接撞出，非人为回拨）：
+    `fontScale=3.0 下音标「/prəˈɡresɪv/」排成 3 行 … expected:<1> but was:<3>`。
 - **GREEN**：`WordCardScreenTest` 本轮点名的 8 条（两条新判据 + A2.5 那条 + 2.0 档护栏 + 三档副标/固定档位/
-  骨架形状四条回归）设备侧 `OK (8 tests)`。
+  骨架形状四条回归）设备侧 `OK (8 tests)`；A2.8 补完后整类复跑 `OK (27 tests)`，
+  外加 `WordCardPronunciationControlsTest OK (3 tests)`、`WordCardRevealFocusTest OK (4 tests)`、
+  `AppScreenTest` 四枚发音路由用例 `OK (4 tests)`（都在 1.0 档，证明换容器没动播控链路）。
 - **JVM 契约**：`WordCardLayoutContractTest` / `WordCardScreenContractTest` / `StickyFooterHairlineGuardTest`
-  共 26 条全绿；两枚变异探针各自见红——阈值回拨（`> 5f`）红 2 条，把堆叠分支改回三行硬写文案红 3 条，
-  证明「每句文案恰一处」「清单引用恰 3 处」「`fontScale > 2f` 恰 3 处」三条锚都不是空转。
+  共 26 条全绿（A2.8 后本屏词卡相关 5 类 62 条复跑全绿）；两枚变异探针各自见红——阈值回拨（`> 5f`）红 2 条，把堆叠分支改回三行硬写文案红 3 条，
+  证明「每句文案恰一处」「清单引用恰 3 处」「`fontScale > 2f` 恰 4 处」三条锚都不是空转。
   探针一律用 Edit 撤销，不用 `git checkout --`（会抹掉在途未提交改动）。
 
 **踩过的坑（写进交接，别重复踩）**：`SemanticsNodeInteraction.getUnclippedBoundsInRoot()` 回 `DpRect`，
@@ -130,5 +143,7 @@ A2.1 的原始描述「`0/12` 只读出一条斜杠」看着像裁切，实测�
 
 - 不给词头加 `maxLines + ellipsis`：词卡的词头就是学习内容，截成 `confide…` 是把要学的词改没。
 - 不加省略号以外的兜底（`TextOverflow.Visible` 保持）：溢出必须靠摆法解决，不靠遮住。
-- 不为顶档新增任何 token 或依赖；六枚判定函数都是本屏自有的 `internal` 纯函数。
+- 不为顶档新增任何 token 或依赖；七枚判定函数都是本屏自有的 `internal` 纯函数。
 - 不动 1.0 / 2.0 档的任何一像素（本轮若出现钉档形状变化即视为回归）。
+- 不把喇叭药片也钉进吸底区（A2.8 的诱惑）：A2.5 钉的是**唯一出口**，药片是一条可选的读音辅助，
+  顶档下它落在首帧之下、滚一下够得着——与 A2.6③ 同一分界（改前它同样不在首帧，见走查册 A2.8 的「如实记」）。

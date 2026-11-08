@@ -228,7 +228,9 @@ AI 主页里「查看词表 / 查看详情」改为直接进词库，不再只�
 而把卡面压没。本规格就此补一条范围：**超过 2.0 档只换摆法，不换内容、不换术语、不增删控件。**
 
 - **词卡**：> 2.0 时①「显示释义」从卡内移进吸底区（评分条之上）常驻；②词头从 `Display` 换到
-  `StrongTitle`；③三档反馈从「三等宽横排、两行居中」换成「整宽上下堆叠、每枚一行」。
+  `StrongTitle`；③三档反馈从「三等宽横排、两行居中」换成「整宽上下堆叠、每枚一行」；
+  ④发音行从「音标+词性一列（`weight(1f)`）与喇叭药片同一行」换成「音标+词性一列拿整幅宽度、药片另起一行」
+  （药片的可见文字与朗读文案同源、不许改，顶档它长到 180dp 会把音标挤到音节中间断三行）。
   2.0 档的卡面形状由 `lemmaAndRevealedMeaningStayFullyVisibleAtMaximumLargeFontScale` 钉死，本次一字未动。
 - **今日计划**：> 2.0 时「还剩 N 个词」从大数右侧换到大数下方一行，计数行本身保持单行（`0` 不再被挤没）。
 - **AI 主页**：> 2.0 时能力卡从两列降到一列，状态徽标不再被推出可视区；共享页头 `AppScreenHeader` 的
@@ -237,8 +239,8 @@ AI 主页里「查看词表 / 查看详情」改为直接进词库，不再只�
 - **底栏**：> 2.0 时给每格补竖向留白，标签行不再画到栏外。
 
 判定一律收在各屏自有的纯函数（`wordCardPinsRevealAction` / `wordCardLemmaUsesCompactTier` /
-`wordCardStacksFeedbackTiers` / `todayPlanRemainingMovesBelowCount` / `aiFeatureGridColumns` /
-`bottomBarSlotVerticalBreathing`），阈值统一 **严格大于 2f**，屏侧只读 `LocalDensity.current.fontScale`；
+`wordCardStacksFeedbackTiers` / `wordCardStacksPronunciationRow` / `todayPlanRemainingMovesBelowCount` /
+`aiFeatureGridColumns` / `bottomBarSlotVerticalBreathing`），阈值统一 **严格大于 2f**，屏侧只读 `LocalDensity.current.fontScale`；
 裁决与量法见 `docs/decisions/2026-11-08-max-font-scale-layout-degradation.md`，
 验收标准补在 `docs/superpowers/specs/2026-10-17-ui-redesign-design.md` 的 AC-R-24。
 

@@ -58,8 +58,9 @@ AC5-03 要求「最大档不破版、不截断关键操作」，既有 connected
 > 决策与量法见 `docs/decisions/2026-11-08-max-font-scale-layout-degradation.md`，
 > 验收标准补为 AC-R-24，逐屏口径见 `docs/superpowers/specs/2026-10-25-full-layout-redesign-design.md` §5.1。
 >
-> 收口复测（3.0 档逐屏实拍）另撞出**第八处**：词卡音标被喇叭药片挤成三行断字，已单独立为 **A2.8 待拍板**
-> （它不在这七条的范围里，按规矩不顺手改码）。
+> 收口复测（3.0 档逐屏实拍）另撞出**第八处**：词卡音标被喇叭药片挤成三行断字，单独立为 **A2.8**
+> （它不在这七条的范围里，按规矩先登记不动码）。2026-11-08 用户拍板「立缺陷修，同批口径」，
+> 已按同一阈值（严格大于 2.0）与同一判据形状（connected 顶档判据 + 契约闸计数）收口，见该条。
 
 - [x] A2.1 今日计划页计数行「0」字掉形：`0/12` 只读出一条斜杠（数字被裁到看不见）。
   对照 `fs100-01-today.png` vs `fs300-01-today.png`。→ 判：**修（用户 2026-11-08「全部都做」）**
@@ -119,7 +120,7 @@ AC5-03 要求「最大档不破版、不截断关键操作」，既有 connected
   实测理由见该函数注释与决策文档 §4）。不取「标签截断」：`AI 助学` 截成 `AI …` 是把目的地名字改没。
   判据 `AppBottomBarTest.slotsStayInsideTheBarAtTopFontScale`（+ 窄屏那条）。
 
-- [ ] A2.8 **收口复测新发现（待拍板，不在「全部都做」那七条里）**：3.0 档词卡正面的**音标被压成三行断字**。
+- [x] A2.8 **收口复测新发现（已拍板修，与 A2.1-A2.7 同一套口径）**：3.0 档词卡正面的**音标被压成三行断字**。
   图证 `.git/qa-scratch/qa3-a2-final/fs300-a23-a24-wordcard-front.png`（首帧）与 `fs300-a23-card-scrolled.png`
   （滚下之后），层级 `dump-wordcard-fs300.txt` / `dump-wordcard-scrolled-fs300.txt`；1.0 对照 `fs100-a23-a24-wordcard-front.png`。
   实测节点：音标 `/prəˈɡresɪv/` 在 3.0 排成 `/prə` `ˈgres` `ɪv/` 三行（节点 `[100,354][335,806]`，宽只有 235px = 89.6dp），
@@ -133,8 +134,25 @@ AC5-03 要求「最大档不破版、不截断关键操作」，既有 connected
   候选修法（按已定口径「只换摆法」）：`> 2f` 时把喇叭药片从音标那一行挪到**单独一行**（整行左对齐），
   音标与词性那一列拿到整幅宽度；1.0/2.0 档一像素不动。
   代价：顶档卡面多一行高度，词头那一屏的滚动量再涨一点（可滚，不影响出口常驻）。
-  → 判：**待用户拍板**（本条是收口复测时撞出来的第八处，不属于 2026-11-08「全部都做」那七条的范围，
-  所以按规矩先登记、不动码；拍板「修」则与 A2.1-A2.7 同一套阈值与判据形状落地）。
+  → 判：**修**（2026-11-08 用户拍板「立缺陷修，同批口径」）
+  修法（已落地）：新增第七枚判档函数 `wordCardStacksPronunciationRow(fontScale) = fontScale > 2f`，
+  顶档把 `Row { Column(weight(1f)){ 音标 ; 词性 } ; SpeakerButton }` 换成
+  `Column { WordCardPronunciationFootnotes(整幅宽) ; SpeakerButton }`——**只换容器，不换内容、不换文案**；
+  1.0/2.0 档走原来那枚 `Row`，一像素不动。`SpeakerButton(` 的调用点仍**恰两枚**（治理闸
+  `WordCardScreenContractTest.the_screen_uses_the_shared_pill_and_restates_no_readout` 钉的就是这个数），
+  两个分支共用同一枚 `val speakerPill: @Composable () -> Unit` 槽位，避免把药片复制成第二处真值。
+  判据：connected `WordCardScreenTest.pronunciationKeepsTheIpaOnOneLineAtTopFontScale`
+  （RED 实测 `expected:<1> but was:<3>`，即 `/prəˈɡresɪv/` 排成 `/prə` `ˈgres` `ɪv/` 三行；GREEN `OK (1 test)`）
+  + 契约 `WordCardLayoutContractTest`（阈值三值同判、`wordCardStacksPronunciationRow(` 定义+调用 2 处、
+  `fontScale > 2f` 由 3 处升到 **4 处**、`word_card_ipa` / `word_card_part_of_speech` 各只渲染 1 处）。
+  收口实拍（`emulator-5554`，`font_scale=3.0`，词头 `progressive`）：音标 `[100,311][624,426]` **一行**、
+  词性 `adj.` `[100,437][263,548]` 一行、药片 `[100,574][719,745]`（619px=236dp）单独一行且完整可点，
+  图证 `fs300-a28-wordcard-front.png`（首帧）/ `fs300-a28-scrolled.png`（滚下后）；
+  1.0 对照 `fs100-a28-wordcard-front.png` + `dump-a28-06-wordcard-fs100.xml`：音标 `[100,518][275,558]`、
+  药片 `[677,499][980,625]` 与改动前逐位一致。
+  如实记一条**未变差但也没被修掉**的旧账：顶档药片在首帧之下、要滚一下才够得着。改前它同样不在首帧
+  （`dump-wordcard-fs300.txt` 里根本没有药片节点，因为三行音标把整行撑到吸底区之下），改后只是从「被压住」
+  变成「在下方一格」。它不是流程断裂（出口由 A2.5 常驻在吸底区），故按 A2.6③ 的同一分界登记为观感取舍、不加判据。
 
 **判据盲区（本轮两次撞上，登记以免下一棒误信自动绿）**：`uiautomator` 的 `bounds` 是节点与父容器的
 **可视交集**，被裁掉的节点永远「不越界」；文案被裁也**不产生省略号**（Compose 的 `Text` 溢出裁剪不走 ellipsis）。

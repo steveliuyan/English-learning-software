@@ -1900,7 +1900,7 @@ GRADLE=/c/Users/steveliuyan/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40
 | 词卡揭晓态 | 释义 + 三档堆叠全在窗口内，出口常驻吸底区 | — |
 | AI 主页 | 功能卡降到单列（`长难句分析` 拿整幅 `[53,248][1027,1103]`），副标题 3 行封顶带省略号 | 双列 `[53,377][524,799]` + `[556,377][1027,799]` |
 
-### 收口复测新发现的第八处（已登记，未改码）
+### 收口复测新发现的第八处（先登记，同日拍板「立缺陷修，同批口径」后已修）
 
 3.0 档词卡正面的**音标被喇叭药片挤成三行断字**：`/prəˈɡresɪv/` 排成 `/prə` `ˈgres` `ɪv/`
 （节点 `[100,354][335,806]`，宽仅 235px = 89.6dp），药片那枚可见文字连字形长到 472px = 180dp
@@ -1908,7 +1908,36 @@ GRADLE=/c/Users/steveliuyan/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40
 词性 `adj.` 因此掉到首帧之外。1.0 对照：音标一行、药片 156px、词性一行到位。
 
 性质与 A2.6② 同类（可滚，不是流程断裂），不在「全部都做」那七条范围内，所以按规矩**先登记、不动码**，
-立为走查册 §A2.8 待用户拍板；候选修法沿用同一口径（`> 2f` 把药片挪成单独一行，音标列拿整幅宽度）。
+立为走查册 §A2.8；用户同日拍板「立缺陷修，同批口径」，遂沿用同一阈值落地。
+
+**修法（第七枚判档函数）**：`wordCardStacksPronunciationRow(fontScale) = fontScale > 2f`；顶档把那一行
+`Row` 换成 `Column { WordCardPronunciationFootnotes(fillMaxWidth) ; speakerPill() }`，钉档以内仍走原 `Row`。
+药片**没有**被复制成两枚：两个分支共用同一枚 `val speakerPill: @Composable () -> Unit`，
+`SpeakerButton(` 的调用窗口仍恰 2 枚（治理闸 `WordCardScreenContractTest.the_screen_uses_the_shared_pill_and_restates_no_readout`）。
+
+**RED→GREEN**：connected `WordCardScreenTest.pronunciationKeepsTheIpaOnOneLineAtTopFontScale`
+红在 `音标「/prəˈɡresɪv/」排成 3 行 … expected:<1> but was:<3>`（真机旧摆法直接撞出，非人为回拨阈值），
+改码后单跑 `OK (1 test)`、整类复跑 `OK (27 tests)`；
+周边回归 `WordCardPronunciationControlsTest OK (3 tests)`、`WordCardRevealFocusTest OK (4 tests)`、
+`AppScreenTest` 四枚发音路由用例 `OK (4 tests)`（1.0 档，证明换容器没动播控链路）。
+JVM 侧 `WordCardLayoutContractTest` 的 `fontScale > 2f` 锚由 3 处升到 **4 处**，并新增
+`word_card_ipa` / `word_card_part_of_speech` 各只渲染 1 处两条计数闸。
+
+**设备实拍**（`emulator-5554`，词头 `progressive`，`.git/qa-scratch/qa3-a2-final/`）：
+
+| 档 | 音标 | 词性 | 喇叭药片 |
+|---|---|---|---|
+| 3.0 修前 | `[100,354][335,806]` 三行断字 | `[100,817][263,928]` 掉出首帧 | 层级里查无此节点（被三行音标顶到吸底区之下） |
+| 3.0 修后 | `[100,311][624,426]` **一行** | `[100,437][263,548]` 一行 | `[100,574][719,745]`（619px=236dp）单独一行、完整可点 |
+| 1.0 修后 | `[100,518][275,558]` 一行 | `[100,569][156,606]` 一行 | `[677,499][980,625]` 与修前逐位一致 |
+
+图证 `fs300-a28-wordcard-front.png`（首帧）/ `fs300-a28-scrolled.png`（滚下后，音标+词性+药片三行齐）/
+`fs100-a28-wordcard-front.png`，层级 `dump-a28-04-wordcard-fs300.xml` / `dump-a28-05-scrolled.xml` /
+`dump-a28-06-wordcard-fs100.xml`；`font_scale` 复测后**已复原 1.0**。
+
+如实记一条**没被修掉、也没被改差**的旧账：顶档药片仍在首帧之下、要滚一下才够得着。修前层级里根本没有
+药片节点（三行音标把整行撑到吸底区之下），修后它只是从「被压住」变成「在下方一格」；
+出口由 A2.5 常驻在吸底区，所以按 A2.6③ 的同一分界记为观感取舍，不钉判据。
 
 ### 判据盲区（本轮又撞第三次，写死在走查册里）
 
@@ -1921,4 +1950,5 @@ GRADLE=/c/Users/steveliuyan/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40
 - A2.4 顶档三档改**整宽上下堆叠**后的观感：吸底区从一行三枚变三行，评分条吃掉的高度会不会让卡面显得局促。
 - A2.6① 顶档副标题 3 行封顶带省略号：末行「把必要的文字交…」被截，读屏仍念整句，视觉上是否可接受。
 - A2.7 顶档底栏 `AI 助学` 仍折两行（格高随字号的必然结果，另一条腿是截断成 `AI …`，已否）：观感是否可接受。
-- A2.8 音标断行要不要一并修（本轮只登记，未动码）。
+- A2.8 修后顶档卡面多出行（音标一行 + 词性一行 + 药片一行），**药片要滚一下才够得着**：这是改前就有的可达性
+  （改前它连节点都不在层级里），本轮只按「换摆法」收口，没把它钉进吸底区——观感是否可接受、要不要进一步常驻，请人眼判。
