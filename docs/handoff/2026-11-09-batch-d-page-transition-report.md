@@ -156,7 +156,8 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
 | 4–5 | 同上 | Wide | `OK (9 tests)` 21.03s / `OK (9 tests)` 20.34s |
 | 6 | `ff4177c`（注释订正后重装） | Compact | `OK (9 tests)` 19.57s |
 
-即 shipped 内容上 **Compact 2 趟 + Wide 3 趟 = 5 趟全类连绿**；唯一一趟红出现在硬化之前、且红在靶面守卫而非判据本身。
+即该表口径下 shipped 内容 **Compact 2 趟 + Wide 3 趟 = 5 趟全类连绿**；**本表内**唯一一趟红出现在硬化之前、且红在靶面守卫而非判据本身。
+硬化并不等于消除：硬化之后 shipped 配置下已另有一趟同形 Wide 红（见本节下方订正句与 §3.8 的 W1），该偶发**仍是 open**。
 
 硬化内容（`ff4177c`，纯 androidTest，零生产码）：①按返回键前先断言词卡腿恰有一枚在场，把「转场没开播」与「驱动走空」分开；
 ②`pumpUntil` 超时文本带现场读数（站 1 腿数、各腿 tag、`word_card_screen` 在场枚数）。
@@ -188,7 +189,7 @@ scoped 复评（覆盖 `6caeeef..37348fc` 与 `37348fc..f713a5a`）判词 With f
 |---|---|---|---|---|
 | 门禁 a | `37348fc` | — | `BUILD SUCCESSFUL in 4m 13s`；XML 现算 **341 类 / 2553 条 / 0 失败 0 错误 0 跳过** | `gate-triple.log` |
 | 门禁 b（修复轮 1 后复跑） | `f713a5a` | — | `BUILD SUCCESSFUL in 4m 13s`；同上 **341 / 2553 / 0 / 0 / 0**（`--rerun-tasks`，XML 按本次落盘计数） | `gate-triple-r1.log` |
-| C1 | `f713a5a` | Compact 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0 | `OK (9 tests)`（链尾读数，日志被并发 `cat` 截成 66 字节，故以 C2 为准） | `connected-compact-r1.log`（残档） |
+| C1 | `f713a5a` | Compact 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0 | **`OK (9 tests)`** Time 31.162s（修复轮 3 现算该档 8 行 / 113 字节：空行、类名行带 9 枚点号、`Time: 31.162`、`OK (9 tests)`；形态与 C2 及 W2–W4 三枚绿档逐行同构 ⇒ 它不是残档，绿趟的 `am instrument` 输出本就不带 `Tests run` 汇总，该汇总只在失败趟出现（对照 W1 同格式档 1450 字节 / 23 行）。上一轮按控制器给的「截成 66 字节、故以 C2 为准」是错的读数，本行已按实物改写，C1 的读数可直接取用） | `connected-compact-r1.log` |
 | C2 | 同上 | Compact | **`OK (9 tests)`** Time 20.306s，`instrument exit=0` | `connected-compact-r2.log` |
 | W1 | 同上 | Wide（`wm size 2560x1600` → override 落 `2160x1600`） | **`Tests run: 9, Failures: 1`**；红点 `transitionsProduceNoExtraBillableOutbound`（`:255`）经 `pumpUntil`（`:595`），现场读数原文：`手动步进 3000ms 内条件仍未成立；现场：站 1 腿 1 枚 tag=[overlay_transition_leg_current]，word_card_screen 在场 1 枚` | `connected-wide-r1.log` |
 | W2–W4 | 同上 | Wide | `OK (9 tests)` / `OK (9 tests)` / `OK (9 tests)`，Time 20.553 / 19.878 / 21.372s | `connected-wide-r2.log`、`connected-wide-r3.log`、`connected-wide-r4.log` |
@@ -205,7 +206,7 @@ W1 的 `:255` / `:595` 是 `f713a5a` 时点的栈行号；本轮发现 1 在 `Sc
   用例注释、矩阵 AC5-07、台账 B4 块与 B2 报告（追加括注）同改。
 - `37348fc`（待办 3）：复评表内 9 处过期行号引用改为现算值；`AppScreen.kt` 未重排，行区间闸安全。
 - `74fc483`（复评修复轮 1，Important 1 + Minor）：Rogue／LearningFlow 等探针由裸子串改「支名反引号定界 + 臂文案」双重取证；
-  ⑬ 夹具补一枚段内非 `override` 形状，使「删 `override ` 前缀」的变异由零证伪变为响亮判红（变异 A／B 实测见席报告「修复轮 1」§2、§3）。
+  ⑬ 夹具补一枚段内非 `override` 形状，使「删 `override ` 前缀」的变异由零证伪变为响亮判红（变异 A 见席报告「修复轮 1」§3、变异 B 见 §2）。
 - `f713a5a`（复评修复轮 1，Important 2）：本节 §3.7 的旧定论同步为「配置归属无留存日志可证」，任务书「三处」补记为四处。
 - `35af07e`（本轮 scoped 复评修复轮 2，发现 1）：四处同一句子由「可证的偶发红只有 `f3cc0c3` 一趟」改为「目前有两趟」，
   第二趟即本表 W1；§3.7 末尾补在册定性（仍是 open、不得据此宣称已关闭）。
