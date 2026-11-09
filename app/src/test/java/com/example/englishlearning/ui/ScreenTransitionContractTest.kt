@@ -904,7 +904,7 @@ class ScreenTransitionContractTest {
         val noBranchPrefix = compliantRouteTable.replace("mountIndex to featureKey", "featureKey")
         assertTrue(
             navigationIdentityOffenders(stripComments(noBranchPrefix)).any { it.contains("支别前缀") },
-            "身份不带支别前缀的形状没被判出：同一枚主键的两支不同屏（词卡详情→重学页，AppScreen.kt:830-832）会被并成同一身份。",
+            "身份不带支别前缀的形状没被判出：同一枚主键的两支不同屏（词卡详情→重学页，AppScreen.kt:834-836）会被并成同一身份。",
         )
         val rogueBranch = compliantRouteTable.replace(
             "data object Settings : FakeRoute { override val mountIndex = 0 }",
@@ -1193,7 +1193,7 @@ class ScreenTransitionContractTest {
                 )
                 !ROUTE_IDENTITY_BRANCH_PREFIX.containsMatchIn(declaration) -> add(
                     "支 `${row.variant}` 的身份没带支别前缀 `mountIndex to`：同一枚主键的两支不同屏" +
-                        "（如词卡详情→重学页，AppScreen.kt:830-832）会被并成同一身份而不起转场。",
+                        "（如词卡详情→重学页，AppScreen.kt:834-836）会被并成同一身份而不起转场。",
                 )
             }
         }

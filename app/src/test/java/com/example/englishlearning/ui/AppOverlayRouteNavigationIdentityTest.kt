@@ -21,7 +21,7 @@ import kotlin.test.assertSame
  * `ScreenTransitionContractTest`（源码闸）与 `ScreenTransitionInstrumentedTest`（设备腿数与 `remember` 存活）。
  *
  * 身份口径（席 B2 裁定）：每一枚都带**支别前缀**（`mountIndex`），这样「同一枚主键的两支不同屏」
- * 一定不等（`VocabularyDetail(c1)` vs `RelearnCard(c1)` 是真实存在的一条边：`AppScreen.kt:830-832`），
+ * 一定不等（`VocabularyDetail(c1)` vs `RelearnCard(c1)` 是真实存在的一条边：`AppScreen.kt:834-836`），
  * 而「同一支的同一枚主键、payload 其余字段全变」一定相等。
  */
 class AppOverlayRouteNavigationIdentityTest {
@@ -168,7 +168,7 @@ class AppOverlayRouteNavigationIdentityTest {
     }
 
     /**
-     * 真实存在的一条边：词卡详情里点「重新学习」把同一枚 card 交给 `selectedRelearnCard`（`AppScreen.kt:830-832`），
+     * 真实存在的一条边：词卡详情里点「重新学习」把同一枚 card 交给 `selectedRelearnCard`（`AppScreen.kt:834-836`），
      * 两支的 cardId 相同、屏却不同 ⇒ 身份必须带支别，否则这一跳不起转场。
      */
     @Test
@@ -243,7 +243,7 @@ class AppOverlayRouteNavigationIdentityTest {
         assertEquals(
             AppOverlayRoute.ArticleReading(null).navigationIdentity,
             AppOverlayRoute.ArticleReading(null).navigationIdentity,
-            "历史腿的身份必须自反：它进出一律经过 ReadingHistory 列表（AppScreen.kt:1868 是唯一发起点）。",
+            "历史腿的身份必须自反：它进出一律经过 ReadingHistory 列表（AppScreen.kt:1872 是唯一发起点）。",
         )
         assertNotEquals(
             AppOverlayRoute.ArticleReading(null).navigationIdentity,

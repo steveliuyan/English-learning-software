@@ -50,7 +50,7 @@ class ScreenTransitionDirectionTest {
 
     /**
      * 终评补口 第 1 条（Critical）的四枚命名边：挂载判据带 fall-through 守卫的臂里，
-     * 更深的一屏声明在更后（`AppOverlayRouteResolver.kt:23-24`、`:45-48`），只比序号会把前进播成返回。
+     * 更深的一屏声明在更后（`AppOverlayRouteResolver.kt:25-26`、`:47-50`），只比序号会把前进播成返回。
      * 方向改比 `AppOverlayRoute` 的 `transitionDepth` 列后，这四条边必须判 Forward；
      * 用例注释即发起点行号证据（照决策册「2026-11-09 修正」证据 :1865 的做法逐对找齐）。
      * 本组用例的 to 支集合与覆写清单相等由 `ScreenTransitionContractTest` 钉死。
@@ -63,7 +63,7 @@ class ScreenTransitionDirectionTest {
             from = AppOverlayRoute.ReadingHistory,
             to = AppOverlayRoute.ArticleReading(readingTarget = null),
         ),
-    ) // 发起点 AppScreen.kt:1865 `onOpenArticle = { historyArticle = it }`（showReadingHistory 仍真，29→32）
+    ) // 发起点 AppScreen.kt:1872 `onOpenArticle = { historyArticle = it }`（showReadingHistory 仍真，29→32）
 
     @Test
     fun namedEdgeArticleReadingToReadingHistoryIsBackward() = assertEquals(
@@ -81,7 +81,7 @@ class ScreenTransitionDirectionTest {
             from = AppOverlayRoute.ReadingFeed,
             to = AppOverlayRoute.ArticleReading(readingTarget = null),
         ),
-    ) // 发起点 AppScreen.kt:1896 `onFetchFeedItem` → ReadingAccessViewModel.kt:243 置 readingTarget（feed 臂守卫 `readingTarget == null` 让位，30→32）
+    ) // 发起点 AppScreen.kt:1903 `onFetchFeedItem` → ReadingAccessViewModel.kt:243 置 readingTarget（feed 臂守卫 `readingTarget == null` 让位，30→32）
 
     @Test
     fun namedEdgeArticleReadingToReadingFeedIsBackward() = assertEquals(
@@ -108,7 +108,7 @@ class ScreenTransitionDirectionTest {
             from = AppOverlayRoute.LearningSetup,
             to = AppOverlayRoute.LearningFlow,
         ),
-    ) // 设置臂守卫 `setupRequired || showSetup`（resolver :23）压在学习臂（:24）之前；AppScreen.kt:1075-1077 onSaved 落位后 7→8
+    ) // 设置臂守卫 `setupRequired || showSetup`（resolver :25）压在学习臂（:26）之前；AppScreen.kt:1082-1085 onSaved 落位后 7→8
 
     @Test
     fun namedEdgeLearningFlowToLearningSetupIsBackward() = assertEquals(
