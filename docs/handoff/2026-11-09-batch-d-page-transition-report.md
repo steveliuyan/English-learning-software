@@ -164,13 +164,18 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
 同口径再订正，与 `ScreenTransitionInstrumentedTest` 用例注释、矩阵 AC5-07、台账 B4 块三处逐字同口径）：席 B2 报告
 §connected 读数表第 2 行那趟红的**配置归属无留存日志可证**——既不能算 shipped 配置的实证 flake，也不能断定是探针配置
 （唯一留存的探针日志 `b2-connected-red.log` 是 `Tests run: 2, Failures: 2`，枚数、用例、红点都与表第 2 行不同，
-而表第 2 行的 `Tests run: 8, Failures: 1` 全仓无原始日志）。shipped 配置下可证的偶发红只有 `f3cc0c3` 的 Wide 全类一趟
-（`b4-wide-connected.log`，`Tests run: 9, Failures: 1`，红点在 `pumpUntil` 3s 超时）。订正写进用例注释；
+而表第 2 行的 `Tests run: 8, Failures: 1` 全仓无原始日志）。shipped 配置下可证的偶发红目前有两趟：`f3cc0c3` 的 Wide 全类一趟
+（`b4-wide-connected.log`，`Tests run: 9, Failures: 1`，红点在 `pumpUntil` 3s 超时）与 scoped 复评修复轮在 `f713a5a` 的
+Wide 全类首趟（`.superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task/connected-wide-r1.log`，`Tests run: 9, Failures: 1`，
+红点同为 `pumpUntil` 3s 超时、现场只有 1 枚腿；同配置后续 Wide 3 趟与 Compact 2 趟 `OK (9 tests)`）。订正写进用例注释；
 B2 报告原文保留、只追加订正括注（历史报告只追加不改写）。
 
 门禁同步复跑（同一棵树）：`BUILD SUCCESSFUL in 4m 5s`，`341 类 / 2553 条 / 0 失败 / 0 错误 / 0 跳过`
 （`--no-daemon --no-build-cache --rerun-tasks`，341 份结果 XML 全部为本次新落盘，按 mtime 计数而非沿用旧文件）。
 设备收口状态：`wm size reset` → 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0，两枚 APK 在装。
+
+在册定性（scoped 复评修复轮 2 补记）：这枚偶发**仍是 open**（两趟留档、同形、后续全绿 ⇒ 记为「Wide 全类连跑的靶面守卫偶发红」，
+不是 shipped 判据缺陷，也不得据此宣称已关闭）；下批候选动作 = 泵超时上限/逐腿等待策略，或按用户裁定加输入闸，**本轮不实施**。
 
 ## 4. Git 状态
 

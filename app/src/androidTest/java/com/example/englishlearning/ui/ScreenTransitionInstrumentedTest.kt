@@ -230,8 +230,11 @@ class ScreenTransitionInstrumentedTest {
         // 没有这份原始日志；唯一留存的探针日志 b2-connected-red.log 是 Tests run: 2, Failures: 2（红点是那两枚身份用例，
         // 枚数、用例、红点都与表第 2 行不同），而该报告 §读数 1 又记探针后逐字还原为 RESTORE_IDENTICAL。
         // 所以既不能把它算作 shipped 配置的实证 flake，也不能断定它发生在摘掉 contentKey 的探针配置里——只能记为归属不明。
-        // shipped 配置下可证的偶发红只有 f3cc0c3 的 Wide 全类一趟（b4-wide-connected.log，Tests run: 9, Failures: 1，
-        // 红点在下面引用的 pumpUntil 3s 超时）。硬化照做不变：固定帧数换成有墙钟超时上限的逐帧步进，本身是判据健壮性；
+        // shipped 配置下可证的偶发红目前有两趟：f3cc0c3 的 Wide 全类一趟（b4-wide-connected.log，Tests run: 9, Failures: 1，
+        // 红点在下面引用的 pumpUntil 3s 超时）与 scoped 复评修复轮在 f713a5a 的 Wide 全类首趟
+        // （.superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task/connected-wide-r1.log，Tests run: 9, Failures: 1，
+        // 红点同为 pumpUntil 3s 超时、现场只有 1 枚腿；同配置后续 Wide 3 趟与 Compact 2 趟 OK (9 tests)）。
+        // 硬化照做不变：固定帧数换成有墙钟超时上限的逐帧步进，本身是判据健壮性；
         // 下面那两道守卫（ff4177c）的理由成立，不依赖上面那趟的归属结论。
         // 改成带超时上限的手动帧泵
         // pumpUntil——本文件既有的「手动时钟下的 waitUntil 替身」：冻住时钟按 16ms 步进帧直到两腿共存，墙钟超时兜底，
