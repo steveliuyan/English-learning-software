@@ -644,6 +644,9 @@ class ScreenTransitionContractTest {
      * 判据 D-4fix-①：`transitionDepth` 默认等于 `mountIndex`（接口默认访问器），
      * 覆写只允许出现在 [TRANSITION_DEPTH_OVERRIDES] 点名的支上且数值逐枚相符；
      * 清单外的覆写、清单内却消失的声明、与清单不符的值、默认访问器失踪，任一形状即判红。
+     * 取样面（scoped 复评 2026-11-09 Important 1 补齐）：数值字面量认 `= 6` 与 `get() = 6` 两种形态；
+     * 声明存在性认所有写法，于是「有声明但取不到数值」（表达式形态）与「同段两枚声明」也各有一臂，
+     * 本闸不再存在「取不到值 = 当没覆写」的静默放行。
      */
     @Test
     fun routeDepthColumnDefaultsToMountIndexExceptOnOverrideList() {
@@ -690,6 +693,10 @@ class ScreenTransitionContractTest {
      * 判据 D-4fix-①/② 的合成双边（must-flag / must-not-flag，本闸的牙齿自证）：
      * ①清单外野覆写、②覆写值漂移、③清单内声明失踪、④默认访问器被拆、⑤有覆写没用例、⑥有用例指没覆写的边、
      * ⑦注释里的命名边不算（取样只走一次 stripComments，二次剥是缺陷）；合规假表 + 合规假用例必须全放行。
+     * scoped 复评 2026-11-09 Important 1 补的形状（层深列过去只钉数值形态，getter / 表达式形态的覆写在同一份文件里
+     * 与 [ROUTE_DEPTH_DEFAULT_ACCESSOR] 的写法不对称）：⑧getter 形态的清单外覆写、⑨表达式形态 = 写法无法取样、
+     * ⑩同段两枚声明 = 取样失真、⑪getter 形态的 `override val mountIndex` 由序号列的取样失真臂兜住（第 4 小项的坐实）、
+     * ⑫清单内支写成 getter 形态且值相符必须放行、值不符必须走「不符」臂、⑬接口默认访问器（无 `override`）不算覆写声明。
      */
     @Test
     fun judgementDepthGateFlagsSyntheticOverrideAndUnpairedNamedEdge() {
@@ -700,6 +707,10 @@ class ScreenTransitionContractTest {
                 data object LearningFlow : FakeRoute { override val mountIndex = 1; override val transitionDepth = 6 }
                 data object Settings : FakeRoute { override val mountIndex = 2 }
                 data object Rogue : FakeRoute { override val mountIndex = 3; override val transitionDepth = 0 }
+                data object GetterRogue : FakeRoute { override val mountIndex = 4; override val transitionDepth: Int get() = 9 }
+                data object ExpressionRogue : FakeRoute { override val mountIndex = 5; override val transitionDepth get() = mountIndex + 1 }
+                data object DoubledDepth : FakeRoute { override val mountIndex = 6; override val transitionDepth = 1; override val transitionDepth = 2 }
+                data object GetterMountIndex : FakeRoute { override val mountIndex: Int get() = 7 }
             }
         """.trimIndent()
         val offenders = depthDeclarationOffenders(stripComments(fakeRoute))
@@ -710,6 +721,42 @@ class ScreenTransitionContractTest {
         assertTrue(
             offenders.none { it.contains("LearningFlow") },
             "合规覆写被误判红（过严会把补口本身卡死）：$offenders",
+        )
+        // scoped 复评（2026-11-09）Important 1 的四条形状：本闸过去只认 `override val transitionDepth = <数字>`，
+        // 于是 getter 形态的覆写、表达式形态的覆写与「同段两枚声明」都落在取样盲区里静默放行（层深退回默认律 = 方向被改掉）。
+        assertTrue(
+            offenders.any { it.contains("GetterRogue") && it.contains("覆写清单之外") },
+            "getter 形态的清单外覆写（`override val transitionDepth: Int get() = 9`）没被判出：取样正则只认数值字面量时，" +
+                "这一臂的层深静默退回默认访问器，方向判定被无声改掉。实测：$offenders",
+        )
+        assertTrue(
+            offenders.any { it.contains("ExpressionRogue") && it.contains("写法无法取样") },
+            "表达式形态的覆写（`override val transitionDepth get() = mountIndex + 1`）没被判出：取不到数值就当没覆写，" +
+                "等于把清单绕过。实测：$offenders",
+        )
+        assertTrue(
+            offenders.any { it.contains("DoubledDepth") && it.contains("取样失真") },
+            "同一支段内两枚 transitionDepth 声明没被判出：singleOrNull 静默变 null 后比对被整个跳过。实测：$offenders",
+        )
+        assertTrue(
+            offenders.any { it.contains("GetterMountIndex") && it.contains("取样失真") },
+            "getter 形态的 `override val mountIndex: Int get() = 7` 没被序号列的取样失真臂判出：该臂是本条口径的唯一承载体，" +
+                "丢牙即成静默盲区。实测：$offenders",
+        )
+        val listedAsGetter = fakeRoute.replace("override val transitionDepth = 6", "override val transitionDepth: Int get() = 6")
+        assertTrue(
+            depthDeclarationOffenders(stripComments(listedAsGetter)).none { it.contains("LearningFlow") },
+            "清单内支把 `= 6` 写成 getter 形态 `: Int get() = 6` 被判红：放宽后两种字面量形态都要能取到值并与清单比对。" +
+                "实测：${depthDeclarationOffenders(stripComments(listedAsGetter))}",
+        )
+        val listedGetterDrift = fakeRoute.replace(
+            "override val transitionDepth = 6",
+            "override val transitionDepth: Int get() = 9",
+        )
+        assertTrue(
+            depthDeclarationOffenders(stripComments(listedGetterDrift)).any { it.contains("LearningFlow") && it.contains("不符") },
+            "getter 形态的覆写值与清单漂移没按「值不符」口径判出（放宽取样后这条边必须走漂移臂，而不是退回「声明消失」）。" +
+                "实测：${depthDeclarationOffenders(stripComments(listedGetterDrift))}",
         )
         val drifted = fakeRoute.replace("override val transitionDepth = 6", "override val transitionDepth = 9")
         assertTrue(
@@ -725,6 +772,19 @@ class ScreenTransitionContractTest {
         assertTrue(
             depthDeclarationOffenders(stripComments(noDefault)).any { it.contains("默认访问器") },
             "接口默认访问器被拆没被判出：未覆写支的层深从此无源可依。",
+        )
+        // 存在性正则只许认 `override`：同族的接口默认访问器（ROUTE_DEPTH_DEFAULT_ACCESSOR 那种写法）不是覆写声明。
+        val defaultAccessorIsNotAnOverride = """
+            sealed interface FakeRoute {
+                val mountIndex: Int
+                val transitionDepth: Int get() = mountIndex
+                data object Plain : FakeRoute { override val mountIndex = 1 }
+            }
+        """.trimIndent()
+        assertTrue(
+            depthDeclarationOffenders(stripComments(defaultAccessorIsNotAnOverride)).isEmpty(),
+            "存在性正则把接口默认访问器（无 `override` 前缀）误当成覆写声明：未覆写支会被判成「写法无法取样」，" +
+                "「默认 = 序号」这条前提反而被闸自己弄失明。实测：${depthDeclarationOffenders(stripComments(defaultAccessorIsNotAnOverride))}",
         )
 
         val pairedTest = """
@@ -994,10 +1054,17 @@ class ScreenTransitionContractTest {
     /**
      * 层深闸取样（判据 D-4fix-①/② 与 [routeVariants] 同族但按**支分段**）：
      * 每个 `data class/object` 从自己的起点截到下一枚变体的起点，段内取恰一枚
-     * `override val mountIndex`（0 或 ≥2 枚 = 取样失真，记 null 响亮报）与至多一枚
-     * `override val transitionDepth`。真实文件与合成夹具走同一实现。
+     * `override val mountIndex`（0 或 ≥2 枚 = 取样失真，记 null 响亮报）与层深列的**两件事**：
+     * 数值字面量（`= 6` 与 `get() = 6` 两种形态都取值）与声明枚数（[DECLARED_TRANSITION_DEPTH_EXISTS]，
+     * 认所有写法）。枚数 ≥2 = 取样失真、恰 1 枚却取不到数值 = 写法无法取样，两者都在
+     * [depthDeclarationOffenders] 里响亮判红——本闸没有「取不到就静默放行」这条路。真实文件与合成夹具走同一实现。
      */
-    private data class RouteDepthRow(val variant: String, val mountIndex: Int?, val declaredTransitionDepth: Int?)
+    private data class RouteDepthRow(
+        val variant: String,
+        val mountIndex: Int?,
+        val declaredTransitionDepth: Int?,
+        val transitionDepthDeclarationCount: Int,
+    )
 
     private fun routeDepthRows(strippedRouteSource: String): List<RouteDepthRow> {
         val starts = ROUTE_VARIANT_DECL.findAll(strippedRouteSource).map { it.groupValues[1] to it.range.first }.toList()
@@ -1010,6 +1077,7 @@ class ScreenTransitionContractTest {
                 variant = name,
                 mountIndex = if (mountIndexes.size == 1) mountIndexes.single() else null,
                 declaredTransitionDepth = depths.singleOrNull(),
+                transitionDepthDeclarationCount = DECLARED_TRANSITION_DEPTH_EXISTS.findAll(segment).count(),
             )
         }
     }
@@ -1021,6 +1089,12 @@ class ScreenTransitionContractTest {
             add("层深闸从 route 源码解析到 0 枚变体：取样空转，清单比对无从进行。")
             return@buildList
         }
+        // 序号列的取样失真臂**无条件**判红，这一条就是 scoped 复评 第 1 条问的「DECLARED_MOUNT_INDEX 是否同款盲区」的答案：
+        // 没有静默盲区。getter 形态的 `override val mountIndex: Int get() = 3` 让只认 `= 数字` 的 DECLARED_MOUNT_INDEX
+        // 在段内取到 0 枚 ⇒ mountIndex == null ⇒ 本臂直接响亮（合成用例的 must-flag GetterMountIndex 坐实，
+        // 见 judgementDepthGateFlagsSyntheticOverrideAndUnpairedNamedEdge）。层深列当年漏的正是这条：
+        // 取不到数值时「declared == null && expected == null」无臂可走，比对被静默跳过——现已由下面的
+        // 枚数臂（≥2 枚）与「写法无法取样」臂（恰 1 枚却无数值）补齐，故序号列不另加新臂，只把口径写清并留牙齿。
         rows.filter { it.mountIndex == null }.forEach {
             add("route 支 `${it.variant}` 段内枚数正常的 `override val mountIndex` 取不到（0 或重复）：取样失真，本判据拒绝比对。")
         }
@@ -1031,10 +1105,18 @@ class ScreenTransitionContractTest {
             val declared = row.declaredTransitionDepth
             val expected = TRANSITION_DEPTH_OVERRIDES[row.variant]
             when {
+                row.transitionDepthDeclarationCount >= 2 ->
+                    add("支 `${row.variant}` 段内有 ${row.transitionDepthDeclarationCount} 枚 `override val transitionDepth` 声明：" +
+                        "取样失真，本判据拒绝比对（比照序号列的取样失真臂，禁止让 singleOrNull 静默变 null 绕过清单）。")
                 declared != null && expected == null ->
                     add("支 `${row.variant}` 在覆写清单之外声明 transitionDepth = $declared：没有命名边用例背书的覆写即判红。")
                 declared != null && declared != expected ->
                     add("支 `${row.variant}` 覆写值 $declared 与清单期望 $expected 不符：改值就是改方向判定，须先回清单与理由。")
+                declared == null && row.transitionDepthDeclarationCount == 1 ->
+                    add("支 `${row.variant}` 声明了 `override val transitionDepth` 但取不到数值（写法无法取样）：" +
+                        "本闸只认数值字面量（`= 6` 与 `get() = 6`），`override val transitionDepth get() = mountIndex + 1` " +
+                        "这类表达式形态的覆写等于绕开清单——清单外即野覆写，清单内即静默退回「默认 = 序号」。" +
+                        "新增覆写请用数值字面量并先补命名边用例与清单。")
                 declared == null && expected != null ->
                     add("支 `${row.variant}` 在覆写清单里但 route 源码的声明消失：方向退回比序号，命名边会重新被播成返回。")
             }
@@ -1246,7 +1328,22 @@ private val ROUTE_DEPTH_DEFAULT_ACCESSOR = Regex("""val transitionDepth: Int get
 private val NAMED_FORWARD_EDGE = Regex("""fun namedEdge(.+?)To(.+?)IsForward\(""")
 private val ROUTE_VARIANT_DECL = Regex("""^ *data (?:class|object) (\w+)""", RegexOption.MULTILINE)
 private val DECLARED_MOUNT_INDEX = Regex("""override val mountIndex = (\d+)""")
-private val DECLARED_TRANSITION_DEPTH = Regex("""override val transitionDepth = (\d+)""")
+
+/**
+ * 层深列的数值取样（scoped 复评 2026-11-09 Important 1 放宽）：两种**字面量**形态都要取到值——
+ * `override val transitionDepth = 6` 与 `override val transitionDepth: Int get() = 6`。
+ * 表达式形态（`get() = mountIndex + 1`）按设计取不到值，由 [DECLARED_TRANSITION_DEPTH_EXISTS] 那条臂响亮记下，
+ * 绝不再走「取不到就当没覆写」。
+ */
+private val DECLARED_TRANSITION_DEPTH =
+    Regex("""override val transitionDepth(?:\s*:\s*Int)?\s*(?:get\(\)\s*)?=\s*(\d+)""")
+
+/**
+ * 层深列的**存在性**正则（与序号列不同：本闸认 getter / 表达式等所有写法）。必须带 `override` 前缀——
+ * 接口默认访问器 [ROUTE_DEPTH_DEFAULT_ACCESSOR]（`val transitionDepth: Int get() = mountIndex`）不是覆写声明，
+ * 误命中会把每一枚未覆写支判成「写法无法取样」，让默认律反而失明（合成用例 defaultAccessorIsNotAnOverride 钉住）。
+ */
+private val DECLARED_TRANSITION_DEPTH_EXISTS = Regex("""override val transitionDepth\b""")
 
 // ---------------------------------------------------------------------------------------------
 // 终评补口 第 2 条（席 B2）：导航身份列的取样正则与身份台账
