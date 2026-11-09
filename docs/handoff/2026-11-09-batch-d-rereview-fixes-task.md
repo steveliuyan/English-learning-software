@@ -48,11 +48,14 @@
 
 ### 2. Important —— `:198` 那趟红的**配置归属被写成事实**，与原始出处矛盾
 
-三处都写了「那趟红发生在摘掉 `contentKey` 的变异探针配置里，不是 shipped 配置的 flake」：
+三处（scoped 复评修复轮 1 补记：实为**四处**，见末条）都写了「那趟红发生在摘掉 `contentKey` 的变异探针配置里，不是 shipped 配置的 flake」：
 
 - `app/src/androidTest/java/com/example/englishlearning/ui/ScreenTransitionInstrumentedTest.kt:229-232`（`ff4177c` 加的「订正」）
 - `docs/verification/ac-traceability-matrix.md:82`（`a5a619d` 改的那段）
 - `.superpowers/sdd/2026-11-06-motion-and-adaptive-layout/progress.md:274`（台账席 B4 块）
+- 【修复轮 1 补记 · 第四处】`docs/handoff/2026-11-09-batch-d-page-transition-report.md` §3.7「同时订正一处旧定性」那句
+  （本清单补记前的自身行号 `:163-164`；该文件当时未被本轮任何提交触及）。任务书原清单只列三处 ⇒ 下轮再漏的风险由这条堵住；
+  该处已由 2026-11-09 scoped 复评修复轮 1 按上面同一口径改掉，硬化本身（`ff4177c` 两道守卫）未动。
 
 复评给的证据：
 
@@ -62,7 +65,7 @@
   与表第 2 行的**枚数、用例、红点都不同**；全仓 `b2-*.log` 里**没有** `Tests run: 8, Failures: 1` 的原始日志。
 - 所以「归属探针配置」这件事**无法证实**，不能当事实写；矩阵里前半句已经承认「未留原始日志」，后半句却仍下定论。
 
-修法（只改措辞，不改代码、不改行为）：三处统一改成实话 ——
+修法（只改措辞，不改代码、不改行为）：三处统一改成实话【修复轮 1 补记：按上面四处统一，第四处为入库阶段报告，随修复轮 1 落地】——
 **「该趟的配置归属无留存日志可证；既不能算 shipped 配置的实证 flake，也不能断定是探针配置。
 shipped 配置下可证的偶发红只有 `f3cc0c3` 的 Wide 全类一趟（`b4-wide-connected.log`，`Tests run: 9, Failures: 1`，
 红点在 `pumpUntil` 3s 超时）」**。硬化本身（`ff4177c` 的两道守卫）理由成立、不动。
