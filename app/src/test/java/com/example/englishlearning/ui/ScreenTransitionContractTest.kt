@@ -1359,7 +1359,7 @@ private val DECLARED_TRANSITION_DEPTH =
  * 这条前缀由合成用例 defaultAccessorIsNotAnOverride 钉住，且牙齿的承载体要说清（scoped 复评 2026-11-09 修复轮 Minor）：
  * routeDepthRows 的段起点取自 [ROUTE_VARIANT_DECL]，接口级访问器永远排在首枚变体之前、落不进任何段，
  * 所以「只放访问器」的形状删掉前缀也不会变红；该夹具因此另带一枚段内、不带 `override` 的 `transitionDepth` 声明，
- * 前缀一丢即由它落进「写法无法取样」臂（变异探针实测见批 D 修复轮报告「修复轮 1」§2）。
+ * 前缀一丢即由它落进「写法无法取样」臂（变异探针实测见批 D 修复轮报告「修复轮 1」§3）。
  */
 private val DECLARED_TRANSITION_DEPTH_EXISTS = Regex("""override val transitionDepth\b""")
 

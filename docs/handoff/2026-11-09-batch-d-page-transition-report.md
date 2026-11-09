@@ -161,7 +161,7 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
 硬化内容（`ff4177c`，纯 androidTest，零生产码）：①按返回键前先断言词卡腿恰有一枚在场，把「转场没开播」与「驱动走空」分开；
 ②`pumpUntil` 超时文本带现场读数（站 1 腿数、各腿 tag、`word_card_screen` 在场枚数）。
 同时订正一处旧定性（原表述：「那趟红是在摘掉 `contentKey` 的变异探针配置里观察到的」；2026-11-09 scoped 复评修复轮按
-同口径再订正，与 `ScreenTransitionInstrumentedTest` 用例注释、矩阵 AC5-07、台账 B4 块三处逐字同口径）：席 B2 报告
+同口径再订正，与 `ScreenTransitionInstrumentedTest` 用例注释、矩阵 AC5-07、台账 B4 块三处核心句逐字一致、其余从句同口径）：席 B2 报告
 §connected 读数表第 2 行那趟红的**配置归属无留存日志可证**——既不能算 shipped 配置的实证 flake，也不能断定是探针配置
 （唯一留存的探针日志 `b2-connected-red.log` 是 `Tests run: 2, Failures: 2`，枚数、用例、红点都与表第 2 行不同，
 而表第 2 行的 `Tests run: 8, Failures: 1` 全仓无原始日志）。shipped 配置下可证的偶发红目前有两趟：`f3cc0c3` 的 Wide 全类一趟
@@ -176,6 +176,45 @@ B2 报告原文保留、只追加订正括注（历史报告只追加不改写�
 
 在册定性（scoped 复评修复轮 2 补记）：这枚偶发**仍是 open**（两趟留档、同形、后续全绿 ⇒ 记为「Wide 全类连跑的靶面守卫偶发红」，
 不是 shipped 判据缺陷，也不得据此宣称已关闭）；下批候选动作 = 泵超时上限/逐腿等待策略，或按用户裁定加输入闸，**本轮不实施**。
+
+### 3.8 2026-11-09 scoped 复评修复轮：复评两枚 Important 的修复与门禁/connected 复跑读数
+
+scoped 复评（覆盖 `6caeeef..37348fc` 与 `37348fc..f713a5a`）判词 With fixes：Critical 0 / Important 2 + 随行 Minor，
+修复由执行席两轮落成（一轮 3 枚 + 复评修复轮 1 的 2 枚 + 本轮 2 枚）；控制器在最终内容上重跑门禁三连与双形态 connected
+（全程 `adb -s emulator-5554`，`install -r` 双包 + `am instrument`，零 `connectedDebugAndroidTest`，真机 `bf353dda` 零命令），
+读数全部落盘在 `.superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task/`（不入库，逐枚可开档核验）：
+
+| 趟 | HEAD 内容 | 形态 | 结果 | 日志（同目录） |
+|---|---|---|---|---|
+| 门禁 a | `37348fc` | — | `BUILD SUCCESSFUL in 4m 13s`；XML 现算 **341 类 / 2553 条 / 0 失败 0 错误 0 跳过** | `gate-triple.log` |
+| 门禁 b（修复轮 1 后复跑） | `f713a5a` | — | `BUILD SUCCESSFUL in 4m 13s`；同上 **341 / 2553 / 0 / 0 / 0**（`--rerun-tasks`，XML 按本次落盘计数） | `gate-triple-r1.log` |
+| C1 | `f713a5a` | Compact 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0 | `OK (9 tests)`（链尾读数，日志被并发 `cat` 截成 66 字节，故以 C2 为准） | `connected-compact-r1.log`（残档） |
+| C2 | 同上 | Compact | **`OK (9 tests)`** Time 20.306s，`instrument exit=0` | `connected-compact-r2.log` |
+| W1 | 同上 | Wide（`wm size 2560x1600` → override 落 `2160x1600`） | **`Tests run: 9, Failures: 1`**；红点 `transitionsProduceNoExtraBillableOutbound`（`:255`）经 `pumpUntil`（`:595`），现场读数原文：`手动步进 3000ms 内条件仍未成立；现场：站 1 腿 1 枚 tag=[overlay_transition_leg_current]，word_card_screen 在场 1 枚` | `connected-wide-r1.log` |
+| W2–W4 | 同上 | Wide | `OK (9 tests)` / `OK (9 tests)` / `OK (9 tests)`，Time 20.553 / 19.878 / 21.372s | `connected-wide-r2.log`、`connected-wide-r3.log`、`connected-wide-r4.log` |
+| 收口 | — | — | `wm size reset` → 1080x1920；`font_scale` 1.0、`animator_duration_scale` 1.0；两枚 APK 在装、数据未清 | — |
+
+W1 的 `:255` / `:595` 是 `f713a5a` 时点的栈行号；本轮发现 1 在 `ScreenTransitionInstrumentedTest.kt:233` 之后插了 3 行注释，
+现 grep 的对应号为：调用点 `:255` → `:258`、`pumpUntil` 的超时报错行 `:595` → `:598`（函数定义 `:589` → `:592`）；历史日志里的栈号不回头改。
+
+本轮 7 枚提交各自干了什么（旧→新）：
+
+- `f76cc9e`（执行席待办 1／复评 Important 1）：层深闸 `DECLARED_TRANSITION_DEPTH` 放宽到认 getter／字面量两种形态，
+  另补存在性正则与「取样失真」「写法无法取样」两臂，配 7 条双边合成探针——getter 形态的清单外覆写不再零判红。
+- `361bccd`（待办 2／复评 Important 2）：`:198` 那趟红的**配置归属**从「探针配置」改为「无留存日志可证」，
+  用例注释、矩阵 AC5-07、台账 B4 块与 B2 报告（追加括注）同改。
+- `37348fc`（待办 3）：复评表内 9 处过期行号引用改为现算值；`AppScreen.kt` 未重排，行区间闸安全。
+- `74fc483`（复评修复轮 1，Important 1 + Minor）：Rogue／LearningFlow 等探针由裸子串改「支名反引号定界 + 臂文案」双重取证；
+  ⑬ 夹具补一枚段内非 `override` 形状，使「删 `override ` 前缀」的变异由零证伪变为响亮判红（变异 A／B 实测见席报告「修复轮 1」§2、§3）。
+- `f713a5a`（复评修复轮 1，Important 2）：本节 §3.7 的旧定论同步为「配置归属无留存日志可证」，任务书「三处」补记为四处。
+- `35af07e`（本轮 scoped 复评修复轮 2，发现 1）：四处同一句子由「可证的偶发红只有 `f3cc0c3` 一趟」改为「目前有两趟」，
+  第二趟即本表 W1；§3.7 末尾补在册定性（仍是 open、不得据此宣称已关闭）。
+- 本枚（本轮，发现 2／3 + §3.8／§4 回写）：`ScreenTransitionContractTest.kt` 存在性正则 KDoc 的变异探针自指分节号由 §2 改为 §3
+  （删 `override ` 前缀那趟的读数实际在「修复轮 1」§3）；§3.7 的「三处逐字同口径」改为「核心句逐字一致、其余从句同口径」。
+
+两枚 Important 的处置一句话：Important 1（层深闸对 getter 形态失明）已由 `f76cc9e` 补取样与判红臂、`74fc483` 收紧取证口径，
+定向 17 例全绿且两枚变异探针各自响亮判红；Important 2（把无法证实的配置归属写成事实）已由 `361bccd` / `f713a5a` 改为
+「无留存日志可证」，本轮再按 W1 的新读数把覆盖面从「只有一趟」改成「目前有两趟」——同一族毛病（限定词写得比证据强）的反向版本。
 
 ## 4. Git 状态
 
@@ -206,6 +245,17 @@ B2 报告原文保留、只追加订正括注（历史报告只追加不改写�
   `ff4177c`（connected 硬化 + 双形态复跑读数）。
 - **仍未推送**：本批全程零 `git push`（用户规则：推送逐批请示）。推送后的远端 tip 待回填此处。
 - 不合 `main`，分支停在 `stage-5-ui-r2-learning-path`。
+
+**scoped 复评修复轮收口补记（控制器现算，本节数字是当时点）**：
+
+- 【测】`git rev-parse --short HEAD` → `35af07e`（发现 1 那枚：四处句子覆盖面 + §3.7 在册定性）；
+  【测】`git log --oneline origin/stage-5-ui-r2-learning-path..HEAD | wc -l` → **42**；
+  【测】origin tip `git rev-parse --short origin/stage-5-ui-r2-learning-path` → `5d93cdc`（`git merge-base --is-ancestor 5d93cdc HEAD` 通过，快进关系）。
+- 本枚（§3.8 与本补记、发现 2／3 所在）落库后 ahead 再 +1，最终 HEAD 由控制器现算；哈希无法写在自己的正文里，收工读数见执行席报告「修复轮 2」节。
+- **零推送**：本轮两枚提交全程未执行 `git push`；**不合 `main`**，分支停在 `stage-5-ui-r2-learning-path`。
+- 设备收口状态（控制器现算，见 §3.8 表末行）：`wm size reset` → 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0，
+  两枚 APK 在装、数据未清；connected 全程 `adb -s emulator-5554`，零 `connectedDebugAndroidTest`，真机 `bf353dda` 零命令。
+- 本轮改动全在注释与文本面（未跑任何 Gradle）：编译面由控制器最后一次门禁三连兜底。
 
 ## 5. 未完成 / 遗留问题
 
