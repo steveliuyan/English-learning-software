@@ -696,7 +696,9 @@ class ScreenTransitionContractTest {
      * scoped 复评 2026-11-09 Important 1 补的形状（层深列过去只钉数值形态，getter / 表达式形态的覆写在同一份文件里
      * 与 [ROUTE_DEPTH_DEFAULT_ACCESSOR] 的写法不对称）：⑧getter 形态的清单外覆写、⑨表达式形态 = 写法无法取样、
      * ⑩同段两枚声明 = 取样失真、⑪getter 形态的 `override val mountIndex` 由序号列的取样失真臂兜住（第 4 小项的坐实）、
-     * ⑫清单内支写成 getter 形态且值相符必须放行、值不符必须走「不符」臂、⑬接口默认访问器（无 `override`）不算覆写声明。
+     * ⑫清单内支写成 getter 形态且值相符必须放行、值不符必须走「不符」臂、⑬不带 `override` 的写法不算覆写声明
+     * （must-not-flag 侧同时放接口默认访问器与一枚**段内**非 `override` 声明——后者才是「正则丢了 `override ` 前缀」
+     * 这一变异的证伪载体，见该用例内注释与 [DECLARED_TRANSITION_DEPTH_EXISTS] 的 KDoc）。
      */
     @Test
     fun judgementDepthGateFlagsSyntheticOverrideAndUnpairedNamedEdge() {
@@ -714,38 +716,44 @@ class ScreenTransitionContractTest {
             }
         """.trimIndent()
         val offenders = depthDeclarationOffenders(stripComments(fakeRoute))
+        // scoped 复评 2026-11-09 修复轮 Important 1：本枚探针改为「支名 + 臂文案」双重定界取证。
+        // 只写 contains("Rogue") 会被同表新增的 GetterRogue / ExpressionRogue 稀释（三枚支名都含 Rogue，
+        // 且「在覆写清单之外」「写法无法取样」两条 offender 文案都以 支 `X` 起头）⇒ 任一枚出红即照绿，名字专属性丢失；
+        // 补「覆写清单之外」钉住它自己的臂，于是数值正则若被再次收窄到漏掉裸 `= 数字`（Rogue 落到「写法无法取样」臂），
+        // 本枚会响亮判红而不是静默放行；反引号定界另防后续再加含 Rogue / LearningFlow 子串的夹具。
         assertTrue(
-            offenders.any { it.contains("Rogue") },
-            "清单外野覆写没被判出：层深默认律对第二套深度口径失明。实测：$offenders",
+            offenders.any { it.contains("`Rogue`") && it.contains("覆写清单之外") },
+            "清单外的数值形态野覆写（`override val transitionDepth = 0`）没按「覆写清单之外」臂判出：" +
+                "层深默认律对第二套深度口径失明。实测：$offenders",
         )
         assertTrue(
-            offenders.none { it.contains("LearningFlow") },
+            offenders.none { it.contains("`LearningFlow`") },
             "合规覆写被误判红（过严会把补口本身卡死）：$offenders",
         )
         // scoped 复评（2026-11-09）Important 1 的四条形状：本闸过去只认 `override val transitionDepth = <数字>`，
         // 于是 getter 形态的覆写、表达式形态的覆写与「同段两枚声明」都落在取样盲区里静默放行（层深退回默认律 = 方向被改掉）。
         assertTrue(
-            offenders.any { it.contains("GetterRogue") && it.contains("覆写清单之外") },
+            offenders.any { it.contains("`GetterRogue`") && it.contains("覆写清单之外") },
             "getter 形态的清单外覆写（`override val transitionDepth: Int get() = 9`）没被判出：取样正则只认数值字面量时，" +
                 "这一臂的层深静默退回默认访问器，方向判定被无声改掉。实测：$offenders",
         )
         assertTrue(
-            offenders.any { it.contains("ExpressionRogue") && it.contains("写法无法取样") },
+            offenders.any { it.contains("`ExpressionRogue`") && it.contains("写法无法取样") },
             "表达式形态的覆写（`override val transitionDepth get() = mountIndex + 1`）没被判出：取不到数值就当没覆写，" +
                 "等于把清单绕过。实测：$offenders",
         )
         assertTrue(
-            offenders.any { it.contains("DoubledDepth") && it.contains("取样失真") },
+            offenders.any { it.contains("`DoubledDepth`") && it.contains("取样失真") },
             "同一支段内两枚 transitionDepth 声明没被判出：singleOrNull 静默变 null 后比对被整个跳过。实测：$offenders",
         )
         assertTrue(
-            offenders.any { it.contains("GetterMountIndex") && it.contains("取样失真") },
+            offenders.any { it.contains("`GetterMountIndex`") && it.contains("取样失真") },
             "getter 形态的 `override val mountIndex: Int get() = 7` 没被序号列的取样失真臂判出：该臂是本条口径的唯一承载体，" +
                 "丢牙即成静默盲区。实测：$offenders",
         )
         val listedAsGetter = fakeRoute.replace("override val transitionDepth = 6", "override val transitionDepth: Int get() = 6")
         assertTrue(
-            depthDeclarationOffenders(stripComments(listedAsGetter)).none { it.contains("LearningFlow") },
+            depthDeclarationOffenders(stripComments(listedAsGetter)).none { it.contains("`LearningFlow`") },
             "清单内支把 `= 6` 写成 getter 形态 `: Int get() = 6` 被判红：放宽后两种字面量形态都要能取到值并与清单比对。" +
                 "实测：${depthDeclarationOffenders(stripComments(listedAsGetter))}",
         )
@@ -754,18 +762,18 @@ class ScreenTransitionContractTest {
             "override val transitionDepth: Int get() = 9",
         )
         assertTrue(
-            depthDeclarationOffenders(stripComments(listedGetterDrift)).any { it.contains("LearningFlow") && it.contains("不符") },
+            depthDeclarationOffenders(stripComments(listedGetterDrift)).any { it.contains("`LearningFlow`") && it.contains("不符") },
             "getter 形态的覆写值与清单漂移没按「值不符」口径判出（放宽取样后这条边必须走漂移臂，而不是退回「声明消失」）。" +
                 "实测：${depthDeclarationOffenders(stripComments(listedGetterDrift))}",
         )
         val drifted = fakeRoute.replace("override val transitionDepth = 6", "override val transitionDepth = 9")
         assertTrue(
-            depthDeclarationOffenders(stripComments(drifted)).any { it.contains("LearningFlow") },
+            depthDeclarationOffenders(stripComments(drifted)).any { it.contains("`LearningFlow`") },
             "覆写值与清单漂移没被判出：改值就是改方向判定，必须走清单。",
         )
         val vanished = fakeRoute.replace("; override val transitionDepth = 6", "")
         assertTrue(
-            depthDeclarationOffenders(stripComments(vanished)).any { it.contains("LearningFlow") },
+            depthDeclarationOffenders(stripComments(vanished)).any { it.contains("`LearningFlow`") },
             "清单内支的声明消失没被判出：方向会静默退回比序号，命名边重新被播成返回。",
         )
         val noDefault = fakeRoute.replace("val transitionDepth: Int get() = mountIndex", "val transitionDepth: Int")
@@ -774,17 +782,23 @@ class ScreenTransitionContractTest {
             "接口默认访问器被拆没被判出：未覆写支的层深从此无源可依。",
         )
         // 存在性正则只许认 `override`：同族的接口默认访问器（ROUTE_DEPTH_DEFAULT_ACCESSOR 那种写法）不是覆写声明。
+        // scoped 复评 2026-11-09 修复轮 Minor（给本枚加牙齿）：routeDepthRows 的段起点取自 ROUTE_VARIANT_DECL，
+        // 接口默认访问器永远排在首枚变体之前、不落进任何段 ⇒ 夹具只放访问器时，「删掉正则里的 `override ` 前缀」
+        // 这一变异仍取到 0 枚、仍全绿（证伪力为零）。故补一枚 ShadowDepth：段内、**不带 `override`** 的
+        // `transitionDepth` 声明（夹具只是取样靶面、从不编译）。前缀一旦丢失它就落进「写法无法取样」臂 ⇒ 本枚判红。
         val defaultAccessorIsNotAnOverride = """
             sealed interface FakeRoute {
                 val mountIndex: Int
                 val transitionDepth: Int get() = mountIndex
                 data object Plain : FakeRoute { override val mountIndex = 1 }
+                data object ShadowDepth : FakeRoute { override val mountIndex = 2; val transitionDepth = 3 }
             }
         """.trimIndent()
         assertTrue(
             depthDeclarationOffenders(stripComments(defaultAccessorIsNotAnOverride)).isEmpty(),
-            "存在性正则把接口默认访问器（无 `override` 前缀）误当成覆写声明：未覆写支会被判成「写法无法取样」，" +
-                "「默认 = 序号」这条前提反而被闸自己弄失明。实测：${depthDeclarationOffenders(stripComments(defaultAccessorIsNotAnOverride))}",
+            "存在性正则把不带 `override` 的 `transitionDepth` 写法误当成覆写声明（接口默认访问器与段内 `ShadowDepth` 那枚都只声明、不算覆写）：" +
+                "未覆写支会被判成「写法无法取样」，「默认 = 序号」这条前提反而被闸自己弄失明。" +
+                "实测：${depthDeclarationOffenders(stripComments(defaultAccessorIsNotAnOverride))}",
         )
 
         val pairedTest = """
@@ -1341,7 +1355,11 @@ private val DECLARED_TRANSITION_DEPTH =
 /**
  * 层深列的**存在性**正则（与序号列不同：本闸认 getter / 表达式等所有写法）。必须带 `override` 前缀——
  * 接口默认访问器 [ROUTE_DEPTH_DEFAULT_ACCESSOR]（`val transitionDepth: Int get() = mountIndex`）不是覆写声明，
- * 误命中会把每一枚未覆写支判成「写法无法取样」，让默认律反而失明（合成用例 defaultAccessorIsNotAnOverride 钉住）。
+ * 误命中会把每一枚未覆写支判成「写法无法取样」，让默认律反而失明。
+ * 这条前缀由合成用例 defaultAccessorIsNotAnOverride 钉住，且牙齿的承载体要说清（scoped 复评 2026-11-09 修复轮 Minor）：
+ * routeDepthRows 的段起点取自 [ROUTE_VARIANT_DECL]，接口级访问器永远排在首枚变体之前、落不进任何段，
+ * 所以「只放访问器」的形状删掉前缀也不会变红；该夹具因此另带一枚段内、不带 `override` 的 `transitionDepth` 声明，
+ * 前缀一丢即由它落进「写法无法取样」臂（变异探针实测见批 D 修复轮报告「修复轮 1」§2）。
  */
 private val DECLARED_TRANSITION_DEPTH_EXISTS = Regex("""override val transitionDepth\b""")
 
