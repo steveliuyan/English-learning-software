@@ -223,26 +223,31 @@ class DesignTokenContractTest {
      */
     private val crossSetIdenticalNeutralTokenExemptions: Set<String> = setOf("onBrand", "onStrong")
 
-    /** 域浅套：spec §2.1 域色表 / 既有 DomainColors 逐值（base, deep）。hex 串同时供正则拼接，避免 Long 十进制插值。 */
+    /**
+     * 域浅套：**2026-11-10 域色归一**后的钉值（base, deep），裁决见
+     * `docs/decisions/2026-11-10-domain-color-normalization.md`。域色这一张表**偏离** spec §2.1 的
+     * 原冻结原型域色表（原型逐域 S 6~77 / L 29~74 各走各的），是本仓库唯一一处「按后续裁决覆盖 spec §2.1」
+     * 的 token 家族；其余 28 枚中性 token 仍逐字对 spec。hex 串同时供正则拼接，避免 Long 十进制插值。
+     */
     private val domainLightHex: Map<String, Pair<String, String>> = linkedMapOf(
         "AiSpeech" to ("0xFF6CCBAB" to "0xFF1A7A63"),
-        "Learn" to ("0xFF7BB4E6" to "0xFF175A93"),
-        "Review" to ("0xFFEBC68B" to "0xFF8A5712"),
-        "Library" to ("0xFFB7A0D9" to "0xFF65478A"),
-        "Reading" to ("0xFFE297A4" to "0xFF9C3B4F"),
-        "Danger" to ("0xFFDD8B81" to "0xFF9E2B24"),
-        "Settings" to ("0xFFA6B0AC" to "0xFF4A5551"),
+        "Learn" to ("0xFF6C9FCB" to "0xFF1A4D7A"),
+        "Review" to ("0xFFCBA76C" to "0xFF7A551A"),
+        "Library" to ("0xFF926CCB" to "0xFF411A7A"),
+        "Reading" to ("0xFFCB6C7C" to "0xFF7A1A2B"),
+        "Danger" to ("0xFFCB766C" to "0xFF7A241A"),
+        "Settings" to ("0xFF96A29D" to "0xFF464E4B"),
     )
 
-    /** 域深套：deep = base（spec §2.1「深色下域色与 base 合一」）。 */
+    /** 域深套：deep = base（spec §2.1「深色下域色与 base 合一」），取值同归一档 S 58 / L 74。 */
     private val domainDarkHex: Map<String, String> = linkedMapOf(
         "AiSpeech" to "0xFF6FD9B6",
-        "Learn" to "0xFF84C4EE",
-        "Review" to "0xFFEFCB92",
-        "Library" to "0xFFC6A9E4",
-        "Reading" to "0xFFEDA8B4",
-        "Danger" to "0xFFE39086",
-        "Settings" to "0xFFB4BEBA",
+        "Learn" to "0xFF96BFE3",
+        "Review" to "0xFFE3C696",
+        "Library" to "0xFFB596E3",
+        "Reading" to "0xFFE396A4",
+        "Danger" to "0xFFE39F96",
+        "Settings" to "0xFFB9C1BD",
     )
 
     private val appPaletteCalibrated: Map<String, Long> = linkedMapOf(
@@ -506,8 +511,8 @@ class DesignTokenContractTest {
         domainLightHex.forEach { (domain, expected) ->
             val (expBase, expDeep) = expected
             val actual = domainHexes(lightSection, "DomainLight", domain)
-            assertEquals(hexValue(expBase), actual.first, "DomainLight.$domain.base 偏离 spec §2.1 浅套域色")
-            assertEquals(hexValue(expDeep), actual.second, "DomainLight.$domain.deep 偏离 spec §2.1 浅套域色")
+            assertEquals(hexValue(expBase), actual.first, "DomainLight.$domain.base 偏离归一后域色（2026-11-10-domain-color-normalization）")
+            assertEquals(hexValue(expDeep), actual.second, "DomainLight.$domain.deep 偏离归一后域色（2026-11-10-domain-color-normalization）")
             // 「与既有 DomainColors 逐值相同（改了就是回归）」：同一批 hex 必须也钉在 AppPalette.kt。
             val declared = Regex(
                 """val\s+$domain\s*=\s*DomainAccent\(\s*Color\(\s*$expBase\s*\)\s*,\s*Color\(\s*$expDeep\s*\)\s*\)""",
@@ -525,7 +530,7 @@ class DesignTokenContractTest {
         val darkSection = section(appColorsText(), "val DomainDark")
         domainDarkHex.forEach { (domain, expected) ->
             val (base, deep) = domainHexes(darkSection, "DomainDark", domain)
-            assertEquals(hexValue(expected), base, "DomainDark.$domain.base 偏离 spec §2.1 深套域色")
+            assertEquals(hexValue(expected), base, "DomainDark.$domain.base 偏离归一后域色（2026-11-10-domain-color-normalization）")
             assertEquals(base, deep, "DomainDark.$domain 应 deep = base（深色下避免暗底深字）")
         }
     }

@@ -864,8 +864,9 @@ private fun ModeChip(
 /**
  * 英文正文：单节点 `AnnotatedString`，高亮区间加粗并用阅读域深色墨。
  *
- * 高亮墨取 `appDomain(AppDomain.Reading).deep` 而不是静态薄荷桥：浅套 9C3B4F 压背景 ≈5.9:1、
- * 深套 EDA8B4 压深底更高——域色两套都由 `appColors()` 家族供给，屏侧不再出现第二套色源。
+ * 高亮墨取 `appDomain(AppDomain.Reading).deep` 而不是静态薄荷桥：浅套 #7A1A2B 压背景 ≈9.4:1、
+ * 深套 #E396A4 压深底 ≈7.9:1——域色两套都由 `appColors()` 家族供给，屏侧不再出现第二套色源。
+ * （2026-11-10 域色归一后重算；见 `docs/decisions/2026-11-10-domain-color-normalization.md`。）
  */
 @Composable
 private fun HighlightedEnglish(

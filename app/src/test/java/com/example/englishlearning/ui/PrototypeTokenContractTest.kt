@@ -193,42 +193,44 @@ class PrototypeTokenContractTest {
     }
 
     @Test
-    fun `domain colors stay on the frozen prototype domain table`() {
+    fun `domain colors stay on the normalized domain table`() {
         val blocks = anchors(themeText)
         val light = blocks.getValue("val DomainLight")
         val dark = blocks.getValue("val DomainDark")
+        // 2026-11-10 域色归一：域色这一族不再逐字等于冻结原型域色表（S/L 收到品牌档），
+        // 依据见 docs/decisions/2026-11-10-domain-color-normalization.md。
         val lightExpected = linkedMapOf(
             "AiSpeech" to (0xFF6CCBABL to 0xFF1A7A63L),
-            "Learn" to (0xFF7BB4E6L to 0xFF175A93L),
-            "Review" to (0xFFEBC68BL to 0xFF8A5712L),
-            "Library" to (0xFFB7A0D9L to 0xFF65478AL),
-            "Reading" to (0xFFE297A4L to 0xFF9C3B4FL),
-            "Danger" to (0xFFDD8B81L to 0xFF9E2B24L),
-            "Settings" to (0xFFA6B0ACL to 0xFF4A5551L),
+            "Learn" to (0xFF6C9FCBL to 0xFF1A4D7AL),
+            "Review" to (0xFFCBA76CL to 0xFF7A551AL),
+            "Library" to (0xFF926CCBL to 0xFF411A7AL),
+            "Reading" to (0xFFCB6C7CL to 0xFF7A1A2BL),
+            "Danger" to (0xFFCB766CL to 0xFF7A241AL),
+            "Settings" to (0xFF96A29DL to 0xFF464E4BL),
         )
         lightExpected.forEach { (domain, pair) ->
             val m = Regex("""AppDomain\.$domain\b[\s\S]*?DomainPalette\(base = Color\((0x[0-9A-Fa-f]{8})\), deep = Color\((0x[0-9A-Fa-f]{8})\)\)""")
                 .find(light)
                 ?: error("DomainLight.$domain 丢失或形状偏离 DomainPalette(base = …, deep = …)")
             val (base, deep) = m.destructured
-            assertEquals(pair.first, base.removePrefix("0x").toLong(16), "DomainLight.$domain.base 偏离原型域色")
-            assertEquals(pair.second, deep.removePrefix("0x").toLong(16), "DomainLight.$domain.deep 偏离原型域色")
+            assertEquals(pair.first, base.removePrefix("0x").toLong(16), "DomainLight.$domain.base 偏离归一域色")
+            assertEquals(pair.second, deep.removePrefix("0x").toLong(16), "DomainLight.$domain.deep 偏离归一域色")
         }
         val darkExpected = linkedMapOf(
             "AiSpeech" to 0xFF6FD9B6L,
-            "Learn" to 0xFF84C4EEL,
-            "Review" to 0xFFEFCB92L,
-            "Library" to 0xFFC6A9E4L,
-            "Reading" to 0xFFEDA8B4L,
-            "Danger" to 0xFFE39086L,
-            "Settings" to 0xFFB4BEBAL,
+            "Learn" to 0xFF96BFE3L,
+            "Review" to 0xFFE3C696L,
+            "Library" to 0xFFB596E3L,
+            "Reading" to 0xFFE396A4L,
+            "Danger" to 0xFFE39F96L,
+            "Settings" to 0xFFB9C1BDL,
         )
         darkExpected.forEach { (domain, hex) ->
             val m = Regex("""AppDomain\.$domain\b[\s\S]*?DomainPalette\(base = Color\((0x[0-9A-Fa-f]{8})\), deep = Color\((0x[0-9A-Fa-f]{8})\)\)""")
                 .find(dark)
                 ?: error("DomainDark.$domain 丢失或形状偏离")
             val (base, deep) = m.destructured
-            assertEquals(hex, base.removePrefix("0x").toLong(16), "DomainDark.$domain.base 偏离原型域色")
+            assertEquals(hex, base.removePrefix("0x").toLong(16), "DomainDark.$domain.base 偏离归一域色")
             assertEquals(hex, deep.removePrefix("0x").toLong(16), "DomainDark.$domain 必须 deep = base")
         }
     }

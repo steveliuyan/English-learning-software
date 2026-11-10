@@ -26,6 +26,7 @@ import com.example.englishlearning.ui.SpeechSettingsUiState
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.components.glass.pillButtonInk
 import com.example.englishlearning.ui.theme.AppColorDark
+import com.example.englishlearning.ui.theme.AppColorSet
 import com.example.englishlearning.ui.theme.AppColorLight
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppPalette
@@ -85,9 +86,14 @@ import org.junit.runner.RunWith
  *    排除门槛 [INK_MIN_DELTA_FROM_BACKDROP] 又把抗锯齿过渡像素（介于两者之间、且每枚值都不同）滤掉，
  *    剩下的字身核心才是众数。取样前必须把节点 `performScrollTo()` 进视口：两块屏都是整列 `verticalScroll`，
  *    视口外节点的 `captureToImage` 区域宽/高为 0，`Bitmap.createBitmap` 直接抛。
- *  - **期望值走 alpha 合成**：`surfaceGlass` 浅 `0xEF` / 深 `0xE6` 都是半透明，直接比 token 原值必然差一整档；
+ *  - **期望值走 alpha 合成**：`surfaceGlass` 浅深两套都是 `0xE0`（224）半透明，直接比 token 原值必然差一整档；
  *    用例内先 src-over 把玻璃与它脚下的实底合成，再比（逐通道 sRGB，与绘制一致）。不透明的 `surface`
  *    合成后就是它自己，同一套比对口径照旧适用。
+ *  - **非均匀页底（半透明腿的真机口径）**：玻璃留 12% 透明度，页底此刻**不是常量**——薄荷主题的页底自带竖向
+ *    渐变，`GlassOverlay` 之下还压着编辑页的卡片与文字（`modifier.frosted(...)` 关掉时是锐利漏色、打开时是
+ *    模糊漏色，两个方向一致）。所以 ① 浮层两条容器腿只认「离**本套合成最近** + 偏差 ≤ 上界」，上界见
+ *    [GLASS_OVERLAY_TRANSLUCENCY_TOLERANCE]；② 卡腿（不透明）与 ③ 试听卡（取样带落在空白卡内边距、页底均匀）
+ *    仍走 [GLASS_CHANNEL_TOLERANCE]。
  *  - **反向判据**：本套墨还得离**另一套**那档墨足够远，否则「浅套常量写死」在深色档可能因两档近似而蒙过。
  *  - **浅色侧不变量**：浅档玻璃用例的期望值取**迁移前那两枚静态常量**（`AppPalette.GlassFill` /
  *    `DomainColors.AiSpeech.deep` / `AppPalette.TextPrimary` / `TextSecondary`），并在断言前先钉住
@@ -204,9 +210,16 @@ class GlassPanelThemeInkTest {
         assertLightTokensEqualThePreMigrationStatics()
         setEditor(ThemeMode.Light, capabilities = setOf(AiCapability.Text, AiCapability.Speech))
         openVoiceOverlay()
-        val glass = modeOf(bandInsideTag(OVERLAY_UNSELECTED_TAG, OVERLAY_BAND_INSET_DP, OVERLAY_BAND_WIDTH_DP))
+        val glass = modeOf(bandRightInsideTag(OVERLAY_UNSELECTED_TAG, OVERLAY_BAND_INSET_DP, OVERLAY_BAND_WIDTH_DP))
         val ink = inkOfText(OVERLAY_UNSELECTED_TEXT, glass)
-        assertGlassIs("GlassOverlay 容器（浅）", glass, AppPalette.GlassFill, scrimOver(AppColorLight.background))
+        assertGlassIs(
+            "GlassOverlay 容器（浅）",
+            glass,
+            AppPalette.GlassFill,
+            scrimOver(AppColorLight.background),
+            tolerance = GLASS_OVERLAY_TRANSLUCENCY_TOLERANCE,
+            otherSetComposite = glassCompositeOverScrimmedPage(AppColorDark),
+        )
         assertInkIs("浮层未选中选项墨（浅）", ink, AppPalette.TextPrimary)
         assertContrastAtLeast("浅套正文墨压浅玻璃", ink, glass, BODY_AA_RATIO)
         // 批 2 终审修复席 C（控制者裁决，B 席 concerns ①）：音色浮层**选中档**那行是 `style = AppType.Body`
@@ -240,11 +253,18 @@ class GlassPanelThemeInkTest {
     fun the_dark_voice_overlay_pairs_dark_glass_with_the_dark_set_inks() {
         setEditor(ThemeMode.Dark, capabilities = setOf(AiCapability.Text, AiCapability.Speech))
         openVoiceOverlay()
-        val glass = modeOf(bandInsideTag(OVERLAY_UNSELECTED_TAG, OVERLAY_BAND_INSET_DP, OVERLAY_BAND_WIDTH_DP))
+        val glass = modeOf(bandRightInsideTag(OVERLAY_UNSELECTED_TAG, OVERLAY_BAND_INSET_DP, OVERLAY_BAND_WIDTH_DP))
         val unselectedInk = inkOfText(OVERLAY_UNSELECTED_TEXT, glass)
         val selectedInk = inkOfText(OVERLAY_SELECTED_TEXT, glass)
         composeRule.onNodeWithTag(OVERLAY_SELECTED_TAG).assertExists()
-        assertGlassIs("GlassOverlay 容器（深）", glass, AppColorDark.surfaceGlass, scrimOver(AppColorDark.background))
+        assertGlassIs(
+            "GlassOverlay 容器（深）",
+            glass,
+            AppColorDark.surfaceGlass,
+            scrimOver(AppColorDark.background),
+            tolerance = GLASS_OVERLAY_TRANSLUCENCY_TOLERANCE,
+            otherSetComposite = glassCompositeOverScrimmedPage(AppColorLight),
+        )
         assertInkIs("浮层未选中选项墨（深）", unselectedInk, AppColorDark.text1)
         assertInkIs("浮层选中选项墨（深，沿用域色 deep）", selectedInk, DomainDark.getValue(AppDomain.AiSpeech).deep)
         assertInkIsFarFromTheOtherSet("浮层未选中选项墨（深）", unselectedInk, AppPalette.TextPrimary)
@@ -293,7 +313,8 @@ class GlassPanelThemeInkTest {
      *
      * 域是 `Danger` 而不是 `Reading`：`AiProfileSettingsScreen` 里这枚药片的装配点是
      * `domain = AppDomain.Danger`（销毁性动作取危险域），本用例按生产装配点取纯表，不自己另选一域
-     * （真机/模拟器实测：按 `Reading` 取墨得 `#EDA8B4`、屏幕像素是 `#E39086`，差 46 档；换色前的
+     * （真机/模拟器实测：按 `Reading` 取墨得 `#EDA8B4`、屏幕像素是 `#E39086`，差 46 档——两条取值都已随
+     * 2026-11-10 域色归一换新（Reading 深套现 `#E396A4`），此处的档差只作历史取证记录；换色前的
      * 旧取值 `#FF7A93` 对 `#FF6B61` 同差 50 档，即本行早在这个用例写下时就与实际域不符）。
      *
      * 顺序不许反：① 从纯表 [pillButtonInk] 取当前档位（深套 / Danger / enabled / Text）的那枚前景
@@ -459,6 +480,21 @@ class GlassPanelThemeInkTest {
         return verticalBand(b, left, (left + widthDp * density).coerceAtMost(b.right))
     }
 
+    /**
+     * 节点**内右侧**那段带（行/框自己铺底、右侧还没有内容的那一段）。
+     *
+     * 浮层选项行用这一侧而不是左侧：行的左侧内边距底下压着编辑页的卡片文字，玻璃的 12% 透明度会把它们
+     * 泄进来（真机实测浅 #E9E9E9 / 深 #1A221E，见 [GLASS_OVERLAY_TRANSLUCENCY_TOLERANCE]），而右侧内边距
+     * 底下是空白页底 ⇒ 实测与本套合成只差 1~2 档（浅 #F1F2F1 对 #F2F2F1、深 #151E1A 对 #151D18）。
+     * 标签全部左对齐（`VoiceOverlayOption` 只有一枚 `Text`），右侧这一带在两套主题里都没有字。
+     */
+    private fun bandRightInsideTag(tag: String, insetDp: Float, widthDp: Float): Rect {
+        val b = boundsOfTag(tag)
+        val density = density()
+        val right = (b.right - insetDp * density).coerceAtLeast(b.left + 1f)
+        return verticalBand(b, (right - widthDp * density).coerceAtLeast(b.left), right)
+    }
+
     /** 掐掉上下各 25%，避开相邻行与描边。 */
     private fun verticalBand(b: Rect, left: Float, right: Float): Rect =
         Rect(left, b.top + b.height * 0.25f, right, b.bottom - b.height * 0.25f)
@@ -557,15 +593,36 @@ class GlassPanelThemeInkTest {
 
     // ---------- 判据 ----------
 
-    /** 容器腿：实测众数必须落在「该档填充压该实底」的合成结果 ±[GLASS_CHANNEL_TOLERANCE] 内。 */
-    private fun assertGlassIs(label: String, actual: Int, fill: Color, backdrop: Color) {
+    /**
+     * 容器腿：实测众数必须落在「该档填充压该实底」的合成结果 ±[tolerance] 内。
+     *
+     * 默认容差 [GLASS_CHANNEL_TOLERANCE] 只够覆盖投影渗色与 dp→px 取整。**半透明玻璃压非均匀页底**的两条腿
+     * （① `GlassOverlay` 音色浮层）另传 [GLASS_OVERLAY_TRANSLUCENCY_TOLERANCE]，并同时传 [otherSetComposite]
+     * 走最近邻判据：放宽容差后必须仍是「离本套最近」才算随套换档，否则这枚容差就把牙齿放宽没了。
+     */
+    private fun assertGlassIs(
+        label: String,
+        actual: Int,
+        fill: Color,
+        backdrop: Color,
+        tolerance: Int = GLASS_CHANNEL_TOLERANCE,
+        otherSetComposite: Int? = null,
+    ) {
         val expected = compositeSrcOver(fill.toArgb(), backdrop.toArgb())
         val delta = rgbDelta(actual, expected)
         assertTrue(
             "$label：期望 ${expected.hex()}（${fill.toArgb().hex()} 压 ${backdrop.toArgb().hex()} 的合成结果），" +
-                "实测 ${actual.hex()}，最大通道差 $delta > $GLASS_CHANNEL_TOLERANCE —— 容器没随套换档，或压根没画玻璃",
-            delta <= GLASS_CHANNEL_TOLERANCE,
+                "实测 ${actual.hex()}，最大通道差 $delta > $tolerance —— 容器没随套换档，或压根没画玻璃",
+            delta <= tolerance,
         )
+        if (otherSetComposite != null) {
+            val otherDelta = rgbDelta(actual, otherSetComposite)
+            assertTrue(
+                "$label：实测 ${actual.hex()} 离本套合成 ${expected.hex()} 只有 $delta 档、离另一套 " +
+                    "${otherSetComposite.hex()} 有 $otherDelta 档 —— 半透明腿放宽容差后必须仍「离本套最近」",
+                delta < otherDelta,
+            )
+        }
         val separation = rgbDelta(
             compositeSrcOver(AppColorLight.surfaceGlass.toArgb(), AppColorLight.background.toArgb()),
             compositeSrcOver(AppColorDark.surfaceGlass.toArgb(), AppColorDark.background.toArgb()),
@@ -573,10 +630,13 @@ class GlassPanelThemeInkTest {
         assertTrue(
             "自检（换套判别力）：容器容差必须小于浅/深两套玻璃压各自页底的间距（实测 $separation 档），" +
                 "否则「另一套」也算命中，本用例失去牙齿",
-            GLASS_CHANNEL_TOLERANCE < separation,
+            tolerance < separation,
         )
     }
 
+    /** 某一套玻璃压该套页底（已含 Scrim）的合成结果：半透明腿的「本套 / 另一套」两枚期望都从这里取。 */
+    private fun glassCompositeOverScrimmedPage(set: AppColorSet): Int =
+        compositeSrcOver(set.surfaceGlass.toArgb(), scrimOver(set.background).toArgb())
     private fun assertInkIs(label: String, actual: Int, expected: Color) {
         val delta = rgbDelta(actual, expected.toArgb())
         assertTrue(
@@ -660,8 +720,14 @@ private const val PROFILE_CARD_INK_TAG = "ai_profile_key_state"
 private const val CARD_BAND_INSET_DP = 12f
 private const val CARD_BAND_WIDTH_DP = 5f
 
-/** 浮层行左内边距 20dp，取行内 12~18dp 那一段（只有面板玻璃，没有字）。 */
-private const val OVERLAY_BAND_INSET_DP = 12f
+/**
+ * 浮层取样带：行**内右侧** 24~30dp 那一段（行内右侧没有字，页底也是空白 ⇒ 只有面板玻璃）。
+ *
+ * 原先取左侧 12~18dp，但那一带的页底压着编辑页卡片文字，玻璃 12% 透明度把它泄进来（真机会偏 5~17 档，
+ * 连带把「墨压玻璃」的正文闸误判成 4.32:1 不过）。24dp 是为了避开面板右边缘那圈投影衰减（实测 22dp 内
+ * 还有 4 档渐变），30dp 收尾仍在行内。
+ */
+private const val OVERLAY_BAND_INSET_DP = 24f
 private const val OVERLAY_BAND_WIDTH_DP = 6f
 
 /** 浮层里「自动」是选中档（draft.voice = "nova" 时不是），alloy 是未选中档：一档域色墨、一档套内正文墨。 */
@@ -685,11 +751,24 @@ private const val PILL_TAG = "ai_profile_key_clear"
  */
 private val PRE_FIX_AI_SPEECH_DEEP_INK: Int = 0xFF188F76.toInt()
 
-/** 「算不透明」下限：与席 A 同口径，必须低于两档玻璃的 alpha（浅 `0xEF` = 239 / 深 `0xE6` = 230）。 */
+/** 「算不透明」下限：与席 A 同口径，必须低于两档玻璃的 alpha（浅/深都是 `0xE0` = 224）。 */
 private const val OPAQUE_ALPHA_FLOOR = 200
 
 /** 容器合成结果的逐通道容差：投影渗色与 dp→px 取整实测 ≤3 档，留 5 档，仍远小于两套玻璃压页底的间距。 */
 private const val GLASS_CHANNEL_TOLERANCE = 5
+
+/**
+ * 半透明玻璃压**非均匀页底**的容器容差（只给 ① 浮层的浅/深两条腿）。
+ *
+ * 玻璃留 12% 透明度（浅/深 `surfaceGlass` 都是 `0xE0`），页底此刻并不是期望里那枚常量：薄荷页底自带竖向
+ * 渐变，`GlassOverlay` 之下还压着编辑页的卡片与文字。真机实测（2026-11-10，bf353dda = M2102J2SC /
+ * Android 13）：浅实测 #E9E9E9 对 #F2F2F1 差 9、深实测 #1A221E 对 #151D18 差 6；把 `modifier.frosted(...)`
+ * 临时关掉后同一带众数差 1（深）/ 5（浅），带内仍有 17 档的漏色斑点（页底文字锐利透出）⇒ 偏差来自
+ * **12% 漏色**，与域色无关（AiSpeech 未动，两条腿的期望值里也没有域色）。上界取 16 档（漏色观测最大值 9
+ * 再留余量），两套玻璃合成间距实测 ~221 档 ⇒ 判别力不变，且本腿另配「离本套最近」判据
+ * （见 [assertGlassIs] 的 otherSetComposite）。② 不透明卡腿与 ③ 试听卡取样带落在空白内边距上，不用这条。
+ */
+private const val GLASS_OVERLAY_TRANSLUCENCY_TOLERANCE = 16
 
 /** 墨核容差：字身核心应逐值等于那档墨，留 12 档只抗不同字号/字重下的覆盖不足。 */
 private const val INK_CHANNEL_TOLERANCE = 12

@@ -135,26 +135,39 @@ enum class AppDomain { AiSpeech, Learn, Review, Library, Reading, Danger, Settin
 /** 域色对：base = 填充/图标/主按钮，deep = 浅底文字与按压态（与既有 `DomainAccent` 同形）。 */
 data class DomainPalette(val base: Color, val deep: Color)
 
-/** 浅套域色：与 `DomainColors` 逐值相同（契约测试双钉：改本表或改 DomainColors 都会红）。 */
+/**
+ * 浅套域色：与 `DomainColors` 逐值相同（契约测试双钉：改本表或改 DomainColors 都会红）。
+ *
+ * 2026-11-10 域色归一（裁决见 `docs/decisions/2026-11-10-domain-color-normalization.md`）：
+ * 七个域只保留各自的色相，饱和度/明度统一收到品牌锚点所在的那一档——浅 `base` S 48 / L 61、
+ * 浅 `deep` S 65 / L 29，深套 S 58 / L 74（深套明度下界由 duotone 图标两侧的对比度夹出来，见裁决文档）。AiSpeech 三值是这一档的取值来源、逐字等于品牌 token
+ * （`brand` #6CCBAB / `brandDeep` #1A7A63 / 深 `brand` #6FD9B6），故不动；`Settings` 是有意的
+ * 近中性域，只对齐明度、饱和度保持 6%。归一是「同一档」，不是「同一个色」——色相仍每域一枚。
+ */
 val DomainLight: Map<AppDomain, DomainPalette> = mapOf(
     AppDomain.AiSpeech to DomainPalette(base = Color(0xFF6CCBAB), deep = Color(0xFF1A7A63)),
-    AppDomain.Learn to DomainPalette(base = Color(0xFF7BB4E6), deep = Color(0xFF175A93)),
-    AppDomain.Review to DomainPalette(base = Color(0xFFEBC68B), deep = Color(0xFF8A5712)),
-    AppDomain.Library to DomainPalette(base = Color(0xFFB7A0D9), deep = Color(0xFF65478A)),
-    AppDomain.Reading to DomainPalette(base = Color(0xFFE297A4), deep = Color(0xFF9C3B4F)),
-    AppDomain.Danger to DomainPalette(base = Color(0xFFDD8B81), deep = Color(0xFF9E2B24)),
-    AppDomain.Settings to DomainPalette(base = Color(0xFFA6B0AC), deep = Color(0xFF4A5551)),
+    AppDomain.Learn to DomainPalette(base = Color(0xFF6C9FCB), deep = Color(0xFF1A4D7A)),
+    AppDomain.Review to DomainPalette(base = Color(0xFFCBA76C), deep = Color(0xFF7A551A)),
+    AppDomain.Library to DomainPalette(base = Color(0xFF926CCB), deep = Color(0xFF411A7A)),
+    AppDomain.Reading to DomainPalette(base = Color(0xFFCB6C7C), deep = Color(0xFF7A1A2B)),
+    AppDomain.Danger to DomainPalette(base = Color(0xFFCB766C), deep = Color(0xFF7A241A)),
+    AppDomain.Settings to DomainPalette(base = Color(0xFF96A29D), deep = Color(0xFF464E4B)),
 )
 
-/** 深套域色：deep = base（spec §2.1「深色下域色与 base 合一，避免暗底深字」）。 */
+/**
+ * 深套域色：deep = base（spec §2.1「深色下域色与 base 合一，避免暗底深字」）。
+ * 取值同归一档：S 58 / L 74——L 不能再往下压：`IconBadge` 的 duotone 图标要求「白字形压域色 <3:1」且
+ * 「深墨 (#04241C) 压 30% 墨稀释后的底幅 ≥3:1」，两条把明度夹在下界（Library 最紧：L70 时白字形 2.92 / 墨压底 3.42）。
+ * AiSpeech 仍逐字等于深 `brand` #6FD9B6（L 64.3，绿本身亮度高，自证两条都达标）。
+ */
 val DomainDark: Map<AppDomain, DomainPalette> = mapOf(
     AppDomain.AiSpeech to DomainPalette(base = Color(0xFF6FD9B6), deep = Color(0xFF6FD9B6)),
-    AppDomain.Learn to DomainPalette(base = Color(0xFF84C4EE), deep = Color(0xFF84C4EE)),
-    AppDomain.Review to DomainPalette(base = Color(0xFFEFCB92), deep = Color(0xFFEFCB92)),
-    AppDomain.Library to DomainPalette(base = Color(0xFFC6A9E4), deep = Color(0xFFC6A9E4)),
-    AppDomain.Reading to DomainPalette(base = Color(0xFFEDA8B4), deep = Color(0xFFEDA8B4)),
-    AppDomain.Danger to DomainPalette(base = Color(0xFFE39086), deep = Color(0xFFE39086)),
-    AppDomain.Settings to DomainPalette(base = Color(0xFFB4BEBA), deep = Color(0xFFB4BEBA)),
+    AppDomain.Learn to DomainPalette(base = Color(0xFF96BFE3), deep = Color(0xFF96BFE3)),
+    AppDomain.Review to DomainPalette(base = Color(0xFFE3C696), deep = Color(0xFFE3C696)),
+    AppDomain.Library to DomainPalette(base = Color(0xFFB596E3), deep = Color(0xFFB596E3)),
+    AppDomain.Reading to DomainPalette(base = Color(0xFFE396A4), deep = Color(0xFFE396A4)),
+    AppDomain.Danger to DomainPalette(base = Color(0xFFE39F96), deep = Color(0xFFE39F96)),
+    AppDomain.Settings to DomainPalette(base = Color(0xFFB9C1BD), deep = Color(0xFFB9C1BD)),
 )
 
 /**

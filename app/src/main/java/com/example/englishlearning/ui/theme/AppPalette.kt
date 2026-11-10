@@ -47,11 +47,14 @@ object AppPalette {
 data class DomainAccent(val base: Color, val deep: Color)
 
 object DomainColors {
-    val AiSpeech = DomainAccent(Color(0xFF6CCBAB), Color(0xFF1A7A63))   // 薄荷绿（品牌锚点）
-    val Learn = DomainAccent(Color(0xFF7BB4E6), Color(0xFF175A93))      // 学习
-    val Review = DomainAccent(Color(0xFFEBC68B), Color(0xFF8A5712))     // 复习
-    val Library = DomainAccent(Color(0xFFB7A0D9), Color(0xFF65478A))    // 词库
-    val Reading = DomainAccent(Color(0xFFE297A4), Color(0xFF9C3B4F))    // 阅读
-    val Danger = DomainAccent(Color(0xFFDD8B81), Color(0xFF9E2B24))     // 不可撤销的破坏性操作
-    val Settings = DomainAccent(Color(0xFFA6B0AC), Color(0xFF4A5551))   // 设置/中性
+    // 2026-11-10 域色归一：色相按域保留，S/L 收到品牌档（浅 base 48/61、浅 deep 65/29）。
+    // 与 AppColors.kt 的 DomainLight 逐值相同（契约测试双钉），裁决见
+    // docs/decisions/2026-11-10-domain-color-normalization.md。
+    val AiSpeech = DomainAccent(Color(0xFF6CCBAB), Color(0xFF1A7A63))   // 薄荷绿（品牌锚点，不动）
+    val Learn = DomainAccent(Color(0xFF6C9FCB), Color(0xFF1A4D7A))      // 学习
+    val Review = DomainAccent(Color(0xFFCBA76C), Color(0xFF7A551A))     // 复习
+    val Library = DomainAccent(Color(0xFF926CCB), Color(0xFF411A7A))    // 词库
+    val Reading = DomainAccent(Color(0xFFCB6C7C), Color(0xFF7A1A2B))    // 阅读
+    val Danger = DomainAccent(Color(0xFFCB766C), Color(0xFF7A241A))     // 不可撤销的破坏性操作
+    val Settings = DomainAccent(Color(0xFF96A29D), Color(0xFF464E4B))   // 设置/中性（S 6%，只对齐 L）
 }
