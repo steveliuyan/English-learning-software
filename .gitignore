@@ -24,3 +24,7 @@ app/src/main/assets/kokoro-production/model-files-v1.0/
 
 # 工具私有记忆数据，不入库
 .workbuddy/
+
+# 本地临时产物（截图 / 一次性脚本 / 试跑工作目录），不入库
+.tmp/
+.dsh-pilot/
