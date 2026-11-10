@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -28,11 +31,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,7 +53,7 @@ import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
 
 /**
- * 词书单词浏览页（D2）：字母分组 + 顶部横向可滚的 A–Z 快速索引（Task 21 起为 48dp 芯片条）。
+ * 词书单词浏览页（D2）：字母分组 + 贴屏幕右边缘的竖排 A–Z 快速索引（m05053 改版；Task 21 起曾为顶部横向 48dp 芯片条）。
  * 默认落在 A 组顶部，点索引字母直接跳到对应组，不用长滑找词。
  *
  * 批 1 Task 5 起本屏还是词库页 `WordBankScreen` 的「词书段」：那种用法下由壳提供页头与四分段，
@@ -109,7 +114,7 @@ fun WordBookWordsScreen(
     ) {
         val colors = appColors()
         if (showHeader) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
                 Text(
                     text = "← 返回",
                     modifier = Modifier
@@ -130,81 +135,85 @@ fun WordBookWordsScreen(
             }
         }
         WordBookWordsFilterBar(state, onFilter)
-        // Task 21：字母索引从右侧竖排压缩槽搬到正文上方的横向可滚 48dp 芯片条
-        // （Rail 的显示条件与挂载语义逐字保留：载入中/不可用时不出现）。
-        if (!state.loading && state.error == null) {
-            WordBookWordsAlphabetRail(
-                availableLetters = groups.map { it.letter }.toSet(),
-                currentLetter = currentLetter,
-                onLetter = { letter ->
-                    // 点了没有单词的字母时跳到「字母序最近的下一组」，避免点了没反应。
-                    val target = groups.firstOrNull { it.letter >= letter }?.letter
-                        ?: groups.lastOrNull()?.letter
-                        ?: return@WordBookWordsAlphabetRail
-                    headerIndices[target]?.let { index ->
-                        railScope.launch { listState.scrollToItem(index) }
-                    }
-                },
-            )
-        }
-        Box(Modifier.fillMaxSize()) {
-            when {
-                state.loading -> SkeletonList(
-                    // 批 C-3（Spec 05 F5-05 / 决策 2026-11-07 决定 3 第一类「等数据」）：
-                    // 旧首帧是 48dp 转圈 + 一句「正在读取词书单词…」。真实列表那一族是
-                    // `Card(surface + 1dp outlineSoft 描边)` 里套 `WordRow(padding 16/12)`、
-                    // 行与行 `spacedBy(10.dp)`（`WordBookWordsRow`），所以这里走族里的**卡行档**
-                    // （`framed = true`：壳、内边距、缝都由族按真实形状给），并且
-                    // `leading = false`——`WordRow` 没有前导图标，词头在左列、状态词在右列。
-                    // 宽度档按真实行：词头（`AppType.Body` 一个英文词）短、释义行（「释义：…」）宽。
-                    // 字母索引条与页尾不铺：前者是有数据才挂的导航件（`!state.loading` 那一判），
-                    // 后者是回执位，都不是「行」的形状。
-                    rows = WORD_BOOK_WORDS_PLACEHOLDER_ROWS,
-                    rowHeight = 48.dp,
-                    tagPrefix = "wordbook_words_row_skeleton_",
-                    leading = false,
-                    framed = true,
-                    titleFraction = 0.30f,
-                    subtitleFraction = 0.62f,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 6.dp)
-                        .testTag("wordbook_words_loading"),
-                )
-                state.error != null -> Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 32.dp)
-                        .testTag("wordbook_words_unavailable"),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text(state.error, style = AppType.Body, color = colors.text1)
-                    Button(
-                        onClick = onRetry,
+        // m05053：字母索引从「正文上方横向可滚 48dp 芯片条」改回「贴屏幕右边缘的竖排 A–Z」，
+        // 且与列表**并排**而不是叠在列表上方——用户反馈：索引本该在屏幕右边；页头 + 筛选条 +
+        // 索引条一起把上半屏吃掉、词区只剩半屏。Rail 的显示条件与挂载语义逐字保留
+        // （载入中/不可用时不挂：没有数据就没有可导航的目标）。
+        Row(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) {
+                when {
+                    state.loading -> SkeletonList(
+                        // 批 C-3（Spec 05 F5-05 / 决策 2026-11-07 决定 3 第一类「等数据」）：
+                        // 旧首帧是 48dp 转圈 + 一句「正在读取词书单词…」。真实列表那一族是
+                        // `Card(surface + 1dp outlineSoft 描边)` 里套 `WordRow(padding 16/12)`、
+                        // 行与行 `spacedBy(10.dp)`（`WordBookWordsRow`），所以这里走族里的**卡行档**
+                        // （`framed = true`：壳、内边距、缝都由族按真实形状给），并且
+                        // `leading = false`——`WordRow` 没有前导图标，词头在左列、状态词在右列。
+                        // 宽度档按真实行：词头（`AppType.Body` 一个英文词）短、释义行（「释义：…」）宽。
+                        // 字母索引条与页尾不铺：前者是有数据才挂的导航件（`!state.loading` 那一判），
+                        // 后者是回执位，都不是「行」的形状。
+                        rows = WORD_BOOK_WORDS_PLACEHOLDER_ROWS,
+                        rowHeight = 48.dp,
+                        tagPrefix = "wordbook_words_row_skeleton_",
+                        leading = false,
+                        framed = true,
+                        titleFraction = 0.30f,
+                        subtitleFraction = 0.62f,
                         modifier = Modifier
-                            .testTag("wordbook_words_retry")
-                            .semantics { contentDescription = "重试读取词书单词" },
-                        colors = ButtonDefaults.buttonColors(containerColor = appDomain(AppDomain.AiSpeech).base, contentColor = colors.onBrand),
-                    ) { Text("重试") }
-                }
-                else -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 20.dp, end = 36.dp, top = 6.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    if (groups.isEmpty()) {
-                        item { WordBookWordsEmpty() }
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                            .testTag("wordbook_words_loading"),
+                    )
+                    state.error != null -> Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 32.dp)
+                            .testTag("wordbook_words_unavailable"),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(state.error, style = AppType.Body, color = colors.text1)
+                        Button(
+                            onClick = onRetry,
+                            modifier = Modifier
+                                .testTag("wordbook_words_retry")
+                                .semantics { contentDescription = "重试读取词书单词" },
+                            colors = ButtonDefaults.buttonColors(containerColor = appDomain(AppDomain.AiSpeech).base, contentColor = colors.onBrand),
+                        ) { Text("重试") }
                     }
-                    groups.forEach { group ->
-                        stickyHeader(key = "letter-${group.letter}") {
-                            WordBookWordsLetterHeader(group.letter)
+                    else -> LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (groups.isEmpty()) {
+                            item { WordBookWordsEmpty() }
                         }
-                        items(group.records, key = { "word-${it.cardId}" }) { row ->
-                            WordBookWordsRow(row, onOpenWord)
+                        groups.forEach { group ->
+                            stickyHeader(key = "letter-${group.letter}") {
+                                WordBookWordsLetterHeader(group.letter)
+                            }
+                            items(group.records, key = { "word-${it.cardId}" }) { row ->
+                                WordBookWordsRow(row, onOpenWord)
+                            }
                         }
                     }
                 }
+            }
+            if (!state.loading && state.error == null) {
+                WordBookWordsAlphabetRail(
+                    availableLetters = groups.map { it.letter }.toSet(),
+                    currentLetter = currentLetter,
+                    onLetter = { letter ->
+                        // 点了没有单词的字母时跳到「字母序最近的下一组」，避免点了没反应。
+                        val target = groups.firstOrNull { it.letter >= letter }?.letter
+                            ?: groups.lastOrNull()?.letter
+                            ?: return@WordBookWordsAlphabetRail
+                        headerIndices[target]?.let { index ->
+                            railScope.launch { listState.scrollToItem(index) }
+                        }
+                    },
+                )
             }
         }
     }
@@ -216,7 +225,7 @@ private fun WordBookWordsFilterBar(state: WordBookWordsUiState, onFilter: (WordB
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val filters = listOf<WordBookRecordStatus?>(null) + WordBookRecordStatus.entries
@@ -296,6 +305,7 @@ private fun WordBookWordsRow(row: WordBookRecord, onOpenRow: (WordBookRecord) ->
             lemma = row.displayLemma,
             gloss = row.card?.meaningZh?.takeIf { it.isNotBlank() }?.let { "释义：$it" } ?: unavailableNotice,
             status = row.status.statusLabel(),
+            lemmaStyle = AppType.Title,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
     }
@@ -317,15 +327,20 @@ private fun WordBookWordsEmpty() {
 }
 
 /**
- * 正文上方的 A–Z 导航条（Task 21 / F5-03 移交账 AC-R-04）：26 枚 **48dp 见方**字母芯片横向可滚。
- * 有单词的字母高亮、当前组更醒目，没有的变淡但仍可点（挂载点保留「跳字母序最近的下一组」）。
+ * 贴屏幕右边缘的竖排 A–Z 导航轨（m05053 改版，取代 Task 21 的顶部横向 48dp 芯片条）。
  *
- * 版面选型（裁定 R-21.1，理由见 task-21 报告）：AC-R-04 约束的是控件**高度** ≥48dp，
- * 横向滚动容器让 26 枚方形目标各占 48dp 宽且互不重叠；本屏 `WordBookWordsFilterBar` 已是
- * `horizontalScroll` + chip 的同款先例。三段折叠会把「任一字母一次直达」变成两次操作，
- * 且 26×48dp=1248dp 的纵向空间远超屏高。
- * 旧竖排压缩槽（`slotPixels = min(18dp, maxHeight/26)`，命中区 ≈24×13dp）连同其**代偿输入路径**
- * ——整轨 `pointerInput` 拖动面——一并退役（豁免注记见 `docs/decisions/2026-10-15-f5-03-accessibility-hardening-semantics.md` §5）。
+ * 现场：用户反馈「字母应该是在屏幕的右边，不在最上面」，且顶部页头 + 筛选条 + 48dp 索引条
+ * 一起把上半屏吃掉、词区只剩半屏。改版后本轨与列表**并排**
+ * （`Row { Box(weight(1f)) { 列表 } ; 本轨 }`），列表因此拿到整块可用高度。
+ *
+ * 触控口径不变（F5-03 移交账 AC-R-04）：每枚字母仍是 **48dp 见方**的可点面、相邻不相交。
+ * 26 × 48dp = 1248dp 远超屏高，所以竖轨自身可滚——这与旧横向条「26 × 48dp = 1295dp 也要横向滚」
+ * 是**同等**的操作代价（旧条在本类 connected 用例里也是先 `performScrollTo()` 再点），不是新退化。
+ * 当前字母由 `LaunchedEffect(currentLetter)` 自动滚进视野：否则滚列表时高亮会滚出可视区，
+ * 「当前字母更大/异色」这两条判据在真机上就无从看起。
+ *
+ * 仍然只有一层可点节点、字形单独一枚语义节点（active 标签必须由独立节点承载：同一节点只能留一枚
+ * `testTag`，设备实测两枚并挂时 `wordbook_words_rail_active_*` 会从语义树里消失）。
  */
 @Composable
 private fun WordBookWordsAlphabetRail(
@@ -336,55 +351,57 @@ private fun WordBookWordsAlphabetRail(
 ) {
     val colors = appColors()
     val accent = appDomain(AppDomain.AiSpeech).base
-    Row(
+    val railScroll = rememberScrollState()
+    val density = LocalDensity.current
+    LaunchedEffect(currentLetter) {
+        val index = ('A'..'Z').indexOfFirst { it.toString() == currentLetter }
+        if (index >= 0) {
+            val slotPx = with(density) { WordBookWordsRailSlotSize.toPx() }
+            // 让当前字母落在可见区靠上的位置（留一个槽的余量），不追求精确居中：
+            // 26 个槽的轨道上「居中」在两端会被夹住、反而看不出滚动。
+            railScroll.animateScrollTo(((index - 1) * slotPx).toInt().coerceIn(0, railScroll.maxValue))
+        }
+    }
+    Column(
         modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
+            .fillMaxHeight()
+            .width(WordBookWordsRailSlotSize)
+            .verticalScroll(railScroll)
             .testTag("wordbook_words_rail")
-            // 左右 20dp 与本屏 `WordBookWordsFilterBar` 的同款横向滚动条一致（贴边会把芯片顶到屏幕边缘）；
-            // 竖向只给 6dp：芯片本身已是 48dp，再叠 FilterBar 那 10dp 会让索引条吃掉过多正文高度。
-            .padding(horizontal = 20.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .semantics { contentDescription = "字母索引 A 到 Z" },
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ('A'..'Z').forEach { letter ->
             val letterText = letter.toString()
             val available = letterText in availableLetters
             val active = letterText == currentLetter
-            // 外层只管「当前字母」这枚标签：**同一个节点只能留一枚 `testTag`**
-            // （设备实测：两枚并挂时 `wordbook_words_rail_active_*` 在语义树里彻底消失，23 例里 17 例连带红），
-            // 所以 active 标签必须由独立语义节点承载。旧竖排也是这个形状（槽 Box + 字形 Text 两枚节点）。
+            // 外层只管「当前字母」这枚标签（同一个节点只能留一枚 `testTag`），
+            // active 标签必须由独立语义节点承载——与旧横条同形（槽 Box + 字形 Text 两枚节点）。
             Box(
-                modifier = if (active) Modifier.testTag("wordbook_words_rail_active_$letterText") else Modifier,
+                modifier = if (active) Modifier.testTag("wordbook_words_rail_active_" + letterText) else Modifier,
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
                     modifier = Modifier
                         // 48dp 下限钉在**这枚带 clickable 的节点自身**（AC-R-04 要的是可点区，不是视觉高度）；
-                        // 用下限而不是 `size`，动态字体下芯片随字号只增不减。`spacedBy(2.dp)` 保证相邻命中区不相交，
-                        // 旧压缩槽「命中区落在整槽内并覆盖槽心」那套代偿护栏因此退役。
-                        // 颜色取主题档（`appColors()` / `appDomain(AiSpeech).base`），不新增裸 hex、
-                        // `AppPalette.` 或 `DomainColors.` 静态读点。
-                        .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                        // 用下限而不是 `size`，动态字体下芯片随字号只增不减。轨内纵向无间隙 ⇒ 命中区天然不相交。
+                        .sizeIn(minWidth = WordBookWordsRailSlotSize, minHeight = WordBookWordsRailSlotSize)
                         .clickable(onClick = { onLetter(letterText) })
-                        .testTag("wordbook_words_rail_$letterText"),
-                    // 字形由 Box 居中，不靠 `lineHeight` 撑高：后者会让 `TextLayoutResult.hasVisualOverflow`
-                    // 为真（设备实测），把「字形不越界」这条护栏变成假红。
+                        .testTag("wordbook_words_rail_" + letterText),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = letterText,
                         // 朗读定语挂在字形这一枚：合并语义后由上面那枚可点芯片承载（TalkBack 念的是按钮），
                         // 而 connected 侧要读字形取值时用 `useUnmergedTree = true` 取本节点。
-                        modifier = Modifier.semantics { contentDescription = "导航字母 $letterText" },
+                        modifier = Modifier.semantics { contentDescription = "导航字母 " + letterText },
                         color = when {
                             active -> accent
                             available -> colors.text1
                             else -> colors.text2.copy(alpha = 0.45f)
                         },
-                        // 17sp / 13sp 的手搓值换成六档同值档（Title 17sp/650、Footnote 13sp/Normal）：
-                        // 原先的 `FontWeight.Bold` / `Normal` 由档自带，connected 侧「当前字母更大」
-                        // 与 `activeLetterUsesADifferentColor` 读的都是 `layoutInput.style`，取值关系逐字保留。
+                        // Title 17sp/650、Footnote 13sp/Normal：档自带字重，不 `copy(fontWeight)`；
+                        // connected 侧「当前字母更大」与 `activeLetterUsesADifferentColor` 读 `layoutInput.style`。
                         style = if (active) AppType.Title else AppType.Footnote,
                         maxLines = 1,
                     )
@@ -393,6 +410,9 @@ private fun WordBookWordsAlphabetRail(
         }
     }
 }
+
+//** 索引轨的槽边尺寸（m05053）：既是竖轨宽度、也是每枚字母的方形触控下限（AC-R-04 的 48dp）。 */
+private val WordBookWordsRailSlotSize = 48.dp
 
 private fun WordBookRecordStatus?.label(): String = when (this) {
     null -> "全部"

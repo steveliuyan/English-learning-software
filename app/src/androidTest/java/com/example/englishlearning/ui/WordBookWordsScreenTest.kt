@@ -112,6 +112,66 @@ class WordBookWordsScreenTest {
     }
 
     /**
+     * m05053 改版判据（用户反馈 3：「字母应该是在屏幕的右边，不在最上面」）：
+     * 索引轨必须**贴屏幕右边缘、与列表并排**，而且是一根**竖轨**（高 > 宽），
+     * 不再横躺在列表上方吃掉半屏高度。
+     *
+     * 天然红锚：改版前的横向 48dp 芯片条内容宽 1295dp、左缘落在正文左留白 20dp 处、
+     * 且整条位于列表**上方**——本用例的「轨在屏幕右半边 + 轨在首行右侧 + 高 > 宽」三条都会当场红。
+     */
+    @Test
+    fun alphabetRailSitsOnTheRightEdgeBesideTheList() {
+        showAlphabet()
+        val screen = composeRule.onNodeWithTag("wordbook_words_screen").getUnclippedBoundsInRoot()
+        val rail = composeRule.onNodeWithTag("wordbook_words_rail").getUnclippedBoundsInRoot()
+        val row = composeRule.onNodeWithTag("wordbook_words_row_A1").getUnclippedBoundsInRoot()
+        assertTrue(
+            "索引轨必须贴屏幕右边缘（右缘对齐屏右缘 1dp 内）: rail=" + rail.toString() + " screen=" + screen.toString(),
+            rail.right >= screen.right - 1.dp,
+        )
+        assertTrue(
+            "索引轨必须整根落在屏幕右半边，不能横躺在正文上方: rail=" + rail.toString() + " screen=" + screen.toString(),
+            rail.left > screen.left + (screen.right - screen.left) / 2,
+        )
+        assertTrue(
+            "索引轨必须在列表右侧（与列表并排，不是叠在列表上方）: rail=" + rail.toString() + " row=" + row.toString(),
+            rail.left >= row.right - 0.5.dp,
+        )
+        assertTrue(
+            "索引轨必须是竖轨（高 > 宽，A–Z 沿列排布）: rail=" + rail.toString(),
+            (rail.bottom - rail.top) > (rail.right - rail.left),
+        )
+        assertTrue(
+            "索引轨宽度必须容得下 48dp 见方的字母触控目标: rail=" + rail.toString(),
+            rail.right - rail.left >= 48.dp - dpConversionTolerance,
+        )
+    }
+
+    /**
+     * m05053 改版判据（用户反馈 3：「这个单词显示得太小了」）：词书列表的词头排印提到标题档
+     * （`AppType.Title`，17sp/650），不再是正文档 15sp（`AppType.Body`）。
+     *
+     * 参照值取自**同屏页头的「词书单词」标题**——它本来就挂 `AppType.Title`，因此本用例两侧都是
+     * 渲染出来的字号（不依赖 `AppType` 的 @Composable 取值，测试处拿不到组合上下文）；
+     * 两处都取 `useUnmergedTree = true`——词行整行是 clickable 卡，合并树里拿不到 TextLayoutResult。
+     *
+     * 天然红锚：`WordBookWordsRow` 改版前调 `WordRow` 用默认 `AppType.Body`（15sp），
+     * 本用例「词头字号 ≥ 页头标题字号」当场红。
+     */
+    @Test
+    fun wordBookLemmaUsesTheTitleScale() {
+        showWords(listOf(word("book:apple", "apple")))
+        val titleSp = composeRule.onNodeWithText("词书单词", useUnmergedTree = true)
+            .textLayout().layoutInput.style.fontSize.value
+        val lemmaSp = composeRule.onNodeWithText("apple", useUnmergedTree = true)
+            .textLayout().layoutInput.style.fontSize.value
+        assertTrue(
+            "词书词头必须与页头标题同档（页头实测 " + titleSp.toString() + "sp，词头 " + lemmaSp.toString() + "sp）",
+            lemmaSp >= titleSp,
+        )
+    }
+
+    /**
      * Task 21 / F5-03 移交账（AC-R-04）：字母索引**每一枚**的可点区必须 ≥48dp 见方，
      * 并且**带 tag 的那枚节点自己**承担 click action（不靠父槽、更不靠整轨拖动代偿）。
      *

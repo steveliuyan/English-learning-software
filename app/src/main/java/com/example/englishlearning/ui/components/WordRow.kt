@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppColorSet
@@ -146,6 +147,15 @@ fun WordRow(
      */
     topDivider: Boolean = false,
     actions: @Composable (RowScope.() -> Unit)? = null,
+    /**
+     * m05053：词头的排印档，默认 [AppType.Body]（15sp/400，既有各挂载点逐字不变）。
+     *
+     * 加这枚形参的现场：用户反馈词书单词页「单词显示得太小」。那一屏的词行是列表主体内容，
+     * 词头应与屏幕标题同档（[AppType.Title]，17sp/650）；而详情页/搜索结果等把词行当次要索引用的
+     * 地方仍留在 Body 档，所以是**可选形参**而不是改默认值（改默认值会连带改掉十几个挂载点的观感）。
+     * 行墨不变（仍取 [wordRowInks] 的 `lemma` 槽），只换字号字重档——档内字重由档自带，不 `copy(fontWeight)`。
+     */
+    lemmaStyle: TextStyle = AppType.Body,
 ) {
     // 四枚墨一律从纯表取（源码契约钉「本文件恰一处 wordRowInks(appColors())」）。
     val inks = wordRowInks(appColors())
@@ -172,7 +182,7 @@ fun WordRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = lemma,
-                style = AppType.Body,
+                style = lemmaStyle,
                 color = inks.lemma,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
