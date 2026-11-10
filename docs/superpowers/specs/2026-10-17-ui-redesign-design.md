@@ -37,7 +37,7 @@
 ### 2.1 颜色（浅 / 深两套，落为 `AppPalette` 常量 + `MaterialTheme` 装配点）
 
 **与既有令牌的关系（须核对，别当已就位）**：`ui/theme/AppPalette.kt` 已存在，全站 154 处引用
-`AppPalette.*` / `DomainColors.*`（实测计数），且 `DomainColors` 七域取值与本文 §2.1 域色表**逐值一致**
+`AppPalette.*` / `DomainColors.*`（实测计数），且 `DomainColors` 七域取值与本文 §2.1 域色表**逐值一致**（注：域色表本身已于 2026-11-10 归一，见下）
 （F5-03 轮建立）。本轮要动的是三件事：① 中性色取值按视觉稿校准（现状 `Background #F5F5F7` 是 iOS 灰，
 本文定为浅薄荷底；`TextSecondary #6E6E73` → `#566B62`；`Separator #E5E5EA` → `#EBF1ED`；
 `GlassFill #CCFFFFFF` → `#EFFFFFFF`）；② 补齐缺失 token（`tint/tint-2/tint-3/outline/on-brand/error-fill`）；
@@ -75,12 +75,18 @@
 | 域 | 浅 deep / base | 深（deep = base） |
 |---|---|---|
 | AI | `#1A7A63` / `#6CCBAB` | `#6FD9B6` |
-| 学习 | `#175A93` / `#7BB4E6` | `#84C4EE` |
-| 复习 | `#8A5712` / `#EBC68B` | `#EFCB92` |
-| 词库 | `#65478A` / `#B7A0D9` | `#C6A9E4` |
-| 阅读 | `#9C3B4F` / `#E297A4` | `#EDA8B4` |
-| 危险 | `#9E2B24` / `#DD8B81` | `#E39086` |
-| 设置 | `#4A5551` / `#A6B0AC` | `#B4BEBA` |
+| 学习 | `#1A4D7A` / `#6C9FCB` | `#96BFE3` |
+| 复习 | `#7A551A` / `#CBA76C` | `#E3C696` |
+| 词库 | `#411A7A` / `#926CCB` | `#B596E3` |
+| 阅读 | `#7A1A2B` / `#CB6C7C` | `#E396A4` |
+| 危险 | `#7A241A` / `#CB766C` | `#E39F96` |
+| 设置 | `#464E4B` / `#96A29D` | `#B9C1BD` |
+
+> **2026-11-10 域色归一（覆盖上表的原型取值）**：上表已换成归一后的值——色相仍每域一枚
+> （AiSpeech 保持品牌色相、三值逐字不动），饱和度/明度收敛成同档：浅 `base` S48/L61、
+> 浅 `deep` S65/L29、深套 S58/L74（`deep = base`），`Settings` 保持 S6 只对齐明度。
+> 这是本仓库**唯一**按后续裁决覆盖冻结原型域色表的 token 家族，其余 28 枚中性 token 不受影响。
+> 依据与旧值对照见 [`docs/decisions/2026-11-10-domain-color-normalization.md`](../../decisions/2026-11-10-domain-color-normalization.md)。
 
 > 域色与语义色是两条线：上表「危险域」只用于入口图标着色，不承担错误文字/按钮语义；
 > 错误与危险操作一律用 §2.1 的 `danger #A5291F` / `danger-tint #FDEEEC`。
@@ -99,11 +105,11 @@
 `AppScreen.kt:2223`/`:2336`）。
 
 **域色容器上的字形对比（本轮新增，与图标选型无关的公共约束）**：图标容器**不得把浅色模式的 `base` 直接当白字形底**。
-按 WCAG 相对亮度实测（轻松档复算），白字形在 `base` 上为 AI `#6CCBAB` **1.95:1**、复习 `#EBC68B` **1.62:1**，
-低于图形非文本对比 3:1 的下限（薄荷与黄恰是最亮的两域）；改用 `deep` 实底则为 **5.24–7.75:1**，全部合格。
+按 WCAG 相对亮度实测（域色归一口径），白字形在 `base` 上为 AI `#6CCBAB` **1.95:1**、复习 `#CBA76C` **2.26:1**，
+低于图形非文本对比 3:1 的下限（薄荷与黄恰是最亮的两域）；改用 `deep` 实底则为 **5.24–12.70:1**，全部合格。
 因此若采用渐变容器，渐变亮端取 **`deep` 混 18% `base`**（不是 `base` 本体；2026-10-27 由 35% 收起，
-`IconBadge.GRADIENT_START_FRACTION = 0.18`），七域白字形实测 **4.28:1–6.20:1**，最差为 AI。
-深色模式容器使用同一组域色（`base = deep`）配 `on-brand #04241C` 深色字形，实测 **6.75:1–10.69:1**，最差为 AI
+`IconBadge.GRADIENT_START_FRACTION = 0.18`），七域白字形实测 **4.28:1–10.40:1**，最差为 AI。
+深色模式容器使用同一组域色（`base = deep`）配 `on-brand #04241C` 深色字形，实测 **6.62:1–10.03:1**，最差为词库
 （旧口径的 `#06231A` 已随 `on-brand` 统一而作废）。
 这些数字由 `docs/design/2026-10-25-icon-system-design-sheet.html` §4.1–§4.4 的同一套令牌算出，验收口径见 §9 AC-R-03。
 
@@ -111,8 +117,8 @@
 [`docs/decisions/2026-10-22-ui-redesign-icon-legibility-and-entry-color.md`](../../decisions/2026-10-22-ui-redesign-icon-legibility-and-entry-color.md)
 裁决 22-2）**：入口行容器**不再按域上底色**——`EntryIconTone.Tint` 的底从「`surface` 混 16% `deep`」改为统一 `tint`，
 域色只留在字形描边上，且**同组同色、跨组才换色**；`Gradient`（域渐变实底）退出入口行族，只留给卡内主行与强调块。
-新配对（域 `deep` 压 `tint`）浅套实测 4.65–6.88:1、深套 6.12–9.70:1（2026-10-27 轻松档复算），
-全部过图形非文本 3:1 且连正文 4.5 都过，最低为 AiSpeech。
+新配对（域 `deep` 压 `tint`）浅套实测 4.57–11.08:1、深套 6.00–9.09:1（2026-11-10 域色归一后复算），
+全部过图形非文本 3:1 且连正文 4.5 都过，最低为浅套 AiSpeech 4.57 / 深套词库 6.00。
 本节上方那段「渐变容器 + 白字形」的实测数字仍然成立，但它管的对象收窄为 `Gradient` 档，不再是入口族的默认呈现。
 
 ### 2.2 排版：语义档 + M3 角色钉值
