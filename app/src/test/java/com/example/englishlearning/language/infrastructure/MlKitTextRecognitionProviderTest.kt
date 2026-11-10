@@ -1,5 +1,6 @@
 package com.example.englishlearning.language.infrastructure
 
+import com.example.englishlearning.language.domain.OcrBlockOrientation
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrImage
 import com.example.englishlearning.language.domain.OcrOutcome
@@ -30,6 +31,9 @@ class MlKitTextRecognitionProviderTest {
         assertEquals(0.8f, outcome.result.regions[0].confidence, 0.0001f)
         assertTrue(outcome.result.regions[1].confidence.isNaN())
         assertEquals(50, outcome.result.regions[0].right)
+        // AC3-07：块内文本与朝向必须跟着几何一起出来，否则原位覆盖只能瞎猜。
+        assertEquals("first line", outcome.result.regions[0].text)
+        assertEquals(OcrBlockOrientation.Horizontal, outcome.result.regions[0].orientation)
     }
 
     @Test

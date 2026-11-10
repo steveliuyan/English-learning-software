@@ -62,6 +62,15 @@
 - OCR 只负责本地文字识别与坐标；翻译是独立步骤。图片默认不保存；上传 AI 前必须确认。
 - 未通过许可核验的词书、词典、音频或模型不得打包、下载或发布。
 
+### 悬浮窗与前台服务
+
+- 任何「在别的应用上层显示内容」的能力都必须用户手动去系统设置开 `SYSTEM_ALERT_WINDOW`：应用只解释为什么需要、给一键跳设置的入口，不主动弹窗索要。
+- 屏幕截取一律走 `MediaProjection` + `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_MEDIA_PROJECTION` 前台服务：授权令牌一次会话有效，界面与文案不得暗示可以长期免授权。
+- **不声明无障碍服务权限**来偷画面；也不为截屏引入任何后台静默入口。
+- 截屏帧只在内存里过一遍（取指纹 → OCR → 丢弃）：不落盘、不上传；上行的只有识别出的文字，且首次发送前仍要走逐次出站确认。
+- 「这一帧没有可翻的内容」不是会话级错误：只提示一句、会话继续；只有真正没法自己好的情况（权限缺失、授权被拒/被回收、本机没有 OCR、没有可用 AI 服务、网络失败）才结束会话。
+- 成本必须可见：已发请求数 + 目标模型名 + 「按服务实际计费」，随时可停；前台常驻通知要带停止入口。
+
 ### 备份与恢复
 
 - 备份可包含学习数据、文章、收藏、查询历史、可选 AI 音频和用户主动保存的拍照翻译记录；绝不包含 API Key、Keystore 密钥、系统 TTS 数据或临时图片。
@@ -78,6 +87,15 @@
 - 核心路径不得阻塞 UI；网络请求可取消、超时并映射为可行动错误。
 - 每个第三方依赖、数据集和模型必须登记版本、许可证、用途、数据流、NOTICE 位置与替代方案。
 
+## 工程实践约定（接线与测试）
+
+- **`assembleDebug` 不编译 androidTest**：改了屏的形参或换了共享件签名，必须单独跑 `gradlew compileDebugAndroidTestKotlin`，否则基线会悄悄烂掉。
+- **屏内不调 `hiltViewModel()`**：`PhotoTranslationScreen` / `SentenceAnalysisScreen` 等屏在 androidTest 里用 `createComposeRule()` 无 Hilt 直接渲染。新功能的 ViewModel 由 `MainActivity` 取、经 `AppScreen` 解包成「快照 + 回调」传给屏，屏侧形参给无默认值以便编译期发现漏接。
+- **契约测试里钉死的行号要跟着漂**：`ScreenTransitionContractTest` 这类按原文行区间断言的测试，只要在锚点之前增删行，就必须重算常数并在报告里记一笔。
+- **裸色值只能在 `ui/` 内**：其它包（`screentranslation/`、`phototranslation/` 等）用 `Color.argb(十进制...)`，棘轮测试按目录判。
+- **改大文件前先看换行**：`AppScreen.kt`、`MainActivity.kt`、`AppScreenTest.kt` 是 CRLF，拼锚点按文件实际换行拼接；锚点须带「只有这个调用点才有」的行（同名调用在一份文件里常出现三处）。
+- **真机拉起应用**用 `adb shell monkey -p <pkg> -c android.intent.category.LAUNCHER 1`（`MainActivity` 未导出，`am start` 会被 Permission Denial 拒掉）。
+- **交付前必背**：`testDebugUnitTest` + `compileDebugAndroidTestKotlin` + `assembleDebug` 三连，再 `adb install -r` 装机走查；报告中逐条写清「验到了什么、没验到什么、为什么」。
 ## 技术方向（待阶段 0 锁定版本）
 
 - Kotlin、Jetpack Compose、Room、WorkManager / AlarmManager。

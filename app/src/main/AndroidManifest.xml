@@ -9,6 +9,14 @@
          运行时请求由恢复页发起，拒绝后页面给出提示并可再次授权，无自动重弹。 -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- F3-05 悬浮窗屏幕翻译：SYSTEM_ALERT_WINDOW 用来在其他应用上层画译文（一次授权长期有效，
+         由用户在系统设置里手动开启，本应用不主动弹窗索要）。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- 截屏会话必须挂在 mediaProjection 类型的前台服务上（Android 14+ 强制），常驻通知即停止入口。
+         注意：这里**没有**声明任何无障碍服务权限——读屏文字树那条路被决策文档明确否决。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
     <application
         android:name=".EnglishLearningApplication"
         android:allowBackup="false"
@@ -26,6 +34,12 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/worksheet_file_paths" />
         </provider>
+        <!-- F3-05：一次会话 = 一次授权。MediaProjection 令牌只在本次会话有效，用户按停止/系统回收即结束；
+             截屏帧只在本机内存过一遍（不落盘、不上传），出站只有识别出的文字。 -->
+        <service
+            android:name=".screentranslation.ScreenTranslationService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
         <activity
             android:name=".MainActivity"
             android:exported="false"

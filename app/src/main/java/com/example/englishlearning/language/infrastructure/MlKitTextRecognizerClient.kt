@@ -1,6 +1,7 @@
 package com.example.englishlearning.language.infrastructure
 
 import android.graphics.BitmapFactory
+import com.example.englishlearning.language.domain.OcrBlockOrientation
 import com.example.englishlearning.language.domain.OcrImage
 import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
@@ -28,6 +29,7 @@ class MlKitTextRecognizerClient : MlTextRecognitionClient {
         return try {
             // Confidence and bounding boxes are exposed per line (TextBlock itself carries neither),
             // and line granularity is what the low-confidence marking in the UI needs anyway.
+            // F3-04 additionally needs the line text next to its box, so the domain region keeps both.
             recognizer.process(InputImage.fromBitmap(bitmap, 0)).awaitOrThrow().textBlocks
                 .flatMap { block -> block.lines }
                 .map { line ->
@@ -39,6 +41,13 @@ class MlKitTextRecognizerClient : MlTextRecognitionClient {
                         right = box?.right ?: 0,
                         bottom = box?.bottom ?: 0,
                         confidence = line.confidence.takeIf { it > 0f },
+                        // 行框高于宽即判竖排（竖排 CJK 最常见的几何特征）；其余一律横排。
+                        orientation =
+                            if (box != null && box.height() > box.width()) {
+                                OcrBlockOrientation.Vertical
+                            } else {
+                                OcrBlockOrientation.Horizontal
+                            },
                     )
                 }
         } finally {

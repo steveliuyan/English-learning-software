@@ -83,6 +83,7 @@ import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
 import com.example.englishlearning.language.domain.OcrProviderChain
 import com.example.englishlearning.language.domain.TemporaryImageWorkspace
+import com.example.englishlearning.phototranslation.BlockTranslationUseCase
 import com.example.englishlearning.phototranslation.PhotoTranslationHistoryRepository
 import com.example.englishlearning.phototranslation.PhotoTranslationUseCase
 import com.example.englishlearning.phototranslation.SavedPhotoTranslation
@@ -2059,10 +2060,13 @@ class AppScreenTest {
         val workspace = TemporaryImageWorkspace(
             java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "photo-translation-wiring").also { it.mkdirs() },
         )
+        val resolver = DefaultTextProfileResolver { DefaultTextProfileResult.NoSelection }
         return PhotoTranslationViewModel(
             ocr = OcrProviderChain(emptyList()),
             workspace = workspace,
-            translate = PhotoTranslationUseCase(DefaultTextProfileResolver { DefaultTextProfileResult.NoSelection }, secrets, transport),
+            translate = PhotoTranslationUseCase(resolver, secrets, transport),
+            // F3-04 加进来的第四枚用例：本用例只走历史删除，覆盖翻译那条腿一律不被调用。
+            translateBlocks = BlockTranslationUseCase(resolver, secrets, transport),
             modelAssets = object : EnglishOcrModelAssets {
                 override suspend fun status(): OcrModelAssetStatus = OcrModelAssetStatus.NotInstalled
 

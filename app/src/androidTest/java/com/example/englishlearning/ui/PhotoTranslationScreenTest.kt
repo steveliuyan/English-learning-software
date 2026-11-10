@@ -19,6 +19,7 @@ import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
 import com.example.englishlearning.phototranslation.SavedPhotoTranslation
+import com.example.englishlearning.screentranslation.ScreenTranslationSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -72,6 +73,14 @@ class PhotoTranslationScreenTest {
                 onRequestDeleteSaved = onRequestDeleteSaved,
                 onBack = onBack,
                 onOpenAiSettings = onOpenAiSettings,
+                onOverlayTranslate = {},
+                onOverlayConfirmOutbound = {},
+                onToggleOverlayBlock = {},
+                onCancelOverlayTranslate = {},
+                screenTranslation = ScreenTranslationSnapshot(),
+                onScreenTranslationConfirmOutbound = {},
+                onScreenTranslationDeclineOutbound = {},
+                onScreenTranslationStop = {},
             )
         }
     }
@@ -199,6 +208,14 @@ class PhotoTranslationScreenTest {
                 onRequestDeleteSaved = {},
                 onBack = {},
                 onOpenAiSettings = {},
+                onOverlayTranslate = {},
+                onOverlayConfirmOutbound = {},
+                onToggleOverlayBlock = {},
+                onCancelOverlayTranslate = {},
+                screenTranslation = ScreenTranslationSnapshot(),
+                onScreenTranslationConfirmOutbound = {},
+                onScreenTranslationDeclineOutbound = {},
+                onScreenTranslationStop = {},
             )
         }
 
@@ -250,6 +267,14 @@ class PhotoTranslationScreenTest {
                 onRequestDeleteSaved = {},
                 onBack = {},
                 onOpenAiSettings = {},
+                onOverlayTranslate = {},
+                onOverlayConfirmOutbound = {},
+                onToggleOverlayBlock = {},
+                onCancelOverlayTranslate = {},
+                screenTranslation = ScreenTranslationSnapshot(),
+                onScreenTranslationConfirmOutbound = {},
+                onScreenTranslationDeclineOutbound = {},
+                onScreenTranslationStop = {},
             )
         }
 

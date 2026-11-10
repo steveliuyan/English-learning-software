@@ -1,5 +1,6 @@
 package com.example.englishlearning.language.infrastructure
 
+import com.example.englishlearning.language.domain.OcrBlockOrientation
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrImage
 import com.example.englishlearning.language.domain.OcrOutcome
@@ -16,6 +17,7 @@ data class MlClientBlock(
     val right: Int,
     val bottom: Int,
     val confidence: Float?,
+    val orientation: OcrBlockOrientation = OcrBlockOrientation.Horizontal,
 )
 
 /** Seam over the ML Kit text recognizer so the provider stays unit-testable off-device. */
@@ -47,6 +49,8 @@ class MlKitTextRecognitionProvider(
                                     right = block.right,
                                     bottom = block.bottom,
                                     confidence = block.confidence ?: Float.NaN,
+                                    text = block.text,
+                                    orientation = block.orientation,
                                 )
                             },
                     ),

@@ -1,5 +1,7 @@
 package com.example.englishlearning.ui
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.englishlearning.ai.AiFailure
@@ -14,6 +16,13 @@ import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
 import com.example.englishlearning.language.domain.OcrProviderChain
 import com.example.englishlearning.language.domain.TemporaryImageWorkspace
+import com.example.englishlearning.phototranslation.BlockTranslationNotConfiguredReason
+import com.example.englishlearning.phototranslation.BlockTranslationResult
+import com.example.englishlearning.phototranslation.BlockTranslationUseCase
+import com.example.englishlearning.phototranslation.ImageTextOverlayRenderer
+import com.example.englishlearning.phototranslation.OverlayBlockLayout
+import com.example.englishlearning.phototranslation.OverlayBlockPlanner
+import com.example.englishlearning.phototranslation.OverlayBlockSource
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
 import com.example.englishlearning.phototranslation.PhotoTranslationResult
 import com.example.englishlearning.phototranslation.PhotoTranslationUseCase
@@ -23,7 +32,9 @@ import com.example.englishlearning.phototranslation.SavedPhotoTranslation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -67,6 +78,26 @@ data class PhotoTranslationUiState(
     val history: List<SavedPhotoTranslation> = emptyList(),
     val lastSavedRecordId: String? = null,
     val saveIssue: AppError? = null,
+    /**
+     * F3-04：本次采集的原图位图，只用于**显示与合成**（识别与覆盖都在同一坐标系里做），
+     * 不写盘、不随保存落库；reset/换图即释放。
+     */
+    val sourceImage: Bitmap? = null,
+    /** 块清单（1 基 id）。空 = 没识别出块或还没识别。 */
+    val overlayBlocks: List<OverlayBlockSource> = emptyList(),
+    /** 参与覆盖的块 id；低置信与空文本块默认不在内，用户可逐块打开。 */
+    val overlayIncludedIds: Set<Int> = emptySet(),
+    /** 块 id → 译文。空 = 还没翻过。 */
+    val overlayTranslations: Map<Int, String> = emptyMap(),
+    val overlayTranslating: Boolean = false,
+    /** 非空即弹出站确认框（与逐段翻译同一个确认门，确认前零字节出网）。 */
+    val overlayPendingConfirmationHost: String? = null,
+    val overlayIssue: PhotoTranslationFailureCategory? = null,
+    /** 原位覆盖产物：**新位图**，原图 [sourceImage] 不被改动（AC3-11）。 */
+    val overlayImage: Bitmap? = null,
+    /** 渲染器判定跳过/截断的块数——「为什么这块没被覆盖」必须在界面上说得出。 */
+    val overlaySkippedCount: Int = 0,
+    val overlayTruncatedCount: Int = 0,
 )
 
 @HiltViewModel
@@ -74,6 +105,7 @@ class PhotoTranslationViewModel @Inject constructor(
     private val ocr: OcrProviderChain,
     private val workspace: TemporaryImageWorkspace,
     private val translate: PhotoTranslationUseCase,
+    private val translateBlocks: BlockTranslationUseCase,
     private val modelAssets: EnglishOcrModelAssets,
     private val history: PhotoTranslationHistoryRepository,
     private val recordIds: WordNoteIdFactory,
@@ -86,12 +118,16 @@ class PhotoTranslationViewModel @Inject constructor(
     private var translateJob: Job? = null
     private var modelJob: Job? = null
     private var historyJob: Job? = null
+    private var overlayJob: Job? = null
 
     /**
      * 本次采集的原图字节只留在内存，唯一出口是用户「明确保存」（AC3-05）；
      * reset/离开页面即释放，磁盘上从头到尾只有临时区，且任何出口零残留。
      */
     private var captureBytes: ByteArray? = null
+
+    /** 覆盖合成的源位图；与 [captureBytes] 同寿命，换图/reset 时 recycle。 */
+    private var captureBitmap: Bitmap? = null
 
     fun onImageBytes(
         bytes: ByteArray,
@@ -101,7 +137,10 @@ class PhotoTranslationViewModel @Inject constructor(
         // 请求照旧飞完并把上一张的译文写回新图界面（批 C-4 补这条，与 translating 同一个面）。
         translateJob?.cancel()
         translateJob = null
+        overlayJob?.cancel()
+        overlayJob = null
         captureBytes = bytes.copyOf()
+        releaseCaptureBitmap()
         _uiState.update {
             it.copy(
                 busy = true,
@@ -115,11 +154,28 @@ class PhotoTranslationViewModel @Inject constructor(
                 pendingConfirmationHost = null,
                 lastSavedRecordId = null,
                 saveIssue = null,
+                sourceImage = null,
+                overlayBlocks = emptyList(),
+                overlayIncludedIds = emptySet(),
+                overlayTranslations = emptyMap(),
+                overlayTranslating = false,
+                overlayPendingConfirmationHost = null,
+                overlayIssue = null,
+                overlayImage = null,
+                overlaySkippedCount = 0,
+                overlayTruncatedCount = 0,
             )
         }
         captureJob =
             viewModelScope.launch {
                 try {
+                    // 解码失败（含 JVM 单测里没有真正位图实现）只是没有覆盖能力，逐行对照照常：
+                    // 覆盖是加分项，不该把「识别出来的文字」一起拖死。
+                    val decoded = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
+                    captureBitmap = decoded
+                    if (decoded != null) {
+                        _uiState.update { it.copy(sourceImage = decoded) }
+                    }
                     val outcome =
                         workspace.useCapture(IMAGE_EXTENSION) { handle ->
                             when (workspace.write(handle, bytes)) {
@@ -129,7 +185,8 @@ class PhotoTranslationViewModel @Inject constructor(
                             }
                         }
                     when (outcome) {
-                        is OcrChainOutcome.Recognized ->
+                        is OcrChainOutcome.Recognized -> {
+                            val blocks = OverlayBlockPlanner.sources(outcome.result.regions)
                             _uiState.update {
                                 it.copy(
                                     busy = false,
@@ -137,8 +194,17 @@ class PhotoTranslationViewModel @Inject constructor(
                                     ocrText = outcome.result.text,
                                     lowConfidenceLineIndices = lowConfidenceLines(outcome),
                                     ocrIssue = null,
+                                    // 块清单随识别一起落地；覆盖与否由 includedIds 决定（低置信默认关）。
+                                    overlayBlocks = blocks,
+                                    overlayIncludedIds = OverlayBlockPlanner.defaultIncludedIds(blocks),
+                                    overlayTranslations = emptyMap(),
+                                    overlayIssue = null,
+                                    overlayImage = null,
+                                    overlaySkippedCount = 0,
+                                    overlayTruncatedCount = 0,
                                 )
                             }
+                        }
                         OcrChainOutcome.OcrUnavailable ->
                             _uiState.update {
                                 it.copy(
@@ -212,9 +278,11 @@ class PhotoTranslationViewModel @Inject constructor(
     fun reset() {
         captureJob?.cancel()
         translateJob?.cancel()
+        overlayJob?.cancel()
         modelJob?.cancel()
         historyJob?.cancel()
         captureBytes = null
+        releaseCaptureBitmap()
         workspace.purgeAll()
         _uiState.value = PhotoTranslationUiState()
     }
@@ -365,6 +433,7 @@ class PhotoTranslationViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        releaseCaptureBitmap()
         workspace.purgeAll()
         super.onCleared()
     }
@@ -426,6 +495,158 @@ class PhotoTranslationViewModel @Inject constructor(
             }
     }
 
+    /** 逐块打开/关闭覆盖。只改「画不画」——已经翻过的译文留着，不再为同一个块付两次钱。 */
+    fun onOverlayBlockToggled(
+        id: Int,
+    ) {
+        val state = _uiState.value
+        val block = state.overlayBlocks.firstOrNull { it.id == id } ?: return
+        // 没识别出文字的块没有可翻的东西，开关对它无意义（AC3-09：该块不覆盖）。
+        if (block.missingText) return
+        val included =
+            if (id in state.overlayIncludedIds) {
+                state.overlayIncludedIds - id
+            } else {
+                state.overlayIncludedIds + id
+            }
+        if (included == state.overlayIncludedIds) return
+        _uiState.update { it.copy(overlayIncludedIds = included) }
+        if (state.overlayTranslations.isNotEmpty()) renderOverlay()
+    }
+
+    fun onOverlayTranslateTapped() {
+        val state = _uiState.value
+        if (state.busy || state.overlayTranslating) return
+        val pending = pendingOverlayBlocks(state)
+        if (pending.isEmpty()) return
+        runOverlayTranslation(pending, confirmedTextHosts = emptySet())
+    }
+
+    fun onOverlayConfirmationResult(
+        confirmed: Boolean,
+    ) {
+        val host = _uiState.value.overlayPendingConfirmationHost ?: return
+        // 与逐段翻译同一口径：确认框点下去即收起，再决定发不发。
+        _uiState.update { it.copy(overlayPendingConfirmationHost = null) }
+        if (!confirmed) return
+        val pending = pendingOverlayBlocks(_uiState.value)
+        if (pending.isEmpty()) return
+        runOverlayTranslation(pending, confirmedTextHosts = setOf(host))
+    }
+
+    fun cancelOverlayTranslate() {
+        if (!_uiState.value.overlayTranslating) return
+        overlayJob?.cancel()
+        overlayJob = null
+        _uiState.update { it.copy(overlayTranslating = false, overlayPendingConfirmationHost = null) }
+    }
+
+    /**
+     * 还要花钱去翻的块：被选中、有文本、且**还没有译文**。
+     * 用户新打开一块低置信块时，只会补翻那一块，不会把整屏重发一遍。
+     */
+    private fun pendingOverlayBlocks(
+        state: PhotoTranslationUiState,
+    ): List<OverlayBlockSource> =
+        state.overlayBlocks
+            .filter { it.id in state.overlayIncludedIds && !it.missingText && it.id !in state.overlayTranslations }
+            .sortedBy { it.id }
+
+    private fun runOverlayTranslation(
+        pending: List<OverlayBlockSource>,
+        confirmedTextHosts: Set<String>,
+    ) {
+        overlayJob?.cancel()
+        _uiState.update { it.copy(overlayTranslating = true) }
+        overlayJob =
+            viewModelScope.launch {
+                try {
+                    when (val result = translateBlocks.translate(pending.map { it.text }, confirmedTextHosts)) {
+                        is BlockTranslationResult.Translated -> {
+                            // 用例回的 id 是「对本次入参的 1 基序号」，这里映射回真实块 id。
+                            val mapped =
+                                result.translations.mapNotNull { (index, translation) ->
+                                    pending.getOrNull(index - 1)?.id?.let { it to translation }
+                                }.toMap()
+                            _uiState.update {
+                                it.copy(
+                                    overlayTranslating = false,
+                                    overlayTranslations = it.overlayTranslations + mapped,
+                                    overlayIssue = null,
+                                    overlayPendingConfirmationHost = null,
+                                )
+                            }
+                            renderOverlay()
+                        }
+                        is BlockTranslationResult.NeedsConfirmation ->
+                            _uiState.update {
+                                it.copy(
+                                    overlayTranslating = false,
+                                    overlayPendingConfirmationHost = result.host,
+                                    overlayIssue = null,
+                                )
+                            }
+                        is BlockTranslationResult.Failed ->
+                            _uiState.update {
+                                it.copy(
+                                    overlayTranslating = false,
+                                    overlayIssue = PhotoTranslationFailureCategory.Ai(result.failure),
+                                    overlayPendingConfirmationHost = null,
+                                )
+                            }
+                        is BlockTranslationResult.NotConfigured ->
+                            _uiState.update {
+                                it.copy(
+                                    overlayTranslating = false,
+                                    overlayIssue =
+                                        PhotoTranslationFailureCategory.NotConfigured(
+                                            PhotoTranslationNotConfiguredReason.valueOf(result.reason.name),
+                                        ),
+                                    overlayPendingConfirmationHost = null,
+                                )
+                            }
+                    }
+                } catch (cancellation: CancellationException) {
+                    // 与逐段翻译同一条规矩：被顶掉/被取消时谁都不许再补一笔状态。
+                    throw cancellation
+                } catch (_: Throwable) {
+                    _uiState.update { it.copy(overlayTranslating = false, overlayPendingConfirmationHost = null) }
+                }
+            }
+    }
+
+    /**
+     * 合成原位覆盖图。源位图是**只读**输入，产物是新位图（AC3-11 原图字节不可变），
+     * 覆盖不上的块也照样进渲染器，由它判「跳过/截断」并计数——界面才说得清原因。
+     */
+    private fun renderOverlay() {
+        val state = _uiState.value
+        val source = captureBitmap ?: return
+        if (state.overlayTranslations.isEmpty()) return
+        val blocks = OverlayBlockPlanner.plan(state.overlayBlocks, state.overlayIncludedIds, state.overlayTranslations)
+        if (blocks.none { it.eligible }) return
+        // 可读下限按**图宽比例**折算成像素：11sp 落在约 400dp 宽的屏上 ≈ 图宽的 2.7%，
+        // 图内字号与屏幕 dp 无关，所以只能这样换算，不能用 density。
+        val renderer = ImageTextOverlayRenderer(minTextSizePx = source.width * MIN_TEXT_SIZE_RATIO)
+        val result = renderer.render(source, blocks)
+        _uiState.update {
+            it.copy(
+                overlayImage = result.image,
+                overlaySkippedCount = result.skipped.size,
+                overlayTruncatedCount = result.layouts.filterIsInstance<OverlayBlockLayout.Drawn>().count { layout -> layout.truncated },
+            )
+        }
+    }
+
+    /**
+     * 丢掉原图与覆盖产物。**刻意不调 Bitmap.recycle()**：这两张位图可能正被屏上的 Image 画着，
+     * 提前回收就是 use-after-recycle 崩溃；API 26+ 像素内存在 GC 之后随 Bitmap 一并释放。
+     */
+    private fun releaseCaptureBitmap() {
+        captureBitmap = null
+        _uiState.update { it.copy(sourceImage = null, overlayImage = null) }
+    }
+
     private fun storageError(
         failure: Throwable,
     ): AppError = (failure as? AppErrorException)?.appError ?: AppError.StorageUnavailable
@@ -440,5 +661,8 @@ class PhotoTranslationViewModel @Inject constructor(
     private companion object {
         const val IMAGE_EXTENSION = "img"
         const val LOW_CONFIDENCE_THRESHOLD = 0.5f
+
+        /** 覆盖文字的可读下限（占图宽比例），对应约 11sp 在 400dp 宽屏上的视觉大小。 */
+        const val MIN_TEXT_SIZE_RATIO = 0.027f
     }
 }

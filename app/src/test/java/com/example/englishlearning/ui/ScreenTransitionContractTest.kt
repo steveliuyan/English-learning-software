@@ -221,7 +221,7 @@ class ScreenTransitionContractTest {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // 唯一豁免：AppScreen.kt:596–600 的 overlayOpen（按文件名 + 原文行区间钉死；2026-11-09 m01889 现算，消费者 BackHandler 在 :603）
+    // 唯一豁免：AppScreen.kt:602–606 的 overlayOpen（按文件名 + 原文行区间钉死；2026-11-10 F3-05 接线后重算，消费者 BackHandler 在 :609）
     // ---------------------------------------------------------------------------------------------
 
     @Test
@@ -521,7 +521,7 @@ class ScreenTransitionContractTest {
      * must-flag：假屏体里就地写一枚 `tween(AppMotion.Slow)` 页面转场规格必须被同一套取样判出——
      * 判据 ② 旧口径只按文件名盯 `AppScreen.kt`，别的屏文件长出第二套转场规格完全隐形，
      * 「全仓唯一规格落点」就成了对着空档放行的口号（这正是 ④ 存在的理由）。
-     * must-not-flag：唯一豁免 `overlayOpen` 那一行（AppScreen.kt:598–602）必须被放行——
+     * must-not-flag：唯一豁免 `overlayOpen` 那一行（AppScreen.kt:602–606）必须被放行——
      * 它问的是「有没有覆盖层亮着」，不含任何规格写法；把它判红就是拿规格禁令去改挂载口径。
      *
      * 双边之外再钉两枚「不许空转 / 不许过严」的形状：
@@ -1285,17 +1285,17 @@ private data class MountConditionExemption(
 }
 
 /**
- * 全契约**唯一**一条豁免：`AppScreen.kt:598–602` 的 `overlayOpen`。
+ * 全契约**唯一**一条豁免：`AppScreen.kt:602–606` 的 `overlayOpen`。
  * 它问的是「有没有覆盖层标志位亮着」（含两枚不在链上的页内浮层位 `selectedArticleCard` / `showWordQaCard`，
- * 且不含 `&& todayReady != null` 那类守卫），唯一消费者是 :605 的 `BackHandler`，
+ * 且不含 `&& todayReady != null` 那类守卫），唯一消费者是 :609 的 `BackHandler`，
  * 与「挂载了哪一支」是两个不同问题（决策 §1.3-1）；它本来不是 `} else if` 条件行，正向扫描天然不命中。
  * **不许**把它改成 `route != null`（同文件另有 `overlayOpenIsTheOnlyExemptionAndStaysFlagBased` 钉这条）。
  */
 private val MOUNT_CONDITION_EXEMPTIONS = listOf(
     MountConditionExemption(
         fileName = "AppScreen.kt",
-        firstLine = 596,
-        lastLine = 600,
+        firstLine = 602,
+        lastLine = 606,
         reason = "BackHandler(enabled = !overlayOpen …) 的低优先级返回键口径，不是挂载判据",
     ),
 )

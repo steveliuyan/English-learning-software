@@ -1,6 +1,7 @@
 package com.example.englishlearning.language.infrastructure
 
 import com.example.englishlearning.language.domain.EnglishOcrModelAssets
+import com.example.englishlearning.language.domain.OcrBlockOrientation
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrImage
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
@@ -17,6 +18,7 @@ data class TesseractLine(
     val top: Int,
     val right: Int,
     val bottom: Int,
+    val orientation: OcrBlockOrientation = OcrBlockOrientation.Horizontal,
 )
 
 sealed interface TesseractRunResult {
@@ -70,6 +72,8 @@ class TesseractOcrProvider(
                                             right = line.right,
                                             bottom = line.bottom,
                                             confidence = run.meanConfidence / CONFIDENCE_SCALE,
+                                            text = line.text,
+                                            orientation = line.orientation,
                                         )
                                     },
                             ),

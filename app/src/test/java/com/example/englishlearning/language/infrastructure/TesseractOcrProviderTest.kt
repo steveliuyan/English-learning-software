@@ -1,5 +1,6 @@
 package com.example.englishlearning.language.infrastructure
 
+import com.example.englishlearning.language.domain.OcrBlockOrientation
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrImage
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
@@ -42,6 +43,9 @@ class TesseractOcrProviderTest {
         assertEquals("hello\nworld", outcome.result.text)
         assertEquals(2, outcome.result.regions.size)
         assertEquals(0.87f, outcome.result.regions[0].confidence, 0.0001f)
+        // AC3-07：降级链路同样要给出块级文本与朝向。
+        assertEquals("hello", outcome.result.regions[0].text)
+        assertEquals(OcrBlockOrientation.Horizontal, outcome.result.regions[0].orientation)
     }
 
     @Test

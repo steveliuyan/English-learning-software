@@ -42,6 +42,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import kotlinx.coroutines.Job
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.englishlearning.screentranslation.ScreenTranslationSnapshot
 import com.example.englishlearning.language.domain.PronunciationAccent
 import com.example.englishlearning.language.domain.PronunciationEntityRef
 import com.example.englishlearning.language.domain.PronunciationEngine
@@ -153,6 +154,8 @@ fun AppScreen(
     refreshVocabularySearchIndex: com.example.englishlearning.learning.RefreshVocabularySearchIndexUseCase? = null,
     sentenceAnalysisViewModel: SentenceAnalysisViewModel? = null,
     photoTranslationViewModel: PhotoTranslationViewModel? = null,
+    /** F3-05 悬浮窗屏幕翻译：会话在别的前台服务里，这一层只把快照与三个意图接到拍照翻译屏的入口段。 */
+    screenTranslationViewModel: ScreenTranslationViewModel? = null,
     imageStudioViewModel: ImageStudioViewModel? = null,
     wordBookTransferViewModel: com.example.englishlearning.wordbook.WordBookTransferViewModel? = null,
     backupExportViewModel: BackupExportViewModel? = null,
@@ -1843,6 +1846,9 @@ fun AppScreen(
                             if (route != overlayRoute) return@LaunchedEffect
                             photoTranslationViewModel?.refreshHistory(state.profile.id)
                         }
+                        val screenTranslationState =
+                            screenTranslationViewModel?.state?.collectAsState()?.value
+                                ?: ScreenTranslationSnapshot()
                         PhotoTranslationScreen(
                             state = photoState,
                             onImageBytes = { bytes -> photoTranslationViewModel?.onImageBytes(bytes) },
@@ -1850,6 +1856,10 @@ fun AppScreen(
                             onTranslate = { photoTranslationViewModel?.onTranslateTapped() },
                             onConfirmOutbound = { confirmed -> photoTranslationViewModel?.onConfirmationResult(confirmed) },
                             onCancelTranslate = { photoTranslationViewModel?.cancelTranslate() },
+                            onOverlayTranslate = { photoTranslationViewModel?.onOverlayTranslateTapped() },
+                            onOverlayConfirmOutbound = { confirmed -> photoTranslationViewModel?.onOverlayConfirmationResult(confirmed) },
+                            onToggleOverlayBlock = { id -> photoTranslationViewModel?.onOverlayBlockToggled(id) },
+                            onCancelOverlayTranslate = { photoTranslationViewModel?.cancelOverlayTranslate() },
                             onRefreshModelStatus = { photoTranslationViewModel?.refreshModelStatus() },
                             onInstallModel = { photoTranslationViewModel?.installModel() },
                             onUninstallModel = { photoTranslationViewModel?.uninstallModel() },
@@ -1887,6 +1897,16 @@ fun AppScreen(
                             onOpenAiSettings = {
                                 selectedFeatureKey = null
                                 openAiProfilesOrSettings()
+                            },
+                            screenTranslation = screenTranslationState,
+                            onScreenTranslationConfirmOutbound = { host ->
+                                screenTranslationViewModel?.confirmOutbound(host)
+                            },
+                            onScreenTranslationDeclineOutbound = {
+                                screenTranslationViewModel?.declineOutbound()
+                            },
+                            onScreenTranslationStop = {
+                                screenTranslationViewModel?.stop()
                             },
                         )
                         // 批 4 Task 4：历史删除的确认门。级联句说清「原图 + 译文一起走」，保留面说清「别的都没动」，

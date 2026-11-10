@@ -13,6 +13,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.englishlearning.reading.domain.ArticleLengthTier
 import com.example.englishlearning.reading.domain.ArticleType
 import com.example.englishlearning.reading.domain.ReadingPreference
+import com.example.englishlearning.screentranslation.ScreenTranslationSnapshot
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -190,6 +191,14 @@ class RequestInProgressEvidenceTest {
                 onSave = {},
                 onRequestDeleteSaved = {},
                 onBack = {},
+                onOverlayTranslate = {},
+                onOverlayConfirmOutbound = {},
+                onToggleOverlayBlock = {},
+                onCancelOverlayTranslate = {},
+                screenTranslation = ScreenTranslationSnapshot(),
+                onScreenTranslationConfirmOutbound = {},
+                onScreenTranslationDeclineOutbound = {},
+                onScreenTranslationStop = {},
                 onOpenAiSettings = {},
             )
         }

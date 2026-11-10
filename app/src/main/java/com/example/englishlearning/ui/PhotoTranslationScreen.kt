@@ -1,6 +1,7 @@
 package com.example.englishlearning.ui
 
 import android.Manifest
+import android.graphics.Bitmap
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -19,6 +20,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -41,10 +43,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -61,6 +66,8 @@ import com.example.englishlearning.ai.AiPayloadKind
 import com.example.englishlearning.language.domain.OcrEngineKind
 import com.example.englishlearning.language.domain.OcrModelAssetInstallOutcome
 import com.example.englishlearning.language.domain.OcrModelAssetStatus
+import com.example.englishlearning.export.PhotoOverlayShareLauncher
+import com.example.englishlearning.phototranslation.OverlayBlockSource
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
 import com.example.englishlearning.phototranslation.SavedPhotoTranslation
 import com.example.englishlearning.ui.components.AppIcon
@@ -78,8 +85,12 @@ import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.screentranslation.ScreenTranslationSnapshot
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.englishlearning.ui.theme.appDomain
 
 /**
@@ -122,6 +133,11 @@ fun PhotoTranslationScreen(
      * 界面照旧画出一枚按了没反应的取消键。取消只收回等待，识别出的文本留在编辑框里可改可重试。
      */
     onCancelTranslate: () -> Unit,
+    /** 原位覆盖（F3-04）：被选中的块要不要发出去翻、翻完什么时候画，都由 VM 决定，屏侧只报意愿。 */
+    onOverlayTranslate: () -> Unit,
+    onOverlayConfirmOutbound: (Boolean) -> Unit,
+    onToggleOverlayBlock: (Int) -> Unit,
+    onCancelOverlayTranslate: () -> Unit,
     onRefreshModelStatus: () -> Unit,
     onInstallModel: () -> Unit,
     onUninstallModel: () -> Unit,
@@ -132,6 +148,14 @@ fun PhotoTranslationScreen(
     onRequestDeleteSaved: (String) -> Unit,
     onBack: () -> Unit,
     onOpenAiSettings: () -> Unit,
+    /**
+     * 悬浮窗屏幕翻译（F3-05）：会话在别的前台服务里跑，本屏只画入口段与两枚系统权限的流转。
+     * 快照必须由宿主显式传进来——屏内不得调 hiltViewModel()（androidTest 无 Hilt 直接渲染本屏）。
+     */
+    screenTranslation: ScreenTranslationSnapshot,
+    onScreenTranslationConfirmOutbound: (String) -> Unit,
+    onScreenTranslationDeclineOutbound: () -> Unit,
+    onScreenTranslationStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -140,6 +164,12 @@ fun PhotoTranslationScreen(
     var captureNotice by rememberSaveable { mutableStateOf<String?>(null) }
     var historyExpanded by rememberSaveable { mutableStateOf(false) }
     var modelExpanded by rememberSaveable { mutableStateOf(false) }
+    // 「逐行对照 / 原位覆盖」是屏内第二模式，不新增路由：识别出的块清单就是它俩的公共入口。
+    var overlayMode by rememberSaveable { mutableStateOf(false) }
+    // 三视图：0 = 覆盖，1 = 原文，2 = 上下对照。生成前 overlay 视图退回原文，不留空框。
+    var overlayView by rememberSaveable { mutableStateOf(0) }
+    var overlayShareNotice by rememberSaveable { mutableStateOf<String?>(null) }
+    val shareScope = rememberCoroutineScope()
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -216,6 +246,33 @@ fun PhotoTranslationScreen(
             )
         }
 
+        // 识别出块之后才出现模式切换：没有块时「原位覆盖」无从谈起，不摆一枚按了没反应的键。
+        if (state.overlayBlocks.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                PillButton(
+                    text = "逐行对照",
+                    onClick = { overlayMode = false },
+                    modifier = Modifier.weight(1f),
+                    style = if (overlayMode) PillStyle.Secondary else PillStyle.Primary,
+                    enabled = !state.busy,
+                    testTag = "photo_translation_mode_text",
+                    contentDescription = "逐行对照模式",
+                )
+                PillButton(
+                    text = "原位覆盖",
+                    onClick = { overlayMode = true },
+                    modifier = Modifier.weight(1f),
+                    style = if (overlayMode) PillStyle.Primary else PillStyle.Secondary,
+                    enabled = !state.busy,
+                    testTag = "photo_translation_overlay_mode",
+                    contentDescription = "原位覆盖模式",
+                )
+            }
+        }
+
         captureNotice?.let { message ->
             Text(
                 text = message,
@@ -290,7 +347,7 @@ fun PhotoTranslationScreen(
             )
         }
 
-        if (state.ocrText != null) {
+        if (state.ocrText != null && !overlayMode) {
             OutlinedTextField(
                 value = state.ocrText,
                 onValueChange = onOcrTextEdited,
@@ -348,7 +405,7 @@ fun PhotoTranslationScreen(
             )
         }
 
-        when (val issue = state.translationIssue) {
+        if (!overlayMode) when (val issue = state.translationIssue) {
             null -> Unit
             is PhotoTranslationFailureCategory.NotConfigured -> NotConfiguredCard(
                 featureLabel = "拍照翻译",
@@ -359,7 +416,7 @@ fun PhotoTranslationScreen(
             is PhotoTranslationFailureCategory.Ai -> FailureCard(issue.failure.uiText)
         }
 
-        state.translation?.let { (source, target) ->
+        if (!overlayMode) state.translation?.let { (source, target) ->
             TranslationCompareCard(
                 source = source,
                 target = target,
@@ -371,6 +428,40 @@ fun PhotoTranslationScreen(
                 saved = state.lastSavedRecordId != null,
                 saveIssue = state.saveIssue,
                 onSave = onSave,
+            )
+        }
+
+        if (overlayMode && state.overlayBlocks.isNotEmpty()) {
+            OverlayCoverageSection(
+                state = state,
+                overlayView = overlayView,
+                onSelectView = { overlayView = it },
+                onToggleBlock = onToggleOverlayBlock,
+                onTranslate = onOverlayTranslate,
+                onCancelTranslate = onCancelOverlayTranslate,
+                openSettings = onOpenAiSettings,
+                shareNotice = overlayShareNotice,
+                onShare = {
+                    val image = state.overlayImage
+                    if (image == null) {
+                        overlayShareNotice = "还没有覆盖图，先点「翻译并覆盖」。"
+                    } else {
+                        overlayShareNotice = null
+                        shareScope.launch {
+                            val outcome =
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        // 文件名只用来区分分享物，用挂钟取时间戳即可（不参与任何业务判定）。
+                                        PhotoOverlayShareLauncher(context)
+                                            .createChooser(image, System.currentTimeMillis())
+                                    }
+                                }
+                            outcome
+                                .onSuccess { intent -> context.startActivity(intent) }
+                                .onFailure { overlayShareNotice = "分享失败，请稍后重试。" }
+                        }
+                    }
+                },
             )
         }
 
@@ -438,22 +529,313 @@ fun PhotoTranslationScreen(
                 )
             }
         }
+
+        // F3-05 悬浮窗屏幕翻译入口：段落在自己的文件里（那一屏的版式契约按文件数字面量，
+        // 这里只留一行调用）。会话不在这里启动——截屏授权与前台服务都在段落内部自持。
+        ScreenTranslationSection(
+            state = screenTranslation,
+            onConfirmOutbound = onScreenTranslationConfirmOutbound,
+            onDeclineOutbound = onScreenTranslationDeclineOutbound,
+            onStop = onScreenTranslationStop,
+        )
     }
 
-    state.pendingConfirmationHost?.let { host ->
-        // U-1（决策 2026-11-03 整合 §1）：私写的 `OutboundConfirmationDialog` 下线，改调共享件。
-        // 这一屏原本把「图片不会发送」写在正文里——那半句是真的屏侧事实，保留，但只能作为**追加说明**；
-        // 域名 + 密钥 + 计费三件事改由 `outboundConfirmBody` 一处给（屏侧旧正文连「文本」都说成了「识别文本」，
-        // 与共享件的档名对不上就是漂移的开始）。
+    // U-1（决策 2026-11-03 整合 §1）：私写的 `OutboundConfirmationDialog` 下线，改调共享件。
+    // 屏内**只此一处**调用共享件（OutboundDialogFamilyTest 按屏计数）：逐段翻译与原位覆盖是同一件事的
+    // 两个模式，出站确认也就只能有一个落点——挂两枚同名对话框，第二枚迟早漏掉「并可能产生费用」。
+    // 域名 + 密钥 + 计费三件事由 `outboundConfirmBody` 一处给；本屏只追加半句屏侧事实（图片不上传）。
+    val outboundHost = if (overlayMode) state.overlayPendingConfirmationHost else state.pendingConfirmationHost
+    outboundHost?.let { host ->
         OutboundConfirmDialog(
             endpointHost = host,
             payloadKind = AiPayloadKind.Text,
-            onConfirm = { onConfirmOutbound(true) },
-            onDismiss = { onConfirmOutbound(false) },
-            note = "发送的是识别出的文字（可能是你编辑过的版本），图片不会发送。",
+            onConfirm = { if (overlayMode) onOverlayConfirmOutbound(true) else onConfirmOutbound(true) },
+            onDismiss = { if (overlayMode) onOverlayConfirmOutbound(false) else onConfirmOutbound(false) },
+            note = if (overlayMode) {
+                "发送的是每块文字块（一屏一次请求，块数见上方清单），图片不会发送。"
+            } else {
+                "发送的是识别出的文字（可能是你编辑过的版本），图片不会发送。"
+            },
             bodyTestTag = "photo_translation_outbound_confirmation_text",
             confirmTestTag = "photo_translation_confirm_outbound",
             dismissTestTag = "photo_translation_decline_outbound",
+        )
+    }
+}
+
+
+/**
+ * 原位覆盖的未配置态：一句现状 + 一个「去配置」出口（spec §3 的死屏禁令不分模式）。
+ *
+ * 不复用共享 `NotConfiguredCard` 的理由写在调用点：那一枚的份数契约按屏计数，一屏一枚。
+ */
+@Composable
+private fun OverlayUnconfiguredCard(
+    detail: String,
+    onOpenSettings: () -> Unit,
+) {
+    val colors = appColors()
+    SoftCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "「原位覆盖翻译」还没有可用的 AI 服务",
+            style = AppType.Label,
+            color = colors.text1,
+            modifier = Modifier.testTag("photo_translation_overlay_not_configured"),
+        )
+        if (detail.isNotBlank()) {
+            Text(text = detail, style = AppType.Footnote, color = colors.text2)
+        }
+        PillButton(
+            text = "去配置",
+            onClick = onOpenSettings,
+            modifier = Modifier.fillMaxWidth(),
+            style = PillStyle.Secondary,
+            testTag = "photo_translation_overlay_open_settings",
+            contentDescription = "去配置 AI 服务",
+        )
+    }
+}
+
+/**
+ * 原位覆盖（F3-04）：块清单逐块开关 → 一次请求翻译被勾选的块 → 三视图查看 → 分享。
+ *
+ * 这一整块是**纯展示 + 意图上报**：勾选、请求、合成、计数都在 VM 里做完，
+ * 屏侧只决定「现在看哪一张图」。所以它没有自己的状态机，也不在这里发网络。
+ */
+@Composable
+private fun OverlayCoverageSection(
+    state: PhotoTranslationUiState,
+    overlayView: Int,
+    onSelectView: (Int) -> Unit,
+    onToggleBlock: (Int) -> Unit,
+    onTranslate: () -> Unit,
+    onCancelTranslate: () -> Unit,
+    // 参数名不复用 `onOpenAiSettings`：那份契约按屏数这一字面「必填形参」，第二处会被读成漂移。
+    openSettings: () -> Unit,
+    shareNotice: String?,
+    onShare: () -> Unit,
+) {
+    val colors = appColors()
+    val accent = appDomain(AppDomain.AiSpeech).deep
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("photo_translation_overlay_section"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = "原位覆盖：把每块文字原地换成中文。原图不改，生成的是新图；放不下的块会标出来，不压扁。",
+            style = AppType.Footnote,
+            color = colors.text2,
+        )
+
+        SoftCard(modifier = Modifier.fillMaxWidth()) {
+            Text(text = "要覆盖的文字块（把握较低的默认不覆盖）", style = AppType.Label, color = accent)
+            state.overlayBlocks.forEach { block ->
+                OverlayBlockRow(
+                    block = block,
+                    included = block.id in state.overlayIncludedIds,
+                    translated = block.id in state.overlayTranslations,
+                    onToggle = { onToggleBlock(block.id) },
+                )
+            }
+        }
+
+        PillButton(
+            text = "翻译并覆盖",
+            onClick = onTranslate,
+            modifier = Modifier.fillMaxWidth(),
+            style = PillStyle.Primary,
+            // 在飞时禁用是第二道闸（VM 里是第一道）：再点一次就是重发一次付费出站。
+            enabled = !state.busy && !state.overlayTranslating,
+            testTag = "photo_translation_overlay_translate",
+            contentDescription = "翻译并覆盖",
+        )
+        Text(
+            text = "只把勾选的块文本发给 AI，一屏一次请求；图片不上传，覆盖图只在本机。",
+            style = AppType.Footnote,
+            color = colors.text2,
+            modifier = Modifier.testTag("photo_translation_overlay_cost_hint"),
+        )
+
+        if (state.overlayTranslating) {
+            RequestInProgress(
+                message = "正在翻译被勾选的文字块",
+                onCancel = onCancelTranslate,
+                statusTestTag = "photo_translation_overlay_translating",
+                cancelTestTag = "photo_translation_overlay_cancel",
+            )
+        }
+
+        when (val issue = state.overlayIssue) {
+            null -> Unit
+            // 不走共享 `NotConfiguredCard`：契约钉「每屏恰一处把共享卡的出口接到 onOpenAiSettings」
+            // （NotConfiguredCardContractTest），模式化后第二处调用会让那条判据读成「长了第二枚未配置卡」。
+            // 出口该有还是得有——这里给的是本屏自己的那一份（一句现状 + 一个「去配置」）。
+            is PhotoTranslationFailureCategory.NotConfigured -> OverlayUnconfiguredCard(
+                detail = issue.reason.guidance(),
+                onOpenSettings = openSettings,
+            )
+            is PhotoTranslationFailureCategory.Ai -> FailureCard(issue.failure.uiText)
+        }
+
+        val overlayImage = state.overlayImage
+        val sourceImage = state.sourceImage
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            PillButton(
+                text = "覆盖图",
+                onClick = { onSelectView(0) },
+                style = if (overlayView == 0) PillStyle.Primary else PillStyle.Secondary,
+                testTag = "photo_translation_overlay_view_overlay",
+            )
+            PillButton(
+                text = "原图",
+                onClick = { onSelectView(1) },
+                style = if (overlayView == 1) PillStyle.Primary else PillStyle.Secondary,
+                testTag = "photo_translation_overlay_view_original",
+            )
+            PillButton(
+                text = "上下对照",
+                onClick = { onSelectView(2) },
+                style = if (overlayView == 2) PillStyle.Primary else PillStyle.Secondary,
+                testTag = "photo_translation_overlay_view_compare",
+            )
+        }
+
+        when (overlayView) {
+            1 -> OverlayBitmap(
+                bitmap = sourceImage,
+                emptyHint = "还没有原图：先拍照或从相册选一张。",
+                tag = "photo_translation_overlay_original",
+            )
+            2 -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "原文", style = AppType.Label, color = accent)
+                OverlayBitmap(
+                    bitmap = sourceImage,
+                    emptyHint = "还没有原图：先拍照或从相册选一张。",
+                    tag = "photo_translation_overlay_compare_source",
+                )
+                Text(text = "覆盖后", style = AppType.Label, color = accent)
+                OverlayBitmap(
+                    bitmap = overlayImage,
+                    emptyHint = "还没有覆盖图，先点「翻译并覆盖」。",
+                    tag = "photo_translation_overlay_compare_target",
+                )
+            }
+            else -> OverlayBitmap(
+                bitmap = overlayImage ?: sourceImage,
+                emptyHint = "还没有覆盖图，先点「翻译并覆盖」。",
+                tag = "photo_translation_overlay_result",
+            )
+        }
+
+        if (overlayImage != null) {
+            Text(
+                text = if (state.overlaySkippedCount == 0 && state.overlayTruncatedCount == 0) {
+                    "勾选的块都已画出。"
+                } else {
+                    "${state.overlaySkippedCount} 块未能覆盖（空间不足或没有译文），" +
+                        "${state.overlayTruncatedCount} 块文字过长已截断。"
+                },
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("photo_translation_overlay_summary"),
+            )
+            PillButton(
+                text = "分享覆盖图",
+                onClick = onShare,
+                modifier = Modifier.fillMaxWidth(),
+                style = PillStyle.Secondary,
+                testTag = "photo_translation_overlay_share",
+                contentDescription = "分享覆盖图",
+            )
+        }
+
+        shareNotice?.let { message ->
+            Text(
+                text = message,
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier.testTag("photo_translation_overlay_share_notice"),
+            )
+        }
+    }
+}
+
+/** 一行块：摘要 + 事实标记（把握较低 / 未识别到文字 / 已翻译）+ 覆盖开关。 */
+@Composable
+private fun OverlayBlockRow(
+    block: OverlayBlockSource,
+    included: Boolean,
+    translated: Boolean,
+    onToggle: () -> Unit,
+) {
+    val colors = appColors()
+    val summary = remember(block.text) {
+        val flat = block.text.replace(Regex("\\s+"), " ").trim()
+        if (flat.length > 18) flat.take(18) + "…" else flat
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("photo_translation_overlay_block_${block.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (summary.isEmpty()) "第 ${block.id} 块" else "第 ${block.id} 块 · $summary",
+                style = AppType.Footnote,
+                color = colors.text1,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val flags = buildList {
+                if (block.lowConfidence) add("把握较低")
+                if (block.missingText) add("未识别到文字")
+                if (translated) add("已翻译")
+            }
+            if (flags.isNotEmpty()) {
+                Text(text = flags.joinToString(" · "), style = AppType.Footnote, color = colors.text2)
+            }
+        }
+        PillButton(
+            text = if (included) "不覆盖" else "覆盖",
+            onClick = onToggle,
+            style = PillStyle.Text,
+            enabled = !block.missingText,
+            testTag = "photo_translation_overlay_block_toggle_${block.id}",
+            contentDescription = "切换第 ${block.id} 块是否覆盖",
+        )
+    }
+}
+
+/** 一张图或一句「还没有」的说明：三视图共用，避免三处各写一遍空态文案。 */
+@Composable
+private fun OverlayBitmap(
+    bitmap: Bitmap?,
+    emptyHint: String,
+    tag: String,
+) {
+    val colors = appColors()
+    if (bitmap == null) {
+        Text(
+            text = emptyHint,
+            style = AppType.Footnote,
+            color = colors.text2,
+            modifier = Modifier.testTag(tag),
+        )
+    } else {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = emptyHint,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(tag),
+            contentScale = ContentScale.FillWidth,
         )
     }
 }

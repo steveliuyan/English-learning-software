@@ -5,6 +5,7 @@ import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.englishlearning.ui.ScreenTranslationViewModel
 import com.example.englishlearning.ui.AiProfileSettingsViewModel
 import com.example.englishlearning.ui.AppScreen
 import com.example.englishlearning.ui.ArticleReadingViewModel
@@ -79,6 +80,7 @@ class MainActivity : FragmentActivity() {
                     globalVocabularySearchViewModel = hiltViewModel<GlobalVocabularySearchViewModel>(),
                     sentenceAnalysisViewModel = hiltViewModel<SentenceAnalysisViewModel>(),
                     photoTranslationViewModel = hiltViewModel<com.example.englishlearning.ui.PhotoTranslationViewModel>(),
+                    screenTranslationViewModel = hiltViewModel<com.example.englishlearning.ui.ScreenTranslationViewModel>(),
                     imageStudioViewModel = hiltViewModel<ImageStudioViewModel>(),
                     wordBookTransferViewModel = hiltViewModel<com.example.englishlearning.wordbook.WordBookTransferViewModel>(),
                     backupExportViewModel = hiltViewModel<com.example.englishlearning.ui.BackupExportViewModel>(),

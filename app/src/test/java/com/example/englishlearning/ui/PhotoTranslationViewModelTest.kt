@@ -28,6 +28,7 @@ import com.example.englishlearning.language.domain.OcrProviderChain
 import com.example.englishlearning.language.domain.OcrRegion
 import com.example.englishlearning.language.domain.OcrResult
 import com.example.englishlearning.language.domain.TemporaryImageWorkspace
+import com.example.englishlearning.phototranslation.BlockTranslationUseCase
 import com.example.englishlearning.phototranslation.PhotoTranslationHistoryRepository
 import com.example.englishlearning.phototranslation.PhotoTranslationNotConfiguredReason
 import com.example.englishlearning.phototranslation.PhotoTranslationResult
@@ -166,6 +167,12 @@ class PhotoTranslationViewModelTest {
             workspace = TemporaryImageWorkspace(root),
             translate =
                 PhotoTranslationUseCase(
+                    defaultTextProfile = DefaultTextProfileResolver { DefaultTextProfileResult.Selected(profile) },
+                    secrets = AiProfileSecretUseCase(FakeSecretStore()),
+                    transport = transport,
+                ),
+            translateBlocks =
+                BlockTranslationUseCase(
                     defaultTextProfile = DefaultTextProfileResolver { DefaultTextProfileResult.Selected(profile) },
                     secrets = AiProfileSecretUseCase(FakeSecretStore()),
                     transport = transport,
@@ -468,6 +475,12 @@ class PhotoTranslationViewModelTest {
                         secrets = AiProfileSecretUseCase(FakeSecretStore()),
                         transport = RecordingTransport(),
                     ),
+                translateBlocks =
+                    BlockTranslationUseCase(
+                        defaultTextProfile = DefaultTextProfileResolver { DefaultTextProfileResult.Selected(profile) },
+                        secrets = AiProfileSecretUseCase(FakeSecretStore()),
+                        transport = RecordingTransport(),
+                    ),
                 modelAssets = FakeModelAssets(),
                 history = FakeHistory(),
                 recordIds = WordNoteIdFactory { "record-1" },
@@ -714,5 +727,129 @@ class PhotoTranslationViewModelTest {
         expected: kotlin.reflect.KClass<*>,
     ) {
         assertTrue(expected.isInstance(value), "expected $expected, got $value")
+    }
+
+    // ---- F3-04 原位覆盖：块清单默认取舍、出站确认、序号回映 ----
+
+    private fun blocksResult(vararg specs: Pair<String, Float>) =
+        OcrOutcome.Success(
+            OcrResult(
+                text = specs.joinToString("\n") { it.first },
+                regions =
+                    specs.mapIndexed { index, (text, confidence) ->
+                        OcrRegion(0, index * 20, 100, index * 20 + 18, confidence, text = text)
+                    },
+            ),
+            OcrEngineKind.MlKit,
+        )
+
+    @Test
+    fun overlayBlocksDefaultToConfidentOnesAndLowConfidenceCanBeToggledOn() = runTest(dispatcher) {
+        val provider = ScriptedOcrProvider(OcrEngineKind.MlKit, blocksResult("Hello" to 0.95f, "Shaky" to 0.2f))
+        val vm = viewModel(OcrProviderChain(listOf(provider)))
+
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertEquals(listOf(1, 2), state.overlayBlocks.map { it.id })
+        assertEquals(setOf(1), state.overlayIncludedIds)
+        assertTrue(state.overlayBlocks[1].lowConfidence)
+
+        vm.onOverlayBlockToggled(2)
+        assertEquals(setOf(1, 2), vm.uiState.value.overlayIncludedIds)
+
+        vm.onOverlayBlockToggled(2)
+        assertEquals(setOf(1), vm.uiState.value.overlayIncludedIds)
+    }
+
+    @Test
+    fun overlayTranslationNeedsOutboundConfirmationThenMapsOrdinalsBackToBlockIds() = runTest(dispatcher) {
+        val transport =
+            RecordingTransport().apply {
+                result =
+                    AiHttpResult.Responded(
+                        AiHttpResponse(
+                            200,
+                            """{"choices":[{"message":{"content":"[{\"id\":1,\"translation\":\"甲\"},{\"id\":2,\"translation\":\"乙\"}]"}}]}""",
+                        ),
+                    )
+            }
+        val provider = ScriptedOcrProvider(OcrEngineKind.MlKit, blocksResult("Hello" to 0.95f, "World" to 0.95f))
+        val vm = viewModel(OcrProviderChain(listOf(provider)), transport = transport)
+
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+
+        vm.onOverlayTranslateTapped()
+        testScheduler.advanceUntilIdle()
+
+        // 确认之前零字节出网（AC3-06 同一口径）。
+        assertEquals(0, transport.requests.size)
+        assertEquals("api.example.com", vm.uiState.value.overlayPendingConfirmationHost)
+        assertTrue(vm.uiState.value.overlayTranslations.isEmpty())
+
+        vm.onOverlayConfirmationResult(true)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, transport.requests.size)
+        assertEquals(mapOf(1 to "甲", 2 to "乙"), vm.uiState.value.overlayTranslations)
+        assertNull(vm.uiState.value.overlayPendingConfirmationHost)
+        assertFalse(vm.uiState.value.overlayTranslating)
+    }
+
+    @Test
+    fun openingALowConfidenceBlockLaterOnlyPaysForThatBlock() = runTest(dispatcher) {
+        val transport =
+            RecordingTransport().apply {
+                result =
+                    AiHttpResult.Responded(
+                        AiHttpResponse(200, """{"choices":[{"message":{"content":"[{\"id\":1,\"translation\":\"甲\"}]"}}]}"""),
+                    )
+            }
+        val provider = ScriptedOcrProvider(OcrEngineKind.MlKit, blocksResult("Hello" to 0.95f, "Shaky" to 0.2f))
+        val vm = viewModel(OcrProviderChain(listOf(provider)), transport = transport)
+
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onOverlayTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.uiState.value.overlayPendingConfirmationHost)
+        vm.onOverlayConfirmationResult(true)
+        testScheduler.advanceUntilIdle()
+        assertEquals(mapOf(1 to "甲"), vm.uiState.value.overlayTranslations)
+
+        vm.onOverlayBlockToggled(2)
+        vm.onOverlayTranslateTapped()
+        testScheduler.advanceUntilIdle()
+
+        // 第二发仍要重新确认（确认不跨调用记忆）。
+        assertEquals(1, transport.requests.size)
+        vm.onOverlayConfirmationResult(true)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, transport.requests.size)
+        val secondBody = transport.requests[1].body
+        assertTrue(secondBody.contains("Shaky"))
+        assertFalse(secondBody.contains("Hello"))
+        assertTrue(vm.uiState.value.overlayTranslations.containsKey(2))
+    }
+
+    @Test
+    fun decliningTheOverlayConfirmationSendsNothing() = runTest(dispatcher) {
+        val transport = RecordingTransport()
+        val provider = ScriptedOcrProvider(OcrEngineKind.MlKit, blocksResult("Hello" to 0.95f))
+        val vm = viewModel(OcrProviderChain(listOf(provider)), transport = transport)
+
+        vm.onImageBytes(byteArrayOf(1))
+        testScheduler.advanceUntilIdle()
+        vm.onOverlayTranslateTapped()
+        testScheduler.advanceUntilIdle()
+        vm.onOverlayConfirmationResult(false)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, transport.requests.size)
+        assertNull(vm.uiState.value.overlayPendingConfirmationHost)
+        assertTrue(vm.uiState.value.overlayTranslations.isEmpty())
     }
 }

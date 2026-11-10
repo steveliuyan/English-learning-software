@@ -37,7 +37,7 @@ class ProviderContractTest {
     }
 
     @Test
-    fun `ocr result exposes text coordinates and confidence only`() =
+    fun `ocr region exposes text, box, confidence and orientation only`() =
         kotlinx.coroutines.test.runTest {
             val provider: OcrProvider = FakeOcrProvider(
                 OcrResult(
@@ -51,8 +51,11 @@ class ProviderContractTest {
             assertIs<OcrOutcome.Success>(outcome)
             assertEquals("word", outcome.result.text)
             assertEquals(0.9f, outcome.result.regions.single().confidence)
+            // spec 03 F3-04 / AC3-07：原位覆盖要求块级文本与朝向随几何一起出来，
+            // 其余字段仍然一个都不许漏：这里钉的是「只多这两项」而不是「随便加」。
+            // width/height 是由四个坐标算出的派生量，不构成新的出站/存储面。
             assertEquals(
-                setOf("left", "top", "right", "bottom", "confidence"),
+                setOf("left", "top", "right", "bottom", "confidence", "text", "orientation", "width", "height"),
                 OcrRegion::class.memberProperties.map { it.name }.toSet(),
             )
         }
