@@ -64,6 +64,14 @@
 
 品牌渐变保持现状不动：`mint-start #A8F3C8` → `mint-mid #5DDFB4` → `mint-end #35B9B5`，`mint-light #D9FFF0`。
 
+> **2026-11-10 药片渐变归一（只动药片，上面这段启动页三段逐字不动）**：`PillButton` 的品牌渐变改吃三枚
+> 药片专属令牌 `mint-pill-start #C1EBD8` → `mint-pill-mid #94DBC5` → `mint-pill-end #73CEBC`
+> （H153/161/168、S51/50/48、L84/72/63），末段 L63 与归一后的浅套域色 `base`（S48/L61）同档，
+> 药片不再比任何一枚域色深一档；压 `on-brand #04241C` 实测 12.67 / 10.36 / 8.85:1 全过 AA 4.5，
+> 压白字 1.30 / 1.59 / 1.86（<4.5 ⇒ 前景仍是 `on-brand`，第 96 行硬规则不变）。
+> 启动页 / 建档封面 / `AiFeatureGradient` 仍用本段 `#A8F3C8 → #5DDFB4 → #35B9B5`。
+> 依据与测试同步清单见 [`docs/decisions/2026-11-10-brand-pill-gradient-softening.md`](../../decisions/2026-11-10-brand-pill-gradient-softening.md)。
+
 深色：`bg #101814`、`surface #161F1A`、`surface-2 #1A2420`、`tint #1C2A24`、`tint-2 #22322B`、
 `line #2A3931`、`line-soft #202D27`、`ink #E9F2EC`、`ink-2 #A5B8AE`、`ink-3 #93A69C`、
 `brand #6FD9B6`、`brand-deep #7FE3C1`、`brand-tint #1D322B`、`strong #22332C`、`strong-hi #2B4038`、

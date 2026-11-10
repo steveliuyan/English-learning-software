@@ -84,9 +84,20 @@ internal val AppleMintEnd: Color = Color(0xFF35B9B5)
 internal val AppleMintLight: Color = Color(0xFFD9FFF0)
 
 /**
- * 品牌**药片**渐变（`BrandMintGradientStops`）的末端，与启动页渐变末端的 [AppleMintEnd] **不是同一枚**：
- * 药片三段是 `Start → Middle → 本枚`，启动页三段是 `Start → Middle → End`，两个渐变视觉不同。
- * Task 26 Step 3（AC-R-02）把这枚裸 hex 从 `components/glass/GlassButton.kt` 移到这里——它属品牌不变族
- * （浅深两套同值，静态度量见文件头），所以落在主题静态源而不是 `AppColorSet`。取值逐字未变（`0xFF65D3B9`）。
+ * 品牌**药片**渐变三端（`BrandMintGradientStops`），与上面启动页那组 `Start → Middle → End`
+ * **不是同一组**：启动页是整屏 hero 面，药片只有 48dp 高、底下就是浅卡／浅底，
+ * 整条渐变处在「小面积色块贴浅底」的语境里，深端比别人深一档就会跳出来抢焦。
+ *
+ * 2026-11-10 药片渐变归一（用户反馈「开始学习的渐变太深了，相对于其他颜色」）：
+ * 三端保留原色相（H153/161/168，旧三端 H146/160/166 同族），饱和度从 S76/67/56 收到 S51/50/48、
+ * 明度抬到 L84/72/63——末段 L63 与域色归一后的浅套 base（L61）同档，药片不再比任何一枚域色深一档。
+ * 主题无关深墨 `onBrand`（#04241C）压三端 12.67 / 10.36 / 8.85，正文 AA 4.5 全线通过（余量最小 4.35）。
+ * 启动页三段（上面那组 `AppleMintStart/Middle/End`）不动：整屏 hero 的视觉重量不同；
+ * 回归口径见 `docs/decisions/2026-11-10-brand-pill-gradient-softening.md`。
+ *
+ * Task 26 Step 3（AC-R-02）把这族末端裸 hex 从 `components/glass/GlassButton.kt` 移到这里——它们属品牌不变族
+ * （浅深两套同值），所以落在主题静态源而不是 `AppColorSet`。
  */
-internal val AppleMintPillEnd: Color = Color(0xFF65D3B9)
+internal val AppleMintPillStart: Color = Color(0xFFC1EBD8)
+internal val AppleMintPillMiddle: Color = Color(0xFF94DBC5)
+internal val AppleMintPillEnd: Color = Color(0xFF73CEBC)

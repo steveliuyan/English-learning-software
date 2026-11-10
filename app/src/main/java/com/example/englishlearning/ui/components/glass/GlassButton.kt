@@ -54,13 +54,18 @@ data class PillInk(
 )
 
 /**
- * 品牌渐变三端（R-14.1 ① 判定现状已合规，本席一行不改）：浅深两套同三段（spec §2.1「品牌渐变保持现状不动」），
- * 所以这一族容器-墨对是**主题无关**的，前景也不许改成 `set.onMint`（深套 `onMint` 是亮墨，压薄荷渐变会塌）。
+ * 品牌**药片**渐变三端：浅深两套同三段（主题无关），所以这一族容器-墨对是**主题无关**的，
+ * 前景也不许改成 `set.onMint`（深套 `onMint` 是亮墨，压薄荷渐变会塌）。
+ *
+ * 2026-11-10 归一（用户反馈「开始学习的渐变太深了，相对于其他颜色」）：三端改用药片专属的
+ * `AppleMintPillStart/Middle/End`（S51/50/48、L84/72/63），不再借用启动页 hero 那三段 S76/67/56——
+ * 药片只有 48dp 高、底下是浅卡，同一条深端渐变贴在浅底上会比周围域色深一档。启动页渐变不动。
+ * 裁决与复算表见 `docs/decisions/2026-11-10-brand-pill-gradient-softening.md`。
  */
 private val BrandMintGradientStops: List<Color> = listOf(
-    AppleMintStart,
-    AppleMintMiddle,
-    // Task 26 Step 3（AC-R-02）：药片渐变末端的裸 hex 已移进主题静态源（`AppleMintPillEnd`，取值逐字未变）。
+    AppleMintPillStart,
+    AppleMintPillMiddle,
+    // Task 26 Step 3（AC-R-02）：药片渐变末端的裸 hex 已移进主题静态源（`AppleMintPillEnd`）。
     AppleMintPillEnd,
 )
 

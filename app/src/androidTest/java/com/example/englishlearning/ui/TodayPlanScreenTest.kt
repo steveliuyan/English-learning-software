@@ -350,8 +350,21 @@ class TodayPlanScreenTest {
         composeRule.onAllNodesWithText("复习生词本").assertCountEquals(0)
         // 空态只许一枚品牌渐变：主出口是 primary（`.btn-primary`），次出口走 `PillStyle.Secondary` 的
         // surface 底 + 描边（`.btn-secondary`）。两枚都长成渐变就等于同屏两个「主操作」。
-        assertRenderedColor("today_plan_adjust_goal", 0xFFA8F3C8.toInt())
-        assertNoRenderedColor("today_plan_read_article", 0xFFA8F3C8.toInt())
+        //
+        // 正向探针三端全查（渐变是纵向三段，三端都落在按钮可见区内）；反向探针只用**中段 `#94DBC5`
+        // 与末端 `#73CEBC` 两枚饱和端**，不用首端 `#C1EBD8`：次出口前景是 `onMint #1A7A63` 压白 surface，
+        // 字形抗锯齿混色正好落在「白 → 深青」这条混色线上——实测次出口画布 715×132 上离 `#C1EBD8`
+        // (193,235,216) 最近的像素是 (199,223,217)@(288,77)，距离 13.45 < 18.0，而它就是 `onMint` 以
+        // t≈0.24 混进白 surface 的字形边缘（255-229t, 255-133t, 255-156t），与渐变无关（旧首端
+        // `#A8F3C8` 距同一点 40.6，所以这条反向断言此前一直绿）。
+        // 中段/末端在**同一条混色线**上的最近距离是 47.8 / 77.7，都远在阈值外；而渐变一旦漏到次出口，
+        // 必然带上这两枚饱和端 ⇒ 反向判据仍成立，且不再被排版抗锯齿误伤（阈值仍是全局对称的 18.0）。
+        listOf(0xFFC1EBD8, 0xFF94DBC5, 0xFF73CEBC).forEach { stop ->
+            assertRenderedColor("today_plan_adjust_goal", stop.toInt())
+        }
+        listOf(0xFF94DBC5, 0xFF73CEBC).forEach { stop ->
+            assertNoRenderedColor("today_plan_read_article", stop.toInt())
+        }
 
         composeRule.onNodeWithTag("today_plan_adjust_goal")
             .performScrollTo()
@@ -512,12 +525,14 @@ class TodayPlanScreenTest {
      *
      * 旧值 `#174C44`（`onMint`）随 M3 `Button` 退役：主 CTA 现在是 `PillButton` 的 Primary + AiSpeech 档，
      * 墨是主题无关的 `onBrand` = `#04241C`（纯表见 `GlassButton.kt` 的 `pillButtonInk`，两套同值）。
-     * 三端渐变 = `#A8F3C8 → #5DDFB4 → #65D3B9`（`MintPalette.kt`）。这是**期望值随形改**，不是放宽：
+     * 三端渐变 = `#C1EBD8 → #94DBC5 → #73CEBC`（`MintPalette.kt` 的 `AppleMintPillStart/Middle/End`；
+     * 2026-11-10 药片渐变归一把此前的 `#A8F3C8 → #5DDFB4 → #65D3B9` 收到 S52/50/48、L84/72/63，
+     * 见 `docs/decisions/2026-11-10-brand-pill-gradient-softening.md`）。这是**期望值随形改**，不是放宽：
      * 判据仍是「两端色都在、墨都在、对比度都过线」，并追加「软档卡里一个端点色都不许有」。
      */
     @Test fun the_primary_cta_keeps_the_only_brand_gradient() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
-        listOf(0xFFA8F3C8, 0xFF5DDFB4, 0xFF65D3B9).forEach { stop ->
+        listOf(0xFFC1EBD8, 0xFF94DBC5, 0xFF73CEBC).forEach { stop ->
             assertRenderedColor("today_plan_start_learning", stop.toInt())
             assertTrue(
                 "品牌渐变端 $stop 压 onBrand 必须过 4.5:1",
@@ -526,8 +541,8 @@ class TodayPlanScreenTest {
         }
         assertRenderedColor("today_plan_start_learning", 0xFF04241C.toInt())
         // 软档卡（词单 / 复习队列 / 今日文章 / 词库四条裸行）里不得出现品牌渐变的两个可辨认端点。
-        assertNoRenderedColor("today_plan_secondary_card", 0xFFA8F3C8.toInt())
-        assertNoRenderedColor("today_plan_secondary_card", 0xFF65D3B9.toInt())
+        assertNoRenderedColor("today_plan_secondary_card", 0xFFC1EBD8.toInt())
+        assertNoRenderedColor("today_plan_secondary_card", 0xFF73CEBC.toInt())
     }
 
     /**
@@ -551,7 +566,7 @@ class TodayPlanScreenTest {
      * （浅套 `#E8F2EA`），2026-10-30 位图档那句「外卡仍是中性白」量的是改令牌之前的版面。
      * 这条改判不是放宽：它原来只能证「白」，现在只能证「原型那一档薄荷」，两者都是**单点期望**；
      * 「域色不铺成色块」那层立法由 `the_primary_cta_keeps_the_only_brand_gradient` 的反向扫禁
-     * （软卡里禁 `#A8F3C8` / `#65D3B9` 两枚渐变端点）继续承担。
+     * （软卡里禁 `#C1EBD8` / `#73CEBC` 两枚渐变端点）继续承担。
      */
     @Test fun the_four_bare_rows_carry_illustrated_badges_on_the_prototype_soft_tint_card() {
         composeRule.setContent { TodayPlanScreen(TodayPlanUiState.Ready("小学", "2026-09-19", 2, 3, 5)) }
@@ -772,12 +787,30 @@ class TodayPlanScreenTest {
      */
     private fun assertNoRenderedColor(tag: String, forbiddenColor: Int) {
         val bitmap = composeRule.onNodeWithTag(tag).performScrollTo().captureToImage().asAndroidBitmap()
-        val nearest = (0 until bitmap.width).flatMap { x ->
-            (0 until bitmap.height).map { y -> colorDistance(bitmap.getPixel(x, y), forbiddenColor) }
-        }.minOrNull() ?: Double.POSITIVE_INFINITY
+        // 除了最近距离，还把「离禁色最近的那个像素」的坐标与 RGB 一起报出来：
+        // 反例一旦判红，能立刻看出命中的是排版色、抗锯齿混色还是真有一枚渐变端，
+        // 不必再回到设备上逐像素猜（阈值 18.0 与 [assertRenderedColor] 对偶，不因取证而放宽）。
+        var nearest = Double.POSITIVE_INFINITY
+        var nearestPixel = 0
+        var nearestX = -1
+        var nearestY = -1
+        for (x in 0 until bitmap.width) {
+            for (y in 0 until bitmap.height) {
+                val pixel = bitmap.getPixel(x, y)
+                val distance = colorDistance(pixel, forbiddenColor)
+                if (distance < nearest) {
+                    nearest = distance
+                    nearestPixel = pixel
+                    nearestX = x
+                    nearestY = y
+                }
+            }
+        }
         assertTrue(
             "$tag 里出现了 ${AndroidColor.red(forbiddenColor)},${AndroidColor.green(forbiddenColor)},${AndroidColor.blue(forbiddenColor)}" +
-                "（最近距离=$nearest，阈值 18.0）",
+                "（最近距离=$nearest，阈值 18.0；最近像素 " +
+                "(${AndroidColor.red(nearestPixel)},${AndroidColor.green(nearestPixel)},${AndroidColor.blue(nearestPixel)})" +
+                " @ ($nearestX,$nearestY)，画布 ${bitmap.width}×${bitmap.height}）",
             nearest > 18.0,
         )
     }

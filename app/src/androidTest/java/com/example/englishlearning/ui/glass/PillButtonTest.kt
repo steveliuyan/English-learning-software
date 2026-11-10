@@ -14,7 +14,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import com.example.englishlearning.ui.theme.AppleMintEnd
-import com.example.englishlearning.ui.theme.AppleMintStart
+import com.example.englishlearning.ui.theme.AppleMintPillEnd
+import com.example.englishlearning.ui.theme.AppleMintPillStart
 import com.example.englishlearning.ui.theme.AppColorDark
 import com.example.englishlearning.ui.theme.AppColorLight
 import com.example.englishlearning.ui.theme.AppDomain
@@ -78,8 +79,9 @@ class PillButtonTest {
         val pixels = (0 until bitmap.width).flatMap { x ->
             (0 until bitmap.height).map { y -> bitmap.getPixel(x, y) }
         }
-        assertTrue("primary should render mint gradient start", pixels.minOf { colorDistance(it, AppleMintStart.toArgb()) } <= 18.0)
-        assertTrue("primary should render softened mint end", pixels.minOf { colorDistance(it, 0xFF65D3B9.toInt()) } <= 18.0)
+        // 2026-11-10 药片渐变归一：三端改用 AppleMintPill*（S52/50/48、L84/72/63），启动页那三段不动。
+        assertTrue("primary should render softened mint gradient start", pixels.minOf { colorDistance(it, AppleMintPillStart.toArgb()) } <= 18.0)
+        assertTrue("primary should render softened mint end", pixels.minOf { colorDistance(it, AppleMintPillEnd.toArgb()) } <= 18.0)
         assertTrue("primary should render deep teal text", pixels.minOf { colorDistance(it, 0xFF174C44.toInt()) } <= 18.0)
     }
 
