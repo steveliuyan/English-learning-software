@@ -143,7 +143,7 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
 ### 3.7 2026-11-09 控制器补记：终评补口后的 connected 双形态复跑（原矩阵 AC5-07 的「待办」在此关闭）
 
 补口各席只跑过单形态（Compact），矩阵 AC5-07 那行留下一条待办：9 枚全类的 Compact/Wide 双形态重跑。现已在最终内容上跑完，
-并把中途观察到的一趟偶发红按「只加守卫、不放宽断言」硬化掉。全部走 `adb install -r` 双包 + `am instrument -e class`，
+并把中途观察到的一趟偶发红按「只加守卫、不放宽断言」加了靶面守卫（是加固观测，不是消除——见本节末的在册定性）。全部走 `adb install -r` 双包 + `am instrument -e class`，
 未用 `connectedDebugAndroidTest`，设备数据零清除；`bf353dda` 零命令。
 
 读数（均为 `com.example.englishlearning.ui.ScreenTransitionInstrumentedTest` 全类，`-e class` 单类）：
@@ -156,8 +156,8 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
 | 4–5 | 同上 | Wide | `OK (9 tests)` 21.03s / `OK (9 tests)` 20.34s |
 | 6 | `ff4177c`（注释订正后重装） | Compact | `OK (9 tests)` 19.57s |
 
-即该表口径下 shipped 内容 **Compact 2 趟 + Wide 3 趟 = 5 趟全类连绿**；**本表内**唯一一趟红出现在硬化之前、且红在靶面守卫而非判据本身。
-硬化并不等于消除：硬化之后 shipped 配置下已另有一趟同形 Wide 红（见本节下方订正句与 §3.8 的 W1），该偶发**仍是 open**。
+即该表口径下 shipped 内容 **Compact 2 趟 + Wide 3 趟 = 5 趟全类连绿**；**该表口径内**唯一一趟红出现在硬化之前、且红在靶面守卫而非判据本身。
+硬化并不等于消除：硬化之后 shipped 配置下已另有两趟同形红——Wide 一趟（§3.8 的 W1）与 Compact 一趟（§3.8 的 Cf），该偶发**仍是 open**。
 
 硬化内容（`ff4177c`，纯 androidTest，零生产码）：①按返回键前先断言词卡腿恰有一枚在场，把「转场没开播」与「驱动走空」分开；
 ②`pumpUntil` 超时文本带现场读数（站 1 腿数、各腿 tag、`word_card_screen` 在场枚数）。
@@ -165,23 +165,28 @@ detekt/ktlint 存量债（在册约 1580 条）按简报不当回归，本批未
 同口径再订正，与 `ScreenTransitionInstrumentedTest` 用例注释、矩阵 AC5-07、台账 B4 块三处核心句逐字一致、其余从句同口径）：席 B2 报告
 §connected 读数表第 2 行那趟红的**配置归属无留存日志可证**——既不能算 shipped 配置的实证 flake，也不能断定是探针配置
 （唯一留存的探针日志 `b2-connected-red.log` 是 `Tests run: 2, Failures: 2`，枚数、用例、红点都与表第 2 行不同，
-而表第 2 行的 `Tests run: 8, Failures: 1` 全仓无原始日志）。shipped 配置下可证的偶发红目前有两趟：`f3cc0c3` 的 Wide 全类一趟
-（`b4-wide-connected.log`，`Tests run: 9, Failures: 1`，红点在 `pumpUntil` 3s 超时）与 scoped 复评修复轮在 `f713a5a` 的
-Wide 全类首趟（`.superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task/connected-wide-r1.log`，`Tests run: 9, Failures: 1`，
-红点同为 `pumpUntil` 3s 超时、现场只有 1 枚腿；同配置后续 Wide 3 趟与 Compact 2 趟 `OK (9 tests)`）。订正写进用例注释；
+而表第 2 行的 `Tests run: 8, Failures: 1` 全仓无原始日志）。shipped 配置下可证的偶发红目前有三趟：`f3cc0c3` 的 Wide 全类一趟
+（`b4-wide-connected.log`，`Tests run: 9, Failures: 1`，红点在 `pumpUntil` 3s 超时）、`f713a5a` 的 Wide 全类首趟（`connected-wide-r1.log`，
+同 `Tests run: 9, Failures: 1`）与最终内容 `d97f8e3` 装配的 APK 上 Compact 首趟（`connected-compact-final.log`，同 `Tests run: 9, Failures: 1`，
+现场同为 1 枚腿；三趟红同形、同配置留档全绿 10 趟 = Wide 5 + Compact 5）。订正写进用例注释；
 B2 报告原文保留、只追加订正括注（历史报告只追加不改写）。
 
 门禁同步复跑（同一棵树）：`BUILD SUCCESSFUL in 4m 5s`，`341 类 / 2553 条 / 0 失败 / 0 错误 / 0 跳过`
 （`--no-daemon --no-build-cache --rerun-tasks`，341 份结果 XML 全部为本次新落盘，按 mtime 计数而非沿用旧文件）。
 设备收口状态：`wm size reset` → 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0，两枚 APK 在装。
 
-在册定性（scoped 复评修复轮 2 补记）：这枚偶发**仍是 open**（两趟留档、同形、后续全绿 ⇒ 记为「Wide 全类连跑的靶面守卫偶发红」，
-不是 shipped 判据缺陷，也不得据此宣称已关闭）；下批候选动作 = 泵超时上限/逐腿等待策略，或按用户裁定加输入闸，**本轮不实施**。
+在册定性（scoped 复评修复轮 2 补记，控制器回写枚按 Cf 改写）：这枚偶发**仍是 open**——硬化后 shipped 配置下 Wide 与 Compact
+各一趟留档、同形、后续同配置全绿 ⇒ 记为「全类连跑的靶面守卫偶发红（Wide 与 Compact 都会出，不再限定 Wide）」，
+不是 shipped 判据缺陷，也不得据此宣称已关闭；下批候选动作 = 泵超时上限/逐腿等待策略，或按用户裁定加输入闸，**本轮不实施**。
+现算口径（不靠本段散文）：`cd .superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task && grep -l "Failures: 1" connected-*.log | wc -l`
+（实测 **2**）与 `grep -l "OK (9 tests)" connected-*.log | wc -l`（实测 **10**）—— 本轮留档 12 档 connected（不含两档 assemble 日志）：
+红 2 档（`connected-wide-r1.log`、`connected-compact-final.log`）、绿 10 档（Wide 5 + Compact 5）。
 
 ### 3.8 2026-11-09 scoped 复评修复轮：复评两枚 Important 的修复与门禁/connected 复跑读数
 
 scoped 复评（覆盖 `6caeeef..37348fc` 与 `37348fc..f713a5a`）判词 With fixes：Critical 0 / Important 2 + 随行 Minor，
-修复由执行席两轮落成（一轮 3 枚 + 复评修复轮 1 的 2 枚 + 本轮 2 枚）；控制器在最终内容上重跑门禁三连与双形态 connected
+修复由执行席三轮落成（一轮 3 枚 + 复评修复轮 1 的 2 枚 + 复评修复轮 2 的 2 枚 + 复评修复轮 3 的 1 枚），
+控制器另有 1 枚回写（见下表的 Cf 与「现算口径」）；控制器在最终内容上重跑门禁三连与双形态 connected
 （全程 `adb -s emulator-5554`，`install -r` 双包 + `am instrument`，零 `connectedDebugAndroidTest`，真机 `bf353dda` 零命令），
 读数全部落盘在 `.superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task/`（不入库，逐枚可开档核验）：
 
@@ -193,12 +198,18 @@ scoped 复评（覆盖 `6caeeef..37348fc` 与 `37348fc..f713a5a`）判词 With f
 | C2 | 同上 | Compact | **`OK (9 tests)`** Time 20.306s，`instrument exit=0` | `connected-compact-r2.log` |
 | W1 | 同上 | Wide（`wm size 2560x1600` → override 落 `2160x1600`） | **`Tests run: 9, Failures: 1`**；红点 `transitionsProduceNoExtraBillableOutbound`（`:255`）经 `pumpUntil`（`:595`），现场读数原文：`手动步进 3000ms 内条件仍未成立；现场：站 1 腿 1 枚 tag=[overlay_transition_leg_current]，word_card_screen 在场 1 枚` | `connected-wide-r1.log` |
 | W2–W4 | 同上 | Wide | `OK (9 tests)` / `OK (9 tests)` / `OK (9 tests)`，Time 20.553 / 19.878 / 21.372s | `connected-wide-r2.log`、`connected-wide-r3.log`、`connected-wide-r4.log` |
+| 门禁 c（最终内容复跑） | `d97f8e3`（其后的 `8675eb7` 只改本报告与 §3.8，测试内容零变） | — | `BUILD SUCCESSFUL in 4m 9s`；XML 按 mtime 现算 **341 类 / 2553 条 / 0 失败 0 错误 0 跳过** | `gate-triple-final.log` |
+| 装配 | 同上 | — | 两枚 APK 装配成功（`app-debug.apk` mtime 09:27、`app-debug-androidTest.apk` 09:33，均早于 `8675eb7`）后 `adb install -r` 双包；装上的确是 `35af07e` 之后的内容；旁证 = Cf 的栈行号 `:258` / `:598` 只存在于 `35af07e` 加了三行注释之后的文件里，而 `35af07e..8675eb7` 之间 androidTest 零改动（`d97f8e3` 只动 JVM 侧与报告） | `connected-final-assemble.log` |
+| Cf | `d97f8e3` 内容装配的 APK（`8675eb7` 未改码 ⇒ 同一份内容） | Compact 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0 | **`Tests run: 9, Failures: 1`**（档 23 行 / 1450 字节）；红点 `transitionsProduceNoExtraBillableOutbound`（`:258`）经 `pumpUntil`（`:598`），现场读数原文与 W1 逐字同：`手动步进 3000ms 内条件仍未成立；现场：站 1 腿 1 枚 tag=[overlay_transition_leg_current]，word_card_screen 在场 1 枚` ⇒ 该偶发**不挑形态** | `connected-compact-final.log` |
+| C3–C5 | 同上 | Compact | `OK (9 tests)` ×3，Time 16.464 / 16.759 / 17.088s | `connected-compact-r3.log`、`connected-compact-r4.log`、`connected-compact-r5.log` |
+| W5–W6 | 同上 | Wide（`wm size 2560x1600` → override 落 `2160x1600`） | `OK (9 tests)` ×2，Time 22.129 / 20.689s | `connected-wide-r5.log`、`connected-wide-r6.log` |
 | 收口 | — | — | `wm size reset` → 1080x1920；`font_scale` 1.0、`animator_duration_scale` 1.0；两枚 APK 在装、数据未清 | — |
 
 W1 的 `:255` / `:595` 是 `f713a5a` 时点的栈行号；本轮发现 1 在 `ScreenTransitionInstrumentedTest.kt:233` 之后插了 3 行注释，
 现 grep 的对应号为：调用点 `:255` → `:258`、`pumpUntil` 的超时报错行 `:595` → `:598`（函数定义 `:589` → `:592`）；历史日志里的栈号不回头改。
+Cf 是在改号之后跑的，所以它的栈号 `:258` / `:598` 与现 grep 直接一致，无需换算。
 
-本轮 7 枚提交各自干了什么（旧→新）：
+本轮 9 枚提交各自干了什么（旧→新）：
 
 - `f76cc9e`（执行席待办 1／复评 Important 1）：层深闸 `DECLARED_TRANSITION_DEPTH` 放宽到认 getter／字面量两种形态，
   另补存在性正则与「取样失真」「写法无法取样」两臂，配 7 条双边合成探针——getter 形态的清单外覆写不再零判红。
@@ -209,13 +220,19 @@ W1 的 `:255` / `:595` 是 `f713a5a` 时点的栈行号；本轮发现 1 在 `Sc
   ⑬ 夹具补一枚段内非 `override` 形状，使「删 `override ` 前缀」的变异由零证伪变为响亮判红（变异 A 见席报告「修复轮 1」§3、变异 B 见 §2）。
 - `f713a5a`（复评修复轮 1，Important 2）：本节 §3.7 的旧定论同步为「配置归属无留存日志可证」，任务书「三处」补记为四处。
 - `35af07e`（本轮 scoped 复评修复轮 2，发现 1）：四处同一句子由「可证的偶发红只有 `f3cc0c3` 一趟」改为「目前有两趟」，
-  第二趟即本表 W1；§3.7 末尾补在册定性（仍是 open、不得据此宣称已关闭）。
-- 本枚（本轮，发现 2／3 + §3.8／§4 回写）：`ScreenTransitionContractTest.kt` 存在性正则 KDoc 的变异探针自指分节号由 §2 改为 §3
+  第二趟即本表 W1；§3.7 末尾补在册定性（仍是 open、不得据此宣称已关闭）。该「两趟」口径随后被本表 Cf 再推翻，由控制器回写枚改为「三趟」。
+- `d97f8e3`（复评修复轮 2，发现 2／3 + §3.8／§4 回写）：`ScreenTransitionContractTest.kt` 存在性正则 KDoc 的变异探针自指分节号由 §2 改为 §3
   （删 `override ` 前缀那趟的读数实际在「修复轮 1」§3）；§3.7 的「三处逐字同口径」改为「核心句逐字一致、其余从句同口径」。
+- `8675eb7`（复评修复轮 3，三枚文本面 Minor）：阶段报告三处措辞按实物订正，含本表 C1 行改写为现算的 8 行 / 113 字节读数。
+- 控制器回写枚（本轮收口，无执行席）：本表补 Cf／C3–C5／W5–W6／门禁 c 四行，§3.7 的订正句、在册定性、用例注释、矩阵 AC5-07
+  与台账 B4 块五处的「目前有两趟」统一改为「目前有三趟」，并把在册定性里「Wide 全类连跑」的形态限定去掉——
+  计数改由日志实物现算（见 §3.7 末「现算口径」两条命令），不再用散文估计；控制器上一版把 C1 读成「截成 66 字节」是取文件取到一半的错读数，
+  已在 `8675eb7` 按实物改写并在此登记为控制器自身的一次读数失误。
 
 两枚 Important 的处置一句话：Important 1（层深闸对 getter 形态失明）已由 `f76cc9e` 补取样与判红臂、`74fc483` 收紧取证口径，
 定向 17 例全绿且两枚变异探针各自响亮判红；Important 2（把无法证实的配置归属写成事实）已由 `361bccd` / `f713a5a` 改为
-「无留存日志可证」，本轮再按 W1 的新读数把覆盖面从「只有一趟」改成「目前有两趟」——同一族毛病（限定词写得比证据强）的反向版本。
+「无留存日志可证」，本轮再按 W1 的新读数把覆盖面从「只有一趟」改成「目前有两趟」，控制器回写枚又按 Cf 改成「目前有三趟」
+——同一族毛病（限定词写得比证据强）的反向版本，且这一版说明「只按当时手头一趟日志改写」仍会低估：改口径时必须把留档日志全数现算。
 
 ## 4. Git 状态
 
@@ -257,6 +274,21 @@ W1 的 `:255` / `:595` 是 `f713a5a` 时点的栈行号；本轮发现 1 在 `Sc
 - 设备收口状态（控制器现算，见 §3.8 表末行）：`wm size reset` → 1080x1920 / density 420 / `font_scale` 1.0 / `animator_duration_scale` 1.0，
   两枚 APK 在装、数据未清；connected 全程 `adb -s emulator-5554`，零 `connectedDebugAndroidTest`，真机 `bf353dda` 零命令。
 - 本轮改动全在注释与文本面（未跑任何 Gradle）：编译面由控制器最后一次门禁三连兜底。
+
+**scoped 复评修复轮 3 + 控制器回写枚收口补记（控制器现算；上面「修复轮」那节数字是当时点，不回头改）**：
+
+- 【测】修复轮 3 落库时 `git rev-parse --short HEAD` → `8675eb7`；【测】`git log --oneline origin/stage-5-ui-r2-learning-path..HEAD | wc -l` → **44**
+  （origin tip 仍是 `5d93cdc`，`git merge-base --is-ancestor 5d93cdc HEAD` 通过，快进关系）；其中 6 枚属 N-1 批次（任务 #75 仍挂着）。
+  本枚（控制器回写枚）落库后 ahead 为 **45**，哈希不写在自己的正文里。
+- 【测】最终内容门禁三连：`BUILD SUCCESSFUL in 4m 9s`，**341 类 / 2553 条 / 0 失败 / 0 错误 / 0 跳过**（`gate-triple-final.log`，
+  XML 按 mtime 现算，非沿用旧档）。
+- connected：§3.8 表末四行为准——同形红 **2 趟**（Wide `f713a5a`、Compact `d97f8e3` 内容装配的 APK），同配置绿 **10 趟**；
+  全程 `adb -s emulator-5554` + `install -r` 双包 + `am instrument`，零 `connectedDebugAndroidTest`，真机 `bf353dda` 零命令。
+- 【测】设备收口 `wm size` → `Physical size: 1080x1920`、`font_scale` 1.0、`animator_duration_scale` 1.0，两枚 APK 在装、数据未清。
+- 在册 open 一项（**等用户裁定，本批不实施**）：`transitionsProduceNoExtraBillableOutbound` 的 `pumpUntil` 3s 靶面守卫在全类连跑里
+  偶发红，Wide 与 Compact 都会出，现场都是「站 1 腿 1 枚」= 步进 3000ms 内 overlap 两腿共存窗口从未出现（只挂着一枚在场腿）。候选动作 = 抬高泵超时上限 / 改成逐腿等待策略 /
+  按 §5(a) 第 5 条真机目视结论决定是否加输入闸。
+- **零推送、不合 `main`**：本批全程未执行 `git push`（逐批请示），分支停在 `stage-5-ui-r2-learning-path`。
 
 ## 5. 未完成 / 遗留问题
 

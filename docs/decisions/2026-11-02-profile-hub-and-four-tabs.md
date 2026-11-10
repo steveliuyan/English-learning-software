@@ -2,6 +2,7 @@
 
 - **日期：** 2026-11-02
 - **状态：** 已接受（用户拍板：直接按后给的参考做，不再做加法）
+- **后续（2026-11-10，m03681 / m04040）：** 「设置」子页在本批之后已整体退役——`ui/SettingsScreen.kt` 删除、13 行台账（含「设置」一行）变 13 行且不再有设置页、主题三态内联到「我的」页头统计卡正下方；本文其余结论不变。见 [`2026-11-10-theme-switch-moves-into-profile.md`](2026-11-10-theme-switch-moves-into-profile.md)。
 - **取代：** `docs/decisions/2026-10-31-settings-as-fifth-tab.md`（设置升为第五个一级 tab）
 
 ## 背景

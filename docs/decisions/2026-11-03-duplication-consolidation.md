@@ -3,6 +3,7 @@
 - **日期：** 2026-11-03
 - **状态：** 已接受（用户原话「你要看一下目前有哪些功能重复啊……你要整合合并整理」＝授权整合；
   具体范围由本决策按 `docs/design/2026-11-03-duplication-audit.md` 的 U-1..U-14 拍板，U-13 本批不动）
+- **后续（2026-11-10，m03681 / m04040）：** 「设置」子页在本批之后已整体退役——`ui/SettingsScreen.kt` 删除、13 行台账（含「设置」一行）变 13 行且不再有设置页、主题三态内联到「我的」页头统计卡正下方；本文其余结论不变。见 [`2026-11-10-theme-switch-moves-into-profile.md`](2026-11-10-theme-switch-moves-into-profile.md)。
 - **上游：** `docs/design/2026-11-03-duplication-audit.md`（盘点表，含每条的文件:行实测证据）
 - **前置：** `docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`（四栏 + 我的 hub 与 13 行台账）、
   `docs/decisions/2026-11-03-today-article-direct-open-and-checkin-name.md`（§1/§1-B「多入口 + 单真值」形状）

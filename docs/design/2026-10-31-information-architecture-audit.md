@@ -5,6 +5,11 @@
 >
 > 本文只做**盘点与提案**，未改任何界面。拍板后按仓库惯例先改 `docs/superpowers/specs/` 与决策文档，再动代码。
 
+> **现状提示（2026-11-10，m03373 → m03681 → m04040）：本文盘点的是 2026-10-31 的界面，此后「设置」子页已整体退役。**
+> `ui/SettingsScreen.kt` 整份删除、13 行入口并入「我的」hub、主题三态内联到「我的」页头统计卡正下方；
+> 因此文中所有「设置 · …」的行号与入口（含 `AppOverlayRoute.Settings`）**均已不存在**。
+> 本文从此只作当时的审计记录保留，现行口径见 [`../decisions/2026-11-10-theme-switch-moves-into-profile.md`](../decisions/2026-11-10-theme-switch-moves-into-profile.md)。
+
 ## 1. 现状：四个一级 tab 及其全部入口
 
 底部导航四栏：学习 / 阅读 / AI 助学 / 我的（`AppTab`）。「设置」不是一级 tab，它以

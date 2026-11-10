@@ -2,6 +2,10 @@
 
 > 附录原件（子代理产出，未改动）。结论取舍与跨组冲突以 [`../2026-10-17-content-placement-audit.md`](../2026-10-17-content-placement-audit.md) 为准。
 
+> **现状提示（2026-11-10，m03681 / m04040）：`ui/SettingsScreen.kt` 已整份退役**，其 13 行入口并入「我的」hub，
+> 主题三态内联到「我的」页头统计卡正下方。本文是当时的只读审计原件（行号、`SettingsScreen.kt` 引用、「设置页」措辞全部已失效），
+> 只作历史记录保留，不再作为现行内容归属依据；现行口径见 [`../../decisions/2026-11-10-theme-switch-moves-into-profile.md`](../../decisions/2026-11-10-theme-switch-moves-into-profile.md)。
+
 - 审计范围（只读）：`ui/SettingsScreen.kt`、`ui/CheckInScreen.kt`、`ui/LearningRecordsScreen.kt`、`ui/ReminderSettingsScreen.kt`、`ui/WorksheetSettingsScreen.kt`、`ui/WorksheetPreviewScreen.kt`、`ui/BackupExportScreen.kt`、`ui/BackupPairingExportScreen.kt`、`ui/BackupRestoreScreen.kt`、`ui/LicensesScreen.kt`、`ui/RecoveryScreen.kt`，并在 `ui/AppScreen.kt` 内核对入口与 `show*` 布尔。
 - 只审**内容归属、分组、信息密度、冗余**；不审配色/字号/圆角/图标风格。
 - 不新增功能；不改备份安全规则（配对挑战码、签名校验、只支持替换本机数据均原样保留）。
