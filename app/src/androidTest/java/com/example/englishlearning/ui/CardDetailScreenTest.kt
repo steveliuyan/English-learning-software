@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
@@ -628,6 +629,55 @@ class CardDetailScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("card_detail_notes_empty").assertExists()
         composeRule.onNodeWithTag("card_detail_personal_note_input").assertExists()
+    }
+
+    // ------------------------------------------ m05053（用户走查）：搭配与派生词可点开详情
+
+    /**
+     * 用户原话：「下面那些词汇派生词啊，那些长固定搭配，希望也能点击查看那个单词也能看到详情」。
+     *
+     * 本屏只做呈现、不做查词：宿主给一对 `openableLemmaOf`（判这一枚手上有没有卡）+
+     * `onOpenLemma`（点开它）时，判得开的那一枚才有 click action、点了把 lemma 原样交回宿主；
+     * 判不开的那一枚保持静态——界面不许画点不动的假入口。
+     */
+    @Test
+    fun relatedWordsAreTappableOnlyWhereTheHostCanResolveThem() {
+        val opened = mutableListOf<String>()
+        composeRule.setContent {
+            CardDetailScreen(
+                card = card(
+                    lemma = "surf",
+                    derived = listOf(
+                        DerivedWord("surfer", "n.", "冲浪者"),
+                        DerivedWord("surfboard", "n.", "冲浪板"),
+                    ),
+                    phrases = listOf(
+                        PhraseEntry("surf the Internet", "在网上冲浪"),
+                        PhraseEntry("surf the web", "浏览网页"),
+                    ),
+                ),
+                onBack = {},
+                openableLemmaOf = { lemma -> lemma == "surfer" || lemma == "surf the Internet" },
+                onOpenLemma = { lemma -> opened += lemma },
+            )
+        }
+
+        composeRule.onNodeWithTag("card_detail_phrases").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("card_detail_phrase_0").assertHasClickAction().performClick()
+        composeRule.onNodeWithTag("card_detail_phrase_1").assertHasNoClickAction()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("card_detail_wordforms").performScrollTo()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("card_detail_derived_chip_surfer").assertHasClickAction().performClick()
+        composeRule.onNodeWithTag("card_detail_derived_chip_surfboard").assertHasNoClickAction()
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("surf the Internet", "surfer"), opened)
+        // 可点面同时保留可读文本：词形一个字都不许省。
+        composeRule.onNodeWithText("surfboard").assertExists()
+        composeRule.onNodeWithText("surf the web").assertExists()
     }
 
     private fun wordNote(noteId: String, answer: String) = WordAiNote(

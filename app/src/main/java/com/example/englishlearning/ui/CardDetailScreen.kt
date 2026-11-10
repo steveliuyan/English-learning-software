@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -86,6 +87,11 @@ import com.example.englishlearning.ui.theme.appDomain
  * 页头 → 主词 / 音标 / 词性 → 口音与次键行（学习流宿主里那一行是「继续学习」，其余宿主是「重新学习」）
  * → 释义 → 例句 → 我的笔记 → 常用搭配 → 近义词 →
  * 词形与派生 → 页末提示 → 「用 AI 追问这个词」块按钮。
+ *
+ * m05053（用户走查）：「常用搭配」与「词形与派生」里出现的词，宿主给了
+ * [openableLemmaOf] + [onOpenLemma] 且判定某个词手上真有卡时，那一枚画成可点面
+ * （搭配行挂 clickable + 尾随「›」、派生词排成芯片），点了换到那个词的详情；
+ * 判不开的保持静态文本。近义词仍是纯读信息（[SynonymChips] 的 KDoc 说明这一点）。
  * 主词站在页面上，卡片从「释义」小节才开始——原型没有英雄卡。
  *
  * The screen stays UI-only: it receives a [WordCard] and explicit callbacks for navigation,
@@ -122,6 +128,13 @@ fun CardDetailScreen(
     onPauseResume: () -> Unit = {},
     onStopPronunciation: () -> Unit = {},
     onAskAi: (() -> Unit)? = null,
+    // m05053（用户走查）：「常用搭配」「词形与派生」里出现的词也要能点开看详情。
+    // 这两个形参必须成对给：openableLemmaOf 判定某一枚词在本宿主手上是否真的能打开
+    // （能打开才画可点面），onOpenLemma 负责把它交给宿主去换卡。二者任一为 null、或
+    // openableLemmaOf 判 false，本屏就退回纯串/纯文本（与 2026-11-10 之前逐字一致），
+    // 绝不画点不动的假入口。
+    openableLemmaOf: ((String) -> Boolean)? = null,
+    onOpenLemma: ((String) -> Unit)? = null,
     notes: List<WordAiNote> = emptyList(),
     onSavePersonalNote: ((String) -> Unit)? = null,
     onDeleteNote: ((String) -> Unit)? = null,
@@ -222,12 +235,14 @@ fun CardDetailScreen(
                     Text(
                         text = "还没有笔记。点「添加 / 管理」记第一条。",
                         style = AppType.Footnote,
+                        color = colors.text2,
                     )
                 } else {
                     notes.forEach { note ->
                         Text(
                             text = note.answer,
                             style = AppType.Body,
+                            color = colors.text1,
                             modifier = Modifier
                                 .testTag("card_detail_note_display_${note.noteId}")
                                 .semantics { contentDescription = "笔记 ${note.answer}" },
@@ -263,22 +278,55 @@ fun CardDetailScreen(
                             modifier = Modifier.padding(vertical = 12.dp),
                         )
                     }
-                    Text(
-                        text = phrase.text,
-                        style = AppType.Body.copy(
-                            fontFamily = AppFont.Serif,
-                            fontSize = 16.sp,
-                            color = colors.text1,
-                        ),
-                    )
-                    // 自镜像搭配（英文串与中文串逐字相同）在包解析处已归一为 null：
-                    // 只讲得出一个字段就只讲一个字段，不把同一串字念两遍。
-                    phrase.meaningZh?.let { meaning ->
-                        Text(
-                            text = meaning,
-                            style = AppType.Caption.copy(color = colors.text3),
-                            modifier = Modifier.padding(top = 2.dp),
-                        )
+                    // m05053：这一条搭配能不能点开看详情，由宿主给的两个形参决定——
+                    // 判得开才挂 clickable 并画一枚方向指示，判不开就逐字退回纯文本两行，
+                    // 不做点不动的假入口。
+                    val phraseLeafOpenable =
+                        onOpenLemma != null && openableLemmaOf?.invoke(phrase.text) == true
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (phraseLeafOpenable) {
+                                    Modifier.clickable(
+                                        role = Role.Button,
+                                        onClickLabel = "查看 ${phrase.text} 的详情",
+                                    ) { onOpenLemma?.invoke(phrase.text) }
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .heightIn(min = 48.dp)
+                            .padding(vertical = 4.dp)
+                            .testTag("card_detail_phrase_$index"),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = phrase.text,
+                                style = AppType.Body.copy(
+                                    fontFamily = AppFont.Serif,
+                                    fontSize = 16.sp,
+                                    color = colors.text1,
+                                ),
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            if (phraseLeafOpenable) {
+                                Text(
+                                    text = "›",
+                                    style = AppType.Body.copy(color = colors.text3),
+                                    modifier = Modifier.padding(start = 6.dp),
+                                )
+                            }
+                        }
+                        // 自镜像搭配（英文串与中文串逐字相同）在包解析处已归一为 null：
+                        // 只讲得出一个字段就只讲一个字段，不把同一串字念两遍。
+                        phrase.meaningZh?.let { meaning ->
+                            Text(
+                                text = meaning,
+                                style = AppType.Caption.copy(color = colors.text3),
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -295,13 +343,57 @@ fun CardDetailScreen(
             SectionGap()
             DetailSection(title = "词形与派生", tag = "card_detail_wordforms") {
                 if (card.derived.isNotEmpty()) {
-                    Text(
-                        text = card.derived.joinToString("；") { it.lemma },
-                        style = AppType.Meta.copy(color = colors.text2),
-                        modifier = Modifier
-                            .testTag("card_detail_derived")
-                            .semantics { contentDescription = "派生词 ${card.derived.joinToString("、") { it.lemma }}" },
-                    )
+                    // m05053：宿主判定「这一组派生词里至少有一枚手上真有卡」时，画成一排可点芯片，
+                    // 每枚单独判定——判得开的才挂 clickable（其余静态），不做点不动的假入口；
+                    // 判不开（或宿主没给回调）就仍走下面那句合并文本，一字不差。
+                    val derivedLeafOpenable =
+                        onOpenLemma != null && card.derived.any { openableLemmaOf?.invoke(it.lemma) == true }
+                    if (derivedLeafOpenable) {
+                        FlowRow(
+                            modifier = Modifier.testTag("card_detail_derived"),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            card.derived.forEach { derivedWord ->
+                                val leafOpenable = openableLemmaOf?.invoke(derivedWord.lemma) == true
+                                Box(
+                                    modifier = Modifier
+                                        .heightIn(min = 32.dp)
+                                        .clip(AppShape.Pill)
+                                        .background(if (leafOpenable) colors.tint else colors.surface)
+                                        .then(
+                                            if (leafOpenable) {
+                                                Modifier.clickable(
+                                                    role = Role.Button,
+                                                    onClickLabel = "查看 ${derivedWord.lemma} 的详情",
+                                                ) { onOpenLemma?.invoke(derivedWord.lemma) }
+                                            } else {
+                                                Modifier
+                                            },
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        .testTag("card_detail_derived_chip_${derivedWord.lemma}"),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = derivedWord.lemma,
+                                        style = AppType.Caption.copy(
+                                            color = if (leafOpenable) colors.brandDeep else colors.text2,
+                                            fontWeight = FontWeight(600),
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = card.derived.joinToString("；") { it.lemma },
+                            style = AppType.Meta.copy(color = colors.text2),
+                            modifier = Modifier
+                                .testTag("card_detail_derived")
+                                .semantics { contentDescription = "派生词 ${card.derived.joinToString("、") { it.lemma }}" },
+                        )
+                    }
                 }
                 if (card.inflections.isNotEmpty()) {
                     Text(
