@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * 闸只闸「发起」，退场腿重启即早退。本闸登记的正是这批退场闸守护的自动发音发起点，把「多一枚自动发音」变成源码面判红。
  *
  * 扫描面（本文件唯一读取口径，照 `StartupPrefetchLoadPointContractTest`）：`AppScreen.kt` 里位于**两站腿体**内的
- * `LaunchedEffect` 块——腿体区间由 `[OverlayLeg(route == overlayRoute) {, private fun OverlayLeg()]` 两个稳定锚界定：
+ * `LaunchedEffect` 块——腿体区间由 `[OverlayLeg(, private fun OverlayLeg(]` 两个锚界定（起点取站 1 lambda 里那行调用，收口取同函数的定义行）：
  * 站 1（全屏子页链）与站 2（tab 分发，嵌在站 1 的 route==null 分支里）都落在这段内；链外的顶层预读
  * `LaunchedEffect(state.profile.id)` 一族（`StartupPrefetchLoadPointContractTest` 的管辖面）在区间之前、不计入。
  * 一个块算「组合即发起发音」当且仅当它调用发音网关 `pronunciationProvider?.(speakWord|speakSentence|speak)`；
@@ -152,6 +152,12 @@ class ScreenTransitionComposeFiredPronunciationContractTest {
         val legStart = lines.indexOfFirst { LEG_BODY_START_ANCHOR in it }
         val legEnd = lines.indexOfFirst { LEG_BODY_END_ANCHOR in it }
         assertTrue(legStart >= 0, "腿体起点锚 `$LEG_BODY_START_ANCHOR` 在 AppScreen.kt 读不到——站 1 的 AnimatedContent lambda 写法变了，本闸扫描范围会失真。")
+        // 缩进守卫：起点锚只钉到「`OverlayLeg(`」，所以必须确认命中的是 lambda 里那次**调用**（有缩进），
+        // 不是同文件末尾的顶层定义行（那是收口锚），否则扫描区间会缩成空甚至反向。
+        assertTrue(
+            lines[legStart].startsWith(" "),
+            "腿体起点锚命中了一行顶层声明而不是站 1 lambda 里的调用：`${lines[legStart]}`（起点 $legStart / 收口 $legEnd）。",
+        )
         assertTrue(legEnd > legStart, "腿体终点锚 `$LEG_BODY_END_ANCHOR` 读不到或不在起点之后（$legStart / $legEnd）——两站腿体的收口界定失效。")
         return sitesIn(lines, legStart, legEnd)
     }
@@ -209,8 +215,15 @@ class ScreenTransitionComposeFiredPronunciationContractTest {
         /** 发音网关调用：`pronunciationProvider?.speakWord|speakSentence|speak(`——「组合即发起发音」的唯一识别面。 */
         val GATEWAY_CALL = Regex("""pronunciationProvider\s*(?:\?)?\s*\.\s*(speakWord|speakSentence|speak)\s*\(""")
 
-        /** 两站腿体的收口锚：起点是站 1 `AnimatedContent` lambda 里的 `OverlayLeg(...)` 调用行，终点是其函数定义行。 */
-        const val LEG_BODY_START_ANCHOR = "OverlayLeg(route == overlayRoute) {"
+        /**
+         * 两站腿体的收口锚：起点是站 1 `AnimatedContent` lambda 里的 `OverlayLeg(...)` 调用行，终点是其函数定义行。
+         *
+         * m05053 起该调用改用具名实参、并因实参变多改成多行（给两条转场腿套 `SaveableStateProvider`
+         * 保屏内滚动位置），所以起点锚只取到调用名与左括号，不再逐字钉实参：本文件只要求「首次出现
+         * `OverlayLeg(` 的那行是**缩进在 lambda 里的调用行**（[composedPronunciationSites] 里的缩进守卫），
+         * 定义行 `private fun OverlayLeg(` 仍作收口锚，腿体区间与扫描口径不变。
+         */
+        const val LEG_BODY_START_ANCHOR = "OverlayLeg("
         const val LEG_BODY_END_ANCHOR = "private fun OverlayLeg("
 
         /** 批 D 终评补口第 4 条开工实测枚数（逐枚对上 allowedComposeFiredPronunciationSites）；下限留余量给版面微调。 */

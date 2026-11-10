@@ -55,7 +55,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -102,6 +104,7 @@ import com.example.englishlearning.ui.theme.AppleMintStart
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import kotlin.math.roundToInt
+import kotlin.reflect.KClass
 import java.time.Instant
 
 private val AppleMintGradient = Brush.linearGradient(listOf(AppleMintStart, AppleMintMiddle, AppleMintEnd))
@@ -747,6 +750,14 @@ fun AppScreen(
             // 返回键优先级，不是层深；方向比 route 表的 transitionDepth 列，决策册 2026-11-09 修正 1），
             // 下面这条链只读解析出来的 route；payload 冻在 route 里，退场腿不回读实时状态（决策 §3.1）。
             // `route` 这一枚局部只读名是给链用的，批 D-3 把链塞进 AnimatedContent 的 lambda 后由那一段自己接。
+            // m05053（用户走查）：「有些选项打开之后再返回，它就不在那个位置上，就直接从头开始了」——
+            // 导航位本身早就 rememberSaveable，丢的是**屏内**滚动位置：rememberLazyListState /
+            // rememberScrollState 的 Saver 挂在组合里，转场结束后该腿被 dispose，没人替它存。
+            // 这里放一枚 SaveableStateHolder，由站 1（overlay）的腿按 [overlayStateKey] 折出的键包一层
+            // SaveableStateProvider：腿离场时把屏内状态存进 holder，重进同一个键就原样还回来。
+            // 只对白名单里的「只读浏览型」覆盖层路线生效（[overlayKeepsInScreenState]）；站 2（主 tab）
+            // 整站不保，因为它的重进语义被 F1-04 / I-1 两条产品规则钉死，理由见那两处 KDoc。
+            val screenStateHolder = rememberSaveableStateHolder()
             val overlayRoute = AppOverlayRouteResolver.resolve(
                 AppMountFlags(
                     selectedSearchCard = selectedSearchCard,
@@ -803,7 +814,11 @@ fun AppScreen(
                 },
                 contentKey = { it?.navigationIdentity },
             ) { route ->
-                OverlayLeg(route == overlayRoute) {
+                OverlayLeg(
+                    isCurrentTarget = route == overlayRoute,
+                    stateHolder = screenStateHolder,
+                    stateKey = overlayStateKey(route),
+                ) {
                     if (route is AppOverlayRoute.VocabularyDetail) {
                         val card = route.card
                         LaunchedEffect(card.cardId) {
@@ -844,6 +859,17 @@ fun AppScreen(
                         }
                         CardDetailScreen(
                             card = card,
+                            // m05053（用户走查）：「常用搭配」「词形与派生」里出现的词也要能点开看详情。
+                            // 这一屏手上有的就是查词列表（vocabularyCards）：查得到才画可点面，
+                            // 查不到保持静态纯文本，不做点不动的假入口。
+                            openableLemmaOf = { lemma ->
+                                vocabularyCards.any { it.lemma.equals(lemma, ignoreCase = true) }
+                            },
+                            onOpenLemma = { lemma ->
+                                vocabularyCards
+                                    .firstOrNull { it.lemma.equals(lemma, ignoreCase = true) }
+                                    ?.let { target -> selectedSearchCard = target }
+                            },
                             onBack = closeSearchDetail,
                             onRelearn = {
                                 selectedRelearnCard = card
@@ -971,6 +997,20 @@ fun AppScreen(
                             onRelearn = {
                                 selectedRelearnCard = card
                                 vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
+                            },
+                            // m05053（用户走查）：搭配与派生词点开看详情——列表用的是这一屏的
+                            // 学习记录卡集合（与「下一个」同一份），查不到就保持静态。
+                            openableLemmaOf = { lemma ->
+                                recordCards.any { it.lemma.equals(lemma, ignoreCase = true) }
+                            },
+                            onOpenLemma = { lemma ->
+                                recordCards
+                                    .firstOrNull { it.lemma.equals(lemma, ignoreCase = true) }
+                                    ?.let { target ->
+                                        selectedLearningRecordCard = target
+                                        detailPronunciationRequest++
+                                        detailPronunciationMessage = PronunciationStatus.Idle
+                                    }
                             },
                             onNext = recordCards.indexOfFirst { it.cardId == card.cardId }
                                 .takeIf { it >= 0 && it + 1 < recordCards.size }
@@ -2062,6 +2102,21 @@ fun AppScreen(
                                         selectedRelearnCard = card
                                         vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
                                     },
+                                    // m05053（用户走查）：搭配与派生词点开看详情——用的是本篇文章
+                                    // 已收录的词卡（与「下一个」同一份），查不到就保持静态。
+                                    openableLemmaOf = { lemma ->
+                                        articleState?.cards.orEmpty()
+                                            .any { it.lemma.equals(lemma, ignoreCase = true) }
+                                    },
+                                    onOpenLemma = { lemma ->
+                                        articleState?.cards.orEmpty()
+                                            .firstOrNull { it.lemma.equals(lemma, ignoreCase = true) }
+                                            ?.let { target ->
+                                                selectedArticleCard = target
+                                                detailPronunciationRequest++
+                                                detailPronunciationMessage = PronunciationStatus.Idle
+                                            }
+                                    },
                                     onNext = articleState?.cards?.indexOfFirst { it.cardId == card.cardId }
                                         ?.takeIf { it >= 0 && it + 1 < (articleState?.cards?.size ?: 0) }
                                         ?.let { index -> {
@@ -2202,7 +2257,10 @@ fun AppScreen(
                                                         )
                                                     },
                                                 ) { tab ->
-                                                    TabLeg(isCurrentTarget = tab == selectedTab, tab = tab) {
+                                                    TabLeg(
+                                                        isCurrentTarget = tab == selectedTab,
+                                                        tab = tab,
+                                                    ) {
                                                         when (tab) {
                                                             AppTab.LEARNING -> TodayPlanScreen(
                                                                 state = todayState,
@@ -2374,6 +2432,69 @@ fun AppScreen(
 }
 
 /**
+ * 覆盖层里**值得把屏内状态跨退出/重回保留**的路线白名单（m05053 反馈 1 的收敛版）。
+ *
+ * 只收「只读浏览型列表页」：这类屏的全部屏内状态就是滚动位置一类的东西，存回去没有任何业务副作用。
+ * 刻意不收的（每条都有产品规则或已落地用例钉着，收了就连规则一起存回去）：
+ *  - `ArticleReading`：进文覆盖词弹窗的口径是「每次进组合重弹一次」
+ *    （`ArticleReadingScreen.kt:197` `rememberSaveable(current.article.articleId) { true }`），
+ *    状态存回去后同一篇再进就不弹了，`AppScreenTest.leavingTheArticleThroughEveryExitPathClearsItsPronunciationPresentation`
+ *    立刻红（点不到 `coverage_popup_close`）；
+ *  - `SpeechSettings` / `AiProfiles`：设置表单的二级菜单展开态被存回去后，`AppScreenTest` 那两条
+ *    「返回后候选必须刷新」的用例再点一次折叠按钮反而把菜单收起来（拿不到 `speech_profile_mimo`）；
+ *  - 其余覆盖层（学习流程 / 学习设置 / 工作纸 / 打卡 / 备份 / 检查更新 / AI 功能页 …）都是事务型屏，
+ *    重进必须按宿主状态重算。
+ *
+ * 站 2（主 tab）**完全不同口径、整站都不保留**：主 tab 的重进语义被产品规则钉死——回到学习 tab
+ * 必须重算今日计划（F1-04）、离开再进学习流必须清空词卡语播呈现（I-1）。设备侧实测：把 tab 腿也
+ * 包进 provider，`AppScreenTest` 里 `returningFromLearningReloadsTodayPlan` /
+ * `leavingAndReenteringLearningClearsTheWordCardPronunciationState` /
+ * `theReviewQueueEntryOpensTheReviewQueueAndBackReturnsToTheLearningTab` 等 5 条立刻超时红。
+ */
+private val overlayRoutesKeepingInScreenState: Set<KClass<out AppOverlayRoute>> = setOf(
+    AppOverlayRoute.GlobalSearch::class,
+    AppOverlayRoute.VocabularyRelearnList::class,
+    AppOverlayRoute.LearningRecords::class,
+    AppOverlayRoute.ReviewQueue::class,
+    AppOverlayRoute.TodayWordList::class,
+    AppOverlayRoute.WordBank::class,
+    AppOverlayRoute.ReadingHistory::class,
+    AppOverlayRoute.ReadingFeed::class,
+)
+
+/**
+ * 判据同 [overlayRoutesKeepingInScreenState]：按**类**比而不是按实例比——`ReviewQueue` / `TodayWordList`
+ * 是带 payload 的 `data class`，实例相等会随计划变化，只有类相等才是「同一屏」。
+ * 用 `::class` 而不是 `is` 分支还有一个契约理由：`ScreenTransitionContractTest` 按
+ * `is AppOverlayRoute.<变体>` 的枚数钉「每枚 route 恰有**一处**挂载点、总数 = route 表枚数」，
+ * 白名单若写成 `is` 分支会立刻把那些判据撑红（这是对的：挂载口径真的只能有一处）。
+ */
+private fun overlayKeepsInScreenState(route: AppOverlayRoute): Boolean =
+    route::class in overlayRoutesKeepingInScreenState
+
+/**
+ * 站 1 腿的屏内状态键：**null 表示这条路线不保留屏内状态**（腿里不包 `SaveableStateProvider`）。
+ * 保留与否由 [overlayKeepsInScreenState] 的白名单决定；白名单之外的路线逐字保持改动前的行为。
+ *
+ * 键为什么要折成字符串、不能直接用 [AppOverlayRoute.navigationIdentity]（m05053 设备侧踩坑）：
+ * `SaveableStateProvider` 在 Android 上会对键走一次 `canBeSaved` 校验，只放行 Bundle 装得下的类型；
+ * 而 `navigationIdentity` 有两种形状——`data object` 路线返回 `this`，卡片/计划类路线返回
+ * `mountIndex to 业务主键` 的 `Pair`。两者都是**普通引用类型**，一进门就抛
+ * `IllegalArgumentException: Type of the key ReadingHistory is not supported`（`AppScreenTest` 全红即此因）。
+ *
+ * 键只需要「**同一路线稳定、不同路线互不相撞**」，所以用「路线类名 + 业务主键」拼：`data object` 的
+ * `toString()` 就是对象名，`Pair` 的 `toString()` 形如 `(3, abc-123)`，足以区分同屏不同挂载位；
+ * 前缀类名再挡掉「两枚不同路线恰好拼出同一串」的理论碰撞。类名只在本进程内比对，R8 混淆不影响语义。
+ *
+ * 注意 `AnimatedContent` 的 `contentKey` 仍直接用 `navigationIdentity`（`Any`）：那里只走 `equals`/`hashCode`，
+ * 没有 Bundle 约束，不必跟着折。
+ */
+private fun overlayStateKey(route: AppOverlayRoute?): String? {
+    if (route == null || !overlayKeepsInScreenState(route)) return null
+    return "${route::class.simpleName}:${route.navigationIdentity}"
+}
+
+/**
  * 站 1 的转场腿根容器：判据与 `TabLeg` 同一条，只是 tag 归全屏子页站。
  * 终评补口 第 5 条：tag 按挂载状态分态（`overlay_transition_leg_current` / `overlay_transition_leg_exiting`）——
  * 35 支子页都共用这一枚腿 tag，不分态则 overlap 窗口里两腿同名，connected 只数得出「隐了几枚」，
@@ -2382,7 +2503,12 @@ fun AppScreen(
  * 两态由 `isCurrentTarget`（= `route == overlayRoute`）互斥且恰好覆盖：同一枚腿要么 current 要么 exiting。
  */
 @Composable
-private fun OverlayLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit) {
+private fun OverlayLeg(
+    isCurrentTarget: Boolean,
+    stateHolder: SaveableStateHolder,
+    stateKey: String?,
+    content: @Composable () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -2391,7 +2517,17 @@ private fun OverlayLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit
                 if (isCurrentTarget) Modifier
                 else Modifier.semantics { invisibleToUser() },
             ),
-    ) { content() }
+    ) {
+        // m05053：这条腿离场时 AnimatedContent 会把它整棵 dispose 掉，屏内滚动位置随之归零
+        // （用户看到的「返回后又从头开始」）。只在白名单路线上按 [overlayStateKey] 折出的键存一次、
+        // 回来再取回；键必须是 Bundle 装得下的类型，理由见 [overlayStateKey] 的 KDoc。
+        val stateKey = stateKey
+        if (stateKey == null) {
+            content()
+        } else {
+            stateHolder.SaveableStateProvider(stateKey) { content() }
+        }
+    }
 }
 
 /**
@@ -2400,7 +2536,11 @@ private fun OverlayLeg(isCurrentTarget: Boolean, content: @Composable () -> Unit
  * 「被 invisibleToUser 隐掉的是不是离场那一枚」，不分态就退化成只数数量。
  */
 @Composable
-private fun TabLeg(isCurrentTarget: Boolean, tab: AppTab, content: @Composable () -> Unit) {
+private fun TabLeg(
+    isCurrentTarget: Boolean,
+    tab: AppTab,
+    content: @Composable () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -2409,7 +2549,12 @@ private fun TabLeg(isCurrentTarget: Boolean, tab: AppTab, content: @Composable (
                 if (isCurrentTarget) Modifier
                 else Modifier.semantics { invisibleToUser() },
             ),
-    ) { content() }
+    ) {
+        // 站 2 **不做**屏内状态保留（与站 1 的刻意不对称，理由见 [overlayStateKey] 的 KDoc）：
+        // 主 tab 的重进语义被产品规则钉死——回到学习 tab 必须重算今日计划（F1-04）、
+        // 离开再进学习流必须清空词卡语播呈现（I-1）。整块保存屏内状态会把这两条规则一起存回去。
+        content()
+    }
 }
 
 /**
