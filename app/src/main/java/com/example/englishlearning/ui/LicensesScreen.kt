@@ -1,11 +1,16 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +37,7 @@ import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 
@@ -41,7 +47,7 @@ import com.example.englishlearning.ui.theme.appColors
  * 台账读不到时**如实显示不可用**，绝不渲染硬编码假台账（零假入口原则）。
  *
  * 批 5 Task 3 按 spec §5「许可证」行重排（重做口径 =「空态带重试；入口名与页名统一」）：
- *  1. 页头换共享 `AppScreenHeader`，页名逐字「开源许可与隐私说明」——与 `SettingsScreen.kt` 的入口名同句；
+ *  1. 页头换共享 `AppScreenHeader`，页名逐字「开源许可与隐私说明」——与「我的 → 关于」那一行的入口名同句；
  *     旧「‹」字形借 `headlineSmall` 凑字号的裸标题与锚 `licenses_back` 一并退役（页头返回位固定
  *     testTag `app_screen_header` + 可及名「返回」）；
  *  2. 九枚静态 `Mint*` 直读与 `MaterialTheme.typography` 归零：底色 `appColors().background`、
@@ -183,21 +189,27 @@ private fun NoticeCard(notice: ThirdPartyNotice) {
             // 「展开 / 收起」是唯一可见的展开线索；许可证已进副标题，不丢信息。
             trailing = if (expanded) "收起" else "展开",
         )
-        if (expanded) {
-            listOf("用途", "数据流", "NOTICE 位置", "替代方案", "商业分发结论").forEach { key ->
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingOut)),
+            exit = shrinkVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingIn)),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                listOf("用途", "数据流", "NOTICE 位置", "替代方案", "商业分发结论").forEach { key ->
+                    Text(
+                        text = "$key：${notice.field(key)}",
+                        style = AppType.Footnote,
+                        color = colors.text2,
+                        modifier = Modifier.padding(horizontal = 15.dp, vertical = 3.dp),
+                    )
+                }
                 Text(
-                    text = "$key：${notice.field(key)}",
-                    style = AppType.Footnote,
+                    text = "以上字段与仓库台账 docs/third-party-notices.md 逐字一致",
+                    style = AppType.Label,
                     color = colors.text2,
-                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 3.dp),
+                    modifier = Modifier.padding(start = 15.dp, end = 15.dp, top = 4.dp, bottom = 12.dp),
                 )
             }
-            Text(
-                text = "以上字段与仓库台账 docs/third-party-notices.md 逐字一致",
-                style = AppType.Label,
-                color = colors.text2,
-                modifier = Modifier.padding(start = 15.dp, end = 15.dp, top = 4.dp, bottom = 12.dp),
-            )
         }
     }
 }

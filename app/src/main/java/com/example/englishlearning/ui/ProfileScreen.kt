@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
@@ -19,22 +18,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishlearning.ui.components.AppCard
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.EntryIconBadge
 import com.example.englishlearning.ui.components.EntryIconTone
 import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.SectionHeading
+import com.example.englishlearning.ui.components.SegmentedControl
 import com.example.englishlearning.ui.components.SkeletonBar
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.StrongCard
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.ui.theme.AppThemePreferences
 import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.theme.ThemeMode
 import com.example.englishlearning.ui.theme.appColors
+import com.example.englishlearning.ui.theme.rememberAppThemeMode
 
 /**
  * 「我的」hub 的一行（静态描述）。
@@ -60,7 +68,7 @@ data class ProfileGroup(
 
 /**
  * 「我的」功能中心的唯一台账（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md` §2）：
- * **恰 3 组、恰 13 行**（我的词汇 3 / 学习 5 / 应用 5）。
+ * **恰 3 组、恰 13 行**（我的词汇 3 / 学习 6 / 应用 4）。
  *
  * 形状逐字取自参考 `sMeHome`（`assets/app.js:1255-1282`）的三个 `section(...)`；本应用比参考多出的
  * 两行（生成默写纸 / 词书内容包）插在「学习」组，因为它们是**已实现**的能力，砍掉就是功能倒退
@@ -101,7 +109,6 @@ object ProfileGroups {
     // 「语音朗读」挨着「AI 服务」：发音走小米 MiMo 时依赖那里配的密钥，两行是近邻。
     // 副标题「当前供应商：X」是读得到的真值，由装配点从 `speechEngineSubtitle` 现取（同「学习计划」的词书名）。
     val Speech = ProfileRow("语音朗读", "profile_open_speech", AppIcon.Speaker, AppDomain.AiSpeech, null)
-    val Settings = ProfileRow("设置", "profile_open_settings", AppIcon.Gear, AppDomain.Settings, "外观（跟随系统 / 浅色 / 深色）")
     val Backup = ProfileRow("数据与备份", "profile_open_backup", AppIcon.Shield, AppDomain.Settings, "导出本机文件、换机恢复与清空学习数据")
     // U-12（决策 2026-11-03 §5）：行名从旧的那枚「关于＋许可」并列名收窄成「关于」，与它打开的页同名。
     // 旧名把两跳说成一跳——第三方清单不住在关于页里，关于页只留一句进许可页的入口，
@@ -112,7 +119,7 @@ object ProfileGroups {
     val all: List<ProfileGroup> = listOf(
         ProfileGroup("我的词汇", "profile_group_vocabulary", listOf(FavoriteWords, NewWords, WrongWords)),
         ProfileGroup("学习", "profile_group_learning", listOf(LearningRecords, LearningPlan, WordBook, Reminder, Worksheet, WordBookTransfer)),
-        ProfileGroup("应用", "profile_group_application", listOf(AiProfiles, Speech, Settings, Backup, About)),
+        ProfileGroup("应用", "profile_group_application", listOf(AiProfiles, Speech, Backup, About)),
     )
 }
 
@@ -124,7 +131,7 @@ object ProfileGroups {
  * 「我的」与「设置」并列成两个 tab 是同一件事的两份入口，参考的做法是设置住在「我的」里。
  *
  * 三组行都是**导航行**，不改任何能力本体：词汇三行进词库页对应分段（`onOpenWordBankSection`，
- * 段位只在宿主一处写，见 `MyWordsScreenContractTest`），学习组进既有子页，应用组进既有子页与设置。
+ * 段位只在宿主一处写，见 `MyWordsScreenContractTest`），学习组进既有子页，应用组进既有子页。
  * 因此本页**不**再内联设置内容（同屏两枚页头 + 两个滚动容器是旧形态），也**不**持有 SAF 与密钥读写。
  *
  * 数字与摘要只读宿主传进来的真值：本页不读仓库（口径同 `TodayPlanScreen`）。
@@ -157,7 +164,6 @@ fun ProfileScreen(
     onOpenAiProfiles: () -> Unit,
     onOpenReminderSettings: () -> Unit,
     onOpenSpeechSettings: () -> Unit,
-    onOpenSettings: () -> Unit,
     onOpenBackupHub: () -> Unit,
     onOpenAbout: () -> Unit,
     wordBookName: String? = null,
@@ -166,6 +172,7 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
+    val context = LocalContext.current
     // 页头副标题只拼**读到的那几枚**（批 C-2 / F5-05）：两枚都没读到时整行不出现，
     // 而不是「连续打卡 0 天 · 累计学过 0 个词」。学习页的同一行早就按这个口径写
     // （没有连续记录时不摆「连续 0 天」），本批把「还没读到」与「读了且是 0」分开表达。
@@ -197,6 +204,14 @@ fun ProfileScreen(
                 ProfileStatCell("文章", articleCount?.toString(), "profile_stat_articles", onOpenReadingHistory, Modifier.weight(1f))
             }
         }
+        // 2026-11-10（用户 m03373 + m03681 拍板选项 1；m04040 再调位置）：「外观」不再住在「设置」子页。
+        // 那一页只剩这一段，用户的原话是「拿到放到我的里面就好了」——主题是每天都要碰的显示开关，
+        // 藏在第二跳里既多点一次、又要在设置里翻；设置页因此整体退役（路由 / 状态位 / 挂载分支一并摘掉），
+        // 三档分段内联在页头统计卡之下、第一组「我的词汇」之前（m04040：「放在图片红线下方」）。
+        // 读写口径与判据原封不动（`AppThemePreferences.write` + `rememberAppThemeMode`，
+        // 见 docs/decisions/2026-11-10-theme-switch-moves-into-profile.md）。
+        SectionHeading(text = "外观", modifier = Modifier.testTag("profile_group_appearance"))
+        ThemeModeRow(mode = rememberAppThemeMode(), onSelect = { AppThemePreferences.write(context, it) })
         ProfileGroups.all.forEach { group ->
             SectionHeading(text = group.title, modifier = Modifier.testTag(group.tag))
             SoftCard(contentPadding = PaddingValues(vertical = 4.dp)) {
@@ -214,7 +229,6 @@ fun ProfileScreen(
                         onOpenAiProfiles = onOpenAiProfiles,
                         onOpenReminderSettings = onOpenReminderSettings,
                         onOpenSpeechSettings = onOpenSpeechSettings,
-                        onOpenSettings = onOpenSettings,
                         onOpenBackupHub = onOpenBackupHub,
                         onOpenAbout = onOpenAbout,
                         speechEngineSubtitle = speechEngineSubtitle,
@@ -248,7 +262,6 @@ private fun ProfileLedgerEntry(
     onOpenAiProfiles: () -> Unit,
     onOpenReminderSettings: () -> Unit,
     onOpenSpeechSettings: () -> Unit,
-    onOpenSettings: () -> Unit,
     onOpenBackupHub: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
@@ -264,7 +277,6 @@ private fun ProfileLedgerEntry(
         ProfileGroups.WordBookTransfer -> onOpenWordBookTransfer
         ProfileGroups.AiProfiles -> onOpenAiProfiles
         ProfileGroups.Speech -> onOpenSpeechSettings
-        ProfileGroups.Settings -> onOpenSettings
         ProfileGroups.Backup -> onOpenBackupHub
         ProfileGroups.About -> onOpenAbout
         else -> error("「我的」hub 台账里这枚行没有落点：${row.title}（新增行必须同时给出目的地）")
@@ -316,7 +328,7 @@ private fun ProfileStatCell(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShape.Button)
             .clickable(onClick = onClick)
             .heightIn(min = 72.dp)
             .padding(vertical = 10.dp, horizontal = 6.dp)
@@ -333,5 +345,51 @@ private fun ProfileStatCell(
             Text(value, style = AppType.Headline, color = LocalContentColor.current)
             Text(label, style = AppType.Footnote, color = LocalContentColor.current.copy(alpha = 0.72f))
         }
+    }
+}
+
+/** 三态在界面上的用户语言标签（存储键仍走 `ThemeMode.storageKey`，这里只是文案）。 */
+private val ThemeMode.userLabel: String
+    get() = when (this) {
+        ThemeMode.System -> "跟随系统"
+        ThemeMode.Light -> "浅色"
+        ThemeMode.Dark -> "深色"
+    }
+
+/**
+ * 主题三态选择卡（稿 §7④「主题」分段控件）：纯展示组件——[mode] 进、[onSelect] 出。
+ *
+ * **2026-11-10 从 `SettingsScreen.kt` 整份搬来**（用户 m03373「浅色 / 深色 / 自动应该拿到外面来」+ m03681 选项 1）：
+ * 原先是「我的 → 设置 → 外观」两跳，现在就在「我的」页末一段。组件形状、标签文案与 TalkBack 口径
+ * （[Role.RadioButton]，读屏念「单选按钮，已选中」）逐字未变——搬的是位置，不是设计。
+ * 卡壳走 [AppCard]（原型 `.card`），分段走 [SegmentedControl]，两件都由共享组件给；
+ * 三档标签固定「跟随系统 / 浅色 / 深色」（`ThemeMode.userLabel`，全站唯一一份文案）。
+ *
+ * 每档 testTag 由本页按 `profile_theme_${option.storageKey}` 给出（`SegmentedControl` 的
+ * `itemTestTags` 形参）：tag 属于本页的词汇表，不住在共享件里；connected 侧
+ * `ProfileScreenTest` 按这三枚定位分段与断选中态。
+ */
+@Composable
+fun ThemeModeRow(mode: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    val colors = appColors()
+    AppCard(modifier = Modifier.testTag("profile_theme_mode")) {
+        Text(
+            text = "主题",
+            style = AppType.Body,
+            fontWeight = FontWeight.Bold,
+            color = colors.text1,
+        )
+        SegmentedControl(
+            options = ThemeMode.entries.map { it.userLabel },
+            selectedIndex = ThemeMode.entries.indexOf(mode),
+            onSelect = { index -> onSelect(ThemeMode.entries[index]) },
+            role = Role.RadioButton,
+            itemTestTags = ThemeMode.entries.map { "profile_theme_${it.storageKey}" },
+        )
+        Text(
+            text = "切换后立即生效，仅影响本机显示，不属于学习数据。",
+            style = AppType.Footnote,
+            color = colors.text2,
+        )
     }
 }

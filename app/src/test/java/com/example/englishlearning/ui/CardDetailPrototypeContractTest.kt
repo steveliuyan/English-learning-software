@@ -159,7 +159,9 @@ class CardDetailPrototypeContractTest {
     /** 页末：一句提示 + 一枚整宽次键「用 AI 追问这个词」（原型 notice + btn-secondary btn-block）。 */
     @Test
     fun `the page ends with the notice and the ai follow up block button`() {
-        val notice = "\"长难句分析、AI 问词都从这里进入，围绕这一个词继续追问。\""
+        // 2026-11-09 真人走查：原型那句的前半截在本仓不成立（本页没有长难句分析入口，
+        // 它是 AI 助学里的独立一屏），故只保留 AI 问词那半句，其余逐字照旧。
+        val notice = "\"AI 问词从这里进入，围绕这一个词继续追问。\""
         assertEquals(
             1,
             countMatches(source, Regex(Regex.escape(notice))),

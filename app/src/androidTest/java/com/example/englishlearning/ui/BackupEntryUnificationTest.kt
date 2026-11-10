@@ -23,15 +23,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Task 25（裁决⑥）connected 判据：设置页「备份与恢复」不再就地展开，而是进入一枚真子页
+ * Task 25（裁决⑥）connected 判据：备份与恢复不再就地展开，而是进入一枚真子页
  * [BackupHubScreen]——三节（导出 / 恢复 / 删除全部学习数据）固定顺序、四枚入口各归其节。
  *
  * 口径沿用本包既有纪律：**一个 `@Test` 只 `setContent` 一次**（同一次测试两次 `setContent` 必崩）；
  * 大字号档用**组合期** `LocalDensity provides Density(density, fontScale = 2f)` 取证
  * （先例 `AppScreenOverlayContainerTest`），不碰设备全局 `font_scale`。
  *
- * 这里只钉子页自身的形状与接线；「设置页那一行真的导航到它」「返回键回到设置页」归宿主腿
- * （`SettingsScreenTest` 的折叠行改造 + `AppScreenOverlayContainerTest` 的集成腿）。
+ * 这里只钉子页自身的形状与接线；「hub 那行真的导航到它」「返回键回到 hub」归宿主腿
+ * （`AppScreenOverlayContainerTest` 的集成腿）。2026-11-10 起设置子页整体退役，入口唯一落点是「我的」hub。
  */
 @RunWith(AndroidJUnit4::class)
 class BackupEntryUnificationTest {

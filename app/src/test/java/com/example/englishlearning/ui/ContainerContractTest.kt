@@ -13,6 +13,15 @@ import kotlin.test.assertTrue
 class ContainerContractTest {
     private val containers: String by lazy { stripComments(uiComponentSource("Containers.kt")) }
 
+    /** M3 `Card(` 的**调用**形态（`\b` 保它不误命中 `AppCard(` / `StrongCard(` 这类共享容器的尾部）。 */
+    private val M3_CARD_CALL = Regex("""\bCard\(""")
+
+    /** 裸圆角的**调用**形态（`\b` 保它不误命中共享件名）：本仓圆角只有 `AppShape` 五档。 */
+    private val BARE_RADIUS_CALL = Regex("""\bRoundedCornerShape\(""")
+
+    /** 裸尺寸形态：`CornerSize(` 是同一条债的另一个写法（`shape = RoundedCornerShape(CornerSize(…))`）。 */
+    private val BARE_CORNER_SIZE_CALL = Regex("""\bCornerSize\(""")
+
     /**
      * 「一屏最多一枚强档卡」的适用范围。批 1 Task 4 立了学习页，Task 5 把词库页并进来；
      * 批 2 把重做过的学习链路五屏（词卡 / 词义详情 / 重新学习 / 默写纸设置 / 默写纸预览）并进来。
@@ -82,6 +91,15 @@ class ContainerContractTest {
             // 恢复异常（Task 8）：详情折叠一枚 `SoftCard`（内嵌裸行 + 展开后的原因），
             // 两条出路全走药片——零强卡、零 M3 `Card(`（旧居中列与 M3 `Button` 一并下线）。
             "RecoveryScreen.kt",
+            // 设计系统收口批（2026-11-09 续）：我的词库三段容器原是全仓最后一枚 M3 `Card(` + 两档私有
+            // 18dp 圆角（`MyWordsSectionCard`）。现在卡壳走共享 `AppCard`，段内 16/12 内距与 4dp 段内节奏
+            // 留在私有 Column 里；本屏因此具备进表的两项资格：零 M3 `Card(`、零强卡。
+            "MyWordsScreen.kt",
+            // 全站圆角统一批（2026-11-10）：我的页与打卡页此前不在表里，那两处裸圆角因此无人守——
+            // 本轮把 `ProfileStatCell` 的 16dp 换成 `AppShape.Button`、打卡周柱的 6dp 换成
+            // `AppShape.GraphicBar`（图形档），两屏收口后并入逐屏清单。两屏都零 M3 `Card(`、零强卡。
+            "ProfileScreen.kt",
+            "CheckInScreen.kt",
         )
             .associateWith { stripComments(uiScreenSource(it)) }
     }
@@ -116,6 +134,68 @@ class ContainerContractTest {
         )
     }
 
+    /**
+     * 逐屏「零 M3 `Card(`」——把 [screens] 每行注释里的自述变成**可执行的判据**。
+     *
+     * 2026-11-09 设计系统收口批（续）：这张表此前只判「强档卡 ≤ 1」，`\bCard(` 归零只判了
+     * `Containers.kt`——于是表头那些「零 M3 `Card(`」全是没人执行的自我承诺（实测把 MyWordsScreen.kt
+     * 加进表里、它身上明摆着一枚 `Card(`，用例照绿）。本用例补上逐屏臂，并给两组反空转样本：
+     * 真 M3 调用必须数得出来；`AppCard(` / `SoftCard(` / `QuietCard(` 的尾部不得被误命中。
+     */
+    @Test
+    fun `no listed screen reaches for the material3 card again`() {
+        screens.forEach { (name, source) ->
+            assertEquals(
+                0,
+                countMatches(source, M3_CARD_CALL),
+                "$name 又出现 M3 `Card(`：三档容器（AppCard / SoftCard / QuietCard）就是替代它的那一层，" +
+                    "M3 卡会把默认海拔、默认形状与默认容器色一并带回来（spec §4.1 的卡片汤就是从这儿回来的）。",
+            )
+        }
+        // 反空转 ①：本计数器对真的 M3 调用必须数得出来，否则上面那圈等于空转。
+        assertEquals(1, countMatches("Card(\n    colors = CardDefaults.cardColors()", M3_CARD_CALL))
+        // 反空转 ②：共享容器的尾部（`AppCard(` 等）不能被当成 M3 `Card(`。
+        assertEquals(0, countMatches("AppCard(\nSoftCard(\nQuietCard(", M3_CARD_CALL))
+    }
+
+    /**
+     * 逐屏「手搓圆角归零」——把各屏 layout 契约里零散写着的「圆角走 `AppShape`」收成一条统一判据。
+     *
+     * 圆角**全部**取具名档：容器五档（10 小按钮·32 徽标 / 14 按钮·输入框·44 徽标 / 20 卡片·64 徽标
+     * / 26 对话框·强卡 / 999 药片）+ 图形两档（`GraphicBar` 6dp 细柱、`GraphicDot` 2dp 图例方点）。
+     * 屏侧自写 `RoundedCornerShape(18.dp)` 这类魔数就是「原型对齐」逐年漂移的入口（2026-11-09 词库页
+     * 两档 13dp/10dp、拍照翻译 14dp、计划图例 2dp 都是这么长出来的）。
+     *
+     * 2026-11-10 全站圆角统一批：最后三处历史债清空——计划图例 8dp 方点改取 `AppShape.GraphicDot`
+     * （不是拿 10dp 去画成圆点，图形另立两档）、我的页统计格 16dp 改取 `AppShape.Button`、打卡周柱
+     * 6dp 改取 `AppShape.GraphicBar`。于是**豁免表整张删除**：本用例改成一律 0，不再有「记账例外」的口袋。
+     */
+    @Test
+    fun `no listed screen hand rolls a corner radius`() {
+        screens.forEach { (name, source) ->
+            assertEquals(
+                0,
+                countMatches(source, BARE_RADIUS_CALL),
+                name + " 手搓了圆角：具名档在 `AppShape`（容器 10 / 14 / 20 / 26 / 999，图形 GraphicBar 6 / GraphicDot 2），" +
+                    "屏侧只许取具名档；确有例外也不许默默留着",
+            )
+            assertEquals(
+                0,
+                countMatches(source, BARE_CORNER_SIZE_CALL),
+                name + " 手搓了 `CornerSize(`：圆角只能取 `AppShape` 具名档",
+            )
+        }
+        // 反空转 ①：真调用必须数得出来，否则上面那圈等于空转。
+        assertEquals(1, countMatches("clip(RoundedCornerShape(18.dp))", BARE_RADIUS_CALL))
+        // 反空转 ②：具名档不是裸圆角（`AppShape.Card` / `Pill` / 图形两档的尾巴不得被误命中）。
+        assertEquals(
+            0,
+            countMatches(
+                "clip(AppShape.Card)\nclip(AppShape.Pill)\nclip(AppShape.GraphicBar)\nclip(AppShape.GraphicDot)",
+                BARE_RADIUS_CALL,
+            ),
+        )
+    }
     /**
      * 强档卡的分套取色（2026-10-31 用户评审：浅套深墨实底「太重、喧宾夺主」）。
      *

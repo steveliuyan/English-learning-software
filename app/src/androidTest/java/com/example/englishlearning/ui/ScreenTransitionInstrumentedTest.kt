@@ -114,10 +114,10 @@ class ScreenTransitionInstrumentedTest {
     }
 
     /**
-     * 判据 2b（终评补口 第 5 条）：站 1（35 支全屏子页）的退场腿同样对 TalkBack 隐身。
+     * 判据 2b（终评补口 第 5 条）：站 1（34 支全屏子页，2026-11-10 设置页退役后少一支）的退场腿同样对 TalkBack 隐身。
      *
      * 旧形状里 `OverlayLeg` 的 tag 不区分离场/在场（两腿同名 `overlay_transition_leg`），无障碍断言只能数
-     * 「隐了几枚」，指不出隐掉的是**哪一腿**，35 支子页的「离场屏不可达」因此没有测试钉着（判据 2 只覆盖站 2）。
+     * 「隐了几枚」，指不出隐掉的是**哪一腿**，全屏子页的「离场屏不可达」因此没有测试钉着（判据 2 只覆盖站 2）。
      * 现 `OverlayLeg` tag 按挂载状态分态（`overlay_transition_leg_current` / `overlay_transition_leg_exiting`），
      * 这里点名「被 `invisibleToUser` 隐掉的那一坨子树必须是离场腿自己那一枚」，在场腿排除在隐身之外——
      * 与判据 2 对站 2 的 `tab_transition_leg_LEARNING` 点名同一套形状。
@@ -126,13 +126,13 @@ class ScreenTransitionInstrumentedTest {
     fun outgoingOverlayLegIsHiddenFromAccessibility() {
         renderReadyAppOnProfileTab()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("profile_open_settings").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("profile_open_about").fetchSemanticsNodes().isNotEmpty()
         }
-        // 与判据 3 同一驱动：先在推进开着时把「设置」行滚入并 settle，再冻时钟停在转场半程。
-        composeRule.onNodeWithTag("profile_open_settings").performScrollTo()
+        // 与判据 3 同一驱动：先在推进开着时把「关于」行滚入并 settle，再冻时钟停在转场半程。
+        composeRule.onNodeWithTag("profile_open_about").performScrollTo()
         composeRule.waitForIdle()
         composeRule.mainClock.autoAdvance = false
-        composeRule.onNodeWithTag("profile_open_settings").performClick()
+        composeRule.onNodeWithTag("profile_open_about").performClick()
         composeRule.mainClock.advanceTimeBy(150)
         val legs = overlayLegNodes()
         assertEquals("开子页半程必须两腿共存，否则没有离场腿可点名", 2, legs.size)
@@ -150,33 +150,34 @@ class ScreenTransitionInstrumentedTest {
 
     /**
      * 判据 3：开全屏子页（站 1）同样两腿共存。
-     * 入口与锚点全部现读，不是编的：`app_tab_ai` 与 `profile_open_settings` 分别是
-     * `AppBottomBar.kt:187`（`app_tab_${tab.name.lowercase()}`）与 `ProfileScreen.kt:104` 的既有 tag，
-     * 点击配方照 `AppScreenTest.kt:617`（`performScrollTo().performClick()`）逐字抄。
+     * 入口与锚点全部现读，不是编的：`app_tab_ai` 与 `profile_open_about` 分别是
+     * `AppBottomBar.kt`（`app_tab_${tab.name.lowercase()}`）与 `ProfileScreen.kt` 台账里的既有 tag，
+     * 点击配方照 `AppScreenTest` 的 `performScrollTo().performClick()` 逐字抄。
+     * 2026-11-10（m03373 选项 1）：`profile_open_about` 随设置子页退役，本组用例改走「我的 → 关于」。
      */
     @Test
     fun openingFullScreenSubPageKeepsBothLegsMountedMidTransition() {
         renderReadyAppOnProfileTab()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("profile_open_settings").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("profile_open_about").fetchSemanticsNodes().isNotEmpty()
         }
-        // 测试形状修正（本批已实测）：`performScrollTo` 需要推进帧把「设置」行组合进布局；若在它之前关掉
+        // 测试形状修正（本批已实测）：`performScrollTo` 需要推进帧把「关于」行组合进布局；若在它之前关掉
         // autoAdvance，LazyColumn 滚不到目标、performScrollTo 永远等不到 ⇒ 用例 8 分钟挂死（红的不是判据而是夹具跑不动）。
         // 先在推进开着时把该行滚入并 settle，再关推进，手动停在转场半程。断言（半程 2 腿、settle 后 1 腿）不变。
-        composeRule.onNodeWithTag("profile_open_settings").performScrollTo()
+        composeRule.onNodeWithTag("profile_open_about").performScrollTo()
         composeRule.waitForIdle()
         composeRule.mainClock.autoAdvance = false
-        composeRule.onNodeWithTag("profile_open_settings").performClick()
+        composeRule.onNodeWithTag("profile_open_about").performClick()
         composeRule.mainClock.advanceTimeBy(150)
         assertEquals(
-            "开设置子页的半程只有一腿 ⇒ 站 1 没在播退场，链仍按标志位当场翻转",
+            "开关于子页的半程只有一腿 ⇒ 站 1 没在播退场，链仍按标志位当场翻转",
             2,
             overlayLegNodes().size,
         )
         composeRule.mainClock.advanceTimeBy(400)
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("settings_screen").assertExists()
+        composeRule.onNodeWithTag("about_screen").assertExists()
         assertEquals(1, overlayLegNodes().size)
     }
 
@@ -230,10 +231,10 @@ class ScreenTransitionInstrumentedTest {
         // 没有这份原始日志；唯一留存的探针日志 b2-connected-red.log 是 Tests run: 2, Failures: 2（红点是那两枚身份用例，
         // 枚数、用例、红点都与表第 2 行不同），而该报告 §读数 1 又记探针后逐字还原为 RESTORE_IDENTICAL。
         // 所以既不能把它算作 shipped 配置的实证 flake，也不能断定它发生在摘掉 contentKey 的探针配置里——只能记为归属不明。
-        // shipped 配置下可证的偶发红目前有两趟：f3cc0c3 的 Wide 全类一趟（b4-wide-connected.log，Tests run: 9, Failures: 1，
-        // 红点在下面引用的 pumpUntil 3s 超时）与 scoped 复评修复轮在 f713a5a 的 Wide 全类首趟
-        // （.superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task/connected-wide-r1.log，Tests run: 9, Failures: 1，
-        // 红点同为 pumpUntil 3s 超时、现场只有 1 枚腿；同配置后续 Wide 3 趟与 Compact 2 趟 OK (9 tests)）。
+        // shipped 配置下可证的偶发红目前有三趟：f3cc0c3 的 Wide 全类一趟（b4-wide-connected.log，Tests run: 9, Failures: 1，
+        // 红点在下面引用的 pumpUntil 3s 超时）、f713a5a 的 Wide 全类首趟 connected-wide-r1.log，与 d97f8e3 内容装配 APK 上的
+        // Compact 首趟 connected-compact-final.log（同目录 .superpowers/sdd/2026-11-09-batch-d-rereview-fixes-task/，
+        // 均 Tests run: 9, Failures: 1，红点同为 pumpUntil 3s 超时、现场同为 1 枚腿 ⇒ 不挑形态；本轮同配置留档另有 10 趟 OK (9 tests)）。
         // 硬化照做不变：固定帧数换成有墙钟超时上限的逐帧步进，本身是判据健壮性；
         // 下面那两道守卫（ff4177c）的理由成立，不依赖上面那趟的归属结论。
         // 改成带超时上限的手动帧泵
@@ -254,8 +255,26 @@ class ScreenTransitionInstrumentedTest {
             composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().size,
         )
         composeRule.mainClock.autoAdvance = false
-        pressSystemBack()
-        pumpUntil(timeoutMillis = 3_000, diagnostic = ::overlayLegSnapshot) { overlayLegNodes().size == 2 }
+        // 【2026-11-09 m02277 丢键硬化】红过五趟的现场读数都是「站 1 腿 1 枚 current + word_card_screen 仍在场」，
+        // 即：这枚返回键压根没被主线程消费（不是转场没开播）。instrumentation 注入键事件是异步的，
+        // 主线程正在做组合/布局时可能整枚丢掉；夹具就位（上面那条恰 1 腿的守卫已过）之后仍丢过一次，
+        // 说明这是注入时序，不是产品行为。本轮 A/B 实测：把新加的详情返回键处理器改成 enabled = false 复跑三趟，
+        // 红点与枚数完全一致（GREEN,RED,GREEN），与本批改动无关。
+        // 驱动因此从「发一次键就看结果」改成「确认这一步确实发生」：发键 → 步进帧等 overlap 窗口；
+        // 若词卡腿原地未动（唯一一枚 current 腿、没有 exiting 腿），再发一次，最多 3 发。
+        // 判据一条都不放宽：窗口始终没开仍由下面那两条 assert 报红，只是不再因为一次丢键把用例判死。
+        var windowOpened = false
+        var attempts = 0
+        while (!windowOpened && attempts < 3) {
+            attempts++
+            pressSystemBack()
+            windowOpened = pumpUntilOrFalse(timeoutMillis = 600) { overlayLegNodes().size == 2 }
+            if (!windowOpened && !backLooksDropped()) break
+        }
+        assertTrue(
+            "返回键发了 $attempts 次仍未开出退场 overlap 窗口（丢键或窗口已跑完）${overlayLegSnapshot()}",
+            windowOpened,
+        )
         assertEquals("退场半程必须两腿共存，否则 overlap 窗口没开着、本判据失去靶面", 2, overlayLegNodes().size)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {
@@ -596,6 +615,32 @@ class ScreenTransitionInstrumentedTest {
             composeRule.mainClock.advanceTimeBy(16)
         }
         assertTrue("手动步进 ${timeoutMillis}ms 内条件仍未成立${diagnostic()}", condition())
+    }
+
+    /**
+     * [pumpUntil] 的布尔版：条件成立即返回 true，墙钟超时返回 false（不抛）。
+     * 给「这一步到底发生了没有、要不要重发一次」这类**驱动**用它，判据仍留在调用处的 assert 里。
+     */
+    private fun pumpUntilOrFalse(timeoutMillis: Long, condition: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return true
+            composeRule.mainClock.advanceTimeBy(16)
+        }
+        return condition()
+    }
+
+    /**
+     * 丢键现场判据：词卡腿原地未动——恰好一枚 current 腿、没有任何 exiting 腿、词卡屏仍在场。
+     * 只有这种现场才可以重发返回键；转场若已开播或已跑完，一律交回调用处的 assert 报红。
+     */
+    private fun backLooksDropped(): Boolean {
+        val legs = overlayLegNodes()
+        val hasExiting = legs.any { node ->
+            node.config.getOrNull(SemanticsProperties.TestTag) == "overlay_transition_leg_exiting"
+        }
+        val wordCardLegs = composeRule.onAllNodesWithTag("word_card_screen").fetchSemanticsNodes().size
+        return !hasExiting && legs.size == 1 && wordCardLegs == 1
     }
 
     /**

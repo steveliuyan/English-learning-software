@@ -1,30 +1,15 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.components.AppScreenHeader
-import com.example.englishlearning.ui.theme.AppType
+import com.example.englishlearning.ui.components.SegmentedControl
 import com.example.englishlearning.ui.theme.appColors
 
 /** 词库四分段（spec §3.3）：词书 / 生词 / 错词 / 收藏。 */
@@ -77,10 +62,12 @@ internal fun wordBankSegmentDescription(section: WordBankSection, count: Int?): 
  *  - 被复用的两屏必须以 `showHeader = false` 挂进来。它们是整屏设计的产物，各自带页头与返回位；
  *    不关掉就是同屏两个返回位、两套标题，用户按哪一枚都可能退错层。
  *
- * 分段控件不是 M3 `TabRow`：三档容器的语言里它属于「一层明度差的底」——`tint2` 凹槽 +
- * 选中格 `surface` 凸起，与 `SoftCard` 同一套明度语法，且四格各自 ≥48dp 命中区（AC-R-04）。
- * 选中态同时给 `stateDescription`（TalkBack 读「已选中」），不只靠颜色——颜色单通道在
- * 深色档与色觉差异下都不可靠。
+ * 分段控件走共享 [SegmentedControl]（2026-11-09 设计系统收口批），本屏不再自画一排格子：
+ * 轨道底色 / 1dp 描边 / 药片形 / 段项 12sp·600 / 48dp 命中区全部归共享件（AC-R-04 的下限由它守），
+ * 本屏只交词汇表——四段的标签（[wordBankSegmentLabel]）、读屏文本（[wordBankSegmentDescription]）
+ * 与 tag（`WordBankSection.tag`）。选中态有两条语义通道：共享件的 `Selected` 属性，以及本屏
+ * 用 `announceSelection = true` 要来的 `stateDescription`（TalkBack 读「已选中 / 未选中」，
+ * 与底导逐字一致）——不只靠颜色，颜色单通道在深色档与色觉差异下都不可靠。
  *
  * ## 分段标签的条数（原型 `sMeWords`，`assets/app.js:1292`）
  *
@@ -115,6 +102,17 @@ fun WordBankScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = appColors()
+    val sections = WordBankSection.entries
+    // 三格条数按段名取（词书段没有条数来源，恒 null）：一张表把「哪段读哪枚形参」写死一次，
+    // 免得四格各写一遍 when 之后漏掉其中一段。
+    val counts = sections.associateWith { cell ->
+        when (cell) {
+            WordBankSection.Book -> null
+            WordBankSection.New -> newCount
+            WordBankSection.Wrong -> wrongCount
+            WordBankSection.Favorite -> favoriteCount
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -127,45 +125,15 @@ fun WordBankScreen(
             onBack = onBack,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-                .clip(RoundedCornerShape(13.dp))
-                .background(colors.tint2)
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            WordBankSection.entries.forEach { cell ->
-                val selected = cell == section
-                val cellCount = when (cell) {
-                    WordBankSection.Book -> null
-                    WordBankSection.New -> newCount
-                    WordBankSection.Wrong -> wrongCount
-                    WordBankSection.Favorite -> favoriteCount
-                }
-                val label = wordBankSegmentLabel(cell, cellCount)
-                Text(
-                    text = label,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (selected) colors.surface else colors.tint2)
-                        .clickable(role = Role.Tab) { onSelectSection(cell) }
-                        .testTag(cell.tag)
-                        .semantics {
-                            contentDescription = wordBankSegmentDescription(cell, cellCount)
-                            role = Role.Tab
-                            stateDescription = if (selected) "已选中" else "未选中"
-                        }
-                        .padding(vertical = 13.dp),
-                    style = AppType.Body.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal),
-                    color = if (selected) colors.text1 else colors.text2,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+        SegmentedControl(
+            options = sections.map { wordBankSegmentLabel(it, counts[it]) },
+            selectedIndex = sections.indexOf(section),
+            onSelect = { index -> onSelectSection(sections[index]) },
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+            itemTestTags = sections.map { it.tag },
+            itemContentDescriptions = sections.map { wordBankSegmentDescription(it, counts[it]) },
+            announceSelection = true,
+        )
         when (section) {
             WordBankSection.Book -> bookPane()
             WordBankSection.New -> newPane()

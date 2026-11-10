@@ -3,7 +3,7 @@ package com.example.englishlearning.ui
 /**
  * 挂载权威：`AppMountFlags` → 当前该挂的那一支全屏覆盖层（`null` = tab 宿主）。
  *
- * 下面 35 枚条件与 `AppScreen.kt:728`–`2020` 原链**逐字一致、顺序逐字照抄**：
+ * 下面 34 枚条件与 `AppScreen.kt:728`–`2020` 原链**逐字一致、顺序逐字照抄**：
  * 「先声明先赢」在原文件里既是 z 序也是返回键优先级承诺（QA3 A1 的许可/关于顺序就是这条），
  * 所以这里改顺序 = 改产品行为，必须回到决策文档重开，不许顺手「整理」。
  * 由 `ScreenTransitionContractTest`（批 D-2 落闸）双向钉：链上不许残留挂载级判据，本文件不许漏支。
@@ -11,8 +11,8 @@ package com.example.englishlearning.ui
  * 转场方向因此比 `AppOverlayRoute.transitionDepth` 列（同一张 route 表），不比本文件的臂序。
  */
 object AppOverlayRouteResolver {
-    /** 链末 `} else {`（tab 宿主）的层级序号：比 34 支都浅，比任何 route 都浅。 */
-    const val TAB_HOST_INDEX = 35
+    /** 链末 `} else {`（tab 宿主）的层级序号：比 33 支都浅，比任何 route 都浅。 */
+    const val TAB_HOST_INDEX = 34
 
     fun resolve(flags: AppMountFlags): AppOverlayRoute? = when {
         flags.selectedSearchCard != null -> AppOverlayRoute.VocabularyDetail(flags.selectedSearchCard)
@@ -50,7 +50,6 @@ object AppOverlayRouteResolver {
         flags.readingTarget != null || flags.historyArticle != null ->
             AppOverlayRoute.ArticleReading(flags.readingTarget)
         flags.showWordBookTransfer -> AppOverlayRoute.WordBookTransfer
-        flags.showSettings -> AppOverlayRoute.Settings
         else -> null
     }
 }

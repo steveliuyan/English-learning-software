@@ -98,8 +98,19 @@ class WordCardScreenContractTest {
     /** UI 不碰播放器（既有红线）：屏侧出现任何播放器符号即判红。 */
     private val playerTouch = Regex("""\bstopPlayback\s*\(|\bPronunciationProvider\b""")
 
-    /** 整屏只该有一枚 `LaunchedEffect`（揭晓焦点那枚）；第二枚 = 停播被写成了焦点那种按 key 重跑的形态。 */
+    /**
+     * 屏侧 `LaunchedEffect` 只允许三类用途：揭晓焦点、回执焦点、切卡保险闸（问题 H）。
+     * 多出来的那一枚 = 停播被写成了焦点那种按 key 重跑的形态。
+     */
     private val launchedEffectDefinition = Regex("""LaunchedEffect\(""")
+
+    /**
+     * 切卡保险闸的形状：换卡后先落 `cardSwitchArmed = false`、`delay(...)` 之后再放行，且键是卡片标识。
+     * 少任一环都等于闸没关上：没有 delay = 窗口为零、没有 false = 从没关过、键不是卡 = 换卡不上保险。
+     */
+    private val cardArmGateEffect = Regex(
+        """LaunchedEffect\(cardKey\) \{\s*if \(lastArmedCardKey != cardKey\) \{\s*lastArmedCardKey = cardKey\s*cardSwitchArmed = false\s*delay\(WORD_CARD_ARM_AFTER_SWITCH_MS\)\s*cardSwitchArmed = true""",
+    )
 
     // ---------- 发音控件统一 ----------
 
@@ -476,7 +487,16 @@ class WordCardScreenContractTest {
     @Test
     fun the_reveal_focus_handover_stays_intact() {
         val source = uiScreenSource(WORD_CARD_SCREEN)
-        assertEquals(2, countMatches(source, launchedEffectDefinition), "只允许两枚焦点迁移（揭晓 / 回执）；停播不得写成按 key 重跑的形态")
+        assertEquals(
+            3,
+            countMatches(source, launchedEffectDefinition),
+            "只允许三枚 LaunchedEffect（揭晓焦点 / 回执焦点 / 切卡保险闸）；停播不得写成按 key 重跑的形态",
+        )
+        assertEquals(
+            1,
+            countMatches(source, cardArmGateEffect),
+            "切卡保险闸必须挂在卡片标识上并在窗口结束后放行（问题 H：连点「下一个词」会写进下一张卡的评分）",
+        )
         assertEquals(2, countMatches(source, focusRequesterCreation), "每枚焦点迁移各配一枚把手")
         assertEquals(1, countMatches(source, revealFocusRequest), "揭晓后 requestFocus 必须仍被 runCatching 包住（释义节点可能已随提交离开组合）")
         assertEquals(1, countMatches(source, receiptFocusRequest), "回执出现后的 requestFocus 同样要被 runCatching 包住")
@@ -636,6 +656,26 @@ class WordCardScreenContractTest {
         assertEquals(0, countMatches("LaunchedEffect(revealed) { meaningFocusRequester.requestFocus() }", revealFocusRequest), "负控：丢掉 runCatching 的写法不得算成同一条护栏")
         assertEquals(1, countMatches(legacyFocus, meaningFocusableModifier), "正控：focusable() 命中")
         assertEquals(0, countMatches("Modifier.focusRequester(other)", meaningFocusModifier), "负控：换焦点把手不得命中")
+
+        val armGate = "LaunchedEffect(cardKey) {\n" +
+            "    if (lastArmedCardKey != cardKey) {\n" +
+            "        lastArmedCardKey = cardKey\n" +
+            "        cardSwitchArmed = false\n" +
+            "        delay(WORD_CARD_ARM_AFTER_SWITCH_MS)\n" +
+            "        cardSwitchArmed = true\n" +
+            "    }\n" +
+            "}"
+        assertEquals(1, countMatches(armGate, cardArmGateEffect), "正控：换卡上保险的四件套命中")
+        assertEquals(
+            0,
+            countMatches(armGate.replace("        delay(WORD_CARD_ARM_AFTER_SWITCH_MS)\n", ""), cardArmGateEffect),
+            "负控：把 delay 抽掉 = 窗口为零，闸从没关上，不得命中",
+        )
+        assertEquals(
+            0,
+            countMatches("LaunchedEffect(position) {\n    if (lastArmedCardKey != position) {\n        lastArmedCardKey = position\n        cardSwitchArmed = false\n        delay(WORD_CARD_ARM_AFTER_SWITCH_MS)\n        cardSwitchArmed = true\n    }\n}", cardArmGateEffect),
+            "负控：键换成 position（换阶段不换卡也会上保险）不得命中",
+        )
     }
 
     // ---------- 批 1 Task 10：三档副标 + 评分回执 ----------
@@ -644,11 +684,13 @@ class WordCardScreenContractTest {
      * 原型 `feedbackBlock()`（`assets/app.js:286`）给三档各配一枚 10px 副标：忘记/想不起来、模糊/差点没想起、
      * 认识/脱口而出。
      *
-     * QA3 A2.4 之后「落在吸底条里」有了两层含义，判据随之改成**文案单点 + 唯一消费处**：
-     * 条内在顶档换成整宽堆叠、在钉档保持三等宽，两分支各画一遍 `FeedbackButton` 会开门，所以三档的内容
-     * （档位、两行文案、tag）上移到 `FeedbackTiers` 清单，由条内两个分支各自 `FeedbackTiers.forEach` 消费。
+     * QA3 A2.4 之后「落在吸底条里」多了一层含义，判据随之改成**文案单点 + 唯一消费处**：三档的内容
+     * （档位、两行文案、tag）集中在 `FeedbackTiers` 清单里，由吸底条那一处 `FeedbackTiers.forEach` 消费。
      * 于是「副标挂在别的清单上」这种误放仍然被判红——只是取样区间从「条定义到按钮定义」改成「清单本身」，
      * 并加了一条「清单被引用的枚数」：清单若被条以外的地方消费，同一份文案就有了第二个主人。
+     *
+     * m03373 起摆法只有一种（三枚整宽上下堆叠），条内的引用从两处收到一处，枚数期望随之 3 → **2**
+     * （声明一处 + 消费一处）；判据本身没有放松——多出来的那一处仍然是「第二个主人」。
      *
      * 档名保留应用的「不认识」而不是原型的「忘记」：F1-03 与学习记录/生词本用的是同一术语，
      * 改一名牵动四个屏与既有契约，属产品文案裁决，登记在批 1 报告里。
@@ -661,9 +703,9 @@ class WordCardScreenContractTest {
         val tierLines = source.lines().filter { it.trimStart().startsWith("FeedbackTierSpec(") }
         assertEquals(3, tierLines.size, "`FeedbackTiers` 必须恰好三档（不认识 / 模糊 / 认识），实际 ${tierLines.size} 档")
         assertEquals(
-            3,
+            2,
             countMatches(source, Regex("""\bFeedbackTiers\b""")),
-            "清单只有声明一处 + 吸底条两个分支各引用一处 = 3；第 4 处 = 条以外还有别的主人",
+            "清单只有声明一处 + 吸底条唯一一处消费 = 2；第 3 处 = 条以外还有别的主人",
         )
         listOf("想不起来", "差点没想起", "脱口而出").forEach { caption ->
             val literal = "\"$caption\""

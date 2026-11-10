@@ -18,6 +18,7 @@ import kotlin.test.assertTrue
  *     + `.strong-meta「最久的一个已经 9 天没见了…」` + `.meter` 70% + `.strong-foot「…6 天后才会再来」`
  *   → `section('到期词', .rows)`（行尾 `9 天前`）
  *   → `section('复习方式', .card-quiet 两行)`：`看英文，想中文 / 默认方式 / .dot` 与 `听发音，选释义 / 练听力时用`
+ *     （2026-11-09 起第二行的**位置**由已实现的「拼写测验 / 看释义拼单词」占住，见偏离 3 的补记）
  *   → `.foot` 主按钮「开始复习」
  *
  * 三条**有意的偏离**（原型写死数据，本仓没有对应的采集，一律整块不搬，不换成同义改写、也不造新指标）：
@@ -30,6 +31,11 @@ import kotlin.test.assertTrue
  *  3. 「听发音，选释义」整行不搬——本仓没有"播放音频让用户从若干释义里选"这一模式（词卡流程只有
  *     看英文想中文 + 三档反馈）。按「无后端就隐藏」口径处理（用户 2026-10-29 拍板）。
  *     留下的那一行「看英文，想中文 / 默认方式」是本仓真实默认模式，`.dot` 就是原型那枚选中点。
+ *     **2026-11-09 补记**：这一格后来由**已实现**的能力填回——「拼写测验 / 看释义拼单词」，
+ *     点进去是 `SpellingQuizScreen`（域层 `learning/spelling/SpellingQuiz.kt` + 19 条 JUnit5 用例）。
+ *     它借的是原型那行的**位置**（复习方式的第二档），能力本体与原型不同：原型是「听发音选释义」，
+ *     本仓是「看释义拼单词」。所以本文件同时钉两件事：这一行存在且可点（真入口），
+ *     以及「听发音 / 练听力」这类**没有实现**的文案依旧为 0——补位不等于把那句原型文案抄回来。
  *
  * 读法是源码文本（[uiScreenSource] 已剥注释），不渲染 Compose；像素与可达性由 connected 的
  * `ReviewQueueScreenTest` 承担。
@@ -96,9 +102,11 @@ class ReviewQueueLayoutContractTest {
         assertTrue("\"到期词\"" in screen, "第一节标题逐字（`app.js:484`）")
         assertTrue("\"复习方式\"" in screen, "第二节标题逐字（`app.js:491`）")
         assertEquals(
-            2,
+            3,
             countMatches(screen, Regex("""WordRow\(""")),
-            "到期词一节与复习方式一节各调一处共享 WordRow；私有行就是留第二份版式（棘轮族 4）",
+            "三处共享 WordRow：到期词一节 + 复习方式一节的两档（默认方式 / 拼写测验）。" +
+                "数字从 2 长到 3 是 2026-11-09 拼写测验补位时改的——多出来的是**同一族共享行**，" +
+                "不是私有版式（下一行的私有 \"*Row*\" 判据照旧为 0）。",
         )
         assertEquals(
             0,
@@ -121,7 +129,7 @@ class ReviewQueueLayoutContractTest {
     }
 
     @Test
-    fun `the review mode section keeps only the mode this app can do`() {
+    fun `the review mode section keeps the two modes this app can do`() {
         assertEquals(1, countMatches(screen, Regex("""QuietCard\(""")), "`.card-quiet`（`app.css:375`）= 共享 QuietCard，恰一处")
         assertTrue("\"看英文，想中文\"" in screen, "默认模式行标题逐字（`app.js:492`）")
         assertTrue("\"默认方式\"" in screen, "默认模式行副案逐字（`app.js:492`）")
@@ -133,6 +141,19 @@ class ReviewQueueLayoutContractTest {
             "默认模式行的前导贴纸取原型 `st('document', 44)` 那一枚（`app.js:492`），经共享 InlineIconBadge 给",
         )
         assertTrue("colors.brandDeep" in screen, "`.dot` 的墨 = `--brand-deep`（`app.css:646`），选中点由调用点显式取色")
+        // 第二档：2026-11-09 补位的拼写测验（真入口，可点）。它与第一行的**差别**就是判据：
+        // 第一行是纯说明（不接 onClick），第二行必须接 onClick 且落到测验屏，否则就是画了个假入口。
+        assertEquals(
+            1,
+            countMatches(screen, Regex("review_queue_mode_spelling")),
+            "拼写测验这一行要有唯一锚点 `review_queue_mode_spelling`（connected 侧按它点进去）",
+        )
+        assertTrue("\"拼写测验\"" in screen, "第二档标题按**真实能力**写「拼写测验」，不是原型那句「听发音，选释义」")
+        assertTrue("\"看释义拼单词\"" in screen, "第二档副案逐字：这一档练的是「看释义拼单词」")
+        assertTrue(
+            "onClick = { showSpelling = true }" in screen,
+            "第二档是真入口：点它把本屏内部状态位翻到测验（`showSpelling`），不是又一个说明行",
+        )
     }
 
     @Test

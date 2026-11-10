@@ -78,13 +78,15 @@ class RelearnLayoutContractTest {
     // ---------- 吸底：三档评分 ----------
 
     /**
-     * spec §5：「三档评分固定在底部」。
+     * 三档评分：恰三枚真实底 `Button`，且全在 `RelearnFeedbackBar` 本体里。
      *
-     * 判「恰三枚真实底 `Button`」+「三枚全在吸底条函数体内」+「吸底条是滚动区之后的兄弟节点」。
-     * 最后一条是「固定在底部」的几何本质：条若在滚动列里，正文一长它就被推着走。
+     * m03560（用户走查「太下了、放在单词下面居中」）之后本屏与词卡屏同口径：**不再吸底**——评分条
+     * 跟着卡面住在内容列的文档流里，正文一长就跟着滚动（旧判据把「固定在底部」当几何本质，
+     * 那是把「拇指够不着」当成了设计）。因此这里只钉「三枚实底按钮各一 + 全在同一条体内 + 条在滚动轴之下」，
+     * 不再要求它是滚动容器的兄弟节点。
      */
     @Test
-    fun `the three feedback actions live in a bar pinned below the scrolling body`() {
+    fun `the three feedback actions live in one bar below the header`() {
         val bar = bodyOf("private fun RelearnFeedbackBar(")
         assertTrue(bar.isNotEmpty(), "取不到 RelearnFeedbackBar 本体，判据会空转")
         assertEquals(3, countMatches(bar, buttonCall), "三档评分（不认识 / 模糊 / 认识）必须是三枚真实底 Button")
@@ -102,7 +104,7 @@ class RelearnLayoutContractTest {
         val scrollAt = body.indexOf("verticalScroll(")
         val barCallAt = body.indexOf("RelearnFeedbackBar(")
         assertTrue(scrollAt >= 0, "屏幕本体里必须有滚动容器")
-        assertTrue(barCallAt > scrollAt, "吸底条必须排在滚动容器之后（兄弟节点），否则正文一长它就跟着走")
+        assertTrue(barCallAt > scrollAt, "评分条必须排在滚动轴之后：它住在内容列里、跟着卡面走（m03560）")
     }
 
     // ---------- 排印 ----------

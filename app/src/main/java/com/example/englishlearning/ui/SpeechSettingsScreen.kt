@@ -1,7 +1,10 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,8 +124,14 @@ fun SpeechSettingsScreen(
                     modifier = Modifier.testTag("speech_preview_toggle"),
                     onClick = { previewExpanded = !previewExpanded },
                 )
-                if (previewExpanded) {
-                    PreviewCard(state, onPreview)
+                AnimatedVisibility(
+                    visible = previewExpanded,
+                    enter = expandVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingOut)),
+                    exit = shrinkVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingIn)),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        PreviewCard(state, onPreview)
+                    }
                 }
 
                 Text(text = "朗读服务", style = AppType.Label, color = colors.text3)

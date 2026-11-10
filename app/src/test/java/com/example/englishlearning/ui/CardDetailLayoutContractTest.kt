@@ -83,6 +83,47 @@ class CardDetailLayoutContractTest {
         )
     }
 
+    // ---------- 学习流宿主：「重新学习」换「继续学习」（m03373） ----------
+
+    /**
+     * 用户 m03373：「点了不认识或者是模糊的时候显示的词义详情，那你不应该是重新学习，应该是继续学习
+     * ……错题本我们现在用不到，错题本不应该在这个上面出现」。
+     *
+     * 「重新学习」在别处（记录 / 收藏 / 查词 / 阅读详情）是**对**的：那是错题本与生词本的重学入口；
+     * 唯独学习流详情是从「刚评完这一张」打开的，用户要的是接着学下一张。所以这屏只在宿主**给了**
+     * `onContinue` 时才画「继续学习」，并且照样不画「重新学习」——两者由同一个条件位互斥：
+     * 宿主只可能在次键行里二选一，界面就有责任让「继续学习」成为那一行的第一枚主按钮。
+     */
+    @Test
+    fun `the learning flow detail offers continue instead of relearn`() {
+        val head = bodyOf("private fun WordHead(")
+        assertTrue(head.isNotEmpty(), "取不到 WordHead 本体，判据会空转")
+        assertEquals(
+            1,
+            countMatches(source, Regex(Regex.escape("""testTag("card_detail_continue")"""))),
+            "「继续学习」全屏只此一处，画在词头次键行里",
+        )
+        // 只在拿到回调时才画：宿主不传 onContinue（其余四宿主），这一行就没有「继续学习」。
+        assertTrue(
+            "onContinue?.let { callback ->" in head,
+            "「继续学习」必须挂在 `onContinue?.let` 上：null 时不许画出一枚点了没反应的按钮",
+        )
+        val continueAt = head.indexOf("""testTag("card_detail_continue")""")
+        assertTrue(continueAt >= 0, "「继续学习」必须在词头次键行内，不得跑到别的小节")
+        val blockAt = head.indexOf("onContinue?.let { callback ->")
+        assertTrue(blockAt >= 0, "取不到「继续学习」那块 `onContinue?.let`")
+        val continueCall = head.substring(blockAt, minOf(head.length, continueAt + 400))
+        assertTrue(
+            "style = PillStyle.Primary" in continueCall && "domain = AppDomain.Learn" in continueCall,
+            "「继续学习」是这一行的主行动：Primary 档 + Learn 域，与词卡回执的「下一个词」同色系",
+        )
+        // 次键行条件必须把 onContinue 也算进来——否则只传 onContinue 的宿主会整行消失。
+        assertTrue(
+            "if (onContinue != null || onRelearn != null || onNext != null)" in head,
+            "次键行的出栏条件必须含 onContinue：学习流宿主只传它，漏了就整行不画",
+        )
+    }
+
     // ---------- 「我的笔记」标题只留一处 ----------
 
     /**

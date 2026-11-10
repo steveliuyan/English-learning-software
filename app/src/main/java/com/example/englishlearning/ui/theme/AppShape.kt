@@ -25,6 +25,15 @@ object AppShape {
     val BadgeLarge = RoundedCornerShape(20.dp)
     val Pill = RoundedCornerShape(percent = 50)
 
+    /**
+     * 图形档（**不是容器档**）：柱状图与图例方点这类「图形」的圆角。
+     * 上面五档是为「盒子装内容」定的——硬套会把 8dp 的图例方点画成圆点、
+     * 把 4dp 的短柱端画成胶囊端，所以图形单独两档，屏侧不再手搓数值。
+     * 使用者：打卡页周完成度柱（`GraphicBar`，6dp）、今日计划图例方点（`GraphicDot`，2dp）。
+     */
+    val GraphicBar: Shape = RoundedCornerShape(6.dp)
+    val GraphicDot: Shape = RoundedCornerShape(2.dp)
+
     /** 迁移期兼容：旧 12dp 图标容器档。 */
     val Icon: Shape = RoundedCornerShape(12.dp)
 

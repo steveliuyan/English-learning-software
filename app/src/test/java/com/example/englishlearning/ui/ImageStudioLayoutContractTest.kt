@@ -262,6 +262,27 @@ class ImageStudioLayoutContractTest {
         )
     }
 
+    // ---------- ⑧ Idle 提示的真话闸 ----------
+
+    /**
+     * 2026-11-09 真人走查实测：主题为空时屏中那句是「填一个主题，页底的主操作会变成「生成画面描述」」。
+     * 可页底那枚键从头到尾都叫这个名（源码 ④ 也钉了「换身份」只发生在描述就绪后），空主题只是让它不可点；
+     * 而且填完主题后这句仍留在屏上，和已经亮起的按钮互相打架。两枚判据：句子挂到「主题为空」上、
+     * 旧说辞逐字退役。
+     */
+    @Test
+    fun `the idle hint stops claiming a state change and clears once a subject is typed`() {
+        assertTrue(
+            "ImageStudioUiState.Idle -> if (subject.isBlank())" in source,
+            "Idle 那句提示必须挂在「主题为空」上（填了主题就该撤走）：它是行动指引，不是常驻说明",
+        )
+        assertEquals(
+            0,
+            countMatches(source, Regex(Regex.escape("页底的主操作会变成"))),
+            "旧文案「页底的主操作会变成「生成画面描述」」退役：那枚键从来没有换过身份，只是从不可点变可点",
+        )
+    }
+
     // ---------- 夹具 ----------
 
     /**

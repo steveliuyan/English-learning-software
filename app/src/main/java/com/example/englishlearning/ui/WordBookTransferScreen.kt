@@ -29,6 +29,7 @@ import com.example.englishlearning.ui.components.EntryIconTone
 import com.example.englishlearning.ui.components.EntryRow
 import com.example.englishlearning.ui.components.InlineNotice
 import com.example.englishlearning.ui.components.InlineNoticeKind
+import com.example.englishlearning.ui.components.SkeletonList
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.GlassDialog
 import com.example.englishlearning.ui.components.glass.PillButton
@@ -37,6 +38,9 @@ import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.wordbook.WordBookTransferViewModel
+
+/** 首帧占位行数：与卡内真实子行同数（导入 + 导出两枚）。 */
+private const val WORD_BOOK_TRANSFER_PLACEHOLDER_ROWS = 2
 
 /**
  * 「词书内容包」子页（决策 §4）：`.wbpack` 的导入与导出。
@@ -88,49 +92,62 @@ fun WordBookTransferScreen(
             onBack = onBack,
         )
         SoftCard(contentPadding = PaddingValues(vertical = 4.dp)) {
-            EntryRow(
-                icon = AppIcon.Upload,
-                domain = AppDomain.Library,
-                title = "导入词书",
-                subtitle = when {
-                    viewModel == null -> "这台设备暂时读不到词书目录"
-                    busy -> "正在处理，请稍候…"
-                    else -> "选择 .wbpack 文件，校验通过后加入本机词书"
-                },
-                iconTone = EntryIconTone.Tint,
-                enabled = viewModel != null && !busy,
-                modifier = Modifier.testTag("word_book_transfer_import"),
-                onClick = {
-                    viewModel?.consumeMessage()
-                    importLauncher.launch(arrayOf("*/*"))
-                },
-            )
-            EntryRow(
-                icon = AppIcon.Download,
-                domain = AppDomain.Library,
-                title = "导出词书",
-                subtitle = when {
-                    viewModel == null -> "这台设备暂时读不到词书目录"
-                    busy -> "正在处理，请稍候…"
-                    books.isNotEmpty() -> "已导入 ${books.size} 册，导出为 .wbpack 分享给别的设备"
-                    else -> "先导入一册词书后才能导出"
-                },
-                iconTone = EntryIconTone.Tint,
-                topDivider = true,
-                enabled = viewModel != null && !busy && books.isNotEmpty(),
-                modifier = Modifier.testTag("word_book_transfer_export"),
-                onClick = {
-                    if (state?.canExport == true) {
+            // uiState 首帧还没到（`state == null`）时画骨架：不画「禁用行 + 正在处理，请稍候…」，
+            // 那是拿假状态顶替等待（`docs/decisions/2026-11-07-loading-skeleton-shimmer-prefetch.md` 决定 1 / 决定 3：
+            // 等数据 → 骨架；动作进行中 → 动效回执 + 真话文案）。`viewModel == null` 是生产组装缺口，
+            // 仍走真禁用行 + 「这台设备暂时读不到词书目录」，那不是等待、是缺件。
+            if (state == null && viewModel != null) {
+                SkeletonList(
+                    rows = WORD_BOOK_TRANSFER_PLACEHOLDER_ROWS,
+                    rowHeight = 56.dp,
+                    tagPrefix = "word_book_transfer_placeholder_",
+                    modifier = Modifier.testTag("word_book_transfer_loading"),
+                )
+            } else {
+                EntryRow(
+                    icon = AppIcon.Upload,
+                    domain = AppDomain.Library,
+                    title = "导入词书",
+                    subtitle = when {
+                        viewModel == null -> "这台设备暂时读不到词书目录"
+                        busy -> "正在处理，请稍候…"
+                        else -> "选择 .wbpack 文件，校验通过后加入本机词书"
+                    },
+                    iconTone = EntryIconTone.Tint,
+                    enabled = viewModel != null && !busy,
+                    modifier = Modifier.testTag("word_book_transfer_import"),
+                    onClick = {
                         viewModel?.consumeMessage()
-                        if (books.size == 1) {
-                            exportWordBookId = books.single()
-                            exportLauncher.launch("${books.single()}.wbpack")
-                        } else {
-                            showExportPicker = true
+                        importLauncher.launch(arrayOf("*/*"))
+                    },
+                )
+                EntryRow(
+                    icon = AppIcon.Download,
+                    domain = AppDomain.Library,
+                    title = "导出词书",
+                    subtitle = when {
+                        viewModel == null -> "这台设备暂时读不到词书目录"
+                        busy -> "正在处理，请稍候…"
+                        books.isNotEmpty() -> "已导入 ${books.size} 册，导出为 .wbpack 分享给别的设备"
+                        else -> "先导入一册词书后才能导出"
+                    },
+                    iconTone = EntryIconTone.Tint,
+                    topDivider = true,
+                    enabled = viewModel != null && !busy && books.isNotEmpty(),
+                    modifier = Modifier.testTag("word_book_transfer_export"),
+                    onClick = {
+                        if (state?.canExport == true) {
+                            viewModel?.consumeMessage()
+                            if (books.size == 1) {
+                                exportWordBookId = books.single()
+                                exportLauncher.launch("${books.single()}.wbpack")
+                            } else {
+                                showExportPicker = true
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         }
         // 结果提示挂在卡外侧：回执是「上一次操作的结果」，不该被卡片内边距吞掉首行（同旧设置页 I4 的口径）。
         state?.message?.let { message ->

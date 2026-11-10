@@ -43,6 +43,7 @@ import com.example.englishlearning.learning.RoomLearningEventRepository
 import com.example.englishlearning.learning.StoredPlanCardSource
 import com.example.englishlearning.learning.SubmitCardFeedbackUseCase
 import com.example.englishlearning.learning.WordCardSource
+import com.example.englishlearning.learning.spelling.RecordSpellingFeedbackUseCase
 import com.example.englishlearning.learning.worksheet.BuildWorksheetContentUseCase
 import com.example.englishlearning.learning.worksheet.WorksheetDocumentBuilder
 import com.example.englishlearning.learning.worksheet.WorksheetPaginator
@@ -164,6 +165,12 @@ object AppModule {
     @Provides @Singleton fun provideFsrsReviewScheduler(): FsrsReviewScheduler = FsrsReviewScheduler()
     @Provides @Singleton fun provideSubmitCardFeedbackUseCase(events: LearningEventRepository, clock: ClockProvider, scheduler: FsrsReviewScheduler): SubmitCardFeedbackUseCase = SubmitCardFeedbackUseCase(repository = events, clock = clock, scheduler = scheduler)
     @Provides @Singleton fun provideEventIdFactory(): EventIdFactory = EventIdFactory.Random
+
+    /**
+     * 拼写测验的排期写入端：只是 [SubmitCardFeedbackUseCase] 之上的一层映射 + 合成 planId，
+     * 幂等与调度都复用同一条通路，这里不另开写库路径。
+     */
+    @Provides @Singleton fun provideRecordSpellingFeedbackUseCase(submit: SubmitCardFeedbackUseCase, eventIds: EventIdFactory): RecordSpellingFeedbackUseCase = RecordSpellingFeedbackUseCase(submit, eventIds)
     /**
      * 词卡内容端口：**导入册优先、内置正式册兜底**。
      *

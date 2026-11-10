@@ -218,7 +218,7 @@ class AiWaitInProgressContractTest {
     /**
      * 宿主真的把取消接到了 VM。
      *
-     * 判 `AppScreen.kt` 里对 `cancel…()` 的调用次数：AI 问词在宿主有**两枚**调用点（词卡详情两处入口），
+     * 判 `AppScreen.kt` 里对 `cancel…()` 的调用次数：AI 问词在宿主有**三枚**调用点（学习流、文章页、查词/词义详情），
      * 少接一处就是「那一处的取消键按了没反应」，而屏侧那条判据看不见宿主。
      * 这里刻意判**方法名**而不是整行字面量：宿主那两处的 surrounding 代码不同（一处带 profileId 派生），
      * 整行判据会逼着两边写成同一行，那是形式不是接线。
@@ -227,7 +227,7 @@ class AiWaitInProgressContractTest {
     fun `host wires each cancel entry to the view model that owns the request`() {
         val host = uiScreenSource("AppScreen.kt")
         listOf(
-            "wordQaViewModel?.cancelAsk()" to 2,
+            "wordQaViewModel?.cancelAsk()" to 3,
             "sentenceAnalysisViewModel?.cancelAnalysis()" to 1,
             "readingAccessViewModel?.cancelGeneration()" to 1,
             "imageStudioViewModel?.cancelGeneration()" to 1,

@@ -595,29 +595,29 @@ class AppScreenTest {
     }
 
     /**
-     * 2026-11-02 决策 §2/§3 的宿主腿：「我的」是第四栏的 hub，**设置**从一级 tab 降为 hub 里的一行子页。
+     * 2026-11-02 决策 §2/§3 的宿主腿：「我的」是第四栏的 hub。
      *
-     * 形状换过两次，这条用例跟着换了两次方向，判据始终是同一句话——**两页不许同屏叠着**：
+     * 形状换过三次，判据始终是同一句话——**不许多出第二份入口**：
      *  - 拆分前：设置 tab 挂 ProfileScreen + 四组接在尾部（用户点评「设置没有自己的位置」）；
-     *  - 2026-10-31：设置升成第五栏，这里改成「设置栏画设置页、我的页不在」；
-     *  - 2026-11-02：用户否掉「我的」与「设置」并列（同一件事的两份入口），设置收回 hub 里。
-     *    于是本条又翻一次：「我的」栏画 hub（设置子页不在），点 `profile_open_settings` 才进子页，
-     *    进去后 hub 让位。顺带钉 hub 仍持有「生成默写纸」这类入口——入口没被设置子页吞回去。
+     *  - 2026-10-31：设置升成第五栏，「设置栏画设置页、我的页不在」；
+     *  - 2026-11-02：用户否掉并列，设置收回 hub 当一行子页；
+     *  - 2026-11-10（用户 m03373 + m03681 拍板选项 1）：设置子页整体退役，「外观」内联到 hub 页头统计卡之下。
+     *    于是本条改成：进「我的」栏画 hub、**没有设置子页也没有设置行**，统计卡下方真有外观段与三档分段，
+     *    并且 hub 的既有入口（如「生成默写纸」）一个没少——搬主题不许顺手吞掉别的东西。
      */
     @Test
-    fun profileTabOpensTheHubAndTheSettingsRowOpensItsOwnSubpage() {
+    fun profileTabOpensTheHubWithTheAppearanceSectionInlined() {
         composeRule.setContent { readyAppScreen() }
         createProfile()
         composeRule.onNodeWithTag("app_tab_profile").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_screen").assertExists()
         composeRule.onNodeWithTag("settings_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("profile_open_settings").assertDoesNotExist()
         composeRule.onNodeWithTag("profile_open_worksheet").performScrollTo().assertExists().assertHasClickAction()
 
-        composeRule.onNodeWithTag("profile_open_settings").performScrollTo().performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("settings_screen").assertExists()
-        composeRule.onNodeWithTag("profile_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("profile_group_appearance").performScrollTo().assertExists()
+        composeRule.onNodeWithTag("profile_theme_mode").performScrollTo().assertExists()
     }
 
     @Test
@@ -2739,8 +2739,8 @@ class AppScreenTest {
      * 关于页的宿主端通路：「我的」hub →「关于」行 → 关于页 → 返回 → 落回 hub。
      *
      * 通路的落点换过两次：先是「我的」页尾部设置内容里的一行，2026-10-31 起搬到独立设置栏，
-     * 2026-11-02 决策 §2 又收回 hub（设置子页不再有说明出口，见
-     * `SettingsLicensesEntryTest#theSettingsSubpageCarriesNeitherAboutNorLicenseRow`）；
+     * 2026-11-02 决策 §2 又收回 hub（设置子页不再有说明出口）；2026-11-10（m03373 选项 1）设置子页
+     * 整体退役后，关于行仍只住在 hub，「只从 hub 进」这一条反而更干净；
      * 2026-11-03（U-12，决策 `2026-11-03-duplication-consolidation.md` §5）行名改成与落地页同名的「关于」，
      * 通路本体一格未动——本条全程按 tag 定位，改名不动接线。
      * 本条钉宿主这一层：切到「我的」栏、滚到关于行、点开、点返回，必须回到**hub**，
@@ -2765,6 +2765,7 @@ class AppScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_screen").assertExists()
         composeRule.onNodeWithTag("settings_screen").assertDoesNotExist()
+        composeRule.onNodeWithTag("profile_open_settings").assertDoesNotExist()
     }
 
     /**

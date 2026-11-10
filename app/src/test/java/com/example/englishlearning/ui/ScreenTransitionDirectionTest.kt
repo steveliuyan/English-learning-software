@@ -11,7 +11,9 @@ import kotlin.test.assertTrue
  * 默认等于序号、只在点名边上覆写——覆写清单 == 本文件命名边用例清单，由 `ScreenTransitionContractTest` 钉住。
  */
 class ScreenTransitionDirectionTest {
-    private val settings = AppOverlayRoute.Settings
+    // 2026-11-10（m03373 选项 1）：`AppOverlayRoute.Settings` 已随设置子页退役，
+    // 这组「深一层子页 ↔ tab 宿主 / 兄弟子页」的方向用例改用同为 data object 的 `WordBookTransfer`（序号 33）。
+    private val settings = AppOverlayRoute.WordBookTransfer
     private val about = AppOverlayRoute.About
     private val detail = AppOverlayRoute.VocabularyDetail(WordCard("c1", "cet4", "apple", "", "", ""))
 
@@ -144,16 +146,16 @@ class ScreenTransitionDirectionTest {
      * `ScreenTransitionDirection.mountIndex` 的定义就是 `route?.mountIndex ?: TAB_HOST_INDEX`——
      * 常量与自身比较，`TAB_HOST_INDEX` 改成 0 或 -1 都照过，等于没牙。这里改成三条：
      * 字面量钉死序号、policy 的 null 腿走同一枚字面量、宿主必须比数值最大的那枚 route
-     * （`Settings` = 34）更浅，否则进出方向判据整个反过来。
+     * （`WordBookTransfer` = 33）更浅，否则进出方向判据整个反过来。
      */
     @Test
     fun tabHostIsTheShallowestLayer() {
-        assertEquals(35, AppOverlayRouteResolver.TAB_HOST_INDEX)
-        assertEquals(35, ScreenTransitionDirectionPolicy.mountIndex(null))
+        assertEquals(34, AppOverlayRouteResolver.TAB_HOST_INDEX)
+        assertEquals(34, ScreenTransitionDirectionPolicy.mountIndex(null))
         assertTrue(
             ScreenTransitionDirectionPolicy.mountIndex(null) >
-                ScreenTransitionDirectionPolicy.mountIndex(AppOverlayRoute.Settings),
-            "tab 宿主必须比 34 支 route 都浅，否则进出方向判据整个反过来",
+                ScreenTransitionDirectionPolicy.mountIndex(AppOverlayRoute.WordBookTransfer),
+            "tab 宿主必须比 33 支 route 都浅，否则进出方向判据整个反过来",
         )
     }
 }

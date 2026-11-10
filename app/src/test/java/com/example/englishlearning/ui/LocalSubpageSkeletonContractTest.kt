@@ -75,6 +75,15 @@ class LocalSubpageSkeletonContractTest {
             endMarker = "GlobalVocabularySearchUiState.ClearingHistory ->",
         ),
         LoadingUnit(
+            fileName = "WordBookTransferScreen.kt",
+            label = "词书内容包首帧",
+            // 用户 2026-11-10 点名的那一处（「加载词书的那个要有预加载骨架」）：uiState 首帧还没到之前
+            // 两枚子行是**禁用态 + 「正在处理，请稍候…」**，那是拿假状态顶替等待。判的是这一帧，
+            // 锚到 else 分支头为止（`SkeletonList(` 不能写进锚里——锚会把这一帧唯一的证据字符吃掉）。
+            startMarker = "if (state == null && viewModel != null) {",
+            endMarker = "} else {",
+        ),
+        LoadingUnit(
             fileName = "ArticleReadingScreen.kt",
             label = "文章正文首帧",
             startMarker = "if (current == null) {",
@@ -94,6 +103,7 @@ class LocalSubpageSkeletonContractTest {
         "VocabularyRelearnScreen.kt" to "relearn_loading",
         "GlobalVocabularySearchScreen.kt" to "global_search_loading",
         "ArticleReadingScreen.kt" to "article_reading_loading",
+        "WordBookTransferScreen.kt" to "word_book_transfer_loading",
     )
 
     /** 骨架行的占位行数只许读本屏常量的屏与常量名（数据量型列表：钉写法，不钉与真实条数相等）。 */
@@ -101,6 +111,7 @@ class LocalSubpageSkeletonContractTest {
         "LearningRecordsScreen.kt" to "LEARNING_RECORDS_PLACEHOLDER_ROWS",
         "WordBookWordsScreen.kt" to "WORD_BOOK_WORDS_PLACEHOLDER_ROWS",
         "GlobalVocabularySearchScreen.kt" to "GLOBAL_SEARCH_PLACEHOLDER_ROWS",
+        "WordBookTransferScreen.kt" to "WORD_BOOK_TRANSFER_PLACEHOLDER_ROWS",
     )
 
     @Test

@@ -1,19 +1,16 @@
 package com.example.englishlearning.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.FavoriteWord
 import com.example.englishlearning.learning.domain.WordCard
+import com.example.englishlearning.ui.components.AppCard
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.ConfirmDestructiveDialog
 import com.example.englishlearning.ui.components.InlineNotice
@@ -399,8 +397,16 @@ fun MyWordsScreen(
 }
 
 /**
- * 一段的容器：与「今日计划」入口组同一规格的卡（`surface` 底 + 1dp `outlineSoft` 描边 + 18dp 圆角），
- * 组标题一行是「段名 + 条数」，段名是这条落位与朗读的唯一锚点。
+ * 一段的容器：走共享 [AppCard]（`surface` 底 + 1dp `outline` 描边 + 圆角 [com.example.englishlearning.ui.theme.AppShape.Card]
+ * = 20dp + 内距 16）。组标题一行是「段名 + 条数」，段名是这条落位与朗读的唯一锚点。
+ *
+ * **为什么内距留空、由这里的 Column 自己给 16/12**：三段堆在**同一页**里，段内节奏是「标题行 → 段说明
+ * → 词行」的 4dp 密排；[AppCard] 自带的 8dp 段落节奏是给「一卡一条可读内容」用的，直接套会把这三行
+ * 抻开。所以卡壳只承接底色/描边/圆角（三档容器的口径），内距与段内节奏留在这枚 Column 上。
+ *
+ * 2026-11-09 设计系统收口批（续）：这里原先是全仓最后一枚 M3 `Card(` + 两档私有 `RoundedCornerShape(18.dp)`
+ * （描边取 `outlineSoft`）。换到共享卡后圆角 18 → 20、描边 `outlineSoft` → `outline`，与全仓的
+ * 「主内容卡」对齐；`ContainerContractTest` 的逐屏「零 M3 `Card(`」臂钉住不回退。
  *
  * [onTopChanged] 把本段顶边在本 Column 内容坐标系里的 y 交回调用方，[MyWordsScreen] 用它做 `section` 落位；
  * 偏移必须来自实测而不是「按段序号估高」——三段的行数是运行时数据，估出来的位置一定错。
@@ -416,12 +422,9 @@ private fun MyWordsSectionCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = appColors()
-    Card(
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        shape = RoundedCornerShape(18.dp),
+    AppCard(
+        contentPadding = PaddingValues(0.dp),
         modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, colors.outlineSoft, RoundedCornerShape(18.dp))
             .testTag(sectionTag)
             .onGloballyPositioned { onTopChanged(it.positionInParent().y.toInt()) },
     ) {
@@ -460,7 +463,6 @@ private fun MyWordsSectionCard(
         }
     }
 }
-
 @Composable
 private fun SectionLoading(tag: String, text: String) {
     val colors = appColors()

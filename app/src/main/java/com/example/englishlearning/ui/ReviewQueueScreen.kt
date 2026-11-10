@@ -14,12 +14,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.learning.domain.WordCard
+import com.example.englishlearning.learning.spelling.SpellingPrompt
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.InlineIconBadge
@@ -74,6 +79,25 @@ import com.example.englishlearning.ui.theme.appColors
  *  3. 「听发音，选释义 / 练听力时用」整行：本仓词卡流程只有「看英文，想中文 + 三档反馈」这一种模式，
  *     没有播放音频选释义的能力。按用户 2026-10-29 拍板「无能力就隐藏」，这一行整行不搬；
  *     留下的「看英文，想中文 / 默认方式」是本仓真实默认模式，`.dot` 说的就是它。
+ *     **2026-11-09 补**：这一格（`.card-quiet` 的第二行）由**已实现**的第二种练习方式填回——
+ *     「拼写测验 / 看释义拼单词」，点进去是 [SpellingQuizScreen]，判分与容错在
+ *     `learning/spelling/SpellingQuiz.kt`（大小写、空格、连字符、撇号不扣分，长度 ≤5 容 1 个编辑距离、
+ *     >5 容 2 个）。取的只是原型那行的**位置**（复习方式的第二档），文案按真实能力写：
+ *     原型那行是「听发音，选释义」，本仓做的是「看释义拼单词」，两者不是同一件事。
+ *
+ *     与第一行的分工：第一行是纯说明（没有 `onClick`、没有可点态），第二行是真入口（可点、带 chevron）。
+ *
+ * ## 拼写测验落在本屏内部，不占宿主的 overlay 位
+ *
+ * [SpellingQuizScreen] 不是一条新的宿主路由：它由本屏一个 `rememberSaveable` 状态位翻页，
+ * 因为「复习方式」本来就是这一屏的内容，换一种方式练习不该把用户从队列里推出去再塞回来。
+ * 返回键由 [SpellingQuizScreen] 内部的 `BackHandler` 先收（后挂载者胜，与仓内链序口径一致），
+ * 于是系统返回先落回复习队列、再退一次才回今日学习。
+ *
+ * 另：拼写结果**已写进复习排期**（2026-11-09 接上 `RecordSpellingFeedbackUseCase`，planId 用
+ * `spelling:<profileId>` 合成前缀：推词卡排期，不冒充今日计划的一次完成）。宿主把 profileId 与
+ * `SpellingQuizViewModel` 从本屏两个可选参数递进 [SpellingQuizScreen]；两者缺任一个时那一屏仍是
+ * 纯练习器，不写库。
  *
  * 另两条与「今日词单」同判的：到期词行前那枚 44dp 贴纸位是原型的**词级**插画
  * （`st(w.icon, 44)`，`w` 来自 `D.words`），本仓 `WordCard` 没有词级图标字段，前导槽留空；
@@ -96,9 +120,23 @@ fun ReviewQueueScreen(
     onStartReview: () -> Unit,
     onOpenWord: (WordCard) -> Unit,
     modifier: Modifier = Modifier,
+    profileId: String? = null,
+    spellingViewModel: SpellingQuizViewModel? = null,
 ) {
     val colors = appColors()
     val dueCount = state.dueQueue.size
+    // 第二种练习方式（2026-11-09）：拼写测验。翻页状态留在本屏内（见类 KDoc），
+    // 提前返回而不是给整个 Box 套一层 else——下面这一大段逐段对着原型的版面不用再动一行。
+    var showSpelling by rememberSaveable { mutableStateOf(false) }
+    if (showSpelling) {
+        SpellingQuizScreen(
+            prompts = SpellingPrompt.from(state.dueQueue),
+            onBack = { showSpelling = false },
+            viewModel = spellingViewModel,
+            profileId = profileId,
+        )
+        return
+    }
     Box(modifier = modifier.fillMaxSize().background(colors.background).testTag("review_queue_screen")) {
         Column(
             modifier = Modifier
@@ -157,6 +195,17 @@ fun ReviewQueueScreen(
                         )
                     },
                     modifier = Modifier.testTag("review_queue_mode_row"),
+                )
+                WordRow(
+                    lemma = "拼写测验",
+                    gloss = "看释义拼单词",
+                    leading = {
+                        InlineIconBadge(icon = AppIcon.List, domain = AppDomain.Review)
+                    },
+                    domain = AppDomain.Review,
+                    onClick = { showSpelling = true },
+                    topDivider = true,
+                    modifier = Modifier.testTag("review_queue_mode_spelling"),
                 )
             }
         }

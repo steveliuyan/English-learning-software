@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 深色系统下的首帧：主主题在 night 里也必须有落点，否则 windowBackground 还是浅色 #F6F9F6，
+         冷启动会先闪一帧白再被 Compose 盖成深色。 -->
+    <style name="Theme.EnglishLearning" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
     <style name="Theme.EnglishLearning.Starting" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">#000000</item>
         <item name="android:statusBarColor">#000000</item>

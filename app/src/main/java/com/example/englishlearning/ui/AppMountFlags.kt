@@ -45,5 +45,4 @@ data class AppMountFlags(
     val readingTarget: ReadingTarget? = null,
     val showArticleImport: Boolean = false,
     val showWordBookTransfer: Boolean = false,
-    val showSettings: Boolean = false,
 )

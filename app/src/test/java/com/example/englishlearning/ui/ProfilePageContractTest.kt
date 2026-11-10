@@ -15,14 +15,15 @@ import kotlin.test.assertTrue
  * 这一层要防的回归：
  *  ① 台账长出第二套真值（渲染侧另抄一份行标题/图标/域色）；
  *  ② 行只画不接（点不动的死行，或者统计格只画数字）；
- *  ③ 设置内容被塞回本页（同屏两枚页头、两个滚动容器，正是被撤回的旧形态）；
+ *  ③ 设置内容被塞回本页（同屏两枚页头、两个滚动容器，正是被撤回的旧形态）——注意 2026-11-10 起
+ *    「外观」是**例外且唯一**：主题三档正式搬进本页页末（用户 m03373 + m03681 选项 1），
+ *    设置子页整体退役。判据因此从「本页不许有主题分段」翻成「本页恰有这一段、宿主不再挂设置页」；
  *  ④ 行的落点又绕开词库页分段（三行词汇各自手写 `showWordBank = true`）。
  * 行为面由 connected `ProfileScreenTest` 与宿主 `AppScreenTest` 承重；本文件钉形状与接线。
  */
 class ProfilePageContractTest {
     private val profile: String by lazy { stripComments(uiScreenSource("ProfileScreen.kt")) }
     private val host: String by lazy { stripComments(uiScreenSource("AppScreen.kt")) }
-    private val settings: String by lazy { stripComments(uiScreenSource("SettingsScreen.kt")) }
     private val about: String by lazy { stripComments(uiScreenSource("AboutScreen.kt")) }
 
     @Test
@@ -61,12 +62,13 @@ class ProfilePageContractTest {
 
     /**
      * hub 台账是**唯一真值**（沿用「台账不是第二套真值」的纪律）：
-     * 三组 14 行的标题/图标/域色/testTag 只写在 [ProfileGroups] 一处，渲染侧按 tag 取。
+     * 三组 13 行的标题/图标/域色/testTag 只写在 [ProfileGroups] 一处，渲染侧按 tag 取。
+     * （13 = 3 + 6 + 4：2026-11-10 起「设置」那一行随子页一起退役。）
      */
     @Test
     fun `the hub renders every ledger row through one assembly point`() {
         val rows = ProfileGroups.all.flatMap { it.rows }
-        assertEquals(14, rows.size, "台账必须恰 14 行（决策 §9：3 + 6 + 5）")
+        assertEquals(13, rows.size, "台账必须恰 13 行（决策 §9 的 3 + 6 + 5 摘掉「设置」行：3 + 6 + 4）")
         rows.forEach { row ->
             assertEquals(
                 1,
@@ -92,19 +94,30 @@ class ProfilePageContractTest {
         )
     }
 
-    /** 我的页**不再**有设置内容槽：设置是「我的 → 设置」子页，同屏两枚页头是旧形态。 */
+    /**
+     * 我的页**恰有**一段外观（主题三档），且**不再**有第二个设置内容槽。
+     *
+     * 2026-11-10（用户 m03373「浅色 / 深色 / 自动应该拿到外面来」+ m03681 选项 1）：设置子页整体退役，
+     * 主题直接住本页页末。旧判据「我的页不得出现主题分段」守的是**旧位置**，位置一换它就是错的，
+     * 故翻成正向：恰一枚 `profile_theme_mode`、三档 tag 走本页词汇表；同时反向钉住「设置页不许回来」。
+     */
     @Test
-    fun `the profile page no longer hosts the settings content`() {
-        assertFalse("SettingsGroups" in profile, "我的页不得再挂设置台账")
+    fun `the profile page owns exactly one appearance section and no settings subpage`() {
+        assertFalse("SettingsGroups" in profile, "我的页不得再挂旧设置台账")
+        assertEquals(
+            1,
+            countMatches(profile, Regex(Regex.escape("profile_theme_mode"))),
+            "我的页必须恰有一枚主题分段卡（0 = 外观没搬过来，2 = 同屏两份真值）",
+        )
         assertEquals(
             0,
             countMatches(profile, Regex(Regex.escape("settings_theme_"))),
-            "我的页不得出现主题分段：外观归设置子页",
+            "旧 tag 前缀 settings_theme_ 不得残留：搬家的同时 tag 也换了词汇表（profile_theme_）",
         )
         assertEquals(
             0,
             countMatches(profile, Regex(Regex.escape("SettingsScreen("))),
-            "我的页不得直接挂设置根页：它是覆盖层，由宿主挂载",
+            "我的页不得直接挂设置根页：它已退役，宿主也没有这一支了",
         )
         assertEquals(
             1,
@@ -112,15 +125,15 @@ class ProfilePageContractTest {
             "宿主必须恰挂一枚 ProfileScreen（0 = 我的栏没有根页，2 = 第二份我的页）",
         )
         assertEquals(
-            1,
+            0,
             countMatches(host, Regex("""(^|[^A-Za-z0-9_])SettingsScreen\(""")),
-            "宿主必须恰挂一枚 SettingsScreen（0 = 设置子页没有挂载，2 = 设置被挂了两份）",
+            "宿主不得再挂 SettingsScreen：2026-11-10 起设置页退役，外观在本页页末",
         )
         assertEquals(0, countMatches(profile, Regex("""Mint[A-Z]\w*""")), "我的页不得读 Mint* 静态 token")
         assertEquals(0, countMatches(profile, Regex("""Color\(0x""")), "我的页不得出现裸 hex")
     }
 
-    /** 三组行必须**逐行接线**：14 个 tag 各有一次 `onClick`，一组行只接一半就是点不动的死行。 */
+    /** 三组行必须**逐行接线**：13 个 tag 各有一次 `onClick`，一组行只接一半就是点不动的死行。 */
     @Test
     fun `every hub row is wired in the host`() {
         val profileStation = host.substringAfter("AppTab.PROFILE -> ProfileScreen(")
@@ -135,7 +148,6 @@ class ProfilePageContractTest {
             "onOpenAiProfiles = openAiProfilesOrSettings",
             "onOpenReminderSettings = {",
             "onOpenSpeechSettings = {",
-            "onOpenSettings = { showSettings = true }",
             "onOpenBackupHub = { showBackupHub = true }",
             "onOpenAbout = { showAbout = true }",
         ).forEach { wiring ->
@@ -172,7 +184,6 @@ class ProfilePageContractTest {
         // 状态位仍在宿主（入口接线与 BackHandler 都没动），这里的两条形状判定一字未改，只换了锚的形状。
         mapOf(
             "showWordBookTransfer" to "AppOverlayRoute.WordBookTransfer",
-            "showSettings" to "AppOverlayRoute.Settings",
         ).forEach { (flag, routeVariant) ->
             assertEquals(
                 1,
@@ -207,13 +218,8 @@ class ProfilePageContractTest {
         )
         assertEquals(
             0,
-            countMatches(settings, Regex(Regex.escape("settings_open_licenses"))),
-            "设置子页不得有许可行：唯一入口在关于页",
-        )
-        assertEquals(
-            0,
-            countMatches(settings, Regex(Regex.escape("onOpenAbout"))),
-            "设置子页不得持有关于回调：关于行住在我的 hub",
+            countMatches(profile, Regex(Regex.escape("onOpenLicenses"))),
+            "自己的页不得持有许可回调：唯一入口在关于页",
         )
         assertEquals(
             0,

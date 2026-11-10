@@ -33,6 +33,10 @@ fun MintGlassTheme(
     val dark = shouldUseDarkTheme(themeMode, isSystemInDarkTheme())
     val set = if (dark) AppColorDark else AppColorLight
     val domains = if (dark) DomainDark else DomainLight
+    // 系统栏染色（真机走查）：窗口不是 edge-to-edge，状态栏/导航条底色只能由窗口属性决定，
+    // 不写就是 framework 默认灰。这里逐次同步成当前套页底，并按深浅切图标明暗——App 主题模式
+    // 独立于系统深色开关，只有运行期写窗口两套才都跟得住。写点收在 SystemBars.kt 一处。
+    SyncSystemBars(dark = dark, background = set.background)
     CompositionLocalProvider(
         LocalAppColors provides set,
         LocalDomainColors provides domains,

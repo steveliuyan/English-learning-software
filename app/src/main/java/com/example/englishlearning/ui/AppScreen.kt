@@ -2,6 +2,7 @@ package com.example.englishlearning.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
@@ -157,6 +159,7 @@ fun AppScreen(
     wrongWordsViewModel: WrongWordsViewModel? = null,
     articleVersionViewModel: ArticleVersionViewModel? = null,
     learningDataDeletionViewModel: LearningDataDeletionViewModel? = null,
+    spellingQuizViewModel: SpellingQuizViewModel? = null,
 ) {
     val pronunciationScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -193,9 +196,6 @@ fun AppScreen(
             var showLicenses by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 批 2 Task 22-B：独立「关于」页（原型 `sMeAbout`）。
             var showAbout by rememberSaveable(state.profile.id) { mutableStateOf(false) }
-            // 2026-11-02：设置回到「我的」里的子页（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
-            // 它不再是第五个一级 tab；齿轮、AI 配置兜底与「我的 → 设置」行都落到这一枚开关。
-            var showSettings by rememberSaveable(state.profile.id) { mutableStateOf(false) }
             // 决策 §4：「词书内容包」作一级子页（参考没有这件，本应用已实现，不能砍），
             // 自带两枚 SAF launcher 与选册对话框。
             // U-13（决策 2026-11-03 §9）：原「提醒与发音」中转子页退役，hub 两行直达既有提醒屏与发音屏。
@@ -209,7 +209,7 @@ fun AppScreen(
             // Task 26 Step 3：四枚 AI 屏的「未配置卡」出口统一送到 AI 配置页（共享 `NotConfiguredCard` 的
             // 必填 `onConfigure`）。少了这个 ViewModel（预览/测试夹具）时**退回「我的」hub**——
             // U-4（决策 2026-11-03 整合 §2）改的这一处：批 5 之后 AI 行在 hub、设置子页只剩外观，
-            // 再退回 `showSettings` 就是把用户送到一个没有 AI 入口的页面，与全站新指引（「我的 → AI 服务」）相反。
+            // 再退回设置页就是让用户落到一个没有 AI 入口的页面，与全站新指引（「我的 → AI 服务」）相反。
             // hub 那一行本身就写着「AI 服务」，兜底落在它上面才是自洽的地图。
             val openAiProfilesOrSettings: () -> Unit = {
                 aiProfileViewModel?.load()
@@ -363,6 +363,19 @@ fun AppScreen(
             // 详情页只持有无字段状态枚举（安全边界），文案映射在 CardDetailScreen 内完成。
             var detailPronunciationMessage by remember { mutableStateOf<PronunciationStatus?>(null) }
             var detailPronunciationRequest by remember { mutableIntStateOf(0) }
+            // 学习流的词义详情（m01889 修复）：这枚状态原先只在学习分支内部收，宿主取不到它，
+            // 于是系统返回键会越过详情直接落到 `BackHandler(enabled = showLearning)` 上——
+            // 一次返回连详情带整条学习流一起被收掉，用户被扔回首页、还要重新进流。
+            // 提到宿主层收一次，返回键才有东西可判。
+            val learningDetailCard by wordCardViewModel.detailCard.collectAsState()
+            // 详情关场的唯一清场收口（同 `clearArticlePronunciation` 的形状）：屏内 `onBack` 与
+            // 返回键处理器必须走同一枚闭包，漏清 `detailPronunciation*` 会让下一位消费宿主顶着旧
+            // Playing 长出假播控行（同 :690 那条 I-3 的事故）。
+            val closeLearningDetail: () -> Unit = {
+                detailPronunciationRequest++
+                detailPronunciationMessage = PronunciationStatus.Idle
+                wordCardViewModel.clearDetail()
+            }
             // F3-03 词 AI 问答覆盖层：从任一词卡详情的「问 AI」进入；WordCard 进不了
             // Bundle，所以和 selectedArticleCard 一样用 remember 而不是 rememberSaveable。
             var showWordQaCard by remember { mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null) }
@@ -581,7 +594,7 @@ fun AppScreen(
                 if (showCheckIn) checkInViewModel?.load(state.profile.id)
             }
             val overlayOpen = setupRequired || showSetup || showLearning || showReadingHistory || showCheckIn || showTodayWordList || showReviewQueue || selectedRelearnCard != null ||
-                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showSettings || showWordBookTransfer || showLearningRecords || showAbout || showLicenses || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
+                showWorksheetSettings || showWorksheetPreview || selectedFeatureKey != null || showAiProfiles || showSpeechSettings || showReminderSettings || showBackupExport || showBackupRestore || showBackupPairingExport || showBackupHub || showWordBookTransfer || showLearningRecords || showAbout || showLicenses || selectedLearningRecordCard != null || showGlobalVocabularySearch || showVocabularyRelearn || selectedSearchCard != null ||
                 showWordBank ||
                 showArticleImport || readingTarget != null || historyArticle != null || selectedArticleCard != null || showReadingFeed ||
                 showWordQaCard != null || selectedFavoriteCard != null
@@ -593,6 +606,11 @@ fun AppScreen(
             BackHandler(enabled = cancelSetup != null) { cancelSetup?.invoke() }
             // Leaving the learning flow is always allowed; unsubmitted cards simply stay open.
             BackHandler(enabled = showLearning) { exitLearning() }
+            // 词义详情压在**学习流之上**（它挂载在 `showLearning` 分支内部），所以它的返回键处理器
+            // 必须声明在上一行之后才拿得到键；再往内的层（重新学习 / 词 AI 问答）声明在更下方，
+            // 照旧优先于它。缺了这一条时返回键直接穿透到 `exitLearning()`——m01889 真机复现：
+            // 详情页按返回直接回首页，学习流一并消失。
+            BackHandler(enabled = learningDetailCard != null) { closeLearningDetail() }
             BackHandler(enabled = showReadingHistory) { showReadingHistory = false }
             // Feed 二级层与阅读历史同优先级档：文章层（下方后声明）永远先拿走返回键。
             BackHandler(enabled = showReadingFeed) { showReadingFeed = false }
@@ -701,9 +719,6 @@ fun AppScreen(
                 worksheetViewModel?.dismissPreview()
                 showWorksheetPreview = false
             }
-            // 2026-11-02：设置是「我的」里的子页。本行必须声明在它的子屏（发音 / 提醒 / 备份 hub /
-            // 关于 / AI 服务）**之前**——后声明者优先，子屏开着时返回键先关子屏，再回到设置首页。
-            BackHandler(enabled = showSettings) { showSettings = false }
             // 词书内容包子页的开关（U-13 起「提醒与发音」不再有独立子层）。
             // 词书内容包的选册对话框住在子屏内部，宿主这枚开关只负责「返回键退整层」。
             BackHandler(enabled = showWordBookTransfer) { showWordBookTransfer = false }
@@ -768,7 +783,6 @@ fun AppScreen(
                     readingTarget = readingTarget,
                     showArticleImport = showArticleImport,
                     showWordBookTransfer = showWordBookTransfer,
-                    showSettings = showSettings,
                 ),
             )
             // 批 D-3 站 1：整条链放进 AnimatedContent，退场腿在自己的 lambda 参数里读旧 route，
@@ -869,8 +883,30 @@ fun AppScreen(
                             onToggleVocabulary = { vocabularyViewModel?.toggle(state.profile.id, card, Instant.now()) },
                             favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
                             onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
-                            onAskAi = null,
+                            onAskAi = {
+                                // 换词打开问答层前清掉上一词的会话状态，避免旧回答串到新词上。
+                                showWordQaCard = card
+                                wordQaViewModel?.reset()
+                                wordQaViewModel?.loadNotes(state.profile.id, card.lemma, card.wordBookId, card.cardId)
+                            },
                         )
+                        showWordQaCard?.let { qaCard ->
+                            WordAiQaScreen(
+                                lemma = qaCard.lemma,
+                                state = wordQaUiState,
+                                onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                onCancelAsk = { wordQaViewModel?.cancelAsk() },
+                                onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
+                                onSaveNote = { wordQaViewModel?.saveNote() },
+                                onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
+                                savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                                onBack = { showWordQaCard = null },
+                                onOpenAiSettings = {
+                                    showWordQaCard = null
+                                    openAiProfilesOrSettings()
+                                },
+                            )
+                        }
                     } else if (route is AppOverlayRoute.GlobalSearch) {
                         val globalSearch = globalVocabularySearchViewModel
                         GlobalVocabularySearchScreen(
@@ -1088,7 +1124,8 @@ fun AppScreen(
                     } else if (route is AppOverlayRoute.LearningFlow) {
                         val cardState by wordCardViewModel.uiState.collectAsState()
                         val pronunciationScope = rememberCoroutineScope()
-                        val detailCard by wordCardViewModel.detailCard.collectAsState()
+                        // 与宿主层那枚 `learningDetailCard` 是同一个流，这里只取名不重复订阅。
+                        val detailCard = learningDetailCard
                         LaunchedEffect(detailCard) {
                             // 批 D-3 补口①：key 读的是实时 VM（detailCard），退场腿内不再发起新工作。
                             if (route != overlayRoute) return@LaunchedEffect
@@ -1200,98 +1237,116 @@ fun AppScreen(
                                     onBackToPlan = exitLearning,
                                 )
                             }
-                            if (detailCard != null) {
-                                val card = detailCard!!
-                                // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
-                                // 否则点击一次会累计两次调用（见 2bff744 回归）。
-                                CardDetailScreen(
-                                    card = card,
-                                    onRelearn = {
-                                        selectedRelearnCard = card
-                                        vocabularyRelearnViewModel?.loadCard(state.profile.id, card)
-                                    },
-                                    onBack = {
-                                        detailPronunciationRequest++
-                                        detailPronunciationMessage = PronunciationStatus.Idle
-                                        wordCardViewModel.clearDetail()
-                                    },
-                                    onNext = if (wordCardViewModel.hasNextDetail()) {
-                                        {
+                            // 词义详情是**叠在学习流之上的第二层**（原型把这一层当第二张纸压上来），
+                            // 所以它的进出场走 `AppTransition.OverlayRiseEnter/Exit`（淡入 + 竖直 ⅛ 升起），
+                            // 不是页面那套水平 ¼ 位移。
+                            //
+                            // 两枚状态各司其职：`visible` 读**实时** `detailCard`（关得掉），
+                            // 内容读 `overlayCard`——最后一张卡。退场那一段 `detailCard` 已经是 null，
+                            // 只有留着一份副本，卡片才画得完退场动画；否则退场腿里是一张空纸。
+                            var overlayCard by remember {
+                                mutableStateOf<com.example.englishlearning.learning.domain.WordCard?>(null)
+                            }
+                            LaunchedEffect(detailCard) { detailCard?.let { overlayCard = it } }
+                            AnimatedVisibility(
+                                visible = detailCard != null,
+                                enter = AppTransition.OverlayRiseEnter,
+                                exit = AppTransition.OverlayRiseExit,
+                            ) {
+                                overlayCard?.let { card ->
+                                    // 打开详情不自动发音：只有 onSpeak（用户点击「播放 X 发音」）才调用 provider，
+                                    // 否则点击一次会累计两次调用（见 2bff744 回归）。
+                                    CardDetailScreen(
+                                        card = card,
+                                        // 学习流详情**不给「重新学习」**（m03373）：那是错题本 / 生词本的重学入口，
+                                        // 而这屏是从「刚评完这一张」打开的，把用户扔进错题本等于换了一条任务线。
+                                        onRelearn = null,
+                                        // 「继续学习」＝接着评下一张。它与吸底回执的「下一个词」是**同一条推进边**：
+                                        // 先关纸（同一枚清场闭包，与返回键一致），再 `advance()`——后者要求
+                                        // `ready.receipt != null`，而学习流详情必在评分写库后才开，所以一定推进。
+                                        onContinue = {
+                                            closeLearningDetail()
+                                            wordCardViewModel.advance()
+                                        },
+                                        // 与返回键处理器走同一枚清场闭包（m01889）。
+                                        onBack = closeLearningDetail,
+                                        // 详情页不再给「下一个单词」（m01676）：那条路会翻到一张还没评分的卡，
+                                        // 等于把下一张的释义提前摆出来，同时让「评分 → 回执 → 下一张」这条
+                                        // 唯一推进链出现第二个入口。推进只归学习流吸底的回执主按钮（`advance`）
+                                        // 与这枚「继续学习」。
+                                        onNext = null,
+                                        onSpeak = {
+                                            val request = ++detailPronunciationRequest
+                                            detailPronunciationMessage = PronunciationStatus.Playing
+                                            pronunciationScope.launch {
+                                                val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(card.cardId)))
+                                                if (request == detailPronunciationRequest && overlayCard === card) {
+                                                    detailPronunciationMessage = result
+                                                }
+                                            }
+                                        },
+                                        onSpeakBritish = {
+                                            val request = ++detailPronunciationRequest
+                                            detailPronunciationMessage = PronunciationStatus.Playing
+                                            pronunciationScope.launch {
+                                                val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(card.cardId)))
+                                                if (request == detailPronunciationRequest && overlayCard === card) {
+                                                    detailPronunciationMessage = result
+                                                }
+                                            }
+                                        },
+                                        pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
+                                        pronunciationControlsEnabled = true,
+                                        pauseResumeSupported = pauseResumeSupported,
+                                        // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
+                                        onPauseResume = {
+                                            val held = detailPronunciationMessage
+                                            val next = when {
+                                                held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
+                                                held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
+                                                // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
+                                                // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
+                                                else -> held
+                                            }
+                                            detailPronunciationMessage = next
+                                        },
+                                        // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
+                                        // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
+                                        onStopPronunciation = {
                                             detailPronunciationRequest++
+                                            pronunciationProvider?.stopPlayback()
                                             detailPronunciationMessage = PronunciationStatus.Idle
-                                            wordCardViewModel.nextDetail()
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                    onSpeak = {
-                                        val request = ++detailPronunciationRequest
-                                        detailPronunciationMessage = PronunciationStatus.Playing
-                                        pronunciationScope.launch {
-                                            val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.American, entity = PronunciationEntityRef.wordCard(card.cardId)))
-                                            if (request == detailPronunciationRequest && detailCard === card) {
-                                                detailPronunciationMessage = result
-                                            }
-                                        }
-                                    },
-                                    onSpeakBritish = {
-                                        val request = ++detailPronunciationRequest
-                                        detailPronunciationMessage = PronunciationStatus.Playing
-                                        pronunciationScope.launch {
-                                            val result = pronunciationStatus(pronunciationProvider?.speakWord(card.lemma, PronunciationAccent.British, entity = PronunciationEntityRef.wordCard(card.cardId)))
-                                            if (request == detailPronunciationRequest && detailCard === card) {
-                                                detailPronunciationMessage = result
-                                            }
-                                        }
-                                    },
-                                    pronunciationStatus = detailPronunciationMessage ?: PronunciationStatus.Idle,
-                                    pronunciationControlsEnabled = true,
-                                    pauseResumeSupported = pauseResumeSupported,
-                                    // 暂停/继续不自增代次（裁决 B3）：暂停不改变这一次发声的归属。
-                                    onPauseResume = {
-                                        val held = detailPronunciationMessage
-                                        val next = when {
-                                            held == PronunciationStatus.Playing && pronunciationProvider?.pausePlayback() == true -> PronunciationStatus.Paused
-                                            held == PronunciationStatus.Paused && pronunciationProvider?.resumePlayback() == true -> PronunciationStatus.Playing
-                                            // 决策 §2（Task 9 评审后裁决）：未被引擎接受时**保持原状态**——
-                                            // 落 Idle 会让整组控件（含唯一可用的「停止」）在朗读仍在继续时消失。
-                                            else -> held
-                                        }
-                                        detailPronunciationMessage = next
-                                    },
-                                    // 停止：先自增本宿主的发声代次再 stopPlayback()，最后直接置空闲——
-                                    // 播放器层把用户主动停止以 Played 收口（决策 §2），代次在前才挡得住迟到的 Played。
-                                    onStopPronunciation = {
-                                        detailPronunciationRequest++
-                                        pronunciationProvider?.stopPlayback()
-                                        detailPronunciationMessage = PronunciationStatus.Idle
-                                    },
-                                    favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
-                                    onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
-                                    onAskAi = {
-                                        // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
-                                        showWordQaCard = card
-                                        wordQaViewModel?.reset()
-                                        wordQaViewModel?.loadNotes(state.profile.id, card.lemma, card.wordBookId, card.cardId)
-                                    },
-                                )
-                                showWordQaCard?.let { qaCard ->
-                                    WordAiQaScreen(
-                                        lemma = qaCard.lemma,
-                                        state = wordQaUiState,
-                                        onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
-                                        onCancelAsk = { wordQaViewModel?.cancelAsk() },
-                                        onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
-                                        onSaveNote = { wordQaViewModel?.saveNote() },
-                                        onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
-                                        savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
-                                        onBack = { showWordQaCard = null },
-                                        onOpenAiSettings = {
-                                            showWordQaCard = null
-                                            openAiProfilesOrSettings()
+                                        },
+                                        favoritePresent = if (favoritesViewModel != null) card.cardId in favoriteIds else null,
+                                        onToggleFavorite = favoritesViewModel?.let { vm -> { vm.toggle(card.cardId, card.wordBookId, card.lemma) } },
+                                        onAskAi = {
+                                            // 换词打开问答层前清掉上一词的状态，防止旧回答串屏。
+                                            showWordQaCard = card
+                                            wordQaViewModel?.reset()
+                                            wordQaViewModel?.loadNotes(state.profile.id, card.lemma, card.wordBookId, card.cardId)
                                         },
                                     )
                                 }
+                            }
+                            // 问答层与详情纸同住一个 Box，但挂在 `AnimatedVisibility` **外面**：
+                            // 它自带浮层进出场（GlassOverlay），与详情纸的升起/落下互不牵连；
+                            // 它只由详情页的 onAskAi 置值，详情关掉后不会自己冒出来。
+                            showWordQaCard?.let { qaCard ->
+                                WordAiQaScreen(
+                                    lemma = qaCard.lemma,
+                                    state = wordQaUiState,
+                                    onAsk = { kind -> wordQaViewModel?.ask(kind, qaCard.lemma, qaCard.example, state.profile.id) },
+                                    onCancelAsk = { wordQaViewModel?.cancelAsk() },
+                                    onConfirmOutbound = { wordQaViewModel?.confirmOutbound(it) },
+                                    onSaveNote = { wordQaViewModel?.saveNote() },
+                                    onSavePersonalNote = { wordQaViewModel?.savePersonalNote(qaCard.lemma, it, qaCard.wordBookId, qaCard.cardId) },
+                                    savedNotes = wordQaViewModel?.savedNotes?.collectAsState()?.value.orEmpty(),
+                                    onBack = { showWordQaCard = null },
+                                    onOpenAiSettings = {
+                                        showWordQaCard = null
+                                        openAiProfilesOrSettings()
+                                    },
+                                )
                             }
                         }
                     } else if (route is AppOverlayRoute.WorksheetPreview) {
@@ -1365,6 +1420,10 @@ fun AppScreen(
                                 selectedSearchCard = card
                                 detailSource = DetailSource.TODAY_QUEUE
                             },
+                            // 拼写测验的判分要写进排期，靠这两个参数：profileId 供合成 planId
+                            // （`spelling:<profileId>`），VM 负责落库与回执。缺一个时那一屏仍是纯练习器。
+                            profileId = state.profile.id,
+                            spellingViewModel = spellingQuizViewModel,
                         )
                     } else if (route is AppOverlayRoute.TodayWordList) {
                         // 批 1 Task 16：今日词单（原型 `learn-queue`）。数据不另开一条通路——词单就是今日计划快照
@@ -1834,12 +1893,14 @@ fun AppScreen(
                             onOpenSettings = {
                                 selectedFeatureKey = null
                                 // 配置页真的存在了，就直接送过去；少了这个 ViewModel 时（预览/测试夹具）
-                                // 退回「设置」栏，不假装能直达。
+                                // 退回「我的」hub，不假装能直达。
+                                // 2026-11-10（用户 m03373 + m03681 选项 1）：设置子页已整体退役，兜底不能再指向它——
+                                // AI 服务那一行就在 hub 上（与 `openAiProfilesOrSettings` 同一落点）。
                                 aiProfileViewModel?.load()
                                 if (aiProfileViewModel != null) {
                                     showAiProfiles = true
                                 } else {
-                                    showSettings = true
+                                    selectedTab = AppTab.PROFILE
                                 }
                             },
                             onOpenLearning = {
@@ -2091,12 +2152,6 @@ fun AppScreen(
                             onBack = { showWordBookTransfer = false },
                             viewModel = wordBookTransferViewModel,
                         )
-                    } else if (route is AppOverlayRoute.Settings) {
-                        // 2026-11-02：设置回到「我的」里的子页（`docs/decisions/2026-11-02-profile-hub-and-four-tabs.md`）。
-                        // 上面所有设置子屏（发音 / 提醒 / 备份 hub / 关于 / AI 服务）都先真先赢，
-                        // 所以本分支挂的是设置首页本身；返回键由声明更早的 `showSettings` BackHandler 接管。
-                        // 词书内容包与提醒发音不再是这页的折叠行：它们是同级的两枚子页（上面两支）。
-                        SettingsScreen(onBack = { showSettings = false })
                     } else if (route == null) {
                         // 四个一级 tab 的根页面装在这里；上面所有分支都是覆盖全屏的二级层，因此天然不显示导航。
                         //
@@ -2180,10 +2235,10 @@ fun AppScreen(
                                                                     globalVocabularySearchViewModel?.openSearch("")
                                                                     showGlobalVocabularySearch = globalVocabularySearchViewModel != null
                                                                 },
-                                                                // 原型对齐批 1：页头行尾的齿轮是「设置」入口（原型 `data-to="me-settings"`）。
-                                                                // 2026-11-02 起设置是「我的」里的子页：齿轮直接打开设置子页，
-                                                                // 返回即回到原页；底导不再有第五格。
-                                                                onOpenSettings = { showSettings = true },
+                                                                // 原型对齐批 1：页头行尾的齿轮是「外观 / 全局开关」入口（原型 `data-to="me-settings"`）。
+                                                                // 2026-11-10（用户 m03373 + m03681 选项 1）：设置子页整体退役、外观三档内联进「我的」，
+                                                                // 齿轮于是落到底导「我的」——按下去一眼就能看到「外观」分段，比先前的两跳更短。
+                                                                onOpenSettings = { selectedTab = AppTab.PROFILE },
                                                                 // 批 1 Task 6：两个数字与我的页同源（宿主层那一份 checkInState），
                                                                 // 学习页自己不再读仓库。「今日文章已读」= 今天有过完成阅读的记录。
                                                                 streakDays = streakDays,
@@ -2199,12 +2254,13 @@ fun AppScreen(
                                                                 onConfirmOutbound = { readingAccessViewModel?.confirmOutbound(it) },
                                                                 onCancelGeneration = { readingAccessViewModel?.cancelGeneration() },
                                                                 onOpenAiSettings = {
-                                                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回设置子页。
+                                                                    // 与 AI 助学 tab 的跳转同一规则：配置页可用就直达，否则退回「我的」hub
+                                                                    // （2026-11-10 起设置子页已退役，AI 服务那一行就在 hub 上）。
                                                                     aiProfileViewModel?.load()
                                                                     if (aiProfileViewModel != null) {
                                                                         showAiProfiles = true
                                                                     } else {
-                                                                        showSettings = true
+                                                                        selectedTab = AppTab.PROFILE
                                                                     }
                                                                 },
                                                                 onOpenImport = { showArticleImport = true },
@@ -2257,7 +2313,6 @@ fun AppScreen(
                                                                     speechSettingsViewModel?.load()
                                                                     showSpeechSettings = speechSettingsViewModel != null
                                                                 },
-                                                                onOpenSettings = { showSettings = true },
                                                                 // 裁决⑥：备份与恢复收成一条导航入口；四枚入口与删除行在子页三节里。
                                                                 onOpenBackupHub = { showBackupHub = true },
                                                                 // 许可唯一入口在 关于 →「开源许可与隐私说明」：别处不再保留同落点的第二行。
@@ -2485,14 +2540,19 @@ private fun ProfileCreationScreen(name: String, onNameChange: (String) -> Unit, 
                     unfocusedTextColor = colors.text1,
                 ),
             )
-            if (!canCreate) {
-                Text(
-                    text = "请输入名字后再创建",
-                    style = AppType.Footnote,
-                    color = colors.text2,
-                    modifier = Modifier.semantics { contentDescription = "请输入名字提示" },
-                )
-            }
+            // 提示位恒定占位（真机走查问题 A）：早先是 if (!canCreate) { Text(…) }，输入名字后这一行整块消失，
+            // 下面的「创建资料」按钮跟着上跳 90px（实测 1054 → 964），主 CTA 凭空弹起。
+            // 现在行位常驻、只切透明度：兄弟节点不再重排；隐藏态顺带撤掉语义，读屏不会念一条看不见的提示。
+            Text(
+                text = "请输入名字后再创建",
+                style = AppType.Footnote,
+                color = colors.text2,
+                modifier = Modifier
+                    .alpha(if (canCreate) 0f else 1f)
+                    .semantics {
+                        if (canCreate) invisibleToUser() else contentDescription = "请输入名字提示"
+                    },
+            )
             Button(
                 onClick = onCreate,
                 enabled = canCreate,

@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.example.englishlearning.learning.domain.WordCard
 import com.example.englishlearning.wordqa.WordAiNote
 import com.example.englishlearning.ui.components.AppGlyph
+import com.example.englishlearning.ui.components.AppGlyphLayer
 import com.example.englishlearning.ui.components.AppIcon
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.DialogButton
@@ -82,7 +83,8 @@ import com.example.englishlearning.ui.theme.appDomain
  * the whole module: no empty heading, no "暂无" placeholder (AC1-12).
  *
  * 版式按原型 `sWordDetail`（`assets/app.js:519-559`，对齐批 1 Task 11）：
- * 页头 → 主词 / 音标 / 词性 → 口音与次键行 → 释义 → 例句 → 我的笔记 → 常用搭配 → 近义词 →
+ * 页头 → 主词 / 音标 / 词性 → 口音与次键行（学习流宿主里那一行是「继续学习」，其余宿主是「重新学习」）
+ * → 释义 → 例句 → 我的笔记 → 常用搭配 → 近义词 →
  * 词形与派生 → 页末提示 → 「用 AI 追问这个词」块按钮。
  * 主词站在页面上，卡片从「释义」小节才开始——原型没有英雄卡。
  *
@@ -98,6 +100,11 @@ fun CardDetailScreen(
     onSpeakBritish: (() -> Unit)? = null,
     onRelearn: (() -> Unit)? = null,
     onNext: (() -> Unit)? = null,
+    // m03373（用户走查）：学习流里「重新学习」是错的承诺——它是错题本/生词本的重学入口，
+    // 而学习流详情是从「刚评完这一张」打开的，用户要的是接着学下一张。宿主给这个回调，
+    // 详情页就把次键位画成一枚「继续学习」主按钮（Primary 档），并且**不再画「重新学习」**。
+    // 其余四种宿主（查词 / 记录 / 收藏 / 阅读）不传它，「重新学习」原样保留。
+    onContinue: (() -> Unit)? = null,
     vocabularyPresent: Boolean? = null,
     onToggleVocabulary: (() -> Unit)? = null,
     // F4-01 决策⑦收藏开关：与生词本开关同款——宿主给足「状态+回调」才出现，UI 不触存储。
@@ -149,6 +156,7 @@ fun CardDetailScreen(
             onSpeak = onSpeak,
             onSpeakBritish = onSpeakBritish,
             onRelearn = onRelearn,
+            onContinue = onContinue,
             onNext = onNext,
             vocabularyPresent = vocabularyPresent,
             onToggleVocabulary = onToggleVocabulary,
@@ -308,20 +316,33 @@ fun CardDetailScreen(
             }
         }
 
-        SectionGap()
-        InlineNotice(
-            text = "长难句分析、AI 问词都从这里进入，围绕这一个词继续追问。",
-            kind = InlineNoticeKind.Info,
-        )
+        // N-2：本屏是「一份 UI、五种宿主」。只有宿主真的给了 AI 问词入口（学习流 / 记录详情）时，
+        // 页末才提示「AI 问词都从这里进入」；搜索 / 查词那一路传 onAskAi = null、压根不渲染 AskAiButton，
+        // 若无条件渲染这句提示，就是对着一枚点不到的按钮撒谎。提示与入口同生同灭。
 
+        // 2026-11-09 真人走查：原型那句「长难句分析、AI 问词都从这里进入」在本仓只兑现了一半——
+        // 本页只有一枚「用 AI 追问这个词」，落到 AI 问词屏也只有近义辨析 / 造个句子 / 谐音记忆三种问法；
+        // 长难句分析是 AI 助学里的独立一屏（吃的是整句，不是词卡），从这里进不去。留着「长难句分析」
+        // 就是把用户指向一条走不通的路，故按实情收成只剩 AI 问词（其余措辞照旧）。
         onAskAi?.let { ask ->
+            SectionGap()
+            InlineNotice(
+                text = "AI 问词从这里进入，围绕这一个词继续追问。",
+                kind = InlineNoticeKind.Info,
+            )
             Spacer(Modifier.height(12.dp))
             AskAiButton(lemma = card.lemma, onAskAi = ask)
         }
     }
 }
 
-/** 页头尾槽的收藏键（原型 `barTop` 的 `icon-btn`）：图标按收藏态换成实心星 / 书签。 */
+/**
+ * 页头尾槽的收藏键（原型 `barTop` 的 `icon-btn`）。
+ *
+ * m03373 起两态都是**同一枚书签**，只换「层 + 色」：未收藏＝仅描边 + 次级墨（text2），
+ * 已收藏＝三层实心 + 学习域实色（`appDomain(Learn).deep`）。旧做法是 Star ↔ Bookmark 换字形，
+ * 用户走查判「不明显」——形状变了人还得先记住哪个是「开」。
+ */
 @Composable
 private fun favoriteHeaderAction(
     lemma: String,
@@ -330,6 +351,7 @@ private fun favoriteHeaderAction(
 ): (@Composable () -> Unit)? {
     if (favoritePresent == null || onToggleFavorite == null) return null
     val colors = appColors()
+    val learn = appDomain(AppDomain.Learn)
     return {
         Box(
             modifier = Modifier
@@ -342,10 +364,14 @@ private fun favoriteHeaderAction(
                 },
             contentAlignment = Alignment.Center,
         ) {
+            // m03373（用户走查「右上角的收藏不明显，只是改了个形状而已」）：两态都用**同一枚书签**，
+            // 靠「层 + 色」区分——未收藏只描边、取次级墨；已收藏三层实心、取学习域实色（浅深两套都亮）。
+            // 换字形（旧做法 Star ↔ Bookmark）恰恰是最认不出的一招：形状变了，人还得先记住哪个是「开」。
             AppGlyph(
-                icon = if (favoritePresent) AppIcon.Star else AppIcon.Bookmark,
-                tint = colors.text1,
+                icon = AppIcon.Bookmark,
+                tint = if (favoritePresent) learn.deep else colors.text2,
                 size = 22.dp,
+                layer = if (favoritePresent) AppGlyphLayer.Duotone else AppGlyphLayer.StrokeOnly,
             )
         }
     }
@@ -368,6 +394,7 @@ private fun WordHead(
     onSpeak: () -> Unit,
     onSpeakBritish: (() -> Unit)?,
     onRelearn: (() -> Unit)?,
+    onContinue: (() -> Unit)?,
     onNext: (() -> Unit)?,
     vocabularyPresent: Boolean?,
     onToggleVocabulary: (() -> Unit)?,
@@ -476,8 +503,22 @@ private fun WordHead(
                 )
             }
         }
-        if (onRelearn != null || onNext != null) {
+        if (onContinue != null || onRelearn != null || onNext != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // m03373：学习流详情只给「继续学习」——它和词卡回执的「下一个词」是**同一条推进边**
+                // （`WordCardViewModel.advance()`），所以不会写出第二个学习事件。
+                onContinue?.let { callback ->
+                    PillButton(
+                        text = "继续学习",
+                        onClick = callback,
+                        style = PillStyle.Primary,
+                        domain = AppDomain.Learn,
+                        contentDescription = "继续学习下一个单词",
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("card_detail_continue"),
+                    )
+                }
                 onRelearn?.let { callback ->
                     PillButton(
                         text = "重新学习",

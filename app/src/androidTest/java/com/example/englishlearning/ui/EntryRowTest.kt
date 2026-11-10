@@ -300,17 +300,18 @@ class EntryRowTest {
      * ——**普通入口行不该多挂任何 semantics**，也不该在 `enabled == true` 时被写成不可用。
      *
      * 为什么要有这一枚：`enabled` / `expanded` 两枚新参都带默认值，全仓 4 个生产消费者里只有设置页的
-     * 折叠子行显式传参，`SettingsScreenTest` 只正面断过「折叠行必须挂 Expand/Collapse」，
+     * 折叠子行显式传参（该页 2026-11-10 已退役，历史断言见 git 记录里的 `SettingsScreenTest`，
+     * 它只正面断过「折叠行必须挂 Expand/Collapse」），
      * 「普通行（两枚都不传）语义里**没有** Expand/Collapse/Disabled」这一腿此前无人守：
      * 有人把快路径的 `if` 写成恒走 `Modifier.semantics { … }` 那支、或把 `null -> Unit` 改成
      * `null -> collapse(…)`，今日计划那 7 枚行会一起挂上折叠动作，而所有既有断言仍全绿。
      * `SemanticsProperties.Disabled` 缺席同时是 `enabled == true` 那条腿的判据
-     * （`assertIsNotEnabled()` 走的是同一条键，`SettingsScreenTest` 已在禁用子行上反用）。
+     * （`assertIsNotEnabled()` 走的是同一条键，退役前的 `SettingsScreenTest` 已在禁用子行上反用）。
      *
      * 判据取**合并树**的 tagged 节点：`testTag` 由调用方传在链首（最外层），而 Expand/Collapse/Disabled
-     * 都挂在同一条链上，`SettingsScreenTest.fold_rows_expose_expand_and_collapse_semantics` 已实测
+     * 都挂在同一条链上，退役前的 `SettingsScreenTest.fold_rows_expose_expand_and_collapse_semantics` 已实测
      * 这一形状下 `onNodeWithTag(...)` 数得到那两枚动作键 ⇒ 反向「数不到」才是有效判据。
-     * 「折叠行必须挂」这一维已由 `SettingsScreenTest` 断过，本席不重复造。
+     * 「折叠行必须挂」这一维已由退役前的 `SettingsScreenTest` 断过，本席不重复造。
      * 本用例自己的反向自证（TDD 红证，日志 `t19fix2-i2-connected-decoy-red.log`）：同一节点、同一 targeting
      * 先断 `keyIsDefined(SemanticsActions.Expand)` 必须红，红讯原文给出该节点 `Actions = […OnClick… ]`
      * 里既无 Expand 也无 Collapse、且没有 `Disabled` 键——证明判据读的是真实语义配置而不是空转。

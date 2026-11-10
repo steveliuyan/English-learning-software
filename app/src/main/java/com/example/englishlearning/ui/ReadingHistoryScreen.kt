@@ -1,5 +1,9 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,6 +32,7 @@ import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.BareRow
 import com.example.englishlearning.ui.components.SectionHeading
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
@@ -166,13 +171,19 @@ private fun VersionGroup(
                 .testTag("reading_history_group_$groupKey")
                 .semantics { stateDescription = if (expanded) "已展开" else "已收起" },
         )
-        if (expanded) {
-            versions.forEach { article ->
-                VersionRow(
-                    article = article,
-                    onOpenArticle = onOpenArticle,
-                    onRequestDeleteVersion = onRequestDeleteVersion,
-                )
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingOut)),
+            exit = shrinkVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingIn)),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                versions.forEach { article ->
+                    VersionRow(
+                        article = article,
+                        onOpenArticle = onOpenArticle,
+                        onRequestDeleteVersion = onRequestDeleteVersion,
+                    )
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,10 +63,12 @@ import com.example.englishlearning.ui.components.SpeakerState
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
+import com.example.englishlearning.ui.theme.AppTransition
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.LocalIsDark
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
+import kotlinx.coroutines.delay
 
 /**
  * Word card screen (spec F1-03, recall-reveal-grade flow per decision 2026-10-14).
@@ -228,6 +231,29 @@ fun WordCardScreen(
                 val fontScale = LocalDensity.current.fontScale
                 val pinRevealAction = wordCardPinsRevealAction(fontScale)
                 val compactLemma = wordCardLemmaUsesCompactTier(fontScale)
+
+                // 问题 H（m03128 真机复现）：回执态的「下一个词」与**下一张卡**的评分条落在同一处——
+                // 「下一个词」实测在 (541,2187)，下一张卡的三档评分横跨 y≈2160–2198，正好压在「模糊」上。
+                // 于是回执上连点两下（实测两击间隔 ~120ms）时，第二击写进的是下一张卡的评分：用户没看词
+                // 就先记了一档，FSRS 排程被一条他根本没做过的判断改写。
+                //
+                // 挡法：**换卡之后**的头 WORD_CARD_ARM_AFTER_SWITCH_MS 毫秒里，评分与揭晓一律不响应。
+                // 只挡「这一下输入」，不改外观（按钮不闪禁用色——那会把一次误触变成每张卡都看得见的抖动），
+                // 窗口也短到任何「先读一眼再评」的停留都远在它之外。首次进组合不设窗口：那时没有任何上一击
+                // 落在本屏上，加了只会让第一张卡白等，且 WordCardScreenTest 的即时点击全都不用改。
+                val cardKey = state.card.cardId
+                var cardSwitchArmed by remember { mutableStateOf(true) }
+                var lastArmedCardKey by remember { mutableStateOf(cardKey) }
+                LaunchedEffect(cardKey) {
+                    if (lastArmedCardKey != cardKey) {
+                        lastArmedCardKey = cardKey
+                        cardSwitchArmed = false
+                        delay(WORD_CARD_ARM_AFTER_SWITCH_MS)
+                        cardSwitchArmed = true
+                    }
+                }
+                val guardedSubmit: (CardFeedback) -> Unit = { if (cardSwitchArmed) onSubmit(it) }
+                val guardedReveal: () -> Unit = { if (cardSwitchArmed) onReveal() }
                 val meaningFocusRequester = remember { FocusRequester() }
                 var wasRevealed by remember { mutableStateOf(state.meaningRevealed) }
                 LaunchedEffect(state.meaningRevealed) {
@@ -303,7 +329,8 @@ fun WordCardScreen(
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp),
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     SoftCard(
@@ -384,7 +411,7 @@ fun WordCardScreen(
                         } else if (!pinRevealAction) {
                             // Recall-first (F1-03): the meaning is only exposed by an explicit action.
                             // 组件本体抽在文件末尾的 `RevealMeaningButton`：形状与理由都归它自己那一段。
-                            RevealMeaningButton(onReveal = onReveal, enabled = !state.submitting)
+                            RevealMeaningButton(onReveal = guardedReveal, enabled = !state.submitting)
                         }
                         // QA3 A2.5：顶档未揭晓时这一格不画东西——出口那颗按钮改由吸底区常驻
                         // （见下面 `pinRevealAction` 那一处）。卡面少一枚按钮、但看得见，
@@ -485,24 +512,24 @@ fun WordCardScreen(
                             )
                         }
                     }
-                }
-                // 吸底区：评分前/揭晓后是三档反馈，回执态换成唯一的主推进按钮（原型 `sSession` 的
-                // 两种 foot）。两者互斥——回执还挂着三档按钮，用户就会在同一条回执上写第二个事件。
-                if (receipt != null) {
-                    WordCardReceiptBar(receipt = receipt, onNext = onNext)
-                } else {
-                    // QA3 A2.5：顶档（> 2.0）把唯一出口「显示释义」常驻在评分条之上——
-                    // 词头在顶档单独就吃掉整个可滚视口，出口留在卡内等于藏在折叠线之下（判据与阈值
-                    // 见文件末尾 `wordCardPinsRevealAction`；1.0 / 2.0 档卡面形状一字未动）。
-                    // 回执态不进这一支：那时揭晓早已完成，出口是「下一个词」。
-                    if (pinRevealAction && !revealed) {
-                        RevealMeaningButton(
-                            onReveal = onReveal,
-                            enabled = !state.submitting,
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                        )
-                    }
-                    WordCardFeedbackBar(state = state, onSubmit = onSubmit)
+                    // m03560（用户走查「这三个选项太下了…放在单词下面就是屏幕居中」）：评分区从「吸底槽」
+                    // 改成卡面**下方的文档流块**——紧接在卡与状态行之后落位，剩下的空白留在它下面。
+                    // 旧摆法是 `Column(weight(1f)) + 吸底槽`：内容区把剩余高度全吃掉，评分条被顶到屏幕最底，
+                    // 握机时拇指够不着（1080×2340 实测「不认识」上沿 671dp，屏高 851dp）。
+                    // 评分前/揭晓后是三档反馈，回执态换成唯一的主推进按钮（原型 `sSession` 的两种 foot）；
+                    // 两者互斥——回执还挂着三档按钮，用户就会在同一条回执上写第二个事件。
+                    // 互换的动效走 `AppTransition.FooterSwapEnter/Exit`：只淡换、不给位移（位移会被读成「换了一页」）。
+                    // 槽体抽成 [WordCardFooterSlot]：`AnimatedVisibility` 有一枚 `ColumnScope` 扩展重载，
+                    // 直接写在 `Column` 的内容 lambda 里，Kotlin 会在这个位置解析到它并报「外层隐式接收者
+                    // 不允许隐式调用」——编译当场失败（这是抽出去的**唯一**硬理由，不是排版偏好）。
+                    WordCardFooterSlot(
+                        state = state,
+                        pinRevealAction = pinRevealAction,
+                        revealed = revealed,
+                        onReveal = guardedReveal,
+                        onSubmit = guardedSubmit,
+                        onNext = onNext,
+                    )
                 }
             }
         }
@@ -533,7 +560,9 @@ private fun WordCardStateBody(content: @Composable ColumnScope.() -> Unit) {
  * 三枚等宽、语义各一：认识 = 学习域实心（本屏唯一主操作），模糊 = 浅薄荷底，不认识 = 白面。
  * 不做描边——描边只留给输入框与危险动作（spec §4.1），三档评分的层级由底色承担。
  *
- * QA3 A2.4：顶档（> 2.0）换摆法——三枚整宽上下堆叠、每枚一行（判档见 [wordCardStacksFeedbackTiers]）。
+ * m03373（用户走查）起摆法是**一种**：三枚整宽上下堆叠、每枚一行（上「不认识」/ 中「模糊」/ 下「认识」），
+ * 不再是「1.0 档三等宽横排、顶档才堆叠」的双摆法——那条分档判据（旧 `wordCardStacksFeedbackTiers`）随之退役。
+ * 三枚横排在 1.0 档把评分条压在屏幕最底（用户原话「太下了」），堆叠后整组自然上移，且任意字号档都不会横向挤字。
  * 1.0 档实测每枚列宽 ≈ 105dp、扣掉按钮 8dp 内边距只剩 89dp，而这一档 `AppType.Label` 是 12sp×3=36sp，
  * CJK 一字一宽 = 36dp，「不认识」三字 108dp 已经站不住，「想不起来」四字 144dp 更站不住：
  * 左格排成「不认/识/想不/起来」四行，整条吸底区吃掉 226dp（设备实测 `Rect(53,1082)-(361,1675)`），
@@ -549,30 +578,20 @@ private fun WordCardFeedbackBar(
 ) {
     val colors = appColors()
     Column(
+        // m03560（用户走查「放在那个单词下面、屏幕居中」）：评分区不再是吸底工具栏，而是卡面正下方的
+        // 文档流块。三件事随之撤掉——不再自铺 `surface`（没有内容从它下面穿过，也就没有「被截断」的缝，
+        // 那层底色只剩「一条压屏底的横带」的读感）；不再补槽顶发丝线；不再吃 `navigationBarsPadding`
+        // （那会把它从居中位置往下推一截系统条的高度）。留白交给外面的内容列统一给（20dp 左右 + 行距）。
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(vertical = 4.dp)
             .testTag("word_card_feedback_bar"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (wordCardStacksFeedbackTiers(LocalDensity.current.fontScale)) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FeedbackTiers.forEach { tier ->
-                    FeedbackButton(state, tier.feedback, tier.label, tier.subCaption, tier.tag, onSubmit, Modifier.fillMaxWidth(), inlineCaption = true)
-                }
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                FeedbackTiers.forEach { tier ->
-                    FeedbackButton(state, tier.feedback, tier.label, tier.subCaption, tier.tag, onSubmit, Modifier.weight(1f), inlineCaption = false)
-                }
-            }
+        // m03373：三档恒竖排（上 不认识 / 中 模糊 / 下 认识）、每枚整宽、行内「档位名 + 副注」居中。
+        // 单条清单直接铺在条里——不再有第二种摆法，也就不需要第二个容器。
+        FeedbackTiers.forEach { tier ->
+            FeedbackButton(state, tier.feedback, tier.label, tier.subCaption, tier.tag, onSubmit, Modifier.fillMaxWidth(), inlineCaption = true)
         }
         // 原型揭晓态脚下那句（`sSession` 的 revealed 分支）。这是唯一一句在**两套流程**里都成立的
         // 评分提示：原型另一句「「认识」直接下一个；模糊/忘记展开释义」描述的是它的揭晓后重评流程，
@@ -587,6 +606,58 @@ private fun WordCardFeedbackBar(
                     .fillMaxWidth()
                     .testTag("word_card_feedback_caption"),
             )
+        }
+    }
+}
+
+/**
+ * 学习流吸底槽：一枚 `Box` 把两支内容钉在同一格上，回执态与反馈态按 `receipt` 互斥淡换。
+ *
+ * 为什么单独抽出来：`AnimatedVisibility` 除了顶层版本，还有一枚 `ColumnScope` 扩展重载。
+ * 写在 `Column` 的内容 lambda 里时，Kotlin 在「调用不带接收者的顶层版本」与「用外层 `ColumnScope`
+ * 当隐式接收者」之间报歧义，实际落成后者并判「外层隐式接收者不允许隐式调用」——编译直接失败。
+ * 本函数不是 `Column` 的内容，落到的就是顶层 `AnimatedVisibility`；`Box` 负责让两支共用一个槽位，
+ * 淡换期间不是上下两条。
+ */
+@Composable
+private fun WordCardFooterSlot(
+    state: WordCardUiState.Ready,
+    pinRevealAction: Boolean,
+    revealed: Boolean,
+    onReveal: () -> Unit,
+    onSubmit: (CardFeedback) -> Unit,
+    onNext: () -> Unit,
+) {
+    val receipt = state.receipt
+    Box(modifier = Modifier.fillMaxWidth()) {
+        AnimatedVisibility(
+            visible = receipt != null,
+            enter = AppTransition.FooterSwapEnter,
+            exit = AppTransition.FooterSwapExit,
+        ) {
+            receipt?.let { WordCardReceiptBar(receipt = it, onNext = onNext) }
+        }
+        AnimatedVisibility(
+            visible = receipt == null,
+            enter = AppTransition.FooterSwapEnter,
+            exit = AppTransition.FooterSwapExit,
+        ) {
+            if (receipt == null) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // QA3 A2.5：顶档（> 2.0）把唯一出口「显示释义」常驻在评分条之上——
+                    // 词头在顶档单独就吃掉整个可滚视口，出口留在卡内等于藏在折叠线之下（判据与阈值
+                    // 见文件末尾 `wordCardPinsRevealAction`；1.0 / 2.0 档卡面形状一字未动）。
+                    // 回执态不进这一支：那时揭晓早已完成，出口是「下一个词」。
+                    if (pinRevealAction && !revealed) {
+                        // m03560：揭晓出口与评分条同住在内容列里，横向留白由外层给，这里不再自己补 20dp。
+                        RevealMeaningButton(
+                            onReveal = onReveal,
+                            enabled = !state.submitting,
+                        )
+                    }
+                    WordCardFeedbackBar(state = state, onSubmit = onSubmit)
+                }
+            }
         }
     }
 }
@@ -661,8 +732,12 @@ private fun FeedbackTierContent(label: String, subCaption: String, ink: Color, i
         Text(subCaption, style = AppType.Caption, color = ink.copy(alpha = 0.8f))
     }
     if (inline) {
+        // 整宽堆叠档：一行里「档位名 + 副注」成对居中对齐（用户 m03373「你居中嘛」的落点）。
+        // m03560 走查补的一处：两者之间留 8dp 气口——贴着写会读成一串「不认识想不起来」，
+        // 副注那 80% 的墨也分不出层次。
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) { tiers() }
     } else {
@@ -795,9 +870,13 @@ private fun WordCardReceiptBar(
     onNext: () -> Unit,
 ) {
     Box(
+        // m03560：与评分条同一处文档流块规格——两枚 foot 互换时槽形与位置都不变，只有槽里的按钮换了，
+        // 用户读到的是「同一个位置换了操作」。不自铺底色、不补发丝线、不吃导航条内边距（理由同上）。
+        // 本条的锚点 `word_card_receipt_bar` 仍是吸底槽台账（StickyFooterHairlineGuardTest）的认领符号。
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(vertical = 4.dp)
+            .testTag("word_card_receipt_bar"),
     ) {
         PillButton(
             text = if (receipt.hasNext) "下一个词" else "完成本轮",
@@ -883,6 +962,14 @@ private fun WordCardPronunciationFootnotes(
 internal fun wordCardPinsRevealAction(fontScale: Float): Boolean = fontScale > 2f
 
 /**
+ * 切卡后反馈 / 揭晓按钮的「保险」窗口（毫秒），用在 WordCardScreen 的 Ready 分支（见那里的 cardSwitchArmed）。
+ *
+ * 300ms 的来历：问题 H 的真机复现里两击间隔 ~120ms，连点必然落在窗口内；而「看一眼再评分」最短也要
+ * 数百毫秒，正常操作不会被吞。窗口只认「换卡」这一次跃迁，首帧与回执态都不设窗。
+ */
+internal const val WORD_CARD_ARM_AFTER_SWITCH_MS = 300L
+
+/**
  * 顶档降级判据（QA3 A2.3）：字号档超过验收钉住的 2.0 时，词头从 `AppType.Display`（46sp）
  * 换到 `AppType.StrongTitle`（27sp）。
  *
@@ -896,26 +983,9 @@ internal fun wordCardPinsRevealAction(fontScale: Float): Boolean = fontScale > 2
  * 而词头正是这一屏唯一的学习对象；`StrongTitle` 仍是同一族衬线显示档，27sp 在 3.0 档排两行 192dp，
  * 整词落得进首帧视口（10 字母一行的临界值约 24sp，两行是这一档既不截字又不吃满屏的落点）。
  *
- * 阈值与 `wordCardPinsRevealAction` / `wordCardStacksFeedbackTiers` 同一条口径：严格大于 2f。
+ * 阈值与 `wordCardPinsRevealAction` / `wordCardStacksPronunciationRow` 同一条口径：严格大于 2f。
  */
 internal fun wordCardLemmaUsesCompactTier(fontScale: Float): Boolean = fontScale > 2f
-
-/**
- * 顶档降级判据（QA3 A2.4）：字号档超过验收钉住的 2.0 时，三档评分从等宽三列改成整宽三行。
- *
- * 设备实测（emulator-5554，`WordCardScreenTest.feedbackTiersStayWholeAndInsideTheWindowAtTopFontScale`
- * 的 3.0 档红态）：每枚按钮拿 `weight(1f)` ≈ 105dp，扣掉 8dp 内边距只剩 89dp 可写，
- * 而这一档 `AppType.Label` 是 12sp×3 = 36sp、CJK 一字一宽 = 36dp——「不认识」三字 108dp 就站不住，
- * 副标「想不起来」144dp 更站不住，左格排成四行、整条吸底区撑到 226dp。
- * 评分条每长一分，词卡可视区就短一分：A2.3 的「词头看不见」有一半是这里挤出来的。
- *
- * 换摆法而不是缩字号：三档文案是评分口径本身（`eachFeedbackTierShowsItsPrototypeSubCaption` 逐字钉过），
- * 缩到能塞进 89dp 就等于把「想不起来 / 差点没想起 / 脱口而出」这套校准提示降级成看不见的装饰。
- * 整宽一行后每枚按钮 ≈ 60dp，三枚 + 间隙 ≈ 196dp，比四行的 226dp 还矮。
- *
- * 阈值同上两条：严格大于 2f。
- */
-internal fun wordCardStacksFeedbackTiers(fontScale: Float): Boolean = fontScale > 2f
 
 /**
  * 顶档降级判据（QA3 A2.8，收口复测实拍发现、用户 2026-11-08 拍板「立缺陷修，同批口径」）：

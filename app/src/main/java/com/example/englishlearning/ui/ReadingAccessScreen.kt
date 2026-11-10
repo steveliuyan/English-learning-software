@@ -1,5 +1,9 @@
 package com.example.englishlearning.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +55,7 @@ import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
@@ -402,18 +407,24 @@ private fun ReadyContent(
     }
 
     GenerationParamsToggle(expanded = generationParamsExpanded, onClick = onToggleGenerationParams)
-    if (generationParamsExpanded) {
-        // 偏好区收进共享软卡（旧实现是 `Card(containerColor = MintTint)` + 自造 18dp 圆角）。
-        // 文案仍是一句现状 + 当前取值，读的是 `ReadingPreference` 的真字段，不是稿面常量。
-        SoftCard(modifier = Modifier.testTag("reading_preference")) {
-            Text(
-                text = "默认类型：${state.preference.defaultArticleType.label} · 长度：${state.preference.explicitLengthTier?.label ?: "按词书默认"}",
-                style = AppType.Body,
-                color = colors.text1,
-            )
-        }
-        ArticleType.entries.forEach { type ->
-            TypeButton(type, onSelectType)
+    AnimatedVisibility(
+        visible = generationParamsExpanded,
+        enter = expandVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingOut)),
+        exit = shrinkVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingIn)),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // 偏好区收进共享软卡（旧实现是 `Card(containerColor = MintTint)` + 自造 18dp 圆角）。
+            // 文案仍是一句现状 + 当前取值，读的是 `ReadingPreference` 的真字段，不是稿面常量。
+            SoftCard(modifier = Modifier.testTag("reading_preference")) {
+                Text(
+                    text = "默认类型：${state.preference.defaultArticleType.label} · 长度：${state.preference.explicitLengthTier?.label ?: "按词书默认"}",
+                    style = AppType.Body,
+                    color = colors.text1,
+                )
+            }
+            ArticleType.entries.forEach { type ->
+                TypeButton(type, onSelectType)
+            }
         }
     }
 

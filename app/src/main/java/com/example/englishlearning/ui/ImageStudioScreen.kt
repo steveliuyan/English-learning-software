@@ -150,11 +150,16 @@ fun ImageStudioScreen(
                 )
 
                 when (state) {
-                    ImageStudioUiState.Idle -> Text(
-                        text = "填一个主题，页底的主操作会变成「生成画面描述」。",
-                        style = AppType.Footnote,
-                        color = colors.text2,
-                    )
+                    // 原句是「填一个主题，页底的主操作会变成「生成画面描述」」——那枚键从头到尾都叫这个名字，
+                    // 主题为空只是不可点，句子把「变可用」说成了「换身份」；而且填完主题它还留在屏上自相矛盾。
+                    // 现在只讲真话，且主题一填就撤（之后的行动指引由页底那枚键自己承担）。
+                    ImageStudioUiState.Idle -> if (subject.isBlank()) {
+                        Text(
+                            text = "填一个主题后，页底的「生成画面描述」才可以点。",
+                            style = AppType.Footnote,
+                            color = colors.text2,
+                        )
+                    }
                     ImageStudioUiState.DraftingPrompt -> RequestInProgress(
                         message = "正在向你配置的 AI 服务生成画面描述",
                         onCancel = onCancelGeneration,

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,6 +28,7 @@ import com.example.englishlearning.learning.domain.DailyLearningStats
 import com.example.englishlearning.ui.components.AppScreenHeader
 import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.MintBackground
 import com.example.englishlearning.ui.theme.MintTextMuted
@@ -142,7 +142,7 @@ private fun ReadyContent(state: CheckInUiState.Ready) {
             state.week.take(7).forEachIndexed { index, day ->
                 val ratio = if (day.targetTaskCount > 0) (day.completedTaskCount.toFloat() / day.targetTaskCount).coerceIn(0f, 1f) else 0f
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(RoundedCornerShape(6.dp)).background(if (ratio > 0f) reviewInk else colors.outlineSoft).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
+                    Box(Modifier.fillMaxWidth().height((72 * ratio).coerceAtLeast(4f).dp).clip(AppShape.GraphicBar).background(if (ratio > 0f) reviewInk else colors.outlineSoft).testTag("check_in_week_bar_$index").semantics { contentDescription = "${day.localDate} 完成度 ${(ratio * 100).toInt()}%" })
                     Text(
                         day.localDate.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA),
                         color = colors.text2,

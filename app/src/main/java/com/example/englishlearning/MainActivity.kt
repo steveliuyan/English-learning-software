@@ -24,6 +24,7 @@ import com.example.englishlearning.ui.ReadingAccessViewModel
 import com.example.englishlearning.ui.SentenceAnalysisViewModel
 import com.example.englishlearning.ui.TodayPlanViewModel
 import com.example.englishlearning.ui.SpeechSettingsViewModel
+import com.example.englishlearning.ui.SpellingQuizViewModel
 import com.example.englishlearning.ui.WordAiQaViewModel
 import com.example.englishlearning.ui.WordCardViewModel
 import com.example.englishlearning.ui.VocabularyViewModel
@@ -69,6 +70,7 @@ class MainActivity : FragmentActivity() {
                     wrongWordsViewModel = hiltViewModel<WrongWordsViewModel>(),
                     articleVersionViewModel = hiltViewModel<ArticleVersionViewModel>(),
                     learningDataDeletionViewModel = hiltViewModel<LearningDataDeletionViewModel>(),
+                    spellingQuizViewModel = hiltViewModel<SpellingQuizViewModel>(),
                     learningRecordsViewModel = hiltViewModel<LearningRecordsViewModel>(),
                     wordBookWordsViewModel = hiltViewModel<WordBookWordsViewModel>(),
                     vocabularyViewModel = hiltViewModel<VocabularyViewModel>(),

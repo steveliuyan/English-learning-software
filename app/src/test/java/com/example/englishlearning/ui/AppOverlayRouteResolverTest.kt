@@ -29,7 +29,7 @@ class AppOverlayRouteResolverTest {
     @Test
     fun firstDeclaredWinsWhenSeveralAreTrue() {
         val route = AppOverlayRouteResolver.resolve(
-            AppMountFlags(selectedSearchCard = card, showSettings = true, showAbout = true),
+            AppMountFlags(selectedSearchCard = card, showWordBookTransfer = true, showAbout = true),
         )
         assertEquals(AppOverlayRoute.VocabularyDetail(card), route)
     }
@@ -96,11 +96,12 @@ class AppOverlayRouteResolverTest {
     }
 
     /**
-     * route 表逐行断言（计划批 D 节 35 行表，行序源出 `AppOverlayRouteResolver.kt` 的 `when` 声明序）。
+     * route 表逐行断言（计划批 D 节 34 行表，行序源出 `AppOverlayRouteResolver.kt` 的 `when` 声明序）。
+     * （2026-11-10 m03373 选项 1：`Settings` 支退役，表从 35 行缩到 34 行。）
      *
      * 四件事一起钉住，缺一件都不算有牙：
-     * ① 行数——必须 0..34 一枚不少（表驱动把「每一支都有测试」从口头承诺变成断言）；
-     * ② 行序——期望序号列本身必须逐行等于 `(0..34)`，谁插队或漏行都会让这张列先红；
+     * ① 行数——必须 0..33 一枚不少（表驱动把「每一支都有测试」从口头承诺变成断言）；
+     * ② 行序——期望序号列本身必须逐行等于 `(0..33)`，谁插队或漏行都会让这张列先红；
      * ③ 逐行归属——每一行的 flags 除了点亮本支判据，**还点亮紧随其后的那一支**，
      *    所以「先声明先赢」是逐行验出来的，不是只在一两处验。相邻两支被对调时，
      *    前一行就会拿到后一支的 `mountIndex`，直接红（变异探针 1 就是这条）；
@@ -155,13 +156,12 @@ class AppOverlayRouteResolverTest {
             AppMountFlags(showReadingFeed = true, showArticleImport = true, historyArticle = null) to 30,
             AppMountFlags(showArticleImport = true, historyArticle = cardArticle()) to 31,
             AppMountFlags(historyArticle = cardArticle(), showWordBookTransfer = true) to 32,
-            AppMountFlags(showWordBookTransfer = true, showSettings = true) to 33,
-            AppMountFlags(showSettings = true) to 34,
+            AppMountFlags(showWordBookTransfer = true) to 33,
         )
 
-        assertEquals(35, rows.size, "route 表必须 35 行整（0..34），少一行就是漏支")
+        assertEquals(34, rows.size, "route 表必须 34 行整（0..33），少一行就是漏支")
         assertEquals(
-            (0..34).toList(),
+            (0..33).toList(),
             rows.map { (_, expected) -> expected },
             "行的期望序号必须逐行等于 resolver `when` 的声明序",
         )

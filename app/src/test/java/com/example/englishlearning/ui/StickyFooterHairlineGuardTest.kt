@@ -146,10 +146,12 @@ class StickyFooterHairlineGuardTest {
         private const val ClaimBottomCenter = "align:BottomCenter"
 
         /**
-         * 吸底槽台账（13 处、16 枚认领符号）。
+         * 吸底槽台账（15 处、17 枚认领符号）。
          *
-         * 前十一处都自铺底色，槽顶必须有 `hairlineTop`；后两处登记但不要求补线——
-         * 词卡屏的评分条透明压底，学习页的 `.plan-bar` 是强档卡体内的行内控件（只因命名族含 `bar` 才被扫到）。
+         * 其中十处自铺底色，槽顶必须有 `hairlineTop`（词卡屏的评分条与回执条在 m03560 走查里
+         * 从吸底工具栏搬进内容列的文档流，随之由认领发丝线转回豁免）；
+         * 另两处登记但不要求补线——词卡屏顶栏的进度条与学习页的 `.plan-bar`，
+         * 都是行内控件，只因命名族含 `bar` 才被扫到。
          */
         private val StickyFooterLedger: List<StickyFooter> = listOf(
             StickyFooter(
@@ -185,8 +187,9 @@ class StickyFooterHairlineGuardTest {
             StickyFooter(
                 file = "VocabularyRelearnScreen.kt",
                 claims = listOf("testTag:relearn_feedback_bar"),
-                paintsOwnFill = true,
-                reason = "三档评分条铺 `surface`，与背景 `background` 只差一层",
+                paintsOwnFill = false,
+                reason = "m03560：三档评分从吸底槽搬进内容列的文档流（跟着卡面走），不再自铺 `surface`，" +
+                    "没有内容从它下面穿过，故不补发丝线",
             ),
             StickyFooter(
                 file = "WorksheetPreviewScreen.kt",
@@ -229,10 +232,25 @@ class StickyFooterHairlineGuardTest {
             ),
             StickyFooter(
                 file = "WordCardScreen.kt",
-                claims = listOf("testTag:word_card_progress_bar", "testTag:word_card_feedback_bar"),
+                claims = listOf("testTag:word_card_progress_bar"),
                 paintsOwnFill = false,
-                reason = "评分条不铺底色（透明压在 `background` 上，`colors.surface` 一次都不出现），" +
-                    "进度条是行内控件不是吸底槽；两者都没有颜色缝，故不补线",
+                reason = "进度条是顶栏里的行内控件、不是吸底槽（只因命名族含 `bar` 才被扫到）；" +
+                    "它在 `background` 上横画一条 4dp 轨道，没有「内容被截断」的缝，故不补线",
+            ),
+            StickyFooter(
+                file = "WordCardScreen.kt",
+                claims = listOf("testTag:word_card_feedback_bar"),
+                paintsOwnFill = false,
+                reason = "m03560（用户走查「太下了、放在单词下面居中」）：评分区从吸底槽搬进内容列的文档流，" +
+                    "落在卡面正下方，空白留在它下面；不再自铺 `surface`（没有内容从它下面穿过，那层底色只剩" +
+                    "「压屏底的横带」读感），因此不需要发丝线，也不再吃 `navigationBarsPadding`",
+            ),
+            StickyFooter(
+                file = "WordCardScreen.kt",
+                claims = listOf("testTag:word_card_receipt_bar"),
+                paintsOwnFill = false,
+                reason = "m03560：回执态主推进条与评分条同一处文档流块（位置与槽形在 foot 互换时都不变），" +
+                    "同样不自铺底色、不补线、不吃导航条内边距",
             ),
             StickyFooter(
                 file = "TodayPlanScreen.kt",

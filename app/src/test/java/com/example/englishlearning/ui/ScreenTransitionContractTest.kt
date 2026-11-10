@@ -12,17 +12,17 @@ import kotlin.test.assertTrue
  *
  *  1. **判据不残留**（[chainHasNoMountLevelFlagConditionsAnymore]）：链区每一条顶层
  *     `if (` / `} else if (` 的条件文本都必须改读 route（`route is AppOverlayRoute.…`，tab 宿主是
- *     `route == null`），原来那 35 枚挂载级原判据必须整体下线。
- *     扫描是**正向白名单**，不是「残留标志位」负则：35 支里有 4 支的条件文字
+ *     `route == null`），原来那 34 枚挂载级原判据必须整体下线。
+ *     扫描是**正向白名单**，不是「残留标志位」负则：34 支里有 4 支的条件文字
  *     （`selectedFeature == AiFeature.X` 三支 + `readingTarget != null || historyArticle != null`）
  *     落在 `} else if ((?:show…|selected… != null|setupRequired)` 这类模式之外，
  *     照负则写闸会让这 4 支残留静默过关——批 A 的「反空转」纪律要防的正是这个形状。
  *  2. **route 全覆盖**（[everyRouteVariantIsConsumedByExactlyOneBranch]）：`AppOverlayRoute.kt` 的
- *     35 枚变体每一枚在 `AppScreen.kt` 剥注释后恰好一枚 `is AppOverlayRoute.…` 消费点；
+ *     34 枚变体每一枚在 `AppScreen.kt` 剥注释后恰好一枚 `is AppOverlayRoute.…` 消费点；
  *     枚数不等于 `OVERLAY_ROUTE_COUNT` 直接报「route 表被改而本契约未同步」，解析到 0 枚同样判红。
  *  3. **链序 = resolver 序**（[chainBranchOrderEqualsResolverArmOrder]）：链上按出现顺序取出的 route 名
  *     （末支再补 tab 宿主）与 `AppOverlayRouteResolver.kt` 里 `when` 的分支顺序逐行相等，
- *     且等价于 `mountIndex` 0..34 升序。链的声明序就是 z 序与返回键优先级（QA3 A1 的许可/关于就是这条），
+ *     且等价于 `mountIndex` 0..33 升序。链的声明序就是 z 序与返回键优先级（QA3 A1 的许可/关于就是这条），
  *     D-2 之后原判据文字下线，这条顺序只剩本闸能钉。
  *
  * 终评补口第 1 席追加两条（决策册「2026-11-09 修正」修正 1；与本节判据 3 互不替代——序号仍只管优先级）：
@@ -92,7 +92,7 @@ class ScreenTransitionContractTest {
             "挂载链上仍残留 ${offenders.size} 枚挂载级原判据（应全部改读 route）：\n" +
                 offenders.joinToString("\n") { "  ${it.diagnostic}" } +
                 "\n口径：链的顶层条件只能是 `route is AppOverlayRoute.…`，tab 宿主是 `route == null`；" +
-                "那 35 枚原判据的逐字原文住在 AppOverlayRouteResolver 的 when 臂里，改判据请两边同步。",
+                "那 34 枚原判据的逐字原文住在 AppOverlayRouteResolver 的 when 臂里，改判据请两边同步。",
         )
 
         assertEquals(
@@ -126,7 +126,7 @@ class ScreenTransitionContractTest {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // 判据 2：route 表 35 枚变体各有且仅有一个消费点
+    // 判据 2：route 表 34 枚变体各有且仅有一个消费点
     // ---------------------------------------------------------------------------------------------
 
     @Test
@@ -164,7 +164,7 @@ class ScreenTransitionContractTest {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // 判据 3：链的分支顺序 == resolver 的 when 分支顺序（== mountIndex 0..34 升序）
+    // 判据 3：链的分支顺序 == resolver 的 when 分支顺序（== mountIndex 0..33 升序）
     // ---------------------------------------------------------------------------------------------
 
     @Test
@@ -216,12 +216,12 @@ class ScreenTransitionContractTest {
         assertEquals(
             declaredOrder,
             chainNames,
-            "链序与 route 声明序（mountIndex 0..34 升序）不一致：$chainNames",
+            "链序与 route 声明序（mountIndex 0..33 升序）不一致：$chainNames",
         )
     }
 
     // ---------------------------------------------------------------------------------------------
-    // 唯一豁免：AppScreen.kt:583–587 的 overlayOpen（按文件名 + 原文行区间钉死；2026-11-09 现算，消费者 BackHandler 在 :590）
+    // 唯一豁免：AppScreen.kt:596–600 的 overlayOpen（按文件名 + 原文行区间钉死；2026-11-09 m01889 现算，消费者 BackHandler 在 :603）
     // ---------------------------------------------------------------------------------------------
 
     @Test
@@ -255,7 +255,7 @@ class ScreenTransitionContractTest {
         )
         assertTrue(
             Regex("""BackHandler\(enabled = !overlayOpen""").findAll(appScreen).toList().isNotEmpty(),
-            "overlayOpen 的消费者是低优先级返回键那枚 BackHandler（:587）；它一旦不被消费，" +
+            "overlayOpen 的消费者是低优先级返回键那枚 BackHandler（:603）；它一旦不被消费，" +
                 "本豁免的理由就失效，必须重开决策而不是改名单。",
         )
     }
@@ -293,7 +293,7 @@ class ScreenTransitionContractTest {
             "readingTarget != null || historyArticle != null",
             "showReviewQueue && todayReady != null",
             "setupRequired || showSetup",
-            "showSettings",
+            "showWordBookTransfer",
         ).forEach { condition ->
             val offenders = chainScan(chainFixture(listOf(condition, TAB_HOST_CONDITION)))
                 .branches
@@ -306,7 +306,7 @@ class ScreenTransitionContractTest {
         }
 
         val compliant = chainScan(
-            chainFixture(listOf("route is AppOverlayRoute.Settings", "route is AppOverlayRoute.About", TAB_HOST_CONDITION)),
+            chainFixture(listOf("route is AppOverlayRoute.WordBookTransfer", "route is AppOverlayRoute.About", TAB_HOST_CONDITION)),
         )
         assertEquals(3, compliant.branches.size, "合规链形取样失真：${compliant.branches.map { it.condition }}")
         assertTrue(
@@ -318,9 +318,9 @@ class ScreenTransitionContractTest {
             @Composable
             fun FakeHost() {
                 Column {
-                    // } else if (showSettings) { ← 注释里的旧判据不算残留
-                    if (route is AppOverlayRoute.Settings) {
-                        SettingsScreen(onBack = {})
+                    // } else if (showWordBookTransfer) { ← 注释里的旧判据不算残留
+                    if (route is AppOverlayRoute.WordBookTransfer) {
+                        WordBookTransferScreen(onBack = {})
                     } else if (route == null) {
                         TabHost()
                     }
@@ -328,9 +328,9 @@ class ScreenTransitionContractTest {
             }
         """.trimIndent()
         assertEquals(
-            listOf("route is AppOverlayRoute.Settings", TAB_HOST_CONDITION),
+            listOf("route is AppOverlayRoute.WordBookTransfer", TAB_HOST_CONDITION),
             chainScan(commentedOnly).branches.map { it.condition },
-            "注释里的 `} else if (showSettings)` 被当成链上的一支：说明取样没走 stripComments（或剥了两次）。",
+            "注释里的 `} else if (showWordBookTransfer)` 被当成链上的一支：说明取样没走 stripComments（或剥了两次）。",
         )
     }
 
@@ -521,7 +521,7 @@ class ScreenTransitionContractTest {
      * must-flag：假屏体里就地写一枚 `tween(AppMotion.Slow)` 页面转场规格必须被同一套取样判出——
      * 判据 ② 旧口径只按文件名盯 `AppScreen.kt`，别的屏文件长出第二套转场规格完全隐形，
      * 「全仓唯一规格落点」就成了对着空档放行的口号（这正是 ④ 存在的理由）。
-     * must-not-flag：唯一豁免 `overlayOpen` 那一行（AppScreen.kt:583–587）必须被放行——
+     * must-not-flag：唯一豁免 `overlayOpen` 那一行（AppScreen.kt:598–602）必须被放行——
      * 它问的是「有没有覆盖层亮着」，不含任何规格写法；把它判红就是拿规格禁令去改挂载口径。
      *
      * 双边之外再钉两枚「不许空转 / 不许过严」的形状：
@@ -842,7 +842,7 @@ class ScreenTransitionContractTest {
 
     /**
      * 判据 D-4fix-③：route 表的**身份列覆写律**。
-     * `navigationIdentity` 的默认访问器（`val navigationIdentity: Any get() = this`）只服务 26 枚 `data object`
+     * `navigationIdentity` 的默认访问器（`val navigationIdentity: Any get() = this`）只服务 25 枚 `data object`
      * （单例的 `this` 天然稳定）；9 枚 `data class` 必须各自 `override val navigationIdentity` 给出稳定业务主键——
      * 漏一枚就是「payload 一变 = 一枚新身份 = 站 1 起一轮新转场」（第 2 条裁定的缺陷本体）。
      * 支数与身份取值逐枚记在 [NAVIGATION_IDENTITY_LEDGER]（本席报告的「第 2 条身份表」一节同源）。
@@ -931,7 +931,7 @@ class ScreenTransitionContractTest {
         val noDefault = compliantRouteTable.replace("val navigationIdentity: Any get() = this", "val navigationIdentity: Any")
         assertTrue(
             navigationIdentityOffenders(stripComments(noDefault)).any { it.contains("默认访问器") },
-            "接口默认访问器被拆没被判出：26 枚 data object 的身份从此无源可依。",
+            "接口默认访问器被拆没被判出：25 枚 data object 的身份从此无源可依。",
         )
         assertTrue(
             navigationIdentityOffenders(stripComments("sealed interface Empty { val mountIndex: Int }")).any { it.contains("空转") },
@@ -1187,7 +1187,7 @@ class ScreenTransitionContractTest {
             return@buildList
         }
         if (!ROUTE_IDENTITY_DEFAULT_ACCESSOR.containsMatchIn(strippedRouteSource)) {
-            add("route 接口缺少 `val navigationIdentity: Any get() = this` 默认访问器：26 枚 data object 的身份从此无源可依。")
+            add("route 接口缺少 `val navigationIdentity: Any get() = this` 默认访问器：25 枚 data object 的身份从此无源可依。")
         }
         rows.filter { it.isDataClass }.forEach { row ->
             val needle = NAVIGATION_IDENTITY_LEDGER[row.variant]
@@ -1243,7 +1243,7 @@ class ScreenTransitionContractTest {
         }
     }
 
-    /** 变体名 → 声明里的 mountIndex 字面量（判据 3 用它核对「链序 = 0..34 升序」）。 */
+    /** 变体名 → 声明里的 mountIndex 字面量（判据 3 用它核对「链序 = 0..33 升序」）。 */
     private fun routeMountIndexes(strippedRouteSource: String): Map<String, Int> {
         val names = routeVariants(strippedRouteSource)
         val indexes = Regex("""override val mountIndex = (\d+)""")
@@ -1285,17 +1285,17 @@ private data class MountConditionExemption(
 }
 
 /**
- * 全契约**唯一**一条豁免：`AppScreen.kt:583–587` 的 `overlayOpen`。
+ * 全契约**唯一**一条豁免：`AppScreen.kt:598–602` 的 `overlayOpen`。
  * 它问的是「有没有覆盖层标志位亮着」（含两枚不在链上的页内浮层位 `selectedArticleCard` / `showWordQaCard`，
- * 且不含 `&& todayReady != null` 那类守卫），唯一消费者是 :590 的 `BackHandler`，
+ * 且不含 `&& todayReady != null` 那类守卫），唯一消费者是 :605 的 `BackHandler`，
  * 与「挂载了哪一支」是两个不同问题（决策 §1.3-1）；它本来不是 `} else if` 条件行，正向扫描天然不命中。
  * **不许**把它改成 `route != null`（同文件另有 `overlayOpenIsTheOnlyExemptionAndStaysFlagBased` 钉这条）。
  */
 private val MOUNT_CONDITION_EXEMPTIONS = listOf(
     MountConditionExemption(
         fileName = "AppScreen.kt",
-        firstLine = 583,
-        lastLine = 587,
+        firstLine = 596,
+        lastLine = 600,
         reason = "BackHandler(enabled = !overlayOpen …) 的低优先级返回键口径，不是挂载判据",
     ),
 )
@@ -1308,7 +1308,7 @@ private const val APP_TRANSITION_SOURCE_PATH = "src/main/java/com/example/englis
 /** 命名边用例的所在文件（判据 D-4fix-② 的用例侧权威；readSource 的存在性守卫就是它的响亮文件数闸）。 */
 private const val DIRECTION_TEST_SOURCE_PATH = "src/test/java/com/example/englishlearning/ui/ScreenTransitionDirectionTest.kt"
 
-private const val OVERLAY_ROUTE_COUNT = 35
+private const val OVERLAY_ROUTE_COUNT = 34
 
 /**
  * `transitionDepth` 覆写清单（决策册「2026-11-09 修正」修正 1；默认律与「清单 == 用例清单」由
@@ -1323,8 +1323,8 @@ private const val OVERLAY_ROUTE_COUNT = 35
  *  - `LearningFlow = 6`：设置臂守卫 `setupRequired || showSetup`（resolver `:25`）压在学习臂（`:26`）之前，
  *    学习流在强制设置落位后回到 8 是把前进播成返回的同形边。6 是 <7 的最大整数，改判区 {6,7} 只有
  *    LearningRecords 与 LearningSetup 两臂：前者全仓没有置 `showLearning` 的回调（`showLearning = true`
- *    实测只落在 `AppScreen.kt:1362/:1384/:2158`，随覆写值仍判 Forward 或不变），后者正是点名的发起臂。
- * 两枚值都必须数值小于 TAB_HOST_INDEX(35)——「子页收回 tab 宿主」仍是 Backward（方向用例
+ *    实测只落在 `AppScreen.kt:1416/:1442/:2216`，随覆写值仍判 Forward 或不变），后者正是点名的发起臂。
+ * 两枚值都必须数值小于 TAB_HOST_INDEX(34)——「子页收回 tab 宿主」仍是 Backward（方向用例
  * `overriddenDepthsStillLeaveTabHostShallowest` 钉住）。
  */
 private val TRANSITION_DEPTH_OVERRIDES = mapOf(
@@ -1367,7 +1367,7 @@ private val DECLARED_TRANSITION_DEPTH_EXISTS = Regex("""override val transitionD
 // 终评补口 第 2 条（席 B2）：导航身份列的取样正则与身份台账
 // ---------------------------------------------------------------------------------------------
 
-/** 身份列的默认访问器（26 枚 `data object` 的唯一承载体，写法与 [ROUTE_DEPTH_DEFAULT_ACCESSOR] 同族）。 */
+/** 身份列的默认访问器（25 枚 `data object` 的唯一承载体，写法与 [ROUTE_DEPTH_DEFAULT_ACCESSOR] 同族）。 */
 private val ROUTE_IDENTITY_DEFAULT_ACCESSOR = Regex("""val navigationIdentity: Any get\(\) = this""")
 
 /** 一枚 `data class` 支的身份声明整行（到行尾），取样器据此核对台账点名的主键与支别前缀。 */
@@ -1391,7 +1391,7 @@ private val STATION_ONE_CONTENT_KEY = Regex("""contentKey\s*=\s*\{\s*it\?\.navig
 /** 全文件的 `contentKey =` 声明（只许站 1 一枚；站 2 的 tab 身份就是 AppTab 枚举本身）。 */
 private val STATION_CONTENT_KEY_DECL = Regex("""(?<![A-Za-z0-9_])contentKey\s*=""")
 
-/** 带 payload 的 `data class` 支数（route 表 35 枚里的 9 枚；新增/删改一支须三处同改：route 表、台账、本计数）。 */
+/** 带 payload 的 `data class` 支数（route 表 34 枚里的 9 枚；新增/删改一支须三处同改：route 表、台账、本计数）。 */
 private const val NAVIGATION_IDENTITY_OVERRIDE_COUNT = 9
 
 /**

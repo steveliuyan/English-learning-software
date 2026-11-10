@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
@@ -514,6 +513,19 @@ fun TodayPlanScreen(
                             )
                         }
                     }
+                    // AGENTS.md《学习与解锁规则》把当日计划定为**不可变快照**：「当日计划生成后的新到期词
+                    // 不加入该计划」「已提交反馈后不得静默重建」。这条规则本身是对的（否则 dueTarget 会在用户
+                    // 学到一半时改数，强卡的「x / N」与解锁判据一起撕裂），但它有一个**用户看不见的前提**：
+                    // 想按「现在真正到期的词」重排，得自己去「学习计划」重选词书并保存——那是唯一合法的
+                    // 显式重建通道（`GetOrCreateTodayPlanUseCase` 见到 `activeWordBookId` 变化才会重算）。
+                    // 设备走查时这就成了「明明刚判了不认识、复习队列还是 0」的困惑，所以在这里补一句人话：
+                    // 只解释规则与出口，不提「多少分钟后开始遗忘」这类本仓没有的预测（同款理由见复习队列行）。
+                    Text(
+                        "今日计划当天固定：新到期的词不会自动加入。要按现在的到期情况重排，到「学习计划」重新选择词书并保存。",
+                        style = AppType.Footnote,
+                        color = colors.text2,
+                        modifier = Modifier.testTag("today_plan_fixed_hint"),
+                    )
                 }
             }
         }
@@ -528,7 +540,7 @@ private fun SearchBox(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(AppShape.Button)
             .background(colors.tint)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp)
@@ -556,7 +568,7 @@ private fun PlanLegendKey(label: String, done: Int, target: Int, swatch: Color, 
         Box(
             Modifier
                 .size(8.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(AppShape.GraphicDot)
                 .background(swatch),
         )
         Text(

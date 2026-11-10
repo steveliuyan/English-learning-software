@@ -15,6 +15,10 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +32,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
@@ -73,6 +76,8 @@ import com.example.englishlearning.ui.components.SoftCard
 import com.example.englishlearning.ui.components.glass.PillButton
 import com.example.englishlearning.ui.components.glass.PillStyle
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppMotion
+import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 import com.example.englishlearning.ui.theme.appDomain
@@ -297,7 +302,7 @@ fun PhotoTranslationScreen(
                 minLines = 3,
                 maxLines = 10,
                 enabled = !state.busy,
-                shape = RoundedCornerShape(14.dp),
+                shape = AppShape.Button,
             )
             if (state.lowConfidenceLineIndices.isNotEmpty()) {
                 Text(
@@ -385,12 +390,18 @@ fun PhotoTranslationScreen(
             modifier = Modifier.testTag("photo_translation_history_entry"),
             onClick = { historyExpanded = !historyExpanded },
         )
-        if (historyExpanded) {
-            SavedHistoryList(
-                records = state.history,
-                lastSavedRecordId = state.lastSavedRecordId,
-                onRequestDeleteSaved = onRequestDeleteSaved,
-            )
+        AnimatedVisibility(
+            visible = historyExpanded,
+            enter = expandVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingOut)),
+            exit = shrinkVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingIn)),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SavedHistoryList(
+                    records = state.history,
+                    lastSavedRecordId = state.lastSavedRecordId,
+                    onRequestDeleteSaved = onRequestDeleteSaved,
+                )
+            }
         }
 
         // 离线备用模型：第二枚折叠入口行，隐私说明跟着它一起收起。
@@ -405,21 +416,27 @@ fun PhotoTranslationScreen(
             modifier = Modifier.testTag("photo_translation_model_entry"),
             onClick = { modelExpanded = !modelExpanded },
         )
-        if (modelExpanded) {
-            OfflineModelCard(
-                status = state.modelStatus,
-                progress = state.modelInstallProgress,
-                issue = state.modelIssue,
-                onInstall = onInstallModel,
-                onUninstall = onUninstallModel,
-            )
-            Text(
-                text = "隐私说明：本机识别（ML Kit）可能向 Google 发送与图片、文字内容无关的性能指标；" +
-                    "识别结果与图片默认不保存，只有你点「保存到本机」才会留下记录。",
-                style = AppType.Footnote,
-                color = colors.text2,
-                modifier = Modifier.testTag("photo_translation_privacy_note"),
-            )
+        AnimatedVisibility(
+            visible = modelExpanded,
+            enter = expandVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingOut)),
+            exit = shrinkVertically(animationSpec = tween(AppMotion.Normal, easing = AppMotion.EasingIn)),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OfflineModelCard(
+                    status = state.modelStatus,
+                    progress = state.modelInstallProgress,
+                    issue = state.modelIssue,
+                    onInstall = onInstallModel,
+                    onUninstall = onUninstallModel,
+                )
+                Text(
+                    text = "隐私说明：本机识别（ML Kit）可能向 Google 发送与图片、文字内容无关的性能指标；" +
+                        "识别结果与图片默认不保存，只有你点「保存到本机」才会留下记录。",
+                    style = AppType.Footnote,
+                    color = colors.text2,
+                    modifier = Modifier.testTag("photo_translation_privacy_note"),
+                )
+            }
         }
     }
 

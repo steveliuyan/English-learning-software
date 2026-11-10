@@ -154,15 +154,19 @@ class ReadingHomeLayoutContractTest {
         // 偏好族的落点按**花括号配对**取展开分支本体来判：不锚行号，也不靠「下一个具名锚」猜边界——
         // 原判据的右腿 `"generationParamsExpanded" in home` 读的就是这份源码，永不红（修复轮 1 F-1）；
         // 而「偏好只要排在开关之后就算对」的窗口式写法也抓不住「平铺回主页、顺序仍在开关之后」这一形状。
-        val expandedBranch = balancedBranchBody(home, "if (generationParamsExpanded)")
+        // 2026-11-10 全站动效批：这一层展开壳从裸 `if (generationParamsExpanded) { … }` 换成
+        // `AnimatedVisibility(visible = generationParamsExpanded, …) { … }`——展开/收起有动效了，形状变了。
+        // 锚随之落到 `visible = generationParamsExpanded`：判的仍是「偏好区与类型行只活在这一层展开体里、
+        // 开关仍是这一枚布尔」，与它住在 `if` 壳还是 `AnimatedVisibility` 壳里无关。
+        val expandedBranch = balancedBranchBody(home, "visible = generationParamsExpanded")
         assertTrue(
             expandedBranch.isNotEmpty(),
-            "主页必须保留 `if (generationParamsExpanded) { … }` 这一层展开分支本体" +
+            "主页必须保留 `visible = generationParamsExpanded` 这一层展开体（`AnimatedVisibility` 的尾 lambda）" +
                 "（取不到 = 开关不再承重，本条与下面两枚一起红才是可读的红样）",
         )
         assertTrue(
             "reading_preference" in expandedBranch,
-            "偏好区 `reading_preference` 必须落在 `if (generationParamsExpanded)` 的分支本体里，" +
+            "偏好区 `reading_preference` 必须落在 `visible = generationParamsExpanded` 的展开体里，" +
                 "而不是平铺在主页长列上：把生产改回「偏好常驻主页」时本条必须红（修复轮 1 F-1 的变异自证）",
         )
         assertTrue(
@@ -171,8 +175,7 @@ class ReadingHomeLayoutContractTest {
                 "只把卡收进分支、类型回到常驻，等于给平铺换个名字",
         )
         assertTrue(
-            Regex("""if \(!generationParamsExpanded\)""").containsMatchIn(home) ||
-                Regex("""if \(generationParamsExpanded\)""").containsMatchIn(home),
+            Regex("""visible = !?generationParamsExpanded""").containsMatchIn(home),
             "展开态必须用 `generationParamsExpanded` 这一个开关承重：不许把偏好区改成第三层导航",
         )
         // 持久化路径不动：四枚类型仍由 `ArticleType.entries` 全量驱动，但**只剩展开区一支**——

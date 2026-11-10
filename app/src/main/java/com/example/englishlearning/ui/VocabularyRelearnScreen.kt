@@ -29,7 +29,6 @@ import com.example.englishlearning.ui.components.SkeletonBar
 import com.example.englishlearning.ui.components.SkeletonCard
 import com.example.englishlearning.ui.components.SkeletonStatGrid
 import com.example.englishlearning.ui.components.SoftCard
-import com.example.englishlearning.ui.components.hairlineTop
 import com.example.englishlearning.ui.theme.AppDomain
 import com.example.englishlearning.ui.theme.AppShape
 import com.example.englishlearning.ui.theme.AppType
@@ -74,9 +73,12 @@ fun VocabularyRelearnScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             RelearnBody(state = state, onRetry = onRetry, onBack = onBack)
-        }
-        if (state is VocabularyRelearnUiState.Ready) {
-            RelearnFeedbackBar(submitting = state.submitting, onSubmit = onSubmit)
+            // m03560（用户走查，词卡屏同一处抱怨）：三档评分不再吸底——它落在卡面正下方，
+            // 剩下的空白留在它下面，握机时拇指不用伸到屏幕最底。槽色与发丝线也随之撤掉
+            // （不再有内容从它下面穿过，也就不存在「被截断」的缝），理由与词卡屏 `WordCardFeedbackBar` 同一份。
+            if (state is VocabularyRelearnUiState.Ready) {
+                RelearnFeedbackBar(submitting = state.submitting, onSubmit = onSubmit)
+            }
         }
     }
 }
@@ -223,10 +225,10 @@ private fun RelearnBody(
 }
 
 /**
- * 吸底三档评分条：条底取 `surface`（与背景 `background` 差一层），三枚按钮等宽。
+ * 三档评分条：三枚按钮等宽。
  *
- * 条底自铺 `surface`，所以条顶有一条发丝线（批 5 遗留 7 收口，与 `BackupExportScreen.kt:221` 同形）：
- * 卡面滚动到条沿时没有边界线，会被读成「卡片被截断」。线走 `hairlineTop`，自带让出的 1dp，不压按钮。
+ * m03560（用户走查「太下了，放在单词下面居中」）之后它不再是吸底槽——跟着卡面住在内容列的文档流里，
+ * 槽色与槽顶发丝线一起撤掉（没有内容从它下面穿过，那 1dp 失去对象），与词卡屏同一口径。
  *
  * 三档的墨色分工与词卡屏同口径：认识 = 学习域实底（正向、最常用）、模糊 = 中性 tint（中间档）、
  * 不认识 = 白面描字（负向但不吓人）。字级统一 `AppType.Label`，单行不换行——三枚等宽的按钮里
@@ -240,11 +242,11 @@ private fun RelearnFeedbackBar(
     val colors = appColors()
     val learn = appDomain(AppDomain.Learn)
     Row(
+        // m03560：三档评分跟着卡面走（文档流内），所以不自铺 `surface`、不补槽顶发丝线；
+        // 横向留白由外层内容列给（20dp），这里只留一点上下气口。
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.surface)
-            .then(hairlineTop(colors.outline))
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(vertical = 4.dp)
             .testTag("relearn_feedback_bar"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

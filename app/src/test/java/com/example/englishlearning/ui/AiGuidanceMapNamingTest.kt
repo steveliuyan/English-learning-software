@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
  * AI 指引地图改指向真存在的落点，且同一页对外只留一个名字。
  *
  * 为什么要一枚**跨文件、连注释一起扫**的闸：`grep -rn "设置 · AI" app/src/main/java` 本轮实测 21 命中
- * （用户可见文案 17 + 注释 4），而批 5 之后设置子页只剩外观——`SettingsScreen.kt:59` 的 KDoc 自陈
- * 「本页不再持有 …AI…任何入口」。也就是说这 21 句都在把用户指向一个**已经不存在的地图**。
+ * （用户可见文案 17 + 注释 4）；而设置子页自批 5 起只剩外观、2026-11-10（m03373 选项 1）更整体退役，
+ * 外观内联进「我的」——也就是说这 21 句都在把用户指向一个**已经不存在的地图**。
  * 单屏 connected（`ImageStudioScreenTest` / `NotConfiguredCardTest` / `SentenceAnalysisScreenTest` /
  * `WordAiQaScreenTest` 各钉一句）只看得到自己那一屏，残留会一直活到下一次走查；
  * hub 台账类（`ProfileHubLedgerTest`）数的是行名，也不看指引句。
@@ -90,9 +90,10 @@ class AiGuidanceMapNamingTest {
     }
 
     /**
-     * U-4 的同一处收口：`openAiProfilesOrSettings`（`AppScreen.kt:207`）在 `aiProfileViewModel` 缺失时
-     * 兜底 `showSettings = true`，会把用户送到只剩「外观」的设置页——文案改对了、代码还送错地方，
-     * 就是新漂移。判据用**窗口**而不是整文件：`showSettings = true` 在别处（设置行、关于页出口）是合法入口。
+     * U-4 的同一处收口：`openAiProfilesOrSettings`（`AppScreen.kt`）在 `aiProfileViewModel` 缺失时
+     * 必须兜底到「我的」hub。历史上这里兜的是 `showSettings = true`（送去只剩「外观」的设置页）——
+     * 文案改对了、代码还送错地方就是新漂移。2026-11-10（m03373 选项 1）设置子页整体退役，
+     * 这一支改成 `selectedTab = AppTab.PROFILE`；判据仍用**窗口**取样，只钉这一支。
      */
     @Test
     fun theAiProfilesFallbackLandsOnTheHubNotTheSettingsPage() {
@@ -111,7 +112,7 @@ class AiGuidanceMapNamingTest {
         )
         assertTrue(
             !window.contains("showSettings = true"),
-            "兜底分支里不得再出现 `showSettings = true`——设置子页自批 5 起没有 AI 入口（U-4）。" +
+            "兜底分支里不得再出现 `showSettings = true`——设置子页已整体退役（2026-11-10 m03373 选项 1），该串连编译都过不去。" +
                 "兜底分支实际内容：$window",
         )
     }

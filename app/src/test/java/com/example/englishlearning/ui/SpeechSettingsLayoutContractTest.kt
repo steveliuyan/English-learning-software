@@ -172,12 +172,15 @@ class SpeechSettingsLayoutContractTest {
             countMatches(source, Regex("""\bBareRow\(""")),
             "折叠后的一行必须是 `BareRow(`（恰 1 处）：D 骨架靠裸行表达「同组」，不新造外壳",
         )
-        val expandAt = source.indexOf("if (previewExpanded)")
-        assertTrue(expandAt > 0, "源码里找不到 `if (previewExpanded)`：折叠壳没有落地")
+        // 折叠壳 2026-11-10 换成 `AnimatedVisibility`（展开/收起有动效，`AppMotion.Normal`），
+        // 锚点随之从 `if (previewExpanded)` 挪到它的 `visible = previewExpanded,`——判据仍是
+        // 「试听卡与两枚 tag 必须落在展开体之内」，只是换了落地形状。
+        val expandAt = source.indexOf("visible = previewExpanded")
+        assertTrue(expandAt > 0, "源码里找不到 `visible = previewExpanded`：折叠壳没有落地")
         val callAt = source.indexOf("PreviewCard(")
         assertTrue(
             callAt > expandAt,
-            "调用点必须落在 `if (previewExpanded)` 之后（$callAt vs $expandAt）：" +
+            "调用点必须落在 `visible = previewExpanded` 之后（$callAt vs $expandAt）：" +
                 "折叠时不该渲染玻璃卡",
         )
         listOf("speech_preview_input", "speech_preview_button").forEach { tag ->
@@ -185,7 +188,7 @@ class SpeechSettingsLayoutContractTest {
             assertTrue(at > 0, "源码里找不到 `$tag` 锚点")
             assertTrue(
                 at > expandAt,
-                "「$tag」必须落在 `if (previewExpanded)` 体内（$at vs $expandAt）：" +
+                "「$tag」必须落在 `visible = previewExpanded` 展开体内（$at vs $expandAt）：" +
                     "折叠时输入框与试听键不该占屏",
             )
         }

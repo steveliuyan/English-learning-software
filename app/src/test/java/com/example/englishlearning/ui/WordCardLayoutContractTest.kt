@@ -127,10 +127,10 @@ class WordCardLayoutContractTest {
      * 取样面是私有 [WordCardFeedbackBar] 的函数体：三档必须**全部**落在那条吸底容器里。旧实现把它们
      * 排在滚动流末尾，大字号下与卡片一起被卷出屏（`WordCardScreenTest` 那两条大字号用例正是为此而写）。
      *
-     * QA3 A2.4 之后条内是**两个容器、一份档位清单**：1.0/2.0 档一枚 `Row` 三等宽，顶档一枚 `Column`
-     * 整宽堆叠。于是 `FeedbackButton(` 在条内只剩 2 处（每分支一次），三档由 `FeedbackTiers` 单点给出
-     * ——判据随之从「数三枚按钮」换成「数两条 `FeedbackTiers.forEach`」：两分支各自 `forEach` 同一份清单，
-     * 才既允许换摆法、又不给「同一档在两处措辞不同」开门。
+     * m03373（用户走查「这三档太靠下，改竖排」）之后条内**只有一个容器、一份档位清单**：三枚整宽按钮
+     * 上下堆叠成三行（上 不认识 / 中 模糊 / 下 认识），不再按字号档分两种摆法。于是 `FeedbackButton(`
+     * 在条内只剩 1 处，三档仍由 `FeedbackTiers` 单点给出——判据是「一处容器 + 一条 `FeedbackTiers.forEach`」，
+     * 既钉住「只有一个摆法」，也不给「同一档在两处措辞不同」开门。
      */
     @Test
     fun `the three feedback actions live in one pinned bar`() {
@@ -142,14 +142,14 @@ class WordCardLayoutContractTest {
         val bar = bodyOf("private fun WordCardFeedbackBar(")
         assertTrue(bar.isNotEmpty(), "取不到 WordCardFeedbackBar 本体，判据会空转")
         assertEquals(
-            2,
+            1,
             countMatches(bar, Regex("""\bFeedbackButton\(""")),
-            "条内只允许两个容器各一处 `FeedbackButton(`（堆叠档 + 等宽档）；第 3 处 = 有一档被写了两遍",
+            "条内只允许一处 `FeedbackButton(`（唯一摆法的 `FeedbackTiers.forEach` 里）；第 2 处 = 有一档被写了两遍",
         )
         assertEquals(
-            2,
+            1,
             countMatches(bar, Regex("""FeedbackTiers\.forEach""")),
-            "两个摆法分支必须都从 `FeedbackTiers` 这份单点清单画三档，不在分支里重排字面量",
+            "条内只有一条 `FeedbackTiers.forEach`：三档从这份单点清单画，摆法不许再分叉成两套",
         )
         assertEquals(
             1,
@@ -175,6 +175,45 @@ class WordCardLayoutContractTest {
                 "$tag 只在 `FeedbackTiers` 里出现一次；两处以上等于同一档有两个出口",
             )
         }
+    }
+
+    // ---------- 三档恒竖排（m03373 用户走查） ----------
+
+    /**
+     * 用户 m03373：「背单词底下这三个选项太下了，你居中嘛；然后依次排就是上面是不认识、中间是模糊、
+     * 下面是认识」。
+     *
+     * 三条一起钉：
+     *  - 摆法只有一种（竖排三行、每枚整宽），条内不许再有 `Row` 横排分支或 `.weight(` 等分份额——
+     *    旧的双摆法正是「1.0 档横排压在屏底」的来源；
+     *  - 顺序即视觉顺序，必须是不认识 → 模糊 → 认识（与 `FeedbackTiers` 清单同口径）；
+     *  - 每枚的「档位名 + 副注」居中对齐（用户要的「居中」；整宽行里左对齐会读成表格）。
+     */
+    @Test
+    fun `the three tiers are always stacked with centered content`() {
+        val bar = bodyOf("private fun WordCardFeedbackBar(")
+        assertTrue(bar.isNotEmpty(), "取不到 WordCardFeedbackBar 本体，判据会空转")
+        assertEquals(0, countMatches(bar, Regex("""\bRow\(""")), "评分条里不许再有横排分支：三档只有竖排一种摆法")
+        assertEquals(0, countMatches(bar, Regex("""\.weight\(""")), "三枚不再分等宽份额：竖排每枚整宽（`Modifier.fillMaxWidth()`）")
+        assertEquals(
+            1,
+            countMatches(bar, Regex(Regex.escape("Modifier.fillMaxWidth(), inlineCaption = true"))),
+            "唯一摆法：三枚整宽 + 行内副注，这句话在条内只许出现一次",
+        )
+        val content = bodyOf("private fun FeedbackTierContent(")
+        assertTrue(content.isNotEmpty(), "取不到 FeedbackTierContent 本体，判据会空转")
+        assertTrue(
+            "Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)" in content,
+            "行内档位文案必须居中（用户 m03373「你居中嘛」），且「档位名 / 副注」之间留 8dp 气口" +
+                "（m03560 走查：贴着写会读成一串「不认识想不起来」）",
+        )
+        val tiersFrom = source.indexOf("private val FeedbackTiers")
+        assertTrue(tiersFrom >= 0, "取不到 `FeedbackTiers` 清单")
+        val tiers = source.substring(tiersFrom).substringBefore("\n)\n")
+        // 带引号找：裸「认识」会先命中「不认识」里的那两个字符（m03373 首版就踩了这一脚）。
+        val order = listOf("\"不认识\"", "\"模糊\"", "\"认识\"").map { tiers.indexOf(it) }
+        assertTrue(order.all { it >= 0 }, "三档文案必须都在 `FeedbackTiers` 清单里")
+        assertTrue(order == order.sorted(), "竖排顺序必须是不认识 → 模糊 → 认识，实际下标 $order")
     }
 
     // ---------- 顶档降级：唯一出口常驻 ----------
@@ -221,10 +260,9 @@ class WordCardLayoutContractTest {
      * 钉死（AC-R-07），这三处降级不许动它一根手指。
      */
     @Test
-    fun `the lemma tier, the feedback arrangement and the pronunciation row change only above the pinned acceptance font tier`() {
+    fun `the lemma tier and the pronunciation row change only above the pinned acceptance font tier`() {
         listOf(
             ::wordCardLemmaUsesCompactTier,
-            ::wordCardStacksFeedbackTiers,
             ::wordCardStacksPronunciationRow,
         ).forEach { decide ->
             assertFalse(decide(1f), "1.0 档是按设计稿画的版面，不得被降级改动")
@@ -241,8 +279,9 @@ class WordCardLayoutContractTest {
      *  - `AppType.StrongTitle` 只出现 1 次且和 `AppType.Display` 同在一枚 `if` 里：词头若在别处再换一次档，
      *    「只改一半」就会让 1.0 档的卡面跟着抖；
      *  - 三个判档函数各只有「定义 + 调用」2 处命中：第三处 = 判定被抄进容器里，变成一串散 `if`；
-     *  - `fontScale > 2f` 恰好 4 处（出口常驻 / 词头换档 / 评分条换摆法 / 发音行换容器）：
-     *    第 5 处必须是新决策漏登记，少一处说明某条降级被并进了别的分支；
+     *  - `fontScale > 2f` 恰好 3 处（出口常驻 / 词头换档 / 发音行换容器）：
+     *    第 4 处必须是新决策漏登记，少一处说明某条降级被并进了别的分支；
+     *    （评分条换摆法那一条已随 m03373 的「三档恒竖排」退役，判档函数 `wordCardStacksFeedbackTiers` 一并删除）
      *  - 音标与词性两枚 tag 各只出现 1 次：A2.8 的两个容器分支共用同一份注脚与同一枚药片调用点，
      *    「同一件控件在两个分支各画一遍」正是这条要关的门（药片那侧由
      *    `WordCardScreenContractTest.the_screen_uses_the_shared_pill_and_restates_no_readout` 钉「调用窗口恰两枚」）；
@@ -261,12 +300,11 @@ class WordCardLayoutContractTest {
             "`AppType.StrongTitle` 只能给词头这一处用；第二处等于换档决策分叉",
         )
         assertEquals(2, countMatches(source, Regex("""wordCardLemmaUsesCompactTier\(""")), "定义 + 唯一调用点")
-        assertEquals(2, countMatches(source, Regex("""wordCardStacksFeedbackTiers\(""")), "定义 + 唯一调用点")
         assertEquals(2, countMatches(source, Regex("""wordCardStacksPronunciationRow\(""")), "定义 + 唯一调用点")
         assertEquals(
-            4,
+            3,
             countMatches(source, Regex(Regex.escape("fontScale > 2f"))),
-            "本屏的顶档降级只有四件事：揭晓出口常驻、词头换档、评分条换摆法、发音行换容器",
+            "本屏的顶档降级只剩三件事：揭晓出口常驻、词头换档、发音行换容器（评分条摆法自 m03373 起不分档）",
         )
         assertEquals(
             1,

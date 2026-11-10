@@ -275,6 +275,16 @@ private fun ExportProgressLine(state: BackupExportUiState) {
             }
         }
 
+        // 2026-11-10 真人走查（问题 G）：导出成功后 `packageReady` 归 false（内存里那份待写字节已落盘作废），
+        // 吸底槽于是退回下面那句「先确认上面的范围，再生成备份包。」——可正文顶上刚报过一条成功回执。
+        // 刚导完的人被叫回去「先确认范围、先生成」，等于说他刚才那一步没发生。取消（同样置 message）之后
+        // 这句也顺：包已作废，想要一份新的就重建。
+        state.message != null -> Text(
+            text = "这份已处理完；要再导一份，请重新生成备份包。",
+            style = AppType.Footnote,
+            color = colors.text2,
+        )
+
         else -> Text(
             text = "先确认上面的范围，再生成备份包。",
             style = AppType.Footnote,

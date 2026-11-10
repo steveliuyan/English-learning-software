@@ -338,6 +338,28 @@ class BackupExportLayoutContractTest {
         )
     }
 
+    // ---------- ⑧ 导出之后，吸底槽不再叫用户「先去生成」 ----------
+
+    /**
+     * 2026-11-10 真人走查（问题 G）：真机走完一次导出（写盘成功、正文报「已导出备份包，请妥善保存。」）后，
+     * 吸底槽同时显示「先确认上面的范围，再生成备份包。」——因为成功分支把 `packageReady` 归了 false，
+     * 状态行落回 **初始态**那句引导。刚导完的人被叫回去「先确认范围、先生成」，读起来像刚才那步没发生。
+     * 判据：状态行里要有一支「已经处理过一份」的分支，且它排在初始态引导之前。
+     */
+    @Test
+    fun `after an export the sticky line stops telling the user to generate first`() {
+        val line = bodyOf(source, "private fun ExportProgressLine(")
+        assertTrue(line.isNotEmpty(), "取不到 `ExportProgressLine(` 本体，判据会空转")
+        val guideAt = line.indexOf("先确认上面的范围，再生成备份包。")
+        assertTrue(guideAt > 0, "初始态引导句缺失，判据会空转")
+        val handledAt = line.indexOf("state.message != null")
+        assertTrue(
+            handledAt in 0 until guideAt,
+            "状态行必须先判「这一份已处理完」（`state.message != null`，现位置 $handledAt，引导句在 $guideAt）：" +
+                "成功导出后 packageReady 归 false，缺这支就会退回初始态引导，和正文的成功回执互相打脸",
+        )
+    }
+
     // ---------- 夹具 ----------
 
     /**

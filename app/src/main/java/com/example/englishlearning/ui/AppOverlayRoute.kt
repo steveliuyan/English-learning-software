@@ -6,7 +6,7 @@ import com.example.englishlearning.learning.domain.WordCard
  * 覆盖全屏的二级层「现在挂的是哪一支」——挂载判据的唯一载体（批 D-1，决策 §3.1；
  * 2026-11-09 修正 1：优先级与层深分列于本表两列，不另建第二张手工表）。
  *
- * `mountIndex` 就是它在 `AppScreen` 原链里的声明序号（0..34，见计划批 D 节 route 表），
+ * `mountIndex` 就是它在 `AppScreen` 原链里的声明序号（0..33，见计划批 D 节 route 表），
  * tab 宿主 = [AppOverlayRouteResolver.TAB_HOST_INDEX]。序号只承载**优先级**：z 序与返回键先后
  * （「先声明先赢」，QA3 A1 的许可/关于顺序就靠这条）；它**不是**方向判据的层深——挂载判据带
  * fall-through 守卫，更深的一屏常声明在更后（阅读历史→文章、学习设置→学习流程即此类）。
@@ -134,5 +134,4 @@ sealed interface AppOverlayRoute {
     }
 
     data object WordBookTransfer : AppOverlayRoute { override val mountIndex = 33 }
-    data object Settings : AppOverlayRoute { override val mountIndex = 34 }
 }

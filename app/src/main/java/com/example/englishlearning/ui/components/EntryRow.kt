@@ -1,5 +1,7 @@
 package com.example.englishlearning.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,8 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -23,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishlearning.ui.theme.AppColorSet
 import com.example.englishlearning.ui.theme.AppDomain
+import com.example.englishlearning.ui.theme.AppMotion
 import com.example.englishlearning.ui.theme.AppType
 import com.example.englishlearning.ui.theme.appColors
 
@@ -123,8 +128,11 @@ fun entryRowInks(set: AppColorSet): EntryRowInk = EntryRowInk(
  *
  * [expanded]（同轮 I4）：把这枚行声明成**折叠入口**（disclosure）。三态里 `null` = 普通入口行，
  * 链上不多挂任何语义，与加这两个形参之前的行为逐字相同（今日计划那 7 枚行不受影响）；
- * 非空时 chevron 随状态取 [AppIcon.ChevronDown]（展开）/ [AppIcon.ChevronRight]（收起），
- * 并注册 `SemanticsActions.Collapse` / `SemanticsActions.Expand`，动作体就是 [onClick]——
+ * 非空时 chevron 由 [AppIcon.ChevronRight] 原地**旋转 90°**（收起 0° / 展开 90°）。2026-11-10 前它是
+ * 「换字形」（展开取 [AppIcon.ChevronDown]），换字形会在一帧内跳成另一个形状、与它下面那段
+ * `AnimatedVisibility` 展开体不是同一次动效；改旋转后两端共用 `AppMotion.Normal`，展开与收起才是
+ * 同一段动效的两端（`docs/decisions/2026-11-06-motion-foundation-and-system-reduced-motion.md`：
+ * 时长只走 token，系统关动画时 `animateFloatAsState` 自己会跳到终值，无需应用内开关）。 * 并注册 `SemanticsActions.Collapse` / `SemanticsActions.Expand`，动作体就是 [onClick]——
  * TalkBack 用户不必先摸到「可点按」也能展开。现盘 Compose（ui 1.10.0）没有布尔 `expanded` 属性，
  * 只有这两枚动作键，所以展开态语义按这一条路落地。
  */
@@ -205,8 +213,20 @@ fun EntryRow(
             )
         }
         if (showChevron) {
-            val chevronIcon = if (expanded == true) AppIcon.ChevronDown else AppIcon.ChevronRight
-            AppGlyph(icon = chevronIcon, tint = inks.chevron, size = 16.dp, layer = AppGlyphLayer.StrokeOnly)
+            // 折叠件的 chevron 走**旋转**而不是换字形：换图标会在一帧内跳成另一个形状，
+            // 旋转与它下面的展开体是同一段 `AppMotion.Normal` 时长（`docs/decisions/2026-11-06-motion-foundation-and-system-reduced-motion.md`），
+            // 展开/收起因此是同一次动效的两端。普通入口行（`expanded == null`）恒为 0°，行为不变。
+            val chevronRotation by animateFloatAsState(
+                targetValue = if (expanded == true) 90f else 0f,
+                animationSpec = tween(durationMillis = AppMotion.Normal, easing = AppMotion.EasingOut),
+                label = "entry_row_chevron_rotation",
+            )
+            AppGlyph(
+                icon = AppIcon.ChevronRight,
+                tint = inks.chevron,
+                modifier = Modifier.rotate(chevronRotation),
+                size = 16.dp, layer = AppGlyphLayer.StrokeOnly,
+            )
         }
     }
 }

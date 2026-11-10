@@ -164,6 +164,56 @@ class WordBankScreenContractTest {
     }
 
     /**
+     * 设计系统收口批（2026-11-09 续）：四分段从「屏内自画一排格子」换成共享 `SegmentedControl`。
+     *
+     * 账目先记账：这排格子原先是 `tint2` 凹槽 + 13dp 轨道 / 10dp 段项两档私搓圆角 + `AppType.Body`
+     * 半粗 + 手搓 `stateDescription`，是全仓最后几处绕过分段控件的写法之一。收口后形状、48dp 命中区、
+     * 药片形与取色全部归共享件，本屏只交**三张词汇表**：标签、读屏文本、tag。
+     *
+     * 这条判据必须存在的原因：分段控件在本仓是**二手**回归点——把四格换回私有 Row 也能过编译、
+     * 也能点，但从此同一件控件在词库页与设置子页各长一副脸；而 `tint2` 一旦回来，屏侧就又多一套
+     * 「一层明度差的底」的语法（`SoftCard` 那套才是词库页该用的）。
+     */
+    @Test
+    fun `the four segments come from the shared control`() {
+        assertEquals(
+            1,
+            countMatches(bank, Regex("""\bSegmentedControl\(""")),
+            "四分段必须恰挂一枚共享分段控件（0 = 又回到屏内自画一排格子，2 = 两排互相抢屏）",
+        )
+        listOf(
+            "options = sections.map { wordBankSegmentLabel(it, counts[it]) }",
+            "itemTestTags = sections.map { it.tag }",
+            "itemContentDescriptions = sections.map { wordBankSegmentDescription(it, counts[it]) }",
+            "announceSelection = true",
+        ).forEach { wire ->
+            assertEquals(
+                1,
+                countMatches(bank, Regex(Regex.escape(wire))),
+                "分段的三张词汇表必须恰一处交给共享件：" + wire + "（0 = 那张表没了，2 = 两处各拼一套）",
+            )
+        }
+        assertEquals(
+            2,
+            countMatches(bank, Regex("""\bwordBankSegmentDescription\(""")),
+            "读屏文本构造必须只有一处调用点（声明 + 调用 = 2）：四格各拼一句就有四份口径",
+        )
+        // 屏侧不再手搓圆角：轨道与段项的药片形归共享件，其余圆角只能取 AppShape 五档。
+        assertEquals(
+            0,
+            countMatches(bank, Regex("""\bRoundedCornerShape\(""")),
+            "词库页不得再手搓圆角（原状 13dp 轨道 / 10dp 段项两档魔数）",
+        )
+        assertEquals(
+            0,
+            countMatches(bank, Regex("""\btint2\b""")),
+            "轨道底色归共享件（surface2）：屏侧再取 tint2 就是第二套分段语法",
+        )
+        // 反空转：同一计数器对真的挂载形态必须数得出来。
+        assertEquals(1, countMatches("SegmentedControl(\n)", Regex("""\bSegmentedControl\(""")))
+    }
+
+    /**
      * 计数不许新开数据通路：宿主三枚实参必须直接取自三段自己的 UiState 列表长度。
      *
      * 反向面钉「不许造 0 兜底」——`?: 0` 一出现，Loading / 不可用就会显示成「空册」。

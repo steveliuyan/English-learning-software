@@ -311,33 +311,9 @@ class WordCardViewModel @Inject constructor(
         _detailCard.value = null
     }
 
-    /** Whether the current detail overlay has another card in the same learning phase. */
-    fun hasNextDetail(): Boolean {
-        val currentCard = _detailCard.value ?: return false
-        val currentSession = session ?: return false
-        val phaseCards = currentSession.cards.filter { card ->
-            when (currentSession.phase) {
-                SessionPhase.REVIEW -> card.cardId in currentSession.reviewCardIds
-                SessionPhase.NEW -> card.cardId in currentSession.newCardIds
-            }
-        }
-        val currentIndex = phaseCards.indexOfFirst { it.cardId == currentCard.cardId }
-        return currentIndex >= 0 && currentIndex + 1 < phaseCards.size
-    }
-
-    /** Opens the next card in the current learning phase without changing learning progress. */
-    fun nextDetail() {
-        val currentCard = _detailCard.value ?: return
-        val currentSession = session ?: return
-        val phaseCards = currentSession.cards.filter { card ->
-            when (currentSession.phase) {
-                SessionPhase.REVIEW -> card.cardId in currentSession.reviewCardIds
-                SessionPhase.NEW -> card.cardId in currentSession.newCardIds
-            }
-        }
-        val nextIndex = phaseCards.indexOfFirst { it.cardId == currentCard.cardId } + 1
-        _detailCard.value = phaseCards.getOrNull(nextIndex)
-    }
+    // m01676：详情页不再有「下一个单词」这条推进（`hasNextDetail()` / `nextDetail()` 随按钮一起退役）。
+    // 学一张卡只走一条链：评分 → 回执 → 吸底主按钮（`advance`）。留着这两个方法就是给「跳过评分
+    // 直接看下一张释义」留后门，而它们也没有任何一处调用点能证明自己还是活的。
 
     private suspend fun startSession(profileId: String, plan: TodayPlan) {
         val completed =

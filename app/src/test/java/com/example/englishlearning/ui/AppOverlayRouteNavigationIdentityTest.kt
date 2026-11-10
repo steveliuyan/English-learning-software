@@ -258,13 +258,13 @@ class AppOverlayRouteNavigationIdentityTest {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // 26 枚 data object：默认访问器 `this` 就是它们的身份（不许覆写，覆写只会长出第二套口径）
+    // 25 枚 data object：默认访问器 `this` 就是它们的身份（不许覆写，覆写只会长出第二套口径）。
+    // （2026-11-10：`Settings` 随设置子页退役，26 → 25。）
     // ---------------------------------------------------------------------------------------------
 
     @Test
     fun dataObjectBranchesUseTheSingletonAsIdentity() {
         listOf<AppOverlayRoute>(
-            AppOverlayRoute.Settings,
             AppOverlayRoute.About,
             AppOverlayRoute.LearningFlow,
             AppOverlayRoute.LearningSetup,
@@ -273,7 +273,7 @@ class AppOverlayRouteNavigationIdentityTest {
         ).forEach { route ->
             assertSame(route, route.navigationIdentity, "${route::class.simpleName} 是单例，身份就该是它自己")
         }
-        assertNotEquals(AppOverlayRoute.Settings.navigationIdentity, AppOverlayRoute.About.navigationIdentity)
+        assertNotEquals(AppOverlayRoute.WordBookTransfer.navigationIdentity, AppOverlayRoute.About.navigationIdentity)
     }
 
     /**

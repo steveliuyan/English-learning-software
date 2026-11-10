@@ -7,7 +7,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -37,6 +39,9 @@ import com.example.englishlearning.ui.ScreenTransitionDirection
 object AppTransition {
     private const val PageOffsetDenominator = 4
 
+    /** 浮层竖直位移的 ⅛ 幅分母（页面位移是水平 ¼，见 [PageOffsetDenominator]）。 */
+    private const val OverlayOffsetDenominator = 8
+
     val PageForwardEnter = fadeIn(tween(AppMotion.Slow, easing = AppMotion.EasingOut)) +
         slideInHorizontally(tween(AppMotion.Slow, easing = AppMotion.EasingOut)) { it / PageOffsetDenominator }
     val PageForwardExit = fadeOut(tween(AppMotion.Slow, easing = AppMotion.EasingIn)) +
@@ -60,6 +65,26 @@ object AppTransition {
         scaleIn(tween(AppMotion.Normal, easing = AppMotion.EasingOut), initialScale = 0.92f)
     val DialogExit = fadeOut(tween(AppMotion.Normal, easing = AppMotion.EasingIn)) +
         scaleOut(tween(AppMotion.Normal, easing = AppMotion.EasingIn), targetScale = 0.92f)
+
+    /**
+     * 吸底槽两枚 foot 互换（词卡屏的「三档评分 ↔ 回执主按钮」）。
+     *
+     * 只做淡入淡出、**不给位移**：槽位没变、变的只是槽里那排按钮，给位移会把「换的只是按钮」
+     * 读成「换了一页」。时长取 `Normal`：这一换发生在一次点击之后，是「就地换装」而不是一次导航。
+     */
+    val FooterSwapEnter = fadeIn(tween(AppMotion.Normal, easing = AppMotion.EasingOut))
+    val FooterSwapExit = fadeOut(tween(AppMotion.Normal, easing = AppMotion.EasingIn))
+
+    /**
+     * 屏内浮层升起（学习流的词义详情叠在词卡之上，原型把这一层当第二张纸压上来）。
+     *
+     * 浮层是**叠上来的第二层**而不是换页：位移走竖直 ⅛（[OverlayOffsetDenominator]），
+     * 与页面那套水平 ¼ 分开记——读者一眼就能分出「换了内容」与「多了一层」。
+     */
+    val OverlayRiseEnter = fadeIn(tween(AppMotion.Slow, easing = AppMotion.EasingOut)) +
+        slideInVertically(tween(AppMotion.Slow, easing = AppMotion.EasingOut)) { it / OverlayOffsetDenominator }
+    val OverlayRiseExit = fadeOut(tween(AppMotion.Slow, easing = AppMotion.EasingIn)) +
+        slideOutVertically(tween(AppMotion.Slow, easing = AppMotion.EasingIn)) { it / OverlayOffsetDenominator }
 
     /**
      * 两站共用同一张表：tab 站的「序号增大 = 新页从右进」与子页站的「更深 = 新页从右进」

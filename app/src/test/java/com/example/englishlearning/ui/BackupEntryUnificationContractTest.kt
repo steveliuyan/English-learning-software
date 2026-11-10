@@ -10,10 +10,10 @@ import kotlin.test.assertTrue
  * Task 25（裁决⑥）源码契约：设置页那一行只做**导航**，三条并行入口在宿主侧收成一条 `showBackupHub`。
  *
  * 为什么这些断言必须在 JVM 侧：connected 用例抓得住「点了没进子页」，却抓不住
- * 「子行删了、`SettingsScreen` 还挂着三枚死回调」与「`overlayOpen` 那条共用 `||` 链只摘了一半」
+ * 「子行删了、旧设置页还挂着三枚死回调」与「`overlayOpen` 那条共用 `||` 链只摘了一半」
  * ——后者是本仓第三次踩同类坑（子屏仍在底导之上，但底导也一起可见）。
  */
-private const val SETTINGS_UI_SOURCE = "src/main/java/com/example/englishlearning/ui/SettingsScreen.kt"
+private const val SETTINGS_FILE_PATH = "src/main/java/com/example/englishlearning/ui/SettingsScreen.kt"
 private const val PROFILE_UI_SOURCE = "src/main/java/com/example/englishlearning/ui/ProfileScreen.kt"
 private const val APP_SCREEN_SOURCE = "src/main/java/com/example/englishlearning/ui/AppScreen.kt"
 private const val HUB_SCREEN_SOURCE = "src/main/java/com/example/englishlearning/ui/BackupHubScreen.kt"
@@ -24,12 +24,12 @@ class BackupEntryUnificationContractTest {
     /**
      * 备份入口只剩一条通往备份子页的回调；旧的折叠态与三条并行子入口必须消失。
      *
-     * 2026-11-02 我的 hub 起，备份入口从「设置」移到「我的 → 应用 → 数据与备份」；
-     * 设置降为只放全局开关的子页，因此两屏各钉一侧：hub 必须在册，设置页必须归零。
+     * 2026-11-02 我的 hub 起，备份入口从「设置」移到「我的 → 应用 → 数据与备份」。
+     * 2026-11-10（用户 m03373 + m03681 选项 1）：设置子页整体退役（外观内联进 hub），
+     * 「设置页必须归零」这一侧判据改为**文件已不存在**——比数零更硬，页都删了就不可能再挂死回调。
      */
-    @Test fun profile_hub_navigates_to_backup_and_settings_does_not() {
+    @Test fun profile_hub_navigates_to_backup_and_no_settings_page_remains() {
         val hub = stripped(PROFILE_UI_SOURCE)
-        val settings = stripped(SETTINGS_UI_SOURCE)
         listOf(
             "onOpenBackupExport",
             "onOpenBackupRestore",
@@ -52,9 +52,9 @@ class BackupEntryUnificationContractTest {
             "旧的四枚备份子行 tag 不得再留在我的页（它们已迁到 BackupHubScreen）",
         )
         assertFalse(
-            settings.contains("onOpenBackupHub"),
-            "SettingsScreen.kt 不得再持有 onOpenBackupHub：设置只放外观与全局开关，" +
-                "备份入口唯一落点是「我的」hub（2026-11-02 去重）",
+            File(SETTINGS_FILE_PATH).exists(),
+            "SettingsScreen.kt 必须已退役（2026-11-10 m03373 选项 1）：它若回来，" +
+                "备份入口就又多出第二落点，且外观会变成两份真值",
         )
     }
 
@@ -91,7 +91,7 @@ class BackupEntryUnificationContractTest {
             """var showBackupHub by rememberSaveable""" to "状态位（rememberSaveable）",
             """BackHandler\(enabled = showBackupHub\) \{ showBackupHub = false \}""" to "BackHandler",
             """\} else if \(route is AppOverlayRoute\.BackupHub\) \{""" to "挂载分支",
-            """onOpenBackupHub = \{ showBackupHub = true \}""" to "设置页入口接线",
+            """onOpenBackupHub = \{ showBackupHub = true \}""" to "我的 hub 入口接线",
         ).forEach { (pattern, station) ->
             assertTrue(
                 Regex(pattern).containsMatchIn(src),

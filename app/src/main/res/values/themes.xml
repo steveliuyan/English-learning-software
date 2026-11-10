@@ -3,6 +3,11 @@
     <style name="Theme.EnglishLearning" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">#F6F9F6</item>
         <item name="android:colorAccent">#1A7A63</item>
+        <!-- 首帧（Compose 挂载前）的系统栏底色：与 windowBackground 同值，避免露出 framework 默认灰。
+             运行期真正的染色在 ui/theme/SystemBars.kt（跟住 App 主题模式，而不是系统深色开关）。 -->
+        <item name="android:statusBarColor">#F6F9F6</item>
+        <item name="android:navigationBarColor">#F6F9F6</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
     <style name="Theme.EnglishLearning.Starting" parent="android:style/Theme.Material.Light.NoActionBar">
