@@ -70,6 +70,10 @@
    `Library #65478A/#B7A0D9`、`Reading #9C3B4F/#E297A4`、`Danger #9E2B24/#DD8B81`、`Settings #4A5551/#A6B0AC`
    （前者 `deep`、后者 `base`）；深套 deep=base：`#6FD9B6`/`#84C4EE`/`#EFCB92`/`#C6A9E4`/`#EDA8B4`/`#E39086`/`#B4BEBA`。
    连带：吉祥物眼白改为 `AiMascot.EyeColor = #1A7A63`（原随旧亮色域值）。
+   > **2026-11-10 注**：本条第 2 项的七域取值已被域色归一覆盖，见
+   > [`docs/decisions/2026-11-10-domain-color-normalization.md`](2026-11-10-domain-color-normalization.md)；
+   > 本文其余裁决（中性色、tint2/tint3 解除、`GRADIENT_START_FRACTION` 0.18、M3 分叉）仍有效，
+   > 文内 4.28–6.20 / 1.62 / 5.24–7.75 等域色实测数字为当时口径。
 3. **解除 2026-10-18 裁决 2 的 `tint2`/`tint3` 禁配**，改为正向钉：`text2` 压五档全过（5.71/5.39/5.07/4.85/4.62）。
    裁决 1（`text3` 非正文）、裁决 3（品牌渐变文字取 `onBrand`）**继续有效**，取值按新色重算
    （`text3` 压三档 3.35/3.16/2.98；`onBrand` 压渐变末端 6.87、`onMint` 压末端 4.07）。

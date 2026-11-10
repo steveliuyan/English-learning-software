@@ -155,6 +155,9 @@ App 侧 **33 组界面版式重做已全部收官、门禁全绿**（配色 + �
 | Reading | `#E297A4` | `#F6DCE0` | `#9C3B4F` |
 | Danger | `#DD8B81` | `#F7DCD6` | `#9E2B24` |
 
+> **2026-11-10 注**：本节七域取值已被域色归一覆盖（见 `docs/decisions/2026-11-10-domain-color-normalization.md`），
+> 本表保留为 2026-11-03 当批的记录，不改数字。
+
 品牌渐变**不动**：`#A8F3C8 → #5DDFB4 → #35B9B5`；`mint-light #D9FFF0`；`AppleMintPillEnd #65D3B9`（`MintPalette.kt`）。
 
 ### 6.4 字体（`AppType.kt`，六档，`@Composable @ReadOnlyComposable` getter，不写 `lineHeight`）

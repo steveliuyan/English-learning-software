@@ -207,6 +207,7 @@ adb -s bf353dda shell dumpsys window | grep -i mCurrentFocus    # 必须出现�
 
 - 屏：`WordCardScreen` 的 `ReviewCompleted` 插入页「开始学习新增词」「返回今日计划」，以及 `Unavailable` 分支「重试」。
 - 实测：深色填充 `#84C4EE`、标签 `#A5B8AE` → **1.10:1**；浅色按同一构造推算 `#7BB4E6` / `#55665D` → **2.76:1**
+  （域色已于 2026-11-10 归一，见 `docs/decisions/2026-11-10-domain-color-normalization.md`；本文域色数字为当时口径，中性 token 不受影响）
   （WCAG AA 正文 4.5:1）。两张深色截图相隔 3s 像素读数一致，非截屏噪声（`43/44-reviewcomplete-dark-1/2`）。
 - 根因：`AppType.Label` 自带 `color = appColors().text2`（`AppType.kt:55-58`）；Compose 中样式里的具体色
   优先于 `Button` 的 `contentColor`。这三处 `Button(colors = buttonColors(containerColor = learn.base,

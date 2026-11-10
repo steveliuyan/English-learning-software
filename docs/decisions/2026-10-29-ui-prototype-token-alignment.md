@@ -47,6 +47,10 @@
 域色沿用原型 `--learn/--review/--library/--reading/--ai` 的 base/deep；深套 `deep = base`。
 `--ai` 与 `--brand` 同值但语义独立，保留 `AppDomain.AiSpeech` 两条映射。
 
+> **2026-11-10 注**：域色（`AppDomain` 七域）取值已于 2026-11-10 归一，覆盖本文上述「域色沿用原型」的口径，
+> 见 [`2026-11-10-domain-color-normalization.md`](2026-11-10-domain-color-normalization.md)；
+> 本表其余中性 token 映射与兼容字段不受影响。
+
 ### 3. 兼容字段（临时）
 
 以下旧字段在批 0 保留，供尚未迁移的屏编译，批 1–3 逐屏替换，批 4 删除：

@@ -366,7 +366,8 @@ XML 数 266 → 275（八枚新契约 + Task 10 一枚）。
 
 - **深套复选/单选未做真机目视取证**：本轮只到源码闸 + JVM 门禁。理由：取值口径与同屏
   `OptionSwitchRow`、以及已取证过的 `SpeechSettingsScreen` 完全同源（深套取 Settings 域 `base`
-  `#A6B0AC` 压在 `surface #17201C` 上），闸已钉住「源码里不许出现第三种取值」；要复看实物需先
+  `#A6B0AC` 压在 `surface #17201C` 上；域色已于 2026-11-10 归一，Settings 深套现为 `#B9C1BD`，
+  见 `docs/decisions/2026-11-10-domain-color-normalization.md`），闸已钉住「源码里不许出现第三种取值」；要复看实物需先
   走「我的 → 设置 → 导出默写纸」并切深套，当前真机导航路径未打通（`uiautomator dump` 未见设置入口，
   需先滚到页底）。已装新包：`app-debug.apk` 328.3MB（`adb install -r` 于 `bf353dda` 成功）。
 - §8-8 底导第三项文案 **已收口（2026-11-02）**：用户定名「AI 助学」，标签/播报/屏名/折叠行/空态一并改完，
