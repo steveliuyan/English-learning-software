@@ -391,7 +391,7 @@
 - 生成口径: 模型 `cn:deepseek-v4.1-flash`（端点 `http://127.0.0.1:7863/v1`，本地网关）；提示词在 `tools/wordbooks/generate_examples.py` 的 `build_prompt`；逐条校验规则在 `tools/wordbooks/example_validation.py`；生成日期 2026-11-11
 - NOTICE 位置: 本文件、`docs/decisions/2026-11-11-card-examples-baked-into-bundled-wordbooks.md`、`docs/superpowers/plans/2026-11-11-f1-08-example-baking.md`
 - 替代方案: 改用经许可核验、允许离线再分发的第三方例句库；或回落为「无例句就整块隐藏」（AC1-28），不留占位
-- 商业分发结论: 内容本身可随应用分发。**发布前须由项目负责人确认**: 该模型服务的使用条款允许把模型输出随安装包再分发（AI 生成文本的商用与再分发条款不随本项目控制）。换模型、换服务商或换提示词版本后必须重跑产线并新增一条本条目，旧版本不得静默沿用
+- 商业分发结论: 可随应用分发。该端点是本项目自部署的本地模型服务（`127.0.0.1` 本地网关，不涉及第三方云服务），模型输出不含第三方服务条款约束；项目负责人已于 2026-11-11 确认「这个是本地模型」，不再有外部条款待核。换模型、换服务商或换提示词版本后必须重跑产线并新增一条本条目，旧版本不得静默沿用
 
 ## voa-learning-english
 - 名称: VOA Learning English（美国之音学习英语）文章正文

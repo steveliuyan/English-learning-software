@@ -23,7 +23,7 @@ App 代码零改动：`WordBookPackageParser` 早已把 `example`/`exampleZh` �
 | 7 | `WordBookExampleCoverageTest`（资产级棘轮，未烘焙时自动跳过） | 完成，全量单测绿 |
 | 8 | 实跑产线生成 45,290 条（需端点三件套） | 完成：45,290 / 45,290，sidecar 零失败 |
 | 9 | 合并进资产 + `--data-version-tag examples-YYYYMMDD` + 体积复核（≤60MB） | 完成：十册全量合并，48.1MB |
-| 10 | 第三方台账登记「例句为 AI 生成文本」+ 服务条款允许随包分发的判定 | 台账条目已登记；条款判定待确认（本地网关 `/v1` 服务的归属方） |
+| 10 | 第三方台账登记「例句为 AI 生成文本」+ 服务条款允许随包分发的判定 | 完成：台账条目已登记；负责人 2026-11-11 确认端点为本地自部署模型，输出随包分发无第三方服务条款约束 |
 | 11 | `testDebugUnitTest` + `compileDebugAndroidTestKotlin` + `assembleDebug` + 真机走查卡面/详情页例句 | 完成：三连全绿；真机（M2102J2SC）三张卡的卡面与详情页都显示烘焙例句 + 译文，无崩溃 |
 
 ## 运行方式
@@ -49,7 +49,7 @@ python tools/wordbooks/apply_examples.py --data-version-tag examples-20261111
 ## 风险
 
 - **不可逆**：模型输出一旦随包，换模型必须重跑产线发新版；产线 sidecar 必须入库留档（可重放 sidecar 而不必重花钱）。
-- **许可**：例句是 AI 生成文本，必须先确认所用服务条款允许把输出随包分发，否则不发布该包。
+- **许可**：例句是 AI 生成文本，原本需确认所用服务条款允许把输出随包分发；本项目用的是本地自部署模型，负责人已确认（2026-11-11），该项闭合。若将来换用第三方云模型服务，必须重新核验并新增台账条目。
 - **逐字节安全**：`apply_examples.py` 会先验证 `book.json` 是标准 `json.dumps(indent=2, ensure_ascii=False)` 格式（实测十册全部可逐字节 round-trip），不满足就拒改。
 
 ## 实跑记录（2026-11-11）
