@@ -13,7 +13,8 @@ import kotlin.test.assertTrue
  *    universal APK，因为模拟器（x86_64）的 instrumented 与真机（arm64-v8a）的安装口令都写在既有
  *    QA 文档里，默认改形状会让那些命令静默指向不存在的文件。
  *  - 打开时只发两块真实 ABI：arm64-v8a + armeabi-v7a；两个 x86 库只服务模拟器，不进交付产物。
- *  - R8/资源压缩本轮仍不启用（同决策决定 3），这条钉住以免有人顺手打开。
+ *  - R8/资源压缩由属性 `r8` 开关、默认开启（决策 docs/decisions/2026-11-11-r8-minification.md），
+ *    见 `ReleaseR8ContractTest`。
  */
 class ReleaseAbiSplitContractTest {
 
@@ -66,15 +67,15 @@ class ReleaseAbiSplitContractTest {
     }
 
     @Test
-    fun `release still does not enable r8 or resource shrinking`() {
+    fun `abi splits and r8 stay independent switches`() {
         val releaseBlock = text.substringAfter("getByName(\"release\")")
         assertTrue(
-            releaseBlock.contains("isMinifyEnabled = false"),
-            "决策决定 3：R8 不随本批打开",
+            releaseBlock.contains("isMinifyEnabled = r8Enabled"),
+            "R8 归 r8 属性开关，不该与 abiSplits 绑在一起",
         )
         assertTrue(
-            !releaseBlock.contains("isShrinkResources = true"),
-            "决策决定 3：资源压缩不随本批打开",
+            releaseBlock.contains("isShrinkResources = r8Enabled"),
+            "资源压缩必须跟着 R8 一起开关（关 R8 时 AGP 不接受单独 shrink）",
         )
     }
 }

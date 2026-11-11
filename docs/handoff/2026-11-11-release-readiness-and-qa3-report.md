@@ -66,3 +66,12 @@
 - **跨册例句去重**：新增 `generate_examples.py --dedupe-cross-book`（只选撞句卡 + 排除提示 + `promptVersion: 2`），7 例新测试。实测 10,760 张 / 3,305 词跨册撞句。
 - **门禁**：单测 366 suites / 2,713 tests / 0 fail / 0 skip；python 侧 normalize 9 + ETL 7 + generator 14 全绿。
 - **未跑**：补生成需要十册 `.xlsx` 原件与本地网关 `--api-key`（本机都没有）。
+
+## 7. R8 已开（收尾）
+
+- `app/build.gradle.kts`：`isMinifyEnabled`/`isShrinkResources` 由属性 `r8` 驱动，**默认 true**，`-Pr8=false` 回退。
+- `app/proguard-rules.pro`：只留反射 / JNI / 按名实例化三类入口（ONNX Runtime、Tesseract、BouncyCastle、Tink、ML Kit、kotlinx.serialization），逐节写理由；无全局 `-ignorewarnings`。
+- 契约测试 `ReleaseR8ContractTest`（4 例）钉住开关默认值、optimize 档、keep 条目与「每节必须有理由」；`ReleaseAbiSplitContractTest` 的第 3 例从「R8 必须关」改成「R8 与 ABI 是两个独立开关」。
+- 体积：universal 310.7 MiB（−11.2）、arm64 166.1（−11.2）、v7a 151.1（−11.2）。
+- 冒烟：debug 签名装真机，冷启动 567ms、无崩溃、首页与查词页正常。
+- **遗留**：底部四 tab 的逐屏回归、OCR/TTS 真机链路未验；签名仍 TODO-USER。

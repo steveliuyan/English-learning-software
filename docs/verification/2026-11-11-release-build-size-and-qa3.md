@@ -130,3 +130,22 @@ python -m unittest discover -s tools/wordbooks/tests -p test_generate_examples.p
 实测：45,290 张卡中 **10,760 张**与「同一个词在另一册的那张卡」例句完全相同，涉及 **3,305 个词**；分册：cet4 1,285、cet6 1,207、doctoral 1,338、graduate 1,310、ielts 1,324、senior 979、toefl 1,341、kaoyan 1,395、junior 416、primary 165。
 
 `generate_examples.py` 新增 `--dedupe-cross-book`：只选撞句卡、把其他册已用句子写进排除提示、新条目记 `promptVersion: 2`。**尚未执行生成**：本机没有十册 Excel 原件，也没有网关密钥（`/v1/models` 返回 `invalid_api_key`）。
+
+## 7. R8 与资源压缩（2026-11-11，用户「开」）
+
+```bash
+"$GRADLE" :app:assembleRelease --no-daemon                     # BUILD SUCCESSFUL in 3m 37s
+"$GRADLE" :app:assembleRelease -PabiSplits=true --no-daemon    # BUILD SUCCESSFUL in 2m 57s
+"$GRADLE" verifyReleaseArtifact -PabiSplits=true --no-daemon   # BUILD SUCCESSFUL in 31s（逐份 secret-scan）
+"$GRADLE" :app:testDebugUnitTest --rerun-tasks --no-daemon     # 367 suites / 2,717 tests / 0 fail / 0 skip
+```
+
+| 产物 | 开 R8 前 | 开 R8 后 |
+|---|---|---|
+| universal `app-release-unsigned.apk` | 321.9 MiB | **310.7 MiB** |
+| `app-arm64-v8a-release-unsigned.apk` | 177.3 MiB | **166.1 MiB** |
+| `app-armeabi-v7a-release-unsigned.apk` | 162.3 MiB | **151.1 MiB** |
+
+`mapping.txt` 98.5 MB（`app/build/outputs/mapping/release/`），发布必须归档。
+
+真机冒烟（arm64，`bf353dda`）：debug keystore 签同一份产物 → `adb install` Success → 冷启动 `Status: ok / 567ms` → 崩溃缓冲空 → 首页正常渲染（「新学 3 个」= 词书解析 + Room + Hilt + WorkManager 全通）→ 查词页正常。**未验**：四条底部 tab 主链的逐屏回归（Compose 语义树把 tab 的 bounds 报成 `[0,0][0,0]`，`input tap` 点不中）、OCR、TTS。

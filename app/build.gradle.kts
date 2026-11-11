@@ -81,10 +81,21 @@ android {
         }
     }
 
+    // 决策 docs/decisions/2026-11-11-r8-minification.md：R8 与资源压缩单开一轮。
+    // 开关是 Gradle 属性 r8，**默认开启**；-Pr8=false 回到未混淆的对照产物，
+    // 供逐库二分定位 keep 规则（关掉时 isShrinkResources 必须同时关，AGP 会拒）。
+    val r8Enabled = (providers.gradleProperty("r8").orNull ?: "true").toBooleanStrictOrNull() ?: true
+
     buildTypes {
         getByName("release") {
-            // 决策 §2: R8/资源压缩本轮不启用——keep 规则需专项真机验证，另开小轮逐库打开。
-            isMinifyEnabled = false
+            // 混淆 + 资源压缩（决策 docs/decisions/2026-11-11-r8-minification.md）：
+            // keep 规则逐库写在 app/proguard-rules.pro，理由也写在那里。
+            isMinifyEnabled = r8Enabled
+            isShrinkResources = r8Enabled
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (releaseStoreFile != null) {
                 signingConfig = signingConfigs.getByName("releaseLocal")
             }
