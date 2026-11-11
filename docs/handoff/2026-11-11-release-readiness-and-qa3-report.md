@@ -74,4 +74,5 @@
 - 契约测试 `ReleaseR8ContractTest`（4 例）钉住开关默认值、optimize 档、keep 条目与「每节必须有理由」；`ReleaseAbiSplitContractTest` 的第 3 例从「R8 必须关」改成「R8 与 ABI 是两个独立开关」。
 - 体积：universal 310.7 MiB（−11.2）、arm64 166.1（−11.2）、v7a 151.1（−11.2）。
 - 冒烟：debug 签名装真机，冷启动 567ms、无崩溃、首页与查词页正常。
-- **遗留**：底部四 tab 的逐屏回归、OCR/TTS 真机链路未验；签名仍 TODO-USER。
+- **遗留**：OCR 两条引擎（ML Kit / Tesseract4Android）的真机识别链路未验；发音只验到「流程跑通 + 有 AudioTrack 通道」，没人工听音质；签名仍 TODO-USER。
+- 底部四 tab 已逐屏回归（学习 / 阅读 / AI 助学 / 我的 全部正常渲染），词义详情音标 `/hɪə(r)/` 正常，查词「hear」30 条结果。

@@ -148,4 +148,20 @@ python -m unittest discover -s tools/wordbooks/tests -p test_generate_examples.p
 
 `mapping.txt` 98.5 MB（`app/build/outputs/mapping/release/`），发布必须归档。
 
-真机冒烟（arm64，`bf353dda`）：debug keystore 签同一份产物 → `adb install` Success → 冷启动 `Status: ok / 567ms` → 崩溃缓冲空 → 首页正常渲染（「新学 3 个」= 词书解析 + Room + Hilt + WorkManager 全通）→ 查词页正常。**未验**：四条底部 tab 主链的逐屏回归（Compose 语义树把 tab 的 bounds 报成 `[0,0][0,0]`，`input tap` 点不中）、OCR、TTS。
+真机冒烟（arm64，`bf353dda`，release + R8，debug keystore 本地签名 → 仅用于冒烟，非交付物）：
+
+| 链路 | 结果 |
+|---|---|
+| `adb install` | Success |
+| 冷启动 `BrandLaunchActivity → MainActivity` | `Status: ok / 567ms`，崩溃缓冲空 |
+| 首页 / 学习 tab | 正常（今日学习、连续打卡、「新学 3 个都已完成」） |
+| 阅读 tab | 正常（每日阅读、生成前参数、阅读历史 0 篇） |
+| AI 助学 tab | 正常（长难句分析、拍照翻译、AI 生图、词文串学、短文填词） |
+| 我的 tab | 正常（Tester、已学 3 词、连续 1 天、主题切换、我的词汇） |
+| 查词 | 输入 hear → 「找到 30 个结果」，各册释义与来源齐全 |
+| 词义详情 | 音标 `/hɪə(r)/` 与释义、例句、笔记区齐全；点「播放发音」后出「发音已播放。」，应用进程有 AudioTrack 通道日志 |
+| 进程稳定性 | 全程同一 pid（22316），无重启、无 `logcat -b crash` 记录 |
+
+底部 nav 的 `uiautomator` 语义节点 bounds 报 `[0,0][0,0]`（Compose 合并语义），因此按几何坐标 `x = 135/405/675/945, y = 2140` 点击命中。
+
+**仍未验**：OCR 两条引擎（ML Kit 主引擎 / Tesseract4Android 兜底）的真机识别链路；发音是「流程跑通 + 有音频通道」的证据，没有人工听过音质；签名仍 TODO-USER。
