@@ -32,6 +32,7 @@ bash scripts/apk-secret-scan-selftest.sh
 ## 已知边界与 TODO-USER（发布前必须处置/知悉）
 
 - **签名**：release 产物当前未签名（仓库不持有 keystore）。用户提供发布 keystore 并在 `local.properties` 配置四键后重跑 `:app:assembleRelease` 与验签；详见决策 §3。
+- **产物形状**：默认 `assembleRelease` 产出四 ABI 的 universal APK（321.9 MiB）；交付用 `-PabiSplits=true` 只出 arm64-v8a（177.3 MiB）/ armeabi-v7a（162.3 MiB）两份，实测见 `docs/verification/2026-11-11-release-build-size-and-qa3.md` §5 与决策 `2026-11-11-release-artifact-size-and-abi-strategy.md`。
 - **R8/资源压缩**：本轮未启用（决策 §2），后续专项轮验证。
 - **AC5-03 无障碍设备走查**：TalkBack 六链、动态字体、深色、小屏以第三轮设备 QA 任务书（`docs/handoff/2026-10-15-qa-round3-task.md`）执行为准；本说明发布前其结论为「部分覆盖」。
 - 真机 bf353dda 性能复测、飞行模式手工六条、B4/B5/T2 同见任务书 TODO-USER 清单。

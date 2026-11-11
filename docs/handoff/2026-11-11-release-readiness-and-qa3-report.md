@@ -48,3 +48,13 @@
 2. 词书 `ipa` 列映射修复（304 卡，含 300 卡音标错位）。
 3. 跨册例句差异化重跑（4,335 组 / 10,855 卡）。
 4. 发布签名（需用户提供 keystore）。
+
+## 5. 追加：ABI 拆分落地（用户「可以」后同棒完成）
+
+- 配置：`app/build.gradle.kts` 新增 `splits.abi`，由 Gradle 属性 `abiSplits` 驱动，**默认 false**（默认产物形状、既有 QA 口令、模拟器 instrumented 全部不变）。
+- 契约测试：`verification.ReleaseAbiSplitContractTest`（3 例，`splits ship only the two arm ABIs` / `abi splits are gated by the abiSplits gradle property` / `release still does not enable r8 or resource shrinking`）—— 3 tests / 0 failures。
+- 门禁：`verifyReleaseArtifact` 改成「扫目录里每个 APK」，拆分产物逐份 secret-scan 干净（arm64 185,930,228 B / armv7 170,205,460 B）。
+- 读数：arm64-v8a **177.3 MiB**、armeabi-v7a **162.3 MiB**，相对 universal 321.9 MiB 分别 **−45% / −50%**（比预估「省 77 MiB」更好，因为不再需要把四份原生库合进一个包）。
+- 决策与实测已回写：`docs/decisions/2026-11-11-release-artifact-size-and-abi-strategy.md` §实施结果、`docs/verification/2026-11-11-release-build-size-and-qa3.md` §5、`docs/verification/release-notes-v0.0.1.md`。
+
+仍未做：R8/资源压缩（决策决定 3，单开一轮）、发布签名（无 keystore）、词书 `ipa` 列映射修复（304 卡）、跨册例句差异化重跑（4,335 组）。

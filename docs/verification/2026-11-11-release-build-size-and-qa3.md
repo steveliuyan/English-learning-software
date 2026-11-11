@@ -83,3 +83,19 @@ AC3-07 AC3-08 AC3-09 AC3-10 AC3-11 AC3-12 AC3-13
 
 - TalkBack 六链语音播报、飞行模式手工六条、真机冷启动性能复测：仍按 `docs/handoff/2026-10-15-qa-round3-task.md` 由人工执行，本轮未覆盖。
 - release 签名：本地无 keystore，产物为 unsigned（`verifyReleaseArtifact` 已注「signature check pending release keystore」）。
+
+## 5. ABI 拆分实测（`-PabiSplits=true`）
+
+```bash
+"$GRADLE" :app:assembleRelease -PabiSplits=true --no-daemon    # BUILD SUCCESSFUL in 1m 42s
+"$GRADLE" verifyReleaseArtifact -PabiSplits=true --no-daemon   # 两份产物 scan clean
+"$GRADLE" :app:testDebugUnitTest --tests "*ReleaseAbiSplitContractTest*"   # 3 tests / 0 failures
+```
+
+| 产物 | 字节 | MiB |
+|---|---|---|
+| `app-arm64-v8a-release-unsigned.apk` | 185,930,228 | 177.3 |
+| `app-armeabi-v7a-release-unsigned.apk` | 170,205,460 | 162.3 |
+| universal（对照，默认构建） | 337,521,268 | 321.9 |
+
+结论：真机 arm64 单机体积从 321.9 MiB 降到 **177.3 MiB（−45%）**，armerabi-v7a 到 162.3 MiB。默认构建不受影响（`abiSplits` 默认 false），既有 QA 安装口令保持原样。

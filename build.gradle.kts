@@ -77,11 +77,14 @@ val verifyReleaseArtifact = tasks.register("verifyReleaseArtifact") {
     dependsOn(":app:assembleRelease")
     doLast {
         val outDir = project(":app").layout.buildDirectory.dir("outputs/apk/release").get().asFile
-        val apk = outDir.listFiles()?.firstOrNull { it.name.endsWith(".apk") }
-        check(apk != null) { "assembleRelease 未产出 APK" }
-        val rc = providers.exec { commandLine("bash", "scripts/apk-secret-scan.sh", apk.absolutePath) }.result.get()
-        check(rc.exitValue == 0) { "APK 密钥扫描命中：见上方输出（AC5-05 发布阻断）" }
-        logger.lifecycle("verifyReleaseArtifact: ${apk.name} scanned clean (signature check pending release keystore).")
+        val apks = outDir.listFiles()?.filter { it.name.endsWith(".apk") }.orEmpty()
+        check(apks.isNotEmpty()) { "assembleRelease 未产出 APK" }
+        // -PabiSplits=true 时产物是每个 ABI 一个 APK（决策 2026-11-11 §1）：逐个扫描，而不是只看第一个。
+        for (apk in apks) {
+            val rc = providers.exec { commandLine("bash", "scripts/apk-secret-scan.sh", apk.absolutePath) }.result.get()
+            check(rc.exitValue == 0) { "APK 密钥扫描命中：见上方输出（AC5-05 发布阻断）—— ${apk.name}" }
+            logger.lifecycle("verifyReleaseArtifact: ${apk.name} (${apk.length()} B) scanned clean (signature check pending release keystore).")
+        }
     }
 }
 

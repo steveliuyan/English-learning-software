@@ -37,6 +37,11 @@ if (releaseStoreFile == null) {
     logger.lifecycle("release keystore 未配置（local.properties 缺 RELEASE_STORE_FILE）：release 产物将未签名，验签 TODO-USER")
 }
 
+// 决策 docs/decisions/2026-11-11-release-artifact-size-and-abi-strategy.md §1:
+// ABI 拆分只由 -PabiSplits=true 显式打开。默认仍产出四 ABI 的 universal APK——模拟器（x86_64）的
+// instrumented 与真机（arm64-v8a）的安装口令都写在既有 QA 文档里，默认改产物形状会让那些命令静默失效。
+val abiSplitsEnabled = (findProperty("abiSplits") as String?)?.toBoolean() ?: false
+
 android {
     namespace = "com.example.englishlearning"
     compileSdk = 36
@@ -48,6 +53,16 @@ android {
         versionCode = 1
         versionName = "0.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    splits {
+        abi {
+            isEnable = abiSplitsEnabled
+            reset()
+            // 只发两块真实 ABI：两个 x86 库只服务模拟器，不进交付拆分（实测每块 38 MB）。
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = false
+        }
     }
 
     buildFeatures {
