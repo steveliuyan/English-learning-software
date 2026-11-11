@@ -5,7 +5,13 @@ from pathlib import Path
 import sys
 import zipfile
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from excel_to_wordbook import normalize_lemma, parse_workbook, write_wordbook_directory
+from excel_to_wordbook import (
+    FALLBACK_POS,
+    normalize_lemma,
+    parse_workbook,
+    split_pronunciation,
+    write_wordbook_directory,
+)
 
 class ConverterTest(unittest.TestCase):
     def test_normalize_lemma_is_case_and_space_insensitive(self):
@@ -46,3 +52,26 @@ class ConverterTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SplitPronunciationTest(unittest.TestCase):
+    """2026-11-11: 304 shipped cards had `/- /` in ipa, 300 of them with the IPA in the pos column."""
+
+    def test_real_ipa_and_pos_are_kept(self):
+        self.assertEqual(split_pronunciation("v.", "/hɪə(r)/"), ("v.", "/hɪə(r)/"))
+
+    def test_ipa_typed_into_the_pos_column_is_moved_back(self):
+        self.assertEqual(split_pronunciation("/hɪə(r)/", "/- /"), (FALLBACK_POS, "/hɪə(r)/"))
+        self.assertEqual(split_pronunciation("/hɪə(r)/", ""), (FALLBACK_POS, "/hɪə(r)/"))
+
+    def test_missing_pronunciation_stays_empty_never_a_placeholder(self):
+        for pos in ("v.", "", "   "):
+            with self.subTest(pos=pos):
+                part, ipa = split_pronunciation(pos, "/- /")
+                self.assertEqual(ipa, "")
+                self.assertEqual(part, pos.strip() or FALLBACK_POS)
+
+    def test_bare_dash_and_slash_variants_count_as_missing(self):
+        for value in ("-", "/ /", "——", "/-/"):
+            with self.subTest(value=value):
+                self.assertEqual(split_pronunciation("n.", value), ("n.", ""))

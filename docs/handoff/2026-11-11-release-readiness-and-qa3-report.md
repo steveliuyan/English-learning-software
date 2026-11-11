@@ -58,3 +58,11 @@
 - 决策与实测已回写：`docs/decisions/2026-11-11-release-artifact-size-and-abi-strategy.md` §实施结果、`docs/verification/2026-11-11-release-build-size-and-qa3.md` §5、`docs/verification/release-notes-v0.0.1.md`。
 
 仍未做：R8/资源压缩（决策决定 3，单开一轮）、发布签名（无 keystore）、词书 `ipa` 列映射修复（304 卡）、跨册例句差异化重跑（4,335 组）。
+
+## 6. 追加：音标列修正 + 跨册例句去重能力（同棒完成）
+
+- **音标列串位已修**：304 张占位卡清零（298 恢复真音标、6 张源表无注音留空串）、2 张斜杠词性还原、0 张串位。数据侧 `tools/wordbooks/normalize_ipa.py`（幂等，只动 `ipa`/`pos` 两列），产线侧 `excel_to_wordbook.split_pronunciation()`，资产侧棘轮 `WordBookIpaFieldHonestyTest`（4 例）。
+- **解析器放宽**：`WordBookPackage.validateCard` 不再要求 `ipa` 非空白，只拒超长——否则「无注音」卡会被判 `InvalidCard`（改动后首轮 4 条测试红过，已定位并修）。
+- **跨册例句去重**：新增 `generate_examples.py --dedupe-cross-book`（只选撞句卡 + 排除提示 + `promptVersion: 2`），7 例新测试。实测 10,760 张 / 3,305 词跨册撞句。
+- **门禁**：单测 366 suites / 2,713 tests / 0 fail / 0 skip；python 侧 normalize 9 + ETL 7 + generator 14 全绿。
+- **未跑**：补生成需要十册 `.xlsx` 原件与本地网关 `--api-key`（本机都没有）。

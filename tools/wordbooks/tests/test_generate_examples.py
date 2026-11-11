@@ -6,7 +6,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from generate_examples import Sidecar, estimate, generate, resolve_one
+from generate_examples import (
+    EXCLUSION_PROMPT_VERSION,
+    Sidecar,
+    build_prompt,
+    cross_book_examples,
+    dedupe_targets,
+    estimate,
+    generate,
+    resolve_one,
+)
 
 
 def task(lemma, book="cet4", pos="n.", meaning="测试释义"):
@@ -123,3 +132,63 @@ class GenerateTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CrossBookDedupeTest(unittest.TestCase):
+    """2026-11-11 用户要求：同一个词在不同册里必须用不同例句。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.assets = Path(self.tmp.name) / "wordbooks"
+        for book, cards in {
+            "cet4": [("hear", "I can hear the birds outside."), ("only4", "Only cet4 uses this sentence.")],
+            "cet6": [("hear", "I can hear the birds outside."), ("only6", "Only cet6 uses this sentence.")],
+        }.items():
+            (self.assets / book).mkdir(parents=True)
+            payload = {"cards": [{"lemma": lemma, "example": example} for lemma, example in cards]}
+            (self.assets / book / "book.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_index_groups_examples_per_lemma_and_book(self):
+        index = cross_book_examples(self.assets)
+        self.assertEqual(index["hear"]["cet4"], ["I can hear the birds outside."])
+        self.assertEqual(index["hear"]["cet6"], ["I can hear the birds outside."])
+        self.assertEqual(index["only4"], {"cet4": ["Only cet4 uses this sentence."]})
+
+    def test_only_colliding_cards_survive(self):
+        tasks = [task("hear", "cet4"), task("hear", "cet6"), task("only4", "cet4")]
+        kept, stats = dedupe_targets(self.assets, tasks)
+        self.assertEqual([t["bookId"] for t in kept], ["cet4", "cet6"])
+        self.assertEqual(stats["colliding"], 2)
+        self.assertEqual(stats["singleBook"], 1)
+
+    def test_the_other_books_sentence_becomes_the_exclusion(self):
+        kept, _ = dedupe_targets(self.assets, [task("hear", "cet4")])
+        self.assertEqual(kept[0]["exclude"], "- I can hear the birds outside.")
+
+    def test_words_only_ever_seen_in_one_book_are_left_alone(self):
+        kept, stats = dedupe_targets(self.assets, [task("only4", "cet4"), task("only6", "cet6")])
+        self.assertEqual(kept, [])
+        self.assertEqual(stats["colliding"], 0)
+
+    def test_prompt_switches_to_the_exclusion_template(self):
+        plain = build_prompt(task("hear", "cet4"))[1]["content"]
+        excluded = build_prompt({**task("hear", "cet4"), "exclude": "- I can hear the birds."})[1]["content"]
+        self.assertNotIn("必须换一句完全不同", plain)
+        self.assertIn("必须换一句完全不同", excluded)
+        self.assertIn("- I can hear the birds.", excluded)
+
+    def test_dedupe_entries_are_stamped_with_the_exclusion_prompt_version(self):
+        sidecar = Sidecar.load(Path(self.tmp.name) / "cet4.json", "cet4", "test-model", EXCLUSION_PROMPT_VERSION)
+        sidecar.accept("hear", "The wind was strong all night long.", "整夜风都很大。", 1)
+        self.assertEqual(sidecar.entries["hear"]["promptVersion"], EXCLUSION_PROMPT_VERSION)
+
+    def test_resume_still_skips_finished_lemmas(self):
+        sidecar = Sidecar.load(Path(self.tmp.name) / "cet4.json", "cet4", "test-model", EXCLUSION_PROMPT_VERSION)
+        sidecar.accept("hear", "The wind was strong all night long.", "整夜风都很大。", 1)
+        fake = FakeRequests(lambda task: good(task["lemma"]))
+        stats = generate([{**task("hear", "cet4"), "exclude": "- x"}], sidecar, fake, retry=0)
+        self.assertEqual(fake.calls, [])
+        self.assertEqual(stats["skipped"], 1)

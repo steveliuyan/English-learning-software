@@ -26,6 +26,42 @@ def normalize_lemma(value: str) -> str:
     return " ".join(value.strip().casefold().split())
 
 
+PLACEHOLDER_IPA = re.compile(r"^[\s/\\\-–—~·]*$")
+IPA_SHAPED = re.compile(r"^/[^/]{1,62}/$")
+# 词性缩写被斜杠包起来（`/n./`、`/vt./`）不是音标。
+POS_ABBREVIATIONS = frozenset({
+    "n", "v", "vt", "vi", "adj", "adv", "prep", "conj", "pron", "art", "num", "int", "aux", "abbr",
+});
+FALLBACK_POS = "词汇"
+
+
+def is_ipa_text(value: str) -> bool:
+    """True only for a real pronunciation, not for a part of speech wrapped in slashes (`/n./`)."""
+    text = (value or "").strip()
+    if IPA_SHAPED.match(text) is None:
+        return False
+    inner = text.strip("/").strip().rstrip(".").strip()
+    return inner.casefold() not in POS_ABBREVIATIONS
+
+
+def split_pronunciation(pos_raw: str, ipa_raw: str) -> tuple[str, str]:
+    """Return (pos, ipa) with the part-of-speech and pronunciation columns un-mixed.
+
+    2026-11-11 field report: 304 shipped cards carried the placeholder `/- /` in `ipa`, and 300 of
+    them had the real IPA typed into the 词性 column instead. A placeholder is not a value: an absent
+    pronunciation must stay absent (empty string) so the UI's `isNotBlank()` guard hides the row,
+    and an IPA-shaped `pos` is moved to where it belongs.
+    """
+    pos = (pos_raw or "").strip()
+    ipa = (ipa_raw or "").strip()
+    if PLACEHOLDER_IPA.match(ipa):
+        if is_ipa_text(pos):
+            ipa, pos = pos, FALLBACK_POS
+        else:
+            ipa = ""
+    return (pos or FALLBACK_POS), ipa
+
+
 def _shared_strings(zf: zipfile.ZipFile) -> list[str]:
     name = "xl/sharedStrings.xml"
     if name not in zf.namelist():
@@ -115,8 +151,7 @@ def parse_workbook(path: Path, book_id: str, display_name: str, level: str) -> t
                     errors.append(f"{sheet_name}!{row_number}: duplicate lemma {lemma}")
                     continue
                 seen.add(lemma)
-                pos = row[2].strip() or "词汇"
-                ipa = row[3].strip() or "/- /"
+                pos, ipa = split_pronunciation(row[2], row[3])
                 meaning = row[4].strip()
                 if not meaning:
                     errors.append(f"{sheet_name}!{row_number}: missing meaning")

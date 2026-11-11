@@ -180,7 +180,10 @@ object WordBookPackageParser {
         // 必须在本册命名空间内：导入册优先于内置册，冒用别册的 id 就能顶替它的词卡
         val namespace = "$bookId:"
         if (!card.cardId.startsWith(namespace) || card.cardId.length == namespace.length) throw reject(rejection)
-        if (!card.lemma.fits(MAX_TERM_CHARS) || !card.ipa.fits(MAX_TERM_CHARS)) throw reject(rejection)
+        if (!card.lemma.fits(MAX_TERM_CHARS)) throw reject(rejection)
+        // 音标允许缺席：源表没注音时数据侧留空串，界面用 isNotBlank() 隐藏整块；
+        // 只有超长才拒。理由见 docs/decisions/2026-11-11-ipa-column-and-cross-book-examples.md §决定 1。
+        if (card.ipa.length > MAX_TERM_CHARS) throw reject(rejection)
         if (!card.example.fits(MAX_SENTENCE_CHARS)) throw reject(rejection)
         if (card.exampleZh != null && !card.exampleZh.fits(MAX_SENTENCE_CHARS)) throw reject(rejection)
         if (card.senses.isEmpty() || card.senses.size > MAX_SENSES) throw reject(rejection)

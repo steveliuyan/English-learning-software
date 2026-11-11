@@ -27,6 +27,10 @@ from example_validation import parse_response, validate
 from excel_to_wordbook import parse_workbook
 
 PROMPT_VERSION = 1
+# 跨册去重（2026-11-11 用户要求）：同一个词在十册里各有一张卡，全量首跑拿到的是同一句。
+# 补生成时只针对「跨册撞句」的卡，并把其他册已用的句子放进提示里显式排除；
+# 提示词变了，因此这类条目单独记版本号 2，交付时用新的 --data-version-tag 区分。
+EXCLUSION_PROMPT_VERSION = 2
 
 EXCEL_BOOKS = {
     "小学英语词汇全书": "primary-school",
@@ -51,6 +55,14 @@ USER_TEMPLATE = (
     "不要引号、不要 Markdown、不超过两句；再给一句对应的中文翻译。\n"
     '只输出：{{"example": "...", "exampleZh": "..."}}'
 )
+USER_TEMPLATE_EXCLUSION = (
+    "单词：{lemma}\n词性：{pos}\n中文释义：{meaningZh}\n"
+    "这个单词在别的词书里已经用过下面这些例句，这次必须换一句完全不同的（换场景、换主语、换句式）：\n"
+    "{exclude}\n"
+    "请另写一句 8–16 个词的英文例句：必须出现该单词（可为其屈折形式），用常见词与简单句式，"
+    "不要引号、不要 Markdown、不超过两句；再给一句对应的中文翻译。\n"
+    '只输出：{{"example": "...", "exampleZh": "..."}}'
+)
 
 
 def repo_root() -> Path:
@@ -69,8 +81,46 @@ def load_metadata(assets_dir: Path) -> dict[str, dict]:
     return {item["id"]: item for item in json.loads((assets_dir / "metadata.json").read_text(encoding="utf-8"))}
 
 
-def build_tasks(excel_dir: Path, assets_dir: Path, books: list[str] | None = None) -> list[dict]:
-    """按「一卡一请求」展开任务；同时核对词条集合与随包资产一致。"""
+def cross_book_examples(assets_dir: Path) -> dict[str, dict[str, list[str]]]:
+    """lemma → {bookId: [该册现用的例句]}，用来判断「这个词在别的册里用的是哪几句」。"""
+    index: dict[str, dict[str, list[str]]] = {}
+    for book_dir in sorted(p for p in assets_dir.iterdir() if p.is_dir()):
+        path = book_dir / "book.json"
+        if not path.exists():
+            continue
+        for card in json.loads(path.read_text(encoding="utf-8")).get("cards", []):
+            example = (card.get("example") or "").strip()
+            if not example:
+                continue
+            index.setdefault(card["lemma"], {}).setdefault(book_dir.name, []).append(example)
+    return index
+
+
+def dedupe_targets(assets_dir: Path, tasks: list[dict]) -> tuple[list[dict], dict[str, int]]:
+    """只留下「跨册撞句」的卡，并把其他册已用的句子挂到任务的 `exclude` 上。
+
+    撞句的定义：同一个 lemma 在至少两册里现用的是同一句。返回 (待补任务, 统计)。
+    """
+    index = cross_book_examples(assets_dir)
+    kept: list[dict] = []
+    stats = {"candidates": len(tasks), "colliding": 0, "singleBook": 0}
+    for task in tasks:
+        by_book = index.get(task["lemma"], {})
+        mine = by_book.get(task["bookId"], [])
+        others = sorted({example for book, examples in by_book.items() if book != task["bookId"] for example in examples})
+        if not mine or not others or not set(mine) & set(others):
+            stats["singleBook"] += 1
+            continue
+        kept.append({**task, "exclude": "\n".join(f"- {example}" for example in others[:4])})
+        stats["colliding"] += 1
+    return kept, stats
+
+
+def build_tasks(excel_dir: Path, assets_dir: Path, books: list[str] | None = None, dedupe_cross_book: bool = False) -> list[dict]:
+    """按「一卡一请求」展开任务；同时核对词条集合与随包资产一致。
+
+    `dedupe_cross_book=True` 时只返回跨册撞句的卡，并带上排除提示（见 dedupe_targets）。
+    """
     metadata = load_metadata(assets_dir)
     tasks: list[dict] = []
     for stem, book_id in EXCEL_BOOKS.items():
@@ -102,6 +152,8 @@ def build_tasks(excel_dir: Path, assets_dir: Path, books: list[str] | None = Non
                     "rank": card["rank"],
                 }
             )
+    if dedupe_cross_book:
+        tasks, _ = dedupe_targets(assets_dir, tasks)
     return tasks
 
 
@@ -110,6 +162,8 @@ class Sidecar:
 
     def __init__(self, path: Path, book_id: str, model: str, prompt_version: int = PROMPT_VERSION):
         self.path = path
+        # 本次运行写出的条目用哪个提示版本；文件级 promptVersion 保持首次写入的值不动。
+        self.entry_version = prompt_version
         self.data = {
             "bookId": book_id,
             "model": model,
@@ -145,7 +199,7 @@ class Sidecar:
             "example": example,
             "exampleZh": example_zh,
             "model": self.data["model"],
-            "promptVersion": self.data["promptVersion"],
+            "promptVersion": self.entry_version,
             "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "attempts": attempts,
         }
@@ -162,9 +216,11 @@ class Sidecar:
 
 
 def build_prompt(task: dict) -> list[dict]:
+    """有 `exclude` 的任务走排除版提示（跨册补生成），其余沿用首跑模板。"""
+    template = USER_TEMPLATE_EXCLUSION if task.get("exclude") else USER_TEMPLATE
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": USER_TEMPLATE.format(**task)},
+        {"role": "user", "content": template.format(**task)},
     ]
 
 
@@ -239,6 +295,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--assets-dir", type=Path, default=default_assets_dir())
     parser.add_argument("--examples-dir", type=Path, default=default_examples_dir())
     parser.add_argument("--book", action="append", default=None, help="只跑某几册（bookId），可重复")
+    parser.add_argument(
+        "--dedupe-cross-book",
+        action="store_true",
+        help="只补生成「同一个词在别的册里用了同一句」的卡，并把其他册的句子放进排除提示（提示版本 2）",
+    )
     parser.add_argument("--limit", type=int, default=0, help="最多处理多少条（0=不限）")
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--retry", type=int, default=2)
@@ -252,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="只报数量与成本，不发任何请求")
     args = parser.parse_args(argv)
 
-    tasks = build_tasks(args.excel_dir, args.assets_dir, args.book)
+    tasks = build_tasks(args.excel_dir, args.assets_dir, args.book, dedupe_cross_book=args.dedupe_cross_book)
     if args.limit:
         tasks = tasks[: args.limit]
 
@@ -285,7 +346,8 @@ def main(argv: list[str] | None = None) -> int:
     for book_id in BOOK_ORDER:
         if book_id not in grouped:
             continue
-        sidecar = Sidecar.load(args.examples_dir / f"{book_id}.json", book_id, args.model)
+        version = EXCLUSION_PROMPT_VERSION if args.dedupe_cross_book else PROMPT_VERSION
+        sidecar = Sidecar.load(args.examples_dir / f"{book_id}.json", book_id, args.model, version)
         if args.concurrency <= 1:
             stats = generate(grouped[book_id], sidecar, request_fn, args.retry, args.flush_every)
         else:

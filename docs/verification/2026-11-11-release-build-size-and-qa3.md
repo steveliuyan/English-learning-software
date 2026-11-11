@@ -99,3 +99,34 @@ AC3-07 AC3-08 AC3-09 AC3-10 AC3-11 AC3-12 AC3-13
 | universal（对照，默认构建） | 337,521,268 | 321.9 |
 
 结论：真机 arm64 单机体积从 321.9 MiB 降到 **177.3 MiB（−45%）**，armerabi-v7a 到 162.3 MiB。默认构建不受影响（`abiSplits` 默认 false），既有 QA 安装口令保持原样。
+
+## 6. 音标列修正与跨册例句去重能力（2026-11-11 用户要求「该修的修，一二干」）
+
+### 6.1 `ipa` / `senses[].pos` 串位
+
+```bash
+python -m unittest discover -s tools/wordbooks/tests -p test_normalize_ipa.py   # 9 tests OK
+python -m unittest discover -s tools/wordbooks/tests -p test_excel_to_wordbook.py # 7 tests OK
+"$GRADLE" :app:testDebugUnitTest --tests "*WordBookIpaFieldHonestyTest*"       # 4 tests / 0 failures
+"$GRADLE" :app:testDebugUnitTest --rerun-tasks                                  # 366 suites / 2,713 tests / 0 fail / 0 skip
+```
+
+| 读数 | 修正前 | 修正后 |
+|---|---|---|
+| `ipa` 为占位串 `/- /` 的卡片 | 304 | **0** |
+| `ipa` 为空串（源表本就没注音，UI 隐藏） | 0 | 6 |
+| `senses[].pos` 放着音标（`/hɪə(r)/`）的卡片 | 300 | **0** |
+| `senses[].pos` 被斜杠包成 `/n./` 的卡片 | 2 | **0**（还原为 `n.`） |
+| 随包卡片总数 | 45,290 | 45,290（未增删） |
+
+解析器同步放宽：`WordBookPackage.validateCard` 原本要求 `ipa` 非空白（`fits()`），现在只拒超长——否则「没有音标」会在导入/内置解析阶段被判 `InvalidCard`（这正是本次改动后首轮 4 条测试变红的原因）。
+
+### 6.2 跨册撞句（能力已实现，产线待跑）
+
+```bash
+python -m unittest discover -s tools/wordbooks/tests -p test_generate_examples.py   # 14 tests OK
+```
+
+实测：45,290 张卡中 **10,760 张**与「同一个词在另一册的那张卡」例句完全相同，涉及 **3,305 个词**；分册：cet4 1,285、cet6 1,207、doctoral 1,338、graduate 1,310、ielts 1,324、senior 979、toefl 1,341、kaoyan 1,395、junior 416、primary 165。
+
+`generate_examples.py` 新增 `--dedupe-cross-book`：只选撞句卡、把其他册已用句子写进排除提示、新条目记 `promptVersion: 2`。**尚未执行生成**：本机没有十册 Excel 原件，也没有网关密钥（`/v1/models` 返回 `invalid_api_key`）。
