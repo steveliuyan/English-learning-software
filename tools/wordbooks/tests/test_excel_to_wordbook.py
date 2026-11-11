@@ -31,7 +31,13 @@ class ConverterTest(unittest.TestCase):
             self.assertEqual(json.loads((first / 'manifest.json').read_text()), {'formatVersion': 1, 'images': []})
 
     def test_real_workbook_extracts_all_vocabulary_sheets(self):
-        path = Path(r'C:/Users/20212/Downloads/四级词汇全书.xlsx')
+        candidates = [
+            Path(r'H:/xwechat_files/wxid_er4oix4ay4wi22_36f0/msg/file/2026-11/四级词汇全书.xlsx'),
+            Path(r'C:/Users/20212/Downloads/四级词汇全书.xlsx'),
+        ]
+        path = next((candidate for candidate in candidates if candidate.exists()), None)
+        if path is None:
+            self.skipTest('本机没有四级词汇全书.xlsx 原件，跳过真实工作簿用例')
         book, errors = parse_workbook(path, 'cet4', '四级词汇', 'CET-4')
         self.assertGreater(len(book['cards']), 4000)
         self.assertEqual(book['cards'][0]['cardId'].split(':', 1)[0], 'cet4')

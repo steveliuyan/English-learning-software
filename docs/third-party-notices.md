@@ -382,6 +382,17 @@
 - 替代方案: 经许可核验的第三方插画素材（须逐张核验归属与署名），或继续使用应用自绘矢量说明图
 - 商业分发结论: 可随应用分发。**发布前须复核**所用 AI 图像生成服务自身的使用条款（尤其商用与再分发条款）；这 12 张仅服务占位词条，真实词书配图的许可须单独闭合后另行登记
 
+## ai-generated-card-examples
+- 名称: 词书词卡例句与中文译文（F1-08 例句离线烘焙，45,290 对）
+- 版本: examples-20261111（烘焙进十册 `book.json`，`metadata.json` 的 `dataVersion` 后缀为 `+examples-20261111`；产线原始件留档于 `tools/wordbooks/examples/<bookId>.json`）
+- 许可证: 无第三方素材许可依赖。英文例句与中文译文由本项目用自有提示词逐词条生成，不含、不复制、不派生于任何第三方例句库、词典例句、语料库或数据集，因此不触发 CC BY-SA 4.0 或其他第三方许可义务
+- 用途: 为随包十册词书的 45,290 张卡提供一句英文语境例句及其中文译文，用于词卡正面（揭晓前的语境线索）与详情页例句模块
+- 数据流: 生成发生在离线产线（一次性烘焙），随 APK 打包并在设备内读取；运行时零请求、零缓存、零出站，不上传任何用户数据。产线请求只含该词的 lemma、词性与中文释义，不含学习记录、笔记或 profile 名称
+- 生成口径: 模型 `cn:deepseek-v4.1-flash`（端点 `http://127.0.0.1:7863/v1`，本地网关）；提示词在 `tools/wordbooks/generate_examples.py` 的 `build_prompt`；逐条校验规则在 `tools/wordbooks/example_validation.py`；生成日期 2026-11-11
+- NOTICE 位置: 本文件、`docs/decisions/2026-11-11-card-examples-baked-into-bundled-wordbooks.md`、`docs/superpowers/plans/2026-11-11-f1-08-example-baking.md`
+- 替代方案: 改用经许可核验、允许离线再分发的第三方例句库；或回落为「无例句就整块隐藏」（AC1-28），不留占位
+- 商业分发结论: 内容本身可随应用分发。**发布前须由项目负责人确认**: 该模型服务的使用条款允许把模型输出随安装包再分发（AI 生成文本的商用与再分发条款不随本项目控制）。换模型、换服务商或换提示词版本后必须重跑产线并新增一条本条目，旧版本不得静默沿用
+
 ## voa-learning-english
 - 名称: VOA Learning English（美国之音学习英语）文章正文
 - 版本: 未固定版本；按 F2-06 白名单在运行期抓取当期文章，来源站点 `learningenglish.voanews.com`

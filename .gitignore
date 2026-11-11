@@ -19,6 +19,13 @@ verification-head.txt
 *.hprof
 .devdb/
 
+# 本地 python 运行时（pythoncore 发行包，3 万+ 文件），不入库
+Python/
+
+# python 工具缓存，不入库
+__pycache__/
+*.pyc
+
 # Kokoro 端侧模型二进制：体积过大不入库；清单/许可/审计文件仍入库，模型获取方式见 docs/decisions/2026-10-06-kokoro-word-pronunciation.md
 app/src/main/assets/kokoro-production/model-files-v1.0/
 

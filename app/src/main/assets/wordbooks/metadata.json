@@ -4,7 +4,7 @@
     "displayName": "四级英语词汇",
     "level": "CET-4",
     "totalWords": 4308,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《四级词汇全书》；仅作本地学习资料。"
@@ -14,7 +14,7 @@
     "displayName": "六级英语词汇",
     "level": "CET-6",
     "totalWords": 4634,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《六级英语词汇全书》；仅作本地学习资料。"
@@ -24,7 +24,7 @@
     "displayName": "博士英语词汇",
     "level": "博士",
     "totalWords": 8537,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《博士英语词汇全书》；仅作本地学习资料。"
@@ -34,7 +34,7 @@
     "displayName": "研究生英语词汇",
     "level": "研究生",
     "totalWords": 4581,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《研究生英语词汇全书》；仅作本地学习资料。"
@@ -44,7 +44,7 @@
     "displayName": "雅思词汇",
     "level": "IELTS",
     "totalWords": 5215,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《雅思词汇全书》；仅作本地学习资料。"
@@ -54,7 +54,7 @@
     "displayName": "初中英语词汇",
     "level": "初中",
     "totalWords": 1732,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《初中英语词汇全书》；仅作本地学习资料。"
@@ -64,7 +64,7 @@
     "displayName": "考研英语词汇",
     "level": "考研",
     "totalWords": 4815,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《考研英语词汇全书》；仅作本地学习资料。"
@@ -74,7 +74,7 @@
     "displayName": "小学英语词汇",
     "level": "小学",
     "totalWords": 816,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《小学英语词汇全书》；仅作本地学习资料。"
@@ -84,7 +84,7 @@
     "displayName": "高中英语词汇",
     "level": "高中",
     "totalWords": 3214,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《高中英语词汇全书》；仅作本地学习资料。"
@@ -94,7 +94,7 @@
     "displayName": "托福词汇",
     "level": "TOEFL",
     "totalWords": 7438,
-    "dataVersion": "v1-xlsx-20261003",
+    "dataVersion": "v1-xlsx-20261003+examples-20261111",
     "sourceId": "ngsl-nawl-1.2",
     "sourcePolicy": "应用内学习分组，不是官方考试大纲词表。",
     "attribution": "用户提供的《托福词汇全书》；仅作本地学习资料。"
